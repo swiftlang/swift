@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 984; // @_lifetime attribute isFromAnnotation flag
+const uint16_t SWIFTMODULE_VERSION_MINOR = 985; // explicit module map
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1121,97 +1121,96 @@ namespace options_block {
 ///
 /// \sa INPUT_BLOCK_ID
 namespace input_block {
-  enum {
-    IMPORTED_MODULE = 1,
-    LINK_LIBRARY,
-    IMPORTED_HEADER,
-    IMPORTED_HEADER_CONTENTS,
-    MODULE_FLAGS, // [unused]
-    SEARCH_PATH,
-    FILE_DEPENDENCY,
-    DEPENDENCY_DIRECTORY,
-    MODULE_INTERFACE_PATH,
-    IMPORTED_MODULE_SPIS,
-    IMPORTED_MODULE_PATH,
-    EXTERNAL_MACRO,
-  };
+enum {
+  IMPORTED_MODULE = 1,
+  LINK_LIBRARY,
+  IMPORTED_HEADER,
+  IMPORTED_HEADER_CONTENTS,
+  MODULE_FLAGS, // [unused]
+  SEARCH_PATH,
+  FILE_DEPENDENCY,
+  DEPENDENCY_DIRECTORY,
+  MODULE_INTERFACE_PATH,
+  IMPORTED_MODULE_SPIS,
+  EXPLICIT_MODULE_MAP_ENTRY,
+  EXTERNAL_MACRO,
+};
 
-  using ImportedModuleLayout = BCRecordLayout<
-    IMPORTED_MODULE,
-    ImportControlField, // import kind
-    BCFixed<1>,         // scoped?
-    BCFixed<1>,         // has spis?
-    BCFixed<1>,         // has path?
-    BCBlob //  module name, with submodule path pieces separated by \0s.  If the
-           // 'scoped' flag is set, the final path piece is an access path
-           // within the module.
-  >;
+using ImportedModuleLayout =
+    BCRecordLayout<IMPORTED_MODULE,
+                   ImportControlField, // import kind
+                   BCFixed<1>,         // scoped?
+                   BCFixed<1>,         // has spis?
+                   BCBlob //  module name, with submodule path pieces separated
+                          //  by \0s.  If the
+                          // 'scoped' flag is set, the final path piece is an
+                          // access path within the module.
+                   >;
 
-  using ImportedModuleSPILayout = BCRecordLayout<
-    IMPORTED_MODULE_SPIS,
-    BCBlob // SPI names, separated by \0s
-  >;
+using ImportedModuleSPILayout =
+    BCRecordLayout<IMPORTED_MODULE_SPIS,
+                   BCBlob // SPI names, separated by \0s
+                   >;
 
-  using ImportedModulePathLayout = BCRecordLayout<
-    IMPORTED_MODULE_PATH,
-    BCBlob // Module file path
-  >;
+using ExplicitModuleMapEntryLayout =
+    BCRecordLayout<EXPLICIT_MODULE_MAP_ENTRY,
+                   BCFixed<1>, // framework
+                   BCFixed<1>, // system
+                   BCFixed<1>, // bridgedheader dependency
+                   BCBlob // \0 separated: moduleName, modulePath, moduleAlias
+                          // moduleDocPath, moduleSourceInfoPath,
+                          // moduleCacheKey, clangModuleMapPath,
+                          // headerDependencyPaths
+                   >;
 
-  using ExternalMacroLayout = BCRecordLayout<
-    EXTERNAL_MACRO,
-    ImportControlField, // import kind
-    BCBlob // ModuleName, Library Path, Executable Path, separated by \0s
-  >;
+using ExternalMacroLayout =
+    BCRecordLayout<EXTERNAL_MACRO,
+                   ImportControlField, // import kind
+                   BCBlob // ModuleName, Library Path, Executable Path,
+                          // separated by \0s
+                   >;
 
-  using LinkLibraryLayout = BCRecordLayout<
-    LINK_LIBRARY,
-    LibraryKindField, // kind
-    BCFixed<1>, // static
-    BCFixed<1>, // forced?
-    BCBlob // library name
-  >;
+using LinkLibraryLayout = BCRecordLayout<LINK_LIBRARY,
+                                         LibraryKindField, // kind
+                                         BCFixed<1>,       // static
+                                         BCFixed<1>,       // forced?
+                                         BCBlob            // library name
+                                         >;
 
-  using ImportedHeaderLayout = BCRecordLayout<
-    IMPORTED_HEADER,
-    BCFixed<1>, // exported?
-    FileSizeField, // file size (for validation)
-    FileHashField, // file hash (for validation)
-    BCBlob // file path
-  >;
+using ImportedHeaderLayout =
+    BCRecordLayout<IMPORTED_HEADER,
+                   BCFixed<1>,    // exported?
+                   FileSizeField, // file size (for validation)
+                   FileHashField, // file hash (for validation)
+                   BCBlob         // file path
+                   >;
 
-  using ImportedHeaderContentsLayout = BCRecordLayout<
-    IMPORTED_HEADER_CONTENTS,
-    BCBlob
-  >;
+using ImportedHeaderContentsLayout =
+    BCRecordLayout<IMPORTED_HEADER_CONTENTS, BCBlob>;
 
-  using SearchPathLayout = BCRecordLayout<
-    SEARCH_PATH,
-    BCFixed<1>, // framework?
-    BCFixed<1>, // system?
-    BCBlob      // path
-  >;
+using SearchPathLayout = BCRecordLayout<SEARCH_PATH,
+                                        BCFixed<1>, // framework?
+                                        BCFixed<1>, // system?
+                                        BCBlob      // path
+                                        >;
 
-  using FileDependencyLayout = BCRecordLayout<
-    FILE_DEPENDENCY,
-    FileSizeField,                 // file size (for validation)
-    FileModTimeOrContentHashField, // mtime or content hash (for validation)
-    BCFixed<1>,                    // are we reading mtime (0) or hash (1)?
-    BCFixed<1>,                    // SDK-relative?
-    BCVBR<8>,                      // subpath-relative index (0=none)
-    BCBlob                         // path
-  >;
+using FileDependencyLayout =
+    BCRecordLayout<FILE_DEPENDENCY,
+                   FileSizeField,                 // file size (for validation)
+                   FileModTimeOrContentHashField, // mtime or content hash (for
+                                                  // validation)
+                   BCFixed<1>, // are we reading mtime (0) or hash (1)?
+                   BCFixed<1>, // SDK-relative?
+                   BCVBR<8>,   // subpath-relative index (0=none)
+                   BCBlob      // path
+                   >;
 
-  using DependencyDirectoryLayout = BCRecordLayout<
-    DEPENDENCY_DIRECTORY,
-    BCBlob
-  >;
+using DependencyDirectoryLayout = BCRecordLayout<DEPENDENCY_DIRECTORY, BCBlob>;
 
-  using ModuleInterfaceLayout = BCRecordLayout<
-    MODULE_INTERFACE_PATH,
-    BCFixed<1>, // SDK-relative?
-    BCBlob      // file path
-  >;
-
+using ModuleInterfaceLayout = BCRecordLayout<MODULE_INTERFACE_PATH,
+                                             BCFixed<1>, // SDK-relative?
+                                             BCBlob      // file path
+                                             >;
 }
 
 /// The record types within the "decls-and-types" block.

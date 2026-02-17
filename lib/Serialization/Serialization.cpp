@@ -55,6 +55,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/Serialization.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
@@ -73,6 +74,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -902,7 +904,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, DEPENDENCY_DIRECTORY);
   BLOCK_RECORD(input_block, MODULE_INTERFACE_PATH);
   BLOCK_RECORD(input_block, IMPORTED_MODULE_SPIS);
-  BLOCK_RECORD(input_block, IMPORTED_MODULE_PATH);
+  BLOCK_RECORD(input_block, EXPLICIT_MODULE_MAP_ENTRY);
   BLOCK_RECORD(input_block, EXTERNAL_MACRO);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
@@ -1336,6 +1338,43 @@ static void flattenImportPath(const ImportedModule &import,
   outStream << accessPathElem.Item.str();
 }
 
+static llvm::SmallString<1024>
+flattenModuleMapEntry(StringRef name,
+                      const ExplicitSwiftModuleInputInfo &info) {
+  llvm::SmallString<1024> out;
+  {
+    llvm::raw_svector_ostream s(out);
+    s << name << '\0';
+    s << info.modulePath << '\0';
+    s << info.moduleAlias.value_or("") << '\0';
+    s << info.moduleDocPath.value_or("") << '\0';
+    s << info.moduleSourceInfoPath.value_or("") << '\0';
+    s << info.moduleCacheKey.value_or("") << '\0';
+    s << '\0'; // clangModuleMap
+    if (info.headerDependencyPaths)
+      for (auto &dep : *info.headerDependencyPaths)
+        s << dep << '\0';
+  }
+  return out;
+}
+
+static llvm::SmallString<1024>
+flattenModuleMapEntry(StringRef name,
+                      const ExplicitClangModuleInputInfo &info) {
+  llvm::SmallString<1024> out;
+  {
+    llvm::raw_svector_ostream s(out);
+    s << name << '\0';
+    s << info.modulePath << '\0';
+    s << info.moduleAlias.value_or("") << '\0';
+    s << '\0'; // moduleDocPath
+    s << '\0'; // moduleSourceInfoPath
+    s << info.moduleCacheKey.value_or("") << '\0';
+    s << info.moduleMapPath << '\0';
+  }
+  return out;
+}
+
 uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {
   if (dep.isHashBased()) return dep.getContentHash();
   return dep.getModificationTime();
@@ -1355,7 +1394,7 @@ void Serializer::writeInputBlock() {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
   input_block::ImportedModuleLayout importedModule(Out);
   input_block::ImportedModuleSPILayout ImportedModuleSPI(Out);
-  input_block::ImportedModulePathLayout ImportedModulePath(Out);
+  input_block::ExplicitModuleMapEntryLayout ExplicitModuleMapEntry(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
   input_block::ImportedHeaderLayout ImportedHeader(Out);
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
@@ -1531,17 +1570,9 @@ void Serializer::writeInputBlock() {
     llvm::SmallSetVector<Identifier, 4> spis;
     M->lookupImportedSPIGroups(import.importedModule, spis);
 
-    StringRef path;
-    if (Options.ExplicitModuleBuild && import.importedModule &&
-        !import.importedModule->isNonSwiftModule()) {
-      path = import.importedModule->getCacheKey();
-      if (path.empty())
-        path = import.importedModule->getModuleLoadedFilename();
-    }
-
-    importedModule.emit(
-        ScratchRecord, static_cast<uint8_t>(stableImportControl),
-        !import.accessPath.empty(), !spis.empty(), !path.empty(), importPath);
+    importedModule.emit(ScratchRecord,
+                        static_cast<uint8_t>(stableImportControl),
+                        !import.accessPath.empty(), !spis.empty(), importPath);
 
     if (!spis.empty()) {
       SmallString<64> out;
@@ -1551,10 +1582,22 @@ void Serializer::writeInputBlock() {
           [&outStream] { outStream << StringRef("\0", 1); });
       ImportedModuleSPI.emit(ScratchRecord, out);
     }
-
-    if (!path.empty())
-      ImportedModulePath.emit(ScratchRecord, path);
   }
+
+  if (auto *esmm = M->getASTContext().getExplicitSwiftModuleMap())
+    for (auto &entry : *esmm)
+      ExplicitModuleMapEntry.emit(
+          ScratchRecord, entry.getValue().isFramework,
+          entry.getValue().isSystem, false,
+          flattenModuleMapEntry(entry.getKey(), entry.getValue()));
+
+  if (auto *ecmm = M->getASTContext().getExplicitClangModuleMap())
+    for (auto &entry : *ecmm)
+      ExplicitModuleMapEntry.emit(
+          ScratchRecord, entry.getValue().isFramework,
+          entry.getValue().isSystem,
+          entry.getValue().isBridgingHeaderDependency,
+          flattenModuleMapEntry(entry.getKey(), entry.getValue()));
 
   if (!Options.ModuleLinkName.empty())
     LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
