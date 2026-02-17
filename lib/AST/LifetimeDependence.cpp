@@ -36,20 +36,6 @@
 
 using namespace swift;
 
-/// Determine whether Type t is "unknown", meaning we cannot safely determine
-/// whether it is Escapable by calling TypeBase::isEscapable.
-static bool isTypeUnknown(Type t) {
-  // These types would hit an assertion in
-  // TypeBase::computeInvertibleConformances.
-  if (t->hasUnboundGenericType() || t->hasTypeParameter())
-    return true;
-  // This type would hit an assertion in checkRequirements.
-  if (t->hasTypeVariable())
-    return true;
-
-  return false;
-}
-
 std::string LifetimeDescriptor::getString() const {
   switch (kind) {
   case DescriptorKind::Named: {
@@ -106,7 +92,119 @@ std::string LifetimeEntry::getString() const {
   return result;
 }
 
+/// Check whether a function with lifetime dependencies `from` can safely be
+/// treated as one with lifetime dependencies `to`.
+///
+/// Calls `LifetimeDependenceInfo::convertibleTo` to compare entries.
+///
+/// This compares members of from and to with the same targetIndex, so the
+/// result is independent of their order, but it takes O(n^2) time. Considering
+/// that n <= 2 for most functions, the function should still be reasonably
+/// fast.
+///
+/// The nonEscapableMask (if non-NULL), is a mask with (numParams + 1) bits.
+/// Each bit should be set iff the parameter at that index (or the result in the
+/// case of the last bit) is ~Escapable. A NULL mask is equivalent to all 1's.
+static bool
+matchLifetimeDependencies(const ArrayRef<LifetimeDependenceInfo> from,
+                          const ArrayRef<LifetimeDependenceInfo> to,
+                          const SmallBitVector *nonEscapableMask) {
+  // If from and to are the same array, they naturally match. This case should
+  // be reasonably common because lifetime dependence info is canonicalized.
+  if (from.data() == to.data() && from.size() == to.size())
+    return true;
+
+  // Every 'from' LifetimeDependenceInfo must have a corresponding 'to'
+  // LifetimeDependenceInfo. If none of the 'from' lifetime targets will be
+  // masked out, this can only be true if 'to' has at least as many
+  // LifetimeDependenceInfo entries.
+  if (!nonEscapableMask && from.size() > to.size())
+    return false;
+
+  // If all of the parameters and the result are Escapable, all lifetime
+  // depenencies are ignored.
+  if (nonEscapableMask && nonEscapableMask->none())
+    return true;
+
+  for (const auto &fromDep : from) {
+    // If the dependence target is Escapable, ignore this fromDep.
+    if (nonEscapableMask && !nonEscapableMask->test(fromDep.getTargetIndex()))
+      continue;
+
+    // For each LifetimeDependenceInfo in 'from', there must be one in 'to' that
+    // satisfies it.
+    const auto toDep = getLifetimeDependenceFor(to, fromDep.getTargetIndex());
+    if (!toDep || !fromDep.convertibleTo(*toDep, nonEscapableMask))
+      return false;
+  }
+  return true;
+}
+
 namespace swift {
+
+bool matchFunctionTypeLifetimeDependencies(
+    const AnyFunctionType *from, ArrayRef<LifetimeDependenceInfo> fromLifetimes,
+    const AnyFunctionType *to, ArrayRef<LifetimeDependenceInfo> toLifetimes,
+    std::optional<Type> implicitSelfParamType) {
+  if (fromLifetimes.empty())
+    // The source type has no lifetime dependencies to enforce.
+    return true;
+
+  const auto numParams =
+      from->getNumParams() + implicitSelfParamType.has_value();
+
+  // Check if lifetimes match without masking out dependencies with Escapable
+  // sources or targets.
+  if (matchLifetimeDependencies(fromLifetimes, toLifetimes, nullptr)) {
+    return true;
+  }
+
+  // Mask out dependencies with Escapable sources or targets & try again.
+  const auto isTypeNonEscapable = [&](Type type) {
+    // Assume the type is Escapable if unknown.
+    //
+    // NOTE: This could theoretically allow false-positive matches, if the type
+    // is "unknown"/generic, but in fact always mapped to a ~Escapable type,
+    // since dependencies involving this type would be incorrectly discarded. In
+    // practice, type matching should run with full information about the types
+    // involved at least once, so this probably isn't an issue.
+    if (LifetimeDependenceInfo::isTypeUnknown(type))
+      return false;
+    return not type->isEscapable();
+  };
+
+  // 1 bit for each normal parameter, self if present, and the result.
+  SmallBitVector nonEscapableMask(numParams + 1, true);
+  for (auto [index, param] : llvm::enumerate(from->getParams())) {
+    nonEscapableMask[index] = isTypeNonEscapable(param.getPlainType());
+  }
+
+  if (implicitSelfParamType.has_value()) {
+    nonEscapableMask[numParams - 1] =
+        isTypeNonEscapable(*implicitSelfParamType);
+  }
+  nonEscapableMask[numParams] = isTypeNonEscapable(from->getResult());
+
+  if (nonEscapableMask.all())
+    // There are no Escapable types to mask, so the result would be the same.
+    return false;
+
+  return matchLifetimeDependencies(fromLifetimes, toLifetimes,
+                                   &nonEscapableMask);
+}
+
+bool matchFunctionTypeLifetimeDependencies(const AnyFunctionType *from,
+                                           const AnyFunctionType *to) {
+  if (!from->hasLifetimeDependencies())
+    // The source type has no lifetime dependencies to enforce.
+    return true;
+
+  const auto fromLifetimes = from->getLifetimeDependencies();
+  const auto toLifetimes = to->getLifetimeDependencies();
+
+  return matchFunctionTypeLifetimeDependencies(from, fromLifetimes, to,
+                                               toLifetimes, std::nullopt);
+}
 
 std::optional<LifetimeDependenceInfo>
 getLifetimeDependenceFor(ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
@@ -165,6 +263,18 @@ getNameForParsedLifetimeDependenceKind(ParsedLifetimeDependenceKind kind) {
 }
 
 } // namespace swift
+
+bool LifetimeDependenceInfo::isTypeUnknown(Type t) {
+  // These types would hit an assertion in
+  // TypeBase::computeInvertibleConformances.
+  if (t->hasUnboundGenericType() || t->hasTypeParameter())
+    return true;
+  // This type would hit an assertion in checkRequirements.
+  if (t->hasTypeVariable())
+    return true;
+
+  return false;
+}
 
 std::string LifetimeDependenceInfo::getString() const {
   std::string lifetimeDependenceString = "@lifetime(";
@@ -696,7 +806,8 @@ public:
     // Even if there were no explicit lifetime entries, we still need to
     // diagnose failed inference if a parameter or the result was ~Escapable.
     const auto isNonEscapableSafe = [](Type t) {
-      return !isTypeUnknown(t) && isDiagnosedNonEscapable(t);
+      return !LifetimeDependenceInfo::isTypeUnknown(t) &&
+             isDiagnosedNonEscapable(t);
     };
     const bool shouldDiagnose =
         !lifetimeEntries.empty() ||
@@ -707,14 +818,14 @@ public:
         isNonEscapableSafe(resultTy);
     bool unknownTypeFound = false;
     for (const auto &paramInfo : parameterInfos) {
-      if (isTypeUnknown(paramInfo.typeInContext)) {
+      if (LifetimeDependenceInfo::isTypeUnknown(paramInfo.typeInContext)) {
         unknownTypeFound = true;
         if (shouldDiagnose)
           diagnose(paramInfo.loc, diag::lifetime_dependence_unknown_type,
                    "parameter");
       }
     }
-    if (isTypeUnknown(resultTy)) {
+    if (LifetimeDependenceInfo::isTypeUnknown(resultTy)) {
       unknownTypeFound = true;
       if (shouldDiagnose)
         diagnose(returnLoc, diag::lifetime_dependence_unknown_type, "result");
@@ -2079,6 +2190,69 @@ ArrayRef<LifetimeDependenceInfo> LifetimeDependenceInfo::uncurry(
   }
 
   return ctx.AllocateCopy(uncurried);
+}
+
+bool LifetimeDependenceInfo::convertibleTo(
+    const LifetimeDependenceInfo &other,
+    const SmallBitVector *nonEscapableMask) const {
+  // We ignore the "isFromAnnotation" flag because it should not affect lifetime
+  // checking.
+
+  // The target must be the same.
+  if (this->getTargetIndex() != other.getTargetIndex()) {
+    return false;
+  }
+
+  // Immortal lifetimes are the least restrictive, so only immortal lifetimes
+  // can convert to them.
+  if (other.isImmortal()) {
+    return this->isImmortal();
+  }
+
+  // Accordingly, immortal lifetimes can convert to any non-immortal lifetimes.
+  if (this->isImmortal()) {
+    return true;
+  }
+
+  const auto isSubset = [&](IndexSubset *from, IndexSubset *to,
+                            bool maskNonEscapableSources) {
+    // The empty set is a subset of every set, and every set is a subset of
+    // itself.
+    if (!from || from == to)
+      return true;
+
+    ASSERT(!from->isEmpty() &&
+           "Empty dependence source lists are represented with nullptr.");
+
+    if (!maskNonEscapableSources) {
+      // The set 'from' is non-empty, so it cannot be a subset of an empty 'to'.
+      if (!to)
+        return false;
+      return from->isSubsetOf(to);
+    }
+
+    // Check whether from is a subset of to after applying the ~Escapable mask.
+    const auto nonEscapableSources = from->getBitVector() & *nonEscapableMask;
+
+    // Again, the empty set is a subset of every set.
+    if (nonEscapableSources.none())
+      return true;
+
+    // The set 'from' is non-empty, so it cannot be a subset of an empty 'to'.
+    if (!to)
+      return false;
+
+    // Test if nonEscapableSources is a subset of to.
+    return not nonEscapableSources.test(to->getBitVector());
+  };
+
+  // Ignore copy dependencies with an Escapable source.
+  return isSubset(this->getInheritIndices(), other.getInheritIndices(),
+                  /*maskNonEscapableSources=*/(nonEscapableMask != nullptr)) &&
+         isSubset(this->getAddressableIndices(), other.getAddressableIndices(),
+                  /*maskNonEscapableSources=*/false) &&
+         isSubset(this->getScopeIndices(), other.getScopeIndices(),
+                  /*maskNonEscapableSources=*/false);
 }
 
 void LifetimeDependenceInfo::dump() const {

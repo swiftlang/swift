@@ -762,6 +762,39 @@ bool swift::TypeChecker::witnessStructureMatches(ValueDecl *req,
       == std::nullopt;
 }
 
+/// Given a witness, a requirement, and their interface types, check if the
+/// witness's lifetime dependencies are enforced by the requirement.
+///
+/// - If lifetimes match, return std::nullopt.
+/// - If lifetimes do not match, return LifetimeConflict.
+static std::optional<RequirementMatch>
+matchLifetimes(ValueDecl *req, AnyFunctionType *reqFnType, ValueDecl *witness,
+               AnyFunctionType *witnessFnType) {
+
+  // Check the lifetime dependencies of the curried types of methods.
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(witness);
+      afd && afd->isInstanceMethod()) {
+    if (!matchFunctionTypeLifetimeDependencies(
+            witnessFnType,
+            witness->getInterfaceType()
+                ->castTo<AnyFunctionType>()
+                ->getLifetimeDependencies(),
+            reqFnType,
+            req->getInterfaceType()
+                ->castTo<AnyFunctionType>()
+                ->getLifetimeDependencies(),
+            afd->getImplicitSelfDecl()->toFunctionParam().getPlainType()))
+      return RequirementMatch(witness, MatchKind::LifetimeConflict);
+    return std::nullopt;
+  }
+
+  // Check the lifetimes of normal function types.
+  if (!matchFunctionTypeLifetimeDependencies(witnessFnType, reqFnType)) {
+    return RequirementMatch(witness, MatchKind::LifetimeConflict);
+  }
+  return std::nullopt;
+}
+
 RequirementMatch swift::matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
     llvm::function_ref<
@@ -906,6 +939,12 @@ RequirementMatch swift::matchWitness(
       if (!witnessFnType->getExtInfo().isAsync() &&
             (req->isObjC() && reqFnType->getExtInfo().isAsync())) {
         return RequirementMatch(witness, MatchKind::AsyncConflict);
+      }
+
+      // Check that lifetime dependencies match
+      if (auto result =
+              matchLifetimes(req, reqFnType, witness, witnessFnType)) {
+        return std::move(result.value());
       }
 
       if (!reqThrownError) {
@@ -3324,6 +3363,10 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
       diags.diagnose(witness, diag::protocol_witness_borrow_mutate_conflict,
                      diagMsg);
     }
+    break;
+  }
+  case MatchKind::LifetimeConflict: {
+    diags.diagnose(match.Witness, diag::protocol_witness_lifetime_conflict);
     break;
   }
   }
