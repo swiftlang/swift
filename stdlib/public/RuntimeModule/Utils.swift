@@ -277,6 +277,9 @@ func getEnv(_ variableName: String) -> String? {
     }
   }
   #else
-  return String(cString: getenv(variableName))
+  if let value = getenv(variableName) {
+    return String(cString: value)
+  }
+  return nil
   #endif
 }

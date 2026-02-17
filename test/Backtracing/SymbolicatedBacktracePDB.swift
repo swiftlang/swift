@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -g -debug-info-format=codeview -Xlinker /debug %s -parse-as-library -Xfrontend -disable-availability-checking -g -Onone -o %t/symbolicated.exe
+// RUN: %target-build-swift -g -debug-info-format=codeview -Xlinker /debug -Xlinker /opt:icf %s -parse-as-library -Xfrontend -disable-availability-checking -g -Onone -o %t/symbolicated.exe
 // RUN: %target-codesign %t/symbolicated.exe
 // RUN: %target-run %t/symbolicated.exe | %FileCheck %s
 
