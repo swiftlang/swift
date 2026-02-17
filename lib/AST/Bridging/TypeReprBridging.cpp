@@ -295,13 +295,11 @@ BridgedExistentialTypeRepr BridgedExistentialTypeRepr_createParsed(
   return new (context) ExistentialTypeRepr(anyLoc, baseTy.unbridged());
 }
 
-BridgedIntegerTypeRepr
-BridgedIntegerTypeRepr_createParsed(BridgedASTContext cContext,
-                                    BridgedStringRef cString, SourceLoc loc,
-                                    SourceLoc minusLoc) {
+BridgedGenericArgumentExprTypeRepr
+BridgedGenericArgumentExprTypeRepr_createParsed(BridgedASTContext cContext,
+                                                BridgedExpr cExpr,
+                                                BridgedStringRef cText,
+                                                SourceLoc loc) {
   ASTContext &context = cContext.unbridged();
-  auto *newLit = new (context) IntegerLiteralExpr(
-      cString.unbridged(), loc,
-      /*implicit*/ true);
-  return new (context) IntegerTypeRepr(newLit);
+  return new (context) GenericArgumentExprTypeRepr(cExpr.unbridged(), cText.unbridged());
 }

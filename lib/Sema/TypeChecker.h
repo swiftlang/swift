@@ -927,6 +927,12 @@ void checkConformancesInContext(IterableDeclContext *idc);
 /// Check that the type of the given property conforms to NSCopying.
 ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 
+/// Simplify expressions which ara type sugar productions that got parsed
+/// as expressions due to the parser not knowing which identifiers are
+/// type names.
+TypeExpr *simplifyTypeExpr(DeclContext *DC, Expr *E,
+                           bool inGenericArgumentContext);
+
 /// \name Name lookup
 ///
 /// Routines that perform name lookup.

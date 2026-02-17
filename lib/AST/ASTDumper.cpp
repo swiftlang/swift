@@ -4996,9 +4996,9 @@ public:
     printFoot();
   }
 
-  void visitIntegerTypeRepr(IntegerTypeRepr *T, Label label) {
-    printCommon("type_integer", label);
-    printRec(T->getValue(), Label::optional("value_expr"));
+  void visitGenericArgumentExprTypeRepr(GenericArgumentExprTypeRepr *T, Label label) {
+    printCommon("generic_argument_expr", label);
+    printRec(T->getArgExpr(), Label::optional("arg_expr"));
     printFoot();
   }
 };

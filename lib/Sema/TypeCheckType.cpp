@@ -24,6 +24,7 @@
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
+#include "LiteralExpressionFolding.h"
 
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1282,9 +1283,24 @@ Type TypeResolution::applyUnboundGenericArguments(
 
     auto substTy = genericArgs[i];
 
-    // Ensure the value-ness of the argument matches the parameter.
-    if (ValueMatchVisitor::check(ctx, origTy, substTy, loc))
-      substTy = ErrorType::get(ctx);
+    // For parameter packs, check each element in the pack individually.
+    if (innerParams[i]->isParameterPack()) {
+      if (auto *packTy = substTy->getAs<PackType>()) {
+        bool hadError = false;
+        for (auto eltTy : packTy->getElementTypes()) {
+          // Look through pack expansions to the pattern type.
+          if (auto *expTy = eltTy->getAs<PackExpansionType>())
+            eltTy = expTy->getPatternType();
+          if (ValueMatchVisitor::check(ctx, origTy, eltTy, loc))
+            hadError = true;
+        }
+        if (hadError)
+          substTy = ErrorType::get(ctx);
+      }
+    } else {
+      if (ValueMatchVisitor::check(ctx, origTy, substTy, loc))
+        substTy = ErrorType::get(ctx);
+    }
 
     // Enter the substitution.
     subs[paramTy] = substTy;
@@ -2411,9 +2427,9 @@ namespace {
     NeverNullType
     resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
                                      TypeResolutionOptions options);
-    NeverNullType resolveIntegerTypeRepr(IntegerTypeRepr *repr,
-                                         DeclContext *dc,
-                                         TypeResolutionOptions options);
+    NeverNullType resolveGenericArgumentExprTypeRepr(GenericArgumentExprTypeRepr *repr,
+                                                     DeclContext *dc,
+                                                     TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveInlineArrayType(InlineArrayTypeRepr *repr,
@@ -3090,9 +3106,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     return resolveLifetimeDependentTypeRepr(
         cast<LifetimeDependentTypeRepr>(repr), options);
 
-  case TypeReprKind::Integer:
-    return resolveIntegerTypeRepr(cast<IntegerTypeRepr>(repr),
-                                  getDeclContext(), options);
+  case TypeReprKind::GenericArgumentExpr:
+    return resolveGenericArgumentExprTypeRepr(cast<GenericArgumentExprTypeRepr>(repr),
+                                              getDeclContext(), options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -5671,10 +5687,11 @@ TypeResolver::resolveInlineArrayType(InlineArrayTypeRepr *repr,
   auto argOptions = options.withoutContext().withContext(
       TypeResolverContext::ValueGenericArgument);
 
-  // It's possible the user accidentally wrote '[Int of 4]', correct that here.
   auto *countRepr = repr->getCount();
   auto *eltRepr = repr->getElement();
-  if (!isa<IntegerTypeRepr>(countRepr) && isa<IntegerTypeRepr>(eltRepr)) {
+  // It's possible the user accidentally wrote '[Int of 4]', correct that here.
+  if (!isa<GenericArgumentExprTypeRepr>(countRepr) &&
+      isa<GenericArgumentExprTypeRepr>(eltRepr)) {
     std::swap(countRepr, eltRepr);
     ctx.Diags
         .diagnose(countRepr->getStartLoc(), diag::inline_array_type_backwards)
@@ -5765,34 +5782,74 @@ TypeResolver::resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
   return resolveType(repr->getBase(), options);
 }
 
-NeverNullType
-TypeResolver::resolveIntegerTypeRepr(IntegerTypeRepr *repr,
-                                     DeclContext *dc,
-                                     TypeResolutionOptions options) {
-  if (!options.is(TypeResolverContext::ValueGenericArgument) &&
+NeverNullType TypeResolver::resolveGenericArgumentExprTypeRepr(
+    GenericArgumentExprTypeRepr *repr, DeclContext *dc,
+    TypeResolutionOptions options) {
+  if (!options.is(TypeResolverContext::ScalarGenericArgument) &&
+      !options.is(TypeResolverContext::VariadicGenericArgument) &&
+      !options.is(TypeResolverContext::ValueGenericArgument) &&
       !options.is(TypeResolverContext::SameTypeRequirement) &&
       !options.is(TypeResolverContext::RawLayoutAttr) &&
       !options.contains(TypeResolutionFlags::SILMode)) {
-    diagnoseInvalid(repr, repr->getLoc(),
-                    diag::integer_type_not_accepted);
+    diagnoseInvalid(repr, repr->getLoc(), diag::integer_type_not_accepted);
     return ErrorType::get(getASTContext());
   }
 
   auto failedToResolveValue = [&](Diag<> diagID) {
+    repr->setFailedToResolve();
     diagnoseInvalid(repr, repr->getLoc(), diagID);
     return ErrorType::get(getASTContext());
   };
 
-  SmallString<10> constantValueText;
-  bool isNegative = false;
-  if (auto litExp = dyn_cast<IntegerLiteralExpr>(repr->getValue())) {
-    litExp->getRawValue().toString(constantValueText, 10, true);
-    isNegative = litExp->isNegative();
-  } else
-    return failedToResolveValue(diag::nonliteral_integer_generic_value);
+  auto resolveIntegerLiteralExpr = [&](IntegerLiteralExpr *expr) {
+    repr->setArgExpr(expr);
+    return IntegerType::get(expr->getDigitsText(), expr->isNegative(),
+                            getASTContext());
+  };
 
-  return IntegerType::get(constantValueText.str().str(), isNegative,
-                          getASTContext());
+  // We have already attempted to resolve this TypeRepr
+  if (repr->isFailedToResolve())
+    return ErrorType::get(getASTContext());
+  else if (auto *typeExpr = repr->getAsResolvedTypeExpr())
+    return resolveType(typeExpr->getTypeRepr(), options);
+  else if (auto *intLitExpr = repr->getAsResolvedIntegerLiteralExpr())
+    return resolveIntegerLiteralExpr(intLitExpr);
+
+  assert(!repr->getArgExpr());
+  auto originalValueExpr = repr->getOriginalArgExpr();
+
+  // Attempt to see if we can resolve the TypeExpr to a type
+  if (auto *simplifiedTyExpr =
+          TypeChecker::simplifyTypeExpr(dc, originalValueExpr,
+                                        /* inGenericArgumentContext */ true)) {
+    repr->setArgExpr(simplifiedTyExpr);
+    return resolveType(simplifiedTyExpr->getTypeRepr(), options);
+  }
+
+  // If using LiteralExpressions, attempt to type-check and constant-fold
+  // the value expression to an integer value (`IntegerLiteralExpr`)
+  if (getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions)) {
+    // If not yet type-checked, we must type-check this expression
+    // before we attempt to constant-fold
+    if (originalValueExpr->getType().isNull() &&
+        !TypeChecker::typeCheckExpression(
+            originalValueExpr, dc,
+            /*contextualInfo=*/
+            {getASTContext().getIntType(), CTP_IntGenericParam}))
+      return failedToResolveValue(diag::nonliteral_integer_expr_generic_value);
+
+    if (auto *seqExpr = dyn_cast<SequenceExpr>(originalValueExpr))
+      originalValueExpr = TypeChecker::foldSequence(seqExpr, dc);
+
+    if (auto foldedExpr = dyn_cast<IntegerLiteralExpr>(
+            foldLiteralExpression(originalValueExpr, &getASTContext())))
+      return resolveIntegerLiteralExpr(foldedExpr);
+    else
+      return failedToResolveValue(diag::nonliteral_integer_expr_generic_value);
+  } else if (auto litExpr = dyn_cast<IntegerLiteralExpr>(originalValueExpr))
+    return resolveIntegerLiteralExpr(litExpr);
+  else
+    return failedToResolveValue(diag::nonliteral_integer_generic_value);
 }
 
 NeverNullType
@@ -6803,7 +6860,7 @@ private:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
     case TypeReprKind::LifetimeDependent:
-    case TypeReprKind::Integer:
+    case TypeReprKind::GenericArgumentExpr:
     case TypeReprKind::CallerIsolated:
       return false;
     }

@@ -1945,6 +1945,13 @@ ERROR(expected_rangle_primary_associated_type_list,PointsToFirstBadToken,
 ERROR(expected_primary_associated_type_name,PointsToFirstBadToken,
       "expected an identifier to name primary associated type", ())
 
+ERROR(expected_integer_generic_value,none,
+      "expected integer literal for generic value", ())
+ERROR(integer_generic_expr_closure_not_supported,none,
+      "closures are not supported in generic value literal expressions", ())
+ERROR(expected_rparen_generic_value_expr,none,
+      "expected ')' to complete generic value expression", ())
+
 //------------------------------------------------------------------------------
 // MARK: Conditional compilation parsing diagnostics
 //------------------------------------------------------------------------------
