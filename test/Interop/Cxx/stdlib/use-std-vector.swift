@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -DCPP20)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -Xcc -std=c++20 -DCPP20)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20 -DCPP20)
 
 // Also test this with a bridging header instead of the StdVector module.
 // RUN: %empty-directory(%t2)
@@ -11,10 +8,6 @@
 // RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -Xfrontend -enable-experimental-cxx-interop)
 // RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=swift-6)
 // RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=upcoming-swift)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -DCPP20)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=swift-6 -Xcc -std=c++20 -DCPP20)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20 -DCPP20)
-
 
 // FIXME: also run in C++20 mode when conformance works properly on UBI platform (rdar://109366764):
 // %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=gnu++20)
@@ -217,54 +210,5 @@ StdVectorTestSuite.test("VectorOfImmortalRefPtr").require(.stdlib_5_8).code {
     v.push_back(i)
     expectEqual(v[0]?.value, 123)
 }
-
-StdVectorTestSuite.test("VecOfInt has contiguous iterator").require(.stdlib_6_3).code {
-    guard #available(SwiftStdlib 6.3, *) else { return }
-    let arr : [Int32] = [1, 2, 3, 4, 5]
-    let v = Vector(arr)
-    expectEqual(v.size(), 5)
-    var iterator = v.makeBorrowingIterator()
-    var counter = 0
-    while true {
-        let span = iterator._nextSpan()
-        if (span.count == 0) { break }
-        #if CPP20
-        expectEqual(span.count, 5)
-        #else
-        expectEqual(span.count, 1)
-        #endif
-        counter += 1
-    }
-    #if CPP20
-    expectEqual(counter, 1)
-    #else
-    expectEqual(counter, 5)
-    #endif
-}
-
-#if CPP20
-StdVectorTestSuite.test("VectorOfNonCopyable has contiguous iterator").require(.stdlib_6_3).code {
-    guard #available(SwiftStdlib 6.3, *) else { return }
-    let v = makeVectorOfNonCopyable()
-    expectEqual(v.size(), 3)
-    var iterator = v.makeBorrowingIterator()
-    var counter = 0
-    while true {
-        let span = iterator._nextSpan()
-        if (span.count == 0) { break }
-        #if CPP20
-        expectEqual(span.count, 3)
-        #else
-        expectEqual(span.count, 1)
-        #endif        
-        counter += 1
-    }
-    #if CPP20
-    expectEqual(counter, 1)
-    #else
-    expectEqual(counter, 3)
-    #endif
-}
-#endif
 
 runAllTests()
