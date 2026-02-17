@@ -198,7 +198,7 @@ extension _AbstractStringStorage {
       }
       
       let ourBuffer = unsafe RawSpan(
-        _unchecked: start,
+        _unsafeStart: start,
         count: count
       )
       
@@ -227,7 +227,7 @@ extension _AbstractStringStorage {
           encoding: Unicode.UTF8.self,
           bytes: utf16Buffer,
           encoding: Unicode.UTF16.self
-        )
+        ) ? 1 : 0
       }
 
       /*
@@ -352,7 +352,11 @@ extension __StringStorage {
     count: Int,
     encoding: UInt
   ) -> Int8 {
-    return _isEqualToBuffer(ptr: ptr, count: count, encoding: encoding) ? 1 : 0
+    return unsafe _isEqualToBuffer(
+      ptr: ptr,
+      count: count,
+      encoding: encoding
+    ) ? 1 : 0
   }
   
   @objc(copyWithZone:)
@@ -477,7 +481,11 @@ extension __SharedStringStorage {
     count: Int,
     encoding: UInt
   ) -> Int8 {
-    return _isEqualToBuffer(ptr: ptr, count: count, encoding: encoding) ? 1 : 0
+    return unsafe _isEqualToBuffer(
+      ptr: ptr,
+      count: count,
+      encoding: encoding
+    ) ? 1 : 0
   }
 
   @objc(copyWithZone:)
