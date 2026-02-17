@@ -1759,6 +1759,13 @@ bool swift::swift_task_isCancelled(AsyncTask *task) {
   return task->isCancelled();
 }
 
+bool swift::swift_task_isCancelledWithFlags(AsyncTask *task,
+                                            swift_task_is_cancelled_flag flags) {
+  bool ignoreCancellationShield =
+      flags & swift_task_is_cancelled_flag_IgnoreCancellationShield;
+  return task->isCancelled(ignoreCancellationShield);
+}
+
 SWIFT_CC(swift)
 static CancellationNotificationStatusRecord*
 swift_task_addCancellationHandlerImpl(
@@ -1838,6 +1845,29 @@ static void swift_task_removePriorityEscalationHandlerImpl(
     EscalationNotificationStatusRecord *record) {
   removeStatusRecordFromSelf(record);
   swift_task_dealloc(record);
+}
+
+SWIFT_CC(swift)
+static bool swift_task_cancellationShieldPushImpl() {
+  if (AsyncTask *task = swift_task_getCurrent()) {
+    auto installed = task->cancellationShieldPush();
+    return installed;
+  }
+
+  return false; // did not install shield
+}
+
+SWIFT_CC(swift)
+static void swift_task_cancellationShieldPopImpl() {
+  if (AsyncTask *task = swift_task_getCurrent()) {
+    task->cancellationShieldPop();
+  }
+}
+
+SWIFT_CC(swift)
+static bool swift_task_hasActiveCancellationShieldImpl(AsyncTask *task) {
+  return task->_private()._status().load(std::memory_order_relaxed)
+      .hasCancellationShield();
 }
 
 SWIFT_CC(swift)

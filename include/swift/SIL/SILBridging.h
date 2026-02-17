@@ -197,7 +197,7 @@ struct BridgedLifetimeDependenceInfo {
   swift::IndexSubset *_Nullable addressableParamIndices;
   swift::IndexSubset *_Nullable conditionallyAddressableParamIndices;
   SwiftUInt targetIndex;
-  bool immortal;
+  bool hasImmortalSpecifier;
   bool fromAnnotation;
 
   BRIDGED_INLINE BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info);
@@ -841,6 +841,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt UncheckedEnumDataInst_caseIndex() const;
   BRIDGED_INLINE SwiftInt InitEnumDataAddrInst_caseIndex() const;
   BRIDGED_INLINE SwiftInt UncheckedTakeEnumDataAddrInst_caseIndex() const;
+  BRIDGED_INLINE bool UncheckedTakeEnumDataAddrInst_isDestructive() const;
   BRIDGED_INLINE SwiftInt InjectEnumAddrInst_caseIndex() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj InjectEnumAddrInst_element() const;
   BRIDGED_INLINE SwiftInt RefElementAddrInst_fieldIndex() const;

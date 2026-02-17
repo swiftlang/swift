@@ -26,7 +26,7 @@ import Swift
 %   [ # PARAMS
 %     'name: String? = nil',
 %     'priority: TaskPriority? = nil',
-%     '@_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success',
+%     '@_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws(Failure) -> Success',
 %   ]),
 %   # ==== --------------------------------------------------------------------
 %   ([ # METHOD_VARIANT
@@ -40,7 +40,7 @@ import Swift
 %   [ # PARAMS
 %     'name: String? = nil',
 %     'priority: TaskPriority? = nil',
-%     'operation: sending @escaping @isolated(any) () async throws -> Success',
+%     'operation: sending @escaping @isolated(any) () async throws(Failure) -> Success',
 %   ]),
 %   # ==== -------------------------------------------------------------------------------------------------------------
 %   # ==== With task executor, but available only since 6.0
@@ -56,7 +56,7 @@ import Swift
 %     'name: String? = nil',
 %     'executorPreference taskExecutor: (any TaskExecutor)?',
 %     'priority: TaskPriority? = nil',
-%     'operation: sending @escaping () async throws -> Success',
+%     'operation: sending @escaping () async throws(Failure) -> Success',
 %   ]),
 %   # ==== --------------------------------------------------------------------
 %   ([ # METHOD_VARIANT
@@ -71,7 +71,7 @@ import Swift
 %     'name: String? = nil',
 %     'executorPreference taskExecutor: (any TaskExecutor)?',
 %     'priority: TaskPriority? = nil',
-%     'operation: sending @escaping () async throws -> Success',
+%     'operation: sending @escaping () async throws(Failure) -> Success',
 %   ]),
 %   # !!!! -------------------------------------------------------------------------------------------------------------
 %   # !!!! Legacy / Source Compatibility "Shims"
@@ -91,6 +91,7 @@ import Swift
 %   ],
 %   [ # PARAMS
 %     'priority: TaskPriority? = nil',
+%     # detach does not support typed throws, it's a legacy api for compat only
 %     '@_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success',
 %   ]),
 %   # ==== Legacy API: runDetached
@@ -105,6 +106,7 @@ import Swift
 %   ],
 %   [ # PARAMS
 %     'priority: TaskPriority? = nil',
+%     # runDetached does not support typed throws, it's a legacy api for compat only
 %     '@_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success',
 %   ]),
 %   # ==== Legacy API: asyncDetached
@@ -119,6 +121,7 @@ import Swift
 %   ],
 %   [ # PARAMS
 %     'priority: TaskPriority? = nil',
+%     # asyncDetached does not support typed throws, it's a legacy api for compat only
 %     '@_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success',
 %   ]),
 %   # ==== Legacy API: async
@@ -133,6 +136,7 @@ import Swift
 %   ],
 %   [ # PARAMS
 %     'priority: TaskPriority? = nil',
+%     # async does not support typed throws, it's a legacy api for compat only
 %     '@_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success',
 %   ]),
 % ]:
@@ -149,8 +153,10 @@ import Swift
 % HAS_ISOLATED_ANY = any('@isolated(any)' in param for param in PARAMS)
 % IS_DEPRECATED = any('deprecated' in a for a in ALL_AVAILABILITY)
 %
-% if IS_THROWING:
-%   FAILURE_TYPE = 'Error'
+% if IS_THROWING and IS_TOP_LEVEL_FUNC:
+%   FAILURE_TYPE = 'Error' # the legacy top-level funcs don't have a generic Failure, so we keep the un-typed throw
+% elif IS_THROWING:
+%   FAILURE_TYPE = 'Failure' # use typed throws, the thrown type is Failure of the Task<_, Failure> type
 % else:
 %   FAILURE_TYPE = 'Never'
 % end
@@ -162,6 +168,7 @@ def adjust_params_for_kind(params):
   for p in params:
     np = p
     if not IS_THROWING:
+      np = np.replace("throws(Failure)", "")
       np = np.replace("throws", "")
     res.append(np)
   return res
@@ -184,7 +191,11 @@ else:
 
 % # ====================================================================================================================
 % if not IS_TOP_LEVEL_FUNC:
+% if IS_THROWING:
+extension Task { // throwing Failure error type
+% else:
 extension Task where Failure == ${FAILURE_TYPE} {
+% end
 % end
 
 % # --------------------------------------------------------------------------------------------------------------------
@@ -286,7 +297,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
 % end # IS_DEPRECATED
   ${"\n  ".join(adjust_availability(ALL_AVAILABILITY))}
   @discardableResult
-  public ${METHOD_VARIANT}( // Task ${METHOD_VARIANT}
+  public ${METHOD_VARIANT}(
     ${",\n    ".join(adjust_params_for_kind(PARAMS))}
   ) ${ARROW_RETURN_TYPE}{
 
@@ -323,7 +334,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
             initialTaskExecutorConsuming: taskExecutor,
             % end
             taskName: nameBytes.baseAddress!._rawValue,
-            operation: operation).0
+            operation: operation).0 // Task ${METHOD_VARIANT}
         }
       #else // no $BuiltinCreateAsyncTaskOwnedTaskExecutor
       // legacy branch for the non-consuming task executor
@@ -338,7 +349,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
             % end
             initialTaskExecutor: executorBuiltin,
             taskName: nameBytes.baseAddress!._rawValue,
-            operation: operation).0
+            operation: operation).0 // Task ${METHOD_VARIANT}
         }
       #endif // $BuiltinCreateAsyncTaskOwnedTaskExecutor
       % else: # if no TASK_EXECUTOR
@@ -350,7 +361,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
             initialSerialExecutor: builtinSerialExecutor,
             % end
             taskName: nameBytes.baseAddress!._rawValue,
-            operation: operation).0
+            operation: operation).0 // Task ${METHOD_VARIANT}
         }
       % end # if no HAS_TASK_EXECUTOR
     } // let name
@@ -368,7 +379,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
         initialSerialExecutor: builtinSerialExecutor,
         % end
         initialTaskExecutorConsuming: taskExecutor,
-        operation: operation).0
+        operation: operation).0 // Task ${METHOD_VARIANT}
       #else
       // legacy branch for the non-consuming task executor
       let executorBuiltin: Builtin.Executor =
@@ -380,7 +391,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
         initialSerialExecutor: builtinSerialExecutor,
         % end
         initialTaskExecutor: executorBuiltin,
-        operation: operation).0
+        operation: operation).0 // Task ${METHOD_VARIANT}
       #endif
     }
 % end # HAS_TASK_EXECUTOR
@@ -392,7 +403,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
       % if HAS_ISOLATED_ANY:
       initialSerialExecutor: builtinSerialExecutor,
       % end
-      operation: operation).0
+      operation: operation).0 // Task ${METHOD_VARIANT}
     }
 
 % if IS_INIT:

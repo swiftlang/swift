@@ -4440,6 +4440,9 @@ bool TypeBase::isNoEscape() const {
   if (auto funcTy = dyn_cast<FunctionType>(type))
     return funcTy->isNoEscape();
 
+  if (auto packExpansionTy = dyn_cast<PackExpansionType>(type))
+    return packExpansionTy.getPatternType()->isNoEscape();
+
   if (auto tupleTy = dyn_cast<TupleType>(type)) {
     for (auto eltTy : tupleTy.getElementTypes())
       if (eltTy->isNoEscape())
@@ -5338,7 +5341,7 @@ getConcurrencyDiagnosticBehaviorLimitRec(
   // Metatypes that aren't Sendable were introduced in Swift 6.2, so downgrade
   // them to warnings prior to Swift 7.
   if (type->is<AnyMetatypeType>()) {
-    if (!declCtx->getASTContext().isAtLeastFutureMajorLanguageMode())
+    if (!declCtx->getASTContext().isLanguageModeAtLeast(LanguageMode::future))
       return DiagnosticBehavior::Warning;
   }
 

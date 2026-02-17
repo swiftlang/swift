@@ -1,12 +1,11 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default -enable-experimental-feature SafeInteropWrappers %t/namespace.swift -emit-module \
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default %t/namespace.swift -emit-module \
 // RUN:   -verify -verify-additional-file %t%{fs-sep}namespace.h -Rmacro-expansions -strict-memory-safety -o %t/out.swiftmodule -import-bridging-header %t/bridging.h
 
-// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default -enable-experimental-feature SafeInteropWrappers %t/namespace.swift -typecheck \
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default %t/namespace.swift -typecheck \
 // RUN:   -dump-source-file-imports -import-bridging-header %t/bridging.h 2>&1 | %FileCheck --dry-run > %t/imports.txt
 // RUN: %diff %t/imports.txt %t/imports.txt.expected
 
@@ -78,22 +77,25 @@ namespace foo {
 //   expected-note@1 5{{in expansion of macro '_SwiftifyImport' on global function 'bar' here}}
 // }}
 __attribute__((swift_attr("@_SwiftifyImport(.countedBy(pointer: .param(1), count: \"len\"))"))) void bar(float *p, int len, foo::foo_t extra);
-// expected-expansion@+13:94{{
+// expected-expansion@+16:94{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func bar2(_ p: Span<foo.foo_t>, _ extra: foo.foo_t) {|}}
 //   expected-remark@3{{macro content: |    let len = foo.foo_t(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    return unsafe bar2(_pPtr.baseAddress!, len, extra)|}}
-//   expected-remark@8{{macro content: |}|}}
+//   expected-remark@7{{macro content: |    defer {|}}
+//   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
+//   expected-remark@9{{macro content: |    }|}}
+//   expected-remark@10{{macro content: |    return unsafe bar2(_pPtr.baseAddress!, len, extra)|}}
+//   expected-remark@11{{macro content: |}|}}
 // }}
 // expected-expansion@+3:6{{
-//   expected-note@1 8{{in expansion of macro '_SwiftifyImport' on global function 'bar2' here}}
+//   expected-note@1 11{{in expansion of macro '_SwiftifyImport' on global function 'bar2' here}}
 // }}
 void bar2(const foo::foo_t * __counted_by(len) p __noescape, foo::foo_t len, foo::foo_t extra);
 namespace baz {
-  // expected-expansion@+14:100{{
+  // expected-expansion@+17:100{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
   //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public static func baz_func(_ p: Span<foo.foo_t>, _ extra: foo.foo_t) {|}}
@@ -101,11 +103,14 @@ namespace baz {
   //   expected-remark@5{{macro content: |    let _pPtr = unsafe p.withUnsafeBufferPointer {|}}
   //   expected-remark@6{{macro content: |        unsafe $0|}}
   //   expected-remark@7{{macro content: |    }|}}
-  //   expected-remark@8{{macro content: |    return unsafe baz_func(_pPtr.baseAddress!, len, extra)|}}
-  //   expected-remark@9{{macro content: |}|}}
+  //   expected-remark@8{{macro content: |    defer {|}}
+  //   expected-remark@9{{macro content: |        _fixLifetime(p)|}}
+  //   expected-remark@10{{macro content: |    }|}}
+  //   expected-remark@11{{macro content: |    return unsafe baz_func(_pPtr.baseAddress!, len, extra)|}}
+  //   expected-remark@12{{macro content: |}|}}
   // }}
   // expected-expansion@+3:8{{
-  //   expected-note@1 9{{in expansion of macro '_SwiftifyImport' on static method 'baz_func' here}}
+  //   expected-note@1 12{{in expansion of macro '_SwiftifyImport' on static method 'baz_func' here}}
   // }}
   void baz_func(const foo::foo_t * __counted_by(len) p __noescape, foo::foo_t len, foo::foo_t extra);
 }

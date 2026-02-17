@@ -137,12 +137,6 @@ public:
   static constexpr unsigned getFutureMajorLanguageVersion() {
     return 7;
   }
-
-  // List of backward-compatibility versions that we permit passing as
-  // -swift-version <vers>
-  static std::array<StringRef, 4> getValidEffectiveVersions() {
-    return {{"4", "4.2", "5", "6"}};
-  };
 };
 
 bool operator>=(const Version &lhs, const Version &rhs);

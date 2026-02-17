@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
+#include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Version.h"
 #include "swift/Option/Options.h"
@@ -510,10 +511,16 @@ static void diagnoseSwiftVersion(std::optional<version::Version> &vers,
   diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                  verArg->getAsString(Args), verArg->getValue());
 
-  // Note valid versions.
-  auto validVers = version::Version::getValidEffectiveVersions();
-  auto versStr = "'" + llvm::join(validVers, "', '") + "'";
-  diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, versStr);
+  // Enumerate the valid language modes.
+  std::string modesStr;
+  {
+    llvm::raw_string_ostream os(modesStr);
+    llvm::interleaveComma(
+        LanguageMode::allSupportedModes(), os,
+        [&](LanguageMode mode) { os << "'" << mode.versionString() << "'"; });
+  }
+
+  diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, modesStr);
 }
 
 /// Create a new Regex instance out of the string value in \p RpassArg.
@@ -940,11 +947,11 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     // If the current language mode enables the feature by default then
     // diagnose and skip it.
-    if (auto firstVersion = feature->getLanguageMode()) {
-      if (Opts.isLanguageModeAtLeast(*firstVersion)) {
+    if (auto languageMode = feature->getLanguageMode()) {
+      if (Opts.isLanguageModeAtLeast(languageMode.value())) {
         Diags.diagnose(SourceLoc(),
                        diag::warning_upcoming_feature_on_by_default,
-                       feature->getName(), *firstVersion);
+                       feature->getName(), languageMode->versionString());
         continue;
       }
     }
@@ -1346,8 +1353,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // Add a future feature if it is not already implied by the language version.
   auto addFutureFeatureIfNotImplied = [&](Feature feature) {
     // Check if this feature was introduced already in this language version.
-    if (auto firstVersion = feature.getLanguageMode()) {
-      if (Opts.isLanguageModeAtLeast(*firstVersion))
+    if (auto languageMode = feature.getLanguageMode()) {
+      if (Opts.isLanguageModeAtLeast(languageMode.value()))
         return;
     }
 
@@ -1524,7 +1531,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasFlag(OPT_enable_nonfrozen_enum_exhaustivity_diagnostics,
                    OPT_disable_nonfrozen_enum_exhaustivity_diagnostics,
-                   Opts.isLanguageModeAtLeast(5))) {
+                   Opts.isLanguageModeAtLeast(LanguageMode::v5))) {
     Opts.enableFeature(Feature::NonfrozenEnumExhaustivity);
   }
 
@@ -1945,7 +1952,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       HadError = true;
     }
-  } else if (Opts.isLanguageModeAtLeast(6)) {
+  } else if (Opts.isLanguageModeAtLeast(LanguageMode::v6)) {
     Opts.UseCheckedAsyncObjCBridging = true;
   }
 
@@ -1992,6 +1999,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::ParserValidation);
   }
 #endif
+
+  if (Args.hasArg(OPT_disable_safe_interop_wrappers))
+    Opts.DisableSafeInteropWrappers = true;
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
@@ -2120,21 +2131,30 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_solver_disable_splitter))
     Opts.SolverDisableSplitter = true;
 
-  if (Args.hasArg(OPT_solver_enable_prepared_overloads) ||
-      Args.hasArg(OPT_solver_disable_prepared_overloads))
-    Opts.SolverEnablePreparedOverloads = Args.hasArg(OPT_solver_enable_prepared_overloads);
+  Opts.CrashOnValidSalvage =
+      Args.hasFlag(OPT_solver_enable_crash_on_valid_salvage,
+                   OPT_solver_disable_crash_on_valid_salvage,
+                   Opts.CrashOnValidSalvage);
 
-  if (Args.hasArg(OPT_solver_enable_prune_disjunctions) ||
-      Args.hasArg(OPT_solver_disable_prune_disjunctions))
-    Opts.SolverPruneDisjunctions = Args.hasArg(OPT_solver_enable_prune_disjunctions);
+  Opts.SolverEnablePreparedOverloads =
+      Args.hasFlag(OPT_solver_enable_prepared_overloads,
+                   OPT_solver_disable_prepared_overloads,
+                   Opts.SolverEnablePreparedOverloads);
 
-  if (Args.hasArg(OPT_solver_enable_optimize_operator_defaults) ||
-      Args.hasArg(OPT_solver_disable_optimize_operator_defaults))
-    Opts.SolverOptimizeOperatorDefaults = Args.hasArg(OPT_solver_enable_optimize_operator_defaults);
+  Opts.SolverPruneDisjunctions =
+      Args.hasFlag(OPT_solver_enable_prune_disjunctions,
+                   OPT_solver_disable_prune_disjunctions,
+                   Opts.SolverPruneDisjunctions);
 
-  if (Args.hasArg(OPT_solver_enable_performance_hacks) ||
-      Args.hasArg(OPT_solver_disable_performance_hacks))
-    Opts.SolverEnablePerformanceHacks = Args.hasArg(OPT_solver_enable_performance_hacks);
+  Opts.SolverOptimizeOperatorDefaults =
+      Args.hasFlag(OPT_solver_enable_optimize_operator_defaults,
+                   OPT_solver_disable_optimize_operator_defaults,
+                   Opts.SolverOptimizeOperatorDefaults);
+
+  Opts.SolverEnablePerformanceHacks =
+      Args.hasFlag(OPT_solver_enable_performance_hacks,
+                   OPT_solver_disable_performance_hacks,
+                   Opts.SolverEnablePerformanceHacks);
 
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;

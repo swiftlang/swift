@@ -60,7 +60,7 @@ package enum PkgEnum {
   case blue, yellow
 }
 
-// CHECK-PKG: package enum PkgEnum {
+// CHECK-PKG: package enum PkgEnum : Swift.Sendable {
 // CHECK-PKG:   case blue, yellow
 // CHECK-PKG:   package static func == (a: Bar.PkgEnum, b: Bar.PkgEnum) -> Swift.Bool
 // CHECK-PKG:   package func hash(into hasher: inout Swift.Hasher)
@@ -137,7 +137,7 @@ package struct PkgStruct {
   package private(set) var four: String
 }
 
-// CHECK-PKG: package struct PkgStruct {
+// CHECK-PKG: package struct PkgStruct : Swift.Sendable {
 // CHECK-PKG:   package var one: Swift.String
 // CHECK-PKG:   package var four: Swift.String {
 // CHECK-PKG:     get

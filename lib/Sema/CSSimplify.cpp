@@ -1784,7 +1784,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         // this is Swift version >= 5 where forwarding is not allowed,
         // argument would always be wrapped into an implicit closure
         // at the end, so we can safely match against result type.
-        if (ctx.isLanguageModeAtLeast(5) || !isAutoClosureArgument(argExpr)) {
+        if (ctx.isLanguageModeAtLeast(LanguageMode::v5) ||
+            !isAutoClosureArgument(argExpr)) {
           // In Swift >= 5 mode there is no @autoclosure forwarding,
           // so let's match result types.
           if (auto *fnType = paramTy->getAs<FunctionType>()) {
@@ -2594,7 +2595,7 @@ static bool isSingleTupleParam(ASTContext &ctx,
   // let foo: ((Int, Int)?) -> Void = { _ in }
   //
   // bar(foo) // Ok
-  if (!ctx.isLanguageModeAtLeast(5))
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5))
     paramType = paramType->lookThroughAllOptionalTypes();
 
   // Parameter type should either a tuple or something that can become a
@@ -3455,7 +3456,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
             canImplodeParams(func1Params, /*destFn*/ func2)) {
           implodeParams(func1Params);
           increaseScore(SK_FunctionConversion, locator);
-        } else if (!ctx.isLanguageModeAtLeast(5) &&
+        } else if (!ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
                    isSingleTupleParam(ctx, func1Params) &&
                    canImplodeParams(func2Params,  /*destFn*/ func1)) {
           auto *simplified = locator.trySimplifyToExpr();
@@ -3542,8 +3543,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // https://github.com/apple/swift/issues/49345
   // Add a super-narrow hack to allow '(()) -> T' to be passed in place
   // of '() -> T'.
-  if (getASTContext().isLanguageModeAtLeast(4) &&
-      !getASTContext().isLanguageModeAtLeast(5)) {
+  if (getASTContext().isLanguageModeAtLeast(LanguageMode::v4) &&
+      !getASTContext().isLanguageModeAtLeast(LanguageMode::v5)) {
     SmallVector<LocatorPathElt, 4> path;
     locator.getLocatorParts(path);
 
@@ -4726,7 +4727,7 @@ ConstraintSystem::matchTypesBindTypeVar(
             ->isLastElement<LocatorPathElt::ApplyArgument>();
 
     if (!(typeVar->getImpl().canBindToPack() && representsParameterList) ||
-        getASTContext().isLanguageModeAtLeast(6)) {
+        getASTContext().isLanguageModeAtLeast(LanguageMode::v6)) {
       if (!shouldAttemptFixes())
         return getTypeMatchFailure(locator);
 
@@ -5106,7 +5107,8 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
 
   if (auto *optTryExpr = dyn_cast<OptionalTryExpr>(anchor)) {
     auto subExprType = cs.getType(optTryExpr->getSubExpr());
-    const bool isSwift5OrGreater = cs.getASTContext().isLanguageModeAtLeast(5);
+    const bool isSwift5OrGreater =
+        cs.getASTContext().isLanguageModeAtLeast(LanguageMode::v5);
 
     if (subExprType->getOptionalObjectType()) {
       if (isSwift5OrGreater) {
@@ -5822,7 +5824,7 @@ bool ConstraintSystem::repairFailures(
           // (note that `swift_attr` in type contexts weren't supported
           // before) and for witnesses to adopt them gradually by matching
           // with a warning in non-strict concurrency mode.
-          if (!(Context.isLanguageModeAtLeast(6) ||
+          if (!(Context.isLanguageModeAtLeast(LanguageMode::v6) ||
                 Context.LangOpts.StrictConcurrencyLevel ==
                     StrictConcurrency::Complete)) {
             auto strippedLHS = lhs->stripConcurrency(/*recursive=*/true,
@@ -7181,6 +7183,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
 
+  // Refuse to match types with errors. We ought to consider making this an
+  // assert (clients should instead use holes), but for now let's bail out of
+  // solving.
+  if (desugar1->hasError() || desugar2->hasError())
+    return getTypeMatchFailure(locator);
+
   // If both sides are dependent members without type variables, it's
   // possible that base type is incorrect e.g. `Foo.Element` where `Foo`
   // is a concrete type substituted for generic parameter,
@@ -7515,15 +7523,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::BuiltinTuple:
       llvm_unreachable("BuiltinTupleType in constraint");
 
-    // Note: Mismatched builtin types fall through to the TypeKind::Error
-    // case below.
+    // Mismatched builtin types
 #define BUILTIN_GENERIC_TYPE(id, parent)
 #define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+      return getTypeMatchFailure(locator);
 
     case TypeKind::Error:
-      return getTypeMatchFailure(locator);
+      llvm_unreachable("Rejected above");
 
     // BuiltinGenericType subclasses
     case TypeKind::BuiltinBorrow:
@@ -8694,7 +8702,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   // affect the prioritization of bindings, which can affect behavior for tuple
   // matching as tuple subtyping is currently a *weaker* constraint than tuple
   // conversion.
-  if (!getASTContext().isLanguageModeAtLeast(6)) {
+  if (!getASTContext().isLanguageModeAtLeast(LanguageMode::v6)) {
     auto paramTypeVar = createTypeVariable(
         getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
         TVO_CanBindToLValue | TVO_CanBindToInOut | TVO_CanBindToNoEscape |
@@ -9017,7 +9025,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           loc,
           LocatorPathElt::ConformanceRequirement(conformance.getConcrete()));
 
-      for (const auto &req : conformance.getConditionalRequirements()) {
+      for (auto req : conformance.getConditionalRequirements()) {
+        // Replace any ErrorTypes with holes if needed in case of substitution
+        // failure.
+        req = req.tranformSubjectTypes([&](Type ty) {
+          return replaceInferableTypesWithTypeVars(ty, loc);
+        });
         addConstraint(
             req, getConstraintLocator(conformanceLoc,
                                       LocatorPathElt::ConditionalRequirement(
@@ -9930,6 +9943,13 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto contextualTy = getContextualTypeInfo(anchor)->getType();
   auto *seqProto = contextualTy->castTo<ProtocolType>()->getDecl();
   auto isAsync = seqProto->isSpecificProtocol(KnownProtocolKind::AsyncSequence);
+  auto isBorrowing =
+      seqProto->isSpecificProtocol(KnownProtocolKind::BorrowingSequence);
+
+  if (seqTy->isExistentialType() && !isAsync && isBorrowing) {
+    isBorrowing = false;
+    seqProto = ctx.getProtocol(KnownProtocolKind::Sequence);
+  }
 
   auto *contextualLoc = getConstraintLocator(
       anchor, LocatorPathElt::ContextualType(CTP_ForEachSequence));
@@ -9945,7 +9965,8 @@ ConstraintSystem::simplifyForEachElementConstraint(
   // The erased element type is `any P`, but `makeIterator` can only produce
   // `any IteratorProtocol`, so the actual element type is `Any`.
   auto *iteratorAssocTy = seqProto->getAssociatedType(
-      isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator);
+      isAsync ? ctx.Id_AsyncIterator
+              : (isBorrowing ? ctx.Id_BorrowingIterator : ctx.Id_Iterator));
   auto iterTy = lookupDependentMember(seqTy, iteratorAssocTy,
                                       /*openExistential*/ true, contextualLoc);
   if (!iterTy) {
@@ -9956,10 +9977,14 @@ ConstraintSystem::simplifyForEachElementConstraint(
 
   // Now we have the Iterator type, do the same lookup for Element, opening
   // an existential if needed.
-  auto *iterProto =
-      ctx.getProtocol(isAsync ? KnownProtocolKind::AsyncIteratorProtocol
-                              : KnownProtocolKind::IteratorProtocol);
-  auto *eltAssocTy = iterProto->getAssociatedType(Context.Id_Element);
+  auto *iterProto = ctx.getProtocol(
+      isAsync ? KnownProtocolKind::AsyncIteratorProtocol
+              : (isBorrowing ? KnownProtocolKind::BorrowingIteratorProtocol
+                             : KnownProtocolKind::IteratorProtocol));
+  // FIXME: update this to only use Id_Element once the BorrowingSequence
+  // protocol lands.
+  auto *eltAssocTy = iterProto->getAssociatedType(
+      isBorrowing ? Context.Id_BorrowedElement : Context.Id_Element);
   auto eltTy = lookupDependentMember(iterTy, eltAssocTy,
                                      /*openExistential*/ true, contextualLoc);
   if (!eltTy) {
@@ -10883,7 +10908,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // Backward compatibility hack. In Swift 4, `init` and init were
   // the same name, so you could write "foo.init" to look up a
   // method or property named `init`.
-  if (!ctx.isLanguageModeAtLeast(5) &&
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
       memberName.getBaseName().isConstructor() && !isImplicitInit) {
     auto &compatLookup = lookupMember(instanceTy,
                                       DeclNameRef(ctx.getIdentifier("init")),
@@ -12633,7 +12658,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   // type must be a (potentially optional) type variable, as only such a
   // constraint could have been previously been left unsolved.
   auto canUseCompatFix = [&]() {
-    if (Context.isLanguageModeAtLeast(6))
+    if (Context.isLanguageModeAtLeast(LanguageMode::v6))
       return false;
 
     if (!rawType1->lookThroughAllOptionalTypes()->isTypeVariableOrMember())

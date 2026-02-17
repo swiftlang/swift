@@ -22,6 +22,9 @@ public func myFunc(_ ptr: inout MutableSpan<CInt>) {
     let _ptrPtr = unsafe ptr.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     return unsafe myFunc(_ptrPtr.baseAddress!, len)
 }
 ------------------------------

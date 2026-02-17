@@ -17,6 +17,10 @@ protocol Playable {
     func play()
 }
 
+protocol Consumable : ~Copyable {
+    func consume()
+}
+
 func callee(_ _: Testable) {
 
 }
@@ -30,6 +34,10 @@ func caller(_ x: DerivedFromDerivedFromHasTestWithDuplicateArg) { callee(x) }
 
 func callee(_ _: Playable) {
 
+}
+
+func callee(_ _: consuming any Consumable & ~Copyable) {
+    
 }
 
 func caller(_ x: Playable) {
@@ -66,3 +74,5 @@ func caller(_ x: HasImportedConf) {
 }
 func caller(_ x: DerivedFromHasImportedConf) { callee(x) }
 func caller(_ x: DerivedFromDerivedFromHasImportedConf) { callee(x) }
+
+func caller(_ x: consuming NonCopyable) { callee(x) }

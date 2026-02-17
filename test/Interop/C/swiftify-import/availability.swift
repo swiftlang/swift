@@ -1,12 +1,10 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
-
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/test.swiftmodule %t/test.swift -I %t -enable-experimental-feature SafeInteropWrappers -strict-memory-safety \
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/test.swiftmodule %t/test.swift -I %t -strict-memory-safety \
 // RUN:   -verify -verify-additional-file %t%{fs-sep}test.h
 
-// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/test.swiftmodule %t/test.swift -I %t -enable-experimental-feature SafeInteropWrappers -strict-memory-safety \
+// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/test.swiftmodule %t/test.swift -I %t -strict-memory-safety \
 // RUN:   -dump-macro-expansions 2> %t/expansions.out
 
 // RUN: %if OS_FAMILY=darwin %{ \
@@ -43,6 +41,9 @@ public func span(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe span(_pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -64,6 +65,9 @@ public func span(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
     }
     return unsafe span(_pPtr.baseAddress!, len)
 }
@@ -87,6 +91,9 @@ public func span(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe span(_pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -109,6 +116,9 @@ public func span(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe span(_pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -129,6 +139,9 @@ public func span(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe span(_pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -148,6 +161,9 @@ public func span(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
     }
     return unsafe span(_pPtr.baseAddress!, len)
 }

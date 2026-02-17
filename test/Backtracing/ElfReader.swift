@@ -8,8 +8,9 @@
 // RUN: %target-run %t/ElfReader %t/fib-no-uuid | %FileCheck %s --check-prefix NOUUID
 // RUN: %target-run %t/ElfReader %t/fib-compress-gnu | %FileCheck %s --check-prefix CMPGNU
 // RUN: %target-run %t/ElfReader %t/fib-compress-zlib | %FileCheck %s --check-prefix CMPZLIB
-// RUN: if %S/Inputs/make-minidebug %t/fib %t/fib-minidebug; then ( %target-run %t/ElfReader %t/fib-minidebug | %FileCheck %s --check-prefix MINIDEBUG ); else echo "warning: skipping minidebug test as we couldn't generate minidebug data"; fi
-// RUN: libc=$(ldd %t/fib | awk '/libc\.so\.6/ { print $3 }'); if %S/Inputs/has-uuid-syms "$libc" >/dev/null; then %target-run %t/ElfReader "$libc" | %FileCheck %s --check-prefix LIBC; else echo "warning: skipping /usr/lib/debug test as libc symbols are not installed"; fi
+// RUN: ! %S/Inputs/make-minidebug %t/fib %t/fib-minidebug || %target-run %t/ElfReader %t/fib-minidebug | %FileCheck %s --check-prefix MINIDEBUG
+// RUN: ldd %t/fib | awk '/libc\.so\.6/ { print $3 }' > %t/libc-path
+// RUN: ! %S/Inputs/has-uuid-syms %{readfile:%t/libc-path} >/dev/null || %target-run %t/ElfReader %{readfile:%t/libc-path} | %FileCheck %s --check-prefix LIBC
 // RUN: %S/Inputs/make-debuglink %t/fib %t/fib-stripped %t/fib.dbg && %target-run %t/ElfReader %t/fib-stripped | %FileCheck %s --check-prefix DBGLINK
 
 // REQUIRES: OS=linux-gnu

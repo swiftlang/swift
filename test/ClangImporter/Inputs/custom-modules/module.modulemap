@@ -297,3 +297,8 @@ module CVarArgs {
   header "CVarArgs.h"
   export *
 }
+
+module SystemModuleWithWarnings {
+  header "SystemModuleWithWarnings.h"
+  export *
+}

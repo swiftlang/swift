@@ -627,7 +627,8 @@ bool CompareDeclSpecializationRequest::evaluate(
   //      x.i // ensure ambiguous.
   //    }
   //
-  if (C.isLanguageModeAtLeast(5) && !isDynamicOverloadComparison) {
+  if (C.isLanguageModeAtLeast(LanguageMode::v5) &&
+      !isDynamicOverloadComparison) {
     auto inProto1 = isa<ProtocolDecl>(outerDC1);
     auto inProto2 = isa<ProtocolDecl>(outerDC2);
     if (inProto1 != inProto2)
@@ -1423,7 +1424,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // compatibility under Swift 4 mode by ensuring we don't introduce any new
     // ambiguities. This will become a more general "is more specialised" rule
     // in Swift 5 mode.
-    if (!cs.getASTContext().isLanguageModeAtLeast(5) &&
+    if (!cs.getASTContext().isLanguageModeAtLeast(LanguageMode::v5) &&
         choice1.getKind() != OverloadChoiceKind::DeclViaDynamic &&
         choice2.getKind() != OverloadChoiceKind::DeclViaDynamic &&
         isa<VarDecl>(decl1) && isa<VarDecl>(decl2)) {
@@ -1633,7 +1634,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // All other things being equal, apply the Swift 4.1 compatibility hack for
   // preferring var members in concrete types over a protocol requirement
   // (see the comment above for the rationale of this hack).
-  if (!cs.getASTContext().isLanguageModeAtLeast(5) && score1 == score2) {
+  if (!cs.getASTContext().isLanguageModeAtLeast(LanguageMode::v5) &&
+      score1 == score2) {
     score1 += isVarAndNotProtocol1;
     score2 += isVarAndNotProtocol2;
   }

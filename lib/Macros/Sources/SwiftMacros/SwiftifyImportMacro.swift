@@ -919,6 +919,9 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
         unsafe \(raw: name)\(raw: questionMark).\(raw: funcName) { unsafe $0 }
         """)
       res.append(CodeBlockItemSyntax.Item(try VariableDeclSyntax("let \(unwrappedName) = \(unwrappedCall)")))
+      let lifetimeFix = ExprSyntax("_fixLifetime(\(raw: name))")
+      let deferLifetime = StmtSyntax("defer { \(lifetimeFix) }")
+      res.append(CodeBlockItemSyntax.Item(deferLifetime))
     }
 
     return res

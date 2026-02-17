@@ -59,6 +59,9 @@ extension SpanProtocol {
         let _ptrPtr = unsafe ptr.withUnsafeBufferPointer {
             unsafe $0
         }
+        defer {
+            _fixLifetime(ptr)
+        }
         return unsafe foo(_ptrPtr.baseAddress!, len)
     }
     /// This is an auto-generated wrapper for safer interop
@@ -78,6 +81,9 @@ extension MixedProtocol {
         let len = CInt(exactly: ptr.count)!
         let _ptrPtr = unsafe ptr.withUnsafeBufferPointer {
             unsafe $0
+        }
+        defer {
+            _fixLifetime(ptr)
         }
         return unsafe foo(_ptrPtr.baseAddress!, len)
     }

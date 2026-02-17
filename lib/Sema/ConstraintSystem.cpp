@@ -2028,6 +2028,22 @@ SolutionResult ConstraintSystem::salvage() {
       if (*best != 0)
         viable[0] = std::move(viable[*best]);
       viable.erase(viable.begin() + 1, viable.end());
+
+      if (getASTContext().TypeCheckerOpts.CrashOnValidSalvage) {
+        auto &solution = viable[0];
+        if (solution.Fixes.empty() &&
+            diagnosticTransaction == nullptr &&
+            !getASTContext().LangOpts.DisableAvailabilityChecking &&
+            solution.getFixedScore().Data[SK_Unavailable] == 0 &&
+            solution.getFixedScore().Data[SK_Hole] == 0 &&
+            solution.getFixedScore().Data[SK_Fix] == 0) {
+          ABORT([&](auto &out) {
+            out << "Found valid solution in salvage()\n\n";
+            solution.dump(out, 0);
+          });
+        }
+      }
+
       return SolutionResult::forSolved(std::move(viable[0]));
     }
 
@@ -4976,7 +4992,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // get any special power from being formed in certain contexts, such
   // as the ability to assign to `let`s in initialization contexts, so
   // we pass null for the DC to `isSettable` here.)
-  if (!getASTContext().isLanguageModeAtLeast(5)) {
+  if (!getASTContext().isLanguageModeAtLeast(LanguageMode::v5)) {
     // As a source-compatibility measure, continue to allow
     // WritableKeyPaths to be formed in the same conditions we did
     // in previous releases even if we should not be able to set

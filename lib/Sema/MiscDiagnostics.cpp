@@ -748,7 +748,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // - member type expressions rooted on non-identifier types, e.g.
       //   '[X].Y' since they used to be accepted without the '.self'.
       bool downgradeToWarningUntil6 = false;
-      if (!Ctx.isLanguageModeAtLeast(6)) {
+      if (!Ctx.isLanguageModeAtLeast(LanguageMode::v6)) {
         if (ParentExpr && (isa<SubscriptExpr>(ParentExpr) ||
                            isa<DynamicSubscriptExpr>(ParentExpr) ||
                            isa<ObjectLiteralExpr>(ParentExpr))) {
@@ -765,7 +765,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
       Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type)
-          .warnUntilLanguageModeIf(downgradeToWarningUntil6, 6);
+          .warnUntilLanguageModeIf(downgradeToWarningUntil6, LanguageMode::v6);
 
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
@@ -1895,7 +1895,7 @@ public:
 
     // Prior to Swift 6, use the old validation logic.
     auto &ctx = inClosure->getASTContext();
-    if (!ctx.isLanguageModeAtLeast(6))
+    if (!ctx.isLanguageModeAtLeast(LanguageMode::v6))
       return selfDeclAllowsImplicitSelf510(DRE, ty, inClosure);
 
     return selfDeclAllowsImplicitSelf(DRE->getDecl(), ty, inClosure,
@@ -2280,7 +2280,7 @@ public:
 
   bool shouldRecordClosure(const AbstractClosureExpr *E) {
     // Record all closures in Swift 6 mode.
-    if (Ctx.isLanguageModeAtLeast(6))
+    if (Ctx.isLanguageModeAtLeast(LanguageMode::v6))
       return true;
 
     // Only record closures requiring self qualification prior to Swift 6
@@ -2293,23 +2293,22 @@ public:
       SourceLoc loc, Expr *base, AbstractClosureExpr *closure,
       Diag<ArgTypes...> ID,
       typename detail::PassArgument<ArgTypes>::type... Args) {
-    std::optional<unsigned> warnUntilVersion;
+    std::optional<LanguageMode> languageModeForError;
     // Prior to Swift 6, we may need to downgrade to a warning for compatibility
     // with the 5.10 diagnostic behavior.
-    if (!Ctx.isLanguageModeAtLeast(6) &&
+    if (!Ctx.isLanguageModeAtLeast(LanguageMode::v6) &&
         invalidImplicitSelfShouldOnlyWarn510(base, closure)) {
-      warnUntilVersion.emplace(6);
+      languageModeForError.emplace(LanguageMode::v6);
     }
     // Prior to the next language mode, downgrade to a warning if we're in a
     // macro to preserve compatibility with the Swift 6 diagnostic behavior
     // where we previously skipped diagnosing.
-    auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-    if (!Ctx.isLanguageModeAtLeast(futureVersion) && isInMacro())
-      warnUntilVersion.emplace(futureVersion);
+    if (!Ctx.isLanguageModeAtLeast(LanguageMode::future) && isInMacro())
+      languageModeForError.emplace(LanguageMode::future);
 
     auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
-    if (warnUntilVersion)
-      diag.warnUntilLanguageMode(*warnUntilVersion);
+    if (languageModeForError)
+      diag.warnUntilLanguageMode(*languageModeForError);
 
     return diag;
   }
@@ -2368,7 +2367,8 @@ public:
 
     if (memberLoc.isValid()) {
       const AbstractClosureExpr *parentDisallowingImplicitSelf = nullptr;
-      if (Ctx.isLanguageModeAtLeast(6) && selfDRE && selfDRE->getDecl()) {
+      if (Ctx.isLanguageModeAtLeast(LanguageMode::v6) && selfDRE &&
+          selfDRE->getDecl()) {
         parentDisallowingImplicitSelf = parentClosureDisallowingImplicitSelf(
             selfDRE->getDecl(), selfDRE->getType(), ACE);
       }
@@ -5697,7 +5697,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       // Do not warn on coercions from implicitly unwrapped optionals
       // for Swift versions less than 5.
-      if (!Ctx.isLanguageModeAtLeast(5) &&
+      if (!Ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
           hasImplicitlyUnwrappedResult(subExpr))
         return;
 
@@ -6525,8 +6525,27 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
     DiagnoseWalker(const DeclContext *dc) : dc(dc) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (auto declRef = E->getReferencedDecl())
-        checkDecl(declRef.getDecl(), E->getLoc());
+      if (auto declRef = E->getReferencedDecl()) {
+        bool downgradeToWarning = false;
+        auto *decl = declRef.getDecl();
+
+        // If this is an implicit reference to `make{Async}Iterator`
+        // or `next` methods, let's produce a warning instead of an
+        // error to maintain source compatibility since it wasn't
+        // diagnosed before in closure contexts.
+        if (E->isImplicit() && decl->isInstanceMember()) {
+          auto &ctx = decl->getASTContext();
+          auto name = decl->getBaseName();
+
+          downgradeToWarning =
+              !ctx.isLanguageModeAtLeast(LanguageMode::future) &&
+              isInClosureContext() &&
+              (name == ctx.Id_makeIterator ||
+               name == ctx.Id_makeAsyncIterator || name == ctx.Id_next);
+        }
+
+        checkDecl(decl, E->getLoc(), downgradeToWarning);
+      }
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
         for (const auto &component : KPE->getComponents()) {
@@ -6550,6 +6569,16 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
             decl, dc, loc,
             downgradeToWarning ? DiagnosticBehavior::Warning
                                : DiagnosticBehavior::Unspecified);
+    }
+
+    bool isInClosureContext() const {
+      auto *DC = dc;
+      do {
+        if (isa<ClosureExpr>(DC))
+          return true;
+      } while ((DC = DC->getParent()));
+
+      return false;
     }
   };
 
@@ -6703,7 +6732,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   maybeDiagnoseCallToKeyValueObserveMethod(E, DC);
   diagnoseExplicitUseOfLazyVariableStorage(E, DC);
   diagnoseComparisonWithNaN(E, DC);
-  if (!ctx.isLanguageModeAtLeast(5))
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)
     diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));

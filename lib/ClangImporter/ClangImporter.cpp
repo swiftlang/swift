@@ -593,9 +593,6 @@ void importer::getNormalInvocationArguments(
     }
   }
 
-  if (LangOpts.hasFeature(Feature::SafeInteropWrappers))
-    invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
-
   // Set C language options.
   if (triple.isOSDarwin()) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
@@ -809,6 +806,9 @@ void importer::getNormalInvocationArguments(
   if (importerOpts.LoadVersionIndependentAPINotes)
     invocationArgStrs.insert(invocationArgStrs.end(),
                              {"-fswift-version-independent-apinotes"});
+
+  if (!LangOpts.DisableSafeInteropWrappers)
+    invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
 }
 
 static void
@@ -1403,6 +1403,16 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
   if (!clang::CompilerInvocation::CreateFromArgs(
           *CI, invocationArgs, clangDiags, importerOpts.clangPath.c_str()))
     return nullptr;
+
+  // Disable validation for PCH in LLDB. This option is not controllable via a
+  // command line option; setting it depending on the DebuggerSupport flag.
+  // LLDB makes a best effort to create a 100% compatible environment by
+  // deserializing its CompilerInvocation and Clang flags from the main Swift
+  // module, but it needs to be able to adjust other language options on top in
+  // a way that otherwise would make validation fail.
+  if (importerOpts.DebuggerSupport)
+    CI->getPreprocessorOpts().DisablePCHOrModuleValidation =
+      clang::DisableValidationForModuleKind::PCH;
 
   return CI;
 }

@@ -268,6 +268,17 @@ func inoutParam_inoutNEParam_void(_: inout NE, _: inout NE) {} // OK
 @_lifetime(&ne)
 func inoutNEParam_NEResult_Lifetime(ne: inout NE) -> NE { ne }
 
+/* DEFAULT: @_lifetime(ne1: copy ne1, copy ne2) */
+// CHECK: @$s30lifetime_depend_infer_defaults013inoutNEParam_F12_mayReassign3ne13ne2yAA2NEVz_AFtF : $@convention(thin) (@lifetime(copy 0, copy 1) @inout NE, @guaranteed NE) -> () {
+@_lifetime(ne1: copy ne2)
+func inoutNEParam_NEParam_mayReassign(ne1: inout NE, ne2: NE) { ne1 = ne2 }
+
+// 'immortal' suppresses the usual 'inout' dependency.
+// CHECK: @$s30lifetime_depend_infer_defaults013inoutNEParam_F13_mustReassign3ne13ne2yAA2NEVz_AFtF : $@convention(thin) (@lifetime(immortal, copy 1) @inout NE, @guaranteed NE) -> () {
+/* DEFAULT: @_lifetime(ne1: copy ne2) */
+@_lifetime(ne1: immortal, copy ne2)
+func inoutNEParam_NEParam_mustReassign(ne1: inout NE, ne2: NE) { ne1 = ne2 }
+
 // =============================================================================
 // inout parameter default rule for methods
 // =============================================================================
@@ -318,6 +329,21 @@ struct NonEscapableMutableSelf: ~Escapable {
   // CHECK: @$s30lifetime_depend_infer_defaults23NonEscapableMutableSelfV30mutating_inoutNEParam_NEResult2neAA10NEImmortalVAA2NEVz_tF : $@convention(method) (@lifetime(copy 0) @inout NE, @lifetime(copy 1) @inout NonEscapableMutableSelf) -> @lifetime(borrow 1) @owned NEImmortal
   @_lifetime(&self)
   mutating func mutating_inoutNEParam_NEResult(ne: inout NE) -> NEImmortal { NEImmortal() }
+
+  /* DEFAULT: @_lifetime(self: copy self, copy ne) */
+  // CHECK: @$s30lifetime_depend_infer_defaults23NonEscapableMutableSelfV28mutating_NEParam_mayReassign2neyAA2NEV_tF : $@convention(method) (@guaranteed NE, @lifetime(copy 0, copy 1) @inout NonEscapableMutableSelf) -> () {
+  @_lifetime(self: copy ne)
+  mutating func mutating_NEParam_mayReassign(ne: NE) {
+    self = _overrideLifetime(self, copying: ne)
+  }
+
+  // 'immortal' suppresses the usual 'inout' dependency.
+  /* DEFAULT: @_lifetime(ne1: copy ne2) */
+  // CHECK: @$s30lifetime_depend_infer_defaults23NonEscapableMutableSelfV29mutating_NEParam_mustReassign2neyAA2NEV_tF : $@convention(method) (@guaranteed NE, @lifetime(immortal, copy 0) @inout NonEscapableMutableSelf) -> () {
+   @_lifetime(self: immortal, copy ne)
+  mutating func mutating_NEParam_mustReassign(ne: NE) {
+    self = _overrideLifetime(self, copying: ne)
+  }
 }
 
 // =============================================================================

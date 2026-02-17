@@ -3,7 +3,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}instance.h %t/test.swift -I %bridging-path -DVERIFY
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety \
+// RUN:    -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}instance.h %t/test.swift -I %bridging-path -DVERIFY
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t%{fs-sep}Inputs -strict-memory-safety \
+// RUN:    -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}instance.h %t/test.swift -I %bridging-path -DVERIFY -verify-additional-prefix nolifetimebound-
 // RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift -dump-macro-expansions -I %bridging-path 2> %t/out.txt
 // RUN: diff --strip-trailing-cr %t/out.txt %t/out.expected
 
@@ -16,10 +19,12 @@ func foo(_ p: inout MutableSpan<CInt>, a: A, aa: inout A, c: C, b: B, bb: inout 
   aa.bar(&p)
   a.constSelf(&p)
   a.valSelf(&p)
+  // expected-nolifetimebound-error@+1{{cannot convert value of type 'UnsafeMutablePointer<Int32>?' to specified type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
   let _: MutableSpan<CInt> = a.lifetimeBoundSelf(3)
   c.refSelf(&p)
   d.refSelf(&p)
   b.nonescaping(&p)
+  // expected-nolifetimebound-error@+1{{cannot convert value of type 'UnsafeMutablePointer<Int32>?' to specified type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
   let _: MutableSpan<CInt> = bb.nonescapingLifetimebound(73)
 
 #if VERIFY
@@ -108,6 +113,9 @@ public mutating func basic(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe basic(_pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -119,6 +127,9 @@ public func basic(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<Int32>) 
     let len = Int32(exactly: p.count)!
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
     }
     return unsafe basic(a, _pPtr.baseAddress!, len)
 }
@@ -132,6 +143,9 @@ public mutating func bar(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe bar(_pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -143,6 +157,9 @@ public func renamed(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<Int32>
     let len = Int32(exactly: p.count)!
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
     }
     return unsafe renamed(a, _pPtr.baseAddress!, len)
 }
@@ -156,6 +173,9 @@ public func constSelf(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe constSelf(_pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -167,6 +187,9 @@ public func constSelf(_ a: UnsafePointer<A>!, _ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
     }
     return unsafe constSelf(a, _pPtr.baseAddress!, len)
 }
@@ -180,6 +203,9 @@ public func valSelf(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe valSelf(_pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -191,6 +217,9 @@ public func valSelf(_ a: A, _ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
     }
     return unsafe valSelf(a, _pPtr.baseAddress!, len)
 }
@@ -220,6 +249,9 @@ public func refSelf(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe refSelf(_pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -231,6 +263,9 @@ public func refSelf(_ c: C!, _ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
     }
     return unsafe refSelf(c, _pPtr.baseAddress!, len)
 }
@@ -244,6 +279,9 @@ public func refSelf(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe refSelf(_pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -256,6 +294,9 @@ public func refSelfCF(_ d: D!, _ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe refSelfCF(d, _pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -267,6 +308,9 @@ public func nonescaping(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
     }
     return unsafe nonescaping(_pPtr.baseAddress!, len)
 }
@@ -306,6 +350,9 @@ public /*not inherited*/ init!(pointerA2 p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     unsafe self.init(countA2: len, pointerA2: _pPtr.baseAddress!)
 }
 ------------------------------
@@ -317,6 +364,9 @@ public func createA2(_ p: inout MutableSpan<Int32>) -> UnsafeMutablePointer<A>! 
     let len = Int32(exactly: p.count)!
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
     }
     return unsafe createA2(len, _pPtr.baseAddress!)
 }

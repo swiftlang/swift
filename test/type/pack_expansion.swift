@@ -108,3 +108,13 @@ typealias First<T, U> = T
 
 func unusedParameterPack2<each T>(_: repeat First<Int, each T>) {}
 // expected-error@-1 {{generic parameter 'T' is not used in function signature}}
+
+// ensure that packs aren't considered implicitly escaping
+func capturePackClosureWithoutEscape<each T>(_ t: repeat () -> each T) {
+  _ = {
+    _ = (repeat (each t)())
+  }
+}
+
+capturePackClosureWithoutEscape({ 1 }, { 2 })
+

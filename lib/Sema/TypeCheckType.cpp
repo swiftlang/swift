@@ -30,6 +30,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1799,6 +1800,32 @@ static void diagnoseGenericArgumentsOnSelf(const TypeResolution &resolution,
   }
 }
 
+/// Diagnose when this is one of the Borrow or Inout types, which currently require
+/// an experimental feature to use.
+static void diagnoseBorrowInoutType(TypeDecl *typeDecl, SourceLoc loc,
+                                    const DeclContext *dc) {
+  if (loc.isInvalid())
+    return;
+
+  if (!typeDecl->isStdlibDecl())
+    return;
+
+  ASTContext &ctx = typeDecl->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::BorrowInout))
+    return;
+
+  auto nameString = typeDecl->getName().str();
+  if (nameString != "Borrow" && nameString != "Inout")
+    return;
+
+  // Don't require this in the standard library or _Concurrency library.
+  auto module = dc->getParentModule();
+  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
+    return;
+
+  ctx.Diags.diagnose(loc, diag::borrow_inout_experimental, nameString);
+}
+
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
 /// \param silContext Used to look up generic parameters in SIL mode.
@@ -1913,6 +1940,8 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
+
+    diagnoseBorrowInoutType(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
     return current;
@@ -4318,9 +4347,9 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   unsigned numIsolatedParams = countIsolatedParamsUpTo(repr, 2);
   if (!repr->isWarnedAbout() && numIsolatedParams > 1) {
     diagnose(repr->getLoc(), diag::isolated_parameter_duplicate_type)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
 
-    if (ctx.isLanguageModeAtLeast(6))
+    if (ctx.isLanguageModeAtLeast(LanguageMode::v6))
       return ErrorType::get(ctx);
     else
       repr->setWarned();
@@ -4333,7 +4362,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     if (globalActor && !globalActor->hasError() && !globalActorAttr->isInvalid()) {
       if (numIsolatedParams != 0) {
         diagnose(repr->getLoc(), diag::isolated_parameter_global_actor_type)
-            .warnUntilLanguageMode(6);
+            .warnUntilLanguageMode(LanguageMode::v6);
         globalActorAttr->setInvalid();
       } else if (isolatedAttr) {
         diagnose(repr->getLoc(), diag::isolated_attr_global_actor_type,
@@ -5870,7 +5899,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   if (doDiag && !options.contains(TypeResolutionFlags::SilenceErrors)) {
     // In language modes up to Swift 5, we allow `T!` in invalid position for
     // compatibility and downgrade the error to a warning.
-    const unsigned swiftLangModeForError = 5;
+    const auto languageModeForError = LanguageMode::v5;
 
     // If we are about to error, mark this node as invalid.
     // This is the only way to indicate that something went wrong without
@@ -5884,17 +5913,17 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     // Compiler should diagnose both `Int!` and `String!` as invalid,
     // but returning `ErrorType` from here would stop type resolution
     // after `Int!`.
-    if (ctx.isLanguageModeAtLeast(swiftLangModeForError)) {
+    if (ctx.isLanguageModeAtLeast(languageModeForError)) {
       repr->setInvalid();
     }
 
     Diag<> diagID = diag::iuo_deprecated_here;
-    if (ctx.isLanguageModeAtLeast(swiftLangModeForError)) {
+    if (ctx.isLanguageModeAtLeast(languageModeForError)) {
       diagID = diag::iuo_invalid_here;
     }
 
     diagnose(repr->getExclamationLoc(), diagID)
-        .warnUntilLanguageMode(swiftLangModeForError);
+        .warnUntilLanguageMode(languageModeForError);
 
     // Suggest a regular optional, but not when `T!` is the right-hand side of
     // a cast expression.

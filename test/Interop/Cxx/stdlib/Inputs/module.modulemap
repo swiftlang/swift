@@ -117,3 +117,9 @@ module StdEnableSharedFromThis {
   requires cplusplus
   export *
 }
+
+module StdList {
+  header "std-list.h"
+  requires cplusplus
+  export *
+}

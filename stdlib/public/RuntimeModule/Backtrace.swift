@@ -361,9 +361,38 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   public func symbolicated(with images: ImageMap? = nil,
                            options: SymbolicationOptions = .default)
     -> SymbolicatedBacktrace? {
+    return symbolicated(with: images,
+                        platform: .default,
+                        alternativeSymbolFilePaths: [],
+                        options: options)
+  }
+
+  @_spi(Internal)
+  public enum SymbolicationPlatform {
+    case Darwin
+    case Linux
+    case Windows
+
+    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    static public let `default` = SymbolicationPlatform.Darwin
+    #elseif os(Linux)
+    static public let `default` = SymbolicationPlatform.Linux
+    #elseif os(Windows)
+    static public let `default` = SymbolicationPlatform.Windows
+    #endif
+  }
+
+  @_spi(Internal)
+  public func symbolicated(with images: ImageMap? = nil,
+                           platform: SymbolicationPlatform,
+                           alternativeSymbolFilePaths: [String],
+                           options: SymbolicationOptions = .default)
+    -> SymbolicatedBacktrace? {
     return SymbolicatedBacktrace.symbolicate(
       backtrace: self,
       images: images,
+      platform: platform,
+      alternativeSymbolFilePaths: alternativeSymbolFilePaths,
       options: options
     )
   }

@@ -58,7 +58,7 @@ TEST(DiagnosticBehavior, WarnUntilSwiftLangMode) {
       [](DiagnosticEngine &diags) {
         diags.setLanguageVersion(version::Version({5}));
         diags.diagnose(SourceLoc(), diag::error_immediate_mode_missing_stdlib)
-            .warnUntilLanguageMode(4);
+            .warnUntilLanguageMode(LanguageMode::v4);
       },
       [](DiagnosticEngine &diags, const DiagnosticInfo &info) {
         EXPECT_EQ(info.Kind, DiagnosticKind::Error);
@@ -72,7 +72,7 @@ TEST(DiagnosticBehavior, WarnUntilSwiftLangMode) {
       [](DiagnosticEngine &diags) {
         diags.setLanguageVersion(version::Version({4}));
         diags.diagnose(SourceLoc(), diag::error_immediate_mode_missing_stdlib)
-            .warnUntilLanguageMode(5);
+            .warnUntilLanguageMode(LanguageMode::v5);
       },
       [](DiagnosticEngine &diags, const DiagnosticInfo &info) {
         EXPECT_EQ(info.Kind, DiagnosticKind::Warning);
@@ -90,7 +90,7 @@ TEST(DiagnosticBehavior, WarnUntilSwiftLangMode) {
       [](DiagnosticEngine &diags) {
         diags.setLanguageVersion(version::Version({4}));
         diags.diagnose(SourceLoc(), diag::error_immediate_mode_missing_stdlib)
-            .warnUntilLanguageMode(99);
+            .warnUntilLanguageMode(LanguageMode::future);
       },
       [](DiagnosticEngine &diags, const DiagnosticInfo &info) {
         EXPECT_EQ(info.Kind, DiagnosticKind::Warning);

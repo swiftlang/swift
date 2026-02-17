@@ -57,7 +57,7 @@ std::optional<Feature> Feature::getExperimentalFeature(llvm::StringRef name) {
       .Default(std::nullopt);
 }
 
-std::optional<unsigned> Feature::getLanguageMode() const {
+std::optional<LanguageMode> Feature::getLanguageMode() const {
   switch (kind) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)                  \

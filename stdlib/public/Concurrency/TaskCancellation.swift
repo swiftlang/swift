@@ -197,9 +197,33 @@ extension Task {
   /// After the value of this property becomes `true`, it remains `true` indefinitely.
   /// There is no way to uncancel a task.
   ///
-  /// - SeeAlso: `checkCancellation()`
-  @_transparent public var isCancelled: Bool {
-    _taskIsCancelled(_task)
+  /// This property returns the actual cancellation state of the task, regardless of whether
+  /// a cancellation shield is active. Use ``Task/isCancelled`` (the static property)
+  /// if you need cancellation checking that respects active shields.
+  ///
+  /// ### Instance property isCancelled ignores Task Cancellation Shields
+  ///
+  /// Instance properties `task.isCancelled` and `unsafeCurrentTask.isCancelled`
+  /// are not contextual and therefore do not respect cancellation shields.
+  /// If a task was cancelled and is executing with an active cancellation shield,
+  /// these properties will return the _actual_ cancellation status of the task.
+  ///
+  /// Prefer using `Task.isCancelled` (the static property) in most situations when checking
+  /// the cancellation status from inside the task.
+  ///
+  /// - SeeAlso: ``Task/isCancelled``
+  /// - SeeAlso: ``Task/checkCancellation()``
+  /// - SeeAlso: ``Task/hasActiveCancellationShield``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  @_transparent
+  public var isCancelled: Bool {
+    // This is @available(SwiftStdlib 6.4, *) but can't use SwiftStdlib in transparent function
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *) {
+      let ignoreTaskCancellationShield: UInt64 = 0x1
+      return unsafe _taskIsCancelledWithFlags(_task, flags: ignoreTaskCancellationShield)
+    } else {
+      return _taskIsCancelled(_task)
+    }
   }
 }
 
@@ -210,11 +234,22 @@ extension Task where Success == Never, Failure == Never {
   /// After the value of this property becomes `true`, it remains `true` indefinitely.
   /// There is no way to uncancel a task.
   ///
-  /// - SeeAlso: `checkCancellation()`
+  /// ### Interaction with Task Cancellation Shields
+  ///
+  /// Cancellation may be suppressed by an active task cancellation shield
+  /// (``withTaskCancellationShield(operation:)``), which may cause `isCancelled`
+  /// to return `false` even though the task has been cancelled externally.
+  ///
+  /// - SeeAlso: ``checkCancellation()``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   public static var isCancelled: Bool {
-     unsafe withUnsafeCurrentTask { task in
-       unsafe task?.isCancelled ?? false
-     }
+    unsafe withUnsafeCurrentTask { task in
+      if #available(SwiftStdlib 6.4, *) {
+        unsafe task?._isCancelled(ignoreTaskCancellationShield: false) ?? false
+      } else {
+        unsafe task?.isCancelled ?? false
+      }
+    }
   }
 }
 
@@ -255,3 +290,215 @@ func _taskRemoveCancellationHandler(
   record: UnsafeRawPointer /*CancellationNotificationStatusRecord*/
 )
 
+
+// ==== Task Cancellation Shielding -------------------------------------------
+
+/// Enters a scope in which a task cancellation shield is active.
+///
+/// Cancellation shields are primarily used to ensure some cleanup code will
+/// definitely run, even if the context in which the cleanup functions are called from
+/// is a cancelled task, and the functions may otherwise return early (due to observing
+/// the cancellation of the current task).
+///
+/// For example, a resource cleanup function might internally check for cancellation,
+/// which could cause it to skip important cleanup work:
+///
+/// ```swift
+/// let resource = await makeResource()
+/// defer {
+///   await withTaskCancellationShield {
+///     await resource.finish() // runs to completion, even if task was cancelled earlier
+///   }
+/// }
+///
+/// struct Resource {
+///   func finish() {
+///     guard !Task.isCancelled() else { return } // returns early if task was cancelled!
+///     // real work happens here
+///   }
+/// ```
+///
+/// While inside a cancellation shield, `Task.isCancelled` returns `false` and
+/// `Task.checkCancellation()` does not throw, even if the surrounding task
+/// has been cancelled. Similarly task cancellation handlers do not trigger
+/// while executing in a shielded block of code.
+///
+/// Once the shield scope exits, the task's actual
+/// cancellation status becomes observable again. Cancellation shields to not
+/// prevent the task from becoming cancelled, but only prevent observing the
+/// cancellation while executing inside a shielded scope.
+///
+/// Cancellation shields also prevent cancellation from propagating to child tasks
+/// created within the shielded scope:
+///
+/// ```swift
+/// let task = Task {
+///   withUnsafeCurrentTask { $0?.cancel() } // cancel the task
+///
+///   await withTaskCancellationShield {
+///     // Child tasks created here do NOT observe the parent's cancellation
+///     // and therefore start as not cancelled. They can be individually cancelled though.
+///     await withTaskGroup(of: Void.self) { group in
+///       group.addTask {
+///         print(Task.isCancelled) // false
+///       }
+///       for await _ in group {}
+///
+///       group.cancelAll() // explicitly cancelling the group does cancel child tasks of the group
+///       group.addTask {
+///         print(Task.isCancelled) // true
+///       }
+///     }
+///   }
+/// }
+/// ```
+///
+/// Note that shielding the `addTask` call itself does not shield the child task:
+///
+/// ```swift
+/// await withTaskGroup(of: Void.self) { group in
+///   group.cancelAll()
+///   withTaskCancellationShield {
+///     group.addTask { print(Task.isCancelled) } // true - child IS cancelled
+///   }
+///   group.addTask {
+///     withTaskCancellationShield { print(Task.isCancelled) } // false - shielded inside child
+///   }
+/// }
+/// ```
+@available(SwiftStdlib 6.4, *)
+@_alwaysEmitIntoClient
+public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
+  operation: nonisolated(nonsending) () async throws(Failure) -> Value,
+) async throws(Failure) -> Value {
+  let didInstallShield = Builtin.taskCancellationShieldPush()
+
+  defer {
+    if Bool(didInstallShield) {
+      Builtin.taskCancellationShieldPop()
+     }
+  }
+
+  return try await operation()
+}
+
+
+/// Enters a scope in which a task cancellation shield is active.
+///
+/// Cancellation shields are primarily used to ensure some cleanup code will
+/// definitely run, even if the context in which the cleanup functions are called from
+/// is a cancelled task, and the functions may otherwise return early (due to observing
+/// the cancellation of the current task).
+///
+/// For example, a resource cleanup function might internally check for cancellation,
+/// which could cause it to skip important cleanup work:
+///
+/// ```swift
+/// let resource = await makeResource()
+/// defer {
+///   await withTaskCancellationShield {
+///     await resource.finish() // runs to completion, even if task was cancelled earlier
+///   }
+/// }
+///
+/// struct Resource {
+///   func finish() {
+///     guard !Task.isCancelled() else { return } // returns early if task was cancelled!
+///     // real work happens here
+///   }
+/// ```
+///
+/// While inside a cancellation shield, `Task.isCancelled` returns `false` and
+/// `Task.checkCancellation()` does not throw, even if the surrounding task
+/// has been cancelled. Similarly task cancellation handlers do not trigger
+/// while executing in a shielded block of code.
+///
+/// Once the shield scope exits, the task's actual
+/// cancellation status becomes observable again. Cancellation shields to not
+/// prevent the task from becoming cancelled, but only prevent observing the
+/// cancellation while executing inside a shielded scope.
+///
+/// Cancellation shields also prevent cancellation from propagating to child tasks
+/// created within the shielded scope:
+///
+/// ```swift
+/// let task = Task {
+///   withUnsafeCurrentTask { $0?.cancel() } // cancel the task
+///
+///   await withTaskCancellationShield {
+///     // Child tasks created here do NOT observe the parent's cancellation
+///     // and therefore start as not cancelled. They can be individually cancelled though.
+///     await withTaskGroup(of: Void.self) { group in
+///       group.addTask {
+///         print(Task.isCancelled) // false
+///       }
+///       for await _ in group {}
+///
+///       group.cancelAll() // explicitly cancelling the group does cancel child tasks of the group
+///       group.addTask {
+///         print(Task.isCancelled) // true
+///       }
+///     }
+///   }
+/// }
+/// ```
+///
+/// Note that shielding the `addTask` call itself does not shield the child task:
+///
+/// ```swift
+/// await withTaskGroup(of: Void.self) { group in
+///   group.cancelAll()
+///   withTaskCancellationShield {
+///     group.addTask { print(Task.isCancelled) } // true - child IS cancelled
+///   }
+///   group.addTask {
+///     withTaskCancellationShield { print(Task.isCancelled) } // false - shielded inside child
+///   }
+/// }
+/// ```
+@available(SwiftStdlib 6.4, *)
+@_alwaysEmitIntoClient
+public func withTaskCancellationShield<Value, Failure>(
+  operation: () throws(Failure) -> Value,
+) throws(Failure) -> Value {
+  let didInstallShield = Builtin.taskCancellationShieldPush()
+
+  defer {
+    if Bool(didInstallShield) {
+      Builtin.taskCancellationShieldPop()
+    }
+  }
+
+  return try operation()
+}
+
+@available(SwiftStdlib 6.4, *)
+extension Task where Success == Never, Failure == Never {
+  /// Checks if the current task is executing in a scope with a task cancellation shield activated by the
+  /// ``withTaskCancellationShield(operation:)`` function.
+  ///
+  /// An active task cancellation shield prevents a task's ability to observe if it was cancelled,
+  /// i.e. the ``Task/isCancelled`` property will always return `false` when the task is executing
+  /// with an active shield.
+  ///
+  /// This property is primarily aimed at  debugging and understanding cancellation behavior
+  /// in complex call hierarchies, and should not be used in regular control flow.
+  ///
+  /// Returns `true` when executing within a task that has an active cancellation shield.
+  ///
+  /// Cancellation shields are not automatically inherited by child tasks; each child task must install
+  /// its own shield if needed if it, independently, wanted to ignore cancellation during a specific scope.
+  ///
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  /// - SeeAlso: ``UnsafeCurrentTask/hasActiveCancellationShield``
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  public static var hasActiveCancellationShield: Bool {
+    @_alwaysEmitIntoClient
+    get {
+      unsafe withUnsafeCurrentTask { task in
+        unsafe task?.hasActiveCancellationShield ?? false
+      }
+    }
+  }
+}

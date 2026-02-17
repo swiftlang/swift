@@ -1342,7 +1342,7 @@ namespace {
         // rdar://85263844, as it can affect the prioritization of bindings,
         // which can affect behavior for tuple matching as tuple subtyping is
         // currently a *weaker* constraint than tuple conversion.
-        if (!CS.getASTContext().isLanguageModeAtLeast(6)) {
+        if (!CS.getASTContext().isLanguageModeAtLeast(LanguageMode::v6)) {
           auto paramTypeVar = CS.createTypeVariable(
               CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument),
               TVO_CanBindToLValue | TVO_CanBindToInOut | TVO_CanBindToNoEscape |
@@ -1527,7 +1527,7 @@ namespace {
       // NB Keep adding the additional layer in Swift 5 and on if this 'try?'
       // applies to a delegation to an 'Optional' initializer, or else we won't
       // discern the difference between a failure and a constructed value.
-      if (CS.getASTContext().isLanguageModeAtLeast(5) &&
+      if (CS.getASTContext().isLanguageModeAtLeast(LanguageMode::v5) &&
           !isDelegationToOptionalInit) {
         CS.addConstraint(ConstraintKind::Conversion,
                          CS.getType(expr->getSubExpr()), optTy,
@@ -4028,6 +4028,8 @@ static bool generateForEachStmtConstraints(ConstraintSystem &cs,
                                            DeclContext *dc, ForEachStmt *stmt,
                                            Pattern *typeCheckedPattern,
                                            bool shouldBindPatternVarsOneWay) {
+  auto &ctx = cs.getASTContext();
+  bool isBorrowing = ctx.LangOpts.hasFeature(Feature::BorrowingForLoop);
   bool isAsync = stmt->getAwaitLoc().isValid();
   auto *sequenceExpr = stmt->getSequence();
 
@@ -4035,8 +4037,10 @@ static bool generateForEachStmtConstraints(ConstraintSystem &cs,
   // constraint for this as part of ForEachElement, and we rely on querying the
   // contextual type for diagnostics.
   auto *sequenceProto = TypeChecker::getProtocol(
-      cs.getASTContext(), stmt->getForLoc(),
-      isAsync ? KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
+      ctx, stmt->getForLoc(),
+      isAsync ? KnownProtocolKind::AsyncSequence
+              : (isBorrowing ? KnownProtocolKind::BorrowingSequence
+                             : KnownProtocolKind::Sequence));
   if (!sequenceProto)
     return true;
 

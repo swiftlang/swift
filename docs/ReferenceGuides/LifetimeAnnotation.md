@@ -189,7 +189,7 @@ Similarly, an implicit initializer of a non-Escapable struct defaults to `@_life
 
 Function types can also have lifetime dependencies. This makes it possible to pass a callback function parameter that returns a non-Escapable type.
 The annotation syntax is the same as above, and the default lifetime inference rules for non-member functions apply.
-Support for lifetime dependencies in closures is not yet implemented, so only normal functions may be passed.
+Support for lifetime dependencies on captured values is not yet implemented, so methods and certain closures (see below) cannot be passed.
 
 Examples:
 
@@ -218,4 +218,31 @@ func takeProcessor2(ne0: NE, ne1: NE,
                     fn: @_lifetime(copy ne0) (_ ne0: NE, NE) -> NE) -> NE {
     return fn(ne0, ne1)
 }
+```
+
+Currently, there is no way to express lifetime dependencies on the captured context.
+Closures can use the captured context, but cannot return or write to captured `~Escapable` values.
+
+```swift
+func takePicker(/* DEFAULT: @_lifetime(copy ne0, copy ne1) */
+                picker: (NE, NE) -> NE) {
+    let x = NE()
+    let y = NE()
+    _ = picker(x, y)
+}
+func predicate(ne: NE) -> Bool { ... }
+
+// OK, only parameters are used
+takePicker { ne0, ne1 in ne0 }
+
+// Error: Captured ~Escapable variable ne2 escapes.
+let ne2 = NE()
+takePicker { ne0, ne1 in ne2 }
+
+// OK, ne3 is captured but it doesn't escape.
+let ne3 = NE()
+takePicker { ne0, ne1 in
+  if predicate(ne: ne3) { return ne0 } else { return ne1 }
+}
+
 ```

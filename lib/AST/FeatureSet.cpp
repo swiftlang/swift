@@ -425,6 +425,7 @@ UNINTERESTING_FEATURE(LibraryEvolution)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
+UNINTERESTING_FEATURE(ImportCxxMembersLazily)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
@@ -529,6 +530,7 @@ UNINTERESTING_FEATURE(BuiltinInterleave)
 UNINTERESTING_FEATURE(BuiltinVectorsExternC)
 UNINTERESTING_FEATURE(AddressOfProperty2)
 UNINTERESTING_FEATURE(ImmutableWeakCaptures)
+UNINTERESTING_FEATURE(BorrowingForLoop)
 
 static bool usesFeatureBorrowAndMutateAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureBorrowAndMutateAccessors =
@@ -597,6 +599,7 @@ static bool usesFeatureReparenting(Decl *decl) {
 
 UNINTERESTING_FEATURE(AnyAppleOSAvailability)
 UNINTERESTING_FEATURE(StrictAccessControl)
+UNINTERESTING_FEATURE(BorrowInout)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

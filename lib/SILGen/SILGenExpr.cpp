@@ -406,12 +406,22 @@ ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
 
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
                                   std::optional<SILLocation> L) {
+  SILLocation loc = L ? *L : E;
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope writeback(*this);
     auto lv = emitLValue(load->getSubExpr(),
                          SGFAccessKind::BorrowedAddressRead);
-    emitCopyLValueInto(L ? *L : E, std::move(lv), I);
+    emitCopyLValueInto(loc, std::move(lv), I);
+    return;
+  }
+
+  if (I->isBorrow()) {
+    FormalEvaluationScope writeback(*this);
+    auto lv = emitLValue(E, SGFAccessKind::BorrowedObjectRead);
+    ManagedValue MV = emitBorrowedLValue(E, std::move(lv));
+    I->copyOrInitValueInto(*this, loc, std::move(MV), /*isInit*/ true);
+    std::move(writeback).deferPop();
     return;
   }
 
@@ -419,7 +429,7 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
   RValue result = emitRValue(E, SGFContext(I));
   if (result.isInContext())
     return;
-  std::move(result).ensurePlusOne(*this, E).forwardInto(*this, L ? *L : E, I);
+  std::move(result).ensurePlusOne(*this, E).forwardInto(*this, loc, I);
 }
 
 namespace {
@@ -1300,8 +1310,9 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   // FIXME: Much of this was copied from visitOptionalEvaluationExpr.
 
   // Prior to Swift 5, an optional try's subexpression is always wrapped in an additional optional
-  bool shouldWrapInOptional = !(SGF.getASTContext().isLanguageModeAtLeast(5));
-  
+  bool shouldWrapInOptional =
+      !(SGF.getASTContext().isLanguageModeAtLeast(LanguageMode::v5));
+
   auto &optTL = SGF.getTypeLowering(E->getType());
 
   Initialization *optInit = C.getEmitInto();
