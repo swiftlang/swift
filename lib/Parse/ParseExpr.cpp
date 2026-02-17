@@ -1387,16 +1387,12 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (Tok.is(tok::l_brace) && isValidTrailingClosure(isExprBasic, *this)) {
       // FIXME: if Result has a trailing closure, break out.
 
+      // Stop after most types of literals, which may never have trailing closures.
+      // Array and dictionary literals support trailing closures since this can mean
+      // `[Element].init { }` or `[Key: Value].init { }`.
       const auto *callee = Result.get();
-      if (isa<LiteralExpr>(callee) || isa<CollectionExpr>(callee) ||
-          isa<TupleExpr>(callee)) {
-        // Trailing closures are allowed after array and dictionary types,
-        // since this can mean `[Element].init { }` or `[Key: Value].init { }`.
-        bool allowTrailingClosureAfterCollectionLiteral =
-            (isa<ArrayExpr>(callee) || isa<DictionaryExpr>(callee));
-
-        if (!allowTrailingClosureAfterCollectionLiteral)
-          break;
+      if (isa<LiteralExpr>(callee) || isa<TupleExpr>(callee)) {
+        break;
       }
 
       SmallVector<Argument, 2> trailingClosures;

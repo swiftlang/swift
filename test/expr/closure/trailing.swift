@@ -537,6 +537,13 @@ extension Dictionary {
   }
 }
 
+extension Dictionary {
+  func callAsFunction(_ closure: (Self) -> Void) -> Self {
+    closure(self)
+    return self
+  }
+}
+
 func testTrailingClosureCollectionInits() {
   _ = [String] { "foo" }
   _ = [String].init { "foo" }
@@ -569,12 +576,28 @@ func testTrailingClosureCollectionInits() {
     (key: "bar", value: 43)
   }
 
+  // Array doesn't has a `callAsFunction` defined in this file.
   _ = [1] { return [1] } // expected-error {{cannot call value of non-function type '[Int]'}}
-  _ = [1: 1] { return [1: 1] } // expected-error {{cannot call value of non-function type '[Int : Int]'}}
 
   _ = [1] // expected-error {{cannot call value of non-function type '[Int]'}}
   { return [1] }
+  
+  var didSetAfterArrayLiteral = [42] {
+    didSet {
+      print(didSetAfterArrayLiteral)
+    }
+  }
 
-  _ = [1: 1] // expected-error {{cannot call value of non-function type '[Int : Int]'}}
-  { return [1: 1] }
+  didSetAfterArrayLiteral[0] += 1
+  
+  // Dictionary does has a `callAsFunction` defined in this file.
+  let dictionaryCallAsFunction = [41: 0] { print($0) }
+
+  var didSetAfterDictionaryLiteral = [42: 0] {
+    didSet {
+      print(didSetAfterDictionaryLiteral)
+    }
+  }
+
+  didSetAfterDictionaryLiteral[42] = 1
 }
