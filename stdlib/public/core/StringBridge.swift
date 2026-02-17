@@ -65,6 +65,13 @@ internal typealias _CocoaString = AnyObject
   
   @objc(isNSString__)
   func getIsNSString() -> Int8
+  
+  @objc(_isEqualToBytes:count:encoding)
+  func isEqualToBytes(
+    _ bytes: UnsafeRawPointer,
+    count: Int,
+    encoding: UInt
+  ) -> Int8
 }
 
 /*
@@ -117,6 +124,31 @@ internal func _stdlib_binary_CFStringGetLength(
 @_effects(readonly)
 internal func _isNSString(_ str:AnyObject) -> Bool {
   return isNSStringImpl(_objc(str))
+}
+
+@_effects(readonly)
+private func _NSStringIsEqualToBytesImpl(
+  _ str: _CocoaString,
+  bytes: UnsafeRawPointer,
+  count: Int,
+  encoding: UInt
+) -> Int8 {
+  return str.isEqualToBytes(bytes, count: count, encoding: encoding)
+}
+
+@_effects(readonly)
+internal func _NSStringIsEqualToBytes(
+  _ str: AnyObject,
+  bytes: UnsafeRawPointer,
+  count: Int,
+  encoding: UInt
+) -> Int8 {
+  return _NSStringIsEqualToBytesImpl(
+    _objc(str),
+    bytes,
+    count,
+    encoding
+  )
 }
 
 @_effects(readonly)
@@ -180,7 +212,8 @@ internal func _cocoaStringSubscript(
 private func _NSStringCopyBytes(
   _ o: _StringSelectorHolder,
   encoding: UInt,
-  into bufPtr: UnsafeMutableRawBufferPointer
+  into bufPtr: UnsafeMutableRawBufferPointer,
+  options: Int
 ) -> Int? {
   let ptr = unsafe bufPtr.baseAddress._unsafelyUnwrappedUnchecked
   let len = o.length
@@ -191,7 +224,7 @@ private func _NSStringCopyBytes(
     maxLength: bufPtr.count,
     usedLength: &usedLen,
     encoding: encoding,
-    options: 0,
+    options: options,
     range: _SwiftNSRange(location: 0, length: len),
     remaining: &remainingRange
   )
@@ -204,24 +237,43 @@ private func _NSStringCopyBytes(
 @_effects(releasenone)
 internal func _cocoaStringCopyUTF8(
   _ target: _CocoaString,
-  into bufPtr: UnsafeMutableRawBufferPointer
+  into bufPtr: UnsafeMutableRawBufferPointer,
+  options: Int = 0
 ) -> Int? {
   return unsafe _NSStringCopyBytes(
     _objc(target),
     encoding: _cocoaUTF8Encoding,
-    into: bufPtr
+    into: bufPtr,
+    options: options
   )
 }
 
 @_effects(releasenone)
 internal func _cocoaStringCopyASCII(
   _ target: _CocoaString,
-  into bufPtr: UnsafeMutableRawBufferPointer
+  into bufPtr: UnsafeMutableRawBufferPointer,
+  options: Int = 0
 ) -> Int? {
   return unsafe _NSStringCopyBytes(
     _objc(target),
     encoding: _cocoaASCIIEncoding,
-    into: bufPtr
+    into: bufPtr,
+    options: options
+  )
+}
+
+@_effects(releasenone)
+internal func _cocoaStringCopyBytes(
+  _ target: _CocoaString,
+  encoding: UInt,
+  into bufPtr: UnsafeMutableRawBufferPointer,
+  options: Int = 0
+) -> Int? {
+  return unsafe _NSStringCopyBytes(
+    _objc(target),
+    encoding: encoding,
+    into: bufPtr,
+    options: options
   )
 }
 

@@ -87,6 +87,8 @@ swift_stdlib_NSObject_isEqual(id lhs,
   return (lhs == rhs) || [lhs isEqual:rhs];
 }
 
+extern BOOL _swizzle_me_isEqual(id, SEL, void *, intptr_t, uintptr_t);
+
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 bool
 swift_stdlib_connectNSBaseClasses() {
@@ -100,6 +102,19 @@ swift_stdlib_connectNSBaseClasses() {
   class_setSuperclass(NS${Class}OurClass, NS${Class}Super);
 #pragma clang diagnostic pop
 % end
+  Class NSStringClass = objc_lookUpClass("NSString");
+  if (!NSStringClass) return false;
+
+#if __LP64__
+  const char *typeString = "c@:^vqQ";
+#else
+  const char *typeString = "c@:^vlL";
+#endif
+  class_addMethod(
+    NSStringClass,
+    @selector(_isEqualToBytes:count:encoding:),
+    (IMP)_swizzle_me_isEqual,
+    typeString);
   return true;
 }
 
