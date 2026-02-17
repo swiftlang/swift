@@ -51,8 +51,6 @@
 #include <cstddef>
 #include <functional>
 
-using namespace swift::constraints::inference;
-
 namespace swift {
 
 class Expr;
@@ -69,6 +67,9 @@ class SyntacticElementTarget;
 struct DeclReferenceType;
 class PreparedOverload;
 struct PreparedOverloadBuilder;
+
+// Subtyping.h
+enum class ConversionBehavior : unsigned;
 
 } // end namespace constraints
 
@@ -3739,6 +3740,36 @@ public:
   /// so return a valid conformance reference.
   ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *P);
 
+  /// We memoize the computation in the below.
+  llvm::DenseMap<std::pair<ConversionBehavior, ProtocolDecl *>, bool>
+      ConformanceTransitiveForSupertypeCache;
+
+  /// Suppose we are given a type T with the given conversion behavior,
+  /// and a protocol P, with the following setup:
+  /// - T conv $T0
+  /// - $T0 conforms P
+  /// The question is, does this imply that T must conform to P? This
+  /// returns true if so, false otherwise.
+  ///
+  /// Also see Subtyping.h, checkTranstiveSupertypeConformance().
+  bool isConformanceTransitiveForSupertype(ConversionBehavior behavior,
+                                           ProtocolDecl *proto);
+
+  /// We memoize the computation in the below.
+  llvm::DenseMap<std::pair<ConversionBehavior, ProtocolDecl *>, bool>
+      ConformanceTransitiveForSubtypeCache;
+
+  /// Suppose we are given a type T with the given conversion behavior,
+  /// and a protocol P, with the following setup:
+  /// - $T0 conv T
+  /// - $T0 conforms P
+  /// The question is, does this imply that T must conform to P? This
+  /// returns true if so, false otherwise.
+  ///
+  /// Also see Subtyping.h, checkTranstiveSubtypeConformance().
+  bool isConformanceTransitiveForSubtype(ConversionBehavior behavior,
+                                         ProtocolDecl *proto);
+
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
   /// the appropriate closure-type and opening extraction functions.
   FunctionType *adjustFunctionTypeForConcurrency(
@@ -4689,13 +4720,13 @@ public:
 
   /// Determine whether given type variable with its set of bindings is viable
   /// to be attempted on the next step of the solver.
-  const BindingSet *determineBestBindings();
+  const inference::BindingSet *determineBestBindings();
 
   /// Get bindings for the given type variable based on current
   /// state of the constraint system.
   ///
   /// FIXME: Remove this.
-  BindingSet getBindingsFor(TypeVariableType *typeVar);
+  inference::BindingSet getBindingsFor(TypeVariableType *typeVar);
 
 private:
   /// Add a constraint to the constraint system.
