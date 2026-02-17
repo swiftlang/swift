@@ -21,6 +21,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceAttributes.h"
 #include "swift/AST/DebuggerClient.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
@@ -3648,6 +3649,100 @@ AllInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   });
 
   return PD->getASTContext().AllocateCopy(result.getArrayRef());
+}
+
+static void diagnoseDuplicateReparenting(
+    ProtocolDecl const *PD,
+    ArrayRef<ReparentingProtocolsRequest::Result> previous,
+    ReparentingProtocolsRequest::Result const &duplicate) {
+
+  auto bestLoc = [](ReparentingProtocolsRequest::Result const &result) {
+    auto *ext = std::get<ExtensionDecl *>(result);
+    auto index = std::get<unsigned>(result);
+    SourceLoc loc = ext->getLoc();
+    if (auto betterLoc = ext->getInherited().getEntry(index).getLoc())
+      loc = betterLoc;
+    return loc;
+  };
+
+  auto &ctx = PD->getASTContext();
+  ProtocolDecl *newParent = std::get<0>(duplicate);
+
+  // Emit the error.
+  ctx.Diags.diagnose(bestLoc(duplicate),
+                     diag::extension_protocol_reparented_duplicate, PD,
+                     newParent);
+
+  // Hunt for the location of the previous extension.
+  SourceLoc previousLoc;
+  for (auto const &prev : previous) {
+    if (std::get<ProtocolDecl *>(prev) == newParent) {
+      previousLoc = bestLoc(prev);
+      break;
+    }
+  }
+  assert(previousLoc);
+
+  // Emit a note about the previous '@reparented' declaration.
+  ctx.Diags.diagnose(previousLoc, diag::invalid_reparented_prev, PD, newParent);
+}
+
+ArrayRef<ReparentingProtocolsRequest::Result>
+ReparentingProtocolsRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *PD) const {
+  // ObjC protocols cannot be reparented.
+  if (PD->isObjC())
+    return {};
+
+  auto const *expectedModule = PD->getModuleContext();
+
+  SmallPtrSet<ProtocolDecl *, 4> reparented;
+  SmallVector<Result, 4> result;
+  for (auto *ext : PD->getExtensions()) {
+
+    // Extensions in other modules can't validly declare a reparenting.
+    if (ext->getModuleContext() != expectedModule)
+      continue;
+
+    // Search for @reparented entries in the extension's inheritance clause.
+    auto inheritedTypes = ext->getInherited();
+    for (auto index : inheritedTypes.getIndices()) {
+      auto const &inherited = inheritedTypes.getEntry(index);
+
+      if (!inherited.isReparented())
+        continue;
+
+      // Resolve the type.
+      Type ty = inheritedTypes.getResolvedType(index,
+                                               TypeResolutionStage::Structural);
+
+      if (!ty || ty->hasError())
+        continue;
+
+      auto protoTy = ty->castTo<ProtocolType>();
+      ProtocolDecl *newBase = protoTy->getDecl();
+      ASSERT(newBase != PD && "reparenting itself?");
+
+      // Duplicate extension. Should only be one.
+      if (!reparented.insert(newBase).second) {
+        diagnoseDuplicateReparenting(PD, result, {newBase, ext, index});
+        continue;
+      }
+
+      result.emplace_back(newBase, ext, index);
+    }
+  }
+
+  if (result.empty())
+    return {};
+
+  // Give a stable ordering by protocols to avoid later non-determinism.
+  llvm::array_pod_sort(result.begin(), result.end(),
+                       [](Result const *a, Result const *b) {
+                         return TypeDecl::compare(std::get<ProtocolDecl *>(*a),
+                                                  std::get<ProtocolDecl *>(*b));
+                       });
+  return PD->getASTContext().AllocateCopy(result);
 }
 
 ArrayRef<ValueDecl *>
