@@ -373,3 +373,190 @@ extension _StringGutsSlice {
     return false
   }
 }
+
+fileprivate extension RawSpan {
+  @inline(__always)
+  func decodeUTF8(ofWidth width: Int, at index: Int, in bytes: RawSpan) -> UInt32? {
+    guard index < bytes.byteOffsets.upperBound &- width else {
+      return nil
+    }
+    var l1 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 0, as: UInt8.self))
+    switch width {
+    case 1:
+      break
+    case 2:
+      let l2 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 1, as: UInt8.self))
+      l1 =  (l1 & 0b00011111) << 6
+      l1 |= (l2 & 0b00111111)
+    case 3:
+      let l2 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 1, as: UInt8.self))
+      let l3 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 2, as: UInt8.self))
+      l1 =  (l1 & 0b00011111) << 12
+      l1 |= (l2 & 0b00111111) << 6
+      l1 |= (l3 & 0b00111111)
+    default:
+      let l2 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 1, as: UInt8.self))
+      let l3 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 2, as: UInt8.self))
+      let l4 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 3, as: UInt8.self))
+      l1 =  (l1 & 0b00011111) << 18
+      l1 |= (l2 & 0b00111111) << 12
+      l1 |= (l3 & 0b00111111) << 6
+      l1 |= (l4 & 0b00111111)
+    }
+    return l1
+  }
+  
+  @inline(__always)
+  func decodeUTF16(ofWidth width: Int, at index: Int, in bytes: RawSpan) -> UInt32? {
+    _debugPrecondition(width == 2 || width == 4)
+    guard index < bytes.byteOffsets.upperBound &- width else {
+      return nil
+    }
+    let r1 = unsafe bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index, as: UInt16.self)
+    if width == 2 {
+      return UInt32(r1)
+    }
+    if !Unicode.UTF16.isLeadSurrogate(r1) {
+      return nil
+    }
+    let r2 = unsafe bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 2, as: UInt16.self)
+    if !Unicode.UTF16.isTrailSurrogate(r2) {
+      return nil
+    }
+    return Unicode.UTF16._decodeSurrogates(r1, r2).value
+  }
+  
+  @inline(__always)
+  func contentsAreTriviallyIdentical(to rhs: RawSpan) -> Bool? {
+    if self.isIdentical(to: rhs) {
+      return true
+    }
+    if self.byteCount == 0 {
+      return rhs.byteCount == 0
+    }
+    if rhs.byteCount == 0 {
+      return false //already covered lhs.byteCount == 0 above
+    }
+    return nil //can't decide trivially
+  }
+}
+
+fileprivate func isEqual(
+  utf8Bytes lhs: RawSpan,
+  utf16Bytes rhs: RawSpan
+) -> Bool {
+    // If the UTF8 buffer is entirely 3 byte characters, that will be 2 bytes in UTF16
+    let minimumUTF16CountForUTF8 = (lhs.byteCount * 2) / 3
+    if rhs.byteCount < minimumUTF16CountForUTF8 {
+      return false
+    }
+    // On the other hand if it's entirely 1 byte characters, that'll double in size
+    let maximumUTF16CountForUTF8 = lhs.byteCount * 2
+    if rhs.byteCount > maximumUTF16CountForUTF8 {
+      return false
+    }
+    
+    var lhsIdx = 0
+    var rhsIdx = 0
+    
+    while true {
+      guard let firstUTF8Byte = lhs.decodeUTF8(ofWidth: 1, at: lhsIdx, in: lhs) else {
+        // If we've consumed everything in both buffers without finding an inequality, we're equal
+        return lhsIdx &+ 1 == lhs.byteOffsets.upperBound && rhsIdx &+ 1 == rhs.byteOffsets.upperBound
+      }
+      let utf8Width: Int
+      let utf16Width: Int
+      if firstUTF8Byte < 128 {
+        utf8Width = 1
+        utf16Width = 2
+        guard let r = rhs.decodeUTF16(ofWidth: utf16Width, at: rhsIdx, in: rhs) else {
+          return false
+        }
+        if r != firstUTF8Byte {
+          return false
+        }
+      } else {
+        utf8Width = _utf8ScalarLength(UInt8(truncatingIfNeeded: firstUTF8Byte))
+        utf16Width = utf8Width == 4 ? 4 : 2
+        guard
+          let l = lhs.decodeUTF8(ofWidth: utf8Width, at: lhsIdx, in: lhs),
+          let r = rhs.decodeUTF16(ofWidth: utf16Width, at: rhsIdx, in: rhs) else {
+          return false
+        }
+        if (l != r) {
+          return false
+        }
+      }
+      lhsIdx &+= utf8Width
+      rhsIdx &+= utf16Width
+    }
+}
+
+@inline(__always)
+fileprivate func isEqual(
+  bytes lhs: RawSpan,
+  bytes rhs: RawSpan
+) -> Bool {
+  _debugPrecondition(lhs.byteCount > 0)
+  if lhs.byteCount != rhs.byteCount {
+    return false
+  }
+  return lhs.withUnsafeBytes { lhsBuffer in
+    return rhs.withUnsafeBytes { rhsBuffer in
+      return 0 == memcmp(
+        lhsBuffer.baseAddress.unsafelyUnwrapped,
+        rhsBuffer.baseAddress.unsafelyUnwrapped,
+        lhs.byteCount
+      )
+    }
+  }
+}
+
+fileprivate func isEqual(
+  asciiBytes lhs: RawSpan,
+  utf16Bytes rhs: RawSpan
+) -> Bool {
+    if lhs.byteCount * 2 != rhs.byteCount {
+      return false
+    }
+    for lhsIdx in lhs.byteOffsets {
+      // Bounds checking handled by looping over `byteOffsets`
+      let l = unsafe lhs.unsafeLoadUnaligned(fromUncheckedByteOffset: lhsIdx, as: UInt8.self)
+      // Bounds checking handled by the count * 2 verification earlier
+      let r = unsafe UInt8(truncatingIfNeeded: rhs.unsafeLoadUnaligned(fromUncheckedByteOffset: lhsIdx, as: UInt16.self))
+      if l != r {
+        return false
+      }
+    }
+    return true
+}
+
+internal func isEqual<LHSEncoding: _UnicodeEncoding, RHSEncoding: _UnicodeEncoding>(
+  bytes lhs: RawSpan,
+  encoding lhsEnc: LHSEncoding.Type,
+  bytes rhs: RawSpan,
+  encoding rhsEnc: RHSEncoding.Type
+) -> Bool {
+  if let trivialCheck = lhs.contentsAreTriviallyIdentical(to: rhs) {
+    return trivialCheck
+  }
+  // ASCII == UTF8 can just use memcmp
+  if (lhsEnc == rhsEnc) ||
+      (lhsEnc == Unicode.ASCII.self && rhsEnc == Unicode.UTF8.self) ||
+      (lhsEnc == Unicode.UTF8.self && rhsEnc == Unicode.ASCII.self) {
+    return isEqual(bytes: lhs, bytes: rhs)
+  }
+  if lhsEnc == Unicode.UTF8.self && rhsEnc == Unicode.UTF16.self {
+    return isEqual(utf8Bytes: lhs, utf16Bytes: rhs)
+  }
+  if lhsEnc == Unicode.UTF16.self && rhsEnc == Unicode.UTF8.self {
+    return isEqual(utf8Bytes: rhs, utf16Bytes: lhs)
+  }
+  if lhsEnc == Unicode.ASCII.self && rhsEnc == Unicode.UTF16.self {
+    return isEqual(asciiBytes: lhs, utf16Bytes: rhs)
+  }
+  if lhsEnc == Unicode.UTF16.self && rhsEnc == Unicode.ASCII.self {
+    return isEqual(asciiBytes: rhs, utf16Bytes: lhs)
+  }
+  fatalError("Unsupported combination of encodings")
+}

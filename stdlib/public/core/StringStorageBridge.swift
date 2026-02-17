@@ -139,6 +139,28 @@ extension _AbstractStringStorage {
     return unsafe (start == nativeOther.start ||
       (memcmp(start, nativeOther.start, count) == 0)) ? 1 : 0
   }
+  
+  @inline(__always)
+  @_effects(readonly)
+  internal func _isEqualToBuffer(
+    ptr: UnsafeRawPointer,
+    count otherCount: Int,
+    encoding: UInt
+  ) {
+    let ourEncoding = if isASCII {
+      _cocoaASCIIEncoding
+    } else {
+      _cocoaUTF8Encoding
+    }
+    return _unicodeBuffersEqual(
+      bytes: start,
+      count: count,
+      encoding: ourEncoding,
+      bytes: ptr,
+      count: otherCount,
+      encoding: encoding
+    )
+  }
 
   @inline(__always)
   @_effects(readonly)
@@ -162,7 +184,7 @@ extension _AbstractStringStorage {
       return unsafe _nativeIsEqual(
         _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
     default:
-          // We're allowed to crash, but for compatibility reasons NSCFString allows
+      // We're allowed to crash, but for compatibility reasons NSCFString allows
       // non-strings here.
       if !_isNSString(other) {
         return 0
@@ -175,25 +197,37 @@ extension _AbstractStringStorage {
         return 0
       }
       
-      // CFString will only give us ASCII bytes here, but that's fine.
-      // We already handled non-ASCII UTF8 strings earlier since they're Swift.
+      let ourBuffer = unsafe RawSpan(
+        _unchecked: start,
+        count: count
+      )
+      
       if let asciiEqual = unsafe withCocoaASCIIPointer(other, work: { (ascii) -> Bool in
-        // otherUTF16Length is the same as the byte count here since it's ASCII
-        // self.count could still be utf8
-        if count != otherUTF16Length {
-          return false
-        }
-        return unsafe (start == ascii || (memcmp(start, ascii, otherUTF16Length) == 0))
+        let asciiBuffer = unsafe RawSpan(
+          _unchecked: ascii,
+          count: otherUTF16Length
+        )
+        return isEqual(
+          bytes: ourBuffer,
+          encoding: Unicode.UTF8.self,
+          bytes: asciiBuffer,
+          encoding: Unicode.ASCII.self
+        )
       }) {
         return asciiEqual ? 1 : 0
       }
       
       if let utf16Ptr = unsafe _stdlib_binary_CFStringGetCharactersPtr(other) {
-        let utf16Buffer = unsafe UnsafeBufferPointer(
-          start: utf16Ptr,
+        let utf16Buffer = unsafe RawSpan(
+          _unchecked: utf16Ptr,
           count: otherUTF16Length
         )
-        return unsafe utf16.elementsEqual(utf16Buffer) ? 1 : 0
+        return isEqual(
+          bytes: ourBuffer,
+          encoding: Unicode.UTF8.self,
+          bytes: utf16Buffer,
+          encoding: Unicode.UTF16.self
+        )
       }
 
       /*
@@ -310,7 +344,17 @@ extension __StringStorage {
   final internal func isEqual(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
   }
-
+  
+  @objc(_isEqualToBytes:count:encoding:)
+  @_effects(readonly)
+  final internal func isEqual(
+    ptr: UnsafeRawPointer,
+    count: Int,
+    encoding: UInt
+  ) -> Int8 {
+    return _isEqualToBuffer(ptr: ptr, count: count, encoding: encoding)
+  }
+  
   @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // While __StringStorage instances aren't immutable in general,
@@ -424,6 +468,16 @@ extension __SharedStringStorage {
   @_effects(readonly)
   final internal func isEqual(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
+  }
+  
+  @objc(_isEqualToBytes:count:encoding:)
+  @_effects(readonly)
+  final internal func isEqual(
+    ptr: UnsafeRawPointer,
+    count: Int,
+    encoding: UInt
+  ) -> Int8 {
+    return _isEqualToBuffer(ptr: ptr, count: count, encoding: encoding)
   }
 
   @objc(copyWithZone:)

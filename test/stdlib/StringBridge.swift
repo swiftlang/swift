@@ -202,4 +202,179 @@ StringBridgeTests.test("Equal UTF16 lengths but unequal UTF8") {
   expectFalse(nsutf8.isEqual(nsascii))
 }
 
+fileprivate extension String {
+  func withBytesInEncoding<R>(
+    _ encoding: UInt,
+    _ work: (UnsafeRawPointer, Int) -> R
+  ) -> R {
+    if encoding == NSASCIIStringEncoding || encoding == NSUTF8StringEncoding {
+      return Array(self.utf8).withUnsafeBufferPointer { buffer in
+        return work(buffer.baseAddress!, count)
+      }
+    }
+    if encoding == NSUTF16StringEncoding {
+      return Array(self.utf16).withUnsafeBufferPointer { utf16Buffer in
+        utf16Buffer.withMemoryRebound(to: UInt8.self) { buffer in
+          work(buffer.baseAddress!, count)
+        }
+      }
+    }
+    fatalError("Unsupported encoding")
+  }
+}
+
+// We don't run the Foundation tests, so make sure we have coverage for _unicodeBuffersEqual ourselves
+StringBridgeTests.test("Foundation Buffer Comparison SPI") {
+  let asciiString = "Hello"                           // ASCII (1-byte UTF-8, 2-byte UTF-16)
+  let utf8_1byte = "abc"                              // 1-byte UTF-8
+  let utf8_2byte = "café"                             // Contains é (2-byte UTF-8)
+  let utf8_3byte = "你好"                              // Chinese characters (3-byte UTF-8)
+  let utf8_4byte = "𝕳𝖊𝖑𝖑𝖔"                            // Math bold characters (4-byte UTF-8, surrogate pairs in UTF-16)
+  let utf16_2byte = "Hello"                           // Basic multilingual plane (2-byte UTF-16)
+  let utf16_4byte = "𝕳𝖊𝖑𝖑𝖔"                           // Supplementary plane (4-byte UTF-16 - surrogate pairs)
+  
+  let differentString1 = "World"
+  let differentString2 = "Different"
+  let shorterString = "Hi"
+    
+  func testEquality(
+    _ lhs: String,
+    lhsEncoding: UInt,
+    _ rhs: String,
+    rhsEncoding: UInt,
+    expectedEqual: Bool,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    let loc = SourceLoc(file, line, comment: "test data")
+
+    let result = lhs.withBytesInEncoding(lhsEncoding) { lhsPtr, lhsCount in
+      rhs.withBytesInEncoding(rhsEncoding) { rhsPtr, rhsCount in
+        _unicodeBuffersEqual(
+          bytes: lhsPtr,
+          count: lhsCount,
+          encoding: lhsEncoding,
+          bytes: rhsPtr,
+          count: rhsCount,
+          encoding: rhsEncoding
+        )
+      }
+    }
+    
+    if expectedEqual {
+      expectEqual(lhs, rhs, stackTrace: SourceLocStack().with(loc))
+    } else {
+      expectNotEqual(lhs, rhs, stackTrace: SourceLocStack().with(loc))
+    }
+  }
+  
+  // ASCII vs ASCII - Equal content
+  testEquality(asciiString, lhsEncoding: NSASCIIStringEncoding, asciiString, rhsEncoding: NSASCIIStringEncoding, expectedEqual: true)
+  
+  // ASCII vs ASCII - Different content, same length
+  testEquality(asciiString, lhsEncoding: NSASCIIStringEncoding, differentString1, rhsEncoding: NSASCIIStringEncoding, expectedEqual: false)
+  
+  // ASCII vs ASCII - Different content, different length
+  testEquality(asciiString, lhsEncoding: NSASCIIStringEncoding, shorterString, rhsEncoding: NSASCIIStringEncoding, expectedEqual: false)
+  
+  // ASCII vs UTF-8 - Equal content
+  testEquality(asciiString, lhsEncoding: NSASCIIStringEncoding, asciiString, rhsEncoding: NSUTF8StringEncoding, expectedEqual: true)
+  
+  // ASCII vs UTF-8 - Different content
+  testEquality(asciiString, lhsEncoding: NSASCIIStringEncoding, differentString1, rhsEncoding: NSUTF8StringEncoding, expectedEqual: false)
+  
+  // ASCII vs UTF-16 - Equal content
+  testEquality(asciiString, lhsEncoding: NSASCIIStringEncoding, asciiString, rhsEncoding: NSUTF16StringEncoding, expectedEqual: true)
+  
+  // ASCII vs UTF-16 - Different content
+  testEquality(asciiString, lhsEncoding: NSASCIIStringEncoding, differentString1, rhsEncoding: NSUTF16StringEncoding, expectedEqual: false)
+  
+  // UTF-8 (1-byte) vs UTF-8 (1-byte) - Equal content
+  testEquality(utf8_1byte, lhsEncoding: NSUTF8StringEncoding, utf8_1byte, rhsEncoding: NSUTF8StringEncoding, expectedEqual: true)
+  
+  // UTF-8 (1-byte) vs UTF-8 (1-byte) - Different content
+  testEquality(utf8_1byte, lhsEncoding: NSUTF8StringEncoding, differentString1, rhsEncoding: NSUTF8StringEncoding, expectedEqual: false)
+  
+  // UTF-8 (2-byte) vs UTF-8 (2-byte) - Equal content
+  testEquality(utf8_2byte, lhsEncoding: NSUTF8StringEncoding, utf8_2byte, rhsEncoding: NSUTF8StringEncoding, expectedEqual: true)
+  
+  // UTF-8 (2-byte) vs UTF-8 (2-byte) - Different content
+  testEquality(utf8_2byte, lhsEncoding: NSUTF8StringEncoding, differentString1, rhsEncoding: NSUTF8StringEncoding, expectedEqual: false)
+  
+  // UTF-8 (3-byte) vs UTF-8 (3-byte) - Equal content
+  testEquality(utf8_3byte, lhsEncoding: NSUTF8StringEncoding, utf8_3byte, rhsEncoding: NSUTF8StringEncoding, expectedEqual: true)
+  
+  // UTF-8 (3-byte) vs UTF-8 (3-byte) - Different content
+  testEquality(utf8_3byte, lhsEncoding: NSUTF8StringEncoding, utf8_1byte, rhsEncoding: NSUTF8StringEncoding, expectedEqual: false)
+  
+  // UTF-8 (4-byte) vs UTF-8 (4-byte) - Equal content
+  testEquality(utf8_4byte, lhsEncoding: NSUTF8StringEncoding, utf8_4byte, rhsEncoding: NSUTF8StringEncoding, expectedEqual: true)
+  
+  // UTF-8 (4-byte) vs UTF-8 (4-byte) - Different content
+  testEquality(utf8_4byte, lhsEncoding: NSUTF8StringEncoding, utf8_3byte, rhsEncoding: NSUTF8StringEncoding, expectedEqual: false)
+  
+  // UTF-8 (1-byte) vs UTF-16 (2-byte) - Equal content
+  testEquality(utf8_1byte, lhsEncoding: NSUTF8StringEncoding, utf8_1byte, rhsEncoding: NSUTF16StringEncoding, expectedEqual: true)
+  
+  // UTF-8 (1-byte) vs UTF-16 (2-byte) - Different content
+  testEquality(utf8_1byte, lhsEncoding: NSUTF8StringEncoding, differentString1, rhsEncoding: NSUTF16StringEncoding, expectedEqual: false)
+  
+  // UTF-8 (2-byte) vs UTF-16 (2-byte) - Equal content
+  testEquality(utf8_2byte, lhsEncoding: NSUTF8StringEncoding, utf8_2byte, rhsEncoding: NSUTF16StringEncoding, expectedEqual: true)
+  
+  // UTF-8 (2-byte) vs UTF-16 (2-byte) - Different content
+  testEquality(utf8_2byte, lhsEncoding: NSUTF8StringEncoding, utf8_1byte, rhsEncoding: NSUTF16StringEncoding, expectedEqual: false)
+  
+  // UTF-8 (3-byte) vs UTF-16 (2-byte) - Equal content
+  testEquality(utf8_3byte, lhsEncoding: NSUTF8StringEncoding, utf8_3byte, rhsEncoding: NSUTF16StringEncoding, expectedEqual: true)
+  
+  // UTF-8 (3-byte) vs UTF-16 (2-byte) - Different content
+  testEquality(utf8_3byte, lhsEncoding: NSUTF8StringEncoding, utf8_2byte, rhsEncoding: NSUTF16StringEncoding, expectedEqual: false)
+  
+  // UTF-8 (4-byte) vs UTF-16 (4-byte) - Equal content
+  testEquality(utf8_4byte, lhsEncoding: NSUTF8StringEncoding, utf8_4byte, rhsEncoding: NSUTF16StringEncoding, expectedEqual: true)
+  
+  // UTF-8 (4-byte) vs UTF-16 (4-byte) - Different content
+  testEquality(utf8_4byte, lhsEncoding: NSUTF8StringEncoding, utf8_3byte, rhsEncoding: NSUTF16StringEncoding, expectedEqual: false)
+  
+  // UTF-16 (2-byte) vs UTF-16 (2-byte) - Equal content
+  testEquality(utf16_2byte, lhsEncoding: NSUTF16StringEncoding, utf16_2byte, rhsEncoding: NSUTF16StringEncoding, expectedEqual: true)
+  
+  // UTF-16 (2-byte) vs UTF-16 (2-byte) - Different content
+  testEquality(utf16_2byte, lhsEncoding: NSUTF16StringEncoding, differentString1, rhsEncoding: NSUTF16StringEncoding, expectedEqual: false)
+  
+  // UTF-16 (4-byte) vs UTF-16 (4-byte) - Equal content
+  testEquality(utf16_4byte, lhsEncoding: NSUTF16StringEncoding, utf16_4byte, rhsEncoding: NSUTF16StringEncoding, expectedEqual: true)
+  
+  // UTF-16 (4-byte) vs UTF-16 (4-byte) - Different content
+  testEquality(utf16_4byte, lhsEncoding: NSUTF16StringEncoding, utf16_2byte, rhsEncoding: NSUTF16StringEncoding, expectedEqual: false)
+  
+  // UTF-16 (2-byte) vs UTF-8 (1-byte) - Equal content (reverse of test 16)
+  testEquality(utf8_1byte, lhsEncoding: NSUTF16StringEncoding, utf8_1byte, rhsEncoding: NSUTF8StringEncoding, expectedEqual: true)
+  
+  // UTF-16 (2-byte) vs UTF-8 (2-byte) - Equal content (reverse of test 18)
+  testEquality(utf8_2byte, lhsEncoding: NSUTF16StringEncoding, utf8_2byte, rhsEncoding: NSUTF8StringEncoding, expectedEqual: true)
+  
+  // UTF-16 (2-byte) vs UTF-8 (3-byte) - Equal content (reverse of test 20)
+  testEquality(utf8_3byte, lhsEncoding: NSUTF16StringEncoding, utf8_3byte, rhsEncoding: NSUTF8StringEncoding, expectedEqual: true)
+  
+  // UTF-16 (4-byte) vs UTF-8 (4-byte) - Equal content (reverse of test 22)
+  testEquality(utf8_4byte, lhsEncoding: NSUTF16StringEncoding, utf8_4byte, rhsEncoding: NSUTF8StringEncoding, expectedEqual: true)
+  
+  // UTF-16 vs ASCII - Equal content (reverse of test 6)
+  testEquality(asciiString, lhsEncoding: NSUTF16StringEncoding, asciiString, rhsEncoding: NSASCIIStringEncoding, expectedEqual: true)
+  
+  // Empty strings - ASCII vs ASCII
+  testEquality("", lhsEncoding: NSASCIIStringEncoding, "", rhsEncoding: NSASCIIStringEncoding, expectedEqual: true)
+  
+  // Empty strings - UTF-8 vs UTF-16
+  testEquality("", lhsEncoding: NSUTF8StringEncoding, "", rhsEncoding: NSUTF16StringEncoding, expectedEqual: true)
+  
+  // Empty vs non-empty
+  testEquality("", lhsEncoding: NSUTF8StringEncoding, asciiString, rhsEncoding: NSUTF8StringEncoding, expectedEqual: false)
+  
+  // Different lengths - UTF-8 vs UTF-16
+  testEquality(asciiString, lhsEncoding: NSUTF8StringEncoding, shorterString, rhsEncoding: NSUTF16StringEncoding, expectedEqual: false)
+}
+
 runAllTests()
