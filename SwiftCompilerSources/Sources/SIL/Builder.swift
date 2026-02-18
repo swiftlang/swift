@@ -857,8 +857,13 @@ public struct Builder {
     let makeAddrBorrow = bridged.createMakeAddrBorrow(referent.bridged)
     return notifyNew(makeAddrBorrow.getAs(MakeAddrBorrowInst.self))
   }
-}
 
+  @discardableResult
+  public func createFixLifetime(operand: Value) -> FixLifetimeInst {
+    let fixLifetime = bridged.createFixLifetime(operand.bridged)
+    return notifyNew(fixLifetime.getAs(FixLifetimeInst.self))
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //                                  Utilities
