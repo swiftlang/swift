@@ -1555,6 +1555,8 @@ bool maybeDiagnoseMissingImportForMember(
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
 
+bool shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy, bool isAsync);
+
 } // end namespace swift
 
 #endif

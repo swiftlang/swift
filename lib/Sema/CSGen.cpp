@@ -4025,7 +4025,6 @@ static bool generateForEachStmtConstraints(ConstraintSystem &cs,
                                            Pattern *typeCheckedPattern,
                                            bool shouldBindPatternVarsOneWay) {
   auto &ctx = cs.getASTContext();
-  bool isBorrowing = ctx.LangOpts.hasFeature(Feature::BorrowingForLoop);
   bool isAsync = stmt->getAwaitLoc().isValid();
   auto *sequenceExpr = stmt->getSequence();
 
@@ -4034,9 +4033,7 @@ static bool generateForEachStmtConstraints(ConstraintSystem &cs,
   // contextual type for diagnostics.
   auto *sequenceProto = TypeChecker::getProtocol(
       ctx, stmt->getForLoc(),
-      isAsync ? KnownProtocolKind::AsyncSequence
-              : (isBorrowing ? KnownProtocolKind::BorrowingSequence
-                             : KnownProtocolKind::Sequence));
+      isAsync ? KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
   if (!sequenceProto)
     return true;
 

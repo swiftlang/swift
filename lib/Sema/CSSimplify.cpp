@@ -19,6 +19,7 @@
 #include "OpenedExistentials.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckEffects.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -9900,10 +9901,9 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   llvm_unreachable("Unhandled CheckedCastKind in switch.");
 }
 
-Type
-ConstraintSystem::lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
-                                        bool openExistential,
-                                        ConstraintLocatorBuilder locator) {
+Type ConstraintSystem::lookupDependentMember(
+    Type base, AssociatedTypeDecl *assocTy, bool openExistential,
+    ConstraintLocatorBuilder locator, ProtocolConformanceRef *conformanceOut) {
   /// TODO: This should become the basis for a new "type witness" constraint to
   /// replace the use of DependentMemberType in the constraint system.
 
@@ -9925,6 +9925,8 @@ ConstraintSystem::lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
   // Then lookup the conformance to dig out the witness. If it's missing, we'll
   // have recorded a fix in the ConformsTo constraint so can bail.
   auto conformance = lookupConformance(base, proto);
+  if (conformanceOut)
+    *conformanceOut = conformance;
   if (!conformance) {
     // Increase SK_Hole just to ensure the solution is marked invalid.
     increaseScore(SK_Hole, locator);
@@ -9979,16 +9981,33 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto contextualTy = getContextualTypeInfo(anchor)->getType();
   auto *seqProto = contextualTy->castTo<ProtocolType>()->getDecl();
   auto isAsync = seqProto->isSpecificProtocol(KnownProtocolKind::AsyncSequence);
-  auto isBorrowing =
-      seqProto->isSpecificProtocol(KnownProtocolKind::BorrowingSequence);
+  auto isBorrowing = shouldUseBorrowingSequence(ctx, seqTy, isAsync);
 
-  if (seqTy->isExistentialType() && !isAsync && isBorrowing) {
-    isBorrowing = false;
-    seqProto = ctx.getProtocol(KnownProtocolKind::Sequence);
+  if (isBorrowing) {
+    seqProto = ctx.getProtocol(KnownProtocolKind::BorrowingSequence);
   }
 
   auto *contextualLoc = getConstraintLocator(
       anchor, LocatorPathElt::ContextualType(CTP_ForEachSequence));
+
+  // Always prefer conformance to Sequence over BorrowingSequence when both are
+  // available. We check this before calling lookupDependentMember, since that
+  // unconditionally adds a ConformsTo constraint for the protocol being looked
+  // up, which would produce an erroneous diagnostic if we later fall back.
+  if (isBorrowing) {
+    auto *seqProtoFallback = ctx.getProtocol(KnownProtocolKind::Sequence);
+    if (!lookupConformance(seqTy, seqProtoFallback).isInvalid()) {
+      seqProto = seqProtoFallback;
+      isBorrowing = false;
+    }
+    // If it does not conform to BorrowingSequence, set seqProto to Sequence.
+    // This ensures that we maintain Sequence as the minimal required
+    // conformance.
+    else if (lookupConformance(seqTy, seqProto).isInvalid()) {
+      seqProto = seqProtoFallback;
+      isBorrowing = false;
+    }
+  }
 
   // To lookup the corresponding element type we first need to lookup the
   // type witness for Iterator, opening an existential if needed.
@@ -10003,8 +10022,11 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto *iteratorAssocTy = seqProto->getAssociatedType(
       isAsync ? ctx.Id_AsyncIterator
               : (isBorrowing ? ctx.Id_BorrowingIterator : ctx.Id_Iterator));
-  auto iterTy = lookupDependentMember(seqTy, iteratorAssocTy,
-                                      /*openExistential*/ true, contextualLoc);
+  ProtocolConformanceRef seqConf;
+  auto iterTy =
+      lookupDependentMember(seqTy, iteratorAssocTy,
+                            /*openExistential*/ true, contextualLoc, &seqConf);
+
   if (!iterTy) {
     // Already recorded fix.
     recordTypeVariablesAsHoles(second);
@@ -10017,8 +10039,6 @@ ConstraintSystem::simplifyForEachElementConstraint(
       isAsync ? KnownProtocolKind::AsyncIteratorProtocol
               : (isBorrowing ? KnownProtocolKind::BorrowingIteratorProtocol
                              : KnownProtocolKind::IteratorProtocol));
-  // FIXME: update this to only use Id_Element once the BorrowingSequence
-  // protocol lands.
   auto *eltAssocTy = iterProto->getAssociatedType(
       isBorrowing ? Context.Id_BorrowedElement : Context.Id_Element);
   auto eltTy = lookupDependentMember(iterTy, eltAssocTy,
