@@ -55,8 +55,7 @@ struct MyModel: Differentiable {
     property2 = localVar
 
     // `false` may instead be any expression that returns a `Bool`.
-    // TODO: cannot use literal `false` because it crashes
-    if 1 == 0 {
+    if false {
       localVar = member3
     }
   }
