@@ -66,6 +66,51 @@ bb0(%0 : @owned $C, %1 : @owned $C, %2 : $Int):
   return %2
 }
 
+// CHECK-LABEL: sil [ossa] @remove_struct_deadend :
+// CHECK:       bb0
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    destroy_value [dead_end] %1
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'remove_struct_deadend'
+sil [ossa] @remove_struct_deadend : $@convention(thin) (@owned C, @owned C, Int) -> () {
+bb0(%0 : @owned $C, %1 : @owned $C, %2 : $Int):
+  %3 = struct $S (%0, %1, %2)
+  destroy_value [dead_end] %3
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @remove_struct_with_fixlifetime :
+// CHECK:       bb1:
+// CHECK-NEXT:    fix_lifetime %0
+// CHECK-NEXT:    fix_lifetime %1
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    fix_lifetime %0
+// CHECK-NEXT:    fix_lifetime %1
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    destroy_value %1
+// CHECK-NEXT:    return %2
+// CHECK:       } // end sil function 'remove_struct_with_fixlifetime'
+sil [ossa] @remove_struct_with_fixlifetime : $@convention(thin) (@owned C, @owned C, Int) -> Int {
+bb0(%0 : @owned $C, %1 : @owned $C, %2 : $Int):
+  %3 = struct $S (%0, %1, %2)
+  cond_br undef, bb1, bb2
+
+bb1:
+  fix_lifetime %3
+  br bb3
+
+bb2:
+  fix_lifetime %3
+  br bb3
+
+bb3:
+  destroy_value %3
+  return %2
+}
+
 // CHECK-LABEL: sil [ossa] @remove_tuple :
 // CHECK:       bb0
 // CHECK-NEXT:    destroy_value %0
@@ -438,6 +483,28 @@ bb2:
 bb3(%4 : @owned $C):
   destroy_value [dead_end] %4
   unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_with_fixlifetime :
+// CHECK:       bb3([[PHI:%.*]] : @owned $C):
+// CHECK-NEXT:    fix_lifetime [[PHI]]
+// CHECK-NEXT:    destroy_value [[PHI]]
+// CHECK:       } // end sil function 'dont_hoist_with_fixlifetime'
+sil [ossa] @dont_hoist_with_fixlifetime : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0)
+
+bb2:
+  br bb3(%0)
+
+bb3(%4 : @owned $C):
+  fix_lifetime %4
+  destroy_value %4
+  %r = tuple ()
+  return %r
 }
 
 // CHECK-LABEL: sil [ossa] @dont_hoist_destroy_in_different_block :

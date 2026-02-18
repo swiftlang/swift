@@ -45,18 +45,6 @@ extension DestroyValueInst : OnoneSimplifiable, SILCombineSimplifiable {
   /// The benefit of this transformation is that the forwarding instruction can be removed.
   ///
   private func tryRemoveForwardingOperandInstruction(_ context: SimplifyContext) {
-    guard context.preserveDebugInfo ? destroyedValue.uses.isSingleUse
-                                    : destroyedValue.uses.ignoreDebugUses.isSingleUse
-    else {
-      return
-    }
-
-    if isDeadEnd {
-      // Dead-end destroys are no-ops, anyway. Don't try to move them away from an `unreachable` instruction.
-      return
-    }
-
-    let destroyedInst: Instruction
     switch destroyedValue {
     case is StructInst,
          is EnumInst:
@@ -64,7 +52,6 @@ extension DestroyValueInst : OnoneSimplifiable, SILCombineSimplifiable {
         // Moving the destroy to a non-copyable struct/enum's operands would drop the deinit call!
         return
       }
-      destroyedInst = destroyedValue as! SingleValueInstruction
 
     // Handle various "forwarding" instructions that simply pass through values
     // without performing operations that would affect destruction semantics.
@@ -85,21 +72,52 @@ extension DestroyValueInst : OnoneSimplifiable, SILCombineSimplifiable {
          is BridgeObjectToRefInst,
          is InitExistentialRefInst,
          is OpenExistentialRefInst:
-      destroyedInst = destroyedValue as! SingleValueInstruction
+      break
 
     case let arg as Argument:
+      if isDeadEnd {
+        // Dead-end destroys are no-ops, anyway. Don't try to move them away from an `unreachable` instruction.
+        return
+      }
+      guard destroyedValue.hasSingleUse(ignoringFixLifetime: false, context) else {
+        return
+      }
       tryRemovePhiArgument(arg, context)
       return
       
     default:
       return
     }
-    
+
+    // Support fix_lifetime as use:
+    // ```
+    //   %3 = struct $S (%1, %2)
+    //   fix_lifetime %3
+    //   destroy_value %3         // the only use of %3, except `fix_lifetime`
+    // ```
+    // ->
+    // ```
+    //   fix_lifetime %1
+    //   fix_lifetime %2
+    //   destroy_value %1
+    //   destroy_value %2
+    // ```
+    guard destroyedValue.hasSingleUse(ignoringFixLifetime: true, context) else {
+      return
+    }
+    let destroyedInst = destroyedValue as! SingleValueInstruction
+
     let builder = Builder(before: self, context)
     for op in destroyedInst.definedOperands where op.value.ownership == .owned {
-      builder.createDestroyValue(operand: op.value)
+      builder.createDestroyValue(operand: op.value, isDeadEnd: isDeadEnd)
     }
-    
+    for fixLifetime in destroyedValue.uses.users(ofType: FixLifetimeInst.self) {
+      let builder = Builder(before: fixLifetime, context)
+      for op in destroyedInst.definedOperands where op.value.ownership == .owned {
+        builder.createFixLifetime(operand: op.value)
+      }
+    }
+
     // Users include `debug_value` instructions and this `destroy_value`
     context.erase(instructionIncludingAllUsers: destroyedInst)
   }
@@ -151,6 +169,27 @@ extension DestroyValueInst : OnoneSimplifiable, SILCombineSimplifiable {
     arg.parentBlock.eraseArgument(at: arg.index, context)
   }
 }
+
+private extension Value {
+  func hasSingleUse(ignoringFixLifetime: Bool, _ context: SimplifyContext) -> Bool {
+    var foundRelevantUse = false
+    for use in uses {
+      switch use.instruction {
+      case is DebugValueInst where !context.preserveDebugInfo:
+        break
+      case is FixLifetimeInst where ignoringFixLifetime:
+        break
+      default:
+        if foundRelevantUse {
+          return false
+        }
+        foundRelevantUse = true
+      }
+    }
+    return foundRelevantUse
+  }
+}
+
 
 private func isDeinitBarrierInBlock(before instruction: Instruction, _ context: SimplifyContext) -> Bool {
   return ReverseInstructionList(first: instruction.previous).contains(where: {
