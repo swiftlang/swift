@@ -408,7 +408,22 @@
     return await group.next()
   } 
   ```
+  
+* [SE-0439][]:
+  Trailing commas can now be used in all symmetrically delimited comma-separated lists, like tuples and function arguments.
 
+  ```swift
+  let coordinates = (
+    latitude: -3.720466,
+    longitude: -38.509559,
+  )
+
+  fetchLocation(
+    latitude: coordinates.latitude,
+    longitude: coordinates.longitude,
+    //    includesDetails: true
+  )
+  ```
 
 ## Swift 6.0
 
@@ -10996,6 +11011,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0424]: https://github.com/apple/swift-evolution/blob/main/proposals/0424-custom-isolation-checking-for-serialexecutor.md
 [SE-0428]: https://github.com/apple/swift-evolution/blob/main/proposals/0428-resolve-distributed-actor-protocols.md
 [SE-0431]: https://github.com/apple/swift-evolution/blob/main/proposals/0431-isolated-any-functions.md
+[SE-0439]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0439-trailing-comma-lists.md
 [SE-0442]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0442-allow-taskgroup-childtaskresult-type-to-be-inferred.md
 [SE-0444]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0444-member-import-visibility.md
 [SE-0458]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0458-strict-memory-safety.md
