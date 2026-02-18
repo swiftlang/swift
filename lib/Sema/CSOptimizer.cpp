@@ -834,21 +834,19 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 /// FIXME: This should be a common utility somewhere instead of being
 /// re-implemented in several places in the compiler.
 static bool isSubclassOf(Type candidateType, Type superclassType) {
-  if (auto *selfType = candidateType->getAs<DynamicSelfType>()) {
-    candidateType = selfType->getSelfType();
-  }
-
-  if (auto *archetypeType = candidateType->getAs<ArchetypeType>()) {
-    candidateType = archetypeType->getSuperclass();
-    if (!candidateType)
-      return false;
-  }
+  auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
+  if (!superclassDecl)
+    return false;
 
   auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
-  auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
-
-  if (!(subclassDecl && superclassDecl))
-    return false;
+  if (!subclassDecl) {
+    candidateType = candidateType->getSuperclass();
+    if (!candidateType)
+      return false;
+    subclassDecl = candidateType->getClassOrBoundGenericClass();
+    if (!subclassDecl)
+      return false;
+  }
 
   return superclassDecl->isSuperclassOf(subclassDecl);
 }
