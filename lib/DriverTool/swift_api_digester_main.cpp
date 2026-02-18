@@ -2532,7 +2532,7 @@ public:
       InitInvoke.getFrontendOptions().PreferInterfaceForModules.push_back(M);
     }
     if (Modules.empty()) {
-      llvm::errs() << "Need to specify -include-all or -module <name>\n";
+      llvm::errs() << "Need to specify -module <name>\n";
       exit(1);
     }
     return 0;
