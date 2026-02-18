@@ -304,7 +304,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         continue()
       endif()
     elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
-      if(NOT "${mod}" MATCHES "x86_64|arm64|arm64e|armv7|armv7m|armv7em")
+      if(NOT "${mod}" MATCHES "x86_64|arm64|arm64e|armv6|armv6m|armv7|armv7m|armv7em")
         continue()
       endif()
 
