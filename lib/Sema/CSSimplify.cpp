@@ -9972,10 +9972,18 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto iterTy =
       lookupDependentMember(seqTy, iteratorAssocTy,
                             /*openExistential*/ true, contextualLoc, &seqConf);
+
+  if (!iterTy) {
+    // Already recorded fix.
+    recordTypeVariablesAsHoles(second);
+    return SolutionKind::Solved;
+  }
+
   if (isBorrowing && seqConf.isConcrete() &&
       seqConf.getConcrete()->getSourceKind() !=
           ConformanceEntryKind::Explicit) {
     ProtocolConformanceRef tmpSeqConf;
+    seqProto = ctx.getProtocol(KnownProtocolKind::Sequence);
     auto tmpIterTy = lookupDependentMember(
         seqTy, seqProto->getAssociatedType(ctx.Id_Iterator),
         /*openExistential*/ true, contextualLoc, &tmpSeqConf);
@@ -9986,22 +9994,13 @@ ConstraintSystem::simplifyForEachElementConstraint(
     }
   }
 
-  if (!iterTy) {
-    // Already recorded fix.
-    recordTypeVariablesAsHoles(second);
-    return SolutionKind::Solved;
-  }
-
   // Now we have the Iterator type, do the same lookup for Element, opening
   // an existential if needed.
   auto *iterProto = ctx.getProtocol(
       isAsync ? KnownProtocolKind::AsyncIteratorProtocol
               : (isBorrowing ? KnownProtocolKind::BorrowingIteratorProtocol
                              : KnownProtocolKind::IteratorProtocol));
-  // FIXME: update this to only use Id_Element once the BorrowingSequence
-  // protocol lands.
-  auto *eltAssocTy = iterProto->getAssociatedType(
-      isBorrowing ? Context.Id_BorrowedElement : Context.Id_Element);
+  auto *eltAssocTy = iterProto->getAssociatedType(Context.Id_Element);
   auto eltTy = lookupDependentMember(iterTy, eltAssocTy,
                                      /*openExistential*/ true, contextualLoc);
   if (!eltTy) {

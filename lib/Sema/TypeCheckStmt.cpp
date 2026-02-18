@@ -3487,6 +3487,7 @@ public:
           seqType, ctx.getProtocol(KnownProtocolKind::Sequence));
       if (!tmpSeqConf.isInvalid()) {
         seqConformanceRef = tmpSeqConf;
+        sequenceProto = ctx.getProtocol(KnownProtocolKind::Sequence);
         isBorrowing = false;
       }
     }
