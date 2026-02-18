@@ -77,6 +77,8 @@ static bool isParamRequiredToBeConstant(AbstractFunctionDecl *funcDecl, ParamDec
     nominal = paramType->getNominalOrBoundGenericNominal();
     return !nominal || !isOSLogDynamicObject(nominal);
   }
+  if (hasSemanticsAttr(funcDecl, semantics::SWIFT_UI_REQUIRES_CONSTANT_RANGE))
+    return param->getParameterName().str() == "data";
   if (!hasSemanticsAttr(funcDecl,
                         semantics::ATOMICS_REQUIRES_CONSTANT_ORDERINGS))
     return false;
@@ -230,6 +232,12 @@ static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
     }
     diags.diagnose(errorLoc, diag::atomics_ordering_must_be_constant,
                    nominalDecl->getName());
+    return;
+  }
+
+  if (hasSemanticsAttr(funcDecl,
+        semantics::SWIFT_UI_REQUIRES_CONSTANT_RANGE)) {
+    diags.diagnose(errorLoc, diag::swiftui_arg_must_be_integer_literal);
     return;
   }
 
