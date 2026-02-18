@@ -201,6 +201,8 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
       if (auto *store = dyn_cast<StoreInst>(initI))
         openedVal = store->getSrc();
     }
+  } else if (auto *sb = dyn_cast<StoreBorrowInst>(openedVal)) {
+    openedVal = sb->getSrc();
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
     OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
