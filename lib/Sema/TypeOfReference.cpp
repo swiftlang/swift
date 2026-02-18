@@ -1166,9 +1166,11 @@ ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
+    TypeResolutionOptions opts = TypeResolverContext::InExpression;
+    if (choice.getFunctionRefInfo().hasModuleSelector())
+      opts |= TypeResolutionFlags::HasModuleSelector;
     auto type =
-        TypeResolution::forInterface(useDC, TypeResolverContext::InExpression,
-                                     /*unboundTyOpener*/ nullptr,
+        TypeResolution::forInterface(useDC, opts, /*unboundTyOpener*/ nullptr,
                                      /*placeholderHandler*/ nullptr,
                                      /*packElementOpener*/ nullptr)
             .resolveTypeInContext(typeDecl, /*foundDC*/ nullptr,

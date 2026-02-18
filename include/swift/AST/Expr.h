@@ -193,16 +193,16 @@ protected:
     LiteralCapacity : 32
   );
 
-  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+3+1+1,
+  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+4+1+1,
     Semantics : 2, // an AccessSemantics
-    FunctionRefInfo : 3,
+    FunctionRefInfo : 4,
     IsImplicitlyAsync : 1,
     IsImplicitlyThrows : 1
   );
 
-  SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+3,
+  SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+4,
     DeclRefKind : 2,
-    FunctionRefInfo : 3
+    FunctionRefInfo : 4
   );
 
   SWIFT_INLINE_BITFIELD(MemberRefExpr, LookupExpr, 2,
@@ -225,8 +225,8 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD(UnresolvedDotExpr, Expr, 3,
-    FunctionRefInfo : 3
+  SWIFT_INLINE_BITFIELD(UnresolvedDotExpr, Expr, 4,
+    FunctionRefInfo : 4
   );
 
   SWIFT_INLINE_BITFIELD_FULL(SubscriptExpr, LookupExpr, 2,
@@ -235,12 +235,12 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicSubscriptExpr, DynamicLookupExpr);
 
-  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 3,
-    FunctionRefInfo : 3
+  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 4,
+    FunctionRefInfo : 4
   );
 
-  SWIFT_INLINE_BITFIELD(OverloadSetRefExpr, Expr, 3,
-    FunctionRefInfo : 3
+  SWIFT_INLINE_BITFIELD(OverloadSetRefExpr, Expr, 4,
+    FunctionRefInfo : 4
   );
 
   SWIFT_INLINE_BITFIELD(BooleanLiteralExpr, LiteralExpr, 1,
