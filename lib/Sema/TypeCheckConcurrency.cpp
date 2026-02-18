@@ -8286,10 +8286,8 @@ struct ActorReferenceResult::Builder {
   const DeclContext *fromDC;
   std::optional<VarRefUseEnv> useKind;
   std::optional<ReferencedActor> referencedActor;
-  std::optional<ActorIsolation> knownDeclIsolation;
-  std::optional<ActorIsolation> knownContextIsolation;
-  llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
-      getClosureActorIsolation;
+  ActorIsolation declIsolation;
+  ActorIsolation contextIsolation;
 
   Builder(ConcreteDeclRef declRef, SourceLoc declRefLoc,
           const DeclContext *fromDC, std::optional<VarRefUseEnv> useKind,
@@ -8300,26 +8298,33 @@ struct ActorReferenceResult::Builder {
               getClosureActorIsolation)
       : declRef(declRef), declRefLoc(declRefLoc), fromDC(fromDC),
         useKind(useKind), referencedActor(referencedActor),
-        knownDeclIsolation(knownDeclIsolation),
-        knownContextIsolation(knownContextIsolation),
-        getClosureActorIsolation(getClosureActorIsolation) {}
+        declIsolation(ActorIsolation::forUnspecified()),
+        contextIsolation(ActorIsolation::forUnspecified()) {
+    // If not provided, compute the isolation of the declaration, adjusted
+    // for references.
+    if (knownDeclIsolation) {
+      declIsolation = *knownDeclIsolation;
+    } else {
+      declIsolation = getActorIsolationForReference(getDecl(), fromDC);
+      if (declIsolation.requiresSubstitution())
+        declIsolation = declIsolation.subst(declRef.getSubstitutions());
+    }
 
+    // Compute the isolation of the context, if not provided.
+    if (knownContextIsolation) {
+      contextIsolation = *knownContextIsolation;
+    } else {
+      contextIsolation =
+          getInnermostIsolatedContext(fromDC, getClosureActorIsolation);
+    }
+  }
+
+  ValueDecl *getDecl() const { return declRef.getDecl(); }
   ActorReferenceResult build();
 };
 
 ActorReferenceResult ActorReferenceResult::Builder::build() {
   auto *const decl = declRef.getDecl();
-
-  // If not provided, compute the isolation of the declaration, adjusted
-  // for references.
-  ActorIsolation declIsolation = ActorIsolation::forUnspecified();
-  if (knownDeclIsolation) {
-    declIsolation = *knownDeclIsolation;
-  } else {
-    declIsolation = getActorIsolationForReference(decl, fromDC);
-    if (declIsolation.requiresSubstitution())
-      declIsolation = declIsolation.subst(declRef.getSubstitutions());
-  }
 
   // Determine what adjustments we need to perform for cross-actor
   // references.
@@ -8339,15 +8344,6 @@ ActorReferenceResult ActorReferenceResult::Builder::build() {
   // concurrency domain.
   if (isNonValueReference(decl))
     return forSameConcurrencyDomain(declIsolation, options);
-
-  // Compute the isolation of the context, if not provided.
-  ActorIsolation contextIsolation = ActorIsolation::forUnspecified();
-  if (knownContextIsolation) {
-    contextIsolation = *knownContextIsolation;
-  } else {
-    contextIsolation =
-        getInnermostIsolatedContext(fromDC, getClosureActorIsolation);
-  }
 
   if (declIsolation.isCallerIsolationInheriting())
     return forSameConcurrencyDomain(declIsolation, options);
