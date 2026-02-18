@@ -828,39 +828,12 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 } // end anonymous namespace
 
 /// Determine whether the candidate type is a subclass of the superclass
-/// type.
+/// type. This check is approximate, because it disregards generic
+/// arguments.
 ///
 /// FIXME: This should be a common utility somewhere instead of being
 /// re-implemented in several places in the compiler.
 static bool isSubclassOf(Type candidateType, Type superclassType) {
-  // Conversion from a concrete type to its existential value.
-  if (superclassType->isExistentialType() && !superclassType->isAny()) {
-    auto layout = superclassType->getExistentialLayout();
-
-    if (auto layoutConstraint = layout.getLayoutConstraint()) {
-      if (layoutConstraint->isClass() &&
-          !(candidateType->isClassExistentialType() ||
-            candidateType->mayHaveSuperclass()))
-        return false;
-    }
-
-    if (layout.explicitSuperclass &&
-        !isSubclassOf(candidateType, layout.explicitSuperclass))
-      return false;
-
-    return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
-      if (auto superclass = P->getSuperclassDecl()) {
-        if (!isSubclassOf(candidateType,
-                          superclass->getDeclaredInterfaceType()))
-          return false;
-      }
-
-      auto result = TypeChecker::containsProtocol(candidateType, P,
-                                                  /*allowMissing=*/false);
-      return result.first || result.second;
-    });
-  }
-
   if (auto *selfType = candidateType->getAs<DynamicSelfType>()) {
     candidateType = selfType->getSelfType();
   }
@@ -878,6 +851,39 @@ static bool isSubclassOf(Type candidateType, Type superclassType) {
     return false;
 
   return superclassDecl->isSuperclassOf(subclassDecl);
+}
+
+/// Determine whether the candidate type can be erased to the given
+/// existential type. This check is approximate, because it disregards
+/// conditional conformance and parameterized protocol types.
+///
+/// FIXME: This should be a common utility somewhere instead of being
+/// re-implemented in several places in the compiler.
+static bool isSubtypeOfExistentialType(Type candidateType, Type existentialType) {
+  auto layout = existentialType->getExistentialLayout();
+
+  if (auto layoutConstraint = layout.getLayoutConstraint()) {
+    if (layoutConstraint->isClass() &&
+        !(candidateType->isClassExistentialType() ||
+          candidateType->mayHaveSuperclass()))
+      return false;
+  }
+
+  if (layout.explicitSuperclass &&
+      !isSubclassOf(candidateType, layout.explicitSuperclass))
+    return false;
+
+  return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
+    if (auto superclass = P->getSuperclassDecl()) {
+      if (!isSubclassOf(candidateType,
+                        superclass->getDeclaredInterfaceType()))
+        return false;
+    }
+
+    auto result = TypeChecker::containsProtocol(candidateType, P,
+                                                /*allowMissing=*/false);
+    return result.first || result.second;
+  });
 }
 
 enum class MatchFlag {
@@ -1055,6 +1061,12 @@ scoreCandidateMatch(ConstraintSystem &cs,
       // Optionality mismatch.
       return 0;
     }
+  }
+
+  // Conversion from a concrete type to its existential value.
+  if (paramType->isExistentialType() && !paramType->isAny()) {
+    if (isSubtypeOfExistentialType(candidateType, paramType))
+      return 100;
   }
 
   // Candidate could be converted to a superclass.
