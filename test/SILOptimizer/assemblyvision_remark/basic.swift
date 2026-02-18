@@ -49,15 +49,15 @@ struct StructWithOwner {
 
 func printStructWithOwner(x : StructWithOwner) {
     print(x) // expected-remark @:11 {{heap allocated ref of type}}
-             // expected-remark @-1 {{retain of type 'Klass'}}
-             // expected-note @-3:27 {{of 'x.owner'}}
+             // expected-remark @-1 {{retain of type 'StructWithOwner'}}
+             // expected-note @-3:27 {{of 'x'}}
              // expected-remark @-3:12 {{release of type}}
 }
 
 func printStructWithOwnerOwner(x : StructWithOwner) {
     print(x.owner) // expected-remark @:11 {{heap allocated ref of type}}
-                   // expected-remark @-1 {{retain of type 'Klass'}}
-                   // expected-note @-3:32 {{of 'x.owner'}}
+                   // expected-remark @-1 {{retain of type 'StructWithOwner'}}
+                   // expected-note @-3:32 {{of 'x'}}
                    // expected-remark @-3:18 {{release of type}}
 }
 
@@ -234,13 +234,13 @@ func inoutKlassQuestionCastArgument(x: inout Klass) -> SubKlass? {
 }
 
 func inoutKlassBangCastArgument2(x: inout Klass?) -> SubKlass {
-    return x as! SubKlass // expected-remark {{retain of type 'Klass'}}
-                          // expected-note @-2 {{of 'x.some'}}
+    return x as! SubKlass // expected-remark {{retain of type 'Optional<Klass>'}}
+                          // expected-note @-2 {{of 'x'}}
 }
 
 func inoutKlassQuestionCastArgument2(x: inout Klass?) -> SubKlass? {
-    return x as? SubKlass // expected-remark {{retain of type 'Klass'}}
-                          // expected-note @-2 {{of 'x.some'}}
+    return x as? SubKlass // expected-remark {{retain of type 'Optional<Klass>'}}
+                          // expected-note @-2 {{of 'x'}}
 }
 
 // We should have 1x rr remark here on calleeX for storing it into the array to
