@@ -9864,10 +9864,9 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   llvm_unreachable("Unhandled CheckedCastKind in switch.");
 }
 
-Type
-ConstraintSystem::lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
-                                        bool openExistential,
-                                        ConstraintLocatorBuilder locator) {
+Type ConstraintSystem::lookupDependentMember(
+    Type base, AssociatedTypeDecl *assocTy, bool openExistential,
+    ConstraintLocatorBuilder locator, ProtocolConformanceRef *conformanceOut) {
   /// TODO: This should become the basis for a new "type witness" constraint to
   /// replace the use of DependentMemberType in the constraint system.
 
@@ -9889,6 +9888,8 @@ ConstraintSystem::lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
   // Then lookup the conformance to dig out the witness. If it's missing, we'll
   // have recorded a fix in the ConformsTo constraint so can bail.
   auto conformance = lookupConformance(base, proto);
+  if (conformanceOut)
+    *conformanceOut = conformance;
   if (!conformance) {
     // Increase SK_Hole just to ensure the solution is marked invalid.
     increaseScore(SK_Hole, locator);
@@ -9967,8 +9968,24 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto *iteratorAssocTy = seqProto->getAssociatedType(
       isAsync ? ctx.Id_AsyncIterator
               : (isBorrowing ? ctx.Id_BorrowingIterator : ctx.Id_Iterator));
-  auto iterTy = lookupDependentMember(seqTy, iteratorAssocTy,
-                                      /*openExistential*/ true, contextualLoc);
+  ProtocolConformanceRef seqConf;
+  auto iterTy =
+      lookupDependentMember(seqTy, iteratorAssocTy,
+                            /*openExistential*/ true, contextualLoc, &seqConf);
+  if (isBorrowing && seqConf.isConcrete() &&
+      seqConf.getConcrete()->getSourceKind() !=
+          ConformanceEntryKind::Explicit) {
+    ProtocolConformanceRef tmpSeqConf;
+    auto tmpIterTy = lookupDependentMember(
+        seqTy, seqProto->getAssociatedType(ctx.Id_Iterator),
+        /*openExistential*/ true, contextualLoc, &tmpSeqConf);
+    if (tmpIterTy) {
+      iterTy = tmpIterTy;
+      seqConf = tmpSeqConf;
+      isBorrowing = false;
+    }
+  }
+
   if (!iterTy) {
     // Already recorded fix.
     recordTypeVariablesAsHoles(second);
