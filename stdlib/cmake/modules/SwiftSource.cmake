@@ -634,7 +634,6 @@ function(_compile_swift_files
     list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
   endif()
 
-  list(APPEND swift_flags "-enable-experimental-feature" "NoncopyableGenerics2")
   list(APPEND swift_flags "-enable-experimental-feature" "SuppressedAssociatedTypes")
   list(APPEND swift_flags "-enable-experimental-feature" "SE427NoInferenceOnExtension")
 
