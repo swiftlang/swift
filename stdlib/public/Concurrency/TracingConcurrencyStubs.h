@@ -17,7 +17,7 @@
 #ifndef SWIFT_CONCURRENCY_TRACINGSIGNPOST_H
 #define SWIFT_CONCURRENCY_TRACINGSIGNPOST_H
 
-#include "Tracing.h"
+#include "TracingConcurrency.h"
 #include "swift/ABI/Executor.h"
 
 namespace swift {
