@@ -15,11 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-SWIFT_REQUEST(ClangImporter, ClangDirectLookupRequest,
-              (SmallVector<SingleEntry, 4>(ClangDirectLookupDescriptor)), Uncached,
-              NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, CXXNamespaceMemberLookup,
               Decl *(CXXNamespaceMemberLookupDescriptor), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, CXXNamespaceMemberEnumeration,
+              Decl *(CXXNamespaceMemberEnumerationDescriptor), Uncached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ClangRecordMemberLookup,
               Decl *(ClangRecordMemberLookupDescriptor), Uncached,
