@@ -29,22 +29,19 @@ func test1() {
 
   // CHECK: [[ADDR:%.+]] = global_addr @{{[^ ]+}}3Lib7lazyFoo
   // CHECK: [[LOADED:%.+]] = load [[ADDR]] : $*Foo
-  // CHECK: [[REF:%.+]] = struct_extract [[LOADED]] : $Foo, #Foo.ref
-  // CHECK: strong_retain [[REF]] : $TopLevelInternalClass
+  // CHECK: retain_value [[LOADED]]
   // CHECK: apply {{%.+}}([[LOADED]])
   testFoo()
 
   // CHECK: [[ADDR:%.+]] = global_addr @{{[^ ]+}}3Lib7lazyBar
   // CHECK: [[LOADED:%.+]] = load [[ADDR]] : $*Bar
-  // CHECK: [[REF:%.+]] = struct_extract [[LOADED]] : $Bar, #Bar.ref
-  // CHECK: strong_retain [[REF]] : $Bar.NestedInternalClass
+  // CHECK: retain_value [[LOADED]]
   // CHECK: apply {{%.+}}([[LOADED]])
   testBar()
 
   // CHECK: [[ADDR:%.+]] = global_addr @{{[^ ]+}}3Lib7lazyBaz
   // CHECK: [[LOADED:%.+]] = load [[ADDR]] : $*Baz
-  // CHECK: [[REF:%.+]] = struct_extract [[LOADED]] : $Baz, #Baz.ref
-  // CHECK: strong_retain [[REF]] : $Baz.NestedInternalClass.DoublyNestedInternalClass
+  // CHECK: retain_value [[LOADED]]
   // CHECK: apply {{%.+}}([[LOADED]])
   testBaz()
 } // CHECK: end sil function '[[TEST1]]'

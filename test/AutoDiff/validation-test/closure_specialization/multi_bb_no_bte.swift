@@ -20,8 +20,8 @@
 //       https://github.com/swiftlang/swift/issues/84920
 // TODO: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK1
 // TODO: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK2
-// TODO: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK3
 
+// RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK3
 // RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK4
 
 import DifferentiationUnittest
