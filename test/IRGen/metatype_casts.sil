@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -enable-objc-interop -emit-ir | %FileCheck %s -DINT=i%target-ptrsize -check-prefix CHECK -check-prefix CHECK-%target-import-type
 
-// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64 || CPU=arm64
 
 // TODO: missing `-enable-objc-interop` results in an assertion
 
@@ -14,6 +14,7 @@ entry:
   %0 = metatype $@thick T.Type
   checked_cast_br T.Type in %0 : $@thick T.Type to @thick U.Type, yes, no
 yes(%1 : $@thick U.Type):
+  fix_lifetime %1
   br end
 
 no:
@@ -32,6 +33,7 @@ sil @existential_archetype_metatype_cast : $@convention(thin) <T> (@thick P.Type
 entry(%0 : $@thick P.Type):
   checked_cast_br P.Type in %0 : $@thick P.Type to @thick T.Type, yes, no
 yes(%1 : $@thick T.Type):
+  fix_lifetime %1
   br end
 
 no:
@@ -77,6 +79,7 @@ entry(%0 : $SomeClass):
   checked_cast_br [exact] @thick SomeClass.Type in %1 : $@thick SomeClass.Type to @thick OtherClass.Type, yes, no
 
 yes(%2 : $@thick OtherClass.Type):
+  fix_lifetime %2
   br end
 
 no:
