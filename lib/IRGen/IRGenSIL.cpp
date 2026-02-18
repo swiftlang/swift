@@ -448,9 +448,12 @@ public:
 
   IRGenSILFunction(IRGenModule &IGM, SILFunction *f, llvm::Function *llvmF);
   ~IRGenSILFunction();
-  
+ 
+
   /// Generate IR for the SIL Function.
   void emitSILFunction();
+  SmallVector<SILValue, 10> arcObjects = {/* your test values */};
+  emitBatchRetainRelease(arcObjects);
 
   /// Calculates EstimatedStackSize.
   void estimateStackSize();
@@ -7251,6 +7254,31 @@ void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
     setLoweredObjCMethod(i, objcMethod.getMethod());
     return;
   }
+  
+  void IRGenFunction::emitBatchRetainRelease(ArrayRef<SILValue> values) {
+    constexpr size_t BatchSize = 5;
+    SmallVector<SILValue, BatchSize> batch;
+
+    for (auto value : values) {
+        batch.push_back(value);
+
+        if (batch.size() == BatchSize) {
+            for (auto val : batch) {
+                emitRetainCall(val);
+            }
+            for (auto val : batch) {
+                emitReleaseCall(val);
+            }
+            batch.clear();
+        }
+    }
+
+    // Handle leftovers
+    for (auto val : batch) {
+        emitRetainCall(val);
+        emitReleaseCall(val);
+    }
+}
 
   // This instruction is specified to be a no-op.
   Explosion temp = getLoweredExplosion(i->getOperand());
