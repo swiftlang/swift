@@ -16,7 +16,7 @@
 
 #if SWIFT_STDLIB_TRACING
 
-#include "TracingSignpost.h"
+#include "TracingConcurrencySignpost.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include <stdio.h>
 
