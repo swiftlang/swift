@@ -3472,7 +3472,7 @@ public:
         (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
       return nullptr;
 
-    isBorrowing = isBorrowing && !seqType->isExistentialType();
+    isBorrowing = !isAsync && isBorrowing && !seqType->isExistentialType();
 
     sequenceProto =
         isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
