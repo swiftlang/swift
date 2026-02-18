@@ -3480,6 +3480,16 @@ public:
                        ? ctx.getProtocol(KnownProtocolKind::BorrowingSequence)
                        : ctx.getProtocol(KnownProtocolKind::Sequence));
     seqConformanceRef = lookupConformance(seqType, sequenceProto);
+    if (isBorrowing && seqConformanceRef.isConcrete() &&
+        seqConformanceRef.getConcrete()->getSourceKind() !=
+            ConformanceEntryKind::Explicit) {
+      ProtocolConformanceRef tmpSeqConf = lookupConformance(
+          seqType, ctx.getProtocol(KnownProtocolKind::Sequence));
+      if (!tmpSeqConf.isInvalid()) {
+        seqConformanceRef = tmpSeqConf;
+        isBorrowing = false;
+      }
+    }
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
     buildMakeIteratorVar();

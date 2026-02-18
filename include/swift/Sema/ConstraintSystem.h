@@ -4437,7 +4437,8 @@ private:
   /// failure.
   Type lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
                              bool openExistential,
-                             ConstraintLocatorBuilder locator);
+                             ConstraintLocatorBuilder locator,
+                             ProtocolConformanceRef *conformanceOut = nullptr);
 
   /// Attempt to simplify the ForEachElement constraint.
   SolutionKind
