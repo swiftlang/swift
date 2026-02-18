@@ -14,6 +14,12 @@ func genericPassThrough<X>(_ body: () throws(X) -> Void) throws(X) {
   try body()
 }
 
+func genericPassThroughReturn<E>(_ body: @escaping () throws(E) -> Void) -> () throws(E) -> Void {
+  body
+}
+
+func genericWithDefault<E>(e: E.Type,_ body: () throws(E) -> Void = {}) -> Void {}
+
 func neverThrow() {}
 func throwConcrete() throws(ConcreteError) {}
 func throwExistential() throws {}
@@ -136,4 +142,54 @@ func test9() throws {
   // CHECK-NEXT: [[T9:%[0-9]+]] = alloc_stack $any Error
   // CHECK-NEXT: try_apply [[T8]]<any Error>([[T9]], [[T7]])
   try genericPassThrough(throwExistential)
+}
+
+// https://github.com/swiftlang/swift/issues/77123
+
+// CHECK-LABEL: sil{{.*}} @$s18typed_throws_thunk6test10yyF
+// Thunks for throws(Never) <-> nothrow
+func test10() {
+  // CHECK:   [[NEVER_THROW:%.*]] = function_ref @$s18typed_throws_thunk10neverThrowyyF
+  // CHECK:   [[THUNK_TO_NEVER:%.*]] = function_ref @$sIeg_s5NeverOIegzr_TR
+  // CHECK:   [[PARTIAL_APPLY_1:%.*]] = partial_apply [callee_guaranteed] [[THUNK_TO_NEVER]]
+  // CHECK:   [[GENERIC_PASSTHROUGH:%.*]] = function_ref @$s18typed_throws_thunk24genericPassThroughReturnyyyxYKcyyxYKcs5ErrorRzlF
+  // CHECK:   [[RESULT:%.*]] = apply [[GENERIC_PASSTHROUGH]]<Never>
+  // CHECK:   [[THUNK_FROM_NEVER:%.*]] = function_ref @$ss5NeverOIegzr_Ieg_TR
+  // CHECK:   [[PARTIAL_APPLY_2:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FROM_NEVER]]
+  _ = genericPassThroughReturn(neverThrow)
+}
+
+// Substituted-to-original Thunk: throws(Never) wrapping nothrow
+
+// CHECK-LABEL: sil {{.*}} [reabstraction_thunk] {{.*}} @$sIeg_s5NeverOIegzr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @error_indirect Never
+// CHECK: bb0([[ERROR_ADDR:%[0-9]+]] : $*Never, [[CLOSURE:%[0-9]+]] : @guaranteed $@callee_guaranteed () -> ()):
+// CHECK:   [[RESULT:%[0-9]+]] = apply [[CLOSURE]]() : $@callee_guaranteed () -> ()
+// CHECK:   [[TUPLE:%[0-9]+]] = tuple ()
+// CHECK:   return [[TUPLE]]
+
+// Original-to-substituted Thunk: nothrow wrapping throws(Never)
+
+// CHECK-LABEL: sil {{.*}} [reabstraction_thunk] {{.*}} @$ss5NeverOIegzr_Ieg_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @error_indirect Never) -> ()
+// CHECK: bb0([[CLOSURE:%[0-9]+]] : @guaranteed $@callee_guaranteed () -> @error_indirect Never):
+// CHECK:   [[ERROR_ADDR:%[0-9]+]] = alloc_stack $Never
+// CHECK:   try_apply [[CLOSURE]]([[ERROR_ADDR]]) : $@callee_guaranteed () -> @error_indirect Never, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+// CHECK: [[NORMAL_BB]]
+// CHECK:   [[TUPLE:%[0-9]+]] = tuple ()
+// CHECK:   dealloc_stack [[ERROR_ADDR]]
+// CHECK:   return [[TUPLE]]
+// CHECK: [[ERROR_BB]]:
+// CHECK:   unreachable
+
+// CHECK-LABEL: sil hidden [ossa] @$s18typed_throws_thunk6test11yyF
+func test11() {
+  // CHECK:   [[DEFAULT_ARG:%.*]] = function_ref @$s18typed_throws_thunk18genericWithDefault1e_yxm_yyxYKXEts5ErrorRzlFfA0_
+  // CHECK:   [[DEFAULT_RESULT:%.*]] = apply [[DEFAULT_ARG]]<Never>()
+  // CHECK:   [[THUNK_FROM_NEVER:%.*]] = function_ref @$ss5NeverOIegzr_Ieg_TR
+  // CHECK:   [[PARTIAL_APPLY_1:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FROM_NEVER]]
+  // CHECK:   [[NOESCAPE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_APPLY_1]]
+  // CHECK:   [[THUNK_TO_NEVER:%.*]] = function_ref @$sIg_s5NeverOIegzr_TR
+  // CHECK:   [[PARTIAL_APPLY_2:%.*]] = partial_apply [callee_guaranteed] [[THUNK_TO_NEVER]]
+  // CHECK:   [[GENERIC_WITH_DEFAULT:%.*]] = function_ref @$s18typed_throws_thunk18genericWithDefault1e_yxm_yyxYKXEts5ErrorRzlF
+  // CHECK:   apply [[GENERIC_WITH_DEFAULT]]<Never>
+  genericWithDefault(e: Never.self)
 }
