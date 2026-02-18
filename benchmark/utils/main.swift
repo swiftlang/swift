@@ -31,6 +31,7 @@ import ArraySliceTests
 import ArraySubscript
 import ArrayTests
 import AsyncTree
+import AutoDiffBuildingSimulator
 import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
 import BitCount
@@ -238,6 +239,7 @@ register(ArraySliceTests.benchmarks)
 register(ArraySubscript.benchmarks)
 register(ArrayTests.benchmarks)
 register(AsyncTree.benchmarks)
+register(AutoDiffBuildingSimulator.benchmarks)
 register(BinaryFloatingPointConversionFromBinaryInteger.benchmarks)
 register(BinaryFloatingPointProperties.benchmarks)
 register(BitCount.benchmarks)
