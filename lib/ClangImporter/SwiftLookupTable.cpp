@@ -2099,11 +2099,8 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
         return;
 
       // If we're in a module, we really need moduleMacro to be valid.
-      if (isModule && !moduleMacro) {
-        // FIXME: "public" visibility macros should actually be added to the 
-        // table.
+      if (isModule && !moduleMacro && !info->isPublic())
         return;
-      }
 
       // Add this entry.
       auto name = nameImporter.importMacroName(macro.first, info);
