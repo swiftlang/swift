@@ -2286,11 +2286,15 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
 /// \returns true if an error occurred.
 static bool checkSuperInit(ConstructorDecl *fromCtor,
                            ApplyExpr *apply, bool implicitlyGenerated) {
+  auto Callee = apply->getSemanticFn();
+  if (auto dotCall = dyn_cast<DotSyntaxCallExpr>(Callee))
+    Callee = dotCall->getSemanticFn();
+
   // Make sure we are referring to a designated initializer.
-  auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
-                        apply->getSemanticFn());
-  if (!otherCtorRef)
+  auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(Callee);
+  if (!otherCtorRef) {
     return false;
+  }
   
   auto ctor = otherCtorRef->getDecl();
   if (!ctor->isDesignatedInit()) {
