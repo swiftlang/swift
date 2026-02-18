@@ -3614,8 +3614,22 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
-  if (const Arg *A = Args.getLastArg(options::OPT_debug_module_path))
-    Opts.DebugModulePath = A->getValue();
+  if (auto *A =
+          Args.getLastArg(OPT_debug_module_path, OPT_debug_module_cache_key,
+                          OPT_debug_module_self_key)) {
+    if (A->getOption().matches(OPT_debug_module_self_key)) {
+      if (!FrontendOpts.InputsAndOutputs.hasModuleOutputPath())
+        Diags.diagnose(SourceLoc(),
+                       diag::error_option_missing_required_output_kind,
+                       A->getAsString(Args), "swiftmodule");
+      if (!Args.hasArg(OPT_cache_compile_job))
+        Diags.diagnose(SourceLoc(),
+                       diag::error_option_missing_required_argument,
+                       A->getAsString(Args), "-cache-compile-job");
+      Opts.DebugModuleSelfKey = true;
+    } else
+      Opts.DebugModulePath = A->getValue();
+  }
   
   for (auto A : Args.getAllArgValues(options::OPT_file_prefix_map)) {
     auto SplitMap = StringRef(A).split('=');

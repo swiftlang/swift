@@ -278,8 +278,11 @@ class IRGenOptions {
 public:
   std::string ModuleName;
 
-  /// The path to the main binary swiftmodule for the debug info.
+  /// The path/cache key to the main binary swiftmodule for the debug info.
   std::string DebugModulePath;
+
+  /// Use self key as swift module cacke key
+  bool DebugModuleSelfKey = false;
 
   /// The compilation directory for the debug info.
   std::string DebugCompilationDir;

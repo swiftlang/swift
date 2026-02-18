@@ -37,6 +37,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/IRGen/TBDGen.h"
@@ -1413,7 +1414,7 @@ swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
   // Create the IR emitter.
   IRGenModule *IGM = new IRGenModule(
       *irgen, std::move(targetMachine), nullptr, "", OutputFilename,
-      MainInputFilenameForDebugInfo, PrivateDiscriminator);
+      MainInputFilenameForDebugInfo, PrivateDiscriminator, "");
 
   initLLVMModule(*IGM, *SILMod);
 
@@ -1519,10 +1520,23 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   auto targetMachine = irgen.createTargetMachine();
   if (!targetMachine) return GeneratedModule::null();
 
+  std::string cacheKeyForJob;
+  if (desc.cacheKeyForJob) {
+    auto moduleKey =
+        createCompileJobCacheKeyForOutput(*desc.CAS, *desc.cacheKeyForJob, 0);
+    if (!moduleKey) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::error_cas,
+                         "IRGenModule compute cache key",
+                         toString(moduleKey.takeError()));
+      return GeneratedModule::null();
+    }
+    cacheKeyForJob = desc.CAS->getID(*moduleKey).toString();
+  }
+
   // Create the IR emitter.
   IRGenModule IGM(irgen, std::move(targetMachine), primaryFile, desc.ModuleName,
                   PSPs.OutputFilename, PSPs.MainInputFilenameForDebugInfo,
-                  desc.PrivateDiscriminator);
+                  desc.PrivateDiscriminator, cacheKeyForJob);
 
   initLLVMModule(IGM, *SILMod);
 
@@ -1741,6 +1755,19 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   bool IGMcreated = false;
 
   auto &Ctx = M->getASTContext();
+  std::string cacheKeyForJob;
+  if (desc.cacheKeyForJob) {
+    auto moduleKey =
+        createCompileJobCacheKeyForOutput(*desc.CAS, *desc.cacheKeyForJob, 0);
+    if (!moduleKey) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::error_cas,
+                         "IRGenModule compute cache key",
+                         toString(moduleKey.takeError()));
+      return;
+    }
+    cacheKeyForJob = desc.CAS->getID(*moduleKey).toString();
+  }
+
   // Create an IRGenModule for each source file.
   bool DidRunSILCodeGenPreparePasses = false;
   unsigned idx = 0;
@@ -1773,7 +1800,8 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 
     IRGenModule *IGM = new IRGenModule(
         irgen, std::move(targetMachine), nextSF, desc.ModuleName, outputName,
-        nextSF->getFilename(), nextSF->getPrivateDiscriminator().str());
+        nextSF->getFilename(), nextSF->getPrivateDiscriminator().str(),
+        cacheKeyForJob);
 
     initLLVMModule(*IGM, *SILMod, idx++);
     if (!DidRunSILCodeGenPreparePasses) {
@@ -1978,7 +2006,8 @@ GeneratedModule swift::performIRGeneration(
     ArrayRef<std::string> parallelOutputFilenames,
     ArrayRef<std::string> parallelIROutputFilenames,
     llvm::GlobalVariable **outModuleHash,
-    cas::SwiftCASOutputBackend *casBackend) {
+    cas::SwiftCASOutputBackend *casBackend,
+    std::optional<llvm::cas::ObjectRef> cacheKeyForJob) {
   // Get a pointer to the SILModule to avoid a potential use-after-move.
   const auto *SILModPtr = SILMod.get();
   const auto &SILOpts = SILModPtr->getOptions();
@@ -1986,7 +2015,7 @@ GeneratedModule swift::performIRGeneration(
       M, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
       ModuleName, PSPs, std::move(CAS), /*symsToEmit*/ std::nullopt,
       parallelOutputFilenames, parallelIROutputFilenames, outModuleHash,
-      casBackend);
+      casBackend, cacheKeyForJob);
 
   if (Opts.shouldPerformIRGenerationInParallel() &&
       !parallelOutputFilenames.empty() &&
@@ -2005,14 +2034,15 @@ GeneratedModule swift::performIRGeneration(
     const PrimarySpecificPaths &PSPs,
     std::shared_ptr<llvm::cas::ObjectStore> CAS, StringRef PrivateDiscriminator,
     llvm::GlobalVariable **outModuleHash,
-    cas::SwiftCASOutputBackend *casBackend) {
+    cas::SwiftCASOutputBackend *casBackend,
+    std::optional<llvm::cas::ObjectRef> cacheKeyForJob) {
   // Get a pointer to the SILModule to avoid a potential use-after-move.
   const auto *SILModPtr = SILMod.get();
   const auto &SILOpts = SILModPtr->getOptions();
   auto desc = IRGenDescriptor::forFile(
       file, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
       ModuleName, PSPs, std::move(CAS), PrivateDiscriminator,
-      /*symsToEmit*/ std::nullopt, outModuleHash, casBackend);
+      /*symsToEmit*/ std::nullopt, outModuleHash, casBackend, cacheKeyForJob);
   return evaluateOrFatal(file->getASTContext().evaluator, IRGenRequest{desc});
 }
 
@@ -2033,7 +2063,7 @@ void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   if (!targetMachine) return;
 
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr,
-                  OutputPath, OutputPath, "", "");
+                  OutputPath, OutputPath, "", "", "");
   initLLVMModule(IGM, SILMod);
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =

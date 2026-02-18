@@ -1840,17 +1840,18 @@ generateIR(const IRGenOptions &IRGenOpts, const TBDGenOptions &TBDOpts,
            StringRef OutputFilename, ModuleOrSourceFile MSF,
            llvm::GlobalVariable *&HashGlobal,
            ArrayRef<std::string> parallelOutputFilenames,
-           ArrayRef<std::string> parallelIROutputFilenames) {
+           ArrayRef<std::string> parallelIROutputFilenames,
+           std::optional<llvm::cas::ObjectRef> cacheKeyForJob) {
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
     return performIRGeneration(SF, IRGenOpts, TBDOpts, std::move(SM),
                                OutputFilename, PSPs, std::move(CAS),
                                SF->getPrivateDiscriminator().str(), &HashGlobal,
-                               casBackend);
+                               casBackend, cacheKeyForJob);
 
   return performIRGeneration(
       cast<ModuleDecl *>(MSF), IRGenOpts, TBDOpts, std::move(SM),
       OutputFilename, PSPs, std::move(CAS), parallelOutputFilenames,
-      parallelIROutputFilenames, &HashGlobal, casBackend);
+      parallelIROutputFilenames, &HashGlobal, casBackend, cacheKeyForJob);
 }
 
 static bool processCommandLineAndRunImmediately(CompilerInstance &Instance,
@@ -2253,7 +2254,9 @@ static bool performCompileStepsPostSILGen(
   auto IRModule = generateIR(
       IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
       Instance.getSharedCASInstance(), casBackend, OutputFilename, MSF,
-      HashGlobal, ParallelOutputFilenames, ParallelIROutputFilenames);
+      HashGlobal, ParallelOutputFilenames, ParallelIROutputFilenames,
+      IRGenOpts.DebugModuleSelfKey ? Instance.getCompilerBaseKey()
+                                   : std::nullopt);
 
   // Write extra LLVM IR output if requested
   if (IRModule && !PSPs.SupplementaryOutputs.LLVMIROutputPath.empty()) {
