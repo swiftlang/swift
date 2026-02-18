@@ -74,6 +74,17 @@ class NotSendable {}
         }
       }
 
+      tests.test("unfold with no awaiting next throwing") {
+        _ = AsyncThrowingStream(unfolding: { return "hello" })
+      }
+
+      tests.test("unfold with no awaiting next uncancelled throwing") {
+        _ = AsyncThrowingStream(
+          unfolding: { return "hello" },
+          onCancel: { expectUnreachable("unexpected cancellation") }
+        )
+      }
+
       tests.test("yield with awaiting next") {
         let series = AsyncStream(String.self) { continuation in
           continuation.yield("hello")
@@ -94,6 +105,29 @@ class NotSendable {}
         }
       }
 
+      tests.test("unfold with awaiting next throwing") {
+        let series = AsyncThrowingStream(unfolding: { return "hello" })
+        var iterator = series.makeAsyncIterator()
+        do {
+          expectEqual(try await iterator.next(isolation: #isolation), "hello")
+        } catch {
+          expectUnreachable("unexpected error thrown")
+        }
+      }
+
+      tests.test("unfold with awaiting next uncancelled throwing") {
+        let series = AsyncThrowingStream(
+          unfolding: { return "hello" },
+          onCancel: { expectUnreachable("unexpected cancellation") }
+        )
+        var iterator = series.makeAsyncIterator()
+        do {
+          expectEqual(try await iterator.next(isolation: #isolation), "hello")
+        } catch {
+          expectUnreachable("unexpected error thrown")
+        }
+      }
+      
       tests.test("yield with awaiting next 2") {
         let series = AsyncStream(String.self) { continuation in
           continuation.yield("hello")
@@ -118,6 +152,35 @@ class NotSendable {}
         }
       }
 
+      tests.test("unfold with awaiting next 2 throwing") {
+        var values = ["hello", "world"].makeIterator()
+        let series = AsyncThrowingStream(
+          unfolding: { @MainActor in return values.next() }
+        )
+        var iterator = series.makeAsyncIterator()
+        do {
+          expectEqual(try await iterator.next(isolation: #isolation), "hello")
+          expectEqual(try await iterator.next(isolation: #isolation), "world")
+        } catch {
+          expectUnreachable("unexpected error thrown")
+        }
+      }
+      
+      tests.test("unfold with awaiting next 2 uncancelled throwing") {
+        var values = ["hello", "world"].makeIterator()
+        let series = AsyncThrowingStream(
+          unfolding: { @MainActor in return values.next() },
+          onCancel: { expectUnreachable("unexpected cancellation") }
+        )
+        var iterator = series.makeAsyncIterator()
+        do {
+          expectEqual(try await iterator.next(isolation: #isolation), "hello")
+          expectEqual(try await iterator.next(isolation: #isolation), "world")
+        } catch {
+          expectUnreachable("unexpected error thrown")
+        }
+      }
+      
       tests.test("yield with awaiting next 2 and finish") {
         let series = AsyncStream(String.self) { continuation in
           continuation.yield("hello")
@@ -136,6 +199,37 @@ class NotSendable {}
           continuation.yield("world")
           continuation.finish()
         }
+        var iterator = series.makeAsyncIterator()
+        do {
+          expectEqual(try await iterator.next(isolation: #isolation), "hello")
+          expectEqual(try await iterator.next(isolation: #isolation), "world")
+          expectEqual(try await iterator.next(isolation: #isolation), nil)
+        } catch {
+          expectUnreachable("unexpected error thrown")
+        }
+      }
+
+      tests.test("unfold with awaiting next 2 and finish throwing") {
+        var values = ["hello", "world"].makeIterator()
+        let series = AsyncThrowingStream(
+          unfolding: {@MainActor in return values.next() }
+        )
+        var iterator = series.makeAsyncIterator()
+        do {
+          expectEqual(try await iterator.next(isolation: #isolation), "hello")
+          expectEqual(try await iterator.next(isolation: #isolation), "world")
+          expectEqual(try await iterator.next(isolation: #isolation), nil)
+        } catch {
+          expectUnreachable("unexpected error thrown")
+        }
+      }
+      
+      tests.test("unfold awaiting next 2 and finish uncancelled throwing") {
+        var values = ["hello", "world"].makeIterator()
+        let series = AsyncThrowingStream(
+          unfolding: { @MainActor in return values.next() },
+          onCancel: { expectUnreachable("unexpected cancellation") }
+        )
         var iterator = series.makeAsyncIterator()
         do {
           expectEqual(try await iterator.next(isolation: #isolation), "hello")
@@ -166,6 +260,190 @@ class NotSendable {}
             expectUnreachable("unexpected error type")
           }
         }
+      }
+
+      tests.test("unfold with awaiting next 2 and throw") {
+        let thrownError = SomeError()
+        var values = ["hello", "world"].makeIterator()
+        let series = AsyncThrowingStream(
+          unfolding: { @MainActor in
+            guard let value = values.next() else { throw thrownError }
+            return value
+          }
+        )
+        var iterator = series.makeAsyncIterator()
+        do {
+          expectEqual(try await iterator.next(isolation: #isolation), "hello")
+          expectEqual(try await iterator.next(isolation: #isolation), "world")
+          _ = try await iterator.next(isolation: #isolation)
+          expectUnreachable("expected thrown error")
+        } catch {
+          if let failure = error as? SomeError {
+            expectEqual(failure, thrownError)
+          } else {
+            expectUnreachable("unexpected error type")
+          }
+        }
+      }
+      
+      tests.test("unfold awaiting next 2 and finish uncancelled and throw") {
+        let thrownError = SomeError()
+        var values = ["hello", "world"].makeIterator()
+        let series = AsyncThrowingStream(
+          unfolding: { @MainActor in
+            guard let value = values.next() else { throw thrownError }
+            return value
+          }, onCancel: { expectUnreachable("unexpected cancellation") }
+        )
+        var iterator = series.makeAsyncIterator()
+        do {
+          expectEqual(try await iterator.next(isolation: #isolation), "hello")
+          expectEqual(try await iterator.next(isolation: #isolation), "world")
+          _ = try await iterator.next(isolation: #isolation)
+          expectUnreachable("expected thrown error")
+        } catch {
+          if let failure = error as? SomeError {
+            expectEqual(failure, thrownError)
+          } else {
+            expectUnreachable("unexpected error type")
+          }
+        }
+      }
+
+      tests.test("unfold awaiting next and cancel throwing") {
+        let expectation = Expectation()
+        let task = Task.detached {
+          let series = AsyncThrowingStream(
+            unfolding: {
+              withUnsafeCurrentTask { $0?.cancel() }
+              return "hello"
+            }, onCancel: { expectation.fulfilled = true }
+          )
+          var iterator = series.makeAsyncIterator()
+          do {
+            expectEqual(try await iterator.next(isolation: #isolation), "hello")
+          } catch {
+            expectUnreachable("unexpected error thrown")
+          }
+        }
+        _ = await task.getResult()
+        expectTrue(expectation.fulfilled)
+      }
+      
+      tests.test("unfold awaiting next and cancel and throw") {
+        let expectation = Expectation()
+        let thrownError = SomeError()
+        let task = Task.detached {
+          let series = AsyncThrowingStream<String, Error>(
+            unfolding: {
+              withUnsafeCurrentTask { $0?.cancel() }
+              throw thrownError
+            }, onCancel: { expectation.fulfilled = true }
+          )
+          var iterator = series.makeAsyncIterator()
+          do {
+            _ = try await iterator.next(isolation: #isolation)
+          } catch {
+            if let failure = error as? SomeError {
+              expectEqual(failure, thrownError)
+            } else {
+              expectUnreachable("unexpected error type")
+            }
+          }
+        }
+        _ = await task.getResult()
+        expectTrue(expectation.fulfilled)
+      }
+      
+      tests.test("unfold awaiting next with ignored cancellation throwing") {
+        let task = Task.detached {
+          let series = AsyncThrowingStream(unfolding: {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return "hello"
+          })
+          var iterator = series.makeAsyncIterator()
+          do {
+            expectEqual(try await iterator.next(isolation: #isolation), "hello")
+          } catch {
+            expectUnreachable("unexpected error thrown")
+          }
+        }
+        _ = await task.getResult()
+      }
+
+      tests.test("unfold awaiting next and throw with ignored cancellation") {
+        let thrownError = SomeError()
+        let task = Task.detached {
+          let series = AsyncThrowingStream<String, Error>(unfolding: {
+            withUnsafeCurrentTask { $0?.cancel() }
+            throw thrownError
+          })
+          var iterator = series.makeAsyncIterator()
+          do {
+            _ = try await iterator.next(isolation: #isolation)
+          } catch {
+            if let failure = error as? SomeError {
+              expectEqual(failure, thrownError)
+            } else {
+              expectUnreachable("unexpected error type")
+            }
+          }
+        }
+        _ = await task.getResult()
+      }
+
+      tests.test("unfold with early ignored cancellation throwing") {
+        let task = Task.detached {
+          let series = AsyncThrowingStream(unfolding: {
+            return "hello"
+          })
+          var iterator = series.makeAsyncIterator()
+          withUnsafeCurrentTask { $0?.cancel() }
+          do {
+            _ = try await iterator.next(isolation: #isolation)
+          } catch {
+            expectUnreachable("unexpected error thrown")
+          }
+        }
+        _ = await task.getResult()
+      }
+
+      tests.test("unfold awaiting next and cancel before throw") {
+        let expectation = Expectation()
+        let task = Task.detached {
+          let series = AsyncThrowingStream<String, Error>(
+            unfolding: { throw SomeError() },
+            onCancel: { expectation.fulfilled = true }
+          )
+          var iterator = series.makeAsyncIterator()
+          do {
+            withUnsafeCurrentTask { $0?.cancel() }
+            expectEqual(try await iterator.next(isolation: #isolation), nil)
+          } catch {
+            expectUnreachable("unexpected error thrown")
+          }
+        }
+        _ = await task.getResult()
+        expectTrue(expectation.fulfilled)
+      }
+
+      tests.test("unfold and cancel before awaiting next throwing") {
+        let expectation = Expectation()
+        let task = Task.detached {
+          let series = AsyncThrowingStream(
+            unfolding: { return "hello" },
+            onCancel: { expectation.fulfilled = true }
+          )
+          var iterator = series.makeAsyncIterator()
+          do {
+            withUnsafeCurrentTask { $0?.cancel() }
+            expectEqual(try await iterator.next(isolation: #isolation), nil)
+          } catch {
+            expectUnreachable("unexpected error thrown")
+          }
+        }
+        _ = await task.getResult()
+        expectTrue(expectation.fulfilled)
       }
 
       tests.test("yield with no awaiting next detached") {
