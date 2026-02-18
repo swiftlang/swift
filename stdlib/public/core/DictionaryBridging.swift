@@ -415,7 +415,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
       unsafe unmanagedObjects[i] = unsafe _key(at: bucket, bridgedKeys: bridgedKeys)
       stored += 1
-      bucket = unsafe hashTable.occupiedBucket(after: bucket)
+      unsafe bucket = unsafe hashTable.occupiedBucket(after: bucket)
     }
     unsafe theState.extra.0 = CUnsignedLong(bucket.offset)
     unsafe state.pointee = theState
