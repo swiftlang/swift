@@ -11389,6 +11389,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   // We'd need to record original base type because it might be a type
   // variable representing another missing member.
   auto origBaseTy = baseTy;
+
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
   baseTy = simplifyType(baseTy, flags);
@@ -11643,6 +11644,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
       bool alreadyDiagnosed = (result.OverallResult ==
                                MemberLookupResult::ErrorAlreadyDiagnosed);
+      std::optional<Constraint*> pastResult = this->findConstraintKindAt(locator, ConstraintKind::ValueMember);
+      alreadyDiagnosed |= pastResult.has_value();
+
       auto *fix = DefineMemberBasedOnUse::create(*this, baseTy, member,
                                                  alreadyDiagnosed, locator);
 
@@ -11653,6 +11657,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       if (instanceTy->is<AnyFunctionType>()) {
         impact += 10;
       }
+
+      if (pastResult.has_value()) //We may want to inspect it
+        impact +=5;
 
       auto *anchorExpr = getAsExpr(locator->getAnchor());
       if (anchorExpr) {
