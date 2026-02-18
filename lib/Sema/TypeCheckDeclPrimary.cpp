@@ -3635,10 +3635,22 @@ public:
       if (FD->isOperator() && !isMemberOperator(FD, nullptr)) {
         auto selfNominal = FD->getDeclContext()->getSelfNominalTypeDecl();
         auto isProtocol = isa_and_nonnull<ProtocolDecl>(selfNominal);
+        auto isExtension = isa_and_nonnull<ExtensionDecl>(FD->getDeclContext()->getAsDecl());
         // We did not find 'Self'. Complain.
-        FD->diagnose(diag::operator_in_unrelated_type,
-                     FD->getDeclContext()->getDeclaredInterfaceType(),
-                     isProtocol, FD);
+        auto diagnostic = FD->diagnose(diag::operator_in_unrelated_type,
+                                       FD->getDeclContext()->getDeclaredInterfaceType(),
+                                       isProtocol, FD);
+        
+        // If we are in a protocol extension and 'isMemberOperator' fails, see if we can suggest a fix-it where we change the type of a single parameter from the protocol itself into 'Self'
+        if (isProtocol && isExtension) {
+          for (auto param : *FD->getParameters()) {
+            auto paramType = param->getInterfaceType()->getMetatypeInstanceType();
+            if (paramType->getAnyNominal() == selfNominal) {
+              diagnostic.fixItReplace(param->getTypeSourceRangeForDiagnostics(), "Self");
+              break;
+            }
+          }
+        }
       }
     }
 
