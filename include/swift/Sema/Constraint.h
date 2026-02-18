@@ -384,7 +384,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   unsigned IsIsolated : 1;
 
   /// The kind of function reference, for member references.
-  unsigned TheFunctionRefInfo : 3;
+  unsigned TheFunctionRefInfo : 4;
 
   /// The trailing closure matching for an applicable function constraint,
   /// if any. 0 = None, 1 = Forward, 2 = Backward.

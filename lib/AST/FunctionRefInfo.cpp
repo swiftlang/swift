@@ -22,11 +22,13 @@
 using namespace swift;
 
 FunctionRefInfo FunctionRefInfo::unapplied(DeclNameLoc nameLoc) {
-  return FunctionRefInfo(ApplyLevel::Unapplied, nameLoc.isCompound());
+  return FunctionRefInfo(ApplyLevel::Unapplied, nameLoc.isCompound(),
+                         nameLoc.getModuleSelectorLoc().isValid());
 }
 
 FunctionRefInfo FunctionRefInfo::unapplied(DeclNameRef nameRef) {
-  return FunctionRefInfo(ApplyLevel::Unapplied, nameRef.isCompoundName());
+  return FunctionRefInfo(ApplyLevel::Unapplied, nameRef.isCompoundName(),
+                         nameRef.hasModuleSelector());
 }
 
 FunctionRefInfo FunctionRefInfo::addingApplicationLevel() const {
@@ -39,7 +41,7 @@ FunctionRefInfo FunctionRefInfo::addingApplicationLevel() const {
       return ApplyLevel::DoubleApply;
     }
   };
-  return FunctionRefInfo(withApply(), isCompoundName());
+  return FunctionRefInfo(withApply(), isCompoundName(), hasModuleSelector());
 }
 
 void FunctionRefInfo::dump(raw_ostream &os) const {
@@ -54,8 +56,16 @@ void FunctionRefInfo::dump(raw_ostream &os) const {
     os << "double apply";
     break;
   }
-  if (isCompoundName())
-    os << " (compound)";
+  if (isCompoundName() || hasModuleSelector()) {
+    os << " (";
+    if (isCompoundName())
+      os << "compound";
+    if (isCompoundName() && hasModuleSelector())
+      os << ", ";
+    if (hasModuleSelector())
+      os << "module selector";
+    os << ")";
+  }
 }
 
 void FunctionRefInfo::dump() const {
