@@ -101,16 +101,16 @@ template <> struct MachOTraits<8> {
 template <unsigned char ELFClass> struct ELFTraits;
 
 template <> struct ELFTraits<llvm::ELF::ELFCLASS32> {
-  using Header = const struct llvm::ELF::Elf32_Ehdr;
-  using Section = const struct llvm::ELF::Elf32_Shdr;
+  using ELFHeader = const struct llvm::ELF::Elf32_Ehdr;
+  using SectionHeader = const struct llvm::ELF::Elf32_Shdr;
   using Offset = llvm::ELF::Elf32_Off;
   using Size = llvm::ELF::Elf32_Word;
   static constexpr unsigned char ELFClass = llvm::ELF::ELFCLASS32;
 };
 
 template <> struct ELFTraits<llvm::ELF::ELFCLASS64> {
-  using Header = const struct llvm::ELF::Elf64_Ehdr;
-  using Section = const struct llvm::ELF::Elf64_Shdr;
+  using ELFHeader = const struct llvm::ELF::Elf64_Ehdr;
+  using SectionHeader = const struct llvm::ELF::Elf64_Shdr;
   using Offset = llvm::ELF::Elf64_Off;
   using Size = llvm::ELF::Elf64_Xword;
   static constexpr unsigned char ELFClass = llvm::ELF::ELFCLASS64;
@@ -552,10 +552,10 @@ public:
       }
     };
 
-    const void *Buf = readData(0, sizeof(typename T::Header));
+    const void *Buf = readData(0, sizeof(typename T::ELFHeader));
     if (!Buf)
       return {};
-    auto Hdr = reinterpret_cast<const typename T::Header *>(Buf);
+    auto Hdr = reinterpret_cast<const typename T::ELFHeader *>(Buf);
     assert(Hdr->getFileClass() == T::ELFClass && "invalid ELF file class");
 
     // From the header, grab information about the section header table.
@@ -563,7 +563,7 @@ public:
     uint16_t SectionHdrNumEntries = Hdr->e_shnum;
     uint16_t SectionEntrySize = Hdr->e_shentsize;
 
-    if (sizeof(typename T::Section) > SectionEntrySize)
+    if (sizeof(typename T::SectionHeader) > SectionEntrySize)
       return {};
 
     // Special handling for large amount of sections.
@@ -577,11 +577,11 @@ public:
     // sh_size member of the initial entry in the section header
     // table holds the value zero.
     if (SectionHdrNumEntries == 0 && SectionEntrySize > 0) {
-      auto SecBuf = readData(SectionHdrAddress, sizeof(typename T::Section));
+      auto SecBuf = readData(SectionHdrAddress, sizeof(typename T::SectionHeader));
       if (!SecBuf)
         return {};
-      const typename T::Section *FirstSectHdr =
-          reinterpret_cast<const typename T::Section *>(SecBuf);
+      const typename T::SectionHeader *FirstSectHdr =
+          reinterpret_cast<const typename T::SectionHeader *>(SecBuf);
       SectionHdrNumEntries = FirstSectHdr->sh_size;
     }
 
@@ -592,14 +592,14 @@ public:
     // reflection sections (by name) and the string table.
     // We read the section headers from the FileBuffer, since they are
     // not mapped in the child process.
-    std::vector<const typename T::Section *> SecHdrVec;
+    std::vector<const typename T::SectionHeader *> SecHdrVec;
     for (unsigned I = 0; I < SectionHdrNumEntries; ++I) {
       uint64_t Offset = SectionHdrAddress + (I * SectionEntrySize);
-      auto SecBuf = readData(Offset, sizeof(typename T::Section));
+      auto SecBuf = readData(Offset, sizeof(typename T::SectionHeader));
       if (!SecBuf)
         return {};
-      const typename T::Section *SecHdr =
-          reinterpret_cast<const typename T::Section *>(SecBuf);
+      const typename T::SectionHeader *SecHdr =
+          reinterpret_cast<const typename T::SectionHeader *>(SecBuf);
 
       SecHdrVec.push_back(SecHdr);
     }
@@ -615,7 +615,7 @@ public:
 
     assert(SecIdx < SecHdrVec.size() && "malformed ELF object");
 
-    const typename T::Section *SecHdrStrTab = SecHdrVec[SecIdx];
+    const typename T::SectionHeader *SecHdrStrTab = SecHdrVec[SecIdx];
     typename T::Offset StrTabOffset = SecHdrStrTab->sh_offset;
     typename T::Size StrTabSize = SecHdrStrTab->sh_size;
 
@@ -652,7 +652,7 @@ public:
           if (Error)
             return {nullptr, 0};
           // Now for all the sections, find their name.
-          for (const typename T::Section *Hdr : SecHdrVec) {
+          for (const typename T::SectionHeader *Hdr : SecHdrVec) {
             // Skip unused headers
             if (Hdr->sh_type == llvm::ELF::SHT_NULL)
               continue;
