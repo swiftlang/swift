@@ -307,6 +307,7 @@ UID_REQUESTS = [
     REQUEST('SyntacticMacroExpansion',
             'source.request.syntactic_macro_expansion'),
     REQUEST('IndexToStore', 'source.request.index_to_store'),
+    REQUEST('PolyglotAST', 'source.request.polyglot_ast'),
 ]
 
 
