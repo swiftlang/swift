@@ -159,7 +159,7 @@ static bool withStatusRecordLock(AsyncTask *task,
       ActiveTaskStatus newStatus = status.withCancelled();
       if (task->_private().Status.compare_exchange_weak(status, newStatus,
             /*success*/ std::memory_order_relaxed,
-            /*failure*/ loadOrdering)) {
+            /*failure*/ std::memory_order_relaxed)) {
         status = newStatus;
         return false;
       }
