@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -solver-scope-threshold=4000 -solver-enable-optimize-operator-defaults -solver-enable-prune-disjunctions
+// RUN: %target-swift-frontend -typecheck %s -solver-scope-threshold=500
 
 func f1a() { let _ = ((1 << 1) + (~(~((1 * 1) - (-(1 + (~(1)))))))) << ((1 - 1) * 1) }
 func f1b() { let _: Int8 = ((1 << 1) + (~(~((1 * 1) - (-(1 + (~(1)))))))) << ((1 - 1) * 1) }
