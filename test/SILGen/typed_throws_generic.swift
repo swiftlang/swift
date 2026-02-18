@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -enable-experimental-feature FullTypedThrows | %FileCheck %s
+// RUN: %target-swift-emit-silgen -swift-version 5 -Xllvm -sil-print-types %s -enable-experimental-feature FullTypedThrows | %FileCheck %s
 
 // REQUIRES: swift_feature_FullTypedThrows
 
@@ -419,4 +419,17 @@ func asyncThrowsLoadableGeneric<E>(_ b: Bool, _: E) async throws(LoadableGeneric
   if b {
     throw LoadableGenericError<E>()
   }
+}
+
+// CHECK-LABEL: sil {{.*}} @$sSci20typed_throws_genericE5first7ElementQzSgyYaF
+// CHECK:         try_apply {{.*}} error [[ERROR_BB:bb[0-9]+]]
+//
+// CHECK:         [[ERROR_BB]]([[ERROR:%.*]] : @owned $any Error):
+// CHECK:           destroy_value [[ERROR]] : $any Error
+extension AsyncSequence {
+    func first() async -> Element? {
+        try? await self.first { _ in
+            return true
+        }
+    }
 }

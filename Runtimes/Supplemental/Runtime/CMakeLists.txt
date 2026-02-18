@@ -124,6 +124,7 @@ add_library(swiftRuntime
 if(${PROJECT_NAME}_ENABLE_BACKTRACING)
   target_sources(swiftRuntime PRIVATE
     Address.swift
+    AggregatingSymbolSource.swift
     Backtrace.swift
     Backtrace+Codable.swift
     BacktraceFormatter.swift
@@ -138,6 +139,7 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     CoreSymbolication.swift
     CrashLog.swift
     CrashLogCapture.swift
+    DefaultSymbolLocator.swift
     Dwarf.swift
     EightByteBuffer.swift
     Elf.swift
@@ -151,6 +153,19 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     ImageSource.swift
     Libc.swift
     LimitSequence.swift
+    PDBCache.swift
+    PDB/Bitset.swift
+    PDB/FunctionInfo.swift
+    PDB/Hashes.swift
+    PDB/ISO8859-1.swift
+    PDB/Module.swift
+    PDB/MultiStreamFile.swift
+    PDB/NameTableNI.swift
+    PDB/PDBFile.swift
+    PDB/PDBFile+SymbolSource.swift
+    PDB/SectionInfo.swift
+    PDB/String+EncodeAs.swift
+    PDB/Windows1252.swift
     MemoryReader.swift
     OSReleaseScanner.swift
     PeCoff.swift
@@ -160,6 +175,7 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     Runtime.swift
     RichFrame.swift
     SymbolicatedBacktrace.swift
+    SymbolLocator.swift
     Utils.swift
     Win32Unwinder.swift
   )
@@ -173,7 +189,7 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     if(processor STREQUAL "AMD64")
       target_sources(swiftRuntime PRIVATE
         get-cpu-context-x86_64.asm)
-    elseif(processor STREQUAL "X86")
+    elseif(processor STREQUAL "X86" OR processor STREQUAL "I686")
       target_sources(swiftRuntime PRIVATE
         get-cpu-context-i686.asm)
     elseif(processor STREQUAL "ARM64")

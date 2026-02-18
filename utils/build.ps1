@@ -2874,6 +2874,8 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
         dispatch_DIR = (Get-ProjectCMakeModules $Platform CDispatch);
 
         # FIXME(compnerd) remove this once the default option is flipped to `ON`.
+        SwiftCore_ENABLE_BACKTRACING = "YES";
+        # FIXME(compnerd) remove this once the default option is flipped to `ON`.
         SwiftCore_ENABLE_CONCURRENCY = "YES";
         # FIXME(compnerd) remove this once the default option is flipped to `ON`.
         SwiftCore_ENABLE_REMOTE_MIRROR = "YES";
@@ -3046,6 +3048,8 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
         # FIXME(compnerd) this currently causes a build failure on Windows, but
         # this should be enabled when building the dynamic runtime.
         SwiftRuntime_ENABLE_LIBRARY_EVOLUTION = "NO";
+
+        SwiftRuntime_ENABLE_BACKTRACING = "YES";
       }
   }
 }
