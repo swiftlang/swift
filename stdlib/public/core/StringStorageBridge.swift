@@ -190,9 +190,9 @@ extension _AbstractStringStorage {
         return 0
       }
       
-      return _NSStringIsEqualToBytes(
+      return unsafe _NSStringIsEqualToBytes(
         other,
-        bytes: _start,
+        bytes: start,
         count: count,
         encoding: isASCII ? _cocoaASCIIEncoding : _cocoaUTF8Encoding
       )
@@ -460,87 +460,87 @@ extension __SharedStringStorage {
 
 // See swift_stdlib_connectNSBaseClasses. This method is installed onto
 // NSString in Foundation via ObjC runtime shenanigans
-@c final internal func _swizzle_me_isEqual(
-  _ ns: _CocoaString,
+@c internal func _swizzle_me_isEqual(
+  _ ns: UnsafeRawPointer,
   _ _cmd: UInt, //SEL
   _ lhsPtr: UnsafeRawPointer,
   _ lhsCount: Int,
   _ lhsEncoding: UInt
 ) -> Int8 {
-  let ns = unsafeBitcast(self, to: _CocoaString.self)
+  let ns = unsafe unsafeBitCast(ns, to: _CocoaString.self)
   defer { _fixLifetime(ns) }
-  let lhs = RawSpan(_uncheckedStart: lhsPtr, count: lhsCount)
+  
+  //TODO: figure out how to do the length check early outs before asking for contents
+  let rhsCount = _stdlib_binary_CFStringGetLength(ns)
+
+  let tryASCIIRHS = { () -> Int8? in
+    return unsafe withCocoaASCIIPointer(ns) {
+      return unsafe _unicodeBuffersEqual(
+        bytes: lhsPtr,
+        count: lhsCount,
+        encoding: lhsEncoding,
+        bytes: $0,
+        count: rhsCount,
+        encoding: _cocoaASCIIEncoding
+      ) ? 1 : 0
+    }
+  }
+  
+  let tryUTF16RHS = { () -> Int8? in
+    if let rhsPtr = unsafe _stdlib_binary_CFStringGetCharactersPtr(ns) {
+      return unsafe _unicodeBuffersEqual(
+        bytes: lhsPtr,
+        count: lhsCount,
+        encoding: lhsEncoding,
+        bytes: rhsPtr,
+        count: rhsCount,
+        encoding: _cocoaUTF16Encoding
+      ) ? 1 : 0
+    }
+    return nil
+  }
+  
   switch lhsEncoding {
   case _cocoaASCIIEncoding:
-    let rhsCount = _stdlib_binary_CFStringGetLength(ns)
-    let result = _withCocoaASCIIPointer(ns, requireStableAddress: false) {
-      isEqual(
-        bytes: lhs,
-        encoding: Unicode.ASCII.self,
-        bytes: RawSpan(_uncheckedStart: $0, count: rhsCount),
-        encoding: Unicode.ASCII.self
-      )
-    }
-    if let result {
-      return result
-    }
+    fallthrough
   case _cocoaUTF8Encoding:
-    //TODO: figure out how to do the length check early outs before asking for contents
-    let rhsCount = _stdlib_binary_CFStringGetLength(ns)
-    let result = _withCocoaASCIIPointer(ns, requireStableAddress: false) {
-      isEqual(
-        bytes: lhs,
-        encoding: Unicode.UTF8.self,
-        bytes: RawSpan(_uncheckedStart: $0, count: rhsCount),
-        encoding: Unicode.ASCII.self
-      )
-    }
-    if let result {
+    if let result = tryASCIIRHS() {
       return result
     }
-    if let rhsPtr = _stdlib_binary_CFStringGetCharactersPtr(ns) {
-      return isEqual(
-        bytes: lhs,
-        encoding: Unicode.UTF8.self,
-        bytes: RawSpan(_uncheckedStart: rhsPtr, count: rhsCount),
-        encoding: Unicode.UTF16.self
-      )
+    if let result = tryUTF16RHS() {
+      return result
     }
   case _cocoaUTF16Encoding:
-    if let rhsPtr = _stdlib_binary_CFStringGetCharactersPtr(ns) {
-      let rhsCount = _stdlib_binary_CFStringGetLength(ns)
-      return isEqual(
-        bytes: lhs,
-        encoding: Unicode.UTF16.self,
-        bytes: RawSpan(_uncheckedStart: rhsPtr, count: rhsCount),
-        encoding: Unicode.UTF16.self
-      )
+    if let result = tryUTF16RHS() {
+      return result
     }
-    // Could check ASCII here but seems not worth it?
+    if let result = tryASCIIRHS() {
+      return result
+    }
   default:
     fatalError("Unsupported encoding")
   }
   return unsafe withUnsafeTemporaryAllocation(
-    of: UInt8,
+    of: UInt8.self,
     capacity: lhsCount
   ) { tmpBuffer in
     let buffer = UnsafeMutableRawBufferPointer(tmpBuffer)
-    guard let rhsCount = _cocoaStringCopyBytes(
+    guard let rhsCount = unsafe _cocoaStringCopyBytes(
       ns,
       encoding: lhsEncoding,
       into: buffer,
       options: 4 /* NSFailOnPartialEncodingConversion */
     ) else {
-      return false
+      return 0
     }
     if rhsCount != lhsCount {
-      return false
+      return 0
     }
     return unsafe 0 == _swift_stdlib_memcmp(
       lhsPtr,
       buffer.baseAddress.unsafelyUnwrapped,
       lhsCount
-    )
+    ) ? 1 : 0
   }
 }
 
