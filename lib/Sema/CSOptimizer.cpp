@@ -1056,7 +1056,7 @@ scoreCandidateMatch(ConstraintSystem &cs,
   }
 
   // Conversion from a concrete type to its existential value.
-  if (paramType->isExistentialType() && !paramType->isAny()) {
+  if (paramType->isExistentialType()) {
     if (isSubtypeOfExistentialType(candidateType, paramType))
       return 100;
   }
@@ -1084,12 +1084,6 @@ scoreCandidateMatch(ConstraintSystem &cs,
   }
 
   if (paramType->isAnyExistentialType()) {
-    // If the parameter is `Any` we assume that all candidates are
-    // convertible to it, which makes it a perfect match. The solver
-    // would then decide whether erasing to an existential is preferable.
-    if (paramType->isAny())
-      return 100;
-
     // If the parameter is `Any.Type` we assume that all metatype
     // candidates are convertible to it.
     if (auto *EMT = paramType->getAs<ExistentialMetatypeType>()) {
