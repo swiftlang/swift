@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -sil-print-types -enable-copy-propagation -enable-lexical-lifetimes=false -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 
+sil_stage canonical
+
 import Swift
 import Builtin
 
@@ -1238,3 +1240,40 @@ bb0(%0 : $Float):
   %r = tuple ()
   return %r : $()
 }
+
+sil @closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@in_guaranteed String, @in_guaranteed String) -> (Bool, @error any Error)) -> (Int, @error any Error)
+
+// CHECK-LABEL: sil [ossa] @try_apply_of_lexical_closure :
+// CHECK:         %1 = function_ref @closure
+// CHECK:         try_apply %1(%0)
+// CHECK-LABEL: } // end sil function 'try_apply_of_lexical_closure'
+sil [ossa] @try_apply_of_lexical_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@in_guaranteed String, @in_guaranteed String) -> (Bool, @error any Error)) -> Int {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed (@in_guaranteed String, @in_guaranteed String) -> (Bool, @error any Error)):
+  %1 = function_ref @closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@in_guaranteed String, @in_guaranteed String) -> (Bool, @error any Error)) -> (Int, @error any Error)
+  %2 = partial_apply [callee_guaranteed] [on_stack] %1(%0) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@in_guaranteed String, @in_guaranteed String) -> (Bool, @error any Error)) -> (Int, @error any Error)
+  %3 = convert_function %2 to $@noescape @callee_guaranteed () -> (Int, @error any Error)
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %7 = begin_borrow [lexical] %3
+  try_apply %7() : $@noescape @callee_guaranteed () -> (Int, @error any Error), normal bb4, error bb5
+
+bb4(%9 : $Int):
+  end_borrow %7
+  destroy_value %3
+  return %9
+
+bb5(%13 : @owned $any Error):
+  end_borrow %7
+  destroy_value %3
+  destroy_value [dead_end] %13
+  unreachable
+}
+
+
