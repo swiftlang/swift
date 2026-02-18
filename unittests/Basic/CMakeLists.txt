@@ -43,6 +43,7 @@ add_swift_unittest(SwiftBasicTests
   TransformRangeTest.cpp
   TypeLookupError.cpp
   UnicodeTest.cpp
+  SwiftVersionTest.cpp
   ${generated_tests}
   )
 
