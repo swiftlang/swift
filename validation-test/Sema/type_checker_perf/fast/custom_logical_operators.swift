@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000 -solver-disable-performance-hacks
 // REQUIRES: tools-release,no_asan
 // REQUIRES: objc_interop
 
@@ -23,7 +23,6 @@ public func || <Predicate> (_ lhs: Predicate, _ rhs: Predicate) -> OrPredicate<P
 
 func f<T: Publisher, U: Publisher, V: Publisher>(_ sendingAction: T, _ conversationState: U, _ shouldDisableUserInput: V)
   where T.Failure == U.Failure, U.Failure == V.Failure, T.Output == Bool, U.Output == E, V.Output == Bool {
-  // expected-error@+1 {{reasonable time}}
   let _ = Publishers.CombineLatest3(sendingAction, conversationState, shouldDisableUserInput)
     .map { sendingAction, state, disableInput in
       sendingAction == false && state == .active && disableInput == false
