@@ -679,7 +679,7 @@ SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
 }
 
 SILInstruction *
-SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
+SILCombiner::legacyVisitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
   if (CastOpt.optimizeCheckedCastBranchInst(CBI))
     MadeChange = true;
 
