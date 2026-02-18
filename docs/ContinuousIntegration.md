@@ -1,4 +1,3 @@
-
 # Continuous Integration for Swift
 
 **Table of Contents**
@@ -29,7 +28,7 @@ This page is designed to assist in the understanding of proper practices for tes
 
 ## Pull Request Testing
 
-In order for the Swift project to be able to advance quickly, it is important that we maintain a green build [[1]](#footnote-1). In order to help maintain this green build, the Swift project heavily uses pull request (PR) testing. Specifically, an important general rule is that **all** non-trivial checkins to any Swift Project repository should at least perform a [smoke test](#smoke-testing) if simulators will not be impacted *or* a full [validation test](#validation-testing) if simulators may be impacted. If in addition one is attempting to make a source breaking change across multiple repositories, one should follow the cross repo source breaking changes workflow. We now continue by describing the Swift system for Pull Request testing, @swift-ci:
+In order for the Swift project to be able to advance quickly, it is important that we maintain a green build [^1]. In order to help maintain this green build, the Swift project heavily uses pull request (PR) testing. Specifically, an important general rule is that **all** non-trivial checkins to any Swift Project repository should at least perform a [smoke test](#smoke-testing) if simulators will not be impacted *or* a full [validation test](#validation-testing) if simulators may be impacted. If in addition one is attempting to make a source breaking change across multiple repositories, one should follow the cross repo source breaking changes workflow. We now continue by describing the Swift system for Pull Request testing, @swift-ci:
 
 ### @swift-ci
 
@@ -95,7 +94,7 @@ Swift SDK for Android        | @swift-ci Please test android                 | S
 
 The core principles of validation testing is that:
 
-1. A validation test should build and run tests for /all/ platforms and all
+1. A validation test should build and run tests for _all_ platforms and all
    architectures supported by the CI.
 2. A validation test should not be incremental. We want there to be a
    definitiveness to a validation test. If one uses a validation test, one
@@ -107,7 +106,7 @@ With that being said, a validation test on macOS does the following:
 1. Removes the workspace.
 2. Builds the compiler.
 3. Builds the standard library for macOS and the simulators for all platforms.
-4. lldb is /not/ built/tested [[2]](#footnote-2)
+4. lldb is _not_ built/tested [^2]
 5. The tests, validation-tests are run for iOS simulator, watchOS simulator and macOS both with
    and without optimizations enabled.
 
@@ -294,13 +293,7 @@ Windows      | @swift-ci Please test Windows platform | Swift Test Windows Platf
 
 FIXME: FILL ME IN!
 
-<a name="footnote-1">[1]</a> Even though it should be without saying, the reason why having a green build is important is that:
+<!-- We are making this numbered list with <ol> and <li> HTML tags intead of a regular Markdown numbered list because GitHub doesn't seem capable of rendering multi-line numbered lists in footnotes, even if we put 2 spaces at the end of each line as per the documentation: https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#footnotes -->
+[^1]: Even though it should go without saying, the reason why having a green build is important is that:<ol><li>A full build break can prevent other developers from testing their work.</li><li>A test break can make it difficult for developers to know whether or not their specific commit has broken a test, requiring them to perform an initial clean build, wasting time.</li><li>@swift-ci pull request testing becomes less effective since one can not perform a test and one must reason about the source of a given failure.</li></ol>
 
-1. A full build break can prevent other developers from testing their work.
-2. A test break can make it difficult for developers to know whether or not their specific commit has broken a test, requiring them to perform an initial clean build, wasting time.
-3. @swift-ci pull request testing becomes less effective since one can not perform a test and one must reason about the source of a given failure.
-
-<a name="footnote-2">[2]</a> This is due to unrelated issues relating to running lldb tests on macOS.
-
-
-
+[^2]: This is due to unrelated issues relating to running lldb tests on macOS.
