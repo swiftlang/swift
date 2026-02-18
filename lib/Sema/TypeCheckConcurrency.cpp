@@ -106,11 +106,11 @@ void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
   }
 }
 
-static bool requiresFlowIsolation(ActorIsolation typeIso,
-                                  ConstructorDecl const *ctor) {
+static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
+                                                     ConstructorDecl *ctor) {
   assert(ctor->isDesignatedInit());
 
-  auto ctorIso = getActorIsolation(const_cast<ConstructorDecl *>(ctor));
+  auto ctorIso = getActorIsolation(ctor);
 
   // Regardless of async-ness, a mismatch in isolation means we need to be
   // flow-sensitive.
@@ -133,25 +133,26 @@ static bool requiresFlowIsolation(ActorIsolation typeIso,
     llvm_unreachable("constructor cannot have erased isolation");
 
   case ActorIsolation::ActorInstance:
-      return !(ctor->hasAsync()); // need flow-isolation for non-async.
+    return !ctor->hasAsync(); // need flow-isolation for non-async.
   };
 }
 
-bool swift::usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn) {
+bool swift::usesFlowSensitiveIsolation(AbstractFunctionDecl *fn) {
   if (!fn)
     return false;
 
   // Only designated constructors or nonisolated destructors use this kind of
   // isolation.
-  if (auto const* ctor = dyn_cast<ConstructorDecl>(fn)) {
-    if (!ctor->isDesignatedInit())
-      return false;
-  } else if (auto const *dtor = dyn_cast<DestructorDecl>(fn)) {
-    if (getActorIsolation(const_cast<DestructorDecl *>(dtor))
-            .isActorIsolated()) {
-      return false;
-    }
-  } else {
+  if (!isa<ConstructorDecl, DestructorDecl>(fn))
+    return false;
+
+  if (auto *ctor = dyn_cast<ConstructorDecl>(fn);
+      ctor && !ctor->isDesignatedInit()) {
+    return false;
+  }
+
+  if (auto *dtor = dyn_cast<DestructorDecl>(fn);
+      dtor && getActorIsolation(dtor).isActorIsolated()) {
     return false;
   }
 
@@ -171,10 +172,9 @@ bool swift::usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn) {
       return true;
 
     // construct an isolation corresponding to the type.
-    auto actorTypeIso = ActorIsolation::forActorInstanceSelf(
-        const_cast<AbstractFunctionDecl *>(fn));
-
-    return requiresFlowIsolation(actorTypeIso, cast<ConstructorDecl>(fn));
+    auto actorTypeIso = ActorIsolation::forActorInstanceSelf(fn);
+    return isolatedConstructorRequiresFlowIsolation(actorTypeIso,
+                                                    cast<ConstructorDecl>(fn));
   }
 
   // Otherwise, the type must be isolated to a global actor.
@@ -186,7 +186,8 @@ bool swift::usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn) {
   if (isa<DestructorDecl>(fn))
     return true;
 
-  return requiresFlowIsolation(nominalIso, cast<ConstructorDecl>(fn));
+  return isolatedConstructorRequiresFlowIsolation(nominalIso,
+                                                  cast<ConstructorDecl>(fn));
 }
 
 bool IsActorRequest::evaluate(
@@ -2043,9 +2044,9 @@ static bool memberAccessHasSpecialPermissionInSwift5(
 ///
 /// \returns true iff the member access is permitted in Sema because it will
 /// be verified later by flow-isolation.
-static bool checkedByFlowIsolation(DeclContext const *refCxt,
+static bool checkedByFlowIsolation(const DeclContext *refCxt,
                                    ReferencedActor &baseActor,
-                                   ValueDecl const *member, SourceLoc memberLoc,
+                                   ValueDecl *member, SourceLoc memberLoc,
                                    std::optional<VarRefUseEnv> useKind) {
 
   // base of member reference must be `self`
@@ -2058,9 +2059,10 @@ static bool checkedByFlowIsolation(DeclContext const *refCxt,
   // NOTE: once flow-isolation can analyze calls to arbitrary local
   // functions, we should be using isActorInitOrDeInitContext instead
   // of this ugly loop.
-  AbstractFunctionDecl const* fnDecl = nullptr;
+  AbstractFunctionDecl *fnDecl = nullptr;
   while (true) {
-    fnDecl = dyn_cast_or_null<AbstractFunctionDecl>(refCxt->getAsDecl());
+    fnDecl = dyn_cast_or_null<AbstractFunctionDecl>(
+        const_cast<DeclContext *>(refCxt)->getAsDecl());
     if (!fnDecl)
       break;
 
