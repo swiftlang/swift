@@ -99,7 +99,7 @@ A function that takes or return primitive Swift types behaves like any other C++
 
 ```swift
 // Swift module 'MyModule'
-func myFunction(x: float, _ c: Int) -> Bool
+func myFunction(x: Float, _ c: Int) -> Bool
 ```
 
 ```c++
@@ -336,7 +336,7 @@ Similarly, any type that conforms to `ExpressibleByArrayLiteral` will receive a 
 
 ### Resilient Swift Structures
 
-Swift resilient structures are bridged over as a C++ class that boxes the Swift value on the heap. Their generated C++ interface resembles the C++ interface for a non-resilient structure, so all the methods and properties can be accessed in the same manner. For example, you can call methods and access the properties on `Foundation::URL` , which is a resilient Swif structure, in the same manner as you would for any other fixed layout Swift structure:
+Swift resilient structures are bridged over as a C++ class that boxes the Swift value on the heap. Their generated C++ interface resembles the C++ interface for a non-resilient structure, so all the methods and properties can be accessed in the same manner. For example, you can call methods and access the properties on `Foundation::URL` , which is a resilient Swift structure, in the same manner as you would for any other fixed layout Swift structure:
 
 ```c++
 #include "Foundation-Swift.h"
@@ -1062,13 +1062,13 @@ Swift protocols can be extended to provide method, initializer, subscript, and c
 
 ```swift
 protocol Shape {
-  var area: double { get }
+  var area: Double { get }
 }
 extension Rect: Shape {
-  var area: double { width * height }
+  var area: Double { width * height }
 }
 extension Shape {
-  func fits(inArea otherArea: double) -> Bool {
+  func fits(inArea otherArea: Double) -> Bool {
     area < otherArea
   }
 }
