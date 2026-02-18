@@ -149,7 +149,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   // --- self.actorSystem
   auto systemRefExpr =
       UnresolvedDotExpr::createImplicit(
-          C, new (C) DeclRefExpr(selfDecl, dloc, implicit), //  TODO: make createImplicit
+          C, new (C) DeclRefExpr(selfDecl, dloc, implicit),
           C.Id_actorSystem);
 
   auto *systemVar = new (C) VarDecl(
@@ -193,6 +193,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   // --- Recording invocation details
   // -- recordGenericSubstitution(s)
+  // TODO: trace all these encoding calls as well so we can record timing for them?
   if (auto genEnv = thunk->getGenericEnvironment()) {
     auto recordGenericSubstitutionName =
         DeclName(C, C.Id_recordGenericSubstitution,
@@ -387,15 +388,14 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   auto *targetVar = new (C) VarDecl(
       /*isStatic=*/false, VarDecl::Introducer::Let, sloc, C.Id_target, thunk);
 
-  {
-    // --- Mangle the thunk name
-    auto mangledAccessorRecordName =
-        mangleDistributedThunkForAccessorRecordName(C, thunk);
+  // --- Mangle the thunk name
+  auto mangledAccessorRecordName =
+      mangleDistributedThunkForAccessorRecordName(C, thunk);
 
+  {
     StringLiteralExpr *mangledTargetStringLiteral =
         new (C) StringLiteralExpr(mangledAccessorRecordName,
                                   SourceRange(), implicit);
-
     // --- let target = RemoteCallTarget(<mangled name>)
     targetVar->setInterfaceType(remoteCallTargetTy);
     targetVar->setImplicit();
@@ -422,6 +422,34 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
     remoteBranchStmts.push_back(targetPB);
     remoteBranchStmts.push_back(targetVar);
+  }
+
+  // === Trace the remoteCall
+  {
+    auto traceRemoteCallRef = UnresolvedDeclRefExpr::createImplicit(
+        C, DeclName(C,
+          C.getIdentifier("_traceDistributedRemoteCall"),
+          {C.getIdentifier("targetActor"), C.getIdentifier("targetIdentifier")}));
+
+    SmallVector<Expr *, 2> traceArgs;
+    // targetActor: some DistributedActor
+    traceArgs.push_back(new (C) DeclRefExpr(selfDecl, dloc, implicit,
+                                            swift::AccessSemantics::Ordinary,
+                                            selfDecl->getInterfaceType()));
+    // targetIdentifier: String
+    StringLiteralExpr *mangledTargetStringLiteral =
+          new (C) StringLiteralExpr(mangledAccessorRecordName,
+                                    SourceRange(), implicit);
+    traceArgs.push_back(mangledTargetStringLiteral);
+
+    auto nameRef = DeclNameRef(traceRemoteCallRef->getName());
+    auto traceArgsList = ArgumentList::forImplicitCallTo(
+        nameRef,
+        traceArgs,
+        C);
+
+    auto traceCallExpr = CallExpr::createImplicit(C, traceRemoteCallRef, traceArgsList);
+    remoteBranchStmts.push_back(traceCallExpr);
   }
 
   // === Make the 'remoteCall(Void)(...)'
