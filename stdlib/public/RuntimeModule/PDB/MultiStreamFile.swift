@@ -52,7 +52,7 @@ class MultiStreamFile {
     var size: Int
     var pages: [Int]
 
-    var valid: Bool { return size != 0xffffffff }
+    var valid: Bool { return size != Int(bitPattern: 0xffffffff) }
   }
 
   enum Kind {
