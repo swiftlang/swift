@@ -103,6 +103,7 @@ void BindingSet::computeLValueState() {
     case ConstraintKind::Disjunction:
     case ConstraintKind::ValueMember:
     case ConstraintKind::UnresolvedValueMember:
+    case ConstraintKind::OptionalObject:
       LValueState = KnownLValueKind::Unknown;
       return;
 
@@ -2243,6 +2244,12 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       // in this case).
       if (kind == AllowedBindingKind::Supertypes) {
         recordAdjacentVar(bindingTypeVar, constraint);
+
+        // If we don't know the lvalue status of the left-hand
+        // side yet, our type variable might still become an
+        // lvalue type.
+        if (bindingTypeVar->getImpl().canBindToLValue())
+          recordDelayedBy(constraint);
       }
       break;
     }

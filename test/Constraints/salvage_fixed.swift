@@ -37,3 +37,17 @@ func iuoOfArrayToPointer(arr: inout [Int]!) {
   func test(_: UnsafeMutablePointer<Int>) {}
   test(&arr)
 }
+
+// OptionalObject constraints can delay resolution of lvalue status.
+struct ImplicitMembers {
+  static var optional: ImplicitMembers?
+}
+
+postfix operator ^
+postfix func ^ (_ lhs: ImplicitMembers) -> Int { }
+
+extension Int {
+  func foo() {}
+}
+
+let _ = .optional?^.foo()
