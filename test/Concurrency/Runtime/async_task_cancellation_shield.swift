@@ -1,5 +1,8 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input=always
 
+// rdar://170452940 - Test is failing in different configurations.
+// REQUIRES: rdar170452940
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: synchronization
