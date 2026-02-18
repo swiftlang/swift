@@ -2903,7 +2903,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ -z "${INSTALL_LIBCXX}" ]] ; then
                     continue
                 fi
-                INSTALL_TARGETS=install-cxx-headers
+                INSTALL_TARGETS="install-cxx install-cxx-headers install-cxxabi install-cxxabi-headers"
                 ;;
             swift)
                 if [[ -z "${INSTALL_SWIFT}" ]] ; then
