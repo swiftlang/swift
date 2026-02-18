@@ -62,6 +62,11 @@ module EnumExhaustivity {
 
 module ExternIntX { header "x.h" }
 
+module GenericModule {
+  header "GenericType.h"
+  export *
+}
+
 module HasSubmodule {
   link framework "HasSubmodule"
   module Submodule {

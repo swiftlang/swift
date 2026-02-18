@@ -561,6 +561,19 @@ getTypeRefImpl(IRGenModule &IGM,
   auto SymbolicName =
     useFlatUnique ? Mangler.mangleTypeForFlatUniqueTypeRef(sig, type)
                   : Mangler.mangleTypeForReflection(IGM, sig, type);
+
+  // If this is a symbolic reference to an imported Objective-C class, track
+  // it so that we record a direct pointer to the class when we emit the
+  // symbolic reference. This keeps it alive for the linker (when
+  // intentionally not using `-ObjC` or `-force_load`).
+  if (auto nominalTy = type->getAnyNominal()) {
+    if (auto classTy = llvm::dyn_cast<ClassDecl>(nominalTy)) {
+      if (classTy->isObjC() && classTy->hasClangNode() &&
+          classTy->hasSuperclass() && !classTy->isForeign()) {
+        SymbolicName.ObjCClassRef = classTy;
+      }
+    }
+  }
   return {IGM.getAddrOfStringForTypeRef(SymbolicName, role),
           SymbolicName.runtimeSizeInBytes()};
 }
