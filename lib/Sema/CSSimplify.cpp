@@ -9864,10 +9864,9 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   llvm_unreachable("Unhandled CheckedCastKind in switch.");
 }
 
-Type
-ConstraintSystem::lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
-                                        bool openExistential,
-                                        ConstraintLocatorBuilder locator) {
+Type ConstraintSystem::lookupDependentMember(
+    Type base, AssociatedTypeDecl *assocTy, bool openExistential,
+    ConstraintLocatorBuilder locator, ProtocolConformanceRef *conformanceOut) {
   /// TODO: This should become the basis for a new "type witness" constraint to
   /// replace the use of DependentMemberType in the constraint system.
 
@@ -9889,6 +9888,8 @@ ConstraintSystem::lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
   // Then lookup the conformance to dig out the witness. If it's missing, we'll
   // have recorded a fix in the ConformsTo constraint so can bail.
   auto conformance = lookupConformance(base, proto);
+  if (conformanceOut)
+    *conformanceOut = conformance;
   if (!conformance) {
     // Increase SK_Hole just to ensure the solution is marked invalid.
     increaseScore(SK_Hole, locator);
@@ -9967,12 +9968,32 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto *iteratorAssocTy = seqProto->getAssociatedType(
       isAsync ? ctx.Id_AsyncIterator
               : (isBorrowing ? ctx.Id_BorrowingIterator : ctx.Id_Iterator));
-  auto iterTy = lookupDependentMember(seqTy, iteratorAssocTy,
-                                      /*openExistential*/ true, contextualLoc);
+  ProtocolConformanceRef seqConf;
+  auto iterTy =
+      lookupDependentMember(seqTy, iteratorAssocTy,
+                            /*openExistential*/ true, contextualLoc, &seqConf);
+
   if (!iterTy) {
     // Already recorded fix.
     recordTypeVariablesAsHoles(second);
     return SolutionKind::Solved;
+  }
+
+  // Always prefer conformance to Sequence if both are available.
+  if (isBorrowing) {
+    auto *tmpSeqProto = ctx.getProtocol(KnownProtocolKind::Sequence);
+    ProtocolConformanceRef tmpSeqConf = lookupConformance(seqTy, tmpSeqProto);
+    if (!tmpSeqConf.isInvalid()) {
+      auto tmpIterTy = lookupDependentMember(
+          seqTy, tmpSeqProto->getAssociatedType(ctx.Id_Iterator),
+          /*openExistential*/ true, contextualLoc, &tmpSeqConf);
+      if (tmpIterTy) {
+        iterTy = tmpIterTy;
+        seqConf = tmpSeqConf;
+        seqProto = tmpSeqProto;
+        isBorrowing = false;
+      }
+    }
   }
 
   // Now we have the Iterator type, do the same lookup for Element, opening
@@ -9981,8 +10002,6 @@ ConstraintSystem::simplifyForEachElementConstraint(
       isAsync ? KnownProtocolKind::AsyncIteratorProtocol
               : (isBorrowing ? KnownProtocolKind::BorrowingIteratorProtocol
                              : KnownProtocolKind::IteratorProtocol));
-  // FIXME: update this to only use Id_Element once the BorrowingSequence
-  // protocol lands.
   auto *eltAssocTy = iterProto->getAssociatedType(Context.Id_Element);
   auto eltTy = lookupDependentMember(iterTy, eltAssocTy,
                                      /*openExistential*/ true, contextualLoc);
