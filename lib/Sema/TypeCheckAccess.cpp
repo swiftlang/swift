@@ -2043,7 +2043,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
                                const ExportContext &where,
                                DowngradeToWarning &downgradeToWarning) {
   downgradeToWarning = DowngradeToWarning::No;
-  ModuleDecl *M = decl->getModuleContext();
+  ModuleDecl *M = decl->getModuleContextForNameLookup();
   auto *SF = where.getDeclContext()->getParentSourceFile();
   auto &Context = M->getASTContext();
 
@@ -2161,7 +2161,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
       where.getDeclContext()->getAsDecl()->getModuleContext()->isResilient() &&
       !where.getDeclContext()
            ->getAsDecl()
-           ->getModuleContext()
+           ->getModuleContextForNameLookup()
            ->getUnderlyingModuleIfOverlay() &&
       decl->hasClangNode() && !decl->getModuleContext()->isSwiftShimsModule() &&
       isFragileClangNode(decl->getClangNode()) &&
