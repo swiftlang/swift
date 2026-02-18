@@ -430,13 +430,18 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
     return nullptr;
 
   swift::ASTContext &Ctx = DC->getASTContext();
+  bool IsFunction = D->getType()->isFunctionType();
   ImportedType Ty =
-      clang.importType(D->getType(), ImportTypeKind::Abstract,
+      clang.importType(D->getType(),
+                      IsFunction
+                          ? ImportTypeKind::Variable
+                          : ImportTypeKind::Abstract,
                        [&clang, &D](Diagnostic &&Diag) {
                          clang.addImportDiagnostic(D, std::move(Diag),
                                                    D->getLocation());
                        }, /*AllowsNSUIntegerAsInt*/true,
-                       Bridgeability::None, { });
+                       Bridgeability::None,
+                       IsFunction ? ImportTypeAttr::Sendable : ImportTypeAttr());
   swift::Type GetterTy = FunctionType::get({}, Ty.getType(), ASTExtInfo{});
   swift::Type SetterTy =
       FunctionType::get({AnyFunctionType::Param(Ty.getType())},

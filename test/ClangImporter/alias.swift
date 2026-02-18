@@ -3,6 +3,7 @@
 // RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules %s -Xcc -DUNICODE -enable-experimental-feature ImportMacroAliases
 // RUN: %target-swift-frontend -I %S/Inputs/custom-modules -parse-as-library -module-name Alias -Osize -emit-ir -o - %s -Xcc -DUNICODE -enable-experimental-feature ImportMacroAliases | %FileCheck %s -check-prefix CHECK-UNICODE-IR
 // RUN: not %target-swift-frontend -I %S/Inputs/custom-modules -parse-as-library -module-name Alias -c %s -DINVALID -o /dev/null 2>&1 -enable-experimental-feature ImportMacroAliases | %FileCheck --dry-run %s -check-prefix CHECK-INVALID
+// RUN: %target-swift-frontend -I %S/Inputs/custom-modules -parse-as-library -module-name Alias -emit-sil %s -o - -enable-experimental-feature ImportMacroAliases | %FileCheck %s -check-prefix CHECK-FUNCTION-POINTER
 
 // REQUIRES: swift_feature_ImportMacroAliases
 
@@ -64,3 +65,38 @@ func h() {
 let _ = ALPHA
 // CHECK-INVALID: error: global variable declaration does not bind any variables
 #endif
+
+// CHECK-FUNCTION-POINTER:      // aliased_function.getter
+// CHECK-FUNCTION-POINTER-NEXT: // Isolation: unspecified
+// CHECK-FUNCTION-POINTER-NEXT: sil shared [transparent] [heuristic_always_inline] @$sSC16aliased_functionyycvg : $@convention(thin) () -> @owned @Sendable @callee_guaranteed () -> () {
+// CHECK-FUNCTION-POINTER:        function_ref @$sSo8functionyyFTO : $@convention(thin) () -> ()
+
+// CHECK-FUNCTION-POINTER:      // MAFunction.getter
+// CHECK-FUNCTION-POINTER-NEXT: // Isolation: unspecified
+// CHECK-FUNCTION-POINTER-NEXT: sil shared [transparent] [heuristic_always_inline] @$sSC10MAFunctionyycvg : $@convention(thin) () -> @owned @Sendable @callee_guaranteed () -> () {
+// CHECK-FUNCTION-POINTER:        function_ref @$sSo19main_actor_functionyyFTO : $@convention(thin) () -> ()
+
+// CHECK-FUNCTION-POINTER:      // @nonobjc function()
+// CHECK-FUNCTION-POINTER-NEXT: // Isolation: unspecified
+// CHECK-FUNCTION-POINTER-NEXT: sil shared [thunk] @$sSo8functionyyFTO : $@convention(thin) () -> () {
+// CHECK-FUNCTION-POINTER:        function_ref @$sSo8functionyyFTo : $@convention(c) () -> ()
+
+// CHECK-FUNCTION-POINTER:      // @objc function()
+// CHECK-FUNCTION-POINTER-NEXT: // Isolation: unspecified
+// CHECK-FUNCTION-POINTER-NEXT: // clang name: function
+// CHECK-FUNCTION-POINTER:      sil [asmname "function"] [clang function] @$sSo8functionyyFTo : $@convention(c) () -> ()
+
+// CHECK-FUNCTION-POINTER:      // @nonobjc main_actor_function()
+// CHECK-FUNCTION-POINTER-NEXT: // Isolation: global_actor. type: MainActor
+// CHECK-FUNCTION-POINTER-NEXT: sil shared [thunk] @$sSo19main_actor_functionyyFTO : $@convention(thin) () -> () {
+// CHECK-FUNCTION-POINTER:        function_ref @$sSo19main_actor_functionyyFTo : $@convention(c) () -> ()
+
+// CHECK-FUNCTION-POINTER:      // @objc main_actor_function()
+// CHECK-FUNCTION-POINTER-NEXT: // Isolation: global_actor. type: MainActor
+// CHECK-FUNCTION-POINTER-NEXT: // clang name: main_actor_function
+// CHECK-FUNCTION-POINTER:      sil [asmname "main_actor_function"] [clang main_actor_function] @$sSo19main_actor_functionyyFTo : $@convention(c) () -> ()
+
+func test() {
+    _ = aliased_function
+    _ = MAFunction()
+}

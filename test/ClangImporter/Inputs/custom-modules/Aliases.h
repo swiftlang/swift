@@ -51,3 +51,10 @@ extern const int const_overloaded __attribute__((__swift_name__("overload")));
 
 void variadic(int count, ...);
 #define aliased_variadic variadic
+
+void function(void);
+#define aliased_function function
+
+__attribute__((__swift_attr__("@MainActor")))
+void main_actor_function(void);
+#define MAFunction main_actor_function

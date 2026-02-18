@@ -13,8 +13,8 @@ public func f() {
             // closure #1 in f()
 // CHECK: bb0(%0 : $*(), %1 : $CVaListPointer):
             // function_ref u_vformatMessage.getter
-// CHECK: [[PROJECTION:%.*]] = function_ref @$sSC16u_vformatMessageyys5Int32V_s14CVaListPointerVSgtcvg : $@convention(thin) () -> @owned @callee_guaranteed (Int32, Optional<CVaListPointer>) -> ()
-// CHECK: [[FUNCTION:%.*]] = apply [[PROJECTION]]() : $@convention(thin) () -> @owned @callee_guaranteed (Int32, Optional<CVaListPointer>) -> ()
+// CHECK: [[PROJECTION:%.*]] = function_ref @$sSC16u_vformatMessageyys5Int32V_s14CVaListPointerVSgtcvg : $@convention(thin) () -> @owned @Sendable @callee_guaranteed (Int32, Optional<CVaListPointer>) -> ()
+// CHECK: [[FUNCTION:%.*]] = apply [[PROJECTION]]() : $@convention(thin) () -> @owned @Sendable @callee_guaranteed (Int32, Optional<CVaListPointer>) -> ()
 // CHECK: [[VALIST:%.*]] = enum $Optional<CVaListPointer>, #Optional.some!enumelt, %1
 // CHECK: [[BORROW:%.*]] = begin_borrow [[FUNCTION]]
-// CHECK: {{.*}} = apply [[BORROW]]({{.*}}, [[VALIST]]) : $@callee_guaranteed (Int32, Optional<CVaListPointer>) -> ()
+// CHECK: {{.*}} = apply [[BORROW]]({{.*}}, [[VALIST]]) : $@Sendable @callee_guaranteed (Int32, Optional<CVaListPointer>) -> ()
