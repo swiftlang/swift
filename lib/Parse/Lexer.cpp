@@ -679,9 +679,6 @@ bool Lexer::isIdentifier(StringRef string) {
 }
 
 bool Lexer::identifierMustAlwaysBeEscaped(StringRef str) {
-  if (str.empty())
-    return false;
-
   bool mustEscape =
       !isOperator(str) && !isIdentifier(str) &&
       str.front() != '$'; // a property wrapper does not need to be escaped
