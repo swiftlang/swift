@@ -192,16 +192,16 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       ///
       /// This strategy enforces keeping at most the specified number of oldest values.
       ///
-      /// - Note: If the specified number is non-positive no elements will be buffered. 
-      /// An iterator receives an element only if it is awaiting a value at the moment the continuation yields.
+      /// - Note: If the specified number is zero or negative, no elements are buffered.
+      /// In that case, an iterator receives an element only if it is already awaiting a value when the continuation yields.
       case bufferingOldest(Int)
       
       /// When the buffer is full, discard the oldest element in the buffer.
       ///
       /// This strategy enforces keeping at most the specified number of newest values.
       ///
-      /// - Note: If the specified number is non-positive no elements will be buffered. 
-      /// An iterator receives an element only if it is awaiting a value at the moment the continuation yields.
+      /// - Note: If the specified number is zero or negative, no elements are buffered.
+      /// In that case, an iterator receives an element only if it is already awaiting a value when the continuation yields.
       case bufferingNewest(Int)
     }
 
