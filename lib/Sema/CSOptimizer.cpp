@@ -874,12 +874,6 @@ static bool isSubtypeOfExistentialType(Type candidateType, Type existentialType)
     return false;
 
   return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
-    if (auto superclass = P->getSuperclassDecl()) {
-      if (!isSubclassOf(candidateType,
-                        superclass->getDeclaredInterfaceType()))
-        return false;
-    }
-
     auto result = TypeChecker::containsProtocol(candidateType, P,
                                                 /*allowMissing=*/false);
     return result.first || result.second;
