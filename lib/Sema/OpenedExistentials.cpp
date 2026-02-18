@@ -715,6 +715,27 @@ bool swift::canOpenExistentialAt(ValueDecl *callee, unsigned paramIdx,
 
   // If all of the conformance requirements on the formal parameter's type
   // are self-conforming, don't open.
+  {
+    auto protos = genericSig->getRequiredProtocols(genericParam);
+    if (ctx.LangOpts.hasFeature(Feature::ImplicitOpenExistentials) &&
+        existentialTy->isAny() &&
+        protos.size() <= 2) {
+      bool isUnconstrainedGenericParam = true;
+      for (auto proto: protos) {
+        auto kind = proto->getKnownProtocolKind();
+        if (!kind ||
+            (*kind != KnownProtocolKind::Copyable &&
+             *kind != KnownProtocolKind::Escapable)) {
+          isUnconstrainedGenericParam = false;
+          break;
+        }
+      }
+
+      if (isUnconstrainedGenericParam)
+        return false;
+    }
+  }
+
   if (!ctx.LangOpts.hasFeature(Feature::ImplicitOpenExistentials)) {
     bool containsNonSelfConformance = false;
     for (auto proto : genericSig->getRequiredProtocols(genericParam)) {
