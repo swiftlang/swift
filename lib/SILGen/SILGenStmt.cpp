@@ -1722,8 +1722,10 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     // A direct error value is passed to the epilog block as a BB argument.
     args.push_back(exn);
   } else if (shouldDiscard) {
-    if (exn && exn->getType().isAddress())
+    if (exn->getType().isAddress())
       B.createDestroyAddr(loc, exn);
+    else
+      B.createDestroyValue(loc, exn);
   }
 
   // Emit clean-ups needed prior to entering throw block.
