@@ -619,8 +619,6 @@ public:
   /// score.
   LiteralBindingKind getLiteralForScore() const;
 
-  bool isDelayedByDisjunction() const;
-
   /// Check if this binding is favored over a disjunction e.g.
   /// if it has only concrete types or would resolve a closure.
   bool favoredOverDisjunction(Constraint *disjunction) const;
