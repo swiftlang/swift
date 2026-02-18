@@ -513,13 +513,30 @@ bool TypeTransformContext::isPrintingSynthesizedExtension() const {
 static std::string
 getLifetimeDependenceIdentifier(unsigned index,
                                 ArrayRef<AnyFunctionType::Param> params) {
-  // TODO: Print "self" for the self parameter. Requires a way to determine if a
-  // type is the interface type of an instance method.
+  // NOTE: Does not handle the implicit self parameter, since this is only used
+  // for function types.
   if (index < params.size() && params[index].hasInternalLabel()) {
     return params[index].getInternalLabel().get();
   }
 
   return std::to_string(index);
+}
+
+static std::string_view
+getLifetimeDependenceSpecifier(unsigned index,
+                               ArrayRef<AnyFunctionType::Param> params,
+                               LifetimeDependenceKind kind) {
+  // NOTE: Does not handle the implicit self parameter, since this is only used
+  // for function types.
+  switch (kind) {
+  case LifetimeDependenceKind::Inherit:
+    return "copy ";
+  case LifetimeDependenceKind::Scope:
+    if (params[index].isInOut()) {
+      return "&";
+    }
+    return "borrow ";
+  }
 }
 
 /// Get a string representation for the list of sources of the given
@@ -536,14 +553,14 @@ static std::string getLifetimeDependenceInfoSourceListString(
 
   bool isFirstSpecifier = true;
   auto getSourceString = [&](IndexSubset *bitvector,
-                             StringRef kind) -> std::string {
+                             LifetimeDependenceKind kind) -> std::string {
     std::string result;
     for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
       if (bitvector->contains(i)) {
         if (!isFirstSpecifier) {
           result += ", ";
         }
-        result += kind;
+        result += getLifetimeDependenceSpecifier(i, params, kind);
         if (addressable && addressable->contains(i)) {
           result += "address ";
         } else if (condAddressable && condAddressable->contains(i)) {
@@ -568,13 +585,13 @@ static std::string getLifetimeDependenceInfoSourceListString(
   auto inheritLifetimeParamIndices = info.getInheritIndices();
   if (inheritLifetimeParamIndices) {
     assert(!inheritLifetimeParamIndices->isEmpty());
-    lifetimeDependenceString +=
-        getSourceString(inheritLifetimeParamIndices, "copy ");
+    lifetimeDependenceString += getSourceString(
+        inheritLifetimeParamIndices, LifetimeDependenceKind::Inherit);
   }
   if (auto scopeLifetimeParamIndices = info.getScopeIndices()) {
     assert(!scopeLifetimeParamIndices->isEmpty());
-    lifetimeDependenceString +=
-        getSourceString(scopeLifetimeParamIndices, "borrow ");
+    lifetimeDependenceString += getSourceString(scopeLifetimeParamIndices,
+                                                LifetimeDependenceKind::Scope);
   }
   return lifetimeDependenceString;
 }

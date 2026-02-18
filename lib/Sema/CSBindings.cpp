@@ -20,6 +20,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
@@ -561,7 +562,7 @@ void BindingSet::inferTransitiveKeyPathBindings() {
             CS.getType(locator->getAnchor())->getAs<TypeVariableType>()) {
       auto &node = CS.getConstraintGraph()[keyPathTy];
       if (node.hasBindingSet()) {
-        auto &bindings = node.getBindingSet();
+        const auto &bindings = node.getBindingSet();
 
         for (auto &binding : bindings.Bindings) {
           auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
@@ -587,7 +588,7 @@ void BindingSet::inferTransitiveKeyPathBindings() {
             if (auto *contextualRootVar = inferredRootTy->getAs<TypeVariableType>()) {
               auto &node = CS.getConstraintGraph()[contextualRootVar];
               if (node.hasBindingSet()) {
-                auto &bindings = node.getBindingSet();
+                const auto &bindings = node.getBindingSet();
 
                 // Don't infer if root is not yet fully resolved.
                 if (bindings.isDelayed())
@@ -628,7 +629,7 @@ void BindingSet::inferTransitiveSupertypeBindings() {
     if (!node.hasBindingSet())
       continue;
 
-    auto &bindings = node.getBindingSet();
+    const auto &bindings = node.getBindingSet();
 
     // FIXME: This is a workaround necessary because solver doesn't filter
     // bindings based on protocol requirements placed on a type variable.
@@ -1490,80 +1491,6 @@ bool swift::constraints::inference::checkTypeOfBinding(
   return true;
 }
 
-ConversionBehavior
-swift::constraints::inference::getConversionBehavior(Type type) {
-  if (type->is<StructType>()) {
-    if (type->isAnyHashable())
-      return ConversionBehavior::AnyHashable;
-    else if (type->isDouble() || type->isCGFloat())
-      return ConversionBehavior::Double;
-    else if (type->getAnyPointerElementType())
-      return ConversionBehavior::Pointer;
-
-    return ConversionBehavior::None;
-  }
-
-  if (auto *structTy = type->getAs<BoundGenericStructType>()) {
-    if (auto eltTy = structTy->getArrayElementType()) {
-      return ConversionBehavior::Array;
-    } else if (ConstraintSystem::isDictionaryType(structTy)) {
-      return ConversionBehavior::Dictionary;
-    } else if (ConstraintSystem::isSetType(structTy)) {
-      return ConversionBehavior::Set;
-    } else if (type->getAnyPointerElementType()) {
-      return ConversionBehavior::Pointer;
-    }
-
-    return ConversionBehavior::None;
-  }
-
-  if (auto *enumTy = type->getAs<BoundGenericEnumType>()) {
-    if (enumTy->getOptionalObjectType())
-      return ConversionBehavior::Optional;
-
-    return ConversionBehavior::None;
-  }
-
-  if (type->is<ClassType>() || type->is<BoundGenericClassType>())
-    return ConversionBehavior::Class;
-
-  if (type->is<EnumType>() ||
-      type->is<BuiltinType>() || type->is<ArchetypeType>())
-    return ConversionBehavior::None;
-
-  if (type->is<FunctionType>() || type->is<MetatypeType>())
-    return ConversionBehavior::Structural;
-
-  return ConversionBehavior::Unknown;
-}
-
-/// Check whether there exists a type that could be implicitly converted
-/// to a given type i.e. is the given type is Double or Optional<..> this
-/// function is going to return true because CGFloat could be converted
-/// to a Double and non-optional value could be injected into an optional.
-bool swift::constraints::inference::hasConversions(Type type) {
-  switch (getConversionBehavior(type)) {
-  case ConversionBehavior::None:
-    return false;
-  case ConversionBehavior::Array:
-    return hasConversions(type->getArrayElementType());
-  case ConversionBehavior::Dictionary: {
-    auto pair = ConstraintSystem::isDictionaryType(type);
-    return hasConversions(pair->first) || hasConversions(pair->second);
-  }
-  case ConversionBehavior::Set:
-    return hasConversions(*ConstraintSystem::isSetType(type));
-  case ConversionBehavior::Class:
-  case ConversionBehavior::AnyHashable:
-  case ConversionBehavior::Double:
-  case ConversionBehavior::Pointer:
-  case ConversionBehavior::Optional:
-  case ConversionBehavior::Structural:
-  case ConversionBehavior::Unknown:
-    return true;
-  }
-}
-
 bool BindingSet::isViable(PotentialBinding &binding) {
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
@@ -1608,7 +1535,7 @@ bool BindingSet::isViable(PotentialBinding &binding) {
     // subtype and other conversions.
     if (existing->Kind != AllowedBindingKind::Exact) {
       if (existingType->isKnownStdlibCollectionType() &&
-          hasConversions(existingType)) {
+          hasProperSubtypes(existingType)) {
         continue;
       }
     }
@@ -1651,7 +1578,7 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
         if (CS.shouldAttemptFixes())
           return false;
 
-        return !hasConversions(binding.BindingType);
+        return !hasProperSubtypes(binding.BindingType);
       })) {
     // Result type of subscript could be l-value so we can't bind it early.
     if (!TypeVar->getImpl().isSubscriptResultType() &&

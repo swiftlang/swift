@@ -142,6 +142,7 @@ import Swift
 @frozen
 public struct Task<Success: Sendable, Failure: Error>: Sendable {
   @usableFromInline
+  @available(SwiftStdlib 5.1, *)
   internal let _task: Builtin.NativeObject
 
   @_alwaysEmitIntoClient
@@ -754,6 +755,8 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> 
 @available(SwiftStdlib 5.1, *)
 @unsafe
 public struct UnsafeCurrentTask {
+  @usableFromInline
+  @available(SwiftStdlib 5.1, *)
   internal let _task: Builtin.NativeObject
 
   // May only be created by the standard library.
@@ -766,9 +769,59 @@ public struct UnsafeCurrentTask {
   /// After the value of this property becomes `true`, it remains `true` indefinitely.
   /// There is no way to uncancel a task.
   ///
-  /// - SeeAlso: `checkCancellation()`
+  /// This property returns the actual cancellation state of the task, regardless of whether
+  /// a cancellation shield is active. Use ``Task/isCancelled`` (the static property)
+  /// if you need cancellation checking that respects active shields.
+  ///
+  /// ### Instance property isCancelled ignores Task Cancellation Shields
+  ///
+  /// Instance properties `task.isCancelled` and `unsafeCurrentTask.isCancelled`
+  /// are not contextual and therefore do not respect cancellation shields. If a task
+  /// was cancelled and is executing
+  /// with an active cancellation shield, these properties will return the _actual_
+  /// cancellation status of the task.
+  ///
+  /// It is possible to determine if a shield is active and then actively determine
+  /// that the cancelled status should be temporarily ignored by using this pair of APIs:
+  ///
+  /// ```swift
+  /// withUnsafeCurrentTask { unsafeTask in
+  ///   if unsafeTask.hasActiveCancellationShield {
+  ///     false
+  ///   } else {
+  ///     unsafeTask.isCancelled
+  ///   }
+  /// }
+  /// ```
+  ///
+  /// Which is equivalent to the contextually aware static `Task.isCancelled` property:
+  ///
+  /// ```swift
+  /// // Contextually aware, and equivalent to the snippet using UnsafeCurrentTask:
+  /// Task.isCancelled
+  /// ```
+  ///
+  /// Prefer using `Task.isCancelled` (the static property) in most situations when checking
+  /// the cancellation status from inside the task.
+  ///
+  /// - SeeAlso: ``Task/isCancelled``
+  /// - SeeAlso: ``Task/checkCancellation()``
+  /// - SeeAlso: ``Task/hasActiveCancellationShield``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   public var isCancelled: Bool {
-    unsafe _taskIsCancelled(_task)
+    if #available(SwiftStdlib 6.4, *) {
+      unsafe _isCancelled(ignoreTaskCancellationShield: true)
+    } else {
+      unsafe _taskIsCancelled(_task)
+    }
+  }
+
+  /// Check if the task is cancelled, optionally ignoring active cancellation shields.
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  internal func _isCancelled(ignoreTaskCancellationShield: Bool) -> Bool {
+    let flags: UInt64 = ignoreTaskCancellationShield ? 0x1 : 0x0
+    return unsafe _taskIsCancelledWithFlags(_task, flags: flags)
   }
 
   /// The current task's priority.
@@ -789,8 +842,43 @@ public struct UnsafeCurrentTask {
   }
 
   /// Cancel the current task.
+  ///
+  /// The task will be immediately cancelled and cancellation will propagate towards any child tasks it has.
+  ///
+  /// ### Interaction with Task Cancellation Shields
+  /// Note that cancellation may not be observed if a task is currently executing with an
+  /// active task cancellation shield. Refer to cancellation shield documentation for detailed semantics.
+  ///
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  /// - SeeAlso: ``Task/hasActiveTaskCancellationShield``
   public func cancel() {
     unsafe _taskCancel(_task)
+  }
+
+  /// Checks if this task is executing in a scope with a task cancellation shield activated by the
+  /// ``withTaskCancellationShield(operation:)`` function.
+  ///
+  /// An active task cancellation shield prevents a task's ability to observe if it was cancelled,
+  /// i.e. the ``Task/isCancelled`` property will always return `false` when the task is executing
+  /// with an active shield.
+  ///
+  /// This property is primarily aimed at debugging and understanding cancellation behavior
+  /// in complex call hierarchies, and should not be used in regular control flow.
+  ///
+  /// Returns `true` when executing within a task that has an active cancellation shield.
+  ///
+  /// Cancellation shields are not automatically inherited by child tasks; each child task must install
+  /// its own shield if needed if it, independently, wanted to ignore cancellation during a specific scope.
+  ///
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  /// - SeeAlso: ``Task/hasActiveCancellationShield``
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  public var hasActiveCancellationShield: Bool {
+    @_alwaysEmitIntoClient
+    get {
+      unsafe _taskHasActiveCancellationShield(_task)
+    }
   }
 }
 
@@ -933,6 +1021,16 @@ public func _taskCancel(_ task: Builtin.NativeObject)
 @_silgen_name("swift_task_isCancelled")
 @usableFromInline
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
+
+@available(SwiftStdlib 6.4, *)
+@_silgen_name("swift_task_isCancelledWithFlags")
+@usableFromInline
+func _taskIsCancelledWithFlags(_ task: Builtin.NativeObject, flags: UInt64) -> Bool
+
+@available(SwiftStdlib 6.4, *)
+@_silgen_name("swift_task_hasActiveCancellationShield")
+@usableFromInline
+internal func _taskHasActiveCancellationShield(_ task: Builtin.NativeObject) -> Bool
 
 @_silgen_name("swift_task_currentPriority")
 internal func _taskCurrentPriority(_ task: Builtin.NativeObject) -> UInt8

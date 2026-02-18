@@ -2028,6 +2028,22 @@ SolutionResult ConstraintSystem::salvage() {
       if (*best != 0)
         viable[0] = std::move(viable[*best]);
       viable.erase(viable.begin() + 1, viable.end());
+
+      if (getASTContext().TypeCheckerOpts.CrashOnValidSalvage) {
+        auto &solution = viable[0];
+        if (solution.Fixes.empty() &&
+            diagnosticTransaction == nullptr &&
+            !getASTContext().LangOpts.DisableAvailabilityChecking &&
+            solution.getFixedScore().Data[SK_Unavailable] == 0 &&
+            solution.getFixedScore().Data[SK_Hole] == 0 &&
+            solution.getFixedScore().Data[SK_Fix] == 0) {
+          ABORT([&](auto &out) {
+            out << "Found valid solution in salvage()\n\n";
+            solution.dump(out, 0);
+          });
+        }
+      }
+
       return SolutionResult::forSolved(std::move(viable[0]));
     }
 

@@ -2360,19 +2360,6 @@ public:
     llvm::report_fatal_error("all apply instructions should be covered");
   }
 
-  /// Helper for code that does not have indirect results. Meant to allow for
-  /// transition to the one with indirect results.
-  template <typename DirectResultsRangeTy, typename SourceValueRangeTy>
-  void
-  translateSILMultiAssign(const DirectResultsRangeTy &directResultValues,
-                          const SourceValueRangeTy &sourceValues,
-                          SILIsolationInfo resultIsolationInfoOverride = {},
-                          bool requireSrcValues = true) {
-    return translateSILMultiAssign(directResultValues, ArrayRef<Operand *>(),
-                                   sourceValues, resultIsolationInfoOverride,
-                                   requireSrcValues);
-  }
-
   /// Require all non-sendable sources, merge their regions, and assign the
   /// resulting region to all non-sendable targets, or assign non-sendable
   /// targets to a fresh region if there are no non-sendable sources.
@@ -2769,7 +2756,12 @@ public:
 
     // If we do not have a special builtin, just do a multi-assign. Builtins do
     // not cross async boundaries.
-    return translateSILMultiAssign(bi->getResults(),
+    //
+    // TODO: Change this into a large switch so when builtins are added, this
+    // code needs to be updated. We can even use a separate visitor if
+    // needed. The important thing is that in the future, builtins that use
+    // indirect results are passed in the indirect result array.
+    return translateSILMultiAssign(bi->getResults(), ArrayRef<Operand *>(),
                                    makeOperandRefRange(bi->getAllOperands()));
   }
 
@@ -2833,14 +2825,15 @@ public:
 
     // If our result is not a 'sending' result, just do the normal multi-assign.
     if (!type->hasSendingResult()) {
-      return translateSILMultiAssign(applyResults, nonSendingParameters,
-                                     isolationInfo);
+      return translateSILMultiAssign(applyResults, ArrayRef<Operand *>(),
+                                     nonSendingParameters, isolationInfo);
     }
 
     // If our result is a 'sending' result, then pass in empty as our results,
     // no override isolation, then perform assign fresh.
     ArrayRef<SILValue> empty;
-    translateSILMultiAssign(empty, nonSendingParameters, {});
+    translateSILMultiAssign(empty, ArrayRef<Operand *>(), nonSendingParameters,
+                            {});
 
     // Sending direct results.
     for (SILValue result : applyResults) {
@@ -3105,7 +3098,8 @@ public:
   /// parameter of the current inst we are processing.
   template <typename Collection>
   void translateSILAssignDirect(SILValue dest, Collection collection) {
-    return translateSILMultiAssign(TinyPtrVector<SILValue>(dest), collection);
+    return translateSILMultiAssign(TinyPtrVector<SILValue>(dest),
+                                   ArrayRef<Operand *>(), collection);
   }
 
   template <>
@@ -3113,6 +3107,7 @@ public:
                                 MutableArrayRef<Operand> collection) {
     auto transform = [](Operand &op) { return &op; };
     return translateSILMultiAssign(TinyPtrVector<SILValue>(dest),
+                                   ArrayRef<Operand *>(),
                                    makeTransformRange(collection, transform));
   }
   /// Perform an assign for dest that is a direct parameter. It should be a
@@ -3129,7 +3124,8 @@ public:
   /// isolationInfo is set.
   void translateSILAssignFresh(SILValue val) {
     return translateSILMultiAssign(TinyPtrVector<SILValue>(val),
-                                   TinyPtrVector<Operand *>());
+                                   ArrayRef<Operand *>(),
+                                   ArrayRef<Operand *>());
   }
 
   void translateSILAssignFresh(SILValue val, SILIsolationInfo info) {
@@ -3309,7 +3305,8 @@ public:
     if (selectEnumInst.hasDefault())
       enumOperands.push_back(selectEnumInst.getDefaultResultOperand());
     return translateSILMultiAssign(
-        TinyPtrVector<SILValue>(selectEnumInst->getResult(0)), enumOperands);
+        TinyPtrVector<SILValue>(selectEnumInst->getResult(0)),
+        ArrayRef<Operand *>(), enumOperands);
   }
 
   void translateSILSwitchEnum(SwitchEnumInst *switchEnumInst) {
@@ -3338,7 +3335,8 @@ public:
                        SILIsolationInfo resultIsolationInfoOverride = {}) {
     argSources.argSources.setFrozen();
     for (auto pair : argSources.argSources.getRange()) {
-      translateSILMultiAssign(TinyPtrVector<SILValue>(pair.first), pair.second,
+      translateSILMultiAssign(TinyPtrVector<SILValue>(pair.first),
+                              ArrayRef<Operand *>(), pair.second,
                               resultIsolationInfoOverride);
     }
   }
@@ -3426,7 +3424,8 @@ public:
 
     case TranslationSemantics::AssignDirect:
       return translateSILMultiAssign(
-          inst->getResults(), makeOperandRefRange(inst->getAllOperands()),
+          inst->getResults(), ArrayRef<Operand *>(),
+          makeOperandRefRange(inst->getAllOperands()),
           SILIsolationInfo::getConformanceIsolation(inst));
 
     case TranslationSemantics::Require:
@@ -4119,7 +4118,7 @@ PartitionOpTranslator::visitStoreBorrowInst(StoreBorrowInst *sbi) {
   // per field basis to allow for us to assign.
   if (nonSendableDest.value().value.isNoAlias() &&
       !isProjectedFromAggregate(destValue)) {
-    translateSILMultiAssign(sbi->getResults(),
+    translateSILMultiAssign(sbi->getResults(), ArrayRef<Operand *>(),
                             makeOperandRefRange(sbi->getAllOperands()),
                             SILIsolationInfo(), false /*require src*/);
   } else {
@@ -4448,7 +4447,7 @@ TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
   // differently depending on what the result of checked_cast_addr_br
   // is. For now just keep the current behavior. It is more conservative,
   // but still correct.
-  translateSILMultiAssign(ArrayRef<SILValue>(),
+  translateSILMultiAssign(ArrayRef<SILValue>(), ArrayRef<Operand *>(),
                           makeOperandRefRange(ccabi->getAllOperands()),
                           SILIsolationInfo::getConformanceIsolation(ccabi));
   return TranslationSemantics::Special;

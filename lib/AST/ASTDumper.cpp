@@ -3368,7 +3368,7 @@ public:
 
     printRec(S->getBody(), Label::optional("body"));
 
-    printRec(S->getCachedDesugaredStmt(), Label::optional("desugared_loop"));
+    printRec(S->getCachedDesugaredStmt(), Label::always("desugared_loop"));
 
     printFoot();
   }
@@ -4214,8 +4214,14 @@ public:
       if (auto fType = Ty->getAs<AnyFunctionType>()) {
         printFlag(!fType->getExtInfo().isNoEscape(), "escaping",
                   ClosureModifierColor);
-        printFlag(fType->getExtInfo().isSendable(), "sendable",
-                  ClosureModifierColor);
+        if (auto sendableTy = fType->getSendableDependentType()) {
+          printFieldQuoted(sendableTy.getString(),
+                           Label::always("sendable_dep"),
+                           ClosureModifierColor);
+        } else {
+          printFlag(fType->getExtInfo().isSendable(), "sendable",
+                    ClosureModifierColor);
+        }
       }
     }
   }
@@ -6632,7 +6638,8 @@ namespace {
           printField(representation, Label::always("representation"));
         }
         printFlag(!T->isNoEscape(), "escaping");
-        printFlag(T->isSendable(), "Sendable");
+        if (!T->getSendableDependentType())
+          printFlag(T->isSendable(), "Sendable");
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
@@ -6674,6 +6681,9 @@ namespace {
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), Label::always("global_actor"));
       }
+
+      if (auto sendableTy = T->getSendableDependentType())
+        printRec(sendableTy, Label::always("sendable_dep"));
 
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext(),
                         Label::optional("clang_type_info"));

@@ -674,6 +674,8 @@ CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddPriorityEscalationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemovePriorityEscalationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskLocalValuePush)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskLocalValuePop)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPush)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPop)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

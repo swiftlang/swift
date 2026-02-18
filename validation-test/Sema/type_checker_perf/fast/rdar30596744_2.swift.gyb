@@ -1,6 +1,8 @@
 // RUN: %scale-test --begin 1 --end 7 --step 1 --select NumLeafScopes %s --expected-exit-code 1
 // REQUIRES: asserts,no_asan
 
+// Invalid expression.
+
 % enum_cases = 3
 % array_elements = N
 

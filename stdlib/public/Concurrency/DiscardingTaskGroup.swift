@@ -227,6 +227,14 @@ public struct DiscardingTaskGroup {
   /// If the task that's currently running this group is canceled,
   /// the group is also implicitly canceled,
   /// which is also reflected in this property's value.
+  ///
+  /// ### Interaction with task cancellation shields
+  ///
+  /// Cancellation may be suppressed by an active task cancellation shield
+  /// (``withTaskCancellationShield(operation:)``), which may cause `isCancelled`
+  /// to return `false` even though the task has been cancelled externally.
+  ///
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -519,6 +527,14 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   /// If the task that's currently running this group is canceled,
   /// the group is also implicitly canceled,
   /// which is also reflected in this property's value.
+  ///
+  /// ### Interaction with task cancellation shields
+  ///
+  /// Cancellation may be suppressed by an active task cancellation shield
+  /// (``withTaskCancellationShield(operation:)``), which may cause `isCancelled`
+  /// to return `false` even though the task has been cancelled externally.
+  ///
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }

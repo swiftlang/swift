@@ -91,7 +91,7 @@
 /include/swift/AST/Evaluator*                      @CodaFi @slavapestov
 /include/swift/Basic/                              @DougGregor
 /include/swift/Basic/Features.def                  @DougGregor @hborla
-/include/swift/ClangImporter                       @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @susmonteiro
+/include/swift/ClangImporter                       @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @susmonteiro @hnrklssn
 /include/swift/DependencyScan                      @artemcm @cachemeifyoucan
 /include/swift/Driver*/                            @artemcm
 /include/swift/Frontend*/                          @artemcm @tshortli
@@ -137,7 +137,7 @@
 /lib/ASTGen/                                        @CodaFi @hamishknight @rintaro
 /lib/Basic/                                         @DougGregor
 /lib/Basic/Windows                                  @compnerd
-/lib/ClangImporter                                  @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @susmonteiro
+/lib/ClangImporter                                  @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @susmonteiro @hnrklssn
 /lib/ClangImporter/DWARFImporter*                   @adrian-prantl
 /lib/DependencyScan                                 @artemcm @cachemeifyoucan
 /lib/Driver*/                                       @artemcm

@@ -149,10 +149,6 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   NULL,
 };
 
-#ifdef _WIN32
-static bool flattenCommandLine(char *buffer, size_t buflen, const char **argv);
-#endif
-
 }
 }
 }
@@ -1194,6 +1190,116 @@ trueOrFalse(OnOffTty oot) {
   return trueOrFalse(oot == OnOffTty::On);
 }
 
+#ifdef _WIN32
+// Convert an argument vector to an appropriately formatted flat command line.
+//
+// The rules for this are really odd; see
+//
+//   https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw
+//
+// for details.
+bool flattenCommandLine(char *buffer, size_t buflen, const char **argv) {
+  char *ptr = cmdline_buf;
+  char *end = cmdline_buf + sizeof(cmdline_buf);
+  const char **parg = backtracer_argv;
+
+#define PUT(ch)                                 \
+  do {                                          \
+    if (ptr == end)                             \
+      return false;                             \
+    *ptr++ = ch;                                \
+  } while(0)
+
+  while (*parg) {
+    const char *argument = *parg++;
+    int slashCount = 0;
+    bool quoted = false;
+
+    if (ptr > cmdline_buf) {
+      PUT(' ');
+    }
+
+    // Check if the argument contains spaces; if it does, we have to quote it
+    const char *pt2 = argument;
+    while (*pt2) {
+      char ch = *pt2++;
+      if (ch == ' ' || ch == '\t') {
+        quoted = true;
+        break;
+      }
+    }
+
+    if (quoted) {
+      PUT('"');
+    }
+
+    pt2 = argument;
+    while (*pt2) {
+      char ch = *pt2++;
+
+      switch (ch) {
+      case '\\':
+        ++slashCount;
+        break;
+      case '"':
+        {
+          char *pend = ptr + 2 * slashCount;
+          if (end - ptr < 2 * slashCount)
+            return false;
+          while (ptr < pend)
+            *ptr++ = '\\';
+          slashCount = 0;
+          PUT('\\');
+          PUT('"');
+        }
+        break;
+      default:
+        {
+          char *pend = ptr + slashCount;
+          if (end - ptr < slashCount)
+            return false;
+          while (ptr < pend)
+            *ptr++ = '\\';
+          slashCount = 0;
+          PUT(ch);
+        }
+        break;
+      }
+    }
+
+    if (slashCount) {
+      if (quoted) {
+        char *pend = ptr + 2 * slashCount;
+        if (end - ptr < 2 * slashCount)
+          return false;
+        while (ptr < pend)
+          *ptr++ = '\\';
+        PUT('"');
+      } else {
+        char *pend = ptr + slashCount;
+        if (end - ptr < slashCount)
+          return false;
+        while (ptr < pend)
+          *ptr++ = '\\';
+      }
+    } else if (quoted) {
+      PUT('"');
+    }
+
+    if (ptr == end)
+      return false;
+  }
+
+  PUT('\0');
+
+#undef PUT
+
+  return true;
+}
+
+#endif
+
+
 } // namespace
 #endif
 
@@ -1551,116 +1657,6 @@ _swift_displayCrashMessage(
   sys_print(fd, outro);
 #endif
 }
-
-#ifdef _WIN32
-// Convert an argument vector to an appropriately formatted flat command line.
-//
-// The rules for this are really odd; see
-//
-//   https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw
-//
-// for details.
-static bool flattenCommandLine(char *buffer, size_t buflen,
-                               const char **argv) {
-  char *ptr = cmdline_buf;
-  char *end = cmdline_buf + sizeof(cmdline_buf);
-  const char **parg = backtracer_argv;
-
-#define PUT(ch)                                 \
-  do {                                          \
-    if (ptr == end)                             \
-      return false;                             \
-    *ptr++ = ch;                                \
-  } while(0)
-
-  while (*parg) {
-    const char *argument = *parg++;
-    int slashCount = 0;
-    bool quoted = false;
-
-    if (ptr > cmdline_buf) {
-      PUT(' ');
-    }
-
-    // Check if the argument contains spaces; if it does, we have to quote it
-    const char *pt2 = argument;
-    while (*pt2) {
-      char ch = *pt2++;
-      if (ch == ' ' || ch == '\t') {
-        quoted = true;
-        break;
-      }
-    }
-
-    if (quoted) {
-      PUT('"');
-    }
-
-    pt2 = argument;
-    while (*pt2) {
-      char ch = *pt2++;
-
-      switch (ch) {
-      case '\\':
-        ++slashCount;
-        break;
-      case '"':
-        {
-          char *pend = ptr + 2 * slashCount;
-          if (end - ptr < 2 * slashCount)
-            return false;
-          while (ptr < pend)
-            *ptr++ = '\\';
-          slashCount = 0;
-          PUT('\\');
-          PUT('"');
-        }
-        break;
-      default:
-        {
-          char *pend = ptr + slashCount;
-          if (end - ptr < slashCount)
-            return false;
-          while (ptr < pend)
-            *ptr++ = '\\';
-          slashCount = 0;
-          PUT(ch);
-        }
-        break;
-      }
-    }
-
-    if (slashCount) {
-      if (quoted) {
-        char *pend = ptr + 2 * slashCount;
-        if (end - ptr < 2 * slashCount)
-          return false;
-        while (ptr < pend)
-          *ptr++ = '\\';
-        PUT('"');
-      } else {
-        char *pend = ptr + slashCount;
-        if (end - ptr < slashCount)
-          return false;
-        while (ptr < pend)
-          *ptr++ = '\\';
-      }
-    } else if (quoted) {
-      PUT('"');
-    }
-
-    if (ptr == end)
-      return false;
-  }
-
-  PUT('\0');
-
-#undef PUT
-
-  return true;
-}
-
-#endif
 
 } // namespace backtrace
 } // namespace runtime

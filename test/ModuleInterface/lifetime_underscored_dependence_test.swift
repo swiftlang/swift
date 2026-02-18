@@ -197,3 +197,11 @@ import lifetime_underscored_dependence
 // CHECK: #if compiler(>=5.3) && $ClosureLifetimes
 // CHECK-NEXT: @inlinable public func takeFullReassign(closure: @_lifetime(dest: immortal, copy source) (_ dest: inout lifetime_underscored_dependence.AnotherView, _ source: lifetime_underscored_dependence.AnotherView) -> ()) {}
 // CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: @inlinable public func takeReadBorrower(f: @_lifetime(borrow a) (_ a: lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView) {}
+// CHECK-NEXT: #endif
+
+// CHECK-NEXT: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: @inlinable public func takeWriteBorrower(f: @_lifetime(&a) (_ a: inout lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView) {}
+// CHECK-NEXT: #endif
