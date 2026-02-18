@@ -16,6 +16,10 @@
 #include "DerivedConformance/DerivedConformance.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityQuery.h"
+#include "swift/AST/AvailabilityRange.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
@@ -448,8 +452,36 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         traceArgs,
         C);
 
+    // The trace call:
     auto traceCallExpr = CallExpr::createImplicit(C, traceRemoteCallRef, traceArgsList);
-    remoteBranchStmts.push_back(traceCallExpr);
+
+    // Wrap the trace call in an availability check:
+    // if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *) { ... }
+    // We use the target platform's domain and set the query manually since
+    // TypeCheckAvailability won't fill it in for synthesized code with
+    // invalid source locations.
+    auto targetDomain = C.getTargetAvailabilityDomain();
+    auto platformSpec = AvailabilitySpec::createForDomain(
+        C, targetDomain, sloc, llvm::VersionTuple(9999), sloc);
+    auto wildcardSpec = AvailabilitySpec::createWildcard(C, sloc);
+
+    auto availableInfo = PoundAvailableInfo::create(
+        C, sloc, sloc, {platformSpec, wildcardSpec}, sloc,
+        /*isUnavailability=*/false);
+
+    // Set the availability query manually since we have invalid SourceLocs.
+    auto versionRange = VersionRange::allGTE(llvm::VersionTuple(9999));
+    availableInfo->setAvailabilityQuery(AvailabilityQuery::dynamic(
+        targetDomain, AvailabilityRange(versionRange), std::nullopt));
+
+    auto traceBraceStmt = BraceStmt::create(C, sloc, {traceCallExpr}, sloc, implicit);
+
+    StmtConditionElement conds[1] = { availableInfo };
+    auto availabilityIfStmt = new (C) IfStmt(
+        LabeledStmtInfo(), sloc, C.AllocateCopy(conds), traceBraceStmt,
+        /*elseloc=*/sloc, /*else=*/nullptr, /*implicit=*/true);
+
+    remoteBranchStmts.push_back(availabilityIfStmt);
   }
 
   // === Make the 'remoteCall(Void)(...)'
