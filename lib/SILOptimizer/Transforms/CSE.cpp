@@ -1106,7 +1106,8 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 
         auto oldValue = cast<SingleValueInstruction>(Inst);
         auto newValue = cast<SingleValueInstruction>(AvailInst);
-        OwnershipRAUWHelper helper(RAUWFixupContext, oldValue, newValue);
+        OwnershipRAUWHelper helper(RAUWFixupContext, oldValue, newValue,
+                                   /*respectLexicalFlags=*/ false);
         // If RAUW requires cloning the original, then there's no point. If it
         // also requires introducing a copy and new borrow scope, then it's a
         // very bad idea.

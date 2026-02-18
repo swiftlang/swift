@@ -595,7 +595,7 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
                                                 UBCI->getType());
     }
 
-    OwnershipRAUWHelper helper(ownershipFixupContext, UBCI, Oper);
+    OwnershipRAUWHelper helper(ownershipFixupContext, UBCI, Oper, /*respectLexicalFlags=*/ false);
     if (helper) {
       auto replacement = helper.prepareReplacement();
       auto *transformedOper = Builder.createUncheckedBitwiseCast(
@@ -906,7 +906,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
         // may be a value with a different lifetime from our original value
         // beyond the initial base value.
         OwnershipReplaceSingleUseHelper helper(ownershipFixupContext, use,
-                                               newValue);
+                                               newValue, /*respectLexicalFlags=*/ false);
         if (!helper)
           continue;
         helper.perform();
@@ -938,7 +938,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
       }
 
       OwnershipRAUWHelper checkRAUW(ownershipFixupContext, pa,
-                                    cfi->getOperand());
+                                    cfi->getOperand(), /*respectLexicalFlags=*/ false);
       if (!checkRAUW)
         continue;
 
@@ -965,7 +965,8 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
       // validity depends on the ownership kind. Reinstantiate
       // OwnershipRAUWHelper to verify that it is still valid
       // (a very fast check in this case).
-      OwnershipRAUWHelper(ownershipFixupContext, pa, newConvert).perform();
+      OwnershipRAUWHelper(ownershipFixupContext, pa, newConvert,
+                          /*respectLexicalFlags=*/ false).perform();
     }
   }
 
