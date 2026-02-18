@@ -1421,6 +1421,27 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
 }
 
 bool BindingSet::operator<(const BindingSet &other) {
+  if (CS.getASTContext().TypeCheckerOpts.SolverEnableBindingOptimizations &&
+      !CS.shouldAttemptFixes()) {
+    unsigned xExactBindings = getNumExactBindings();
+    unsigned yExactBindings = other.getNumExactBindings();
+
+    // Always prefer a binding set with one exact binding over anything else.
+    if (xExactBindings == 1 && yExactBindings != 1)
+      return true;
+
+    // Anything else is worse than a binding set with one exact binding.
+    if (xExactBindings != 1 && yExactBindings == 1)
+      return false;
+
+    // If both have one exact binding, it shouldn't matter which one we pick,
+    // so intentionally skip the rest of the ranking logic.
+    if (xExactBindings == 1 && yExactBindings == 1)
+      return false;
+
+    // For any other combination, do the old ranking.
+  }
+
   auto xScore = formBindingScore(*this);
   auto yScore = formBindingScore(other);
 
@@ -1808,7 +1829,7 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
     return false;
 
   if (!CS.shouldAttemptFixes()) {
-    if (getNumExactBindings() > 0)
+    if (getNumExactBindings() == 1)
       return true;
   }
 

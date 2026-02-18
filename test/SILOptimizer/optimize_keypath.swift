@@ -323,8 +323,10 @@ func testNestedModify<T : P>(_ s: inout GenStruct<GenClass<GenClass<T>>>) {
 // CHECK-LABEL: sil {{.*}}testTuple
 // CHECK: [[E:%[0-9]+]] = struct_element_addr
 // CHECK: [[T1:%[0-9]+]] = tuple_element_addr [[E]]
-// CHECK: [[I:%[0-9]+]] = load [[T1]]
-// CHECK: [[T2:%[0-9]+]] = tuple_element_addr [[E]]
+// CHECK1: [[I:%[0-9]+]] = load [[T1]]
+// CHECK1: [[T2:%[0-9]+]] = tuple_element_addr [[E]]
+// CHECK2: [[T2:%[0-9]+]] = tuple_element_addr [[E]]
+// CHECK2: [[I:%[0-9]+]] = load [[T1]]
 // CHECK: store [[I]] to [[T2]]
 // CHECK: return
 @inline(never)
