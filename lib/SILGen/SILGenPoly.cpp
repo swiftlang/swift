@@ -6575,8 +6575,14 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto loc = customDerivativeFn->getLocation();
   SILGenFunctionBuilder fb(*this);
   // Derivative thunks have the same linkage as the original function, stripping
-  // external.
-  auto linkage = stripExternalFromLinkage(originalFn->getLinkage());
+  // external. For @_alwaysEmitIntoClient original functions, force PublicNonABI
+  // linkage of derivative thunks so we can serialize them (the original
+  // function itself might be HiddenExternal in this case if we only have
+  // declaration without definition).
+  auto linkage = originalFn->markedAsAlwaysEmitIntoClient()
+                     ? SILLinkage::PublicNonABI
+                     : stripExternalFromLinkage(originalFn->getLinkage());
+
   auto *thunk = fb.getOrCreateFunction(
       loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent,
       customDerivativeFn->getSerializedKind(),
