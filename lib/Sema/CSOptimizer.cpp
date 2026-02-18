@@ -1083,14 +1083,17 @@ scoreCandidateMatch(ConstraintSystem &cs,
     }
   }
 
-  if (paramType->isAnyExistentialType()) {
-    // If the parameter is `Any.Type` we assume that all metatype
-    // candidates are convertible to it.
-    if (auto *EMT = paramType->getAs<ExistentialMetatypeType>()) {
-      if (EMT->getExistentialInstanceType()->isAny() &&
-          (candidateType->is<ExistentialMetatypeType>() ||
-           candidateType->is<MetatypeType>()))
-        return 100;
+  // Conversion from a metatype to an existential metatype.
+  if (auto *EMT = paramType->getAs<ExistentialMetatypeType>()) {
+    if (auto *candidateEMT = candidateType->getAs<AnyMetatypeType>()) {
+      auto instanceType = candidateEMT->getInstanceType();
+      // Concrete metatypes of existentials don't convert to existential
+      // metatypes.
+      if (candidateType->is<ExistentialMetatypeType>() ||
+          !instanceType->isExistentialType()) {
+        if (isSubtypeOfExistentialType(instanceType, EMT->getInstanceType()))
+          return 100;
+      }
     }
   }
 
