@@ -4039,10 +4039,10 @@ public:
 /// Report default imports if other imports of the same target from this
 /// module have an explicitly defined access level. In such a case, all imports
 /// of the target module need an explicit access level or it may be made public
-/// by error. This applies only to pre-Swift 6 mode.
+/// by error. This applies only in non-InternalImportsByDefault mode.
 class CheckInconsistentAccessLevelOnImport
     : public SimpleRequest<CheckInconsistentAccessLevelOnImport,
-                           evaluator::SideEffect(SourceFile *),
+                           evaluator::SideEffect(ModuleDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4050,7 +4050,7 @@ public:
 private:
   friend SimpleRequest;
 
-  evaluator::SideEffect evaluate(Evaluator &evaluator, SourceFile *mod) const;
+  evaluator::SideEffect evaluate(Evaluator &evaluator, ModuleDecl *mod) const;
 
 public:
   // Cached.
