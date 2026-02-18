@@ -244,7 +244,7 @@ void taskInvokeWithExclusionValue(AsyncTask *task,
     if (oldTask) ActiveTask::set(oldTask);
   } else {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    // This balances with the retain in taskEnqueueDirectOrSteal which happens
+    // This balances with the retain in swift_task_enqueue_maybe_steal which happens
     // when adding the first stealer after a direct enqueue. That is, when that
     // function causes flagAsRunningFromEnqueued to return false for the direct
     // enqueue, it does a retain in case that direct enqueue lives for a long
@@ -280,9 +280,6 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
 #endif
 
   if (auto task = dyn_cast<AsyncTask>(job)) {
-    // taskRemoveEnqueued modifies the TaskActiveStatus so we could plumb
-    // through the result and avoid an extra reload later. It could also
-    // be pulled into the cas to flag as running in the successful case
     taskInvokeWithExclusionValue(task, task->_private().LocalStealerExclusionValue, true);
   } else {
     // There's no extra bookkeeping to do for simple jobs besides swapping in
@@ -2801,7 +2798,7 @@ void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
       // enqueue the original Task if another stealer had previously
       // been enqueued and still is but the original Task did manage to
       // run at some point (while rare, this wouldn't be unexpected)
-      taskEnqueueDirectOrSteal(task, executor, true);
+      swift_task_enqueue_maybe_steal(task, executor, true);
     }
 #endif
     return;

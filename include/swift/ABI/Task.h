@@ -450,7 +450,7 @@ public:
   ///
   /// The second return value is an opaque value used to restore the state of
   /// the thread before returning to the context invoking this Task (either the
-  /// executor or the caller of Task.immediate). When fagAsRunning succeeds,
+  /// executor or the caller of Task.immediate). When flagAsRunning succeeds,
   /// Dispatch is the default executor, and priority escalation is enabled,
   /// this value must be passed to swift_dispatch_thread_reset_override_self.
   std::pair<bool, uint32_t> flagAsRunningFromEnqueued(uint8_t allowedExclusionValue, bool removeEnqueued);

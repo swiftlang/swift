@@ -1043,6 +1043,9 @@ inline bool AsyncTask::isCancelled(bool ignoreShield = false) const {
 /// but after reading the local stealer exclusion value.
 /// This should not be done from any concurrent context.
 static inline void taskRemoveEnqueued(AsyncTask *task) {
+  // In theory, we could do plumbing so that this read isn't
+  // needed and so that this happens as a part of a later CAS when
+  // possible (and prevents a single forced CAS fail in some cases)
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
   do {
@@ -1330,7 +1333,7 @@ public:
 /// the Task is already directly enqueued. This may only be called when
 /// TaskStatus is locked or otherwise no concurrent calls may be made
 static inline void
-taskEnqueueDirectOrSteal(AsyncTask *task, SerialExecutorRef newExecutor,
+swift_task_enqueue_maybe_steal(AsyncTask *task, SerialExecutorRef newExecutor,
                          bool updateStealerExclusionValue) {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   SWIFT_TASK_DEBUG_LOG("Starting enqueue for %p on %p",
@@ -1342,14 +1345,6 @@ taskEnqueueDirectOrSteal(AsyncTask *task, SerialExecutorRef newExecutor,
   // Async let tasks allocate within their parent's allocator so they may
   // not outlive their parent which is possible if a stealer is introduced
   auto allowsStealer = !task->Flags.task_isAsyncLetTask();
-  // Environment variable override to always use stealers
-  // to debug memory usage by Tasks stuck on low-priority
-  // queues: SWIFT_DEBUG_CONCURRENCY_ALWAYS_USE_STEALERS
-  auto forceStealer = runtime::environment::concurrencyAlwaysUseStealers();
-
-  if (forceStealer && allowsStealer) {
-    needsStealer = true;
-  }
 
   // needsStealer implies allowsStealer
   SWIFT_TASK_DEBUG_LOG("needsStealer: %d, allowsStealer: %d",
@@ -1532,7 +1527,7 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
   // Even though we are not in the "enqueue stealer" path, this
   // may still enqueue a stealer because we may have previously
   // run from a stealer and the original Task is still enqueued.
-  taskEnqueueDirectOrSteal(this, newExecutor, false);
+  swift_task_enqueue_maybe_steal(this, newExecutor, false);
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 
