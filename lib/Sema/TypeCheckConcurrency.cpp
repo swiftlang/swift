@@ -27,6 +27,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Concurrency.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -6159,6 +6160,16 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
         if (!contextIsolation.isMainActor())
           return {};
       }
+
+      // Global variables cannot be global actor isolated.
+      if (auto *var = dyn_cast<VarDecl>(value)) {
+        if (var->isTopLevelGlobal())
+          return {};
+      }
+
+      // typealiases cannot infer `@MainActor` regardless where they appear.
+      if (isa<TypeAliasDecl>(value))
+        return {};
 
       // Members and nested types must check the isolation of the enclosing
       // nominal type.
