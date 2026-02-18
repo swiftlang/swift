@@ -19,6 +19,7 @@
 #include "OpenedExistentials.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckEffects.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -9909,12 +9910,10 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto contextualTy = getContextualTypeInfo(anchor)->getType();
   auto *seqProto = contextualTy->castTo<ProtocolType>()->getDecl();
   auto isAsync = seqProto->isSpecificProtocol(KnownProtocolKind::AsyncSequence);
-  auto isBorrowing =
-      seqProto->isSpecificProtocol(KnownProtocolKind::BorrowingSequence);
+  auto isBorrowing = shouldUseBorrowingSequence(ctx, seqTy, isAsync);
 
-  if (seqTy->isExistentialType() && !isAsync && isBorrowing) {
-    isBorrowing = false;
-    seqProto = ctx.getProtocol(KnownProtocolKind::Sequence);
+  if (isBorrowing) {
+    seqProto = ctx.getProtocol(KnownProtocolKind::BorrowingSequence);
   }
 
   auto *contextualLoc = getConstraintLocator(

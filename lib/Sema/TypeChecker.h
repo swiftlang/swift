@@ -1560,6 +1560,11 @@ bool maybeDiagnoseMissingImportForMember(
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
 
+// Guide ForEachStmt type-checking by indicating whether the BorrowingSequence
+// protocol should be used, thus enabling Borrowing iteration for a given
+// sequence type.
+bool shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy, bool isAsync);
+
 } // end namespace swift
 
 #endif
