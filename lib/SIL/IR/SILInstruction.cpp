@@ -2179,6 +2179,31 @@ SILModule &SILInstructionContext::getModule() {
   return storage.get<SILFunction *>()->getModule();
 }
 
+template <class Impl, class Base>
+SILDeclRef ApplyInstBase<Impl, Base, false>::getCalleeDeclRef() const {
+  SILValue origin = getCalleeOrigin();
+  if (!origin)
+    return {};
+
+  if (auto *fri = dyn_cast<FunctionRefInst>(origin))
+    return fri->getReferencedFunction()->getDeclRef();
+
+  if (auto *m = dyn_cast<MethodInst>(origin))
+    return m->getMember();
+
+  return {};
+}
+
+template SILDeclRef
+ApplyInstBase<ApplyInst, SingleValueInstruction, false>::getCalleeDeclRef()
+    const;
+template SILDeclRef ApplyInstBase<PartialApplyInst, SingleValueInstruction,
+                                  false>::getCalleeDeclRef() const;
+template SILDeclRef ApplyInstBase<BeginApplyInst, MultipleValueInstruction,
+                                  false>::getCalleeDeclRef() const;
+template SILDeclRef
+ApplyInstBase<TryApplyInst, TryApplyInstBase, false>::getCalleeDeclRef() const;
+
 #ifndef NDEBUG
 
 //---
