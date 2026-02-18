@@ -2767,7 +2767,6 @@ namespace {
           case FunctionTypeIsolation::Kind::NonIsolated: {
             switch (fromIsolation.getKind()) {
             case FunctionTypeIsolation::Kind::Parameter:
-            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
             case FunctionTypeIsolation::Kind::Erased:
               diagnoseNonSendableParametersAndResult(toFnType,
                                                      LanguageMode::future);
@@ -2780,12 +2779,13 @@ namespace {
               break;
             }
 
-            case FunctionTypeIsolation::Kind::NonIsolated: {
-              // nonisolated synchronous <-> @concurrent
-              if (fromFnType->isAsync() != toFnType->isAsync()) {
-                diagnoseNonSendableParametersAndResult(toFnType,
-                                                       LanguageMode::future);
-              }
+            case FunctionTypeIsolation::Kind::NonIsolated:
+            case FunctionTypeIsolation::Kind::NonIsolatedNonsending: {
+              // Converting a `nonisolated(nonsending)` function type to a
+              // `@concurrent` one is the same as converting it to an
+              // actor-isolated function type. `nonisolated(nonsending)`
+              // functions run on the caller's actor without crossing an
+              // isolation boundary and so no Sendable checking is necessary.
               break;
             }
             }
