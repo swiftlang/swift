@@ -173,7 +173,7 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     if(processor STREQUAL "AMD64")
       target_sources(swiftRuntime PRIVATE
         get-cpu-context-x86_64.asm)
-    elseif(processor STREQUAL "X86")
+    elseif(processor STREQUAL "X86" OR processor STREQUAL "I686")
       target_sources(swiftRuntime PRIVATE
         get-cpu-context-i686.asm)
     elseif(processor STREQUAL "ARM64")
