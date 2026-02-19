@@ -95,6 +95,9 @@ extension Unicode {
   /// discards lookahead information -- some scalars will be processed multiple
   /// times. The rules are carefully constructed so that the algorithm reports
   /// the same word boundaries whether or not recognizer state is preserved.
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @available(StdlibDeploymentTarget 6.3, *)
   public // Core primitive
   struct _WordRecognizer: Sendable {
@@ -149,6 +152,9 @@ extension Unicode {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @available(StdlibDeploymentTarget 6.3, *)
 extension Unicode._WordRecognizer {
   /// The parts of the word recognizer state that are in addition to saved
@@ -383,6 +389,9 @@ extension Unicode._WordRecognizer {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode {
   /// A state machine for recognizing safe word boundaries in a backward
   /// sequence of Unicode scalars, based on the specification in [Unicode Annex
@@ -447,6 +456,9 @@ extension Unicode {
 }
 
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @available(StdlibDeploymentTarget 6.3, *)
 extension Unicode._RandomAccessWordRecognizer {
   internal enum _State: Int, Sendable {
@@ -643,6 +655,9 @@ extension Unicode._RandomAccessWordRecognizer {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension String {
   /// Find and return a word boundary position at or before an arbitrary index
   /// within this string. The result may not be the closest word break to the
@@ -718,6 +733,9 @@ extension String {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension _StringGuts {
   @available(StdlibDeploymentTarget 6.3, *)
   @inline(never)

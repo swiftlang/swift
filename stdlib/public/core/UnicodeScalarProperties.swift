@@ -119,6 +119,9 @@ extension Unicode.Scalar.Properties {
 }
 
 /// Boolean properties that are defined by the Unicode Standard.
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode.Scalar.Properties {
   fileprivate var _binaryProperties: _BinaryProperties {
     _BinaryProperties(
@@ -742,6 +745,9 @@ extension Unicode.Scalar.Properties {
 }
 
 /// Case mapping properties.
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode.Scalar.Properties {
   fileprivate struct _CaseMapping {
     let rawValue: UInt8
@@ -848,6 +854,9 @@ extension Unicode.Scalar.Properties {
   ///
   /// This property corresponds to the "Age" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public var age: Unicode.Version? {
     let age: UInt16 = _swift_stdlib_getAge(_scalar.value)
 
@@ -1147,12 +1156,18 @@ extension Unicode.Scalar.Properties {
   ///
   /// This property corresponds to the "General_Category" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public var generalCategory: Unicode.GeneralCategory {
     let rawValue = _swift_stdlib_getGeneralCategory(_scalar.value)
     return Unicode.GeneralCategory(rawValue: rawValue)
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode.Scalar.Properties {
   internal func _hangulName() -> String {
     // T = Hangul tail consonants
@@ -1430,6 +1445,9 @@ extension Unicode.Scalar.Properties {
   ///
   /// This property corresponds to the "Canonical_Combining_Class" property in
   /// the [Unicode Standard](http://www.unicode.org/versions/latest/).
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public var canonicalCombiningClass: Unicode.CanonicalCombiningClass {
     let normData = Unicode._NormData(_scalar)
     return Unicode.CanonicalCombiningClass(rawValue: normData.ccc)
@@ -1496,6 +1514,9 @@ extension Unicode {
 }
 
 /// Numeric properties of scalars.
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode.Scalar.Properties {
 
   /// The numeric type of the scalar.

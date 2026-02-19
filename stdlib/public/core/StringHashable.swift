@@ -12,6 +12,9 @@
 
 import SwiftShims
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension String: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
@@ -30,6 +33,9 @@ extension String: Hashable {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension StringProtocol {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
@@ -43,6 +49,9 @@ extension StringProtocol {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension _StringGutsSlice {
   @_effects(releasenone) @inline(never) // slow-path
   internal func _normalizedHash(into hasher: inout Hasher) {

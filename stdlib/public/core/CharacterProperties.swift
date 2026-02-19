@@ -23,6 +23,9 @@ extension Character {
   }
 
   /// A Boolean value indicating whether this is an ASCII character.
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @inlinable
   public var isASCII: Bool {
     return asciiValue != nil
@@ -48,6 +51,9 @@ extension Character {
   ///     // lf.asciiValue == 10
   ///     let crlf = "\r\n" as Character
   ///     // crlf.asciiValue == 10
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @inlinable
   public var asciiValue: UInt8? {
     if _slowPath(self == "\r\n") { return 0x000A /* LINE FEED (LF) */ }
@@ -64,6 +70,9 @@ extension Character {
   /// - " " (U+0020 SPACE)
   /// - U+2029 PARAGRAPH SEPARATOR
   /// - U+3000 IDEOGRAPHIC SPACE
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public var isWhitespace: Bool {
     return _firstScalar.properties.isWhitespace
   }
@@ -100,6 +109,9 @@ extension Character {
   /// - "㊈" (U+3288 CIRCLED IDEOGRAPH NINE)
   /// - "𝟠" (U+1D7E0 MATHEMATICAL DOUBLE-STRUCK DIGIT EIGHT)
   /// - "๒" (U+0E52 THAI DIGIT TWO)
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public var isNumber: Bool {
     return _firstScalar.properties.numericType != nil
   }
@@ -113,6 +125,9 @@ extension Character {
   /// - "५" (U+096B DEVANAGARI DIGIT FIVE) => 5
   /// - "๙" (U+0E59 THAI DIGIT NINE) => 9
   /// - "万" (U+4E07 CJK UNIFIED IDEOGRAPH-4E07) => 10_000
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @inlinable
   public var isWholeNumber: Bool {
     return wholeNumberValue != nil
@@ -133,6 +148,9 @@ extension Character {
   ///     // ④ --> Optional(4)
   ///     // 万 --> Optional(10000)
   ///     // a --> nil
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public var wholeNumberValue: Int? {
     guard _isSingleScalar else { return nil }
     guard let value = _firstScalar.properties.numericValue else { return nil }
@@ -196,6 +214,9 @@ extension Character {
   /// - "ڈ" (U+0688 ARABIC LETTER DDAL)
   /// - "日" (U+65E5 CJK UNIFIED IDEOGRAPH-65E5)
   /// - "ᚨ" (U+16A8 RUNIC LETTER ANSUZ A)
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public var isLetter: Bool {
     return _firstScalar.properties.isAlphabetic
   }
@@ -216,6 +237,9 @@ extension Character {
   ///     // π --> Π
   ///     // ß --> SS
   ///     // 1 --> 1
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public func uppercased() -> String { return String(self).uppercased() }
 
   /// Returns a lowercased version of this character.
@@ -233,10 +257,20 @@ extension Character {
   ///     // И --> и
   ///     // Π --> π
   ///     // 1 --> 1
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public func lowercased() -> String { return String(self).lowercased() }
 
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @usableFromInline
   internal var _isUppercased: Bool { return String(self) == self.uppercased() }
+
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @usableFromInline
   internal var _isLowercased: Bool { return String(self) == self.lowercased() }
 
@@ -248,6 +282,9 @@ extension Character {
   /// - "É" (U+0045 LATIN CAPITAL LETTER E, U+0301 COMBINING ACUTE ACCENT)
   /// - "И" (U+0418 CYRILLIC CAPITAL LETTER I)
   /// - "Π" (U+03A0 GREEK CAPITAL LETTER PI)
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @inlinable
   public var isUppercase: Bool {
     if _fastPath(_isSingleScalar && _firstScalar.properties.isUppercase) {
@@ -264,6 +301,9 @@ extension Character {
   /// - "é" (U+0065 LATIN SMALL LETTER E, U+0301 COMBINING ACUTE ACCENT)
   /// - "и" (U+0438 CYRILLIC SMALL LETTER I)
   /// - "π" (U+03C0 GREEK SMALL LETTER PI)
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @inlinable
   public var isLowercase: Bool {
     if _fastPath(_isSingleScalar && _firstScalar.properties.isLowercase) {
@@ -274,6 +314,9 @@ extension Character {
 
   /// A Boolean value indicating whether this character changes under any form
   /// of case conversion.
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @inlinable
   public var isCased: Bool {
     if _fastPath(_isSingleScalar && _firstScalar.properties.isCased) {
@@ -294,6 +337,9 @@ extension Character {
   /// - "®" (U+00AE REGISTERED SIGN)
   /// - "⌹" (U+2339 APL FUNCTIONAL SYMBOL QUAD DIVIDE)
   /// - "⡆" (U+2846 BRAILLE PATTERN DOTS-237)
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public var isSymbol: Bool {
     return _firstScalar.properties.generalCategory._isSymbol
   }
@@ -315,6 +361,9 @@ extension Character {
   ///
   /// This property corresponds to the "Math" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public var isMathSymbol: Bool {
     return _firstScalar.properties.isMath
   }
@@ -327,6 +376,9 @@ extension Character {
   /// - "$" (U+0024 DOLLAR SIGN)
   /// - "¥" (U+00A5 YEN SIGN)
   /// - "€" (U+20AC EURO SIGN)
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public var isCurrencySymbol: Bool {
     return _firstScalar.properties.generalCategory == .currencySymbol
   }
@@ -340,6 +392,9 @@ extension Character {
   /// - "…" (U+2026 HORIZONTAL ELLIPSIS)
   /// - "—" (U+2014 EM DASH)
   /// - "“" (U+201C LEFT DOUBLE QUOTATION MARK)
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public var isPunctuation: Bool {
     return _firstScalar.properties.generalCategory._isPunctuation
   }

@@ -211,6 +211,9 @@ extension String {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Character: Equatable {
   @inlinable @inline(__always)
   @_effects(readonly)
@@ -219,6 +222,9 @@ extension Character: Equatable {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Character: Comparable {
   @inlinable @inline(__always)
   @_effects(readonly)
@@ -227,6 +233,9 @@ extension Character: Comparable {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Character: Hashable {
   // not @inlinable (performance)
   /// Hashes the essential components of this value by feeding them into the

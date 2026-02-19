@@ -64,6 +64,9 @@ extension Unicode {
       rawValue & 0x1 == 0
     }
 
+    #if hasFeature(CustomAvailability)
+    @available(Unicode)
+    #endif
     init(_ scalar: Unicode.Scalar, fastUpperbound: UInt32 = 0xC0) {
       if _fastPath(scalar.value < fastUpperbound) {
         // CCC = 0, NFC_QC = Yes, NFD_QC = Yes
@@ -159,6 +162,9 @@ extension Unicode {
   //                decomposition entry so that we can guard against scalars
   //                who happen to hash to the same index.
   //
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   internal struct _DecompositionEntry {
     let rawValue: UInt32
 
@@ -186,6 +192,9 @@ extension Unicode {
       )
     }
 
+    #if hasFeature(CustomAvailability)
+    @available(Unicode)
+    #endif
     init(_ scalar: Unicode.Scalar) {
       rawValue = _swift_stdlib_getDecompositionEntry(scalar.value)
     }
@@ -199,38 +208,29 @@ extension Unicode.Scalar {
 }
 
 //===----------------------------------------------------------------------===//
-// Utilities
-//===----------------------------------------------------------------------===//
-
-@_extern(c)
-func _swift_stdlib_getMphIdx(
-  _ scalar: UInt32,
-  _ levels: Int,
-  _ keys: UnsafePointer<UInt64>,
-  _ ranks: UnsafePointer<UInt16>,
-  _ sizes: UnsafePointer<UInt16>
-) -> Int
-
-@_extern(c)
-func _swift_stdlib_getScalarBitArrayIdx(
-  _ scalar: UInt32,
-  _ bitArrays: UnsafePointer<UInt64>,
-  _ ranks: UnsafePointer<UInt16>
-) -> Int
-
-//===----------------------------------------------------------------------===//
 // Normalization
 //===----------------------------------------------------------------------===//
-
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getNormData(_ scalar: UInt32) -> UInt16
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getDecompositionEntry(_ scalar: UInt32) -> UInt32
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getComposition(_ x: UInt32, _ y: UInt32) -> UInt32
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 var _swift_stdlib_nfd_decompositions: UnsafePointer<UInt8>?
 
@@ -248,6 +248,9 @@ func _swift_stdlib_isInCB_Consonant(_ scalar: UInt32) -> Bool
 // Word Breaking
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getWordBreakProperty(_ scalar: UInt32) -> UInt8
 
@@ -255,21 +258,39 @@ func _swift_stdlib_getWordBreakProperty(_ scalar: UInt32) -> UInt8
 // Unicode.Scalar.Properties
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getBinaryProperties(_ scalar: UInt32) -> UInt64
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getNumericType(_ scalar: UInt32) -> UInt8
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getNumericValue(_ scalar: UInt32) -> Double
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getNameAlias(_ scalar: UInt32) -> UnsafePointer<UInt8>?
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getMapping(_ scalar: UInt32, _ mapping: UInt8) -> Int32
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getSpecialMapping(
   _ scalar: UInt32,
@@ -277,6 +298,9 @@ func _swift_stdlib_getSpecialMapping(
   _ length: UnsafeMutablePointer<Int>
 ) -> UnsafePointer<UInt8>?
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getScalarName(
   _ scalar: UInt32,
@@ -284,21 +308,36 @@ func _swift_stdlib_getScalarName(
   _ capacity: Int
 ) -> Int
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getAge(_ scalar: UInt32) -> UInt16
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getGeneralCategory(_ scalar: UInt32) -> UInt8
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getScript(_ scalar: UInt32) -> UInt8
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getScriptExtensions(
   _ scalar: UInt32,
   _ count: UnsafeMutablePointer<UInt8>
 ) -> UnsafeMutablePointer<UInt8>?
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getCaseMapping(
   _ scalar: UInt32,

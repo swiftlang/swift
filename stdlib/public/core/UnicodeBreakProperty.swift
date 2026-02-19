@@ -80,6 +80,9 @@ extension Unicode {
 }
 
 extension Unicode {
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   internal enum _WordBreakProperty: UInt8, Sendable {
     case aLetter
     case any

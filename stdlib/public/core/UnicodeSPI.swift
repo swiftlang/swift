@@ -27,6 +27,9 @@ extension Unicode {
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFD: Sendable {}
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFD {
   @_spi(_Unicode)
@@ -36,9 +39,15 @@ extension Unicode._NFD {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFD.Iterator: Sendable {}
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFD.Iterator: IteratorProtocol {
   @_spi(_Unicode)
@@ -48,6 +57,9 @@ extension Unicode._NFD.Iterator: IteratorProtocol {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFD: Sequence {
   @_spi(_Unicode)
@@ -57,6 +69,9 @@ extension Unicode._NFD: Sequence {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension String {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
@@ -65,6 +80,9 @@ extension String {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Substring {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
@@ -77,6 +95,9 @@ extension Substring {
 // Unicode.NFC
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
@@ -85,9 +106,15 @@ extension Unicode {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFC: Sendable {}
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFC {
   @_spi(_Unicode)
@@ -97,9 +124,15 @@ extension Unicode._NFC {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFC.Iterator: Sendable {}
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFC.Iterator: IteratorProtocol {
   @_spi(_Unicode)
@@ -109,6 +142,9 @@ extension Unicode._NFC.Iterator: IteratorProtocol {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFC: Sequence {
   @_spi(_Unicode)
@@ -118,6 +154,9 @@ extension Unicode._NFC: Sequence {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension String {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
@@ -126,6 +165,9 @@ extension String {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Substring {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
@@ -138,6 +180,9 @@ extension Substring {
 // Unicode.Script
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode.Scalar.Properties {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
@@ -178,6 +223,9 @@ extension Unicode.Scalar.Properties {
 // Case folding
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode.Scalar.Properties {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
