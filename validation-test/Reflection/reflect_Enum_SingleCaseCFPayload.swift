@@ -40,7 +40,9 @@ reflect(object: ClassWithSingleCaseCFPayloadEnum())
 // CHECK64-NEXT:  (field name=e1 offset=16 
 // CHECK64-NEXT:   (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1 
 // CHECK64-NEXT:    (case name=some index=0 offset=0 
-// CHECK64-NEXT:    (reference kind=strong refcounting=unknown)) 
+// CHECK64-NEXT:    (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:      (case name=only index=0 offset=0
+// CHECK64-NEXT:       (reference kind=strong refcounting=unknown))))
 
 // CHECK32: Type info:
 
@@ -53,14 +55,14 @@ reflect(enum: SingleCaseCFPayloadEnum.only(cfs1))
 // CHECK-NEXT: (enum reflect_Enum_SingleCaseCFPayload.SingleCaseCFPayloadEnum)
 
 // CHECK: Type info:
-// CHECK-NEXT: (reference kind=strong refcounting=unknown) 
-
+// CHECK-NEXT: (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-NEXT:   (case name=only index=0 offset=0
+// CHECK-NEXT:     (reference kind=strong refcounting=unknown)))
 // CHECK: Mangled name: $s32reflect_Enum_SingleCaseCFPayload0cdeB0O 
 // CHECK-NEXT: Demangled name: reflect_Enum_SingleCaseCFPayload.SingleCaseCFPayloadEnum 
 
 // CHECK: Enum value:
-// CHECK-NEXT: (reference kind=strong refcounting=unknown)
-
+// CHECK-NEXT: (enum_value name=only index=0
 // CHECK: Mangled name: $s32reflect_Enum_SingleCaseCFPayload0cdeB0O 
 // CHECK-NEXT: Demangled name: reflect_Enum_SingleCaseCFPayload.SingleCaseCFPayloadEnum 
 
