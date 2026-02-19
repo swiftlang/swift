@@ -1172,7 +1172,6 @@ Added: _$sSs9UTF16ViewV20isTriviallyIdentical2toSbAB_tF
 Added: __swift_runtime_demangle
 Added: __swift_runtime_demangle_allocate
 
-<<<<<<< HEAD
 // New SPI for dynamic exclusivity checking.
 Added: __swift_exclusivityAccessGetParent
 Added: __swift_exclusivityAccessSetNext
@@ -1207,7 +1206,3 @@ Added: _$ss4SpanVyxGs26_BorrowingIteratorProtocolsRi_zrlMc
 
 // CommandLine._executablePathCString
 Added: _$ss11CommandLineO14executablePathSSvgZ
-=======
-// SE-NNNN: CommandLine.executablePath
-Added: _$ss11CommandLineO14executablePathSSSgvpZMV
->>>>>>> 7c3d0ddd1d4 (Fix ABI test)
