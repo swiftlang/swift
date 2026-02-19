@@ -4482,7 +4482,9 @@ if (-not $IsCrossCompiling) {
   if ($Test -contains "llbuild") { Invoke-BuildStep Test-LLBuild $BuildPlatform }
   if ($Test -contains "swiftpm") { Invoke-BuildStep Test-PackageManager $BuildPlatform }
   if ($Test -contains "swift-format") { Invoke-BuildStep Test-Format $BuildPlatform }
-  if ($Test -contains "sourcekit-lsp") { Invoke-BuildStep Test-SourceKitLSP $BuildPlatform}
+
+  # FIXME: https://github.com/swiftlang/swift/issues/85337
+  # if ($Test -contains "sourcekit-lsp") { Invoke-BuildStep Test-SourceKitLSP $BuildPlatform}
 
   if ($Test -contains "swift") {
     foreach ($Build in $AndroidSDKBuilds) {
