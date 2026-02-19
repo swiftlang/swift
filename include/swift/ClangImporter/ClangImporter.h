@@ -535,6 +535,7 @@ public:
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
   clang::ASTContext &getClangASTContext() const override;
+  bool hasClangASTContext() const;
   clang::Preprocessor &getClangPreprocessor() const override;
   clang::Sema &getClangSema() const override;
   const clang::CompilerInstance &getClangInstance() const override;

@@ -14,6 +14,7 @@
 
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/CompileJobCacheResult.h"
@@ -118,6 +119,8 @@ public:
                          ObjectRef BytesRef);
   Error finalizeCacheKeysFor(unsigned InputIndex);
 
+  void setStatsReporter(UnifiedStatsReporter *Stats) { this->Stats = Stats; }
+
 private:
   friend class SwiftCASOutputBackend;
   ObjectStore &CAS;
@@ -126,6 +129,7 @@ private:
   const FrontendInputsAndOutputs &InputsAndOutputs;
   const FrontendOptions &Opts;
   FrontendOptions::ActionType Action;
+  UnifiedStatsReporter *Stats = nullptr;
 
   // Lock for updating output file status.
   llvm::sys::SmartMutex<true> OutputLock;
@@ -210,6 +214,10 @@ Error SwiftCASOutputBackend::storeMCCASObjectID(StringRef OutputFilename,
   return Error::success();
 }
 
+void SwiftCASOutputBackend::setStatsReporter(UnifiedStatsReporter *Stats) {
+  Impl.setStatsReporter(Stats);
+}
+
 void SwiftCASOutputBackend::Implementation::initBackend(
     const FrontendInputsAndOutputs &InputsAndOutputs) {
   // FIXME: The output to input map might not be enough for example all the
@@ -255,6 +263,7 @@ void SwiftCASOutputBackend::Implementation::initBackend(
 Error SwiftCASOutputBackend::Implementation::storeImpl(
     StringRef Path, StringRef Bytes, unsigned InputIndex,
     file_types::ID OutputKind) {
+  FrontendStatsTracer tracer(Stats, "cas-output-store");
   std::optional<ObjectRef> BytesRef;
   if (Error E = CAS.storeFromString(/*Refs*/ {}, Bytes).moveInto(BytesRef))
     return E;

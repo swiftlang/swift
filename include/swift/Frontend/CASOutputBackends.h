@@ -20,6 +20,10 @@
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/VirtualOutputFile.h"
 
+namespace swift {
+class UnifiedStatsReporter;
+} // namespace swift
+
 namespace swift::cas {
 
 class SwiftCASOutputBackend : public llvm::vfs::OutputBackend {
@@ -60,6 +64,8 @@ public:
   /// that corresponds to the \p OutputFilename
   llvm::Error storeMCCASObjectID(StringRef OutputFilename, llvm::cas::CASID ID);
 
+  /// Set a new stats reporter.
+  void setStatsReporter(UnifiedStatsReporter *stats);
 private:
   class Implementation;
   Implementation &Impl;
