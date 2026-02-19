@@ -17,12 +17,28 @@
 #ifndef SWIFT_RUNTIME_PORTABILITY_H
 #define SWIFT_RUNTIME_PORTABILITY_H
 
+#include "swift/Shims/Visibility.h"
 #include <cstdarg>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
-size_t _swift_strlcpy(char *dst, const char *src, size_t maxlen);
+// Skip the attribute when included by the compiler.
+#ifdef SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+#endif
+inline static size_t
+_swift_strlcpy(char *dst, const char *src, size_t maxlen) {
+  const size_t srclen = std::strlen(src);
+  if (SWIFT_LIKELY(srclen < maxlen)) {
+    std::memcpy(dst, src, srclen + 1);
+  } else if (maxlen != 0) {
+    std::memcpy(dst, src, maxlen - 1);
+    dst[maxlen - 1] = '\0';
+  }
+  return srclen;
+}
 
 // Skip the attribute when included by the compiler.
 #ifdef SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
