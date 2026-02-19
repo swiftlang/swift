@@ -161,10 +161,7 @@ endif()
 
 string(TOLOWER "${SwiftCore_OBJECT_FORMAT}x" SwiftCore_OBJECT_FORMAT)
 if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
-  add_library(swiftrt OBJECT
-    SwiftRT-ELF-WASM.cpp
-    SwiftRT-ELF-Testing.cpp
-  )
+  add_library(swiftrt OBJECT SwiftRT-ELF-WASM.cpp)
   target_compile_definitions(swiftrt PRIVATE
     -DSWIFT_ENABLE_BACKTRACING=$<BOOL:${SwiftCore_ENABLE_BACKTRACING}>)
   target_include_directories(swiftrt PRIVATE
