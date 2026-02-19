@@ -2,6 +2,7 @@
 // REQUIRES: swift_feature_Lifetimes
 
 // RUN: %target-swift-ide-test -print-module -module-to-print=SizedByLifetimeboundClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Werror -Xcc -Wno-nullability-completeness | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=SizedByLifetimeboundClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -Xcc -Werror -Xcc -Wno-nullability-completeness | %FileCheck %s --check-prefix CHECK-STABLE
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
 // RUN: %empty-directory(%t)
@@ -10,6 +11,9 @@
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __sized_by __lifetimebound parameters and return values.
 
 import SizedByLifetimeboundClang
+
+// lifetimebound support is not stabilized yet. Don't generate _any_ overloads on functions with lifetimebound to prevent future sourcebreak.
+// CHECK-STABLE-NOT: @_alwaysEmitIntoClient
 
 // CHECK:      /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)

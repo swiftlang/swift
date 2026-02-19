@@ -1167,20 +1167,20 @@ namespace {
             DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
                         subjectType, shouldIncludeFutureVersionComment);
 
-        auto shouldWarnUntilVersion = [&theEnum]() -> unsigned {
+        auto languageModeForError = [&theEnum]() -> LanguageMode {
           if (theEnum) {
             // Presence of `@nonexhaustive(warn)` pushes the warning farther,
             // into the future.
             if (auto *nonexhaustive =
                     theEnum->getAttrs().getAttribute<NonexhaustiveAttr>()) {
               if (nonexhaustive->getMode() == NonexhaustiveMode::Warning)
-                return swift::version::Version::getFutureMajorLanguageVersion();
+                return LanguageMode::future;
             }
           }
-          return 6;
+          return LanguageMode::v6;
         };
 
-        diag.warnUntilLanguageMode(shouldWarnUntilVersion());
+        diag.warnUntilLanguageMode(languageModeForError());
 
         mainDiagType = std::nullopt;
       }

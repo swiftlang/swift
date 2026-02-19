@@ -36,6 +36,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/TypeVariableType.h"
 
 using namespace swift;
 using namespace constraints;
@@ -444,8 +445,9 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
   auto *expansionLoc = getConstraintLocator(locator.withPathElement(
       LocatorPathElt::PackExpansionType(openedPackExpansion)));
 
-  auto *expansionVar = createTypeVariable(expansionLoc, TVO_PackExpansion,
-                                          preparedOverload);
+  auto *expansionVar = createTypeVariable(
+      expansionLoc, TVO_PackExpansion | TVO_CanBindToNoEscape,
+      preparedOverload);
 
   // This constraint is important to make sure that pack expansion always
   // has a binding and connect pack expansion var to any type variables
@@ -1014,36 +1016,43 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
         }
       } else if (numApplies < decl->getNumCurryLevels() &&
                  decl->hasCurriedSelf() ) {
-        auto shouldMarkMemberTypeSendable = [&]() {
-          Type capturedBaseType = baseType;
+        Type sendableDepTy = baseType;
+        if (!decl->isInstanceMember()) {
+          // Static member types are Sendable when the metatype of their
+          // base type is Sendable, because they capture that metatype.
+          // For example, `(S.Type) -> () -> Void`.
+          if (!sendableDepTy)
+            sendableDepTy = decl->getDeclContext()->getSelfTypeInContext();
 
-          if (!decl->isInstanceMember()) {
-            // Static member types are Sendable when the metatype of their
-            // base type is Sendable, because they capture that metatype.
-            // For example, `(S.Type) -> () -> Void`.
-            if (!capturedBaseType)
-              capturedBaseType = decl->getDeclContext()->getSelfTypeInContext();
+          if (!sendableDepTy->is<AnyMetatypeType>())
+            sendableDepTy = MetatypeType::get(sendableDepTy);
+        } else if (sendableDepTy) {
+          // For instance members we need to check whether instance type
+          // is Sendable because @Sendable function values cannot capture
+          // non-Sendable values (base instance type in this case).
+          // For example, `(C) -> () -> Void` where `C` should be Sendable
+          // for the inner function type to be Sendable as well.
+          sendableDepTy = sendableDepTy->getMetatypeInstanceType();
 
-            if (!capturedBaseType->is<AnyMetatypeType>())
-              capturedBaseType = MetatypeType::get(capturedBaseType);
-          } else if (capturedBaseType) {
-            // For instance members we need to check whether instance type
-            // is Sendable because @Sendable function values cannot capture
-            // non-Sendable values (base instance type in this case).
-            // For example, `(C) -> () -> Void` where `C` should be Sendable
-            // for the inner function type to be Sendable as well.
-            capturedBaseType = capturedBaseType->getMetatypeInstanceType();
-          }
-
-          return capturedBaseType && capturedBaseType->isSendableType();
-        };
+          // Partially applied actor instance methods cannot cross isolation
+          // boundary unless they are asynchronous otherwise it would be
+          // possible to escape the actor context and access actor-isolated
+          // storage from different isolation.
+          if (sendableDepTy->isAnyActorType() && !decl->isAsync())
+            sendableDepTy = Type();
+        }
 
         auto referenceTy = adjustedTy->getResult()->castTo<FunctionType>();
-        if (shouldMarkMemberTypeSendable()) {
+        if (sendableDepTy && !referenceTy->isSendable()) {
+          sendableDepTy = simplifyType(sendableDepTy);
+          auto extInfo = referenceTy->getExtInfo();
+          if (sendableDepTy->hasTypeVariable()) {
+            extInfo = extInfo.withSendableDependentType(sendableDepTy);
+          } else {
+            extInfo = extInfo.withSendable(sendableDepTy->isSendableType());
+          }
           referenceTy =
-              referenceTy
-                  ->withExtInfo(referenceTy->getExtInfo().withSendable())
-                  ->getAs<FunctionType>();
+              referenceTy->withExtInfo(extInfo)->castTo<FunctionType>();
         }
 
         // @Sendable since fully uncurried type doesn't capture anything.
@@ -1157,9 +1166,11 @@ ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
+    TypeResolutionOptions opts = TypeResolverContext::InExpression;
+    if (choice.getFunctionRefInfo().hasModuleSelector())
+      opts |= TypeResolutionFlags::HasModuleSelector;
     auto type =
-        TypeResolution::forInterface(useDC, TypeResolverContext::InExpression,
-                                     /*unboundTyOpener*/ nullptr,
+        TypeResolution::forInterface(useDC, opts, /*unboundTyOpener*/ nullptr,
                                      /*placeholderHandler*/ nullptr,
                                      /*packElementOpener*/ nullptr)
             .resolveTypeInContext(typeDecl, /*foundDC*/ nullptr,
@@ -1501,38 +1512,28 @@ void ConstraintSystem::openGenericRequirements(
 }
 
 void ConstraintSystem::openGenericRequirement(
-    DeclContext *outerDC, GenericSignature signature,
-    unsigned index, Requirement req,
-    ConstraintLocatorBuilder locator,
+    DeclContext *outerDC, GenericSignature signature, unsigned index,
+    Requirement req, ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn,
     PreparedOverloadBuilder *preparedOverload) {
-  std::optional<Requirement> openedReq;
-  auto openedFirst = substFn(req.getFirstType());
 
   bool prohibitIsolatedConformance = false;
   auto kind = req.getKind();
-  switch (kind) {
-  case RequirementKind::Conformance: {
+  if (kind == RequirementKind::Conformance && signature) {
     // Check whether the given type parameter has requirements that
     // prohibit it from using an isolated conformance.
-    if (signature &&
-        signature->prohibitsIsolatedConformance(req.getFirstType()))
-      prohibitIsolatedConformance = true;
-
-    openedReq = Requirement(kind, openedFirst, req.getSecondType());
-    break;
-  }
-  case RequirementKind::Superclass:
-  case RequirementKind::SameType:
-  case RequirementKind::SameShape:
-    openedReq = Requirement(kind, openedFirst, substFn(req.getSecondType()));
-    break;
-  case RequirementKind::Layout:
-    openedReq = Requirement(kind, openedFirst, req.getLayoutConstraint());
-    break;
+    prohibitIsolatedConformance =
+        signature->prohibitsIsolatedConformance(req.getFirstType()).has_value();
   }
 
-  addConstraint(*openedReq,
+  // Open the requirement's subject type, replacing ErrorTypes with holes if
+  // needed in case of substitution failure.
+  auto openedReq = req.tranformSubjectTypes([&](Type ty) {
+    return replaceInferableTypesWithTypeVars(substFn(ty), locator,
+                                             preparedOverload);
+  });
+
+  addConstraint(openedReq,
                 locator.withPathElement(
                     LocatorPathElt::TypeParameterRequirement(index, kind)),
                 /*isFavored=*/false, prohibitIsolatedConformance,
@@ -3142,7 +3143,8 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
           // method without any applications at all, which would get
           // miscompiled into a function with undefined behavior. Warn for
           // source compatibility.
-          bool isWarning = !getASTContext().isLanguageModeAtLeast(5);
+          bool isWarning =
+              !getASTContext().isLanguageModeAtLeast(LanguageMode::v5);
           (void)recordFix(
               AllowInvalidPartialApplication::create(isWarning, *this, locator));
         } else if (level == 1) {

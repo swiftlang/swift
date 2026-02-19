@@ -1101,8 +1101,17 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     if (auto trailing = proto->getTrailingWhereClause())
       return { ", ", trailing->getRequirements().back().getSourceRange().End };
 
+    auto const &inheritedTys = proto->getInherited();
+
     // Inheritance clause.
-    return { " where ", proto->getInherited().getEndLoc() };
+    if (!inheritedTys.empty())
+      return { " where ", inheritedTys.getEndLoc() };
+
+    // Otherwise, there's no nice way to find the end of the protocol's name or
+    // the opening '{', so just give a close approximation.
+    SourceLoc Loc = proto->getNameLoc();
+    Loc = Loc.getAdvancedLocOrInvalid(proto->getName().str().size());
+    return { " where ",  Loc};
   };
 
   // Retrieve the set of requirements that a given associated type declaration
@@ -1241,6 +1250,12 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
           //
           // FIXME: Protocol extensions with noncopyable generics can!
           if (ext->getTrailingWhereClause()) continue;
+
+          // Also ignore extensions defining a reparenting, this request will
+          // infer a same-type requirement upon the entire protocol, whereas
+          // reparented extensions only want the same-type requirement within
+          // the extension's generic environment.
+          if (ext->isForReparenting()) continue;
         }
 
         // We found something.

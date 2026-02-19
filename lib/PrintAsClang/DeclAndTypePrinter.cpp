@@ -980,7 +980,7 @@ private:
       }
 
       // Print the raw values, even the ones that we synthesize.
-      auto *ILE = cast<IntegerLiteralExpr>(Elt->getStructuralRawValueExpr());
+      auto *ILE = cast<IntegerLiteralExpr>(Elt->getRawValueExpr());
       os << " = ";
       if (ILE->isNegative())
         os << "-";
@@ -1423,7 +1423,7 @@ private:
       // because it's a diagnostic inflicted on /clients/, but it's close
       // enough. It really is invalid to call +new when -init is unavailable.
       StringRef annotationName = "SWIFT_UNAVAILABLE_MSG";
-      if (!getASTContext().isLanguageModeAtLeast(5))
+      if (!getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
         annotationName = "SWIFT_DEPRECATED_MSG";
       os << "+ (nonnull instancetype)new " << annotationName
          << "(\"-init is unavailable\");\n";
@@ -1783,8 +1783,14 @@ public:
         continue;
       }
 
+      auto platKind = AvAttr.getPlatform();
+      if (platKind == PlatformKind::anyAppleOS) {
+        if (auto domainAndRange =
+                AvAttr.getIntroducedDomainAndRange(D->getASTContext()))
+          platKind = domainAndRange->getDomain().getPlatformKind();
+      }
       const char *plat;
-      switch (AvAttr.getPlatform()) {
+      switch (platKind) {
       case PlatformKind::macOS:
         plat = "macos";
         break;
@@ -1825,9 +1831,11 @@ public:
         plat = "driverkit";
         break;
       case PlatformKind::Swift:
-      case PlatformKind::anyAppleOS:
         // FIXME: [runtime availability] Figure out how to support this.
         ASSERT(0);
+        break;
+      case PlatformKind::anyAppleOS:
+        llvm_unreachable("must have been resolved before");
         break;
       case PlatformKind::FreeBSD:
         plat = "freebsd";

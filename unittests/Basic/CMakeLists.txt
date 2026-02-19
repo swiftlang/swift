@@ -23,6 +23,7 @@ add_swift_unittest(SwiftBasicTests
   FrozenMultiMapTest.cpp
   ImmutablePointerSetTest.cpp
   JSONSerialization.cpp
+  LanguageModeTest.cpp
   OptionSetTest.cpp
   Options.cpp
   OwnedStringTest.cpp
@@ -42,6 +43,7 @@ add_swift_unittest(SwiftBasicTests
   TransformRangeTest.cpp
   TypeLookupError.cpp
   UnicodeTest.cpp
+  SwiftVersionTest.cpp
   ${generated_tests}
   )
 

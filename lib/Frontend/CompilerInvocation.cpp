@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
+#include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Version.h"
 #include "swift/Option/Options.h"
@@ -249,9 +250,16 @@ updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   //
   //   C:\...\Swift\Runtimes\6.0.0\usr\bin
   //
+  // But, for testing, we also need to look in `bin`, next to the driver.
+
   llvm::SmallString<128> RuntimePath(LibPath);
 
   llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::remove_filename(RuntimePath);
+
+  // For testing, we need to look in `bin` first
+  llvm::sys::path::append(RuntimePath, "bin");
+  SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(RuntimePath.str()));
   llvm::sys::path::remove_filename(RuntimePath);
   llvm::sys::path::remove_filename(RuntimePath);
 
@@ -503,10 +511,16 @@ static void diagnoseSwiftVersion(std::optional<version::Version> &vers,
   diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                  verArg->getAsString(Args), verArg->getValue());
 
-  // Note valid versions.
-  auto validVers = version::Version::getValidEffectiveVersions();
-  auto versStr = "'" + llvm::join(validVers, "', '") + "'";
-  diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, versStr);
+  // Enumerate the valid language modes.
+  std::string modesStr;
+  {
+    llvm::raw_string_ostream os(modesStr);
+    llvm::interleaveComma(
+        LanguageMode::allSupportedModes(), os,
+        [&](LanguageMode mode) { os << "'" << mode.versionString() << "'"; });
+  }
+
+  diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, modesStr);
 }
 
 /// Create a new Regex instance out of the string value in \p RpassArg.
@@ -607,6 +621,13 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Opts.PreserveTypesAsWritten = false;
     diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                    "-module-interface-preserve-types-as-written",
+                   "-enable-module-selectors-in-module-interface");
+  }
+
+  if (Opts.AliasModuleNames && Opts.UseModuleSelectors) {
+    Opts.AliasModuleNames = false;
+    diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
+                   "-alias-module-names-in-module-interface",
                    "-enable-module-selectors-in-module-interface");
   }
 }
@@ -926,11 +947,11 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     // If the current language mode enables the feature by default then
     // diagnose and skip it.
-    if (auto firstVersion = feature->getLanguageMode()) {
-      if (Opts.isLanguageModeAtLeast(*firstVersion)) {
+    if (auto languageMode = feature->getLanguageMode()) {
+      if (Opts.isLanguageModeAtLeast(languageMode.value())) {
         Diags.diagnose(SourceLoc(),
                        diag::warning_upcoming_feature_on_by_default,
-                       feature->getName(), *firstVersion);
+                       feature->getName(), languageMode->versionString());
         continue;
       }
     }
@@ -1332,8 +1353,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // Add a future feature if it is not already implied by the language version.
   auto addFutureFeatureIfNotImplied = [&](Feature feature) {
     // Check if this feature was introduced already in this language version.
-    if (auto firstVersion = feature.getLanguageMode()) {
-      if (Opts.isLanguageModeAtLeast(*firstVersion))
+    if (auto languageMode = feature.getLanguageMode()) {
+      if (Opts.isLanguageModeAtLeast(languageMode.value()))
         return;
     }
 
@@ -1510,7 +1531,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasFlag(OPT_enable_nonfrozen_enum_exhaustivity_diagnostics,
                    OPT_disable_nonfrozen_enum_exhaustivity_diagnostics,
-                   Opts.isLanguageModeAtLeast(5))) {
+                   Opts.isLanguageModeAtLeast(LanguageMode::v5))) {
     Opts.enableFeature(Feature::NonfrozenEnumExhaustivity);
   }
 
@@ -1931,7 +1952,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       HadError = true;
     }
-  } else if (Opts.isLanguageModeAtLeast(6)) {
+  } else if (Opts.isLanguageModeAtLeast(LanguageMode::v6)) {
     Opts.UseCheckedAsyncObjCBridging = true;
   }
 
@@ -1978,6 +1999,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::ParserValidation);
   }
 #endif
+
+  if (Args.hasArg(OPT_disable_safe_interop_wrappers))
+    Opts.DisableSafeInteropWrappers = true;
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
@@ -2082,12 +2107,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
         SWIFT_ONONE_SUPPORT);
   }
 
-  Opts.EnableOperatorDesignatedTypes |=
-      Args.hasArg(OPT_enable_operator_designated_types);
-
-  // Always enable operator designated types for the standard library.
-  Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
-
   Opts.PrintFullConvention |=
       Args.hasArg(OPT_experimental_print_full_convention);
 
@@ -2112,13 +2131,30 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_solver_disable_splitter))
     Opts.SolverDisableSplitter = true;
 
-  if (Args.hasArg(OPT_solver_enable_prepared_overloads) ||
-      Args.hasArg(OPT_solver_disable_prepared_overloads))
-    Opts.SolverEnablePreparedOverloads = Args.hasArg(OPT_solver_enable_prepared_overloads);
+  Opts.CrashOnValidSalvage =
+      Args.hasFlag(OPT_solver_enable_crash_on_valid_salvage,
+                   OPT_solver_disable_crash_on_valid_salvage,
+                   Opts.CrashOnValidSalvage);
 
-  if (Args.hasArg(OPT_solver_enable_prune_disjunctions) ||
-      Args.hasArg(OPT_solver_disable_prune_disjunctions))
-    Opts.SolverPruneDisjunctions = Args.hasArg(OPT_solver_enable_prune_disjunctions);
+  Opts.SolverEnablePreparedOverloads =
+      Args.hasFlag(OPT_solver_enable_prepared_overloads,
+                   OPT_solver_disable_prepared_overloads,
+                   Opts.SolverEnablePreparedOverloads);
+
+  Opts.SolverPruneDisjunctions =
+      Args.hasFlag(OPT_solver_enable_prune_disjunctions,
+                   OPT_solver_disable_prune_disjunctions,
+                   Opts.SolverPruneDisjunctions);
+
+  Opts.SolverOptimizeOperatorDefaults =
+      Args.hasFlag(OPT_solver_enable_optimize_operator_defaults,
+                   OPT_solver_disable_optimize_operator_defaults,
+                   Opts.SolverOptimizeOperatorDefaults);
+
+  Opts.SolverEnablePerformanceHacks =
+      Args.hasFlag(OPT_solver_enable_performance_hacks,
+                   OPT_solver_disable_performance_hacks,
+                   Opts.SolverEnablePerformanceHacks);
 
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
@@ -2782,15 +2818,26 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Opts.WarningGroupControlRules.emplace_back(
           WarningGroupBehavior::AsWarning);
       break;
-    case OPT_Werror:
-      Opts.WarningGroupControlRules.emplace_back(
-          WarningGroupBehavior::AsError, getDiagGroupIDByName(arg->getValue()));
+    case OPT_Werror: {
+      auto groupID = getDiagGroupIDByName(arg->getValue());
+      if (groupID && *groupID != DiagGroupID::no_group) {
+        Opts.WarningGroupControlRules.emplace_back(
+            WarningGroupBehavior::AsError, *groupID);
+      } else {
+        Opts.UnknownWarningGroups.push_back(arg->getValue());
+      }
       break;
-    case OPT_Wwarning:
-      Opts.WarningGroupControlRules.emplace_back(
-          WarningGroupBehavior::AsWarning,
-          getDiagGroupIDByName(arg->getValue()));
+    }
+    case OPT_Wwarning: {
+      auto groupID = getDiagGroupIDByName(arg->getValue());
+      if (groupID && *groupID != DiagGroupID::no_group) {
+        Opts.WarningGroupControlRules.emplace_back(
+            WarningGroupBehavior::AsWarning, *groupID);
+      } else {
+        Opts.UnknownWarningGroups.push_back(arg->getValue());
+      }
       break;
+    }
     default:
       llvm_unreachable("unhandled warning as error option");
     };
@@ -2895,6 +2942,12 @@ static void configureDiagnosticEngine(
 void CompilerInvocation::setUpDiagnosticEngine(DiagnosticEngine &diags) {
   configureDiagnosticEngine(DiagnosticOpts, LangOpts.EffectiveLanguageVersion,
                             FrontendOpts.MainExecutablePath, diags);
+
+  // Once configured, immediately diagnose any unknown warning groups that were
+  // encountered while parsing the diagnostic options.
+  for (const auto &unknownGroup : DiagnosticOpts.UnknownWarningGroups) {
+    diags.diagnose(SourceLoc(), diag::unknown_warning_group, unknownGroup);
+  }
 }
 
 /// Parse -enforce-exclusivity=... options
@@ -4321,8 +4374,8 @@ bool CompilerInvocation::parseArgs(
                         SearchPathOpts.RuntimeResourcePath, ParsedArgs, Diags)) {
     return true;
   }
-  
-  SDKInfo = parseSDKSettings(*llvm::vfs::getRealFileSystem(), LangOpts,
+
+  SDKInfo = parseSDKSettings(*llvm::vfs::createPhysicalFileSystem(), LangOpts,
                              SearchPathOpts, Diags);
 
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);

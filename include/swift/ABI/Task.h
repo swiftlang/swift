@@ -468,7 +468,10 @@ public:
 
   /// Check whether this task has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
-  bool isCancelled() const;
+  ///
+  /// \param ignoreShield if cancellation shield should be ignored. 
+  ///        Cancellation shields prevent the observation of the isCancelled flag while active.
+  bool isCancelled(bool ignoreShield) const;
 
   // ==== INITIAL TASK RECORDS =================================================
   // A task may have a number of "initial" records set, they MUST be set in the
@@ -530,6 +533,15 @@ public:
 
   /// Returns true if storage has still more bindings.
   bool localValuePop();
+
+  // ==== Cancellation Shields -------------------------------------------------
+
+  /// Install a cancellation shield in this task.
+  /// Returns true if the shield was installed, and false if there was already 
+  /// one active and this action didn't change anything.
+  bool cancellationShieldPush();
+
+  void cancellationShieldPop();
 
   // ==== Child Fragment -------------------------------------------------------
 

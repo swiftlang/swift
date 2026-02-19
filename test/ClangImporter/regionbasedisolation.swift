@@ -45,7 +45,7 @@ extension ObjCObject {
   // Then create the actual block. NOTE: Since the block is @Sendable, the block
   // does not propagate regions.
   //
-  // CHECK: [[COMPLETION_HANDLER_BLOCK:%.*]] = function_ref @$sSo7NSArrayCSgSo7NSErrorCSgIeyBhyy_SaySo8NSObjectCGTz_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSArray>, Optional<NSError>) -> ()
+  // CHECK: [[COMPLETION_HANDLER_BLOCK:%.*]] = function_ref @$sSo7NSArrayCSgSo7NSErrorCSgIeyBhyy_SaySo8NSObjectCGTZ_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSArray>, Optional<NSError>) -> ()
   // CHECK: [[COMPLETION_BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]], invoke [[COMPLETION_HANDLER_BLOCK]]
   //
   // Since the block is @Sendable, it does not propagate the connection in
@@ -106,7 +106,7 @@ extension ObjCObject {
   // Then create the actual block. NOTE: Since the block is @Sendable, the block
   // does not propagate regions.
   //
-  // CHECK: [[COMPLETION_HANDLER_BLOCK:%.*]] = function_ref @$sSo7NSArrayCSgSo7NSErrorCSgIeyBhyy_SaySo8NSObjectCGTz_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSArray>, Optional<NSError>) -> ()
+  // CHECK: [[COMPLETION_HANDLER_BLOCK:%.*]] = function_ref @$sSo7NSArrayCSgSo7NSErrorCSgIeyBhyy_SaySo8NSObjectCGTZ_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSArray>, Optional<NSError>) -> ()
   // CHECK: [[COMPLETION_BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]], invoke [[COMPLETION_HANDLER_BLOCK]]
   //
   // Since the block is @Sendable, it does not propagate the connection in

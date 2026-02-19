@@ -20,6 +20,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/DenseMap.h"
@@ -29,10 +30,9 @@ using namespace swift::unittest;
 using namespace swift::constraints::inference;
 
 SemaTest::SemaTest()
-    : Context(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts,
-                               SearchPathOpts, ClangImporterOpts,
-                               SymbolGraphOpts, CASOpts, SerializationOpts,
-                               SourceMgr, Diags, SDKInfo)) {
+    : Context(*ASTContext::get(
+          LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts, ClangImporterOpts,
+          SymbolGraphOpts, CASOpts, SerializationOpts, SourceMgr, Diags)) {
   INITIALIZE_LLVM();
 
   registerParseRequestFunctions(Context.evaluator);

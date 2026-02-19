@@ -1502,7 +1502,7 @@ static StringRef renameUnsafeMethod(ASTContext &ctx,
                                     const clang::NamedDecl *decl,
                                     StringRef name) {
   if (isa<clang::CXXMethodDecl>(decl) &&
-      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl}), {})) {
+      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl, ctx}), {})) {
     return ctx.getIdentifier(("__" + name + "Unsafe").str()).str();
   }
 

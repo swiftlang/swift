@@ -42,6 +42,7 @@ add_library(swiftCore
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
+  BorrowingSequence.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   BridgingBuffer.swift
@@ -333,7 +334,7 @@ target_include_directories(swiftCore INTERFACE
 
 target_link_libraries(swiftCore
   PRIVATE
-    swiftRuntime
+    swiftRuntimeCore
     swiftLLVMSupport
     swiftDemangling
     swiftStdlibStubs
@@ -343,7 +344,7 @@ target_link_libraries(swiftCore
   PUBLIC
     swiftShims
   INTERFACE
-    swiftRuntimeCMakeConfig)
+    swiftRuntimeCoreCMakeConfig)
 
 string(TOLOWER "${SwiftCore_OBJECT_FORMAT}" SwiftCore_OBJECT_FORMAT_lc)
 if("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "elf")
@@ -364,7 +365,7 @@ target_link_options(swiftCore PUBLIC
 
 if(NOT POLICY CMP0157)
   target_compile_options(swiftCore PRIVATE
-    $<TARGET_OBJECTS:swiftRuntime>
+    $<TARGET_OBJECTS:swiftRuntimeCore>
     $<TARGET_OBJECTS:swiftLLVMSupport>
     $<TARGET_OBJECTS:swiftDemangling>
     $<TARGET_OBJECTS:swiftStdlibStubs>

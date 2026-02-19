@@ -689,8 +689,31 @@ static void validatePrefixList(ArrayRef<std::string> prefixes) {
   }
 }
 
-static bool parseTargetBufferName(StringRef &MatchStart, StringRef &Out, size_t &TextStartIdx) {
+bool DiagnosticVerifier::parseTargetBufferName(StringRef &MatchStart,
+                                               StringRef &Out,
+                                               size_t &TextStartIdx) {
   StringRef Offs = MatchStart.slice(0, TextStartIdx);
+
+  if (Offs.starts_with("@'")) {
+    // Windows paths may start with something like T:\, so they need to be quoted
+    // to prevent the colon from seeming like the end of the path.
+    Offs = Offs.substr(2);
+    size_t QuoteEndIndex = Offs.find("'");
+    if (QuoteEndIndex == StringRef::npos) {
+      addError(
+          MatchStart.data(),
+          "no closing \"'\" found to match opening \"'\" for file path here");
+      return false;
+    }
+    if (!Offs.substr(QuoteEndIndex + 1).starts_with(":")) {
+      addError(MatchStart.data(), "expected ':' after buffer name");
+      return false;
+    }
+    Out = Offs.slice(0, QuoteEndIndex);
+    MatchStart = MatchStart.substr(QuoteEndIndex + 3);
+    TextStartIdx -= (QuoteEndIndex + 3);
+    return true;
+  }
 
   size_t LineIndex = Offs.find(':');
   if (LineIndex == 0 || LineIndex == StringRef::npos)
@@ -853,6 +876,10 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
             NestedExpected.ExpectedEnd - NestedMatchStart.data();
         assert(NestedMatchEnd > 0);
         PrevMatchEnd = NestedMatch + NestedMatchEnd;
+      } else {
+        // Skip line if this an expected diagnostic with a prefix this invocation ignores,
+        // otherwise its }} will close the expansion.
+        PrevMatchEnd = MatchStart.find("\n", PrevMatchEnd);
       }
 
       size_t NextEnd = MatchStart.find("}}", PrevMatchEnd);

@@ -36,7 +36,7 @@ static const StrictConcurrencyTestCase strictConcurrencyTestCases[] = {
       {},
       StrictConcurrency::Minimal),
   StrictConcurrencyTestCase(
-      {"-swift-version", strictConcurrencyF.langMode},
+      {"-swift-version", strictConcurrencyF.getLanguageMode()->versionString()},
       StrictConcurrency::Complete),
   StrictConcurrencyTestCase(
       {"-enable-upcoming-feature", strictConcurrencyF.name},

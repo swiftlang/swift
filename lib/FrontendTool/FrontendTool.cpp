@@ -204,11 +204,11 @@ printModuleInterfaceIfNeeded(llvm::vfs::OutputBackend &outputBackend,
     return false;
 
   DiagnosticEngine &diags = M->getDiags();
-  if (!LangOpts.isLanguageModeAtLeast(5)) {
-    assert(LangOpts.isLanguageModeAtLeast(4));
-    diags.diagnose(SourceLoc(),
-                   diag::warn_unsupported_module_interface_swift_version,
-                   LangOpts.isLanguageModeAtLeast(4, 2) ? "4.2" : "4");
+  if (!LangOpts.isLanguageModeAtLeast(LanguageMode::v5)) {
+    assert(LangOpts.isLanguageModeAtLeast(LanguageMode::v4));
+    diags.diagnose(
+        SourceLoc(), diag::warn_unsupported_module_interface_swift_version,
+        LangOpts.isLanguageModeAtLeast(LanguageMode::v4_2) ? "4.2" : "4");
   }
   if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
     diags.diagnose(SourceLoc(),
@@ -615,8 +615,9 @@ static bool emitConstValuesForWholeModuleIfNeeded(
   // List of protocols whose conforming nominal types
   // we should extract compile-time-known values from
   std::unordered_set<std::string> Protocols;
-  bool inputParseSuccess = parseProtocolListFromFile(constExtractProtocolListPath,
-                                                     Instance.getDiags(), Protocols);
+  bool inputParseSuccess = parseProtocolListFromFile(
+      constExtractProtocolListPath, Instance.getDiags(),
+      Instance.getFileSystem(), Protocols);
   if (!inputParseSuccess)
     return true;
   auto ConstValues = gatherConstValuesForModule(Protocols,
@@ -640,8 +641,9 @@ static void emitConstValuesForAllPrimaryInputsIfNeeded(
   // List of protocols whose conforming nominal types
   // we should extract compile-time-known values from
   std::unordered_set<std::string> Protocols;
-  bool inputParseSuccess = parseProtocolListFromFile(constExtractProtocolListPath,
-                                                     Instance.getDiags(), Protocols);
+  bool inputParseSuccess = parseProtocolListFromFile(
+      constExtractProtocolListPath, Instance.getDiags(),
+      Instance.getFileSystem(), Protocols);
   if (!inputParseSuccess)
     return;
   for (auto *SF : Instance.getPrimarySourceFiles()) {

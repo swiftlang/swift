@@ -168,14 +168,14 @@ bb0(%0 : $*Str):
   dealloc_stack %1 : $*Str
   return %3 : $Str
 }
-// CHECK-LABEL: sil @load_in_wrong_block
-// CHECK:      bb0(%0 : $*GS<B>):
-// CHECK-NEXT:   alloc_stack
-// CHECK-NEXT:   copy_addr
-// CHECK-NEXT:   struct_element_addr
-// CHECK-NEXT:   br bb1
-// CHECK:        return
-sil @load_in_wrong_block : $@convention(thin) <B> (@in GS<B>) -> () {
+// CHECK-LABEL: sil @load_in_different_block
+// CHECK-NOT:      alloc_stack
+// CHECK-NOT:      copy_addr
+// CHECK:          [[S:%.*]] = struct_element_addr %0
+// CHECK:        bb1:
+// CHECK-NEXT:        = load [[S]]
+// CHECK:       } // end sil function 'load_in_different_block'
+sil @load_in_different_block : $@convention(thin) <B> (@in GS<B>) -> () {
 bb0(%0 : $*GS<B>):
   %4 = alloc_stack $GS<B>
   copy_addr %0 to [init] %4 : $*GS<B>
@@ -191,13 +191,11 @@ bb1:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @projection_in_wrong_block
-// CHECK:      bb0(%0 : $*GS<B>):
-// CHECK-NEXT:   alloc_stack
-// CHECK-NEXT:   copy_addr
-// CHECK-NEXT:   br bb1
-// CHECK:        return
-sil @projection_in_wrong_block : $@convention(thin) <B> (@in GS<B>) -> () {
+// CHECK-LABEL: sil @projection_in_different_block
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'projection_in_different_block'
+sil @projection_in_different_block : $@convention(thin) <B> (@in GS<B>) -> () {
 bb0(%0 : $*GS<B>):
   %4 = alloc_stack $GS<B>
   copy_addr %0 to [init] %4 : $*GS<B>

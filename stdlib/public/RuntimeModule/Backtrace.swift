@@ -301,8 +301,9 @@ public struct Backtrace: CustomStringConvertible, Sendable {
                              offset: Int = 0,
                              top: Int = 16,
                              images: ImageMap? = nil) throws -> Backtrace {
-    #if os(Linux)
-    // On Linux, we need the captured images to resolve async functions
+    #if os(Linux) || os(Windows)
+    // On Linux, we need the captured images to resolve async functions;
+    // on Windows, we need them because they contain unwind information.
     let theImages = images ?? ImageMap.capture()
     #else
     let theImages = images
@@ -360,9 +361,38 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   public func symbolicated(with images: ImageMap? = nil,
                            options: SymbolicationOptions = .default)
     -> SymbolicatedBacktrace? {
+    return symbolicated(with: images,
+                        platform: .default,
+                        alternativeSymbolFilePaths: [],
+                        options: options)
+  }
+
+  @_spi(Internal)
+  public enum SymbolicationPlatform {
+    case Darwin
+    case Linux
+    case Windows
+
+    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    static public let `default` = SymbolicationPlatform.Darwin
+    #elseif os(Linux)
+    static public let `default` = SymbolicationPlatform.Linux
+    #elseif os(Windows)
+    static public let `default` = SymbolicationPlatform.Windows
+    #endif
+  }
+
+  @_spi(Internal)
+  public func symbolicated(with images: ImageMap? = nil,
+                           platform: SymbolicationPlatform,
+                           alternativeSymbolFilePaths: [String],
+                           options: SymbolicationOptions = .default)
+    -> SymbolicatedBacktrace? {
     return SymbolicatedBacktrace.symbolicate(
       backtrace: self,
       images: images,
+      platform: platform,
+      alternativeSymbolFilePaths: alternativeSymbolFilePaths,
       options: options
     )
   }
@@ -414,6 +444,12 @@ extension Backtrace {
   //           arguments not lining up properly when this gets used from
   //           swift-backtrace.
 
+  #if os(Windows)
+  @_spi(Internal) public typealias CaptureableContext = Win32Context
+  #else
+  @_spi(Internal) public typealias CaptureableContext = Context
+  #endif
+
   @_spi(Internal)
   //@_specialize(exported: true, kind: full, where Ctx == HostContext, Rdr == UnsafeLocalMemoryReader)
   //@_specialize(exported: true, kind: full, where Ctx == HostContext, Rdr == RemoteMemoryReader)
@@ -421,7 +457,7 @@ extension Backtrace {
   //@_specialize(exported: true, kind: full, where Ctx == HostContext, Rdr == MemserverMemoryReader)
   //#endif
   @inlinable
-  public static func capture<Ctx: Context, Rdr: MemoryReader>(
+  public static func capture<Ctx: CaptureableContext, Rdr: MemoryReader>(
     from context: Ctx,
     using memoryReader: Rdr,
     images: ImageMap?,
@@ -431,14 +467,37 @@ extension Backtrace {
     top: Int = 16
   ) throws -> Backtrace {
     switch algorithm {
-      // All of them, for now, use the frame pointer unwinder.  In the long
-      // run, we should be using DWARF EH frame data for .precise.
+      // Eventually it would be nice to support using DWARF EH unwind info
+      // when doing .precise unwinding, rather than just using the frame
+      // pointer unwinder.
       case .auto, .fast, .precise:
+        #if os(Windows)
+        context.withNTContext { ntContext in
+          let unwinder =
+            Win32Unwinder(context: context,
+                          ntContext: ntContext,
+                          images: images!,
+                          memoryReader: memoryReader)
+          if let limit = limit {
+            let limited = LimitSequence(unwinder,
+                                        limit: limit,
+                                        offset: offset,
+                                        top: top)
+
+            return Backtrace(architecture: context.architecture,
+                             frames: limited,
+                             images: images)
+          }
+
+          return Backtrace(architecture: context.architecture,
+                           frames: unwinder.dropFirst(offset),
+                           images: images)
+        }
+        #else // !os(Windows)
         let unwinder =
           FramePointerUnwinder(context: context,
                                images: images,
                                memoryReader: memoryReader)
-
         if let limit = limit {
           let limited = LimitSequence(unwinder,
                                       limit: limit,
@@ -453,6 +512,7 @@ extension Backtrace {
         return Backtrace(architecture: context.architecture,
                          frames: unwinder.dropFirst(offset),
                          images: images)
+        #endif
 
       @unknown default:
         // This will never execute but its needed to avoid warnings when

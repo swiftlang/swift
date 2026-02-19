@@ -72,13 +72,13 @@ public struct Wrapper {
 
   var nested_get3: Int {
     borrow {
-      return _s.get_k.id // TODO: Diagnose this case
+      return _s.get_k.id  // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
     }
   }
 
   var nested_get4: Int {
     borrow {
-      return s_get.borrow_k.id // TODO: Diagnose this case
+      return s_get.borrow_k.id  // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
     }
   }
 
@@ -256,6 +256,26 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
     borrow {
       return _prop // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
     }
+  }
+}
+
+// Borrow and mutate accessor using lazy properties
+struct ExampleWithLazyProp {
+  private lazy var _cachedResult: Int = {
+    return expensiveComputation()
+  }()
+
+  var result: Int {
+    mutating borrow {
+      return _cachedResult // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+    }
+    mutate {
+      return &_cachedResult // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+    }
+  }
+
+  private func expensiveComputation() -> Int {
+    return (1...1000).reduce(0, +)
   }
 }
 

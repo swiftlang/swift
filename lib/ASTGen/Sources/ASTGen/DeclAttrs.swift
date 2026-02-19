@@ -295,6 +295,7 @@ extension ASTGenVisitor {
         .Preconcurrency,
         .PreInverseGenerics,
         .PropertyWrapper,
+        .Reparentable,
         .RequiresStoredPropertyInits,
         .ResultBuilder,
         .Safe,

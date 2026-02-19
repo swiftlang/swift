@@ -43,20 +43,19 @@ extension FuzzerInput {
   struct Header: Codable {
     enum CodingKeys: String, CodingKey {
       case _splits = "splits"
-      case _sourceKitRequest = "sourceKitRequest"
       case _sourceKitRequests = "sourceKitRequests"
+      case _frontendArgs = "frontendArgs"
     }
     private var _splits: [Int]?
     var splits: [Int] { _splits ?? [] }
 
-    private var _sourceKitRequest: SourceKitRequest?
     private var _sourceKitRequests: [SourceKitRequest]?
+    var sourceKitRequests: [SourceKitRequest] { _sourceKitRequests ?? [] }
 
-    var sourceKitRequests: [SourceKitRequest] {
-      if let _sourceKitRequest {
-        return [_sourceKitRequest]
-      }
-      return _sourceKitRequests ?? []
+    var _frontendArgs: [String]?
+    var frontendArgs: [Command.Argument]? {
+      guard let _frontendArgs else { return nil }
+      return _frontendArgs.map { .value($0) }
     }
   }
 

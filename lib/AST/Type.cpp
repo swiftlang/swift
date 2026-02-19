@@ -1300,6 +1300,15 @@ bool TypeBase::isCGFloat() {
          NTD->getName().is("CGFloat");
 }
 
+bool TypeBase::isStdlibInteger() {
+  return isInt() || isInt8() || isInt16() || isInt32() || isInt64() ||
+         isUInt() || isUInt8() || isUInt16() || isUInt32() || isUInt64();
+}
+
+bool TypeBase::isStdlibFloat() {
+  return isFloat() || isDouble() || isFloat80();
+}
+
 bool TypeBase::isObjCBool() {
   auto *NTD = getAnyNominal();
   if (!NTD)
@@ -4218,6 +4227,14 @@ CanType ProtocolCompositionType::getMinimalCanonicalType() const {
   return result.subst(existentialSig.Generalization)->getCanonicalType();
 }
 
+bool AnyFunctionType::hasExplicitLifetimeDependencies() const {
+  return hasLifetimeDependencies() &&
+         llvm::any_of(getLifetimeDependencies(),
+                      [](const LifetimeDependenceInfo &dep) {
+                        return dep.isFromAnnotation();
+                      });
+}
+
 ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {
   switch (getKind()) {
   case TypeKind::Function:
@@ -4241,7 +4258,19 @@ Type AnyFunctionType::getThrownError() const {
   }
 }
 
+Type AnyFunctionType::getSendableDependentType() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getSendableDependentType();
+  case TypeKind::GenericFunction:
+    return Type();
+  default:
+    llvm_unreachable("Illegal type kind for AnyFunctionType.");
+  }
+}
+
 bool AnyFunctionType::isSendable() const {
+  ASSERT(!hasSendableDependentType() && "Query Sendable dependence first");
   return getExtInfo().isSendable();
 }
 
@@ -4326,10 +4355,15 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
     }
   }
 
+  Type sendableDependentType = getSendableDependentType();
+  if (sendableDependentType)
+    sendableDependentType = sendableDependentType->getCanonicalType();
+
   return ExtInfo(bits,
                  useClangFunctionType ? getCanonicalClangTypeInfo()
                                       : ClangTypeInfo(),
-                 globalActor, thrownError, getLifetimeDependencies());
+                 globalActor, thrownError, sendableDependentType,
+                 getLifetimeDependencies());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
@@ -4405,6 +4439,9 @@ bool TypeBase::isNoEscape() const {
 
   if (auto funcTy = dyn_cast<FunctionType>(type))
     return funcTy->isNoEscape();
+
+  if (auto packExpansionTy = dyn_cast<PackExpansionType>(type))
+    return packExpansionTy.getPatternType()->isNoEscape();
 
   if (auto tupleTy = dyn_cast<TupleType>(type)) {
     for (auto eltTy : tupleTy.getElementTypes())
@@ -5304,8 +5341,7 @@ getConcurrencyDiagnosticBehaviorLimitRec(
   // Metatypes that aren't Sendable were introduced in Swift 6.2, so downgrade
   // them to warnings prior to Swift 7.
   if (type->is<AnyMetatypeType>()) {
-    if (!type->getASTContext().isLanguageModeAtLeast(
-            version::Version::getFutureMajorLanguageVersion()))
+    if (!declCtx->getASTContext().isLanguageModeAtLeast(LanguageMode::future))
       return DiagnosticBehavior::Warning;
   }
 

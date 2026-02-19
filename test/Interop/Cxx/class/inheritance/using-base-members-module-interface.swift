@@ -3,48 +3,48 @@
 
 // CHECK:      public struct PublicBase {
 // CHECK-NEXT:   public init()
+// CHECK-NEXT:   private var value: Int32
 // CHECK-NEXT:   public func publicGetter() -> Int32
 // CHECK-NEXT:   public mutating func publicSetter(_ v: Int32)
 // CHECK-NEXT:   public func notExposed()
-// CHECK-NEXT:   private var value: Int32
 // CHECK-NEXT: }
 
 // CHECK:      public struct PublicBasePrivateInheritance {
 // CHECK-NEXT:   public init()
+// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
+// CHECK-NEXT:   private var value: Int32
 // CHECK-NEXT:   public func publicGetter() -> Int32
 // CHECK-NEXT:   public mutating func publicSetter(_ v: Int32)
 // CHECK-NEXT:   private func notExposed()
-// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
-// CHECK-NEXT:   private var value: Int32
 // CHECK-NEXT: }
 
 // CHECK:      public struct PublicBaseProtectedInheritance {
 // CHECK-NEXT:   public init()
+// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
+// CHECK-NEXT:   private var value: Int32
 // CHECK-NEXT:   public func publicGetter() -> Int32
 // CHECK-NEXT:   public mutating func publicSetter(_ v: Int32)
 // CHECK-NEXT:   private func notExposed()
-// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
-// CHECK-NEXT:   private var value: Int32
 // CHECK-NEXT: }
 
 // CHECK:      public struct PublicBaseUsingPrivateTypedef {
 // CHECK-NEXT:   public init()
-// CHECK-NEXT:   private typealias MyBase = PublicBase
+// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
+// CHECK-NEXT:   private var value: Int32
 // CHECK-NEXT:   public func publicGetter() -> Int32
 // CHECK-NEXT:   public mutating func publicSetter(_ v: Int32)
 // CHECK-NEXT:   private func notExposed()
-// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
-// CHECK-NEXT:   private var value: Int32
+// CHECK-NEXT:   private typealias MyBase = PublicBase
 // CHECK-NEXT: }
 
 // CHECK:      public struct PublicBaseUsingPrivateUsingType {
 // CHECK-NEXT:   public init()
-// CHECK-NEXT:   private typealias MyBase = PublicBase
+// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
+// CHECK-NEXT:   private var value: Int32
 // CHECK-NEXT:   public func publicGetter() -> Int32
 // CHECK-NEXT:   public mutating func publicSetter(_ v: Int32)
 // CHECK-NEXT:   private func notExposed()
-// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
-// CHECK-NEXT:   private var value: Int32
+// CHECK-NEXT:   private typealias MyBase = PublicBase
 // CHECK-NEXT: }
 
 // CHECK:      public struct UsingBaseConstructorWithParam {
@@ -70,14 +70,14 @@
 
 // CHECK:      public struct OperatorBasePrivateInheritance : CxxConvertibleToBool {
 // CHECK-NEXT:   public init()
-// CHECK-NEXT:   public subscript(x: Int32) -> Int32 { get }
 // CHECK-NEXT:   public func __convertToBool() -> Bool
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   public func __operatorStar() -> Int32
-// CHECK-NEXT:   prefix public static func ! (lhs: OperatorBasePrivateInheritance) -> OperatorBase
 // CHECK-NEXT:   @available(*, unavailable, message: "use ! instead")
 // CHECK-NEXT:   public func __operatorExclaim() -> OperatorBase
 // CHECK-NEXT:   @available(*, unavailable, message: "use subscript")
 // CHECK-NEXT:   public func __operatorSubscriptConst(_ x: Int32) -> Int32
+// CHECK-NEXT:   prefix public static func ! (lhs: OperatorBasePrivateInheritance) -> OperatorBase
 // CHECK-NEXT:   public var pointee: Int32 { get }
+// CHECK-NEXT:   public subscript(x: Int32) -> Int32 { get }
 // CHECK-NEXT: }

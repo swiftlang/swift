@@ -171,13 +171,16 @@ BridgedParameterInfo BridgedParameterInfoArray::at(SwiftInt parameterIndex) cons
 //                       BridgedLifetimeDependenceInfo
 //===----------------------------------------------------------------------===//
 
-BridgedLifetimeDependenceInfo::BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info)
+BridgedLifetimeDependenceInfo::BridgedLifetimeDependenceInfo(
+    swift::LifetimeDependenceInfo info)
     : inheritLifetimeParamIndices(info.getInheritIndices()),
       scopeLifetimeParamIndices(info.getScopeIndices()),
       addressableParamIndices(info.getAddressableIndices()),
       conditionallyAddressableParamIndices(
-        info.getConditionallyAddressableIndices()),
-      targetIndex(info.getTargetIndex()), immortal(info.isImmortal()) {}
+          info.getConditionallyAddressableIndices()),
+      targetIndex(info.getTargetIndex()),
+      hasImmortalSpecifier(info.hasImmortalSpecifier()),
+      fromAnnotation(info.isFromAnnotation()) {}
 
 SwiftInt BridgedLifetimeDependenceInfoArray::count() const {
   return lifetimeDependenceInfoArray.unbridged<swift::LifetimeDependenceInfo>().size();
@@ -189,7 +192,7 @@ BridgedLifetimeDependenceInfoArray::at(SwiftInt index) const {
 }
 
 bool BridgedLifetimeDependenceInfo::empty() const {
-  return !immortal && inheritLifetimeParamIndices == nullptr &&
+  return !hasImmortalSpecifier && inheritLifetimeParamIndices == nullptr &&
          scopeLifetimeParamIndices == nullptr;
 }
 
@@ -1157,6 +1160,10 @@ BridgedLocation BridgedInstruction::getLocation() const {
   return unbridged()->getDebugLocation();
 }
 
+void BridgedInstruction::setLocation(BridgedLocation loc) const {
+  return unbridged()->setDebugLocation(loc.getLoc());
+}
+
 BridgedMemoryBehavior BridgedInstruction::getMemBehavior() const {
   return (BridgedMemoryBehavior)unbridged()->getMemoryBehavior();
 }
@@ -1403,6 +1410,10 @@ SwiftInt BridgedInstruction::InitEnumDataAddrInst_caseIndex() const {
 
 SwiftInt BridgedInstruction::UncheckedTakeEnumDataAddrInst_caseIndex() const {
   return getAs<swift::UncheckedTakeEnumDataAddrInst>()->getCaseIndex();
+}
+
+bool BridgedInstruction::UncheckedTakeEnumDataAddrInst_isDestructive() const {
+  return getAs<swift::UncheckedTakeEnumDataAddrInst>()->isDestructive();
 }
 
 SwiftInt BridgedInstruction::InjectEnumAddrInst_caseIndex() const {

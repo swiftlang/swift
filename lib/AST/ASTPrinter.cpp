@@ -27,11 +27,13 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -273,7 +275,8 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    InterfaceMode interfaceMode,
-                                                   bool useExportedModuleNames,
+                                                   ExportedModuleNameUsage
+                                                    useExportedModuleNames,
                                                    bool aliasModuleNames,
                                                    llvm::SmallSet<StringRef, 4>
                                                      *aliasModuleNamesTargets
@@ -501,6 +504,128 @@ Type TypeTransformContext::getBaseType() const {
 
 bool TypeTransformContext::isPrintingSynthesizedExtension() const {
   return !Decl.isNull();
+}
+
+/// Get a string representation of the parameter at params[index]. This will be
+/// the label or internal label of a normal parameter, or the string form of
+/// index. We cannot currently print lifetimes with indices in swiftinterface
+/// files because SwiftSyntax cannot parse lifetime entries that use them.
+static std::string
+getLifetimeDependenceIdentifier(unsigned index,
+                                ArrayRef<AnyFunctionType::Param> params) {
+  // NOTE: Does not handle the implicit self parameter, since this is only used
+  // for function types.
+  if (index < params.size() && params[index].hasInternalLabel()) {
+    return params[index].getInternalLabel().get();
+  }
+
+  return std::to_string(index);
+}
+
+static std::string_view
+getLifetimeDependenceSpecifier(unsigned index,
+                               ArrayRef<AnyFunctionType::Param> params,
+                               LifetimeDependenceKind kind) {
+  // NOTE: Does not handle the implicit self parameter, since this is only used
+  // for function types.
+  switch (kind) {
+  case LifetimeDependenceKind::Inherit:
+    return "copy ";
+  case LifetimeDependenceKind::Scope:
+    if (params[index].isInOut()) {
+      return "&";
+    }
+    return "borrow ";
+  }
+}
+
+/// Get a string representation for the list of sources of the given
+/// LifetimeDependenceInfo, if they can be printed.
+///
+/// See getLifetimeDependenceIdentifier.
+static std::string getLifetimeDependenceInfoSourceListString(
+    LifetimeDependenceInfo const &info,
+    ArrayRef<AnyFunctionType::Param> params) {
+
+  std::string lifetimeDependenceString = "";
+  auto addressable = info.getAddressableIndices();
+  auto condAddressable = info.getConditionallyAddressableIndices();
+
+  bool isFirstSpecifier = true;
+  auto getSourceString = [&](IndexSubset *bitvector,
+                             LifetimeDependenceKind kind) -> std::string {
+    std::string result;
+    for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
+      if (bitvector->contains(i)) {
+        if (!isFirstSpecifier) {
+          result += ", ";
+        }
+        result += getLifetimeDependenceSpecifier(i, params, kind);
+        if (addressable && addressable->contains(i)) {
+          result += "address ";
+        } else if (condAddressable && condAddressable->contains(i)) {
+          result += "address_for_deps ";
+        }
+        // Print source labels for explicit lifetime annotations. Otherwise,
+        // print the index. Indices should ideally never be used in Swift
+        // lifetime annotations, especially in module interfaces.
+        result += getLifetimeDependenceIdentifier(i, params);
+        isFirstSpecifier = false;
+      }
+    }
+    return result;
+  };
+  if (info.hasImmortalSpecifier()) {
+    if (!isFirstSpecifier) {
+      lifetimeDependenceString += ", ";
+    }
+    lifetimeDependenceString += "immortal";
+    isFirstSpecifier = false;
+  }
+  auto inheritLifetimeParamIndices = info.getInheritIndices();
+  if (inheritLifetimeParamIndices) {
+    assert(!inheritLifetimeParamIndices->isEmpty());
+    lifetimeDependenceString += getSourceString(
+        inheritLifetimeParamIndices, LifetimeDependenceKind::Inherit);
+  }
+  if (auto scopeLifetimeParamIndices = info.getScopeIndices()) {
+    assert(!scopeLifetimeParamIndices->isEmpty());
+    lifetimeDependenceString += getSourceString(scopeLifetimeParamIndices,
+                                                LifetimeDependenceKind::Scope);
+  }
+  return lifetimeDependenceString;
+}
+
+/// Get a string representation for this dependence info as a Swift lifetime
+/// attribute (for a type or decl). The target and sources are referred to by
+/// their labels if possible (see getLifetimeDependenceIdentifier).
+///
+/// TODO: Factor this with LifetimeDependenceInfo::getString.
+static std::string
+getLifetimeDependenceInfoSwiftString(LifetimeDependenceInfo const &info,
+                                     ArrayRef<AnyFunctionType::Param> params) {
+  std::string lifetimeDependenceString = "@_lifetime(";
+
+  // Only print the target if it is a parameter or self.
+  const auto resultIndex = params.size();
+  const auto targetIndex = info.getTargetIndex();
+  if (targetIndex != resultIndex) {
+    lifetimeDependenceString +=
+        getLifetimeDependenceIdentifier(targetIndex, params);
+    lifetimeDependenceString += ": ";
+  }
+
+  lifetimeDependenceString +=
+      getLifetimeDependenceInfoSourceListString(info, params);
+  lifetimeDependenceString += ") ";
+  return lifetimeDependenceString;
+}
+
+void ASTPrinter::printSwiftLifetimeDependence(
+    LifetimeDependenceInfo const &lifetimeDependence,
+    ArrayRef<AnyFunctionType::Param> params) {
+
+  *this << getLifetimeDependenceInfoSwiftString(lifetimeDependence, params);
 }
 
 void ASTPrinter::anchor() {}
@@ -1487,6 +1612,12 @@ void PrintAST::printAttributes(const Decl *D) {
     }
   }
 
+  // Attributes that are not permitted to appear should not be printed
+  for (auto *attr : attrs) {
+    if (!attr->canAppearOnDecl(D))
+      scope.Options.ExcludeAttrList.push_back(attr->getKind());
+  }
+
   attrs.print(Printer, Options, D);
 }
 
@@ -1856,7 +1987,7 @@ InversesAtDepth::InversesAtDepth(GenericContext *level) {
 }
 bool InversesAtDepth::operator()(const InverseRequirement &inverse) const {
   if (includedDepth) {
-    auto d = inverse.subject->castTo<GenericTypeParamType>()->getDepth();
+    auto d = inverse.subject->getRootGenericParam()->getDepth();
     return d == includedDepth.value();
   }
   return false;
@@ -1927,7 +2058,7 @@ void PrintAST::printGenericSignature(
 
     SmallVector<InverseRequirement, 2> inversesAtDepth;
     for (auto inverseReq : inverses) {
-      if (inverseReq.subject->castTo<GenericTypeParamType>()->getDepth() == depth)
+      if (inverseReq.subject->getRootGenericParam()->getDepth() == depth)
         inversesAtDepth.push_back(inverseReq);
     }
 
@@ -2583,8 +2714,11 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     Printer << " {";
     if (mutatingGetter) printWithSpace("mutating");
 
-    // TODO: Print borrow/yielding borrow here?
-    printWithSpace("get");
+    if (ASD->getParsedAccessor(AccessorKind::Borrow)) {
+      printWithSpace("borrow");
+    } else {
+      printWithSpace("get");
+    }
 
     if (asyncGet) printWithSpace("async");
 
@@ -2596,8 +2730,11 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     if (settable) {
       if (nonmutatingSetter) printWithSpace("nonmutating");
 
-      // TODO: Print mutate/yielding mutate here?
-      printWithSpace("set");
+      if (ASD->getParsedAccessor(AccessorKind::Mutate)) {
+        printWithSpace("mutate");
+      } else {
+        printWithSpace("set");
+      }
     }
     Printer << " }";
     return;
@@ -2909,6 +3046,112 @@ static void addNamespaceMembers(Decl *decl,
   }
 }
 
+/// Sort and print Clang record members in the following order:
+///
+///   struct PrintMe {
+///     // non-Clang init()
+///     // non-Clang init(...)
+///     // Clang decls (in source order)
+///     // non-Clang decls
+///   }
+///
+///  Doing so keeps the commonly-synthesized constructors near the top,
+///  and the rarely synthesized other decls near the bottom.
+///
+///  Within each section, members are sorted according to source order.
+static bool sortClangDecls(Decl *lhs, Decl *rhs) {
+  auto &SM = lhs->getASTContext().SourceMgr;
+  auto *CML = lhs->getASTContext().getClangModuleLoader();
+
+  auto getClangDecl = [&CML](Decl *d) -> const clang::Decl * {
+    // Has an attached clang::Decl
+    if (auto *D = d->getClangDecl())
+      return D;
+
+    // Cloned from some base member associated with some clang::Decl
+    if (auto *vd = dyn_cast<ValueDecl>(d); vd && CML)
+      if (auto *ovd = CML->getOriginalForClonedMember(vd))
+        return ovd->getClangDecl();
+
+    return nullptr;
+  };
+
+  auto *LHS = getClangDecl(lhs), *RHS = getClangDecl(rhs);
+  if (LHS && RHS) {
+    // Both lhs and rhs are directly imported from Clang
+    // First, sort based on module name, if any
+    auto *LMod = LHS->getOwningModule(), *RMod = RHS->getOwningModule();
+    if (!LMod || !RMod)
+      return (bool)LMod < (bool)RMod;
+    if (LMod != RMod)
+      return LMod->Name < RMod->Name;
+
+    // Both come from the same module; sort based on location, if any
+    auto LLoc = LHS->getLocation(), RLoc = RHS->getLocation();
+    if (!LLoc.isValid() || !RLoc.isValid())
+      return LLoc.isValid() < RLoc.isValid();
+    auto &ClangSM = LHS->getASTContext().getSourceManager();
+    return ClangSM.isBeforeInTranslationUnit(LLoc, RLoc);
+  }
+
+  // At least one of lhs or rhs does not have an associated Clang decl,
+  // i.e., synthesized in some way.
+
+  auto *lctor = LHS ? nullptr : dyn_cast<ConstructorDecl>(lhs),
+       *rctor = RHS ? nullptr : dyn_cast<ConstructorDecl>(rhs);
+  if (!lctor ^ !rctor)
+    // One of these is a non-Clang constructor, and the other is not.
+    return !lctor < !rctor;
+
+  if (lctor && rctor) {
+    // Both of these are non-Clang constructors.
+
+    // If only one of these has zero arguments, prioritize that
+    auto l0 = !lctor->getParameters() || lctor->getParameters()->size() == 0,
+         r0 = !rctor->getParameters() || rctor->getParameters()->size() == 0;
+    if (!l0 ^ !r0)
+      return !l0 < !r0;
+
+    auto *lmod = lhs->getDeclContext()->getModuleScopeContext(),
+         *rmod = rhs->getDeclContext()->getModuleScopeContext();
+    if (lmod != rmod) {
+      // They are somehow from different modules; sort by file name
+      auto *lfile = dyn_cast<SourceFile>(lmod),
+           *rfile = dyn_cast<SourceFile>(rmod);
+      if (!lfile || !rfile)
+        return (bool)lfile < (bool)rfile;
+
+      return lfile->getFilename() < rfile->getFilename();
+    }
+
+    // Same module; use SourceManager to break all other ties
+    return SM.isBeforeInBuffer(lhs->getLoc(), rhs->getLoc());
+  }
+
+  // Neither are non-Clang constructors
+
+  if (!LHS ^ !RHS)
+    // One of these is from Clang; that goes before the other
+    return !LHS < !RHS;
+
+  // Neither are from Clang
+
+  auto *lmod = lhs->getDeclContext()->getModuleScopeContext(),
+       *rmod = rhs->getDeclContext()->getModuleScopeContext();
+  if (lmod != rmod) {
+    // They are somehow from different modules; sort by file name
+    auto *lfile = dyn_cast<SourceFile>(lmod),
+         *rfile = dyn_cast<SourceFile>(rmod);
+    if (!lfile || !rfile)
+      return (bool)lfile < (bool)rfile;
+
+    return lfile->getFilename() < rfile->getFilename();
+  }
+
+  // Same module; use SourceManager to break all other ties
+  return SM.isBeforeInBuffer(lhs->getLoc(), rhs->getLoc());
+}
+
 void PrintAST::printMembersOfDecl(Decl *D, bool needComma, bool openBracket,
                                   bool closeBracket, bool doIndent) {
   llvm::SmallVector<Decl *, 16> Members;
@@ -2940,8 +3183,13 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma, bool openBracket,
         }
       }
     }
-    if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl()))
+    if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl())) {
       addNamespaceMembers(D, Members);
+    } else if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
+      // For Clang records, sort their members, because we may import them
+      // in an unstable order.
+      std::stable_sort(Members.begin(), Members.end(), sortClangDecls);
+    }
   }
   printMembers(Members, needComma, openBracket, closeBracket, doIndent);
 }
@@ -3043,6 +3291,8 @@ void PrintAST::printInherited(const Decl *decl) {
         Printer << "@retroactive ";
       if (inherited.isPreconcurrency())
         Printer << "@preconcurrency ";
+      if (inherited.isReparented())
+        Printer << "@reparented ";
       switch (inherited.getExplicitSafety()) {
       case ExplicitSafety::Unspecified:
       case ExplicitSafety::Safe:
@@ -4511,7 +4761,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
     break;
   }
 
-  auto *raw = elt->getStructuralRawValueExpr();
+  auto *raw = elt->getRawValueExpr();
   if (!raw || raw->isImplicit())
     return;
 
@@ -6079,6 +6329,49 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
+  /// If \p TyDecl belongs to a submodule, return the \c ModuleDecl for that
+  /// submodule; otherwise just return the parent module.
+  ModuleDecl *getParentSubModuleOrModule(GenericTypeDecl *TyDecl) {
+    // Only clang declarations can belong to a submodule
+    if (auto clangNode = TyDecl->getClangNode()) {
+      auto importer = TyDecl->getASTContext().getClangModuleLoader();
+      if (auto clangMod = importer->getClangOwningModule(clangNode)) {
+        return importer->getWrapperForModule(clangMod);
+      }
+    }
+
+    return TyDecl->getParentModule();
+  }
+
+  bool shouldUseExportedModuleName(GenericTypeDecl *TyDecl,
+                                   StringRef exportedModuleName) {
+    auto &ctx = TyDecl->getASTContext();
+    if (exportedModuleName.empty())
+      return false;
+
+    switch (Options.UseExportedModuleNames) {
+    case PrintOptions::ExportedModuleNameUsage::Always:
+      return true;
+    case PrintOptions::ExportedModuleNameUsage::Never:
+      return false;
+    case PrintOptions::ExportedModuleNameUsage::IfLoaded:
+      // Has the module we're exporting as been loaded? If not, we might be
+      // in a dependency of the exported-as module, so we can't use its name.
+      auto exportAsModule = ctx.getLoadedModule(
+                                ctx.getIdentifier(exportedModuleName));
+      if (!exportAsModule)
+        return false;
+
+      // Is the specific submodule TyDecl belongs to actually visible through
+      // exportAsModule? There are some subtleties about re-exports from
+      // submodules that are captured by querying the ImportCache.
+      auto tyDeclParent = getParentSubModuleOrModule(TyDecl);
+      return ctx.getImportCache().isImportedBy(tyDeclParent, exportAsModule);
+    }
+
+    llvm_unreachable("Unrecognized ExportedModuleNameUsage");
+  }
+
   void printModuleContext(GenericTypeDecl *TyDecl) {
     FileUnit *File = cast<FileUnit>(TyDecl->getModuleScopeContext());
     ModuleDecl *Mod = File->getParentModule();
@@ -6116,7 +6409,7 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     // Should use the module real (binary) name here and everywhere else the
     // module is printed in case module aliasing is used (see -module-alias)
     Identifier Name = Mod->getRealName();
-    if (Options.UseExportedModuleNames && !ExportedModuleName.empty()) {
+    if (shouldUseExportedModuleName(TyDecl, ExportedModuleName)) {
       Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
     }
 
@@ -6158,14 +6451,15 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
   }
 
   bool isMemberOfGenericParameter(TypeBase *T) {
+    if (T->is<DependentMemberType>())    // desugars typealiases
+      // Parent is always a generic parameter.
+      return true;
+
     Type parent = nullptr;
     if (auto alias = dyn_cast<TypeAliasType>(T))    // don't desugar
       parent = alias->getParent();
     else if (auto generic = T->getAs<AnyGenericType>())
       parent = generic->getParent();
-    else if (T->is<DependentMemberType>())
-      // Parent is always a generic parameter.
-      return true;
     return parent && (parent->is<SubstitutableType>() ||
                         isMemberOfGenericParameter(parent.getPointer()));
   }
@@ -6731,6 +7025,17 @@ public:
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
+    // Print lifetime dependencies using Swift syntax.
+    if (!Options.PrintInSILBody && fnType->hasLifetimeDependencies()) {
+      ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
+
+      for (const auto &lifetimeDependence : info.getLifetimeDependencies()) {
+        if (lifetimeDependence.isFromAnnotation()) {
+          Printer.printSwiftLifetimeDependence(lifetimeDependence, params);
+        }
+      }
+    }
+
     SmallString<64> buf;
     switch (Options.PrintFunctionRepresentationAttrs) {
     case PrintOptions::FunctionRepresentationMode::None:
@@ -6916,8 +7221,16 @@ public:
     }
   }
 
+  /// Print a function type's parameter list.
+  ///
+  /// * printExternalLabels: Whether to print the parameters' external labels.
+  ///
+  /// * printAllLabels: Whether to print all parameter labels (external and
+  ///   internal). This is used when a function has explicit lifetime
+  ///   dependencies, which may refer to the parameters by their labels.
   void visitAnyFunctionTypeParams(
-      ArrayRef<AnyFunctionType::Param> Params, bool printLabels,
+      ArrayRef<AnyFunctionType::Param> Params, bool printExternalLabels,
+      bool printAllLabels,
       ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) {
     Printer << "(";
 
@@ -6931,16 +7244,23 @@ public:
         Printer.printStructurePost(PrintStructureKind::FunctionParameter);
       };
 
-      if ((Options.AlwaysTryPrintParameterLabels || printLabels) &&
+      bool hasValidInternalLabel = Param.hasInternalLabel() &&
+                                   !Param.getInternalLabel().hasDollarPrefix();
+
+      if ((Options.AlwaysTryPrintParameterLabels || printExternalLabels ||
+           printAllLabels) &&
           Param.hasLabel()) {
         // Label printing was requested and we have an external label. Print it
         // and omit the internal label.
         Printer.printName(Param.getLabel(),
                           PrintNameContext::FunctionParameterExternal);
+        if (printAllLabels && hasValidInternalLabel) {
+          Printer << ' ';
+          Printer.printName(Param.getInternalLabel());
+        }
         Printer << ": ";
-      } else if (Options.AlwaysTryPrintParameterLabels &&
-                 Param.hasInternalLabel() &&
-                 !Param.getInternalLabel().hasDollarPrefix()) {
+      } else if ((Options.AlwaysTryPrintParameterLabels || printAllLabels) &&
+                 hasValidInternalLabel) {
         // We didn't have an external parameter label but were requested to
         // always try and print parameter labels.
         // If the internal label is a valid internal parameter label (does not
@@ -6952,7 +7272,9 @@ public:
         Printer << ": ";
       }
 
-      Printer.printLifetimeDependenceAt(lifetimeDependencies, i);
+      if (Options.PrintInSILBody) {
+        Printer.printLifetimeDependenceAt(lifetimeDependencies, i);
+      }
 
       auto type = Param.getPlainType();
       if (Param.isVariadic()) {
@@ -6968,6 +7290,12 @@ public:
     Printer << ")";
   }
 
+  static bool shouldPrintLabelsForLifetimeAttributes(AnyFunctionType const *T) {
+    // If the type has explicit lifetime dependencies, print the labels, because
+    // explicit lifetimes use them to describe their sources and targets.
+    return T->hasExplicitLifetimeDependencies();
+  }
+
   void visitFunctionType(FunctionType *T,
                          NonRecursivePrintOptions nrOptions) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
@@ -6978,7 +7306,10 @@ public:
     printFunctionExtInfo(T, nrOptions);
 
     // If we're stripping argument labels from types, do it when printing.
-    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/ false,
+    visitAnyFunctionTypeParams(T->getParams(),
+                               /*printExternalLabels*/ false,
+                               /*printAllLabels*/
+                               shouldPrintLabelsForLifetimeAttributes(T),
                                T->getLifetimeDependencies());
 
     if (T->hasExtInfo()) {
@@ -7004,7 +7335,10 @@ public:
       Printer.printKeyword("sending ", Options);
     }
 
-    Printer.printLifetimeDependence(T->getLifetimeDependenceForResult());
+    if (Options.PrintInSILBody) {
+      Printer.printLifetimeDependenceAt(T->getLifetimeDependencies(),
+                                        T->getParams().size());
+    }
 
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
@@ -7039,7 +7373,9 @@ public:
                           PrintAST::defaultGenericRequirementFlags(Options));
     Printer << " ";
 
-    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/ true,
+    visitAnyFunctionTypeParams(T->getParams(),
+                               /*printExternalLabels*/ true, /*printAllLabels*/
+                               shouldPrintLabelsForLifetimeAttributes(T),
                                T->getLifetimeDependencies());
 
     if (T->hasExtInfo()) {
@@ -7061,8 +7397,10 @@ public:
 
     Printer << " -> ";
 
-    Printer.printLifetimeDependenceAt(T->getLifetimeDependencies(),
-                                      T->getParams().size());
+    if (Options.PrintInSILBody) {
+      Printer.printLifetimeDependenceAt(T->getLifetimeDependencies(),
+                                        T->getParams().size());
+    }
 
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
@@ -7167,7 +7505,7 @@ public:
       }
       Printer << ") -> ";
 
-      Printer.printLifetimeDependence(T->getLifetimeDependenceForResult());
+      Printer.printSILLifetimeDependence(T->getLifetimeDependenceForResult());
 
       bool parenthesizeResults = mustParenthesizeResults(T);
       if (parenthesizeResults)
@@ -7811,12 +8149,13 @@ void AnyFunctionType::printParams(ArrayRef<AnyFunctionType::Param> Params,
   printParams(Params, Printer, PO);
 }
 void AnyFunctionType::printParams(ArrayRef<AnyFunctionType::Param> Params,
-                                  ASTPrinter &Printer,
-                                  const PrintOptions &PO) {
-  // TODO: Handle lifetime dependence printing here
+                                  ASTPrinter &Printer, const PrintOptions &PO) {
+  // Function type lifetimes are printed as part of the ExtInfo, not the
+  // parameter list, so we do not need to print them here.
   TypePrinter(Printer, PO)
       .visitAnyFunctionTypeParams(Params,
-                                  /*printLabels*/ true, {});
+                                  /*printExternalLabels*/ true,
+                                  /*printAllLabels*/ false, {});
 }
 
 std::string
@@ -8005,7 +8344,7 @@ void SILParameterInfo::print(
   }
 
   if (lifetimeDependence) {
-    Printer.printLifetimeDependence(*lifetimeDependence);
+    Printer.printSILLifetimeDependence(*lifetimeDependence);
   }
 
   if (options.contains(SILParameterInfo::ImplicitLeading)) {
@@ -8328,6 +8667,7 @@ swift::getInheritedForPrinting(
 
   InheritedTypes inherited = InheritedTypes(decl);
 
+  bool explicitSendable = false;
   // Collect explicit inherited types.
   for (auto i : inherited.getIndices()) {
     if (auto ty = inherited.getResolvedType(i)) {
@@ -8393,6 +8733,10 @@ swift::getInheritedForPrinting(
         entry = InheritedEntry(TypeLoc::withoutLoc(strippedType),
                                entry.getOptions());
       }
+
+      if (auto P = type->getKnownProtocol()) {
+        explicitSendable |= *P == KnownProtocolKind::Sendable;
+      }
     }
 
     Results.push_back(entry);
@@ -8423,6 +8767,38 @@ swift::getInheritedForPrinting(
         uncheckedProtocols.push_back(proto);
       if (attr->isSuppressed())
         suppressedProtocols.push_back(proto);
+    }
+  }
+
+  if (auto *T = dyn_cast<NominalTypeDecl>(decl)) {
+    auto *sendable =
+        T->getASTContext().getProtocol(KnownProtocolKind::Sendable);
+
+    // If printing is for a package interface, let's add derived/implied `Sendable`
+    // conformance to avoid having to infer it while type-checking the interface
+    // file later. Such inference is not always possible, because i.e. a package
+    // declaration can have private storage that won't be printed in a package
+    // interface file and attempting inference would produce an invalid result.
+    bool shouldPrintSynthesizedSendable = [&] {
+      // If `Sendable` is stated explicit or imported from ObjC, were are done.
+      if (explicitSendable || protocols.contains(sendable))
+        return false;
+
+      // Otherwise only do this for package declarations.
+      return options.printPackageInterface() && isPackage(T);
+    }();
+
+    if (shouldPrintSynthesizedSendable) {
+      auto conformance =
+          lookupConformance(T->getDeclaredInterfaceType(), sendable,
+                            /*allowMissing=*/false);
+      if (conformance.isConcrete() &&
+          !conformance.hasUnavailableConformance()) {
+        auto *concrete = conformance.getConcrete();
+        if (concrete->getSourceKind() == ConformanceEntryKind::Synthesized ||
+            concrete->getSourceKind() == ConformanceEntryKind::Implied)
+          protocols.insert(sendable);
+      }
     }
   }
 

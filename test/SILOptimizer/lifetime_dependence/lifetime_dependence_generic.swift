@@ -52,7 +52,7 @@ struct NCInt: ~Copyable {
 struct NEInt: ~Escapable {
   let value: Builtin.Int64
 
-  @_lifetime(copy o)
+  @_lifetime(borrow o)
   init<O: ~Copyable & ~Escapable>(v: Builtin.Int64, o: borrowing O) {
     self.value = v
   }

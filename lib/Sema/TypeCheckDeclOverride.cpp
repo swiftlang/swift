@@ -581,7 +581,7 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
             diags
                 .diagnose(decl, diag::override_sendability_mismatch,
                           decl->getName())
-                .limitBehaviorUntilLanguageMode(limit, 6)
+                .limitBehaviorUntilLanguageMode(limit, LanguageMode::v6)
                 .limitBehaviorIf(
                     fromContext.preconcurrencyBehavior(baseDeclClass));
             return false;
@@ -599,7 +599,7 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
       diags
           .diagnose(decl, diag::override_global_actor_isolation_mismatch,
                     decl->getName())
-          .limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning, 6)
+          .warnUntilLanguageMode(LanguageMode::v6)
           .limitBehaviorIf(fromContext.preconcurrencyBehavior(baseDeclClass));
     }
     break;
@@ -1218,7 +1218,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   // is helpful in several cases - just not this one.
   auto dc = decl->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
-  if (decl->getASTContext().isLanguageModeAtLeast(5) &&
+  if (decl->getASTContext().isLanguageModeAtLeast(LanguageMode::v5) &&
       baseDecl->getInterfaceType()->hasDynamicSelfType() &&
       !decl->getInterfaceType()->hasDynamicSelfType() &&
       !classDecl->isSemanticallyFinal()) {
@@ -1709,6 +1709,7 @@ namespace  {
     UNINTERESTING_ATTR(PropertyWrapper)
     UNINTERESTING_ATTR(DisfavoredOverload)
     UNINTERESTING_ATTR(ResultBuilder)
+    UNINTERESTING_ATTR(Reparentable)
     UNINTERESTING_ATTR(ProjectedValueProperty)
     UNINTERESTING_ATTR(OriginallyDefinedIn)
     UNINTERESTING_ATTR(Actor)
@@ -1928,7 +1929,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
          overrideASD->getAttrs().hasAttribute<LazyAttr>()) &&
         !overrideASD->hasObservers()) {
       bool downgradeToWarning = false;
-      if (!ctx.isLanguageModeAtLeast(5) &&
+      if (!ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
           overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
         // Swift 4.0 had a bug where lazy properties were considered
         // computed by the time of this check. Downgrade this diagnostic to
@@ -2314,6 +2315,13 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
 
     // Objective-C protocols
     if (inheritedProto->isObjC()) return TypeWalker::Action::Continue;
+
+    // Associated types defined within reparentable protocols Q
+    // are not overridden by one defined in any reparented ones P, i.e.,
+    // if P was reparented by Q, then P's associated type serves as the anchor.
+    // We skip processing any protocols further inherited by the reparentable.
+    if (inheritedProto->getAttrs().hasAttribute<ReparentableAttr>())
+      return TypeWalker::Action::SkipNode;
 
     // Look for associated types with the same name.
     bool foundAny = false;

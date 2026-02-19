@@ -1233,7 +1233,7 @@ bool Decl::preconcurrency() const {
 
   // Variables declared in top-level code are @_predatesConcurrency
   if (const VarDecl *var = dyn_cast<VarDecl>(this)) {
-    return !getASTContext().isLanguageModeAtLeast(6) &&
+    return !getASTContext().isLanguageModeAtLeast(LanguageMode::v6) &&
            var->isTopLevelGlobal() && var->getDeclContext()->isAsyncContext();
   }
 
@@ -1910,6 +1910,8 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
       setOption(ProtocolConformanceFlags::Preconcurrency);
     if (typeRepr->findAttrLoc(TypeAttrKind::Nonisolated).isValid())
       setOption(ProtocolConformanceFlags::Nonisolated);
+    if (typeRepr->findAttrLoc(TypeAttrKind::Reparented).isValid())
+      setOption(ProtocolConformanceFlags::Reparented);
 
     // Dig out the custom attribute that should be the global actor isolation.
     if (auto customAttr = typeRepr->findCustomAttr()) {
@@ -2257,6 +2259,20 @@ ExtensionDecl::isAddingConformanceToInvertible() const {
           return kind;
   }
   return std::nullopt;
+}
+
+bool ExtensionDecl::isForReparenting() const {
+  // Must be a protocol extension
+  if (!getExtendedProtocolDecl())
+    return false;
+
+  // Must be at least one @reparented inherited entry.
+  for (auto const& entry : getInherited().getEntries()) {
+    if (entry.isReparented())
+      return true;
+  }
+
+  return false;
 }
 
 bool Decl::hasOnlyCEntryPoint() const {
@@ -2769,6 +2785,20 @@ VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
   return getPatternList()[i].getAnchoringVarDecl();
 }
 
+bool PatternBindingDecl::hasSingleVarConstantFoldedInit() const {
+  auto *singleVar = getSingleVar();
+  return singleVar && singleVar->isConstValue() &&
+         getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
+}
+
+Expr *PatternBindingDecl::getExecutableInit(unsigned i) const {
+  auto idxInit = getPatternList()[i].getExecutableInit();
+  if (auto &ctx = getASTContext(); idxInit && hasSingleVarConstantFoldedInit())
+    return evaluateOrDefault(ctx.evaluator,
+                             ConstantFoldExpression{idxInit, &ctx}, {});
+  return idxInit;
+}
+
 bool VarDecl::isInitExposedToClients() const {
   // 'lazy' initializers are emitted inside the getter, which is never
   // @inlinable.
@@ -2840,7 +2870,7 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr, ASTContext &ctx) {
     return true;
 
   // Also support the desugared 'Optional<T>' spelling.
-  if (!ctx.isLanguageModeAtLeast(5)) {
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
     if (typeRepr->isSimpleUnqualifiedIdentifier(ctx.Id_Void)) {
       return true;
     }
@@ -3021,7 +3051,7 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
   assert(defer->isDeferBody());
 
   // In Swift 6+, then yes.
-  if (defer->getASTContext().isLanguageModeAtLeast(6))
+  if (defer->getASTContext().isLanguageModeAtLeast(LanguageMode::v6))
     return true;
 
   // If the defer is part of a function that is a member of an actor or
@@ -3095,7 +3125,7 @@ static bool isDirectToStorageAccess(const DeclContext *UseDC,
     // In Swift 5 and later, the access must also be a member access on 'self'.
     if (!isAccessOnSelf &&
         var->getDeclContext()->isTypeContext() &&
-        var->getASTContext().isLanguageModeAtLeast(5))
+        var->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
       return false;
 
     // As a special case, 'read' and 'modify' coroutines with forced static
@@ -4093,7 +4123,7 @@ bool swift::conflicting(ASTContext &ctx,
     // Prior to Swift 5, we permitted redeclarations of variables as different
     // declarations if the variable was declared in an extension of a generic
     // type. Make sure we maintain this behaviour in versions < 5.
-    if (!ctx.isLanguageModeAtLeast(5)) {
+    if (!ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
       if ((sig1.IsVariable && sig1.InExtensionOfGenericType) ||
           (sig2.IsVariable && sig2.InExtensionOfGenericType)) {
         if (wouldConflictInSwift5)
@@ -4117,7 +4147,7 @@ bool swift::conflicting(ASTContext &ctx,
   // Swift 5, a variable not in an extension of a generic type got a null
   // overload type instead of a function type as it does now, so we really
   // follow that behaviour and warn if there's going to be a conflict in future.
-  if (!ctx.isLanguageModeAtLeast(5)) {
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
     auto swift4Sig1Type = sig1.IsVariable && !sig1.InExtensionOfGenericType
                               ? CanType()
                               : sig1Type;
@@ -5784,6 +5814,16 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
       return result;
   }
 
+  // Prefer non-reparentable protocols.
+  if (auto *proto1 = dyn_cast<ProtocolDecl>(type1)) {
+    if (auto *proto2 = dyn_cast<ProtocolDecl>(type2)) {
+      auto rp1 = proto1->getAttrs().hasAttribute<ReparentableAttr>();
+      auto rp2 = proto2->getAttrs().hasAttribute<ReparentableAttr>();
+      if (rp1 != rp2)
+        return int(rp1) < int(rp2) ? -1 : +1;
+    }
+  }
+
   if (int result = type1->getBaseIdentifier().str().compare(
                                   type2->getBaseIdentifier().str()))
     return result;
@@ -7336,6 +7376,13 @@ ArrayRef<ProtocolDecl *> ProtocolDecl::getAllInheritedProtocols() const {
                            {});
 }
 
+ArrayRef<ReparentingProtocolsRequest::Result>
+ProtocolDecl::getReparentingProtocols() const {
+  auto *mutThis = const_cast<ProtocolDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ReparentingProtocolsRequest{mutThis}, {});
+}
+
 ArrayRef<AssociatedTypeDecl *>
 ProtocolDecl::getAssociatedTypeMembers() const {
   if (Bits.ProtocolDecl.HasAssociatedTypes)
@@ -7598,7 +7645,8 @@ void ProtocolDecl::computeKnownProtocolKind() const {
       !module->getName().is("Foundation") &&
       !module->getName().is("_Differentiation") &&
       !module->getName().is("_Concurrency") &&
-      !module->getName().is("Distributed")) {
+      !module->getName().is("Distributed") && 
+      !module->getName().is("Cxx")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
@@ -8507,16 +8555,12 @@ static bool isMemberwiseInitExcludedVar(const VarDecl *VD,
   auto &ctx = VD->getASTContext();
 
   // For property wrappers, the property must be at least internal. This
-  // predates 'ExcludePrivateFromMemberwiseInit'.
+  // predates SE-0502.
   if (VD->hasAttachedPropertyWrapper()) {
     minAccess.emplace(AccessLevel::Internal);
-  } else {
+  } else if (initKind == MemberwiseInitKind::Compatibility) {
     // We don't exclude private VarDecls for the compatibility overload.
-    if (initKind == MemberwiseInitKind::Compatibility)
-      return false;
-    // Must have the feature enabled.
-    if (!ctx.LangOpts.hasFeature(Feature::ExcludePrivateFromMemberwiseInit))
-      return false;
+    return false;
   }
 
   if (!minAccess) {
@@ -11781,7 +11825,7 @@ SourceRange FuncDecl::getSourceRange() const {
 EnumElementDecl::EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
                                  ParameterList *Params,
                                  SourceLoc EqualsLoc,
-                                 LiteralExpr *RawValueExpr,
+                                 Expr *RawValueExpr,
                                  DeclContext *DC)
   : DeclContext(DeclContextKind::EnumElementDecl, DC),
     ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
@@ -11845,28 +11889,37 @@ EnumCaseDecl *EnumElementDecl::getParentCase() const {
 
   llvm_unreachable("enum element not in case of parent enum");
 }
-      
+
+Expr *EnumElementDecl::getOriginalRawValueExpr() const {
+  // The return value of this request is irrelevant - it exists as
+  // a cache-warmer.
+  (void)evaluateOrDefault(
+      getASTContext().evaluator,
+      EnumRawValuesRequest{getParentEnum()},
+      {});
+  return RawValueExpr;
+}
+
 LiteralExpr *EnumElementDecl::getRawValueExpr() const {
   // The return value of this request is irrelevant - it exists as
   // a cache-warmer.
-  (void)evaluateOrDefault(
-      getASTContext().evaluator,
-      EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Interface},
-      {});
-  return RawValueExpr;
+  (void)evaluateOrDefault(getASTContext().evaluator,
+                          EnumRawValuesRequest{getParentEnum()}, {});
+  // This request will have been evaluated during the above
+  // 'EnumRawValuesRequest' so this is meant to return the
+  // cached result, if the above request was successful.
+  if (RawValueExpr)
+    if (getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions))
+      return dyn_cast<LiteralExpr>(evaluateOrDefault(
+            getASTContext().evaluator,
+            ConstantFoldExpression{RawValueExpr, &getASTContext()}, {}));
+    else
+      return dyn_cast<LiteralExpr>(RawValueExpr);
+  else
+    return nullptr;
 }
 
-LiteralExpr *EnumElementDecl::getStructuralRawValueExpr() const {
-  // The return value of this request is irrelevant - it exists as
-  // a cache-warmer.
-  (void)evaluateOrDefault(
-      getASTContext().evaluator,
-      EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Structural},
-      {});
-  return RawValueExpr;
-}
-
-void EnumElementDecl::setRawValueExpr(LiteralExpr *e) {
+void EnumElementDecl::setRawValueExpr(Expr *e) {
   assert((!RawValueExpr || e == RawValueExpr || e->getType()) &&
          "Illegal mutation of raw value expr");
   RawValueExpr = e;
@@ -12283,7 +12336,7 @@ ActorIsolation swift::getActorIsolationOfContext(
         ctx.LangOpts.StrictConcurrencyLevel >= StrictConcurrency::Complete) {
       if (Type mainActor = ctx.getMainActorType())
         return ActorIsolation::forGlobalActor(mainActor).withPreconcurrency(
-            !ctx.isLanguageModeAtLeast(6));
+            !ctx.isLanguageModeAtLeast(LanguageMode::v6));
     }
   }
 

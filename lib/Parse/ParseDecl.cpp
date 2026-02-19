@@ -2545,7 +2545,7 @@ static std::optional<Identifier> parseSingleAttrOptionImpl(
 }
 
 static std::optional<LifetimeDescriptor>
-parseLifetimeDescriptor(Parser &P,
+parseLifetimeDescriptor(Parser &P, bool allowIndices,
                         ParsedLifetimeDependenceKind lifetimeDependenceKind =
                             ParsedLifetimeDependenceKind::Default) {
   auto token = P.Tok;
@@ -2577,6 +2577,13 @@ parseLifetimeDescriptor(Parser &P,
   case tok::integer_literal: {
     SourceLoc loc;
     unsigned index;
+    if (!allowIndices) {
+      P.diagnose(
+          token,
+          diag::expected_identifier_or_index_or_self_after_lifetime_dependence,
+          /* allow indices */ false);
+      return std::nullopt;
+    }
     if (P.parseUnsignedInteger(
             index, loc, diag::expected_param_index_lifetime_dependence)) {
       return std::nullopt;
@@ -2590,7 +2597,8 @@ parseLifetimeDescriptor(Parser &P,
   default: {
     P.diagnose(
         token,
-        diag::expected_identifier_or_index_or_self_after_lifetime_dependence);
+        diag::expected_identifier_or_index_or_self_after_lifetime_dependence,
+        allowIndices);
     return std::nullopt;
   }
   }
@@ -2601,7 +2609,7 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(StringRef attrName,
                                                           SourceLoc loc) {
   ParserStatus status;
 
-  auto lifetimeEntry = parseLifetimeEntry(loc);
+  auto lifetimeEntry = parseLifetimeEntry(loc, /*allowIndices=*/false);
   if (lifetimeEntry.isNull()) {
     status.setIsParseError();
     return status;
@@ -4229,7 +4237,7 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
     consumeToken();
     if (Version.empty()) {
       // Versions cannot be empty (e.g. "0").
-      diagnose(Range.Start, D).warnUntilLanguageMode(6);
+      diagnose(Range.Start, D).warnUntilLanguageMode(LanguageMode::v6);
       return true;
     }
     return false;
@@ -4270,7 +4278,7 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
 
   if (Version.empty()) {
     // Versions cannot be empty (e.g. "0.0").
-    diagnose(Range.Start, D).warnUntilLanguageMode(6);
+    diagnose(Range.Start, D).warnUntilLanguageMode(LanguageMode::v6);
     return true;
   }
 
@@ -4308,7 +4316,7 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(SourceLoc atLoc) {
   if (isAtAttributeLParen(/*isCustomAttribute=*/true)) {
     if (getEndOfPreviousLoc() != Tok.getLoc()) {
       diagnose(getEndOfPreviousLoc(), diag::attr_extra_whitespace_before_lparen)
-          .warnUntilLanguageMode(6);
+          .warnUntilLanguageMode(LanguageMode::v6);
     }
     // If we have no local context to parse the initial value into, create
     // one for the attribute.
@@ -4367,7 +4375,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
                                         bool isFromClangAttribute) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
   }
 
   bool hasModuleSelector = peekToken().is(tok::colon_colon);
@@ -4430,12 +4438,12 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
   // In Swift 5 and above, these become hard errors. In Swift 4.2, emit a
   // warning for compatibility. Otherwise, don't diagnose at all.
-  if (Context.isLanguageModeAtLeast(5)) {
+  if (Context.isLanguageModeAtLeast(LanguageMode::v5)) {
     checkInvalidAttrName("_versioned", "usableFromInline",
                          DeclAttrKind::UsableFromInline, diag::attr_renamed);
     checkInvalidAttrName("_inlineable", "inlinable", DeclAttrKind::Inlinable,
                          diag::attr_renamed);
-  } else if (Context.isLanguageModeAtLeast(4, 2)) {
+  } else if (Context.isLanguageModeAtLeast(LanguageMode::v4_2)) {
     checkInvalidAttrName("_versioned", "usableFromInline",
                          DeclAttrKind::UsableFromInline,
                          diag::attr_renamed_warning);
@@ -4786,7 +4794,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                         bool justChecking) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
   }
 
   // If this not an identifier, the attribute is malformed.
@@ -5076,6 +5084,22 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     return makeParserSuccess();
   }
 
+  case TypeAttrKind::Lifetime: {
+    const auto entryResult = parseLifetimeEntry(AtLoc, /*allowIndices=*/false);
+    if (entryResult.isNull()) {
+      return makeParserError();
+    }
+
+    auto *entry = entryResult.get();
+
+    if (!justChecking) {
+      result = new (Context) LifetimeTypeAttr(
+          AtLoc, attrLoc, SourceRange(entry->getStartLoc(), entry->getEndLoc()),
+          entryResult.get());
+    }
+    return makeParserSuccess();
+  }
+
   case TypeAttrKind::Convention: {
     ConventionTypeAttr *convention = nullptr;
     if (parseConventionAttributeInternal(AtLoc, attrLoc, convention,
@@ -5148,7 +5172,8 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   llvm_unreachable("bad attribute kind");
 }
 
-ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
+ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc,
+                                                       bool allowIndices) {
   ParserStatus status;
 
   auto getLifetimeDependenceKind =
@@ -5182,7 +5207,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   std::optional<LifetimeDescriptor> targetDescriptor;
   if (Tok.isAny(tok::identifier, tok::integer_literal, tok::kw_self) &&
       peekToken().is(tok::colon)) {
-    targetDescriptor = parseLifetimeDescriptor(*this);
+    targetDescriptor = parseLifetimeDescriptor(*this, allowIndices);
     if (!targetDescriptor) {
       status.setIsParseError();
       return status;
@@ -5207,8 +5232,8 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
           consumeToken();
         }
 
-        auto sourceDescriptor =
-            parseLifetimeDescriptor(*this, lifetimeDependenceKind);
+        auto sourceDescriptor = parseLifetimeDescriptor(*this, allowIndices,
+                                                        lifetimeDependenceKind);
         if (!sourceDescriptor) {
           invalidSourceDescriptor = true;
           listStatus.setIsParseError();
@@ -5225,7 +5250,8 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   if (!foundParamId) {
     diagnose(
         Tok,
-        diag::expected_identifier_or_index_or_self_after_lifetime_dependence);
+        diag::expected_identifier_or_index_or_self_after_lifetime_dependence,
+        /* allow indices */ isInSILMode());
     status.setIsParseError();
     return status;
   }
@@ -5567,7 +5593,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       }
       P.consumeToken(); // consume '@'
       auto loc = P.consumeToken(); // consume 'lifetime'
-      auto result = P.parseLifetimeEntry(loc);
+      auto result = P.parseLifetimeEntry(loc, /*allowIndices=*/true);
       if (result.isNull()) {
         status |= result;
         continue;
@@ -8848,6 +8874,20 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
       P.diagnose(Init->getLoc(), diag::init_accessor_is_not_on_property);
     }
   }
+
+  // A 'borrow' can only be paired with 'mutate'
+  if (Borrow) {
+    if (Set || Modify || YieldingMutate || MutableAddress) {
+      P.diagnose(Borrow->getLoc(), diag::borrow_mutate_pair_restrict, "borrow",
+                 "mutate");
+    }
+  }
+  if (Mutate) {
+    if (Get || Read || YieldingBorrow || Address) {
+      P.diagnose(Mutate->getLoc(), diag::borrow_mutate_pair_restrict, "mutate",
+                 "borrow");
+    }
+  }
 }
 
 
@@ -9520,7 +9560,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   return DCC.fixupParserResult(Status, ED);
 }
 
-static bool isValidEnumRawValueLiteral(LiteralExpr *expr) {
+static bool isValidEnumRawValueLiteral(Expr *expr) {
   if (expr == nullptr)
     return false;
 
@@ -9633,7 +9673,6 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     // See if there's a raw value expression.
     SourceLoc EqualsLoc;
     ParserResult<Expr> RawValueExpr;
-    LiteralExpr *LiteralRawValueExpr = nullptr;
     if (Tok.is(tok::equal)) {
       EqualsLoc = consumeToken();
       {
@@ -9649,12 +9688,13 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         Status.setIsParseError();
         return Status;
       }
-      // The raw value must be syntactically a simple literal.
-      LiteralRawValueExpr = dyn_cast<LiteralExpr>(RawValueExpr.getPtrOrNull());
-      if (!isValidEnumRawValueLiteral(LiteralRawValueExpr)) {
-        diagnose(RawValueExpr.getPtrOrNull()->getLoc(),
-                 diag::nonliteral_enum_case_raw_value);
-        LiteralRawValueExpr = nullptr;
+
+      if (!Context.LangOpts.hasFeature(Feature::LiteralExpressions)) {
+        if (!isValidEnumRawValueLiteral(RawValueExpr.getPtrOrNull())) {
+          diagnose(RawValueExpr.getPtrOrNull()->getLoc(),
+                   diag::nonliteral_enum_case_raw_value);
+          RawValueExpr = nullptr;
+        }
       }
     }
     
@@ -9680,7 +9720,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     auto *result = new (Context) EnumElementDecl(NameLoc, FullName,
                                                  ArgParams.getPtrOrNull(),
                                                  EqualsLoc,
-                                                 LiteralRawValueExpr,
+                                                 RawValueExpr.getPtrOrNull(),
                                                  CurDeclContext);
 
     if (NameLoc == CaseLoc) {
@@ -10542,46 +10582,15 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
                                  diag::operator_decl_expected_precedencegroup,
                                  DeclNameFlag::ModuleSelectorUnsupported);
 
-    if (Context.TypeCheckerOpts.EnableOperatorDesignatedTypes) {
-      // Designated types have been removed; consume the list (mainly for source
-      // compatibility with old swiftinterfaces) and emit a warning.
-
-      // These SourceLocs point to the ends of the designated type list. If
-      // `typesEndLoc` never becomes valid, we didn't find any designated types.
-      SourceLoc typesStartLoc = Tok.getLoc();
-      SourceLoc typesEndLoc;
-
-      if (isPrefix || isPostfix) {
-        // These have no precedence group, so we already parsed the first entry
-        // in the designated types list. Retroactively include it in the range.
-        typesStartLoc = colonLoc;
-        typesEndLoc = groupLoc.getEndLoc();
-      }
-
-      while (Tok.isNot(tok::eof)) {
-        if (!consumeIf(tok::comma, typesEndLoc)) {
-          break;
-        }
-
-        if (Tok.isNot(tok::eof)) {
-          typesEndLoc = consumeToken();
-        }
-      }
-
-      if (typesEndLoc.isValid())
-        diagnose(typesStartLoc, diag::operator_decl_remove_designated_types)
-            .fixItRemove({typesStartLoc, typesEndLoc});
-    } else {
-      if (isPrefix || isPostfix) {
-        // If we have nothing after the colon, then just remove the colon.
-        auto endLoc = groupLoc.isValid() ? groupLoc.getEndLoc() : colonLoc;
-        diagnose(colonLoc, diag::precedencegroup_not_infix)
-            .fixItRemove({colonLoc, endLoc});
-      }
-      // Nothing to complete here, simply consume the token.
-      if (Tok.is(tok::code_complete))
-        consumeToken();
+    if (isPrefix || isPostfix) {
+      // If we have nothing after the colon, then just remove the colon.
+      auto endLoc = groupLoc.isValid() ? groupLoc.getEndLoc() : colonLoc;
+      diagnose(colonLoc, diag::precedencegroup_not_infix)
+          .fixItRemove({colonLoc, endLoc});
     }
+    // Nothing to complete here, simply consume the token.
+    if (Tok.is(tok::code_complete))
+      consumeToken();
   }
 
   // Diagnose deprecated operator body syntax `operator + { ... }`.

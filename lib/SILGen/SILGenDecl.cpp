@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ProfileCounter.h"
@@ -1488,6 +1489,46 @@ void BoolPatternInitialization::copyOrInitValueIntoImpl(SILGenFunction &SGF,
 }
 
 namespace {
+/// An initialization for a borrowing pattern binding (if let, if case, etc.)
+/// This handles borrowing similar to switch statement borrowing patterns.
+class BorrowBindingInitialization : public Initialization {
+  Pattern *pattern;
+  VarDecl *var;
+
+public:
+  BorrowBindingInitialization(Pattern *pattern, VarDecl *var)
+      : pattern(pattern), var(var) {
+    ASSERT(var->getIntroducer() == VarDecl::Introducer::Borrowing);
+  }
+
+  bool isBorrow() override { return true; }
+
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue value, bool isInit) override {
+
+    auto bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+        pattern, value,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
+        MarkUnresolvedNonCopyableValueInst::IsStrict);
+
+    SGF.VarLocs[var] = SILGenFunction::VarLoc(bindValue.getValue(),
+                                              SILAccessEnforcement::Unknown);
+
+    // Emit debug info for the borrowed noncopyable binding.
+    if (EmitDebugValueOnInit) {
+      RegularLocation VarLoc(var);
+      SILDebugVariable DbgVar(var->getName().str(), var->isLet(), /*ArgNo=*/0);
+      SGF.B.emitDebugDescription(VarLoc, bindValue.getValue(), DbgVar);
+    }
+  }
+
+  void finishInitialization(SILGenFunction &SGF) override {
+    // Nothing special needed
+  }
+};
+} // end anonymous namespace
+
+namespace {
 
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
@@ -1529,7 +1570,7 @@ struct InitializationForPattern
   // AnyPatterns (i.e, _) don't require any storage. Any value bound here will
   // just be dropped.
   InitializationPtr visitAnyPattern(AnyPattern *P) {
-    return InitializationPtr(new BlackHoleInitialization());
+    return InitializationPtr(new BlackHoleInitialization(P->isBorrowing()));
   }
 
   // Bind to a named pattern by creating a memory location and initializing it
@@ -1539,6 +1580,11 @@ struct InitializationForPattern
       // Unnamed parameters don't require any storage. Any value bound here will
       // just be dropped.
       return InitializationPtr(new BlackHoleInitialization());
+    }
+
+    if (P->getDecl()->getIntroducer() == VarDecl::Introducer::Borrowing) {
+      return InitializationPtr(
+          new BorrowBindingInitialization(P, P->getDecl()));
     }
 
     return SGF.emitInitializationForVarDecl(P->getDecl(), P->getDecl()->isLet(),
@@ -1728,6 +1774,13 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD, unsigned idx,
     return initialization->finishUninitialized(*this);
   }
 
+  // In case of a borrowing binding, we do not want the scope to be limited to
+  // this function.
+  if (initialization.get()->isBorrow()) {
+    emitExprInto(initExpr, initialization.get());
+    return;
+  }
+
   // Otherwise, an initial value expression was specified by the decl... emit it
   // into the initialization.
   FullExpr Scope(Cleanups, CleanupLocation(initExpr));
@@ -1845,6 +1898,11 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
           InitializationPtr initialization = emitPatternBindingInitialization(
               elt.getPattern(), FalseDest, /*debugInfo*/ true, NumTrueTaken,
               NumFalseTaken, customInitLoc);
+
+          if (initialization->isBorrow()) {
+            emitExprInto(elt.getInitializer(), initialization.get(), loc);
+            continue;
+          }
 
           // Emit the initial value into the initialization.
           FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
@@ -2526,7 +2584,8 @@ void BlackHoleInitialization::performPackExpansionInitialization(
 void BlackHoleInitialization::copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                                                   ManagedValue value, bool isInit) {
   // If we do not have a noncopyable type, just insert an ignored use.
-  if (!value.getType().isMoveOnly()) {
+  // Similarly, if we have a borrowed noncopyable type, insert an ignored use.
+  if (!value.getType().isMoveOnly() || isBorrowing) {
     SGF.B.createIgnoredUse(loc, value.getValue());
     return;
   }

@@ -501,13 +501,14 @@ enum DwarfSection {
 @available(Backtracing 6.2, *)
 protocol DwarfSource {
 
+  static var pathSeparator: String { get }
+
   func getDwarfSection(_ section: DwarfSection) -> ImageSource?
 
 }
 
 @available(Backtracing 6.2, *)
-struct DwarfReader<S: DwarfSource & AnyObject> {
-
+class DwarfReader<S: DwarfSource & AnyObject> {
   typealias Source = S
   typealias Address = UInt64
   typealias Size = UInt64
@@ -661,7 +662,7 @@ struct DwarfReader<S: DwarfSource & AnyObject> {
       // .2 version
       let version = Int(maybeSwap(try cursor.read(as: Dwarf_Half.self)))
 
-      if version < 3 || version > 5 {
+      if version < 2 || version > 5 {
         throw DwarfError.unsupportedVersion(version)
       }
 
@@ -692,7 +693,7 @@ struct DwarfReader<S: DwarfSource & AnyObject> {
 
         dieBounds = Bounds(base: cursor.pos, size: next - cursor.pos)
       } else {
-        if version >= 3 && version <= 4 {
+        if version >= 2 && version <= 4 {
           // .3 debug_abbrev_offset
           abbrevOffset = Address(maybeSwap(try cursor.read(as: Dwarf_Word.self)))
 
@@ -824,7 +825,7 @@ struct DwarfReader<S: DwarfSource & AnyObject> {
       // .2 version
       let version = Int(maybeSwap(try cursor.read(as: Dwarf_Half.self)))
 
-      if version < 3 || version > 5 {
+      if version < 2 || version > 5 {
         cursor.pos = nextOffset
         continue
       }
@@ -881,7 +882,7 @@ struct DwarfReader<S: DwarfSource & AnyObject> {
       var dirNames: [String] = []
       var fileInfo: [DwarfFileInfo] = []
 
-      if version == 3 || version == 4 {
+      if version >= 2 && version <= 4 {
         // .11 include_directories
 
         // Prior to version 5, the compilation directory is not included; put
@@ -1041,6 +1042,7 @@ struct DwarfReader<S: DwarfSource & AnyObject> {
       cursor.pos = nextOffset
 
       result.append(DwarfLineNumberInfo(
+                      pathSeparator: Source.pathSeparator,
                       baseOffset: baseOffset,
                       version: version,
                       addressSize: addressSize,
@@ -1682,10 +1684,186 @@ struct DwarfReader<S: DwarfSource & AnyObject> {
     }
   }
 
-  lazy var inlineCallSites: [CallSiteInfo] = _buildCallSiteList()
+  struct FunctionInfo {
+    var depth: Int
+    var rawName: String
+    var name: String?
+    var lowPC: Address
+    var highPC: Address
+  }
 
-  private func _buildCallSiteList() -> [CallSiteInfo] {
+  private func buildFunctionInfo (
+    depth: Int,
+    unit: Unit,
+    attributes: [Dwarf_Attribute:DwarfValue],
+    _ fn: (FunctionInfo) -> ()
+  ) throws {
+    var name: String? = nil
+    var refAttrs = attributes
+
+    if let specificationVal = refAttrs[.DW_AT_specification],
+       case let .reference(specification) = specificationVal {
+      var cursor = ImageSourceCursor(source: infoSection,
+                                     offset: specification)
+      let abbrev = try cursor.readULEB128()
+      if abbrev == 0 {
+        return
+      }
+
+      guard let abbrevInfo = unit.abbrevs[abbrev] else {
+        throw DwarfError.missingAbbrev(abbrev)
+      }
+
+      let tag = abbrevInfo.tag
+      if tag != .DW_TAG_subprogram {
+        return
+      }
+
+      refAttrs = try readDieAttributes(
+        at: &cursor,
+        unit: unit,
+        abbrevInfo: abbrevInfo,
+        shouldFetchIndirect: true
+      )
+    }
+
+    if let nameVal = refAttrs[.DW_AT_name],
+       case let .string(theName) = nameVal {
+      name = theName
+    }
+
+    let rawName: String
+
+    if let linkageNameVal = refAttrs[.DW_AT_linkage_name],
+       case let .string(theRawName) = linkageNameVal {
+      rawName = theRawName
+    } else {
+      rawName = name ?? "<unknown>"
+    }
+
+    if let lowPCVal = attributes[.DW_AT_low_pc],
+       let highPCVal = attributes[.DW_AT_high_pc],
+       case let .address(lowPC) = lowPCVal {
+      let highPC: Address
+      if case let .address(highPCAddr) = highPCVal {
+        highPC = highPCAddr
+      } else if let highPCOffset = highPCVal.uint64Value() {
+        highPC = lowPC + highPCOffset
+      } else {
+        return
+      }
+
+      fn(FunctionInfo(
+           depth: depth,
+           rawName: rawName,
+           name: name,
+           lowPC: lowPC,
+           highPC: highPC))
+    }
+  }
+
+  private lazy var _lazyInfo: (callSites: [CallSiteInfo],
+                               functions: [FunctionInfo]) = _scanUnits()
+
+  var inlineCallSites: [CallSiteInfo] {
+    _lazyInfo.callSites
+  }
+
+  var functions: [FunctionInfo] {
+    _lazyInfo.functions
+  }
+
+  func lookupInlineCallSites(
+    at address: Address
+  ) -> ArraySlice<CallSiteInfo> {
+    var min = 0
+    var max = inlineCallSites.count
+
+    while min < max {
+      let mid = min + (max - min) / 2
+      let callSite = inlineCallSites[mid]
+
+      if callSite.lowPC <= address && callSite.highPC > address {
+        var first = mid, last = mid
+        while first > 0
+                && inlineCallSites[first - 1].lowPC <= address
+                && inlineCallSites[first - 1].highPC > address {
+          first -= 1
+        }
+        while last < inlineCallSites.count - 1
+                && inlineCallSites[last + 1].lowPC <= address
+                && inlineCallSites[last + 1].highPC > address {
+          last += 1
+        }
+
+        return inlineCallSites[first...last]
+      } else if callSite.highPC <= address {
+        min = mid + 1
+      } else if callSite.lowPC > address {
+        max = mid
+      }
+    }
+
+    return []
+  }
+
+  func lookupFunction(
+    at address: Address
+  ) -> FunctionInfo? {
+    var min = 0, max = functions.count
+    while min < max {
+      let mid = min + (max - min) / 2
+      let function = functions[mid]
+
+      if function.lowPC <= address && function.highPC > address {
+        return function
+      } else if function.highPC <= address {
+        min = mid + 1
+      } else if function.lowPC > address {
+        max = mid
+      }
+    }
+    return nil
+  }
+
+  typealias SourceLocation = SymbolicatedBacktrace.SourceLocation
+
+  func sourceLocation(
+    for address: Address
+  ) throws -> SourceLocation? {
+    var result: SourceLocation? = nil
+    var prevState: DwarfLineNumberState? = nil
+
+    for ndx in 0..<lineNumberInfo.count {
+      var info = lineNumberInfo[ndx]
+      try info.executeProgram { (state, done) in
+        if let oldState = prevState,
+           address >= oldState.address && address < state.address {
+          result = SourceLocation(
+            path: oldState.path,
+            line: oldState.line,
+            column: oldState.column
+          )
+          done = true
+        }
+
+        if state.endSequence {
+          prevState = nil
+        } else {
+          prevState = state
+        }
+      }
+    }
+
+    return result
+  }
+
+  private func _scanUnits()
+    -> (callSites: [CallSiteInfo],
+        functions: [FunctionInfo]) {
+
     var callSites: [CallSiteInfo] = []
+    var functions: [FunctionInfo] = []
 
     for unit in units {
       do {
@@ -1714,7 +1892,8 @@ struct DwarfReader<S: DwarfSource & AnyObject> {
             at: &cursor,
             unit: unit,
             abbrevInfo: abbrevInfo,
-            shouldFetchIndirect: tag == .DW_TAG_inlined_subroutine
+            shouldFetchIndirect: (tag == .DW_TAG_inlined_subroutine
+                                    || tag == .DW_TAG_subprogram)
           )
 
           if tag == .DW_TAG_inlined_subroutine {
@@ -1722,6 +1901,12 @@ struct DwarfReader<S: DwarfSource & AnyObject> {
                                   unit: unit,
                                   attributes: attributes) {
               callSites.append($0)
+            }
+          } else if tag == .DW_TAG_subprogram {
+            try buildFunctionInfo(depth: depth,
+                                  unit: unit,
+                                  attributes: attributes) {
+              functions.append($0)
             }
           }
 
@@ -1750,7 +1935,12 @@ struct DwarfReader<S: DwarfSource & AnyObject> {
         a.lowPC < b.lowPC || (a.lowPC == b.lowPC) && a.depth > b.depth
       })
 
-    return callSites
+    functions.sort(
+      by: { (a, b) in
+        a.lowPC < b.lowPC || (a.lowPC == b.lowPC) && a.depth > b.depth
+      })
+
+    return (callSites: callSites, functions: functions)
   }
 
 }
@@ -1811,6 +2001,8 @@ struct DwarfLineNumberState: CustomStringConvertible {
 struct DwarfLineNumberInfo {
   typealias Address = UInt64
 
+  var pathSeparator: String
+
   var baseOffset: Address
   var version: Int
   var addressSize: Int?
@@ -1835,7 +2027,7 @@ struct DwarfLineNumberInfo {
     }
 
     let info = files[index]
-    if info.path.hasPrefix("/") {
+    if info.path.hasPrefix(pathSeparator) {
       return info.path
     }
 
@@ -1847,7 +2039,7 @@ struct DwarfLineNumberInfo {
       dirName = "<unknown>"
     }
 
-    return "\(dirName)/\(info.path)"
+    return "\(dirName)\(pathSeparator)\(info.path)"
   }
 
   /// Execute the line number program, calling a closure for every line

@@ -384,7 +384,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   unsigned IsIsolated : 1;
 
   /// The kind of function reference, for member references.
-  unsigned TheFunctionRefInfo : 3;
+  unsigned TheFunctionRefInfo : 4;
 
   /// The trailing closure matching for an applicable function constraint,
   /// if any. 0 = None, 1 = Forward, 2 = Backward.
@@ -832,11 +832,6 @@ public:
       return !constraint->isDisabled();
     });
   }
-
-  /// Returns the number of resolved argument types for an applied disjunction
-  /// constraint. This is always zero for disjunctions that do not represent
-  /// an applied overload.
-  unsigned countResolvedArgumentTypes(ConstraintSystem &cs) const;
 
   /// Determine if this constraint represents explicit conversion,
   /// e.g. coercion constraint "as X" which forms a disjunction.

@@ -101,6 +101,12 @@ struct PotentialCrasher: Hashable {
     )
   }
 
+  static func custom(
+    _ input: FuzzerInput, frontendArgs: [Command.Argument]
+  ) -> Self {
+    .init(input, options: .custom(frontendArgs: frontendArgs))
+  }
+
   var withGuardMalloc: Self {
     var result = self
     result.options.useGuardMalloc = true

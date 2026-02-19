@@ -19,6 +19,7 @@
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSTrail.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
@@ -26,6 +27,7 @@
 
 using namespace swift;
 using namespace constraints;
+using namespace inference;
 
 #define DEBUG_TYPE "SolverTrail"
 
@@ -323,7 +325,7 @@ SolverTrail::Change::RetiredConstraint(ConstraintList::iterator where,
 
 SolverTrail::Change
 SolverTrail::Change::AddedBinding(TypeVariableType *typeVar,
-                                  inference::PotentialBinding binding) {
+                                  PotentialBinding binding) {
   Change result;
   result.Kind = ChangeKind::AddedBinding;
   result.Binding.TypeVar = typeVar;
@@ -337,7 +339,7 @@ SolverTrail::Change::AddedBinding(TypeVariableType *typeVar,
 
 SolverTrail::Change
 SolverTrail::Change::RetractedBinding(TypeVariableType *typeVar,
-                                      inference::PotentialBinding binding) {
+                                      PotentialBinding binding) {
   Change result;
   result.Kind = ChangeKind::RetractedBinding;
   result.Binding.TypeVar = typeVar;

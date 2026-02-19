@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify -solver-disable-crash-on-valid-salvage
+// RUN: not --crash %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -solver-enable-crash-on-valid-salvage
 
 // REQUIRES: objc_interop
 

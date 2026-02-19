@@ -1737,7 +1737,7 @@ struct ReferenceSelfDotMethods {
 }
 
 actor UserDefinedActorSelfDotMethod {
-  func actorAffinedFunc() {} // expected-note {{calls to instance method 'actorAffinedFunc()' from outside of its actor context are implicitly asynchronous}}
+  func actorAffinedFunc() {}
 
   // Unfortunately we can't express the desired isolation of this returned closure statically to
   // be able to call it on the desired actor. This may be possible with the acceptance of
@@ -1745,7 +1745,7 @@ actor UserDefinedActorSelfDotMethod {
   // in the type system to express this sort of curry.
   nonisolated
   private func testCurry() -> (UserDefinedActorSelfDotMethod) -> (@isolated(any) () -> Void) {
-    let functionRef = Self.actorAffinedFunc // expected-error {{call to actor-isolated instance method 'actorAffinedFunc()' in a synchronous nonisolated context}}
+    let functionRef = Self.actorAffinedFunc
     // error message changes with InferSendabaleFromCaptures - see actor_isolation_swift6.swift
     return functionRef // expected-error {{cannot convert return expression of type '(isolated Self) -> () -> ()' to return type '(UserDefinedActorSelfDotMethod) -> @isolated(any) () -> Void'}}
   }
@@ -1774,5 +1774,41 @@ class InvalidInheritedGlobalActorIsolation {
       self.mainActorFunction()
       // expected-error@-1 {{call to main actor-isolated instance method 'mainActorFunction()' in a synchronous nonisolated context}}
     }
+  }
+}
+
+actor PartialApplyTest {
+  func compute(_: Int) {}
+  func expensiveCompute() async {}
+
+  func test() {
+    _ = Self.compute // Ok
+    _ = Self.compute(_:) // Ok
+
+    _ = Self.expensiveCompute // Ok
+    _ = self.expensiveCompute // Ok (this is okay because method is async)
+  }
+
+  nonisolated static func test(a: PartialApplyTest) {
+    _ = PartialApplyTest.compute // Ok
+    _ = PartialApplyTest.compute(_:) // Ok
+
+    _ = a.compute // expected-error {{actor-isolated instance method 'compute' can not be partially applied}}
+    _ = a.compute(_:) // expected-error {{actor-isolated instance method 'compute' can not be partially applied}}
+
+    _ = Self.expensiveCompute // Ok
+    _ = a.expensiveCompute // Ok (this is okay because method is async)
+  }
+}
+
+func testPartialApplyWithIsolatedParameters() {
+  func isolatedFn(v: Int, _: isolated PartialApplyTest) {
+  }
+
+  let fn = isolatedFn(v:_:) // expected-note {{calls to let 'fn' from outside of its actor context are implicitly asynchronous}}
+  let _: (Int, isolated PartialApplyTest) -> Void = fn // Ok
+
+  func apply(a: PartialApplyTest) {
+    fn(42, a) //expected-error {{call to actor-isolated let 'fn' in a synchronous nonisolated context}}
   }
 }

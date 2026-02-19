@@ -647,11 +647,9 @@ ManagedValue Transform::transform(ManagedValue v,
         llvm::report_fatal_error("unsupported collection upcast kind");
       }
 
-      return SGF
-          .emitCollectionConversion(Loc, fn, inputSubstType, outputSubstType, v,
-                                    /*keyConversion*/ nullptr,
-                                    /*valueConversion*/ nullptr, ctxt)
-          .getScalarValue();
+      return SGF.emitCollectionConversion(Loc, fn, inputSubstType,
+                                          outputSubstType, v, ctxt)
+                .getScalarValue();
     }
   }
 
@@ -2981,7 +2979,8 @@ forwardFunctionArguments(SILGenFunction &SGF, SILLocation loc,
     if (isGuaranteedParameterInCallee(argTy.getConvention())) {
       auto forwardedArg =
           SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue();
-      if (fTy->hasGuaranteedResult(/*loweredAddresses*/ true)) {
+      if (forwardedArg->getType().isObject() &&
+          fTy->hasGuaranteedResult(/*loweredAddresses*/ true)) {
         forwardedArg = SGF.B.createUncheckedOwnership(loc, forwardedArg);
       }
       forwardedArgs.push_back(forwardedArg);
@@ -7455,6 +7454,14 @@ void SILGenFunction::emitProtocolWitness(
   // Grab the type of our thunk.
   auto thunkTy = F.getLoweredFunctionType();
 
+  // The protocol conditional conformance itself might bring some T :
+  // Differentiable conformances. They are already added to the derivative
+  // generic signature. Update witness substitution map generic signature to
+  // have them as well.
+  if (auto *derivativeId = witness.getDerivativeFunctionIdentifier())
+    witnessSubs = SubstitutionMap::get(derivativeId->getDerivativeGenericSignature(),
+                                       witnessSubs);
+  
   // Then get the type of the witness.
   auto witnessKind = getWitnessDispatchKind(witness, isSelfConformance);
   auto witnessInfo = getConstantInfo(getTypeExpansionContext(), witness);

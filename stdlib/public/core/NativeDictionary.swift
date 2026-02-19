@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -755,10 +755,10 @@ extension _NativeDictionary { // Deletion
 }
 
 extension _NativeDictionary { // High-level operations
-  @inlinable
-  internal func mapValues<T>(
-    _ transform: (Value) throws -> T
-  ) rethrows -> _NativeDictionary<Key, T> {
+  @_alwaysEmitIntoClient
+  internal func mapValues<T, E: Error>(
+    _ transform: (Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
     let resultStorage = unsafe _DictionaryStorage<Key, T>.copy(original: _storage)
     unsafe _internalInvariant(resultStorage._seed == _storage._seed)
     let result = unsafe _NativeDictionary<Key, T>(resultStorage)
@@ -773,68 +773,91 @@ extension _NativeDictionary { // High-level operations
     return result
   }
 
-  @inlinable
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of mapValues, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func mapValues<T>(
+      _ transform: (Value) throws -> T
+    ) throws -> _NativeDictionary<Key, T>
+  )
+  @usableFromInline
+  internal func __rethrows_mapValues<T>(
+    _ transform: (Value) throws -> T
+  ) throws -> _NativeDictionary<Key, T> {
+    try mapValues(transform)
+  }
+#endif
+
+  @_alwaysEmitIntoClient
+  internal mutating func merge<S: Sequence, E: Error>(
+    _ keysAndValues: __owned S,
+    isUnique: Bool,
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where S.Element == (Key, Value) {
+    var isUnique = isUnique
+    for (key, value) in keysAndValues {
+      let (bucket, found) = mutatingFind(key, isUnique: isUnique)
+      isUnique = true
+      if found {
+        let newValue = try combine(unsafe uncheckedValue(at: bucket), value)
+        unsafe _values[bucket.offset] = newValue
+      } else {
+        _insert(at: bucket, key: key, value: value)
+      }
+    }
+  }
+
+  @_alwaysEmitIntoClient
   internal mutating func merge<S: Sequence>(
+    trappingOnDuplicates keysAndValues: __owned S,
+  ) where S.Element == (Key, Value) {
+    var isUnique = true
+    for (key, value) in keysAndValues {
+      let (bucket, found) = mutatingFind(key, isUnique: isUnique)
+      isUnique = true
+      if found {
+        #if !$Embedded
+        fatalError("Duplicate values for key: '\(key)'")
+        #else
+        fatalError("Duplicate values for a key in a Dictionary")
+        #endif
+      } else {
+        _insert(at: bucket, key: key, value: value)
+      }
+    }
+  }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of merge, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    mutating func merge<S: Sequence>(
+      _ keysAndValues: __owned S,
+      isUnique: Bool,
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) throws where S.Element == (Key, Value)
+  )
+  @usableFromInline
+  internal mutating func __rethrows_merge<S: Sequence>(
     _ keysAndValues: __owned S,
     isUnique: Bool,
     uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Element == (Key, Value) {
-    var isUnique = isUnique
-    for (key, value) in keysAndValues {
-      let (bucket, found) = mutatingFind(key, isUnique: isUnique)
-      isUnique = true
-      if found {
-        do {
-          let newValue = try combine(unsafe uncheckedValue(at: bucket), value)
-          unsafe _values[bucket.offset] = newValue
-        } catch _MergeError.keyCollision {
-          #if !$Embedded
-          fatalError("Duplicate values for key: '\(key)'")
-          #else
-          fatalError("Duplicate values for a key in a Dictionary")
-          #endif
-        }
-      } else {
-        _insert(at: bucket, key: key, value: value)
-      }
-    }
+  ) throws where S.Element == (Key, Value) {
+    try merge(keysAndValues, isUnique: isUnique, uniquingKeysWith: combine)
   }
+#endif
 
-  #if $Embedded
-  @inlinable
-  internal mutating func merge<S: Sequence>(
-    _ keysAndValues: __owned S,
-    isUnique: Bool,
-    uniquingKeysWith combine: (Value, Value) throws(_MergeError) -> Value
-  ) where S.Element == (Key, Value) {
-    var isUnique = isUnique
-    for (key, value) in keysAndValues {
-      let (bucket, found) = mutatingFind(key, isUnique: isUnique)
-      isUnique = true
-      if found {
-        do throws(_MergeError) {
-          let newValue = try combine(unsafe uncheckedValue(at: bucket), value)
-          unsafe _values[bucket.offset] = newValue
-        } catch {
-          #if !$Embedded
-          fatalError("Duplicate values for key: '\(key)'")
-          #else
-          fatalError("Duplicate values for a key in a Dictionary")
-          #endif
-        }
-      } else {
-        _insert(at: bucket, key: key, value: value)
-      }
-    }
-  }
-  #endif
-
-  @inlinable
+  @_alwaysEmitIntoClient
   @inline(__always)
-  internal init<S: Sequence>(
+  internal init<S: Sequence, E: Error>(
     grouping values: __owned S,
-    by keyForValue: (S.Element) throws -> Key
-  ) rethrows where Value == [S.Element] {
+    by keyForValue: (S.Element) throws(E) -> Key
+  ) throws(E) where Value == [S.Element] {
     self.init()
     for value in values {
       let key = try keyForValue(value)
@@ -847,13 +870,33 @@ extension _NativeDictionary { // High-level operations
     }
   }
 
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of init, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    init<S: Sequence>(
+      grouping values: __owned S,
+      by keyForValue: (S.Element) throws -> Key
+    ) throws where Value == [S.Element]
+  )
+  @usableFromInline
+  internal init<S: Sequence>(
+    __rethrows_grouping values: __owned S,
+    by keyForValue: (S.Element) throws -> Key
+  ) throws where Value == [S.Element] {
+    try self.init(grouping: values, by: keyForValue)
+  }
+#endif
+
   @_alwaysEmitIntoClient
-  internal func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> _NativeDictionary<Key, Value> {
+  internal func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> _NativeDictionary<Key, Value> {
     try unsafe _UnsafeBitset.withTemporaryBitset(
       capacity: _storage._bucketCount
-    ) { bitset in
+    ) { (bitset: _UnsafeBitset) throws(E) -> _NativeDictionary<Key, Value> in
       var count = 0
       for unsafe bucket in unsafe hashTable {
         if try unsafe isIncluded(

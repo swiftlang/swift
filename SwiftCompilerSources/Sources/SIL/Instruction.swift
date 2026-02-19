@@ -92,6 +92,11 @@ public class Instruction : CustomStringConvertible, Hashable {
     return Location(bridged: bridged.getLocation())
   }
 
+  final public func set(location: Location, _ context: some MutatingContext) {
+    bridged.setLocation(location.bridged)
+    context.notifyInstructionsChanged()
+  }
+
   public final func move(before otherInstruction: Instruction, _ context: some MutatingContext) {
     BridgedContext.moveInstructionBefore(bridged, otherInstruction.bridged)
     context.notifyInstructionsChanged()
@@ -1124,6 +1129,17 @@ final public class InitEnumDataAddrInst : SingleValueInstruction, UnaryInstructi
 final public class UncheckedTakeEnumDataAddrInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
   public var `enum`: Value { operand.value }
   public var caseIndex: Int { bridged.UncheckedTakeEnumDataAddrInst_caseIndex() }
+
+  /// True, if this instruction invalidates the operand memory value.
+  /// This happens for certain enum kinds because the enum tag must be cleared before the payload may be used.
+  public var isDestructive: Bool { bridged.UncheckedTakeEnumDataAddrInst_isDestructive() }
+
+  /// True, if this instruction may invalidate the operand memory value.
+  public var mayBeDestructive: Bool {
+    return isDestructive ||
+           // We don't know the layout of resilient enums. So be conservative and assume they are destructive.
+           self.enum.type.nominal!.isResilient(in: parentFunction)
+  }
 }
 
 final public class SelectEnumInst : SingleValueInstruction {

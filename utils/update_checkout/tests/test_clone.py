@@ -11,6 +11,7 @@
 # ===----------------------------------------------------------------------===#
 
 import os
+import subprocess
 import sys
 import shutil
 from unittest.mock import patch
@@ -95,6 +96,97 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
             output,
         )
 
+    def test_clone_with_git_config(self):
+        """
+        Test that git is cloning with the following settings:
+         - core.symlinks = true
+         - core.autocrlf = false
+        """
+        self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.source_root,
+                "--clone",
+            ]
+        )
+
+        for repo in self.get_all_repos():
+            repo_path = os.path.join(self.source_root, repo)
+            output = subprocess.check_output(
+                ["git", "-C", repo_path, "config", "--get", "core.symlinks"], text=True
+            )
+            self.assertIn("true", output)
+            output = subprocess.check_output(
+                ["git", "-C", repo_path, "config", "--get", "core.autocrlf"], text=True
+            )
+            self.assertIn("false", output)
+
+    @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
+    @patch("sys.exit", return_value=None)
+    def test_clone_with_incorrect_git_config(self, mock_exit, mock_obtain):
+        repo = self.get_all_repos()[0]
+
+        def side_effect(*args, **kwargs):
+            result = obtain_all_additional_swift_sources(*args, **kwargs)
+            repo_path = os.path.join(self.source_root, repo)
+            subprocess.run(["git", "-C", repo_path, "config", "core.symlinks", "false"])
+            subprocess.run(["git", "-C", repo_path, "config", "core.autocrlf", "true"])
+            return result
+
+        mock_obtain.side_effect = side_effect
+
+        sys.argv = [
+            "update-checkout",
+            "--config",
+            self.config_path,
+            "--source-root",
+            self.source_root,
+            "--clone",
+        ]
+        with contextlib.redirect_stdout(StringIO()) as stdout:
+            main()
+            output = stdout.getvalue()
+            self.assertIn(
+                f"[WARNING] '{repo}' was not cloned with 'core.symlinks=true'. This can cause build/tests failures.",
+                output,
+            )
+            self.assertIn(
+                f"[WARNING] '{repo}' was not cloned with 'core.autocrlf=false'. This can cause build/tests failures.",
+                output,
+            )
+
+    @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
+    @patch("sys.exit", return_value=None)
+    def test_clone_with_missing_git_config_entry(self, mock_exit, mock_obtain):
+        repo = self.get_all_repos()[0]
+
+        def side_effect(*args, **kwargs):
+            result = obtain_all_additional_swift_sources(*args, **kwargs)
+            repo_path = os.path.join(self.source_root, repo)
+            subprocess.run(
+                ["git", "-C", repo_path, "config", "--unset", "core.symlinks"]
+            )
+            subprocess.run(
+                ["git", "-C", repo_path, "config", "--unset", "core.autocrlf"]
+            )
+            return result
+
+        mock_obtain.side_effect = side_effect
+
+        sys.argv = [
+            "update-checkout",
+            "--config",
+            self.config_path,
+            "--source-root",
+            self.source_root,
+            "--clone",
+        ]
+        with contextlib.redirect_stdout(StringIO()):
+            main()
+
     @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
     @patch("sys.exit", return_value=None)
     def test_clone_with_retry(self, mock_exit, mock_obtain):
@@ -109,7 +201,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
 
         mock_obtain.side_effect = side_effect
 
-        # TODO: eventually call update_checkout using `main` rather than 
+        # TODO: eventually call update_checkout using `main` rather than
         # `subprocess.call` to be able to mock some methods.
         sys.argv = [
             "update-checkout",
@@ -125,6 +217,70 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
             main()
 
         self.assertEqual(call_count[0], 2)
+
+
+class SchemeWithHashTestCase(scheme_mock.SchemeMockTestCase):
+    def __init__(self, *args, **kwargs):
+        super(SchemeWithHashTestCase, self).__init__(*args, **kwargs)
+
+    def setUp(self):
+        import json
+
+        super().setUp()
+        remote_repo_path = os.path.join(self.workspace, "remote", "repo1")
+
+        commits = (
+            self.call(["git", "rev-list", "main"], cwd=remote_repo_path, text=True)
+            .strip()
+            .split("\n")
+        )
+
+        self.commit_hash = commits[-1]
+        self.commit_scheme_name = "commit-hash-scheme"
+        commit_scheme = {
+            "aliases": [self.commit_scheme_name],
+            "repos": {
+                "repo1": self.commit_hash,
+                "repo2": "main",
+            },
+        }
+        self.add_branch_scheme(self.commit_scheme_name, commit_scheme)
+
+        with open(self.config_path, "w") as f:
+            json.dump(self.config, f)
+
+    def test_clone_with_skip_history(self):
+        self._test_clone_with_commit_hash(["--skip-history"])
+
+    def test_clone_with_reset_to_remote(self):
+        self._test_clone_with_commit_hash(["--reset-to-remote"])
+
+    def _test_clone_with_commit_hash(self, additional_flags):
+        """
+        Test that cloning works with commit hashes.
+        """
+        self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.source_root,
+                "--clone",
+                "--scheme",
+                self.commit_scheme_name,
+                "--verbose",
+            ] + additional_flags
+        )
+
+        for repo in self.get_all_repos():
+            repo_path = os.path.join(self.source_root, repo)
+            self.assertTrue(os.path.isdir(repo_path))
+
+        current_commit = self.call(
+            ["git", "rev-parse", "HEAD"], cwd=os.path.join(self.source_root, "repo1")
+        ).strip()
+        self.assertEqual(current_commit, self.commit_hash)
 
 
 class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):

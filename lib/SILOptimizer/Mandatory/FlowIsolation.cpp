@@ -474,7 +474,7 @@ void Info::diagnoseAll(AnalysisInfo &info, bool forDeinit,
       diag.diagnose(illegalLoc.getSourceLoc(),
                     diag::isolated_property_mutation_in_nonisolated_context,
                     accessor->getStorage(), accessor->isSetter())
-          .warnUntilLanguageMode(6);
+          .warnUntilLanguageMode(LanguageMode::v6);
       continue;
     }
 
@@ -486,7 +486,7 @@ void Info::diagnoseAll(AnalysisInfo &info, bool forDeinit,
     diag.diagnose(illegalLoc.getSourceLoc(), diag::isolated_after_nonisolated,
                   forDeinit, var)
         .highlight(illegalLoc.getSourceRange())
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
 
     // after <verb><adjective> <subject>, ... can't use self anymore, etc ...
     //   example:

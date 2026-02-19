@@ -237,13 +237,6 @@ func testIndirectNonForwardedResult<T>(arg1: GNE<T>, arg2: GNE<T>) -> GNE<T> {
   forward(arg2) // expected-note {{this use causes the lifetime-dependent value to escape}}
 }
 
-func testIndirectClosureResult<T>(f: () -> GNE<T>) -> GNE<T> {
-  f()
-  // expected-error @-1{{lifetime-dependent variable '$return_value' escapes its scope}}
-  // expected-note  @-3{{it depends on the lifetime of argument '$return_value'}}
-  // expected-note  @-3{{this use causes the lifetime-dependent value to escape}}
-}
-
 // =============================================================================
 // Coroutines
 // =============================================================================
@@ -448,3 +441,28 @@ func dynamicCastBad<T>(_ span: Span<T>) -> Span<Int> {
   }
   return Span<Int>()
 }
+
+
+struct Wrapper<T: BitwiseCopyable>: ~Escapable {
+  private let span: Span<T>
+
+  @_lifetime(copy span)
+  init(span: borrowing Span<T>) {
+    self.span = copy span
+  }
+}
+
+struct SuperWrapper<T: BitwiseCopyable>: ~Escapable {
+  private let wrapper: Wrapper<T>
+
+  // An extra field forces a projection on 'self' within the initializer without any access scope.
+  var depth: Int = 0
+
+  // Make sure that LocalVariableUtils can successfully analyze 'self'. That's required to determine that the assignment
+  // of `wrapper` is returned without escaping
+  @_lifetime(copy span)
+  init(span: borrowing Span<T>) {
+    self.wrapper = Wrapper(span: span)
+  }
+}
+

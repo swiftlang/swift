@@ -2406,8 +2406,8 @@ public:
 /// Computes the raw values for an enum type.
 class EnumRawValuesRequest :
     public SimpleRequest<EnumRawValuesRequest,
-                         evaluator::SideEffect (EnumDecl *, TypeResolutionStage),
-                         RequestFlags::SeparatelyCached> {
+                         evaluator::SideEffect (EnumDecl *),
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
   
@@ -2416,17 +2416,15 @@ private:
   
   // Evaluation.
   evaluator::SideEffect
-  evaluate(Evaluator &evaluator, EnumDecl *ED, TypeResolutionStage stage) const;
+  evaluate(Evaluator &evaluator, EnumDecl *ED) const;
   
 public:
   // Cycle handling.
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
                            
-  // Separate caching.
-  bool isCached() const;
-  std::optional<evaluator::SideEffect> getCachedResult() const;
-  void cacheResult(evaluator::SideEffect value) const;
+  // Caching.
+  bool isCached() const { return true; }
 };
 
 /// Determines if an override is ABI compatible with its base method.
@@ -5015,6 +5013,24 @@ friend SimpleRequest;
 
 evaluator::SideEffect
 evaluate(Evaluator &evaluator, SourceFile *SF) const;
+
+public:
+bool isCached() const { return true; }
+};
+
+/// A request to constant-fold an expression node
+class ConstantFoldExpression
+: public SimpleRequest<ConstantFoldExpression,
+                       Expr *(const Expr *, ASTContext *),
+                       RequestFlags::Cached> {
+public:
+using SimpleRequest::SimpleRequest;
+
+private:
+friend SimpleRequest;
+
+Expr *
+evaluate(Evaluator &evaluator, const Expr *expr, ASTContext *ctx) const;
 
 public:
 bool isCached() const { return true; }

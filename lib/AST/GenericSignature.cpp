@@ -1356,36 +1356,125 @@ void GenericSignatureImpl::getRequirementsWithInverses(
     SmallVector<InverseRequirement, 2> &inverses) const {
   auto &ctx = getASTContext();
 
-  // Record the absence of conformances to invertible protocols.
-  for (auto gp : getGenericParams()) {
+  // TODO: deprecate support for this old version of the feature.
+  const bool LegacySuppAssoc =
+      ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypes);
+
+  llvm::SmallSet<CanType, 12> seenDMTs;
+  auto addInverses = [&](Type tyParam) {
+    // We keep track of member types for which we tried to add an inverse,
+    // as they're the same set of types for which we should filter-out
+    // any positive requirements as well, as they may not need an inverse.
+    if (tyParam->getAs<DependentMemberType>() &&
+        !seenDMTs.insert(tyParam->getCanonicalType()).second)
+      return;
+
     // Any generic parameter with a superclass bound or concrete type does not
     // have an inverse.
-    if (getSuperclassBound(gp) || getConcreteType(gp))
-      continue;
+    if (getSuperclassBound(tyParam) || getConcreteType(tyParam))
+      return;
 
     // Variable generics never have inverses (or the positive thereof).
-    if (gp->isValue())
-      continue;
+    if (auto gp = tyParam->getAs<GenericTypeParamType>()) {
+      if (gp->isValue())
+        return;
+    }
 
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
 
       // If we can derive a conformance to this protocol, then don't add an
       // inverse.
-      if (requiresProtocol(gp, proto))
+      if (requiresProtocol(tyParam, proto))
         continue;
 
       // Nothing implies a conformance to this protocol, so record the inverse.
-      inverses.push_back({gp, proto, SourceLoc()});
+      inverses.push_back({tyParam, proto, SourceLoc()});
+    }
+  };
+
+  // Record the absence of conformances to invertible protocols
+  // for generic parameters.
+  for (auto gp : getGenericParams()) {
+    addInverses(gp);
+  }
+
+  const unsigned MinDepth = getGenericParams().front()->getDepth();
+
+  /// Add inverses for all primary associated types (PATs) that are suppressed.
+  /// For example, given this protocol:
+  ///
+  ///     public protocol P<A> {
+  ///       associatedtype A: ~Copyable
+  ///     }
+  ///     public func i<T: P>(..) where T.A: ~Copyable {}
+  ///     public func c<T: P>(..) where T.A: Copyable {}
+  ///
+  /// The legacy version of the feature, without defaults, `i` would not mention
+  /// any inverses, as it was taken as a given it's ~Copyable, and only in `c`
+  /// would we see (both in mangling and interfaces) `T.A: Copyable`.
+  ///
+  /// In the new version, WITH defaults for PATs, it's the opposite.
+  /// Function `f` now WILL mention the inverse `T.A: ~Copyable` in `i`,
+  /// but `c` will not mention `T.A: Copyable`, as it's a given.
+  ///
+  /// For non-primary associated types, the behavior is the same as the legacy
+  /// version of the feature.
+  for (auto req : getRequirements()) {
+
+    // We never emitted inverses for any associated types in the legacy version.
+    if (LegacySuppAssoc)
+      break;
+
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    auto subject = req.getFirstType();
+    auto *proto = req.getProtocolDecl();
+
+    // Only consider conformance requirements whose subject is rooted in
+    // a generic parameter that is within this signature's depth.
+    if (subject->getRootGenericParam()->getDepth() < MinDepth)
+      continue;
+
+    // Try to add inverses all primary associated types, if they're suppressed
+    // within this signature.
+    for (auto pat : proto->getPrimaryAssociatedTypes()) {
+      auto member = DependentMemberType::get(subject, pat);
+
+      // Can end up in a situation where member is τ_1_0.Element under this sig:
+      //   <τ_1_0 where τ_0_0 : P7, τ_1_0 : Sequence, τ_0_0.A == τ_1_0.Element>
+      // and thus we end up with a type parameter τ_0_0.[P7:A] outside the sig.
+      if (!isValidTypeParameter(member))
+        continue;
+
+      addInverses(member);
     }
   }
 
-  // Filter out explicit conformances to invertible protocols.
+  // Filter out most explicit conformances to invertible protocols.
   for (auto req : getRequirements()) {
-    if (req.isInvertibleProtocolRequirement()) {
+    // If it's not a conformance to an invertible protocol, always include it.
+    if (req.getKind() != RequirementKind::Conformance ||
+        !req.getProtocolDecl()->getInvertibleProtocolKind()) {
+      reqs.push_back(req);
       continue;
     }
 
+    auto subject = req.getFirstType();
+
+    // Drop conformances to invertibles for generic type parameters, as we do
+    // infer a default for them.
+    if (subject->is<GenericTypeParamType>())
+      continue;
+
+    // If the subject matches a primary associated type we identified earlier,
+    // then we will infer a default for them, so drop this requirement.
+    if (seenDMTs.contains(subject->getCanonicalType()))
+      continue;
+
+    // Otherwise, for a non-primary associated type, no default is inferred,
+    // thus this conformance requirement was explicitly stated. Keep it.
     reqs.push_back(req);
   }
 }

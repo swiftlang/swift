@@ -138,6 +138,10 @@ void emitBuiltinTaskLocalValuePush(IRGenFunction &IGF, llvm::Value *key,
 
 void emitBuiltinTaskLocalValuePop(IRGenFunction &IGF);
 
+llvm::Value *emitBuiltinTaskCancellationShieldPush(IRGenFunction &IGF);
+
+void emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF);
+
 } // end namespace irgen
 } // end namespace swift
 

@@ -558,6 +558,8 @@ static AvailabilityRange getObjCClassStubAvailability(ASTContext &ctx) {
     return AvailabilityRange(llvm::VersionTuple(6, 0, 0));
   if (target.isXROS())
     return AvailabilityRange(llvm::VersionTuple(1, 0, 0));
+  if (target.isAppleFirmware())
+    return AvailabilityRange(llvm::VersionTuple(1, 0, 0));
   return AvailabilityRange::alwaysAvailable();
 }
 
@@ -2880,11 +2882,11 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
       // conflict checking and have to be diagnosed as warnings in Swift 5:
 
       // * Selectors for imported methods with async variants.
-      bool breakingInSwift5 = originalIsImportedAsync;
-      
+      bool breakingPreSwift6 = originalIsImportedAsync;
+
       // * Protocol requirements
       if (!isa<ClassDecl>(conflict.typeDecl))
-        breakingInSwift5 = true;
+        breakingPreSwift6 = true;
 
       bool redeclSame = (diagInfo == origDiagInfo);
       auto diag = Ctx.Diags.diagnose(conflictingDecl,
@@ -2893,7 +2895,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
                                      diagInfo.first, diagInfo.second,
                                      origDiagInfo.first, origDiagInfo.second,
                                      conflict.selector);
-      diag.warnUntilLanguageModeIf(breakingInSwift5, 6);
+      diag.warnUntilLanguageModeIf(breakingPreSwift6, LanguageMode::v6);
 
       // Temporarily soften selector conflicts in objcImpl extensions; we're
       // seeing some that are caused by ObjCImplementationChecker improvements.
@@ -3056,7 +3058,7 @@ bool swift::diagnoseObjCCategoryConflicts(SourceFile &sf) {
             .diagnose(catToCheck, diag::objc_redecl_category_name,
                       catToCheck->hasClangNode(), bestCat->hasClangNode(),
                       catName)
-            .warnUntilLanguageMode(6);
+            .warnUntilLanguageMode(LanguageMode::v6);
 
         Ctx.Diags.diagnose(bestCat, diag::invalid_redecl_prev_name, catName);
       }

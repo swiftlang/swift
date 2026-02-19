@@ -28,6 +28,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -119,6 +120,9 @@ namespace {
 
       /// The source type is any other pointer type.
       OtherPointer,
+
+      /// The source types is annotated with SWIFT_REFCOUNTED_PTR.
+      IntrusivelyRefCountedSmartPtr,
     };
 
     ImportHintKind Kind;
@@ -148,6 +152,7 @@ namespace {
     case ImportHint::Boolean:
     case ImportHint::NSUInteger:
     case ImportHint::Void:
+    case ImportHint::IntrusivelyRefCountedSmartPtr:
       return false;
 
     case ImportHint::Block:
@@ -894,6 +899,7 @@ namespace {
         case ImportHint::CFunctionPointer:
         case ImportHint::OtherPointer:
         case ImportHint::VAList:
+        case ImportHint::IntrusivelyRefCountedSmartPtr:
           return {mappedType, underlying.Hint};
 
         case ImportHint::Boolean:
@@ -1037,6 +1043,14 @@ namespace {
           Impl.importDecl(type->getDecl(), Impl.CurrentVersion));
       if (!decl)
         return nullptr;
+
+      for (const auto *attr : decl->getAttrs())
+        if (const auto *customAttr = dyn_cast<CustomAttr>(attr))
+          if (customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
+                  "_refCountedPtr")) {
+            return ImportResult(decl->getDeclaredInterfaceType(),
+                                ImportHint::IntrusivelyRefCountedSmartPtr);
+          }
 
       return decl->getDeclaredInterfaceType();
     }
@@ -1681,6 +1695,17 @@ static ImportedType adjustTypeForConcreteImport(
     }
 
     break;
+  case ImportHint::IntrusivelyRefCountedSmartPtr:
+    if (bridging == Bridgeability::Full && canBridgeTypes(importKind)) {
+      auto decl = importedType->castTo<StructType>()->getDecl();
+      auto lookupResult = decl->lookupDirect(
+          DeclName(impl.SwiftContext.getIdentifier("asReference")));
+      ASSERT(lookupResult.size() == 1);
+      auto asReference = cast<VarDecl>(lookupResult.front());
+      importedType = asReference->getInterfaceType();
+      optKind = OTK_None;
+    }
+    break;
   }
 
   assert(importedType);
@@ -2319,8 +2344,13 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   // context that uses C++ interop. In order to avoid the x-ref resolution
   // failure, normalize the return type's nullability for builtin functions in
   // C++ interop mode, to match the imported type in C interop mode.
+  //
+  // In C interop mode some of these builtins now have bounds annotations on
+  // Apple platforms, which breaks the clang bug that drops the nullability
+  // annotations. To avoid regressing, and make sure the platforms align, strip
+  // this info in C interop mode as well.
   auto builtinContext = clang::Builtin::Context();
-  if (SwiftContext.LangOpts.EnableCXXInterop && clangDecl->getBuiltinID() &&
+  if (clangDecl->getBuiltinID() &&
       !builtinContext.isTSBuiltin(clangDecl->getBuiltinID()) &&
       builtinContext.isPredefinedLibFunction(
           clangDecl->getBuiltinID()) &&

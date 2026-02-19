@@ -14,7 +14,7 @@ func test(_ b : BaseInHead) {
 // RUN: %sourcekitd-test -req=cursor -pos=3:7 %s -- %s -module-name Mixed -pch-output-dir %t -import-objc-header %S/Inputs/header.h | %FileCheck %s
 // RUN: stat %t/*.pch
 
-// CHECK: source.lang.swift.ref.function.method.instance ({{.*}}Inputs/header.h:4:9-4:23)
+// CHECK: source.lang.swift.ref.function.method.instance ({{.*}}Inputs/header.h:4:1-4:22)
 // CHECK: doIt(_:)
 // CHECK: c:objc(cs)BaseInHead(im)doIt:
 // CHECK: (BaseInHead) -> (Int32) -> ()

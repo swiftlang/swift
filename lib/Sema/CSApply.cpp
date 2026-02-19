@@ -445,15 +445,12 @@ namespace {
     bool SuppressDiagnostics;
 
     ExprRewriter(ConstraintSystem &cs, Solution &solution,
-                 SyntacticElementTarget target, bool suppressDiagnostics)
-        : ctx(cs.getASTContext()), cs(cs), dc(target.getDeclContext()),
+                 std::optional<SyntacticElementTarget> target,
+                 bool suppressDiagnostics)
+        : ctx(cs.getASTContext()), cs(cs),
+          dc(target ? target->getDeclContext() : cs.DC),
           solution(solution), target(target),
           SuppressDiagnostics(suppressDiagnostics) {}
-
-    ExprRewriter(ConstraintSystem &cs, Solution &solution, DeclContext &dc,
-                 bool suppressDiagnostics)
-        : ctx(cs.getASTContext()), cs(cs), dc(&dc), solution(solution),
-          target(std::nullopt), SuppressDiagnostics(suppressDiagnostics) {}
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
@@ -1248,6 +1245,10 @@ namespace {
         auto *param = thunkParamList->get(idx);
         auto arg = thunkTy->getParams()[idx];
 
+        // Propagate isolation from function type to the parameter declaration,
+        // this is important for subsequent verification.
+        param->setIsolated(arg.isIsolated());
+
         param->setInterfaceType(arg.getParameterType()->mapTypeOutOfEnvironment());
         param->setSpecifier(ParamDecl::getParameterSpecifierForValueOwnership(
             arg.getValueOwnership()));
@@ -1389,6 +1390,10 @@ namespace {
           ParamDecl::getParameterSpecifierForValueOwnership(
               selfThunkParam.getValueOwnership()));
       selfParamDecl->setImplicit();
+
+      // Propagate isolation from function type to the parameter declaration,
+      // this is important for subsequent verification.
+      selfParamDecl->setIsolated(selfThunkParam.isIsolated());
 
       // Build a reference to the 'self' parameter.
       Expr *selfParamRef = new (ctx) DeclRefExpr(selfParamDecl, DeclNameLoc(),
@@ -3750,8 +3755,8 @@ namespace {
       //  - Equal to T? if T is not optional
       //
       // The result is that in Swift 5, 'try?' avoids producing nested optionals.
-      
-      if (!ctx.isLanguageModeAtLeast(5)) {
+
+      if (!ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
         // Nothing to do for Swift 4 and earlier!
         return simplifyExprType(expr);
       }
@@ -4318,7 +4323,7 @@ namespace {
       // be an optional type, leave any extra optionals on the source in place.
       // Only apply the latter condition in Swift 5 mode to best preserve
       // compatibility with Swift 4.1's casting behaviour.
-      if (isBridgeToAnyObject || (ctx.isLanguageModeAtLeast(5) &&
+      if (isBridgeToAnyObject || (ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
                                   destValueType->canDynamicallyBeOptionalType(
                                       /*includeExistential*/ false))) {
         auto destOptionalsCount = destOptionals.size() - destExtraOptionals;
@@ -4532,7 +4537,7 @@ namespace {
         Expr *sub = expr->getSubExpr();
         auto subLoc =
             cs.getConstraintLocator(sub, ConstraintLocator::CoercionOperand);
-        sub = solution.coerceToType(sub, expr->getCastType(), subLoc, *dc);
+        sub = solution.coerceToType(sub, expr->getCastType(), subLoc);
         if (!sub)
           return nullptr;
 
@@ -5796,8 +5801,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
     SmallString<16> toLabelStr;
     concatLabels(labels, toLabelStr);
 
-    using namespace version;
-    if (ctx.isLanguageModeAtLeast(Version::getFutureMajorLanguageVersion())) {
+    if (ctx.isLanguageModeAtLeast(LanguageMode::future)) {
       ctx.Diags.diagnose(expr->getLoc(), diag::reordering_tuple_shuffle,
                          fromLabelStr, toLabelStr);
     } else {
@@ -6164,7 +6168,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
     // Both the caller and the allee are in the same module.
     if (dc->getParentModule() == decl->getModuleContext()) {
-      return !dc->getASTContext().isLanguageModeAtLeast(6);
+      return !dc->getASTContext().isLanguageModeAtLeast(LanguageMode::v6);
     }
 
     // If we cannot figure out where the callee came from, let's conservatively
@@ -6341,7 +6345,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
         // to be used by value if parameter would return a function
         // type (it just needs to get wrapped into autoclosure expr),
         // otherwise argument must always form a call.
-        return ctx.isLanguageModeAtLeast(5);
+        return ctx.isLanguageModeAtLeast(LanguageMode::v5);
       }
 
       return true;
@@ -6709,9 +6713,11 @@ static Expr *buildElementConversion(ExprRewriter &rewriter,
   return rewriter.coerceToType(element, destType, locator);
 }
 
-static ConversionPair buildOpaqueElementConversion(
-    ExprRewriter &rewriter, SourceRange srcRange, Type srcType, Type destType,
-    bool bridged, ConstraintLocatorBuilder locator, unsigned typeArgIndex) {
+static CollectionUpcastConversionExpr::ConversionPair
+buildOpaqueElementConversion(ExprRewriter &rewriter, SourceRange srcRange,
+                             Type srcType, Type destType,
+                             bool bridged, ConstraintLocatorBuilder locator,
+                             unsigned typeArgIndex) {
   // Build the conversion.
   auto &cs = rewriter.getConstraintSystem();
   ASTContext &ctx = cs.getASTContext();
@@ -6724,69 +6730,6 @@ static ConversionPair buildOpaqueElementConversion(
       opaque);
 
   return { opaque, conversion };
-}
-
-static ClosureExpr *buildClosureElementConversion(
-    ExprRewriter &rewriter, SourceRange srcRange, Type srcType, Type destType,
-    bool bridged, ConstraintLocatorBuilder locator, unsigned typeArgIndex) {
-  // Build the conversion.
-  auto &cs = rewriter.getConstraintSystem();
-  ASTContext &Context = cs.getASTContext();
-
-  DeclContext *declContext = rewriter.dc;
-
-  DeclAttributes attributes;
-  SourceRange bracketRange;
-  VarDecl *capturedSelfDecl = nullptr;
-  SourceLoc asyncLoc;
-  SourceLoc throwsLoc;
-  TypeExpr *thrownType = nullptr;
-  SourceLoc arrowLoc;
-  TypeExpr *explicitResultType = nullptr;
-  SourceLoc inLoc;
-
-  ClosureExpr *closure = new (Context) ClosureExpr(
-      attributes, bracketRange, capturedSelfDecl, nullptr, asyncLoc, throwsLoc,
-      thrownType, arrowLoc, inLoc, explicitResultType, declContext);
-  closure->setImplicit(true);
-  closure->setIsConversionClosure(true);
-
-  Identifier ident = Context.getDollarIdentifier(0);
-  ParamDecl *param = new (Context) ParamDecl(
-      SourceLoc(), SourceLoc(), Identifier(), SourceLoc(), ident, closure);
-
-  param->setSpecifier(ParamSpecifier::Default);
-  param->setInterfaceType(srcType->mapTypeOutOfEnvironment());
-  param->setImplicit();
-
-  ParameterList *params =
-      ParameterList::create(Context, SourceLoc(), ArrayRef(param), SourceLoc());
-  closure->setParameterList(params);
-
-  auto srcExp = rewriter.cs.cacheType(
-      new (Context) DeclRefExpr(param, DeclNameLoc(srcRange.Start), true,
-                                AccessSemantics::Ordinary, srcType));
-
-  Expr *conversion = buildElementConversion(
-      rewriter, srcRange, srcType, destType, bridged,
-      locator.withPathElement(LocatorPathElt::GenericArgument(typeArgIndex)),
-      srcExp);
-
-  auto *RS = ReturnStmt::createImplicit(Context, conversion);
-  ASTNode bodyNode(RS);
-  auto *BS = BraceStmt::createImplicit(Context, ArrayRef(bodyNode));
-  closure->setBody(BS);
-
-  auto closureParam = AnyFunctionType::Param(srcType);
-  auto extInfo =
-      FunctionType::ExtInfo().withNoEscape().withSendable().withoutIsolation();
-  auto *fnTy = FunctionType::get(ArrayRef(closureParam), destType, extInfo);
-  closure->setType(fnTy);
-
-  closure->setCaptureInfo(CaptureInfo::empty());
-
-  rewriter.cs.cacheType(closure);
-  return closure;
 }
 
 void ExprRewriter::peepholeArrayUpcast(ArrayExpr *expr, Type toType,
@@ -6923,8 +6866,10 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
   // Build the first value conversion.
   auto fromArgs = cs.getType(expr)->castTo<BoundGenericType>()->getGenericArgs();
   auto toArgs = toType->castTo<BoundGenericType>()->getGenericArgs();
-  auto conv = buildClosureElementConversion(*this, expr->getLoc(), fromArgs[0],
-                                            toArgs[0], bridged, locator, 0);
+  auto conv =
+    buildOpaqueElementConversion(*this, expr->getLoc(),
+                                 fromArgs[0], toArgs[0],
+                                 bridged, locator, 0);
 
   // For single-parameter collections, form the upcast.
   if (toType->isArray() || ConstraintSystem::isSetType(toType)) {
@@ -6936,8 +6881,10 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
          "Unhandled collection upcast");
 
   // Build the second value conversion.
-  auto conv2 = buildClosureElementConversion(*this, expr->getLoc(), fromArgs[1],
-                                             toArgs[1], bridged, locator, 1);
+  auto conv2 =
+    buildOpaqueElementConversion(*this, expr->getLoc(),
+                                 fromArgs[1], toArgs[1],
+                                 bridged, locator, 1);
 
   return cs.cacheType(
            new (ctx) CollectionUpcastConversionExpr(expr, toType, conv, conv2));
@@ -7019,7 +6966,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
 
   // Use the requirements of any parameterized protocols to build out fake
   // argument conversions that can be used to infer opaque types.
-  SmallVector<ConversionPair, 4> argConversions;
+  SmallVector<CollectionUpcastConversionExpr::ConversionPair, 4> argConversions;
 
   auto fromConstraintType = fromInstanceType;
   if (auto existential = fromConstraintType->getAs<ExistentialType>())
@@ -7152,8 +7099,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // ```
       //
       // See also: https://github.com/apple/swift/issues/49345
-      if (ctx.isLanguageModeAtLeast(4) &&
-          !ctx.isLanguageModeAtLeast(5)) {
+      if (ctx.isLanguageModeAtLeast(LanguageMode::v4) &&
+          !ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
         auto obj1 = fromType->getOptionalObjectType();
         auto obj2 = toType->getOptionalObjectType();
 
@@ -7753,6 +7700,23 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
         // Propagating 'async' might have satisfied the entire conversion.
         // If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
+      }
+    }
+
+    // If we have a ClosureExpr, then we can safely propagate the lifetime
+    // dependence info to the closure without invalidating prior analysis.
+    fromEI = fromFunc->getExtInfo();
+    if (!toEI.getLifetimeDependencies().empty() &&
+        fromEI.getLifetimeDependencies().empty()) {
+      auto newFromFuncType = fromFunc->withExtInfo(
+          fromEI.withLifetimeDependencies(toEI.getLifetimeDependencies()));
+      if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+
+        // Propagating 'lifetime dependence info' might have satisfied the
+        // entire conversion. If so, we're done, otherwise keep converting.
         if (fromFunc->isEqual(toType))
           return expr;
       }
@@ -9291,8 +9255,7 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
 
   auto locator = cs.getConstraintLocator(
       target.getAsExpr(), LocatorPathElt::ContextualType(CTP_Initialization));
-  initializer = solution.coerceToType(initializer, initType, locator,
-                                      *rewriter.getCurrentDC());
+  initializer = solution.coerceToType(initializer, initType, locator);
   if (!initializer)
     return std::nullopt;
 
@@ -9798,10 +9761,10 @@ ConstraintSystem::applySolution(Solution &solution,
   return resultTarget;
 }
 
-Expr *Solution::coerceToType(Expr *expr, Type toType,
-                             ConstraintLocator *locator, DeclContext &dc) {
+Expr *
+Solution::coerceToType(Expr *expr, Type toType, ConstraintLocator *locator) {
   auto &cs = getConstraintSystem();
-  ExprRewriter rewriter(cs, *this, dc, /*suppressDiagnostics=*/false);
+  ExprRewriter rewriter(cs, *this, std::nullopt, /*suppressDiagnostics=*/false);
   Expr *result = rewriter.coerceToType(expr, toType, locator);
   if (!result)
     return nullptr;

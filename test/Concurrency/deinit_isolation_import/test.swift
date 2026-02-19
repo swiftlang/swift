@@ -259,7 +259,7 @@ class ProbeDefault_BaseIsolatedClass: BaseIsolatedClass {
 }
 
 // CHECK-LABEL: @objc @_inheritsConvenienceInitializers @MainActor @preconcurrency class ProbeIsolated_BaseIsolatedClass : BaseIsolatedClass {
-// CHECK: @objc @preconcurrency isolated deinit
+// CHECK: @objc isolated deinit
 // CHECK: }
 // CHECK-SYMB: ProbeIsolated_BaseIsolatedClass.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor
@@ -319,7 +319,7 @@ class ProbeDefault_DerivedIsolatedClass: DerivedIsolatedClass {
 }
 
 // CHECK-LABEL: @objc @_inheritsConvenienceInitializers @MainActor @preconcurrency class ProbeIsolated_DerivedIsolatedClass : DerivedIsolatedClass {
-// CHECK: @objc @preconcurrency isolated deinit
+// CHECK: @objc isolated deinit
 // CHECK: }
 // CHECK-SYMB: ProbeIsolated_DerivedIsolatedClass.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor

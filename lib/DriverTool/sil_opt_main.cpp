@@ -763,11 +763,12 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       exit(-1);
     }
 
-    if (auto firstVersion = feature->getLanguageMode()) {
-      if (Invocation.getLangOptions().isLanguageModeAtLeast(*firstVersion)) {
+    if (auto languageMode = feature->getLanguageMode()) {
+      if (Invocation.getLangOptions().isLanguageModeAtLeast(
+              languageMode.value())) {
         llvm::errs() << "error: upcoming feature " << QuotedString(featureName)
-                     << " is already enabled as of Swift version "
-                     << *firstVersion << '\n';
+                     << " already enabled as of the Swift "
+                     << languageMode->versionString() << " language mode\n";
         exit(-1);
       }
     }

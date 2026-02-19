@@ -593,9 +593,6 @@ void importer::getNormalInvocationArguments(
     }
   }
 
-  if (LangOpts.hasFeature(Feature::SafeInteropWrappers))
-    invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
-
   // Set C language options.
   if (triple.isOSDarwin()) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
@@ -809,6 +806,9 @@ void importer::getNormalInvocationArguments(
   if (importerOpts.LoadVersionIndependentAPINotes)
     invocationArgStrs.insert(invocationArgStrs.end(),
                              {"-fswift-version-independent-apinotes"});
+
+  if (!LangOpts.DisableSafeInteropWrappers)
+    invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
 }
 
 static void
@@ -1179,7 +1179,15 @@ ClangImporter::computeClangImporterFileSystem(
   if (fileMapping.redirectedFiles.empty() && fileMapping.overridenFiles.empty())
     return baseFS;
 
+  // Compute and set working directory.
   const auto &importerOpts = ctx.ClangImporterOpts;
+  auto workingDirPos =
+      std::find(importerOpts.ExtraArgs.rbegin(), importerOpts.ExtraArgs.rend(),
+                "-working-directory");
+  if (workingDirPos != importerOpts.ExtraArgs.rend() &&
+      workingDirPos != importerOpts.ExtraArgs.rbegin())
+    baseFS->setCurrentWorkingDirectory(*(workingDirPos - 1));
+
   if (!fileMapping.redirectedFiles.empty()) {
     if (importerOpts.DumpClangDiagnostics) {
       llvm::errs() << "clang importer redirected file mappings:\n";
@@ -1395,6 +1403,16 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
   if (!clang::CompilerInvocation::CreateFromArgs(
           *CI, invocationArgs, clangDiags, importerOpts.clangPath.c_str()))
     return nullptr;
+
+  // Disable validation for PCH in LLDB. This option is not controllable via a
+  // command line option; setting it depending on the DebuggerSupport flag.
+  // LLDB makes a best effort to create a 100% compatible environment by
+  // deserializing its CompilerInvocation and Clang flags from the main Swift
+  // module, but it needs to be able to adjust other language options on top in
+  // a way that otherwise would make validation fail.
+  if (importerOpts.DebuggerSupport)
+    CI->getPreprocessorOpts().DisablePCHOrModuleValidation =
+      clang::DisableValidationForModuleKind::PCH;
 
   return CI;
 }
@@ -6226,9 +6244,9 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
 
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types, unless the base accessor returns it by value.
-  bool useAddress = baseClassVar->getAccessor(AccessorKind::Address) ||
-                    (contextTy->isNoncopyable() &&
-                     baseClassVar->getReadImpl() == ReadImplKind::Stored);
+  bool useAddress = contextTy->isNoncopyable() &&
+                    (baseClassVar->getReadImpl() == ReadImplKind::Stored ||
+                     baseClassVar->getAccessor(AccessorKind::Address));
 
   ParameterList *bodyParams = nullptr;
   if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
@@ -6376,6 +6394,12 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
   }
 
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    auto contextTy =
+        newContext->mapTypeIntoEnvironment(subscript->getElementInterfaceType());
+    // Subscripts that return non-copyable types are not yet supported.
+    // See: https://github.com/apple/swift/issues/70047.
+    if (contextTy->isNoncopyable())
+      return nullptr;
     auto out = SubscriptDecl::create(
         subscript->getASTContext(), subscript->getName(), subscript->getStaticLoc(),
         subscript->getStaticSpelling(), subscript->getSubscriptLoc(),
@@ -7838,6 +7862,10 @@ Decl *ClangImporter::importDeclDirectly(const clang::NamedDecl *decl) {
   return Impl.importDecl(decl, Impl.CurrentVersion);
 }
 
+Decl *ClangImporter::lookupImportedDecl(const clang::NamedDecl *decl) {
+  return Impl.lookupImportedDecl(decl);
+}
+
 ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
     ValueDecl *decl, DeclContext *newContext,
     ClangInheritanceInfo inheritance) {
@@ -7878,16 +7906,6 @@ bool ClangImporter::Implementation::isMemberSynthesizedPerType(
 void ClangImporter::Implementation::markMemberSynthesizedPerType(
     const ValueDecl *decl) {
   membersSynthesizedPerType.insert(decl);
-}
-
-size_t ClangImporter::Implementation::getImportedBaseMemberDeclArity(
-    const ValueDecl *valueDecl) {
-  if (auto *func = dyn_cast<FuncDecl>(valueDecl)) {
-    if (auto *params = func->getParameters()) {
-      return params->size();
-    }
-  }
-  return 0;
 }
 
 ValueDecl *
@@ -8137,21 +8155,22 @@ importer::getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
   return refParentDecls.front();
 }
 
-// Is this a pointer to a foreign reference type.
-// TODO: We need to review functions like this to ensure that
-// CxxRecordSemantics::evaluate is consistently invoked wherever we need to
-// determine whether a C++ type qualifies as a foreign reference type
-// rdar://145184659
-static bool isForeignReferenceType(const clang::QualType type) {
-  if (!type->isPointerType())
+/// Is this a pointer or a reference to a foreign reference type.
+static bool isForeignReferenceType(const clang::QualType type,
+                                   ASTContext &ctx) {
+  if (!type->isPointerOrReferenceType())
     return false;
 
   auto pointeeType =
       dyn_cast<clang::RecordType>(type->getPointeeType().getCanonicalType());
   if (pointeeType == nullptr)
     return false;
+  auto pointeeDecl = pointeeType->getAsRecordDecl();
 
-  return hasImportAsRefAttr(pointeeType->getDecl());
+  auto semanticsKind = evaluateOrDefault(
+      ctx.evaluator,
+      CxxRecordSemantics({pointeeDecl, ctx, /*importerImpl=*/nullptr}), {});
+  return semanticsKind == CxxRecordSemanticsKind::Reference;
 }
 
 static bool hasSwiftAttribute(const clang::Decl *decl, StringRef attr) {
@@ -8598,7 +8617,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
         isa<clang::CXXConstructorDecl>(decl))
       return true;
 
-    if (isForeignReferenceType(method->getReturnType()))
+    if (isForeignReferenceType(method->getReturnType(), desc.ctx))
       return true;
 
     // begin and end methods likely return an interator, so they're unsafe. This
@@ -8611,8 +8630,8 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
       ->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
 
     bool parentIsSelfContained =
-      !isForeignReferenceType(parentQualType) &&
-      anySubobjectsSelfContained(method->getParent());
+        !isForeignReferenceType(parentQualType, desc.ctx) &&
+        anySubobjectsSelfContained(method->getParent());
 
     // If it returns a pointer or reference from an owned parent, that's a
     // projection (unsafe).
@@ -8872,6 +8891,94 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
 
 bool ClangDeclExplicitSafety::isCached() const {
   return isa<clang::RecordDecl>(std::get<0>(getStorage()).decl);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           ClangRefCountedSmartPointerDescriptor desc) {
+  out << "Validating SWIFT_REFCOUNTED_PTR for '";
+  out << desc.smartPtr->getNameStr();
+  out << "'\n";
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(ClangRefCountedSmartPointerDescriptor desc) {
+  return SourceLoc();
+}
+
+RefCountedPtrRequestResult ClangRefCountedSmartPointer::evaluate(
+    Evaluator &evaluator, ClangRefCountedSmartPointerDescriptor desc) const {
+  for (const auto *attr : desc.smartPtr->getAttrs()) {
+    if (const auto *customAttr = dyn_cast<CustomAttr>(attr)) {
+      if (!customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
+              "_refCountedPtr"))
+        continue;
+      StringRef ToRawPtrFuncName;
+      for (auto arg : *customAttr->getArgs()) {
+        if (arg.getLabel().str() == "ToRawPointer") {
+          if (const auto *literal = dyn_cast<StringLiteralExpr>(arg.getExpr()))
+            ToRawPtrFuncName = literal->getValue();
+        }
+      }
+      if (ToRawPtrFuncName.empty())
+        return {RefCountedPtrError::MissingToRawPointer, nullptr};
+
+      auto results = getValueDeclsForName(desc.smartPtr, ToRawPtrFuncName);
+      if (results.empty())
+        return {RefCountedPtrError::ToRawPointerLookupFailure, nullptr,
+                ToRawPtrFuncName};
+
+      if (results.size() > 1)
+        return {RefCountedPtrError::ToRawPointerLookupAmbiguity, nullptr,
+                ToRawPtrFuncName};
+
+      auto toRawPtrFunc = dyn_cast<FuncDecl>(results.front());
+      if (!toRawPtrFunc)
+        return {RefCountedPtrError::ToRawPointerNotFunction, toRawPtrFunc};
+
+      auto pointeeType = toRawPtrFunc->getResultInterfaceType()
+                             ->lookThroughSingleOptionalType();
+      ClassDecl *referenceDecl = pointeeType->getClassOrBoundGenericClass();
+
+      if (toRawPtrFunc->getParameters()->size() != 0 || !referenceDecl)
+        return {RefCountedPtrError::ToRawPointerWrongSignature, toRawPtrFunc};
+
+      auto ctors =
+          desc.smartPtr->lookupDirect(DeclBaseName::createConstructor());
+      // We should have a single constructor taking a foreign reference
+      // types. This is relied on during SILGen to introduce implicit
+      // bridging.
+      ConstructorDecl *selected = nullptr;
+      Type selectedCtorParamType = nullptr;
+      for (auto result : ctors) {
+        auto ctor = cast<ConstructorDecl>(result);
+        if (ctor->getParameters()->size() != 1)
+          continue;
+        Type ctorParamType = ctor->getParameters()->get(0)->getInterfaceType();
+        if (ctorParamType->isForeignReferenceType()) {
+          if (selected != nullptr)
+            return {RefCountedPtrError::CtorLookupAmbiguity, toRawPtrFunc};
+          selected = ctor;
+          selectedCtorParamType = ctorParamType;
+        }
+      }
+      if (!selected)
+        return {RefCountedPtrError::CtorLookupFailure, toRawPtrFunc};
+      if (!selectedCtorParamType->lookThroughSingleOptionalType()->isEqual(
+              pointeeType))
+        return {RefCountedPtrError::CtorWrongParamType, toRawPtrFunc};
+
+      return {RefCountedPtrInfo{selected}, toRawPtrFunc};
+    }
+  }
+  return {RefCountedPtrError::NotAnnotated, nullptr};
+}
+
+RefCountedPtrRequestResult
+importer::getClangRefCountedSmartPointer(NominalTypeDecl *decl) {
+  return evaluateOrDefault(
+      decl->getASTContext().evaluator,
+      ClangRefCountedSmartPointer(ClangRefCountedSmartPointerDescriptor{decl}),
+      RefCountedPtrRequestResult{RefCountedPtrError::NotAnnotated, nullptr});
 }
 
 const clang::TypedefType *ClangImporter::getTypeDefForCXXCFOptionsDefinition(

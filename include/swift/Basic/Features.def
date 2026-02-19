@@ -278,38 +278,48 @@ LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
 LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)")
 LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
+LANGUAGE_FEATURE(ClosureLifetimes, 0, "Support @_lifetime on function types")
+BASELINE_LANGUAGE_FEATURE(ExcludePrivateFromMemberwiseInit, 502, "Exclude private initialized properties from memberwise init")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
 SUPPRESSIBLE_LANGUAGE_FEATURE(CAttribute, 495, "@c attribute")
 
-// Swift 6
-UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
-UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
-UPCOMING_FEATURE(StrictConcurrency, 0337, 6)
-UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
-UPCOMING_FEATURE(DeprecateApplicationMain, 383, 6)
-UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
-UPCOMING_FEATURE(DisableOutwardActorInference, 401, 6)
-UPCOMING_FEATURE(IsolatedDefaultValues, 411, 6)
-UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
-UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
-UPCOMING_FEATURE(ImplicitOpenExistentials, 352, 6)
-UPCOMING_FEATURE(RegionBasedIsolation, 414, 6)
-UPCOMING_FEATURE(DynamicActorIsolation, 423, 6)
-UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, 6)
-UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
+//===----------------------------------------------------------------------===//
+// MARK: - Swift 6 features
+//===----------------------------------------------------------------------===//
 
-// Swift 7
-MIGRATABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
-UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
-MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
-MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
-MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
-UPCOMING_FEATURE(ImmutableWeakCaptures, 481, 7)
-UPCOMING_FEATURE(StrictAccessControl, 0, 7)
+UPCOMING_FEATURE(ConciseMagicFile, 274, LanguageMode::v6)
+UPCOMING_FEATURE(ForwardTrailingClosures, 286, LanguageMode::v6)
+UPCOMING_FEATURE(StrictConcurrency, 0337, LanguageMode::v6)
+UPCOMING_FEATURE(BareSlashRegexLiterals, 354, LanguageMode::v6)
+UPCOMING_FEATURE(DeprecateApplicationMain, 383, LanguageMode::v6)
+UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, LanguageMode::v6)
+UPCOMING_FEATURE(DisableOutwardActorInference, 401, LanguageMode::v6)
+UPCOMING_FEATURE(IsolatedDefaultValues, 411, LanguageMode::v6)
+UPCOMING_FEATURE(GlobalConcurrency, 412, LanguageMode::v6)
+UPCOMING_FEATURE(InferSendableFromCaptures, 418, LanguageMode::v6)
+UPCOMING_FEATURE(ImplicitOpenExistentials, 352, LanguageMode::v6)
+UPCOMING_FEATURE(RegionBasedIsolation, 414, LanguageMode::v6)
+UPCOMING_FEATURE(DynamicActorIsolation, 423, LanguageMode::v6)
+UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, LanguageMode::v6)
+UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, LanguageMode::v6)
 
-// Optional language features / modes
+//===----------------------------------------------------------------------===//
+// MARK: - Future Swift features
+//===----------------------------------------------------------------------===//
+
+MIGRATABLE_UPCOMING_FEATURE(ExistentialAny, 335, LanguageMode::future)
+UPCOMING_FEATURE(InternalImportsByDefault, 409, LanguageMode::future)
+MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, LanguageMode::future)
+MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, LanguageMode::future)
+MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, LanguageMode::future)
+UPCOMING_FEATURE(ImmutableWeakCaptures, 481, LanguageMode::future)
+UPCOMING_FEATURE(StrictAccessControl, 0, LanguageMode::future)
+
+//===----------------------------------------------------------------------===//
+// MARK: - Optional features
+//===----------------------------------------------------------------------===//
 
 /// Diagnose uses of language constructs and APIs that can violate memory
 /// safety.
@@ -317,7 +327,9 @@ MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(StrictMemorySafety, 458, "Strict memory saf
 
 OPTIONAL_LANGUAGE_FEATURE(LibraryEvolution, 0, "Library evolution")
 
-// Experimental features
+//===----------------------------------------------------------------------===//
+// MARK: - Experimental features
+//===----------------------------------------------------------------------===//
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
@@ -492,8 +504,9 @@ EXPERIMENTAL_FEATURE(Extern, true)
 // Enable trailing comma for comma-separated lists.
 EXPERIMENTAL_FEATURE(TrailingComma, false)
 
-// Import bounds safety and lifetime attributes from interop headers to
-// generate Swift wrappers with safe pointer types.
+// Enable legacy wrappers that treat __lifetimebound parameters as implicitly
+//  __noescape. Kept around to avoid breaking early adopters, but will not be
+// stabilized.
 EXPERIMENTAL_FEATURE(SafeInteropWrappers, true)
 
 /// Ignore resilience errors due to C++ types.
@@ -501,6 +514,9 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 
 /// Import inherited non-public members when importing C++ classes.
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
+
+/// Do not import non-field C++ record members until requested from Swift.
+EXPERIMENTAL_FEATURE(ImportCxxMembersLazily, true)
 
 /// `yielding borrow`/`yielding mutate` single-yield coroutine accessors
 // TODO: When this is turned on by default, take care of:
@@ -529,8 +545,12 @@ EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 /// Allow declaration of compile-time values
 EXPERIMENTAL_FEATURE(CompileTimeValues, true)
 
-/// Allow declaration of compile-time values
+/// Allow declaration of compile-time values bypassing
+/// syntactic legality checking
 EXPERIMENTAL_FEATURE(CompileTimeValuesPreview, false)
+
+/// Allow use of literal expressions as literals
+EXPERIMENTAL_FEATURE(LiteralExpressions, true)
 
 /// Allow function body macros applied to closures.
 EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
@@ -545,15 +565,18 @@ EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
 /// Enable @_lifetime attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
-/// Excludes '(file)private' properties with initial values from the memberwise
-/// initializer if there is a more accessible initializable property.
-EXPERIMENTAL_FEATURE(ExcludePrivateFromMemberwiseInit, true)
+/// Deprecates the compatibility memberwise initializer introduced by SE-0502,
+/// and removes it in the next major language mode.
+EXPERIMENTAL_FEATURE(DeprecateCompatMemberwiseInit, false)
 
 /// Allow macro based aliases to be imported into Swift
 EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 
 /// Enable borrow/mutate accessors
 EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, false)
+
+/// Enable borrowing for-in loops
+EXPERIMENTAL_FEATURE(BorrowingForLoop, false)
 
 /// Allow use of @inline(always) attribute
 SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
@@ -587,11 +610,17 @@ EXPERIMENTAL_FEATURE(CheckImplementationOnlyStrict, false)
 /// Check that use sites have the required @_spi import for operators.
 EXPERIMENTAL_FEATURE(EnforceSPIOperatorGroup, true)
 
+/// Allows an existing protocol to refine a new one, without ABI break.
+EXPERIMENTAL_FEATURE(Reparenting, true)
+
 /// Enable source-level warning control with `@warn`
 EXPERIMENTAL_FEATURE(SourceWarningControl, true)
 
 /// Allows a `get` returning a noncopyable type have owned semantics in opaque interfaces.
 EXPERIMENTAL_FEATURE(UnderscoreOwned, true)
+
+/// Allows the standard library `Borrow` and `Inout` types to be used.
+EXPERIMENTAL_FEATURE(BorrowInout, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

@@ -41,6 +41,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
 
@@ -1783,7 +1784,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         // this is Swift version >= 5 where forwarding is not allowed,
         // argument would always be wrapped into an implicit closure
         // at the end, so we can safely match against result type.
-        if (ctx.isLanguageModeAtLeast(5) || !isAutoClosureArgument(argExpr)) {
+        if (ctx.isLanguageModeAtLeast(LanguageMode::v5) ||
+            !isAutoClosureArgument(argExpr)) {
           // In Swift >= 5 mode there is no @autoclosure forwarding,
           // so let's match result types.
           if (auto *fnType = paramTy->getAs<FunctionType>()) {
@@ -2593,7 +2595,7 @@ static bool isSingleTupleParam(ASTContext &ctx,
   // let foo: ((Int, Int)?) -> Void = { _ in }
   //
   // bar(foo) // Ok
-  if (!ctx.isLanguageModeAtLeast(5))
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5))
     paramType = paramType->lookThroughAllOptionalTypes();
 
   // Parameter type should either a tuple or something that can become a
@@ -2940,6 +2942,52 @@ matchFunctionThrowing(ConstraintSystem &cs,
   }
 }
 
+ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionSendability(
+    FunctionType *func1, FunctionType *func2, ConstraintKind kind,
+    ConstraintSystem::TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *constraint = Constraint::create(*this, kind, func1, func2,
+                                            getConstraintLocator(locator));
+      addUnsolvedConstraint(constraint);
+      return getTypeMatchSuccess();
+    }
+    return getTypeMatchAmbiguous();
+  };
+
+  // First check to see if we have any sendable dependent function types, if
+  // any of them still have unresolved type variables we need to wait until
+  // they're fully resolved.
+  auto dep1 = func1->getSendableDependentType();
+  if (dep1) {
+    dep1 = simplifyType(dep1);
+    if (dep1->hasTypeVariable())
+      return formUnsolved();
+  }
+  auto dep2 = func2->getSendableDependentType();
+  if (dep2) {
+    dep2 = simplifyType(dep2);
+    if (dep2->hasTypeVariable())
+      return formUnsolved();
+  }
+
+  // Sendability is given by either the sendability of the dependent type if
+  // present, otherwise it's given by the function itself.
+  auto func1Sendable = dep1 ? dep1->isSendableType() : func1->isSendable();
+  auto func2Sendable = dep2 ? dep2->isSendableType() : func2->isSendable();
+
+  if (func1Sendable != func2Sendable) {
+    // A @Sendable function can be a subtype of a non-@Sendable function.
+    if (kind < ConstraintKind::Subtype || func2Sendable) {
+      if (AddSendableAttribute::attempt(*this, kind, func1, func2, locator))
+        return getTypeMatchFailure(locator);
+    }
+  }
+  return getTypeMatchSuccess();
+}
+
 static bool isWitnessMatching(ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
   (void) locator.getLocatorParts(path);
@@ -3127,6 +3175,12 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
+  // If the locator is for a @Sendable match, that's all we want to do.
+  if (auto last = locator.last()) {
+    if (last->is<LocatorPathElt::FunctionSendability>())
+      return matchFunctionSendability(func1, func2, kind, flags, locator);
+  }
+
   // Match the 'throws' effect.
   TypeMatchResult throwsResult =
       matchFunctionThrowing(*this, func1, func2, kind, flags, locator);
@@ -3159,14 +3213,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       increaseScore(SK_SyncInAsync, locator);
   }
 
-  // A @Sendable function can be a subtype of a non-@Sendable function.
-  if (func1->isSendable() != func2->isSendable()) {
-    // Cannot add '@Sendable'.
-    if (func2->isSendable() || kind < ConstraintKind::Subtype) {
-      if (AddSendableAttribute::attempt(*this, kind, func1, func2, locator))
-        return getTypeMatchFailure(locator);
-    }
-  }
+  // Match @Sendable.
+  auto sendableResult = matchFunctionSendability(
+      func1, func2, kind, TMF_GenerateConstraints,
+      locator.withPathElement(ConstraintLocator::FunctionSendability));
+  if (sendableResult.isFailure())
+    return sendableResult;
 
   // A non-@noescape function type can be a subtype of a @noescape function
   // type.
@@ -3404,7 +3456,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
             canImplodeParams(func1Params, /*destFn*/ func2)) {
           implodeParams(func1Params);
           increaseScore(SK_FunctionConversion, locator);
-        } else if (!ctx.isLanguageModeAtLeast(5) &&
+        } else if (!ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
                    isSingleTupleParam(ctx, func1Params) &&
                    canImplodeParams(func2Params,  /*destFn*/ func1)) {
           auto *simplified = locator.trySimplifyToExpr();
@@ -3491,8 +3543,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // https://github.com/apple/swift/issues/49345
   // Add a super-narrow hack to allow '(()) -> T' to be passed in place
   // of '() -> T'.
-  if (getASTContext().isLanguageModeAtLeast(4) &&
-      !getASTContext().isLanguageModeAtLeast(5)) {
+  if (getASTContext().isLanguageModeAtLeast(LanguageMode::v4) &&
+      !getASTContext().isLanguageModeAtLeast(LanguageMode::v5)) {
     SmallVector<LocatorPathElt, 4> path;
     locator.getLocatorParts(path);
 
@@ -4675,7 +4727,7 @@ ConstraintSystem::matchTypesBindTypeVar(
             ->isLastElement<LocatorPathElt::ApplyArgument>();
 
     if (!(typeVar->getImpl().canBindToPack() && representsParameterList) ||
-        getASTContext().isLanguageModeAtLeast(6)) {
+        getASTContext().isLanguageModeAtLeast(LanguageMode::v6)) {
       if (!shouldAttemptFixes())
         return getTypeMatchFailure(locator);
 
@@ -5055,7 +5107,8 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
 
   if (auto *optTryExpr = dyn_cast<OptionalTryExpr>(anchor)) {
     auto subExprType = cs.getType(optTryExpr->getSubExpr());
-    const bool isSwift5OrGreater = cs.getASTContext().isLanguageModeAtLeast(5);
+    const bool isSwift5OrGreater =
+        cs.getASTContext().isLanguageModeAtLeast(LanguageMode::v5);
 
     if (subExprType->getOptionalObjectType()) {
       if (isSwift5OrGreater) {
@@ -5771,7 +5824,7 @@ bool ConstraintSystem::repairFailures(
           // (note that `swift_attr` in type contexts weren't supported
           // before) and for witnesses to adopt them gradually by matching
           // with a warning in non-strict concurrency mode.
-          if (!(Context.isLanguageModeAtLeast(6) ||
+          if (!(Context.isLanguageModeAtLeast(LanguageMode::v6) ||
                 Context.LangOpts.StrictConcurrencyLevel ==
                     StrictConcurrency::Complete)) {
             auto strippedLHS = lhs->stripConcurrency(/*recursive=*/true,
@@ -7130,6 +7183,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
 
+  // Refuse to match types with errors. We ought to consider making this an
+  // assert (clients should instead use holes), but for now let's bail out of
+  // solving.
+  if (desugar1->hasError() || desugar2->hasError())
+    return getTypeMatchFailure(locator);
+
   // If both sides are dependent members without type variables, it's
   // possible that base type is incorrect e.g. `Foo.Element` where `Foo`
   // is a concrete type substituted for generic parameter,
@@ -7464,15 +7523,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::BuiltinTuple:
       llvm_unreachable("BuiltinTupleType in constraint");
 
-    // Note: Mismatched builtin types fall through to the TypeKind::Error
-    // case below.
+    // Mismatched builtin types
 #define BUILTIN_GENERIC_TYPE(id, parent)
 #define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+      return getTypeMatchFailure(locator);
 
     case TypeKind::Error:
-      return getTypeMatchFailure(locator);
+      llvm_unreachable("Rejected above");
 
     // BuiltinGenericType subclasses
     case TypeKind::BuiltinBorrow:
@@ -8643,7 +8702,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   // affect the prioritization of bindings, which can affect behavior for tuple
   // matching as tuple subtyping is currently a *weaker* constraint than tuple
   // conversion.
-  if (!getASTContext().isLanguageModeAtLeast(6)) {
+  if (!getASTContext().isLanguageModeAtLeast(LanguageMode::v6)) {
     auto paramTypeVar = createTypeVariable(
         getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
         TVO_CanBindToLValue | TVO_CanBindToInOut | TVO_CanBindToNoEscape |
@@ -8966,7 +9025,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           loc,
           LocatorPathElt::ConformanceRequirement(conformance.getConcrete()));
 
-      for (const auto &req : conformance.getConditionalRequirements()) {
+      for (auto req : conformance.getConditionalRequirements()) {
+        // Replace any ErrorTypes with holes if needed in case of substitution
+        // failure.
+        req = req.tranformSubjectTypes([&](Type ty) {
+          return replaceInferableTypesWithTypeVars(ty, loc);
+        });
         addConstraint(
             req, getConstraintLocator(conformanceLoc,
                                       LocatorPathElt::ConditionalRequirement(
@@ -9879,6 +9943,13 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto contextualTy = getContextualTypeInfo(anchor)->getType();
   auto *seqProto = contextualTy->castTo<ProtocolType>()->getDecl();
   auto isAsync = seqProto->isSpecificProtocol(KnownProtocolKind::AsyncSequence);
+  auto isBorrowing =
+      seqProto->isSpecificProtocol(KnownProtocolKind::BorrowingSequence);
+
+  if (seqTy->isExistentialType() && !isAsync && isBorrowing) {
+    isBorrowing = false;
+    seqProto = ctx.getProtocol(KnownProtocolKind::Sequence);
+  }
 
   auto *contextualLoc = getConstraintLocator(
       anchor, LocatorPathElt::ContextualType(CTP_ForEachSequence));
@@ -9894,7 +9965,8 @@ ConstraintSystem::simplifyForEachElementConstraint(
   // The erased element type is `any P`, but `makeIterator` can only produce
   // `any IteratorProtocol`, so the actual element type is `Any`.
   auto *iteratorAssocTy = seqProto->getAssociatedType(
-      isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator);
+      isAsync ? ctx.Id_AsyncIterator
+              : (isBorrowing ? ctx.Id_BorrowingIterator : ctx.Id_Iterator));
   auto iterTy = lookupDependentMember(seqTy, iteratorAssocTy,
                                       /*openExistential*/ true, contextualLoc);
   if (!iterTy) {
@@ -9905,10 +9977,14 @@ ConstraintSystem::simplifyForEachElementConstraint(
 
   // Now we have the Iterator type, do the same lookup for Element, opening
   // an existential if needed.
-  auto *iterProto =
-      ctx.getProtocol(isAsync ? KnownProtocolKind::AsyncIteratorProtocol
-                              : KnownProtocolKind::IteratorProtocol);
-  auto *eltAssocTy = iterProto->getAssociatedType(Context.Id_Element);
+  auto *iterProto = ctx.getProtocol(
+      isAsync ? KnownProtocolKind::AsyncIteratorProtocol
+              : (isBorrowing ? KnownProtocolKind::BorrowingIteratorProtocol
+                             : KnownProtocolKind::IteratorProtocol));
+  // FIXME: update this to only use Id_Element once the BorrowingSequence
+  // protocol lands.
+  auto *eltAssocTy = iterProto->getAssociatedType(
+      isBorrowing ? Context.Id_BorrowedElement : Context.Id_Element);
   auto eltTy = lookupDependentMember(iterTy, eltAssocTy,
                                      /*openExistential*/ true, contextualLoc);
   if (!eltTy) {
@@ -10472,55 +10548,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // have already been excluded.
   llvm::SmallPtrSet<ValueDecl *, 2> excludedDynamicMembers;
 
-  // Delay solving member constraint for unapplied methods
-  // where the base type has a conditional Sendable conformance
-  auto shouldDelayDueToPartiallyResolvedBaseType =
-      [&](Type baseTy, ValueDecl *decl,
-          FunctionRefInfo functionRefInfo) -> bool {
-    if (!Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures))
-      return false;
-
-    if (!Context.getProtocol(KnownProtocolKind::Sendable))
-      return false;
-
-    auto shouldCheckSendabilityOfBase = [&]() {
-      if (!isa_and_nonnull<FuncDecl>(decl))
-        return Type();
-
-      if (!decl->isInstanceMember() &&
-          !decl->getDeclContext()->getSelfProtocolDecl())
-        return Type();
-
-      auto hasAppliedSelf =
-          decl->hasCurriedSelf() && doesMemberRefApplyCurriedSelf(baseTy, decl);
-      auto numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
-      if (numApplies >= decl->getNumCurryLevels())
-        return Type();
-
-      return decl->isInstanceMember() ? baseTy->getMetatypeInstanceType()
-                                      : baseTy;
-    };
-
-    Type baseTyToCheck = shouldCheckSendabilityOfBase();
-    if (!baseTyToCheck)
-      return false;
-
-    auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
-    auto baseConformance = lookupConformance(baseTyToCheck, sendableProtocol);
-
-    return llvm::any_of(baseConformance.getConditionalRequirements(),
-                        [&](const auto &req) {
-                          if (req.getKind() != RequirementKind::Conformance)
-                            return false;
-
-                          return (req.getFirstType()->hasTypeVariable() &&
-                                  (req.getProtocolDecl()->isSpecificProtocol(
-                                       KnownProtocolKind::Sendable) ||
-                                   req.getProtocolDecl()->isSpecificProtocol(
-                                       KnownProtocolKind::SendableMetatype)));
-                        });
-  };
-
   // Local function that adds the given declaration if it is a
   // reasonable choice.
   auto addChoice = [&](OverloadChoice candidate) {
@@ -10546,12 +10573,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // we are going to see.
     auto baseTy = candidate.getBaseType();
     const auto baseObjTy = baseTy->getRValueType();
-
-    // If we need to delay, update the status but record the member.
-    if (shouldDelayDueToPartiallyResolvedBaseType(
-            baseObjTy, decl, candidate.getFunctionRefInfo())) {
-      result.OverallResult = MemberLookupResult::Unsolved;
-    }
 
     bool hasInstanceMembers = false;
     bool hasInstanceMethods = false;
@@ -10887,7 +10908,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // Backward compatibility hack. In Swift 4, `init` and init were
   // the same name, so you could write "foo.init" to look up a
   // method or property named `init`.
-  if (!ctx.isLanguageModeAtLeast(5) &&
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
       memberName.getBaseName().isConstructor() && !isImplicitInit) {
     auto &compatLookup = lookupMember(instanceTy,
                                       DeclNameRef(ctx.getIdentifier("init")),
@@ -12371,8 +12392,13 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   // Propagate @Sendable from the contextual type to the closure.
   auto closureExtInfo = inferredClosureType->getExtInfo();
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
-    if (contextualFnType->isSendable())
-      closureExtInfo = closureExtInfo.withSendable();
+    if (!closureExtInfo.isSendable()) {
+      if (auto sendTy = contextualFnType->getSendableDependentType()) {
+        closureExtInfo = closureExtInfo.withSendableDependentType(sendTy);
+      } else if (contextualFnType->isSendable()) {
+        closureExtInfo = closureExtInfo.withSendable();
+      }
+    }
   }
 
   // Propagate sending result from the contextual type to the closure.
@@ -12637,7 +12663,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   // type must be a (potentially optional) type variable, as only such a
   // constraint could have been previously been left unsolved.
   auto canUseCompatFix = [&]() {
-    if (Context.isLanguageModeAtLeast(6))
+    if (Context.isLanguageModeAtLeast(LanguageMode::v6))
       return false;
 
     if (!rawType1->lookThroughAllOptionalTypes()->isTypeVariableOrMember())
@@ -13363,18 +13389,20 @@ retry_after_fail:
           return true;
         }
 
-        // If types of arguments/parameters and result lined up exactly,
-        // let's favor this overload choice.
-        //
-        // Note this check ignores `ExtInfo` on purpose and only compares
-        // types, if there are overloads that differ only in effects then
-        // all of them are going to be considered and filtered as part of
-        // "favored" group after forming a valid partial solution.
-        if (auto *choiceFnType = choiceType->getAs<FunctionType>()) {
-          if (FunctionType::equalParams(argFnType->getParams(),
-                                        choiceFnType->getParams()) &&
-              argFnType->getResult()->isEqual(choiceFnType->getResult()))
-            constraint->setFavored();
+        if (getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
+          // If types of arguments/parameters and result lined up exactly,
+          // let's favor this overload choice.
+          //
+          // Note this check ignores `ExtInfo` on purpose and only compares
+          // types, if there are overloads that differ only in effects then
+          // all of them are going to be considered and filtered as part of
+          // "favored" group after forming a valid partial solution.
+          if (auto *choiceFnType = choiceType->getAs<FunctionType>()) {
+            if (FunctionType::equalParams(argFnType->getParams(),
+                                          choiceFnType->getParams()) &&
+                argFnType->getResult()->isEqual(choiceFnType->getResult()))
+              constraint->setFavored();
+          }
         }
 
         // Account for any optional unwrapping/binding

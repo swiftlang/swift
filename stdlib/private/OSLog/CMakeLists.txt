@@ -15,6 +15,7 @@ if((SWIFT_BUILD_CLANG_OVERLAYS
 endif()
 
 add_swift_target_library(swiftOSLogTestHelper
+  IS_OSLOG
   IS_SDK_OVERLAY
   SHARED
 

@@ -109,7 +109,7 @@ UNINTERESTING_FEATURE(ImplicitSome)
 UNINTERESTING_FEATURE(ParserASTGen)
 UNINTERESTING_FEATURE(BuiltinMacros)
 UNINTERESTING_FEATURE(GenerateBindingsForThrowingFunctionsInCXX)
-UNINTERESTING_FEATURE(ExcludePrivateFromMemberwiseInit)
+UNINTERESTING_FEATURE(DeprecateCompatMemberwiseInit)
 UNINTERESTING_FEATURE(ReferenceBindings)
 UNINTERESTING_FEATURE(BuiltinModule)
 UNINTERESTING_FEATURE(RegionBasedIsolation)
@@ -231,6 +231,56 @@ static bool usesFeatureLifetimes(Decl *decl) {
     return !varDecl->getTypeInContext()->isEscapable();
   }
   return false;
+}
+
+static bool hasLifetimeDependencies(Type type) {
+  if (auto *aft = type->getAs<AnyFunctionType>()) {
+    return aft->hasExplicitLifetimeDependencies();
+  }
+  return false;
+}
+
+/// Search for any types within decl with lifetime dependencies. Ignore
+/// lifetimes on AbstractFunctionDecl decls, since those are supported by the
+/// Lifetimes feature, not ClosureLifetimes.
+static bool findClosureLifetimes(Decl *decl) {
+  // Search for any Decl that uses a type with lifetime dependencies, possibly
+  // restricting this to explicit dependencies.
+  class ClosureLifetimesWalker : public ASTWalker {
+
+  public:
+    bool useFound = false;
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+        // Check the parameters and result, but not the AFD itself, since
+        // lifetimes on AFDs are supported by the Lifetimes feature.
+        Type resultType =
+            afd->getInterfaceType()->getAs<AnyFunctionType>()->getResult();
+        useFound = resultType.findIf(hasLifetimeDependencies);
+        return Action::StopIf(useFound);
+      }
+
+      // Check for lifetime dependence info on param and type decls.
+      if (isa<ParamDecl>(D) || isa<TypeDecl>(D)) {
+        useFound = usesTypeMatching(D, hasLifetimeDependencies);
+        return Action::StopIf(useFound);
+      }
+
+      // Any other Decl kinds are irrelevant.
+      return Action::SkipChildren();
+    }
+  };
+
+  ClosureLifetimesWalker walker;
+  decl->walk(walker);
+  return walker.useFound;
+}
+
+static bool usesFeatureClosureLifetimes(Decl *decl) {
+  // This will find function types with lifetimes & closures with lifetimes,
+  // since it walks the AST rooted at decl, checking types.
+  return findClosureLifetimes(decl);
 }
 
 static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
@@ -360,10 +410,6 @@ static bool usesFeatureCompileTimeValues(Decl *decl) {
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
 }
 
-static bool usesFeatureCompileTimeValuesPreview(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureClosureBodyMacro(Decl *decl) {
   return false;
 }
@@ -372,11 +418,14 @@ static bool usesFeatureBuiltinConcurrencyStackNesting(Decl *decl) {
   return false;
 }
 
+UNINTERESTING_FEATURE(CompileTimeValuesPreview)
+UNINTERESTING_FEATURE(LiteralExpressions)
 UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(LibraryEvolution)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
+UNINTERESTING_FEATURE(ImportCxxMembersLazily)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
@@ -481,8 +530,28 @@ UNINTERESTING_FEATURE(BuiltinInterleave)
 UNINTERESTING_FEATURE(BuiltinVectorsExternC)
 UNINTERESTING_FEATURE(AddressOfProperty2)
 UNINTERESTING_FEATURE(ImmutableWeakCaptures)
-// Ignore borrow and mutate accessors until it is used in the standard library.
-UNINTERESTING_FEATURE(BorrowAndMutateAccessors)
+UNINTERESTING_FEATURE(BorrowingForLoop)
+
+static bool usesFeatureBorrowAndMutateAccessors(Decl *decl) {
+  auto accessorDeclUsesFeatureBorrowAndMutateAccessors =
+      [](AccessorDecl *accessor) {
+        return requiresFeatureBorrowAndMutateAccessors(
+            accessor->getAccessorKind());
+      };
+  switch (decl->getKind()) {
+  case DeclKind::Var: {
+    auto *var = cast<VarDecl>(decl);
+    return llvm::any_of(var->getAllAccessors(),
+                        accessorDeclUsesFeatureBorrowAndMutateAccessors);
+  }
+  case DeclKind::Accessor: {
+    auto *accessor = cast<AccessorDecl>(decl);
+    return accessorDeclUsesFeatureBorrowAndMutateAccessors(accessor);
+  }
+  default:
+    return false;
+  }
+}
 
 static bool usesFeatureInlineAlways(Decl *decl) {
   if (auto *inlineAttr = decl->getAttrs().getAttribute<InlineAttr>()) {
@@ -513,8 +582,24 @@ static bool usesFeatureTildeSendable(Decl *decl) {
       });
 }
 
+static bool usesFeatureReparenting(Decl *decl) {
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    if (proto->getAttrs().hasAttribute<ReparentableAttr>())
+      return true;
+  }
+
+  InheritedTypes inherited(decl);
+  for (auto const &entry : inherited.getEntries()) {
+    if (entry.isReparented())
+      return true;
+  }
+
+  return false;
+}
+
 UNINTERESTING_FEATURE(AnyAppleOSAvailability)
 UNINTERESTING_FEATURE(StrictAccessControl)
+UNINTERESTING_FEATURE(BorrowInout)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

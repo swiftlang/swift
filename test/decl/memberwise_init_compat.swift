@@ -1,15 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-ide-test -print-ast-typechecked -print-access -source-filename=%s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-COMPAT -implicit-check-not='init('
-// RUN: %target-swift-ide-test -print-ast-typechecked -print-access -enable-experimental-feature ExcludePrivateFromMemberwiseInit -source-filename=%s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-COMPAT -check-prefix=CHECK-NEW -implicit-check-not='init('
-// RUN: %target-swift-ide-test -swift-version 7 -print-ast-typechecked -print-access -enable-experimental-feature ExcludePrivateFromMemberwiseInit -source-filename=%s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-NEW -implicit-check-not='init('
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature ExcludePrivateFromMemberwiseInit -DFORCE -primary-file %s > /dev/null
+// RUN: %target-swift-ide-test -swift-version 7 -print-ast-typechecked -print-access -enable-experimental-feature DeprecateCompatMemberwiseInit -source-filename=%s | %FileCheck %s -check-prefix=CHECK -implicit-check-not='init('
+// RUN: %target-swift-frontend -emit-sil -DFORCE -primary-file %s > /dev/null
 
-// REQUIRES: swift_feature_ExcludePrivateFromMemberwiseInit
+// REQUIRES: swift_feature_DeprecateCompatMemberwiseInit
 // REQUIRES: swift7
 
-// - CHECK matches before, during, and after adoption of the feature
-// - CHECK-COMPAT matches before and during the feature
-// - CHECK-NEW matches during and after the feature
+// - CHECK matches before and after the compatibility overload is removed
+// - CHECK-COMPAT only matches before the compatibility overload is removed
 
 // CHECK-LABEL: struct A {
 struct A {
@@ -48,7 +46,7 @@ struct D {
   private var x = 0
   var y: String
   // CHECK-COMPAT: private init(x: Int = 0, y: String)
-  // CHECK-NEW: internal init(y: String)
+  // CHECK: internal init(y: String)
 
 #if FORCE
   func forceEmission() { _ = Self.init(x:y:) }
@@ -59,7 +57,7 @@ struct D {
 struct E {
   var x: String
   private var y: Int?
-  // CHECK-NEW: internal init(x: String)
+  // CHECK: internal init(x: String)
   // CHECK-COMPAT: private init(x: String, y: Int? = nil)
 
 #if FORCE
@@ -135,7 +133,7 @@ struct J {
   var y: Int
   var z: String
   // CHECK-COMPAT: private init(x: Int = 0, z: String)
-  // CHECK-NEW: internal init(z: String)
+  // CHECK: internal init(z: String)
 
 #if FORCE
   func forceEmission() { _ = Self.init(x:z:) }
@@ -183,7 +181,7 @@ struct O1 {
   fileprivate var x = 0
   var y: String
   // CHECK-COMPAT: fileprivate init(x: Int = 0, y: String)
-  // CHECK-NEW: internal init(y: String)
+  // CHECK: internal init(y: String)
 
 #if FORCE
   func forceEmission() { _ = Self.init(x:y:) }
@@ -213,7 +211,7 @@ struct Q {
   private var x: Int = 0, y = ""
   var z: String
   // CHECK-COMPAT: private init(x: Int = 0, y: String = "", z: String)
-  // CHECK-NEW: internal init(z: String)
+  // CHECK: internal init(z: String)
 
 #if FORCE
   func forceEmission() { _ = Self.init(x:y:z:) }
@@ -225,7 +223,7 @@ struct R {
   private lazy var x = 0
   var y: String
   // CHECK-COMPAT: private init(x: Int? = nil, y: String)
-  // CHECK-NEW: internal init(y: String)
+  // CHECK: internal init(y: String)
 
 #if FORCE
   func forceEmission() { _ = Self.init(x:y:) }
@@ -249,7 +247,7 @@ private struct T {
   private var x: Int?
   var y: Int
   // CHECK-COMPAT: private init(x: Int? = nil, y: Int)
-  // CHECK-NEW: internal init(y: Int)
+  // CHECK: internal init(y: Int)
 
 #if FORCE
   func forceEmission() { _ = Self.init(x:y:) }
@@ -266,7 +264,7 @@ struct U {
     init { b = newValue + c }
     get { b }
   }
-  // CHECK-NEW: internal init(a: Int, c: Int)
+  // CHECK: internal init(a: Int, c: Int)
   // CHECK-COMPAT: private init(a: Int, c: Int, d: Int = 0)
 }
 
@@ -288,7 +286,7 @@ func locals() {
     private var x: Int?
     var y: Int
     // CHECK-COMPAT: private init(x: Int? = nil, y: Int)
-    // CHECK-NEW: internal init(y: Int)
+    // CHECK: internal init(y: Int)
 
 #if FORCE
   func forceEmission() { _ = Self.init(x:y:) }
@@ -314,7 +312,7 @@ private enum TestNested {
     private var x: Int?
     var y: Int
     // CHECK-COMPAT: private init(x: Int? = nil, y: Int)
-    // CHECK-NEW: internal init(y: Int)
+    // CHECK: internal init(y: Int)
 
 #if FORCE
     func forceEmission() { _ = Self.init(x:y:) }

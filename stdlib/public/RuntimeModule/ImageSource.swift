@@ -20,6 +20,7 @@ import Swift
 internal import Darwin
 #elseif os(Windows)
 internal import ucrt
+internal import WinSDK
 #elseif canImport(Glibc)
 internal import Glibc
 #elseif canImport(Musl)
@@ -28,13 +29,17 @@ internal import Musl
 
 enum ImageSourceError: Error {
   case outOfBoundsRead
+  #if os(Windows)
+  case win32Error(DWORD)
+  #else
   case posixError(Int32)
+  #endif
 }
 
 @available(Backtracing 6.2, *)
-struct ImageSource {
+struct ImageSource: CustomStringConvertible {
 
-  private class Storage {
+  private class Storage: CustomStringConvertible {
     /// Says how we allocated the buffer.
     private enum MemoryBufferKind {
       /// Currently empty
@@ -132,23 +137,87 @@ struct ImageSource {
       self.bytes = chunk
     }
 
-    convenience init(path: String) throws {
-      let fd = open(path, O_RDONLY, 0)
+    convenience init(path: String, alternativePaths: [String]) throws {
+      #if os(Windows)
+      let hFile =
+        path.withCString(encodedAs: UTF16.self) { lpwszPath in
+          CreateFileW(lpwszPath,
+                      GENERIC_READ,
+                      DWORD(FILE_SHARE_READ),
+                      nil,
+                      DWORD(OPEN_EXISTING),
+                      DWORD(FILE_ATTRIBUTE_NORMAL),
+                      nil)
+        }
+      if hFile == INVALID_HANDLE_VALUE {
+        throw ImageSourceError.win32Error(GetLastError())
+      }
+      defer {
+        CloseHandle(hFile)
+      }
+      var fileSize = LARGE_INTEGER()
+      if !GetFileSizeEx(hFile, &fileSize) {
+        throw ImageSourceError.win32Error(GetLastError())
+      }
+      let size = Int(fileSize.QuadPart)
+      let hMapping = CreateFileMappingW(hFile,
+                                        nil,
+                                        DWORD(PAGE_READONLY),
+                                        0, 0,
+                                        nil)
+      if hMapping == nil {
+        throw ImageSourceError.win32Error(GetLastError())
+      }
+      defer {
+        CloseHandle(hMapping)
+      }
+      let base = MapViewOfFile(hMapping,
+                               DWORD(FILE_MAP_READ),
+                               0, 0,
+                               0)
+      if base == nil {
+        CloseHandle(hMapping)
+        throw ImageSourceError.win32Error(GetLastError())
+      }
+
+      self.init(mapped: UnsafeRawBufferPointer(
+                  start: base, count: size))
+      #else
+      var fd = _swift_open(path, O_RDONLY, 0)
+
       if fd < 0 {
-        throw ImageSourceError.posixError(errno)
+        let filePathCharacter: Character = "/" // non windows path separator
+
+        // we didn't find the image in question at the path it originally ran at
+        // so we will now check for the image at various alternative paths
+        if let imageBaseName = path.split(separator: filePathCharacter).last {
+          for alternativePath in alternativePaths {
+            let alternativeFullPath =
+              alternativePath + String(filePathCharacter) + imageBaseName
+            fd = _swift_open(alternativeFullPath, O_RDONLY, 0)
+            if fd >= 0 {
+              // we found a match
+              break
+            }
+          }
+        }
+      }
+
+      if fd < 0 {
+        throw ImageSourceError.posixError(_swift_get_errno())
       }
       defer { close(fd) }
       let size = lseek(fd, 0, SEEK_END)
       if size < 0 {
-        throw ImageSourceError.posixError(errno)
+        throw ImageSourceError.posixError(_swift_get_errno())
       }
       let base = mmap(nil, Int(size), PROT_READ, MAP_FILE|MAP_PRIVATE, fd, 0)
       if base == nil || base! == UnsafeRawPointer(bitPattern: -1)! {
-        throw ImageSourceError.posixError(errno)
+        throw ImageSourceError.posixError(_swift_get_errno())
       }
-
       self.init(mapped: UnsafeRawBufferPointer(
                   start: base, count: Int(size)))
+      #endif
     }
 
     deinit {
@@ -156,8 +225,12 @@ struct ImageSource {
         case .allocated:
           mutableBytes.deallocate()
         case .mapped:
+          #if os(Windows)
+          UnmapViewOfFile(UnsafeMutableRawPointer(mutating: bytes.baseAddress))
+          #else
           munmap(UnsafeMutableRawPointer(mutating: bytes.baseAddress),
                  bytes.count)
+          #endif
         case .substorage, .unowned, .empty:
           break
       }
@@ -265,6 +338,15 @@ struct ImageSource {
       dest.copyMemory(from: toAppend)
       kind = .allocated(newCount)
     }
+
+    var description: String {
+      switch kind {
+        case .empty:
+          return "Empty Storage"
+        default:
+          return "Storage of type \(kind) of \(count) bytes with buffer \(String(describing: bytes))"
+      }
+    }
   }
 
   /// The storage holding the image data.
@@ -287,6 +369,10 @@ struct ImageSource {
 
   /// If this ImageSource knows its path, this will be non-nil.
   private(set) var path: String?
+
+  var description: String {
+    return "ImageSource(storage: \(storage), isMappedImage: \(isMappedImage), path: \(String(describing: path))"
+  }
 
   /// Private initialiser, not for general use
   private init(storage: Storage, isMappedImage: Bool, path: String?) {
@@ -318,9 +404,11 @@ struct ImageSource {
               isMappedImage: isMappedImage, path: path)
   }
 
-  /// Initialise with a mapped file
-  init(path: String) throws {
-    self.init(storage: try Storage(path: path),
+  /// Initialise with a mapped file (this is currently used by Linux)
+  init(path: String, alternativePaths: [String] = []) throws {
+    self.init(storage: try Storage(
+                  path: path,
+                  alternativePaths: alternativePaths),
               isMappedImage: false, path: path)
   }
 

@@ -89,3 +89,56 @@ public struct RigidArray : ~Copyable {
   }
 }
 
+// Function types
+
+@inlinable
+@_lifetime(copy ne0)
+public func takeCopier(f: @_lifetime(io: copy io) @_lifetime(copy inview) (_ inview: consuming AnotherView, _ io: inout AnotherView) -> AnotherView, ne0: consuming AnotherView, ne1: inout AnotherView) -> AnotherView {
+    let ne2 = f(ne0, &ne1)
+    return ne2
+}
+
+@inlinable
+public func takeCopierUnannotated(f: (consuming AnotherView) -> AnotherView) {}
+
+public typealias ExplicitNestedType = @_lifetime(copy ne0) @_lifetime(ne1: copy ne0) ((AnotherView) -> AnotherView, _ ne0: consuming AnotherView, _ ne1: inout AnotherView) -> AnotherView
+
+@inlinable
+public func takeExplicitNestedType(f: ExplicitNestedType) {}
+
+
+@inlinable
+public func returnableCopier(_ aView: AnotherView) -> AnotherView {
+  return aView
+}
+
+@inlinable
+public func returnCopier() -> @_lifetime(copy a) (_ a: AnotherView) -> AnotherView {
+  return returnableCopier
+}
+
+@inlinable
+@_lifetime(dest: immortal)
+public func immortalInout(dest: inout AnotherView) {
+  dest = _overrideLifetime(dest, copying: ())
+}
+
+@inlinable public func takeImmortalInout(
+  closure: @_lifetime(dest: immortal) (_ dest: inout AnotherView) -> ()
+) {}
+
+@inlinable
+@_lifetime(dest: immortal, copy source)
+public func fullReassign(dest: inout AnotherView, source: AnotherView) {
+  dest = source
+}
+
+@inlinable public func takeFullReassign(
+  closure: @_lifetime(dest: immortal, copy source) (_ dest: inout AnotherView, _ source: AnotherView) -> ()
+) {}
+
+@inlinable
+public func takeReadBorrower(f: @_lifetime(borrow a) (_ a: AnotherView) -> AnotherView) {}
+
+@inlinable
+public func takeWriteBorrower(f: @_lifetime(&a) (_ a: inout AnotherView) -> AnotherView) {}

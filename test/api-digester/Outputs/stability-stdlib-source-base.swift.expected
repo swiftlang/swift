@@ -52,6 +52,19 @@ Constructor Array.init(unsafeUninitializedCapacity:initializingWith:) is now wit
 Constructor ContiguousArray.init(unsafeUninitializedCapacity:initializingWith:) has generic signature change from <Element> to <Element, E where E : Swift.Error>
 Constructor ContiguousArray.init(unsafeUninitializedCapacity:initializingWith:) has parameter 1 type change from (inout Swift.UnsafeMutableBufferPointer<Element>, inout Swift.Int) throws -> Swift.Void to (inout Swift.UnsafeMutableBufferPointer<Element>, inout Swift.Int) throws(E) -> Swift.Void
 Constructor ContiguousArray.init(unsafeUninitializedCapacity:initializingWith:) is now without rethrows
+Func RangeReplaceableCollection.filter(_:) has generic signature change from <Self where Self : Swift.RangeReplaceableCollection> to <Self, E where Self : Swift.RangeReplaceableCollection, E : Swift.Error>
+Func RangeReplaceableCollection.filter(_:) has self access kind changing from __Consuming to Consuming
+Func RangeReplaceableCollection.filter(_:) is now without rethrows
+Func Dictionary.filter(_:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.filter(_:) has self access kind changing from __Consuming to Consuming
+Func Dictionary.filter(_:) is now without rethrows
+Func Sequence.filter(_:) has generic signature change from <Self where Self : Swift.Sequence> to <Self, E where Self : Swift.Sequence, E : Swift.Error>
+Func Sequence.filter(_:) is now without rethrows
+Func Set.filter(_:) has generic signature change from <Element where Element : Swift.Hashable> to <Element, E where Element : Swift.Hashable, E : Swift.Error>
+Func Set.filter(_:) has self access kind changing from __Consuming to Consuming
+Func Set.filter(_:) is now without rethrows
+Func Substring.filter(_:) has generic signature change from to <E where E : Swift.Error>
+Func Substring.filter(_:) is now without rethrows
 
 Protocol SIMDScalar has generic signature change from <Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar> to <Self : Swift.BitwiseCopyable, Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMDMaskScalar == Self.SIMDMaskScalar.SIMDMaskScalar, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar>
 
@@ -361,6 +374,18 @@ Func ContiguousArray.withUnsafeBufferPointer(_:) is now without rethrows
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) is now without rethrows
+Func Dictionary.mapValues(_:) has generic signature change from <Key, Value, T where Key : Swift.Hashable> to <Key, Value, T, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.mapValues(_:) is now without rethrows
+Func Dictionary.merge(_:uniquingKeysWith:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.merge(_:uniquingKeysWith:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, S : Swift.Sequence, S.Element == (Key, Value)> to <Key, Value, S, E where Key : Swift.Hashable, S : Swift.Sequence, E : Swift.Error, S.Element == (Key, Value)>
+Func Dictionary.merge(_:uniquingKeysWith:) is now without rethrows
+Func Dictionary.merging(_:uniquingKeysWith:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.merging(_:uniquingKeysWith:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, S : Swift.Sequence, S.Element == (Key, Value)> to <Key, Value, S, E where Key : Swift.Hashable, S : Swift.Sequence, E : Swift.Error, S.Element == (Key, Value)>
+Func Dictionary.merging(_:uniquingKeysWith:) is now without rethrows
+Constructor Dictionary.init(_:uniquingKeysWith:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, S : Swift.Sequence, S.Element == (Key, Value)> to <Key, Value, S, E where Key : Swift.Hashable, S : Swift.Sequence, E : Swift.Error, S.Element == (Key, Value)>
+Constructor Dictionary.init(_:uniquingKeysWith:) is now without rethrows
+Constructor Dictionary.init(grouping:by:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, Value == [S.Element], S : Swift.Sequence> to <Key, Value, S, E where Key : Swift.Hashable, Value == [S.Element], S : Swift.Sequence, E : Swift.Error>
+Constructor Dictionary.init(grouping:by:) is now without rethrows
 
 // Adoption of @_addressableForDependencies
 Struct CollectionOfOne is now with @_addressableForDependencies

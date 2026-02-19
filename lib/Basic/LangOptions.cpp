@@ -77,6 +77,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "iOS",
   "visionOS",
   "xrOS",
+  "Firmware",
   "Linux",
   "FreeBSD",
   "OpenBSD",
@@ -334,8 +335,8 @@ LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
   if (state.isEnabled())
     return state;
 
-  if (auto version = feature.getLanguageMode()) {
-    if (isLanguageModeAtLeast(*version)) {
+  if (auto languageMode = feature.getLanguageMode()) {
+    if (isLanguageModeAtLeast(languageMode.value())) {
       return FeatureState(feature, FeatureState::Kind::Enabled);
     }
   }
@@ -348,8 +349,8 @@ bool LangOptions::hasFeature(Feature feature, bool allowMigration) const {
   if (state.isEnabled())
     return true;
 
-  if (auto version = feature.getLanguageMode()) {
-    if (isLanguageModeAtLeast(*version))
+  if (auto languageMode = feature.getLanguageMode()) {
+    if (isLanguageModeAtLeast(languageMode.value()))
       return true;
   }
 
@@ -540,6 +541,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::XROS:
     addPlatformConditionValue(PlatformConditionKind::OS, "xrOS");
     addPlatformConditionValue(PlatformConditionKind::OS, "visionOS");
+    break;
+  case llvm::Triple::Firmware:
+    addPlatformConditionValue(PlatformConditionKind::OS, "Firmware");
     break;
   case llvm::Triple::Linux:
     if (Target.getEnvironment() == llvm::Triple::Android)

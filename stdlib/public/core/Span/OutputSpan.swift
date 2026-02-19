@@ -418,7 +418,7 @@ extension OutputSpan where Element: ~Copyable {
     ) throws(E) -> R
   ) throws(E) -> R {
     let bytes = unsafe UnsafeMutableRawBufferPointer(
-      start: _pointer, count: capacity
+      start: _pointer, count: capacity &* MemoryLayout<Element>.stride
     )
     var initializedCount = _count
     defer {

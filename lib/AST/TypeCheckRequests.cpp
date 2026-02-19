@@ -1028,24 +1028,6 @@ void StructuralTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 // EnumRawValuesRequest computation.
 //----------------------------------------------------------------------------//
 
-bool EnumRawValuesRequest::isCached() const {
-  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
-}
-
-std::optional<evaluator::SideEffect>
-EnumRawValuesRequest::getCachedResult() const {
-  auto *ED = std::get<0>(getStorage());
-  if (ED->SemanticFlags.contains(EnumDecl::HasFixedRawValuesAndTypes))
-    return std::make_tuple<>();
-  return std::nullopt;
-}
-
-void EnumRawValuesRequest::cacheResult(evaluator::SideEffect) const {
-  auto *ED = std::get<0>(getStorage());
-  ED->SemanticFlags |= OptionSet<EnumDecl::SemanticInfoFlags>{
-      EnumDecl::HasFixedRawValues | EnumDecl::HasFixedRawValuesAndTypes};
-}
-
 void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // This request computes the raw type, and so participates in cycles involving
   // it. For now, the raw type provides a rich enough circularity diagnostic
@@ -2769,6 +2751,7 @@ void LifetimeDependenceInfoRequest::cacheResult(
     }
     auto *eed = cast<EnumElementDecl>(decl);
     eed->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
+    return;
   }
 
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));

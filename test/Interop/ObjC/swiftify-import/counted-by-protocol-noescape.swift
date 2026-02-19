@@ -1,13 +1,15 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_LifetimeDependence
+
+// XFAIL: *
+// Safe interop Protocol support removed for now
 
 // REQUIRES: foundation
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence %t/test.swift -verify -Xcc -Wno-nullability-completeness
-// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence %t/test.swift -dump-macro-expansions 2> %t/expansions.out
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature LifetimeDependence %t/test.swift -verify -Xcc -Wno-nullability-completeness
+// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature LifetimeDependence %t/test.swift -dump-macro-expansions 2> %t/expansions.out
 // RUN: %diff %t/expansions.out %t/expansions.expected
 
 //--- test.h

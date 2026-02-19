@@ -197,20 +197,23 @@ suite.test("IndexingSubscript")
 }
 
 suite.test("withUnsafeBufferPointer")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  let capacity: UInt8 = 64
-  var a = Array(0..<capacity)
+.require(.stdlib_6_2).code {
+  let capacity = 10
+  var a = ContiguousArray(0..<10)
   a.withUnsafeMutableBufferPointer {
-    let view = MutableSpan(_unsafeElements: $0)
-    view.withUnsafeBufferPointer { b in
-      let i = Int(capacity/2)
-      expectEqual(b[i], b[i])
+    let span = MutableSpan(_unsafeElements: $0)
+    span.withUnsafeBufferPointer {
+      expectEqual($0.count, capacity)
+      for i in $0.indices {
+        expectEqual($0[i], i)
+      }
+    }
+
+    let empty0 = UnsafeBufferPointer(start: $0.baseAddress, count: 0)
+    let emptySpan = Span(_unsafeElements: empty0)
+    emptySpan.withUnsafeBufferPointer {
+      expectEqual($0.count, 0)
+      expectNotNil($0.baseAddress)
     }
   }
 }
@@ -235,19 +238,14 @@ suite.test("withUnsafeBytes")
 }
 
 suite.test("withUnsafeMutableBufferPointer")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  let capacity: UInt8 = 64
+.require(.stdlib_6_2).code {
+  let capacity = 10
   var a = Array(0..<capacity)
-  let i = Int.random(in: a.indices)
+  guard let i = expectNotNil(a.indices.last) else { return }
   a.withUnsafeMutableBufferPointer {
-    var view = MutableSpan(_unsafeElements: $0)
-    view.withUnsafeMutableBufferPointer {
+    var span = MutableSpan(_unsafeElements: $0)
+    span.withUnsafeMutableBufferPointer {
+      expectEqual($0.count, capacity)
       $0[i] += 1
     }
 
@@ -258,7 +256,7 @@ suite.test("withUnsafeMutableBufferPointer")
       expectNotNil($0.baseAddress)
     }
   }
-  expectEqual(Int(a[i]), i+1)
+  expectEqual(a[i], i+1)
 }
 
 suite.test("withUnsafeMutableBytes")

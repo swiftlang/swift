@@ -26,6 +26,7 @@
 
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
+#include "LiteralExpressionFolding.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ParameterList.h"
@@ -207,19 +208,6 @@ static Expr *checkConstantness(Expr *expr) {
   return nullptr;
 }
 
-/// Return true iff the given \p type is a Stdlib integer type.
-static bool isIntegerType(Type type) {
-  return type->isInt() || type->isInt8() || type->isInt16() ||
-         type->isInt32() || type->isInt64() || type->isUInt() ||
-         type->isUInt8() || type->isUInt16() || type->isUInt32() ||
-         type->isUInt64();
-}
-
-/// Return true iff the given \p type is a Float type.
-static bool isFloatType(Type type) {
-  return type->isFloat() || type->isDouble() || type->isFloat80();
-}
-
 /// Given an error expression \p errorExpr, diagnose the error based on the type
 /// of the expression. For instance, if the expression's type is expressible by
 /// a literal e.g. integer, boolean etc. report that it must be a literal.
@@ -256,11 +244,11 @@ static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_string_literal);
     return;
   }
-  if (isIntegerType(exprType)) {
+  if (exprType->isStdlibInteger()) {
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_integer_literal);
     return;
   }
-  if (isFloatType(exprType)) {
+  if (exprType->isStdlibFloat()) {
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_float_literal);
     return;
   }
