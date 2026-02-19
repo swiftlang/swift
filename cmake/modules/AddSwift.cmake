@@ -882,6 +882,7 @@ endmacro()
 #   add_swift_host_tool(name
 #     [HAS_SWIFT_MODULES | DOES_NOT_USE_SWIFT]
 #     [THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY]
+#     [EXPORT_SYMBOLS_WITH_APPLE_LINKER]
 #
 #     [BOOTSTRAPPING 0|1]
 #     [SWIFT_COMPONENT component]
@@ -900,6 +901,9 @@ endmacro()
 # THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
 #   Opt-out of LLVM IR optimizations when linking ThinLTO with ld64
 #
+# EXPORT_SYMBOLS_WITH_APPLE_LINKER
+#   Export symbols when using ld on Apple platforms
+#
 # BOOTSTRAPPING
 #   Bootstrapping stage.
 #
@@ -912,7 +916,7 @@ endmacro()
 # source1 ...
 #   Sources to add into this executable.
 function(add_swift_host_tool executable)
-  set(options HAS_SWIFT_MODULES DOES_NOT_USE_SWIFT THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
+  set(options HAS_SWIFT_MODULES DOES_NOT_USE_SWIFT THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY EXPORT_SYMBOLS_WITH_APPLE_LINKER)
   set(single_parameter_options SWIFT_COMPONENT BOOTSTRAPPING)
   set(multiple_parameter_options LLVM_LINK_COMPONENTS)
 
@@ -1037,7 +1041,7 @@ function(add_swift_host_tool executable)
     string(CONCAT lto_codegen_only_link_options
       "$<"
         "$<AND:"
-          "$<BOOL:${LLVM_LINKER_IS_LD64}>,"
+          "$<BOOL:${LLVM_LINKER_IS_APPLE}>,"
           "$<BOOL:${SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS}>,"
           "$<STREQUAL:${SWIFT_TOOLS_ENABLE_LTO},thin>"
         ">:"
@@ -1045,6 +1049,16 @@ function(add_swift_host_tool executable)
       ">")
     target_link_options(${executable} PRIVATE "${lto_codegen_only_link_options}")
   endif()
+
+  string(CONCAT no_exported_symbols_link_option
+  "$<"
+      "$<AND:"
+      "$<BOOL:${LLVM_LINKER_IS_APPLE}>,"
+      "$<NOT:$<BOOL:${ASHT_EXPORT_SYMBOLS_WITH_APPLE_LINKER}>>"
+      ">:"
+      "LINKER:-no_exported_symbols"
+  ">")
+  target_link_options(${executable} PRIVATE "${no_exported_symbols_link_option}")
 
   if(NOT ASHT_SWIFT_COMPONENT STREQUAL "no_component")
     add_dependencies(${ASHT_SWIFT_COMPONENT} ${executable})
