@@ -14,6 +14,7 @@ target_link_libraries(swiftDependencyScan INTERFACE
 target_link_libraries(swiftDependencyScan PRIVATE
   swiftClangImporter
   swiftAST
+  swiftFrontendTool
   swiftSerialization)
 
 target_link_libraries(swiftDependencyScan PUBLIC

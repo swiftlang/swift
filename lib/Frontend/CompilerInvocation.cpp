@@ -2687,6 +2687,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   Opts.DisableCrossImportOverlaySearch |=
       Args.hasArg(OPT_disable_cross_import_overlay_search);
 
+  for (auto &Mod : Args.getAllArgValues(OPT_dependency_only_import)) {
+    Opts.DependencyOnlyModuleImports.push_back(Mod);
+  }
+
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to

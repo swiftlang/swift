@@ -547,10 +547,10 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::REPL:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
-  case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
   case ActionType::PrintArguments:
     return false;
+  case ActionType::ScanDependencies:
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
   case ActionType::MergeModules:
