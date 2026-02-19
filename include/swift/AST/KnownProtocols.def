@@ -156,8 +156,8 @@ CXX_PROTOCOL(UnsafeCxxMutableContiguousIterator)
 PROTOCOL(AsyncSequence)
 PROTOCOL(AsyncIteratorProtocol)
 
-PROTOCOL_WITH_NAME(BorrowingSequence, "BorrowingSequence")
-PROTOCOL_WITH_NAME(BorrowingIteratorProtocol, "BorrowingIteratorProtocol")
+PROTOCOL(BorrowingSequence)
+PROTOCOL(BorrowingIteratorProtocol)
 
 PROTOCOL(FloatingPoint)
 
