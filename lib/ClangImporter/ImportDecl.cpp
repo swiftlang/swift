@@ -6742,8 +6742,13 @@ static Type findCFSuperclass(ClangImporter::Implementation &impl,
                              CFPointeeInfo info) {
   if (Type immutable = findImmutableCFSuperclass(impl, decl, info))
     return immutable;
+  
+  // Check if NSObject exists and use it as the superclass if it does.
+  auto &ctx = impl.getASTContext();
+  if (auto nsObjectClass = ctx.getNSObjectType()) {
+    return nsObjectClass;
+  }
 
-  // TODO: use NSObject if it exists?
   return Type();
 }
 
