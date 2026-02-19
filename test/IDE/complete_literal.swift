@@ -28,7 +28,7 @@
   "swift".#^LITERAL4^#
 }
 
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: withCString({#(body): (UnsafePointer<Int8>) throws -> Result##(UnsafePointer<Int8>) throws -> Result#})[' rethrows'][#Result#]; name=withCString(:){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: withCString({#(body): (UnsafePointer<Int8>) throws(Error) -> Success##(UnsafePointer<Int8>) throws(Error) -> Success#})[' throws'][#Success#]; name=withCString(:){{$}}
 
 // FIXME: we should show the qualified String.Index type.
 // rdar://problem/20788802
