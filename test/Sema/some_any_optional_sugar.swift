@@ -106,6 +106,12 @@ extension Optional {
 func f98(_: any RP?.P) {}
 func f99(_: any RP?.P?) {}
 
+// Parameterized protocols
+let _: any Sequence<Int>? = [1, 2, 3]
+func someSequenceOfInt() -> some Sequence<Int>? { return [1, 2, 3] }
+
+let _: any P.Type? = S.self
+
 // ...but these should still be errors:
 
 // expected-error@+2 {{confusing use of optional after a 'some' or 'any' composition; use parentheses to clarify precedence}}{{12-12=(}}{{17-17=)}}
