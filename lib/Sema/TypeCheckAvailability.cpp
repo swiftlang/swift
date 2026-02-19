@@ -48,6 +48,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -2007,6 +2008,48 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
   return false;
 }
 
+/// Check if a protocol declaration is a non-runtime ObjC protocol.
+/// Returns the protocol name if it is, empty string otherwise.
+static StringRef getNonRuntimeProtocolName(const ProtocolDecl *proto) {
+  if (!proto)
+    return StringRef();
+  auto *clangDecl = proto->getClangDecl();
+  if (!clangDecl)
+    return StringRef();
+  auto *objcProto = dyn_cast<clang::ObjCProtocolDecl>(clangDecl);
+  if (!objcProto)
+    return StringRef();
+  if (!objcProto->isNonRuntimeProtocol())
+    return StringRef();
+  return proto->getName().str();
+}
+
+/// Diagnose the use of a non-runtime protocol in a context where metadata
+/// is required (e.g., dynamic casts, extended existential types).
+static bool diagnoseNonRuntimeProtocolMetadataUsage(CanType type,
+                                                    SourceRange refLoc,
+                                                    const DeclContext *refDC) {
+  ASTContext &ctx = refDC->getASTContext();
+
+  // findIf() walks into protocol compositions and existential types,
+  // so we only need to check for ProtocolType directly.
+  bool diagnosed = false;
+  type.findIf([&](CanType componentType) {
+    if (auto proto = dyn_cast<ProtocolType>(componentType)) {
+      StringRef protoName = getNonRuntimeProtocolName(proto->getDecl());
+      if (!protoName.empty()) {
+        ctx.Diags.diagnose(refLoc.Start,
+                           diag::non_runtime_protocol_requires_metadata,
+                           protoName);
+        diagnosed = true;
+        return true;
+      }
+    }
+    return false;
+  });
+  return diagnosed;
+}
+
 static bool checkTypeMetadataAvailabilityInternal(CanType type,
                                                   SourceRange refLoc,
                                                   const DeclContext *refDC) {
@@ -2463,6 +2506,9 @@ public:
                                       Where.getDeclContext());
         checkTypeMetadataAvailabilityForConverted(CE->getSubExpr()->getType(),
                                                   loc, Where.getDeclContext());
+        // Check for non-runtime protocol usage in dynamic casts
+        diagnoseNonRuntimeProtocolMetadataUsage(
+            CE->getCastType()->getCanonicalType(), loc, Where.getDeclContext());
       }
 
       diagnoseTypeAvailability(CE->getCastTypeRepr(), CE->getCastType(),

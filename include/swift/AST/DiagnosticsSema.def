@@ -7227,6 +7227,11 @@ ERROR(availability_variadic_type_only_version_newer, none,
       "parameter packs in generic types are only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
 
+ERROR(non_runtime_protocol_requires_metadata, none,
+      "protocol '%0' has the 'objc_non_runtime_protocol' attribute and cannot "
+      "be used in a context that requires runtime protocol metadata",
+      (StringRef))
+
 NOTE(availability_guard_with_version_check, none,
      "add 'if #available' version check", ())
 
