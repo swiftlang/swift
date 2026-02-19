@@ -242,12 +242,8 @@ StringBridgeTests.test("Foundation Buffer Comparison SPI") {
     lhsEncoding: UInt,
     _ rhs: String,
     rhsEncoding: UInt,
-    expectedEqual: Bool,
-    file: StaticString = #filePath,
-    line: UInt = #line
+    expectedEqual: Bool
   ) {
-    let loc = SourceLoc(String(file), line, comment: "test data")
-
     let result = lhs.withBytesInEncoding(lhsEncoding) { lhsPtr, lhsCount in
       rhs.withBytesInEncoding(rhsEncoding) { rhsPtr, rhsCount in
         _unicodeBuffersEqual(
@@ -261,11 +257,7 @@ StringBridgeTests.test("Foundation Buffer Comparison SPI") {
       }
     }
     
-    if expectedEqual {
-      expectEqual(lhs, rhs, stackTrace: SourceLocStack().with(loc))
-    } else {
-      expectNotEqual(lhs, rhs, stackTrace: SourceLocStack().with(loc))
-    }
+    expectEqual(result, expectedEqual)
   }
   
   // ASCII vs ASCII - Equal content
