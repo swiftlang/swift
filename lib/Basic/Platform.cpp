@@ -11,6 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Assertions.h"
+#include "swift/ABI/System.h"
+#include "swift/Basic/Feature.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Pack.h"
 #include "swift/Basic/Platform.h"
 #include "llvm/ADT/StringExtras.h"
@@ -154,6 +157,33 @@ bool swift::tripleBTCFIByDefaultInOpenBSD(const llvm::Triple &triple) {
      triple.getArch() == llvm::Triple::aarch64 ||
      triple.getArch() == llvm::Triple::x86_64);
 
+}
+
+uint64_t swift::getLeastValidPointerValueForTriple(const llvm::Triple &triple,
+                                                  const LangOptions &LangOpts,
+                                                  uint64_t customLeastValidPointerValue) {
+  if (customLeastValidPointerValue != 0)
+    return customLeastValidPointerValue;
+
+  uint64_t value = SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
+
+  if (triple.isOSDarwin() && !LangOpts.hasFeature(Feature::Embedded)) {
+    // Non-embedded Darwin reserves the low 4GB of address space.
+    switch (triple.getArch()) {
+    case llvm::Triple::x86_64:
+      value = SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER;
+      break;
+    case llvm::Triple::aarch64:
+      value = SWIFT_ABI_DARWIN_ARM64_LEAST_VALID_POINTER;
+      break;
+    default:
+      break;
+    }
+  } else if (triple.getArch() == llvm::Triple::wasm32) {
+    value = SWIFT_ABI_WASM32_LEAST_VALID_POINTER;
+  }
+
+  return value;
 }
 
 DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {

@@ -16,6 +16,8 @@
 
 // RUN: %swift_driver -print-target-info -target x86_64-apple-ios12.0 | %FileCheck -check-prefix CHECK-IOS-SIM %s
 
+// RUN: %swift_frontend_plain -target wasm32-unknown-wasip1 -print-target-info | %FileCheck -check-prefix CHECK-WASM %s
+
 // RUN: %swift_frontend_plain -target thumbv7-unknown-windows-msvc -print-target-info | %FileCheck -check-prefix CHECK-PTR-SIZE-32 %s
 // RUN: %swift_frontend_plain -target aarch64-unknown-windows-msvc -print-target-info | %FileCheck -check-prefix CHECK-PTR-SIZE-64 %s
 
@@ -25,6 +27,7 @@
 // CHECK-IOS:     "triple": "arm64-apple-ios12.0",
 // CHECK-IOS:     "unversionedTriple": "arm64-apple-ios",
 // CHECK-IOS:     "moduleTriple": "arm64-apple-ios",
+// CHECK-IOS:     "leastValidPointerValue": 4294967296,
 // CHECK-IOS:     "swiftRuntimeCompatibilityVersion": "5.0",
 // CHECK-IOS:     "compatibilityLibraries": [
 // CHECK-IOS:       "libraryName": "swiftCompatibility50",
@@ -53,6 +56,7 @@
 // CHECK-LINUX:   "target": {
 // CHECK-LINUX:     "triple": "x86_64-unknown-linux",
 // CHECK-LINUX:     "moduleTriple": "x86_64-unknown-linux",
+// CHECK-LINUX:     "leastValidPointerValue": 4096,
 // CHECK-LINUX:     "librariesRequireRPath": false
 // CHECK-LINUX:   }
 
@@ -66,6 +70,7 @@
 // CHECK-LINUX-STATIC:   "target": {
 // CHECK-LINUX-STATIC:     "triple": "x86_64-unknown-linux",
 // CHECK-LINUX-STATIC:     "moduleTriple": "x86_64-unknown-linux",
+// CHECK-LINUX-STATIC:     "leastValidPointerValue": 4096,
 // CHECK-LINUX-STATIC:     "librariesRequireRPath": false
 // CHECK-LINUX-STATIC:   }
 
@@ -77,6 +82,7 @@
 // CHECK-PRE-CONCURRENCY-ZIPPERED:   "triple": "x86_64-apple-macosx10.15"
 // CHECK-PRE-CONCURRENCY-ZIPPERED:   "unversionedTriple": "x86_64-apple-macosx"
 // CHECK-PRE-CONCURRENCY-ZIPPERED:   "moduleTriple": "x86_64-apple-macos"
+// CHECK-PRE-CONCURRENCY-ZIPPERED:   "leastValidPointerValue": 4294967296,
 // CHECK-PRE-CONCURRENCY-ZIPPERED:   "swiftRuntimeCompatibilityVersion": "5.1"
 // CHECK-PRE-CONCURRENCY-ZIPPERED:   "librariesRequireRPath": true
 // CHECK-PRE-CONCURRENCY-ZIPPERED: }
@@ -85,6 +91,7 @@
 // CHECK-PRE-CONCURRENCY-ZIPPERED:   "triple": "x86_64-apple-ios13.1-macabi"
 // CHECK-PRE-CONCURRENCY-ZIPPERED:   "unversionedTriple": "x86_64-apple-ios-macabi"
 // CHECK-PRE-CONCURRENCY-ZIPPERED:   "moduleTriple": "x86_64-apple-ios-macabi"
+// CHECK-PRE-CONCURRENCY-ZIPPERED:   "leastValidPointerValue": 4294967296,
 // CHECK-PRE-CONCURRENCY-ZIPPERED:   "swiftRuntimeCompatibilityVersion": "5.1"
 // CHECK-PRE-CONCURRENCY-ZIPPERED:   "librariesRequireRPath": true
 // CHECK-PRE-CONCURRENCY-ZIPPERED: }
@@ -110,6 +117,13 @@
 // CHECK-IOS-SIM:     "swiftRuntimeCompatibilityVersion": "5.0",
 // CHECK-IOS-SIM:     "librariesRequireRPath": true
 // CHECK-IOS-SIM:   }
+
+// CHECK-WASM: "target": {
+// CHECK-WASM:   "triple": "wasm32-unknown-wasip1",
+// CHECK-WASM:   "moduleTriple": "wasm32-unknown-wasip1",
+// CHECK-WASM:   "leastValidPointerValue": 4096,
+// CHECK-WASM:   "librariesRequireRPath": false
+// CHECK-WASM: }
 
 // CHECK-PTR-SIZE-32: "target": {
 // CHECK-PTR-SIZE-32:   "triple": "thumbv7-unknown-windows-msvc",
