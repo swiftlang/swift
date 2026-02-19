@@ -43,15 +43,15 @@ struct CompilerBuildConfiguration: BuildConfiguration {
   func isCustomConditionSet(name: String) -> Bool {
     staticBuildConfiguration.isCustomConditionSet(name: name)
   }
-  
+
   func hasFeature(name: String) -> Bool {
     staticBuildConfiguration.hasFeature(name: name)
   }
-  
+
   func hasAttribute(name: String) -> Bool {
     staticBuildConfiguration.hasAttribute(name: name)
   }
-  
+
   func canImport(
     importPath: [(TokenSyntax, String)],
     version: CanImportVersion
@@ -89,19 +89,19 @@ struct CompilerBuildConfiguration: BuildConfiguration {
       }
     }
   }
-  
+
   func isActiveTargetOS(name: String) -> Bool {
     staticBuildConfiguration.isActiveTargetOS(name: name)
   }
-  
+
   func isActiveTargetArchitecture(name: String) -> Bool {
     staticBuildConfiguration.isActiveTargetArchitecture(name: name)
   }
-  
+
   func isActiveTargetEnvironment(name: String) -> Bool {
     staticBuildConfiguration.isActiveTargetEnvironment(name: name)
   }
-  
+
   func isActiveTargetRuntime(name: String) throws -> Bool {
     // Complain if the provided runtime isn't one of the known values.
     switch name {
@@ -115,7 +115,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
   func isActiveTargetPointerAuthentication(name: String) -> Bool {
     staticBuildConfiguration.isActiveTargetPointerAuthentication(name: name)
   }
-  
+
   var targetPointerBitWidth: Int {
     staticBuildConfiguration.targetPointerBitWidth
   }
@@ -320,6 +320,26 @@ private enum InactiveCodeChecker {
   case name(String)
   case tryOrThrow
 
+  /// Check if a token is part of a pattern in a variable/constant declaration.
+  private func isInPatternBinding(of token: TokenSyntax) -> Bool {
+    var node: Syntax? = Syntax(token)
+    while let currentNode = node {
+      if let patternBinding = currentNode.as(PatternBindingSyntax.self) {
+        // Check if the token is within the pattern (the name being declared)
+        // but not in the initializer or accessor
+        let pattern = patternBinding.pattern
+        if pattern.position <= token.position && token.endPosition <= pattern.endPosition {
+          return true
+        }
+
+        return false
+      }
+
+      node = currentNode.parent
+    }
+    return false
+  }
+
   /// Search for the kind of entity in the given syntax node.
   func search(syntax: SourceFileSyntax, configuredRegions: ConfiguredRegions) -> Bool {
     // If there are no regions, everything is active. This is the common case.
@@ -333,6 +353,10 @@ private enum InactiveCodeChecker {
       switch self {
       case .name(let name):
         if let identifier = token.identifier, identifier.name == name {
+          // Skip if this is in a pattern binding declaration
+          if isInPatternBinding(of: token) {
+            continue
+          }
           break
         }
 
