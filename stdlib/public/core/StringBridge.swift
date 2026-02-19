@@ -213,23 +213,34 @@ private func _NSStringCopyBytes(
   _ o: _StringSelectorHolder,
   encoding: UInt,
   into bufPtr: UnsafeMutableRawBufferPointer,
-  options: UInt
+  options: UInt,
+  UTF16Range: Range<Int>? = nil,
+  remainingRange: UnsafeMutablePointer<_SwiftNSRange>? = nil
 ) -> Int? {
   let ptr = unsafe bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-  let len = o.length
-  var remainingRange = _SwiftNSRange(location: 0, length: 0)
+  var tmpRemainingRange = _SwiftNSRange(location: 0, length: 0)
   var usedLen = 0
+  let range = if let UTF16Range {
+    _SwiftNSRange(location: UTF16Range.lowerBound, length: UTF16Range.count)
+  } else {
+    _SwiftNSRange(location: 0, length: o.length)
+  }
   let success = unsafe 0 != o.getBytes(
     ptr,
     maxLength: bufPtr.count,
     usedLength: &usedLen,
     encoding: encoding,
     options: options,
-    range: _SwiftNSRange(location: 0, length: len),
-    remaining: &remainingRange
+    range: range,
+    remaining: &tmpRemainingRange
   )
-  if success && remainingRange.length == 0 {
-    return usedLen
+  if success {
+    if let remainingRange = unsafe remainingRange {
+      unsafe remainingRange.pointee = tmpRemainingRange
+      return usedLen
+    } else if tmpRemainingRange.length == 0 {
+      return usedLen
+    }
   }
   return nil
 }
@@ -267,14 +278,26 @@ internal func _cocoaStringCopyBytes(
   _ target: _CocoaString,
   encoding: UInt,
   into bufPtr: UnsafeMutableRawBufferPointer,
-  options: UInt = 0
+  options: UInt = 0,
+  UTF16Range: Range<Int>,
+  remainingRange: inout Range<Int>
 ) -> Int? {
-  return unsafe _NSStringCopyBytes(
-    _objc(target),
-    encoding: encoding,
-    into: bufPtr,
-    options: options
-  )
+  var cocoaRemainingRange = _SwiftNSRange(location: 0, length: 0)
+  defer {
+    remainingRange = cocoaRemainingRange.location ..< cocoaRemainingRange.location + cocoaRemainingRange.length
+  }
+  return unsafe withUnsafeMutablePointer(
+    to: &cocoaRemainingRange
+  ) { remainingPtr in
+    return unsafe _NSStringCopyBytes(
+      _objc(target),
+      encoding: encoding,
+      into: bufPtr,
+      options: options,
+      UTF16Range: UTF16Range,
+      remainingRange: remainingPtr
+    )
+  }
 }
 
 @_effects(readonly)
@@ -505,7 +528,7 @@ private func _withCocoaUTF8Pointer<R>(
   return nil
 }
 
-@_effects(readonly) @inline(__always)
+@_effects(readonly)
 internal func withCocoaASCIIPointer<R>(
   _ str: _CocoaString,
   work: (UnsafePointer<UInt8>) -> R?
@@ -513,7 +536,7 @@ internal func withCocoaASCIIPointer<R>(
   return unsafe _withCocoaASCIIPointer(str, requireStableAddress: false, work: work)
 }
 
-@_effects(readonly) @inline(__always)
+@_effects(readonly)
 internal func withCocoaUTF8Pointer<R>(
   _ str: _CocoaString,
   work: (UnsafePointer<UInt8>) -> R?

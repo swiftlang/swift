@@ -88,7 +88,7 @@ swift_stdlib_NSObject_isEqual(id lhs,
 }
 
 extern "C" {
-  BOOL _swizzle_me_isEqual(id, SEL, void *, intptr_t, uintptr_t);
+  BOOL _swift_NSStringIsEqualToBytesImpl(id, SEL, void *, intptr_t, uintptr_t);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
@@ -115,7 +115,7 @@ swift_stdlib_connectNSBaseClasses() {
   class_addMethod(
     NSStringClass,
     @selector(_isEqualToBytes:count:encoding:),
-    (IMP)_swizzle_me_isEqual,
+    (IMP)_swift_NSStringIsEqualToBytesImpl,
     typeString);
   return true;
 }
