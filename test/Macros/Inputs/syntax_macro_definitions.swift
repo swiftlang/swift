@@ -3014,3 +3014,28 @@ public struct CustomConditionCheckMacro: ExpressionMacro {
     return "\(literal: isSet)"
   }
 }
+
+public struct ExtensionWithLocalTypeMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let ext: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription) {
+        static func test(_ value: Int) {
+          enum Status {
+            case active
+            case inactive
+          }
+          func checkStatus(value: Int, status: Status?) {}
+          checkStatus(value: value, status: nil)
+        }
+      }
+      """
+    return [ext.cast(ExtensionDeclSyntax.self)]
+  }
+}
