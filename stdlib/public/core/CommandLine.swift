@@ -202,9 +202,9 @@ extension CommandLine {
     unsafe _withExecutablePath { path in
       if unsafe path.pointee != 0 {
 #if os(Windows)
-        let count = wcslen(path)
+        let count = unsafe wcslen(path)
 #else
-        let count = strlen(path)
+        let count = unsafe strlen(path)
 #endif
         let buffer = unsafe UnsafeBufferPointer(start: path, count: count)
         result = unsafe ContiguousArray(buffer)
