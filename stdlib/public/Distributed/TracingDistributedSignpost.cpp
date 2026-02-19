@@ -20,7 +20,7 @@
 #include <stdio.h>
 
 #define SWIFT_LOG_DISTRIBUTED_SUBSYSTEM "com.apple.swift.distributed"
-#define SWIFT_LOG_DISTRIBUTED_CATEGORY "DistributedActor"
+#define SWIFT_LOG_DISTRIBUTED_CATEGORY "Distributed"
 
 namespace swift {
 namespace distributed {
@@ -37,8 +37,7 @@ void setupLogs(void *unused) {
   }
 
   TracingEnabled = true;
-  DistributedLog = os_log_create(SWIFT_LOG_DISTRIBUTED_SUBSYSTEM,
-                                 SWIFT_LOG_DISTRIBUTED_CATEGORY);
+  DistributedLog = os_log_create(SWIFT_LOG_DISTRIBUTED_SUBSYSTEM, SWIFT_LOG_DISTRIBUTED_CATEGORY);
 }
 
 } // namespace trace

@@ -17,6 +17,7 @@
 #ifndef SWIFT_DISTRIBUTED_TRACING_H
 #define SWIFT_DISTRIBUTED_TRACING_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 namespace swift {
@@ -44,6 +45,11 @@ void distributed_remote_call_outbound(HeapObject *localTargetActor,
 void distributed_execute_distributed_target(HeapObject *localTargetActor,
                                             const char *targetActorId,
                                             const char *targetIdentifier);
+
+/// Emitted when `swift_findAccessibleFunction` has found (or not) a distributed function accessor.
+void distributed_find_accessible_function(const char *targetName,
+                                          size_t targetNameLength,
+                                          const void *func);
 
 /// Emitted when a result handler is invoked after execution of a local distributed call target completes.
 ///

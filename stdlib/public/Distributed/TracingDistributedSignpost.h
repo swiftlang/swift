@@ -44,6 +44,7 @@
 // * Change event names.
 // * Change subsystem names.
 
+#define SWIFT_LOG_DISTRIBUTED_FIND_ACCESSIBLE_FUNCTION_NAME "distributed_find_accessible_function"
 #define SWIFT_LOG_DISTRIBUTED_REMOTE_CALL_OUTBOUND_NAME "distributed_remote_call_outbound"
 #define SWIFT_LOG_DISTRIBUTED_EXECUTE_TARGET_NAME "distributed_execute_distributed_target"
 #define SWIFT_LOG_DISTRIBUTED_RESULT_HANDLER_NAME "distributed_invoke_result_handler"
@@ -90,7 +91,7 @@ inline bool distributed_trace_is_enabled() {
 inline void distributed_remote_call_outbound(HeapObject *localTargetActor,
                                              const char *targetActorId,
                                              const char *targetIdentifier) {
-  ENSURE_LOGS();
+ENSURE_LOGS();
 
   if (!os_signpost_enabled(DistributedLog))
     return;
@@ -135,6 +136,27 @@ inline void distributed_execute_distributed_target(HeapObject *localTargetActor,
       typeName.data,
       targetActorId ? targetActorId : "<unknown>",
       targetIdentifier ? targetIdentifier : "<unknown>");
+}
+
+inline void distributed_find_accessible_function(const char *targetName,
+                                                 size_t targetNameLength,
+                                                 const void *func) {
+  ENSURE_LOGS();
+
+  if (!os_signpost_enabled(DistributedLog))
+    return;
+
+  auto id = os_signpost_id_generate(DistributedLog);
+  os_signpost_event_emit(
+      DistributedLog, id, SWIFT_LOG_DISTRIBUTED_FIND_ACCESSIBLE_FUNCTION_NAME,
+      "inbound"
+      " targetFunction=%{public}.*s"
+      " found=%{bool}d"
+      " funcPtr=%p",
+      (int)targetNameLength,
+      targetName ? targetName : "<unknown>",
+      func != nullptr,
+      func);
 }
 
 inline void distributed_invoke_result_handler(HeapObject *localTargetActor,

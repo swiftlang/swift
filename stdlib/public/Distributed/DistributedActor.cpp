@@ -20,17 +20,17 @@
 #include "swift/Basic/Casting.h"
 #include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Concurrency.h"
+#include "TracingDistributed.h"
 
 using namespace swift;
 
 static const AccessibleFunctionRecord *
 findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
-  if (auto *func = runtime::swift_findAccessibleFunction(targetNameStart,
-                                                         targetNameLength)) {
-    assert(func->Flags.isDistributed());
-    return func;
-  }
-  return nullptr;
+  auto func = runtime::swift_findAccessibleFunction(targetNameStart, targetNameLength);
+  assert(!func || func->Flags.isDistributed() && "Found distributed accessor was not 'distributed'!");
+
+  distributed::trace::distributed_find_accessible_function(targetNameStart, targetNameLength, func);
+  return func;
 }
 
 

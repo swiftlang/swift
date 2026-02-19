@@ -27,16 +27,24 @@ inline bool distributed_trace_is_enabled() { return false; }
 
 inline void distributed_remote_call_outbound(HeapObject *localTargetActor,
                                              const char *targetActorID,
-                                             const char *targetIdentifier) {}
+                                             const char *targetIdentifier) {
+}
 
 inline void distributed_execute_distributed_target(HeapObject *localTargetActor,
                                                    const char *targetActorID,
-                                                   const char *targetIdentifier) {}
+                                                   const char *targetIdentifier) {
+}
+
+inline void distributed_find_accessible_function(const char *targetName,
+                                                 size_t targetNameLength,
+                                                 const void *func) {
+}
 
 inline void distributed_invoke_result_handler(HeapObject *localTargetActor,
                                                     const char *targetActorID,
                                                     const char *targetIdentifier,
-                                                    bool success) {}
+                                                    bool success) {
+}
 
 } // namespace trace
 } // namespace distributed
