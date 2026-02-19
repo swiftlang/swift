@@ -214,10 +214,6 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     auto importPath = builder.copyTo(ctx);
     auto modulePath = importPath.getModulePath(dependency.isScoped());
     auto accessPath = importPath.getAccessPath(dependency.isScoped());
-    if (!getContext().LangOpts.DisableDeserializationOfExplicitPaths &&
-        !dependency.Core.BinaryModulePath.empty())
-      ctx.addExplicitModulePath(modulePath.front().Item.str(),
-                                dependency.Core.BinaryModulePath.str());
 
     auto module = getModule(modulePath, /*allowLoading*/true);
     if (!module || module->failedToLoad()) {
