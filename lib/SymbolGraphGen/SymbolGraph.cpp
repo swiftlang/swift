@@ -624,16 +624,26 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
     }); // end metadata:
 
     OS.attributeObject("module", [&](){
+      std::string ModuleName;
       if (DeclaringModule) {
         // A cross-import overlay can be considered part of its declaring module
-        OS.attribute("name", getFullModuleName(*DeclaringModule));
+        ModuleName = getFullModuleName(*DeclaringModule);
+        OS.attribute("name", ModuleName);
         std::vector<StringRef> B;
         for (auto BModule : BystanderModules) {
           B.push_back(BModule.str());
         }
         OS.attribute("bystanders", B);
       } else {
-        OS.attribute("name", getFullModuleName(&M));
+        ModuleName = getFullModuleName(&M);
+        OS.attribute("name", ModuleName);
+      }
+      if (ExtendedModule) {
+        OS.attribute("extended", getFullModuleName(*ExtendedModule));
+      } else {
+        // When the symbol graph isn't extending another module, signal that to the reader by 
+        // repeating the source module's name.
+        OS.attribute("extended", ModuleName);
       }
       AttributeRAII Platform("platform", OS);
 
