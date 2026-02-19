@@ -2629,10 +2629,14 @@ namespace {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd) &&
               !isa<clang::TypeAliasTemplateDecl>(nd) &&
               !isa<clang::FunctionTemplateDecl>(nd)) {
-            // We don't know what this member is.
-            // Assume it may be important in C.
-            hasUnreferenceableStorage = true;
-            hasMemberwiseInitializer = false;
+            auto varDecl = dyn_cast<clang::VarDecl>(nd);
+            // Static fields don't affect the memberwise initializer.
+            if (!(varDecl && varDecl->isStaticDataMember())) {
+              // We don't know what this member is.
+              // Assume it may be important in C.
+              hasUnreferenceableStorage = true;
+              hasMemberwiseInitializer = false;
+            }
           }
           continue;
         }
