@@ -567,6 +567,9 @@ public:
   /// Enable auto bridging header chaining.
   bool BridgingHeaderChaining = false;
 
+  /// The module names for dependecy only imports.
+  std::vector<std::string> DependencyOnlyModuleImports;
+
   /// Return all module search paths that (non-recursively) contain a file whose
   /// name is in \p Filenames.
   SmallVector<const ModuleSearchPath *, 4>
@@ -589,21 +592,23 @@ public:
   llvm::hash_code getPCHHashComponents() const {
     using llvm::hash_combine;
     using llvm::hash_combine_range;
-    return hash_combine(SDKPath,
-                        hash_combine_range(ImportSearchPaths.begin(), ImportSearchPaths.end()),
-                        hash_combine_range(VFSOverlayFiles.begin(), VFSOverlayFiles.end()),
-                        hash_combine_range(FrameworkSearchPaths.begin(),
-                                           FrameworkSearchPaths.end()),
-                        hash_combine_range(LibrarySearchPaths.begin(),
-                                           LibrarySearchPaths.end()),
-                        RuntimeResourcePath,
-                        hash_combine_range(RuntimeLibraryImportPaths.begin(),
-                                           RuntimeLibraryImportPaths.end()),
-                        hash_combine_range(ImplicitFrameworkSearchPaths.begin(),
-                                           ImplicitFrameworkSearchPaths.end()),
-                        DisableModulesValidateSystemDependencies,
-                        ScannerModuleValidation,
-                        ModuleLoadMode);
+    return hash_combine(
+        SDKPath,
+        hash_combine_range(ImportSearchPaths.begin(), ImportSearchPaths.end()),
+        hash_combine_range(VFSOverlayFiles.begin(), VFSOverlayFiles.end()),
+        hash_combine_range(FrameworkSearchPaths.begin(),
+                           FrameworkSearchPaths.end()),
+        hash_combine_range(LibrarySearchPaths.begin(),
+                           LibrarySearchPaths.end()),
+        RuntimeResourcePath,
+        hash_combine_range(RuntimeLibraryImportPaths.begin(),
+                           RuntimeLibraryImportPaths.end()),
+        hash_combine_range(ImplicitFrameworkSearchPaths.begin(),
+                           ImplicitFrameworkSearchPaths.end()),
+        hash_combine_range(DependencyOnlyModuleImports.begin(),
+                           DependencyOnlyModuleImports.end()),
+        DisableModulesValidateSystemDependencies, ScannerModuleValidation,
+        ModuleLoadMode);
   }
 
   /// Return a hash code of any components from these options that should
