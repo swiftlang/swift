@@ -1830,10 +1830,11 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
                                                            throws);
 
   // Get the callee value.
-  auto substFnType = args[0].getType().castTo<SILFunctionType>();
+  unsigned calleeIndex = throws ? 1 : 0;
+  auto substFnType = args[calleeIndex].getType().castTo<SILFunctionType>();
   SILValue fnValue = (substFnType->isCalleeConsumed()
-                      ? args[0].forward(SGF)
-                      : args[0].getValue());
+                      ? args[calleeIndex].forward(SGF)
+                      : args[calleeIndex].getValue());
 
   // Call the provided function value.
   SGF.B.createApply(loc, fnValue, {}, {continuation});
@@ -1853,7 +1854,13 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
 
     Scope errorScope(SGF, loc);
 
-    auto errorTy = SGF.getASTContext().getErrorExistentialType();
+    CanType errorTy;
+    if (subs.getReplacementTypes().size() > 1) {
+      errorTy = subs.getReplacementTypes()[1]->getCanonicalType();
+    } else {
+      errorTy = SGF.getASTContext().getErrorExistentialType();
+    }
+
     auto errorVal = SGF.B.createTermResult(
         SILType::getPrimitiveObjectType(errorTy), OwnershipKind::Owned);
 

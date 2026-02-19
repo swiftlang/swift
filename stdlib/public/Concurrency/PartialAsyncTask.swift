@@ -932,12 +932,12 @@ public func withUnsafeContinuation<T>(
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @unsafe
-public func withUnsafeThrowingContinuation<T>(
+public func withUnsafeThrowingContinuation<T, E>(
   isolation: isolated (any Actor)? = #isolation,
-  _ fn: (UnsafeContinuation<T, Error>) -> Void
-) async throws -> sending T {
-  return try await Builtin.withUnsafeThrowingContinuation {
-    unsafe fn(UnsafeContinuation<T, Error>($0))
+  _ fn: (UnsafeContinuation<T, E>) -> Void
+) async throws(E) -> sending T {
+  return try await Builtin.withUnsafeThrowingContinuation(E.self) {
+    unsafe fn(UnsafeContinuation<T, E>($0))
   }
 }
 
@@ -961,11 +961,11 @@ public func _unsafeInheritExecutor_withUnsafeContinuation<T>(
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @_unsafeInheritExecutor
-public func _unsafeInheritExecutor_withUnsafeThrowingContinuation<T>(
-  _ fn: (UnsafeContinuation<T, Error>) -> Void
-) async throws -> sending T {
-  return try await Builtin.withUnsafeThrowingContinuation {
-    unsafe fn(UnsafeContinuation<T, Error>($0))
+public func _unsafeInheritExecutor_withUnsafeThrowingContinuation<T, E>(
+  _ fn: (UnsafeContinuation<T, E>) -> Void
+) async throws(E) -> sending T {
+  return try await Builtin.withUnsafeThrowingContinuation(E.self) {
+    unsafe fn(UnsafeContinuation<T, E>($0))
   }
 }
 

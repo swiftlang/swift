@@ -2259,26 +2259,30 @@ static ValueDecl *getPolymorphicBinaryOperation(ASTContext &ctx,
 static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
                                             Identifier id,
                                             bool throws) {
-  BuiltinFunctionBuilder builder(ctx);
-
-  auto contTy = ctx.TheRawUnsafeContinuationType;
-  SmallVector<AnyFunctionType::Param, 1> params;
-  params.emplace_back(contTy);
-
-  auto voidTy = ctx.TheEmptyTupleType;
-  auto extInfo = FunctionType::ExtInfoBuilder().withNoEscape().build();
-  auto *fnTy = FunctionType::get(params, voidTy, extInfo);
-
-  builder.addParameter(makeConcrete(fnTy));
+  BuiltinFunctionBuilder builder(ctx, throws ? 2 : 1);
 
   auto resultTy = makeGenericParam();
   builder.addConformanceRequirement(resultTy, KnownProtocolKind::Escapable);
   builder.setResult(resultTy);
-
   builder.setAsync();
-  if (throws)
+
+  SmallVector<AnyFunctionType::Param, 1> params;
+  if (throws) {
+    auto errorTy = makeGenericParam(1);
+    builder.addConformanceRequirement(errorTy, KnownProtocolKind::Error);
     builder.setThrows();
+    builder.setThrownError(errorTy);
+    builder.addParameter(makeMetatype(errorTy));
+  }
   builder.setSendingResult();
+
+  // Add the closure parameter.
+  auto voidTy = ctx.TheEmptyTupleType;
+  auto contTy = ctx.TheRawUnsafeContinuationType;
+  params.emplace_back(contTy);
+  auto extInfo = FunctionType::ExtInfoBuilder().withNoEscape().build();
+  auto *fnTy = FunctionType::get(params, voidTy, extInfo);
+  builder.addParameter(makeConcrete(fnTy));
 
   return builder.build(id);
 }
