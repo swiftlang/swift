@@ -396,7 +396,7 @@ sil [ossa] @test_store_borrow_init_enum : $@convention(thin) (@guaranteed Option
 bb0(%0 :  @guaranteed $Optional<T>):
   %s = alloc_stack $Optional<T>
   %sb = store_borrow %0 to %s : $*Optional<T>
-  %ie = init_enum_data_addr %sb : $*Optional<T>, #Optional.some!enumelt
+  inject_enum_addr %sb : $*Optional<T>, #Optional.some!enumelt
   end_borrow %sb : $*Optional<T>
   dealloc_stack %s : $*Optional<T>
   %res = tuple ()

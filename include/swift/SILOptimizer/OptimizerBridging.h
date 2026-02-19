@@ -167,6 +167,9 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLoopTree getLoopTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLoop getLoop() const;
   
+  // TODO: Make ColdBlockInfo a proper SILAnalysis. This function is way too expensive.
+  BRIDGED_INLINE bool isBlockCold(BridgedBasicBlock bb) const;
+  
   // Array semantics call
   
   static BRIDGED_INLINE ArrayCallKind getArraySemanticsCallKind(BridgedInstruction inst);
