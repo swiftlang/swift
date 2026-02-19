@@ -23,6 +23,9 @@
 
 //--- A.swift
 
+// CHECK-NOT: @_Concurrency.MainActor @preconcurrency public var x: Swift.Int
+public var x: Int = 42
+
 // CHECK: @_Concurrency.MainActor @preconcurrency public protocol P
 public protocol P {
 }
@@ -33,6 +36,20 @@ nonisolated public protocol Q: Sendable {
 
 // CHECK: @_Concurrency.MainActor @preconcurrency public struct S : A.P {
 public struct S: P {
+  // CHECK: @_Concurrency.MainActor @preconcurrency public enum E : Swift.String {
+  // CHECK:   case a
+  // CHECK:   case b
+  // CHECK:   nonisolated public init?(rawValue: Swift.String)
+  // CHECK:   public typealias RawValue = Swift.String
+  // CHECK:   nonisolated public var rawValue: Swift.String {
+  // CHECK:     get
+  // CHECK:   }
+  // CHECK: }
+  public enum E: String {
+    case a
+    case b
+  }
+
   // CHECK:   @_Concurrency.MainActor @preconcurrency public func f()
   public func f() {}
 
@@ -82,6 +99,18 @@ open class IsolatedDeinitTest {
 }
 // CHECK: }
 
+// CHECK: @_Concurrency.MainActor @preconcurrency public struct TestAccessors {
+public struct TestAccessors {
+  // CHECK: @_Concurrency.MainActor @preconcurrency public var test: Swift.Int {
+  // CHECK:   get
+  // CHECK:   set
+  // CHECK: }
+  public var test: Int {
+    get { 42 }
+    set { }
+  }
+}
+// CHECK: }
 
 //--- Client.swift
 import A
