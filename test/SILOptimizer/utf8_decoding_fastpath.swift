@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
-// REQUIRES: optimized_stdlib,CPU=x86_64
+// REQUIRES: swift_stdlib_no_asserts
+// REQUIRES: optimized_stdlib
+// REQUIRES: CPU=x86_64
 
 // This is an end-to-end test to ensure that the optimizer generates
 // good code for various ways to create a String from a Sequence of UTF-8
