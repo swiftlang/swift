@@ -184,7 +184,7 @@ param
 
   # Debug Information
   [switch] $DebugInfo,
-  [ValidateSet("codeview", "dwarf")]
+  [ValidateSet("codeview", "dwarf", "dwarf-fission")]
   [string] $CDebugFormat = "dwarf",
   [ValidateSet("codeview", "dwarf")]
   [string] $SwiftDebugFormat = "dwarf",
@@ -1537,10 +1537,16 @@ function Build-CMakeProject {
           Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
 
           if ($DebugInfo) {
-            $ASMDebugFlags = if ($CDebugFormat -eq "dwarf") {
-              if ($UseGNUDriver) { @("-gdwarf") } else { @("-clang:-gdwarf") }
-            } else {
-              if ($UseGNUDriver) { @("-gcodeview") } else { @("-clang:-gcodeview") }
+            $ASMDebugFlags = switch ($CDebugFormat) {
+              "dwarf" {
+                if ($UseGNUDriver) { @("-gdwarf") } else { @("-clang:-gdwarf") }
+              }
+              "dwarf-fission" {
+                if ($UseGNUDriver) { @("-g", "-gsplit-dwarf") } else { @("-clang:-g", "-clang:-gsplit-dwarf") }
+              }
+              default {
+                if ($UseGNUDriver) { @("-gcodeview") } else { @("-clang:-gcodeview") }
+              }
             }
 
             # CMake does not set a default value for the ASM compiler debug
@@ -1596,11 +1602,15 @@ function Build-CMakeProject {
 
           if ($DebugInfo) {
             if ($UsePinnedCompilers.Contains("C") -or $UseBuiltCompilers.Contains("C")) {
-              if ($CDebugFormat -eq "dwarf") {
-                $CFLAGS += if ($UseGNUDriver) {
-                  @("-gdwarf")
-                } else {
-                  @("-clang:-gdwarf")
+              $CFLAGS += switch ($CDebugFormat) {
+                "dwarf" {
+                  if ($UseGNUDriver) { @("-gdwarf") } else { @("-clang:-gdwarf") }
+                }
+                "dwarf-fission" {
+                  if ($UseGNUDriver) { @("-g", "-gsplit-dwarf") } else { @("-clang:-g", "-clang:-gsplit-dwarf") }
+                }
+                default {
+                  if ($UseGNUDriver) { @("-gcodeview") } else { @("-clang:-gcodeview") }
                 }
               }
             }
@@ -1644,11 +1654,15 @@ function Build-CMakeProject {
 
           if ($DebugInfo) {
             if ($UsePinnedCompilers.Contains("CXX") -or $UseBuiltCompilers.Contains("CXX")) {
-              if ($CDebugFormat -eq "dwarf") {
-                $CXXFLAGS += if ($UseGNUDriver) {
-                  @("-gdwarf")
-                } else {
-                  @("-clang:-gdwarf")
+              $CXXFLAGS += switch ($CDebugFormat) {
+                "dwarf" {
+                  if ($UseGNUDriver) { @("-gdwarf") } else { @("-clang:-gdwarf") }
+                }
+                "dwarf-fission" {
+                  if ($UseGNUDriver) { @("-g", "-gsplit-dwarf") } else { @("-clang:-g", "-clang:-gsplit-dwarf") }
+                }
+                default {
+                  if ($UseGNUDriver) { @("-gcodeview") } else { @("-clang:-gcodeview") }
                 }
               }
             }
