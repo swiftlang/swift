@@ -668,3 +668,4 @@ public func addressOnlyVarArgTestCCFlowReinitInBlockTest<T : P>(_ k: inout (any 
 // CHECK-DAG: ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]] = !DILocalVariable(name: "k",
 // CHECK-DAG: ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]] = !DILocalVariable(name: "k",
 // CHECK-DAG: ![[K_COPYABLE_LET_CCFLOW_METADATA]] = !DILocalVariable(name: "k",
+
