@@ -223,7 +223,7 @@ fileprivate extension String {
   }
 }
 
-// We don't run the Foundation tests, so make sure we have coverage for _unicodeBuffersEqual ourselves
+// We don't run the Foundation tests, so make sure we have coverage for _swift_unicodeBuffersEqual_nonNormalizing ourselves
 StringBridgeTests.test("Foundation Buffer Comparison SPI") {
   let asciiString = "Hello"                           // ASCII (1-byte UTF-8, 2-byte UTF-16)
   let utf8_1byte = "abc"                              // 1-byte UTF-8
@@ -246,7 +246,7 @@ StringBridgeTests.test("Foundation Buffer Comparison SPI") {
   ) {
     let result = lhs.withBytesInEncoding(lhsEncoding) { lhsPtr, lhsCount in
       rhs.withBytesInEncoding(rhsEncoding) { rhsPtr, rhsCount in
-        _unicodeBuffersEqual(
+        _swift_unicodeBuffersEqual_nonNormalizing(
           bytes: lhsPtr,
           count: lhsCount,
           encoding: lhsEncoding,

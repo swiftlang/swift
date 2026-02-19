@@ -1205,4 +1205,4 @@ Added: _$ss4SpanVyxGs18_BorrowingSequencesRi_zrlMc
 Added: _$ss4SpanVyxGs26_BorrowingIteratorProtocolsRi_zrlMc
 
 // Cross-encoding strcmp for Foundation
-Added: _swift_unicodeBuffersEqual_nonNormalizing
+Added: __swift_unicodeBuffersEqual_nonNormalizing
