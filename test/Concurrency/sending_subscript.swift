@@ -2,7 +2,9 @@
 
 // REQUIRES: concurrency
 
-class NonSendableKlass {}
+protocol P {}
+
+class NonSendableKlass: P {}
 
 // CHECK-DAG: subscript(_: sending NonSendableKlass) -> sending NonSendableKlass { get }
 
@@ -20,3 +22,18 @@ struct S2 {
   }
 }
 
+// CHECK-DAG: subscript(_: sending NonSendableKlass) -> sending some P { get }
+
+// CHECK-DAG: sil hidden [ossa] @$s17sending_subscript2S3VyQrAA16NonSendableKlassCncig : $@convention(method) (@sil_sending @owned NonSendableKlass, S3) -> @sil_sending @out @_opaqueReturnTypeOf("$s17sending_subscript2S3VyQrAA16NonSendableKlassCncip", 0) __ {
+struct S3 {
+  subscript(_: sending NonSendableKlass) -> sending (some P) { NonSendableKlass() }
+}
+
+// CHECK-DAG: subscript(_: sending NonSendableKlass) -> sending (some P, NonSendableKlass) { get }
+
+// CHECK-DAG: sil hidden [ossa] @$s17sending_subscript2S4VyQr_AA16NonSendableKlassCtAEncig : $@convention(method) (@sil_sending @owned NonSendableKlass, S4) -> (@sil_sending @out @_opaqueReturnTypeOf("$s17sending_subscript2S4VyQr_AA16NonSendableKlassCtAEncip", 0) __, @sil_sending @owned NonSendableKlass) {
+struct S4 {
+  subscript(_: sending NonSendableKlass) -> sending (some P, NonSendableKlass) {
+    (NonSendableKlass(), NonSendableKlass())
+  }
+}
