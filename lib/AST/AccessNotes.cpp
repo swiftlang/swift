@@ -20,6 +20,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h" // DeclContext::isModuleScopeContext()
 #include "swift/Basic/Assertions.h"
 #include "swift/Parse/ParseDeclName.h"
@@ -35,11 +36,9 @@ AccessNoteDeclName::AccessNoteDeclName()
 AccessNoteDeclName::AccessNoteDeclName(ASTContext &ctx, StringRef str) {
   auto parsedName = parseDeclName(str);
 
-  StringRef first, rest = parsedName.ContextName;
-  while (!rest.empty()) {
-    std::tie(first, rest) = rest.split('.');
-    parentNames.push_back(ctx.getIdentifier(first));
-  }
+  SmallVector<DeclNameRef, 4> parentNamesTemp;
+  parsedName.formContextNames(ctx, parentNamesTemp);
+  llvm::append_range(parentNames, parentNamesTemp);
 
   if (parsedName.IsGetter)
     accessorKind = AccessorKind::Get;
@@ -48,7 +47,25 @@ AccessNoteDeclName::AccessNoteDeclName(ASTContext &ctx, StringRef str) {
   else
     accessorKind = std::nullopt;
 
-  name = parsedName.formDeclName(ctx, /*isSubscript=*/true);
+  name = parsedName.formDeclNameRef(ctx, /*isSubscript=*/true);
+}
+
+static bool isVisibleFrom(ValueDecl *VD, Identifier moduleSelector) {
+  // If there's no selector, treat as visible.
+  if (moduleSelector.empty())
+    return true;
+
+  ASTContext &ctx = VD->getASTContext();
+
+  ModuleDecl *visibleFrom = ctx.getLoadedModule(moduleSelector);
+  if (!visibleFrom && moduleSelector == ctx.TheBuiltinModule->getName())
+    visibleFrom = ctx.TheBuiltinModule;
+
+  // If we didn't find a module by this name, it doesn't match.
+  if (!visibleFrom)
+    return false;
+
+  return ctx.getImportCache().isImportedBy(VD->getModuleContext(), visibleFrom);
 }
 
 bool AccessNoteDeclName::matches(ValueDecl *VD) const {
@@ -67,12 +84,15 @@ bool AccessNoteDeclName::matches(ValueDecl *VD) const {
     return false;
 
   // Check that `name` matches `lookupVD`.
-  if (!lookupVD->getName().matchesRef(name))
+  if (!lookupVD->getName().matchesRef(name.getFullName()))
+    return false;
+
+  if (!isVisibleFrom(lookupVD, name.getModuleSelector()))
     return false;
 
   // The rest of this checks `parentNames` against the parents of `lookupVD`.
 
-  ArrayRef<Identifier> remainingContextNames = parentNames;
+  ArrayRef<DeclNameRef> remainingContextNames = parentNames;
   DeclContext *nextContext = lookupVD->getDeclContext();
 
   while (!nextContext->isModuleScopeContext()) {
@@ -80,13 +100,15 @@ bool AccessNoteDeclName::matches(ValueDecl *VD) const {
     if (remainingContextNames.empty())
       return false;
 
-    Identifier contextName = remainingContextNames.back();
+    DeclNameRef contextName = remainingContextNames.back();
 
     // If the context is not a type (or extension), we can't name VD in an
     // access note and the match fails; if the name doesn't match, the match
     // fails too.
     auto contextType = nextContext->getSelfNominalTypeDecl();
-    if (!contextType || contextType->getName() != contextName)
+    if (!contextType || contextType->getName() != contextName.getFullName())
+      return false;
+    if (!isVisibleFrom(contextType, contextName.getModuleSelector()))
       return false;
 
     // Still checking. Move to the parent.
