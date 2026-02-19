@@ -8,6 +8,8 @@ add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   DeclAttrs.swift
   Decls.swift
   Diagnostics.swift
+  SARIFSchema.swift
+  SARIFConversion.swift
   DiagnosticsBridge.swift
   EmbeddedSupport.swift
   Exprs.swift

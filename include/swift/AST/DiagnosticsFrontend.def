@@ -100,8 +100,11 @@ ERROR(error_option_missing_required_argument, none,
 
 ERROR(cannot_open_file,none,
       "cannot open file '%0' (%1)", (StringRef, StringRef))
-ERROR(cannot_open_serialized_file,none,
+ERROR(cannot_open_serialized_file, none,
       "cannot open file '%0' for diagnostics emission (%1)",
+      (StringRef, StringRef))
+ERROR(cannot_serialize_diagnostics_to_sarif, none,
+      "cannot serialize diagnostics in SARIF format to file '%0': %1",
       (StringRef, StringRef))
 ERROR(error_open_input_file,none,
       "error opening input file '%0' (%1)", (StringRef, StringRef))

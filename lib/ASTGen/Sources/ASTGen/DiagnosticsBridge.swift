@@ -12,6 +12,7 @@
 
 import ASTBridging
 import BasicBridging
+import Foundation
 import SwiftDiagnostics
 import SwiftSyntax
 
@@ -139,6 +140,9 @@ struct QueuedDiagnostics {
 
   /// The known source files
   var sourceFiles: [ExportedSourceFile] = []
+
+  /// Diagnostics grouped by file name for SARIF export
+  var diagnosticsMap: [String: DiagnosticInfo] = [:]
 }
 
 /// Create a grouped diagnostics structure in which we can add osou
@@ -417,7 +421,36 @@ public func addQueuedDiagnostic(
     fixIts: fixIts
   )
 
+  // Add to grouped diagnostics for console rendering
   queuedDiagnostics.pointee.grouped.addDiagnostic(diagnostic)
+
+  updateMap(
+    queuedDiagnostics: queuedDiagnostics,
+    sourceFile: sourceFile,
+    diagnostic: diagnostic
+  )
+}
+
+fileprivate func updateMap(
+  queuedDiagnostics: UnsafeMutablePointer<QueuedDiagnostics>,
+  sourceFile: ExportedSourceFile,
+  diagnostic: Diagnostic
+) {
+  let filePath = sourceFile.fileName
+
+  // Only process if we have a SourceFileSyntax
+  guard let tree = sourceFile.syntax.as(SourceFileSyntax.self) else {
+    return
+  }
+
+  queuedDiagnostics.pointee.diagnosticsMap[
+    filePath,
+    default: DiagnosticInfo(
+      filePath: filePath,
+      tree: tree,
+      diagnostics: []
+    )
+  ].add(diagnostic: diagnostic)
 }
 
 /// Render a single diagnostic that has no source location information.
@@ -560,4 +593,95 @@ public func renderCategoryFootnotes(
 
   // Clear out categories so we start fresh.
   state.pointee.referencedCategories = []
+}
+
+/// Export queued diagnostics as SARIF JSON.
+@_cdecl("swift_ASTGen_renderQueuedDiagnosticsAsSARIF")
+public func renderQueuedDiagnosticsAsSARIF(
+  queuedDiagnosticsPtr: UnsafeMutableRawPointer,
+  bridgedCompilerVersion: BridgedStringRef,
+  bridgedOutputPath: BridgedStringRef,
+  bridgedInvocationProperties: BridgedArrayRef,
+  errorMessageOutPtr: UnsafeMutablePointer<BridgedStringRef>
+) {
+
+  let queuedDiagnostics = queuedDiagnosticsPtr.assumingMemoryBound(to: QueuedDiagnostics.self)
+
+  let diagnosticInfoArray = Array(queuedDiagnostics.pointee.diagnosticsMap.values)
+
+  let toolInfo = ToolInfo(
+    name: "Swift Compiler",
+    version: String(bridged: bridgedCompilerVersion),
+    informationUri: "https://swift.org",
+    organization: "Swift Project"
+  )
+
+  // Parse configuration properties from bridged array
+  let invocationPropertyBag = parseInvocationProperties(bridgedProps: bridgedInvocationProperties)
+
+  let invocation = Invocation(
+    properties: invocationPropertyBag /*.isEmpty ? nil : invocationPropertyBag */
+  )
+
+  let sarifLog = convertToSARIFLog(
+    toolInfo: toolInfo,
+    diagnosticInfoArray: diagnosticInfoArray,
+    invocation: invocation
+  )
+
+  do {
+    try sarifLog.toJSONFile(url: URL(fileURLWithPath: String(bridged: bridgedOutputPath)))
+  } catch {
+    let errorMessage = "\(error)"
+    errorMessageOutPtr.pointee = allocateBridgedString(errorMessage)
+  }
+}
+
+/// Represents a configuration property key-value pair from C++
+fileprivate struct BridgedInvocationProperty {
+  let category: BridgedStringRef
+  let key: BridgedStringRef
+  let value: BridgedStringRef
+  let type: UInt8  // 0=string, 1=int, 2=bool
+}
+
+/// Parse configuration properties from the bridged array into a PropertyBag
+fileprivate func parseInvocationProperties(bridgedProps: BridgedArrayRef) -> PropertyBag {
+  var properties: [String: PropertyValue] = [:]
+
+  bridgedProps.withElements(ofType: BridgedInvocationProperty.self) { props in
+    for prop in props {
+      let category = String(bridged: prop.category)
+      let key = String(bridged: prop.key)
+      let valueStr = String(bridged: prop.value)
+
+      let value: PropertyValue
+      switch prop.type {
+      case 0:  // string
+        value = .string(valueStr)
+      case 1:  // int
+        if let intVal = Int(valueStr) {
+          value = .int(intVal)
+        } else {
+          value = .string(valueStr)
+        }
+      case 2:  // bool
+        value = .bool(valueStr == "true")
+      default:
+        value = .string(valueStr)
+      }
+
+      // Get or create the category object
+      if case .object(var categoryBag) = properties[category] {
+        categoryBag[key] = value
+        properties[category] = .object(categoryBag)
+      } else {
+        var categoryBag = PropertyBag()
+        categoryBag[key] = value
+        properties[category] = .object(categoryBag)
+      }
+    }
+  }
+
+  return PropertyBag(properties)
 }

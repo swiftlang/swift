@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "artifacts": [
+        {
+          "location": {
+            "uri": "FILE[0]"
+          },
+          "mimeType": "text/x-swift",
+          "sourceLanguage": "swift"
+        }
+      ],
+      "invocations": [
+        {
+          "properties": {
+            "Frontend": {
+              "moduleName": "warnings"
+            },
+            "Language": {
+              "activeConcurrencyModel": "Standard",
+              "strictConcurrencyLevel": "Minimal"
+            }
+          }
+        }
+      ],
+      "results": [
+        {
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "index": 0
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "endColumn": 16,
+                        "endLine": 6,
+                        "startColumn": 3,
+                        "startLine": 6
+                      },
+                      "insertedContent": {
+                        "text": "_"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": ""
+              }
+            }
+          ],
+          "kind": "fail",
+          "level": "warning",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "testWarning",
+                  "kind": "function",
+                  "name": "testWarning"
+                },
+                {
+                  "fullyQualifiedName": "testWarning.unusedVar",
+                  "kind": "variable",
+                  "name": "unusedVar",
+                  "parentIndex": 0
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 7,
+                  "startLine": 6
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "initialization of variable 'unusedVar' was never used; consider replacing with assignment to '_' or removing it"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://swift.org",
+          "name": "Swift Compiler",
+          "organization": "Swift Project",
+          "version": "6.3"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}
