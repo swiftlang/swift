@@ -1043,7 +1043,7 @@ def strict_concurrency : Joined<["-"], "strict-concurrency=">,
   HelpText<"Specify the how strict concurrency checking will be. The value may "
            "be 'minimal' (most 'Sendable' checking is disabled), "
            "'targeted' ('Sendable' checking is enabled in code that uses the "
-           "concurrency model, or 'complete' ('Sendable' and other checking is "
+           "concurrency model), or 'complete' ('Sendable' and other checking is "
            "enabled for all code in the module)">;
 
 def default_isolation : Separate<["-"], "default-isolation">,
