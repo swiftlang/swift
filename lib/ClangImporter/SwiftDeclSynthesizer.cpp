@@ -288,6 +288,23 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
 
     auto literalType = getConstantLiteralType(type, convertKind);
 
+    auto findBuiltinInit = [&](NominalTypeDecl *decl,
+                               StringRef paramName) -> ValueDecl * {
+      auto memberIter =
+          llvm::find_if(decl->getCurrentMembers(), [&](Decl *member) -> bool {
+            if (auto ctorDecl = dyn_cast<ConstructorDecl>(member)) {
+              if (ctorDecl->getParameters()->size() == 1 &&
+                  ctorDecl->getParameters()->hasInternalParameter(
+                      paramName)) {
+                return true;
+              }
+            }
+            return false;
+          });
+      ASSERT(memberIter != decl->getCurrentMembers().end());
+      return cast<ValueDecl>(*memberIter);
+    };
+
     // Create the expression node.
     StringRef printedValueCopy(context.AllocateCopy(printedValue));
     if (value.getKind() == clang::APValue::Int) {
@@ -308,7 +325,8 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
                                              /*Implicit=*/true);
 
         auto *intDecl = literalType->getAnyNominal();
-        intExpr->setBuiltinInitializer(context.getIntBuiltinInitDecl(intDecl));
+        intExpr->setBuiltinInitializer(
+            findBuiltinInit(intDecl, "_builtinIntegerLiteral"));
         intExpr->setType(literalType);
 
         expr = intExpr;
