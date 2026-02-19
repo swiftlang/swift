@@ -985,7 +985,8 @@ bool BindingSet::finalizeKeyPathBindings() {
         }
       }
 
-      Bindings = std::move(updatedBindings);
+      Bindings.clear();
+      Bindings.append(updatedBindings.begin(), updatedBindings.end());
       Defaults.clear();
 
       // Note the fact that we modified the binding set.
@@ -1014,9 +1015,12 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
         CS.recordPotentialHole(TypeVar);
         // Clear all of the previously collected bindings which are inferred
         // from inside of a member chain.
-        Bindings.remove_if([](const PotentialBinding &binding) {
-          return binding.Kind == AllowedBindingKind::Supertypes;
-        });
+        Bindings.erase(
+          llvm::remove_if(Bindings,
+                          [](const PotentialBinding &binding) {
+                            return binding.Kind == AllowedBindingKind::Supertypes;
+                          }),
+          Bindings.end());
 
         // Note the fact that we modified the binding set.
         markDirty();
@@ -1036,8 +1040,10 @@ static std::optional<bool> subsumeBinding(PotentialBinding &binding,
                                           const PotentialBinding &existing,
                                           bool isClosureParameterType) {
   if (binding.BindingType->isEqual(existing.BindingType)) {
-    if (binding.Kind == AllowedBindingKind::Subtypes &&
-        existing.Kind == AllowedBindingKind::Supertypes) {
+    if (binding.Kind == existing.Kind) {
+      return false;
+    } else if (binding.Kind == AllowedBindingKind::Subtypes &&
+               existing.Kind == AllowedBindingKind::Supertypes) {
       binding.Kind = AllowedBindingKind::Subtypes;
       return true;
     } else if (binding.Kind == AllowedBindingKind::Supertypes &&
@@ -1187,9 +1193,6 @@ void BindingSet::addBinding(PotentialBinding binding) {
     }
   }
 
-  if (Bindings.count(binding))
-    return;
-
   if (binding.isTransitive() &&
       !checkTypeOfBinding(TypeVar, binding.BindingType))
     return;
@@ -1213,7 +1216,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
   }
 
   bool isClosureParameterType = TypeVar->getImpl().isClosureParameterType();
-  SmallVector<PotentialBinding, 1> joined;
+  llvm::SmallSetVector<PotentialBinding, 1> joined;
 
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
@@ -1248,7 +1251,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
       for (auto *adjacentVar : referencedTypeVars)
         AdjacentVars.insert(adjacentVar);
 
-      joined.push_back(binding);
+      joined.insert(binding);
       continue;
     } else {
       // Drop the new binding.
@@ -1256,8 +1259,11 @@ void BindingSet::addBinding(PotentialBinding binding) {
     }
   }
 
-  for (const auto &binding : joined)
-    (void)Bindings.insert(binding);
+  for (const auto &binding : joined) {
+    DEBUG_ASSERT(std::find(Bindings.begin(), Bindings.end(), binding)
+                 == Bindings.end());
+    Bindings.push_back(binding);
+  }
 
   // If new binding has been joined with at least one of existing
   // bindings, there is no reason to include it into the set.
@@ -1267,7 +1273,9 @@ void BindingSet::addBinding(PotentialBinding binding) {
   for (auto *adjacentVar : referencedTypeVars)
     AdjacentVars.insert(adjacentVar);
 
-  (void)Bindings.insert(std::move(binding));
+  DEBUG_ASSERT(std::find(Bindings.begin(), Bindings.end(), binding)
+               == Bindings.end());
+  Bindings.push_back(std::move(binding));
 }
 
 void BindingSet::determineLiteralCoverage() {
@@ -1296,7 +1304,8 @@ void BindingSet::determineLiteralCoverage() {
       if (adjustedTy) {
         auto newBinding = binding->withType(adjustedTy);
         (void)Bindings.erase(binding);
-        Bindings.insert(newBinding);
+
+        addBinding(newBinding);
 
         // Note the fact that we modified the binding set.
         markDirty();

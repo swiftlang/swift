@@ -171,6 +171,11 @@ struct PotentialBinding {
   }
 
   void print(llvm::raw_ostream &out, const PrintOptions &PO) const;
+
+  bool operator==(const PotentialBinding &other) const {
+    return (Kind == other.Kind &&
+            BindingType->isEqual(other.BindingType));
+  }
 };
 
 struct LiteralRequirement {
@@ -374,18 +379,11 @@ struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
   }
 
   static bool isEqual(const Binding &LHS, const Binding &RHS) {
-    if (LHS.Kind != RHS.Kind)
-      return false;
-
-    auto lhsTy = LHS.BindingType.getPointer();
-    auto rhsTy = RHS.BindingType.getPointer();
-
-    // Fast path: pointer equality.
-    if (DenseMapInfo<swift::TypeBase *>::isEqual(lhsTy, rhsTy))
-      return true;
-
     // If either side is empty or tombstone, let's use pointer equality.
     {
+      auto lhsTy = LHS.BindingType.getPointer();
+      auto rhsTy = RHS.BindingType.getPointer();
+
       auto emptyTy = llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey();
       auto tombstoneTy =
           llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey();
@@ -397,8 +395,7 @@ struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
         return lhsTy == rhsTy;
     }
 
-    // Otherwise let's drop the sugar and check.
-    return LHS.BindingType->isEqual(RHS.BindingType);
+    return LHS == RHS;
   }
 
 private:
@@ -443,7 +440,7 @@ class BindingSet {
   KnownLValueKind LValueState = KnownLValueKind::Unknown;
 
 public:
-  swift::SmallSetVector<PotentialBinding, 4> Bindings;
+  swift::SmallVector<PotentialBinding, 4> Bindings;
 
   /// The set of unique literal protocol requirements placed on this
   /// type variable or inferred transitively through subtype chains.
