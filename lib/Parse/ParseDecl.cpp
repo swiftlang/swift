@@ -8051,6 +8051,12 @@ struct Parser::ParsedAccessors {
         func(accessor);
   }
 
+  bool hasNonObservingAccessor() const {
+    return llvm::any_of(Accessors, [](AccessorDecl *accessor) {
+      return !accessor->isObservingAccessor();
+    });
+  }
+
   /// Find the first accessor that can be used to perform mutation.
   AccessorDecl *findFirstMutator() const {
     if (Init) return Init;
@@ -8664,8 +8670,7 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
     return nullptr;
 
   if (!typedPattern) {
-    if (accessors.Get || accessors.Set || accessors.Address ||
-        accessors.MutableAddress) {
+    if (accessors.hasNonObservingAccessor()) {
       SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
         pattern->getBoundName().getLength());
       diagnose(pattern->getLoc(), diag::computed_property_missing_type)

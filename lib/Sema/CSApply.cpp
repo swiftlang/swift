@@ -6089,10 +6089,16 @@ static void computeParameterBindingsSubstitutions(
   for (unsigned bindingIdx = 0, numBindings = origBindings.size();
        bindingIdx != numBindings; ++bindingIdx) {
     if (origBindings[bindingIdx].size() > 1) {
+      if (substitutedBindings.size() >= params.size()) {
+        substitutedBindings.push_back(origBindings[bindingIdx]);
+        continue;
+      }
+
       const auto &param = params[substitutedBindings.size()];
       if (!param.isVariadic()) {
 #ifndef NDEBUG
-        auto *PD = getParameterAt(callee.getDecl(), bindingIdx);
+        auto *PD = callee.getDecl() ? getParameterAt(callee.getDecl(), bindingIdx)
+                                    : nullptr;
         assert(PD && PD->getInterfaceType()->is<PackExpansionType>());
 #endif
         // Explode binding set to match substituted function parameters.
@@ -6104,10 +6110,11 @@ static void computeParameterBindingsSubstitutions(
 
     const auto &bindings = origBindings[bindingIdx];
     if (bindings.size() == 0) {
-      auto *PD = getParameterAt(callee.getDecl(), bindingIdx);
+      auto *PD = callee.getDecl() ? getParameterAt(callee.getDecl(), bindingIdx)
+                                  : nullptr;
       // Skip pack expansions with no arguments because they are not
       // present in the substituted function type.
-      if (PD->getInterfaceType()->is<PackExpansionType>())
+      if (PD && PD->getInterfaceType()->is<PackExpansionType>())
         continue;
     }
 
@@ -6200,9 +6207,22 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
   // Determine the parameter bindings that were applied.
   auto *locatorPtr = cs.getConstraintLocator(locator);
-  assert(solution.argumentMatchingChoices.count(locatorPtr) == 1);
-  auto parameterBindings = solution.argumentMatchingChoices.find(locatorPtr)
-                               ->second.parameterBindings;
+  auto argMatch = solution.argumentMatchingChoices.find(locatorPtr);
+  SmallVector<ParamBinding, 4> parameterBindings;
+
+  if (argMatch == solution.argumentMatchingChoices.end()) {
+    // Some synthetic call forms are rewritten without recording
+    // argument-matching choices. Only recover when argument/parameter arity
+    // already matches; otherwise, fail this solution gracefully.
+    if (args->size() != params.size())
+      return nullptr;
+
+    parameterBindings =
+        MatchCallArgumentResult::forArity(args->size()).parameterBindings;
+  } else {
+    parameterBindings = argMatch->second.parameterBindings;
+  }
+
   bool shouldSubstituteBindings = shouldSubstituteParameterBindings(callee);
 
   SmallVector<ParamBinding, 4> substitutedBindings;
@@ -6212,6 +6232,11 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   } else {
     substitutedBindings = parameterBindings;
   }
+
+  // Bail out instead of walking mismatched bindings, which can happen in
+  // invalid pack-expansion solutions.
+  if (substitutedBindings.size() != params.size())
+    return nullptr;
 
   SmallVector<Argument, 4> newArgs;
   for (unsigned paramIdx = 0, numParams = substitutedBindings.size();
