@@ -2,6 +2,7 @@
 // RUN: not --crash %target-swift-emit-silgen %s -swift-version 6 -sil-verify-none 2>&1 | %FileCheck %s
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 // https://github.com/swiftlang/swift/issues/77365
 // FIXME: This sort of pattern should be diagnosed as an error in Sema if possible.
