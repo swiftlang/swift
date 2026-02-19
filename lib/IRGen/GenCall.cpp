@@ -870,26 +870,30 @@ void SignatureExpansion::expandCoroutineResult(bool forContinuation) {
   }
 
   // Find the maximal sequence of the component types that we can
-  // convince the ABI to pass directly.
+  // convince the ABI to pass directly if the target supports
+  // directly returning at least two pointers.
   // When counting components, ignore the continuation pointer.
-  unsigned numDirectComponents = components.size() - 1;
   SmallVector<llvm::Type*, 8> overflowTypes;
-  while (clang::CodeGen::swiftcall::
-                shouldPassIndirectly(IGM.ClangCodeGen->CGM(), components,
-                                     /*asReturnValue*/ true)) {
-    // If we added a pointer to the end of components, remove it.
-    if (!overflowTypes.empty()) components.pop_back();
+  unsigned numDirectComponents = components.size() - 1;
+  if (IGM.TargetInfo.SupportsDirectReturningAtLeastTwoPointers) {
+    while (clang::CodeGen::swiftcall::shouldPassIndirectly(
+        IGM.ClangCodeGen->CGM(), components,
+        /*asReturnValue*/ true)) {
+      // If we added a pointer to the end of components, remove it.
+      if (!overflowTypes.empty())
+        components.pop_back();
 
-    // Remove the last component and add it as an overflow type.
-    overflowTypes.push_back(components.pop_back_val());
-    --numDirectComponents;
+      // Remove the last component and add it as an overflow type.
+      overflowTypes.push_back(components.pop_back_val());
+      --numDirectComponents;
 
-    // Add a pointer to the end of components.
-    components.push_back(IGM.Int8PtrTy);
+      // Add a pointer to the end of components.
+      components.push_back(IGM.Int8PtrTy);
+    }
+
+    // We'd better have been able to pass at least two pointers.
+    assert(components.size() >= 2 || overflowTypes.empty());
   }
-
-  // We'd better have been able to pass at least two pointers.
-  assert(components.size() >= 2 || overflowTypes.empty());
   CoroInfo.NumDirectYieldComponents = numDirectComponents;
 
   // Replace the pointer type we added to components with the real

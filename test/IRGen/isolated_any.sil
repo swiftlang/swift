@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir %s | %IRGenFileCheck %s
 
 // REQUIRES: concurrency
+// UNSUPPORTED: CPU=wasm32
 
 import Swift
 import _Concurrency

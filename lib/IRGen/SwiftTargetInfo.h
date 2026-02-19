@@ -118,6 +118,9 @@ public:
   bool HasSwiftSwiftDirectRuntimeLibrary = false;
 
   bool UsableSwiftAsyncContextAddrIntrinsic = false;
+
+  /// True if the target supports directly returning at least two pointers.
+  bool SupportsDirectReturningAtLeastTwoPointers = true;
 };
 
 }

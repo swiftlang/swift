@@ -63,7 +63,8 @@ public:
 
 public:
   SILType getNewSILType(GenericEnvironment *GenericEnv, SILType storageType,
-                        irgen::IRGenModule &Mod);
+                        irgen::IRGenModule &Mod,
+                        bool useResultConvention = false);
   bool shouldTransformResults(GenericEnvironment *env,
                               CanSILFunctionType fnType,
                               irgen::IRGenModule &IGM);
@@ -72,9 +73,11 @@ public:
                                    irgen::IRGenModule &IGM);
   SILParameterInfo getNewParameter(GenericEnvironment *env,
                                    SILParameterInfo param,
-                                   irgen::IRGenModule &IGM);
+                                   irgen::IRGenModule &IGM,
+                                   bool useResultConvention);
   bool shouldTransformParameter(GenericEnvironment *env, SILParameterInfo param,
-                                irgen::IRGenModule &IGM);
+                                irgen::IRGenModule &IGM,
+                                bool useResultConvention);
   SmallVector<SILParameterInfo, 4> getNewParameters(GenericEnvironment *env,
                                                     CanSILFunctionType fnType,
                                                     irgen::IRGenModule &IGM);
@@ -95,7 +98,7 @@ public:
   SILType getNewTupleType(GenericEnvironment *GenericEnv,
                           irgen::IRGenModule &Mod,
                           const SILType &nonOptionalType,
-                          const SILType &storageType);
+                          const SILType &storageType, bool useResultConvention);
   bool newResultsDiffer(GenericEnvironment *GenericEnv,
                         ArrayRef<SILResultInfo> origResults,
                         irgen::IRGenModule &Mod);
@@ -103,17 +106,51 @@ public:
   bool containsDifferentFunctionSignature(GenericEnvironment *genEnv,
                                           irgen::IRGenModule &Mod,
                                           SILType storageType,
-                                          SILType newSILType);
+                                          SILType newSILType,
+                                          bool useResultConvention = false);
+
+  struct NewTypeCacheKey {
+    GenericEnvironment *GenericEnv;
+    SILType storageType;
+    bool useResultConvention;
+  };
 
 private:
   // Cache of already computed type transforms
-  llvm::MapVector<std::pair<GenericEnvironment *, SILType>, SILType>
-      oldToNewTypeMap;
+  llvm::MapVector<NewTypeCacheKey, SILType> oldToNewTypeMap;
 };
+
+namespace llvm {
+
+template <>
+struct DenseMapInfo<LargeSILTypeMapper::NewTypeCacheKey> {
+  static bool isEqual(const LargeSILTypeMapper::NewTypeCacheKey &lhs,
+                      const LargeSILTypeMapper::NewTypeCacheKey &rhs) {
+    return lhs.GenericEnv == rhs.GenericEnv &&
+           lhs.storageType == rhs.storageType &&
+           lhs.useResultConvention == rhs.useResultConvention;
+  }
+  static inline LargeSILTypeMapper::NewTypeCacheKey getEmptyKey() {
+    return {nullptr, SILType(), false};
+  }
+  static inline LargeSILTypeMapper::NewTypeCacheKey getTombstoneKey() {
+    return {DenseMapInfo<GenericEnvironment *>::getTombstoneKey(),
+            DenseMapInfo<SILType>::getTombstoneKey(), false};
+  }
+  static unsigned getHashValue(const LargeSILTypeMapper::NewTypeCacheKey &Val) {
+    return hash_combine(
+        DenseMapInfo<GenericEnvironment *>::getHashValue(Val.GenericEnv),
+        DenseMapInfo<SILType>::getHashValue(Val.storageType),
+        Val.useResultConvention ? 1 : 0);
+  }
+};
+
+} // end namespace llvm
 
 /// Utility to determine if this is a large loadable type
 static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
-                                irgen::IRGenModule &Mod) {
+                                irgen::IRGenModule &Mod,
+                                bool useResultConvention = false) {
   if (t.isAddress() || t.isClassOrClassMetatype()) {
     return false;
   }
@@ -128,7 +165,9 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
     assert(t.isObject() && "Expected only two categories: address and object");
     assert(!canType->hasTypeParameter());
     const TypeInfo &TI = Mod.getTypeInfoForLowered(canType);
-    auto &nativeSchemaOrigParam = TI.nativeParameterValueSchema(Mod);
+    auto &nativeSchemaOrigParam = useResultConvention
+                                      ? TI.nativeReturnValueSchema(Mod)
+                                      : TI.nativeParameterValueSchema(Mod);
     return nativeSchemaOrigParam.requiresIndirect();
   }
   return false;
@@ -144,8 +183,9 @@ static bool modifiableFunction(CanSILFunctionType funcType) {
 
 bool LargeSILTypeMapper::shouldTransformParameter(GenericEnvironment *env,
                                                   SILParameterInfo param,
-                                                  irgen::IRGenModule &IGM) {
-  auto newParam = getNewParameter(env, param, IGM);
+                                                  irgen::IRGenModule &IGM,
+                                                  bool useResultConvention) {
+  auto newParam = getNewParameter(env, param, IGM, useResultConvention);
   return (param != newParam);
 }
 
@@ -170,12 +210,13 @@ bool LargeSILTypeMapper::shouldTransformFunctionType(GenericEnvironment *env,
     return true;
 
   for (auto param : fnType->getParameters()) {
-    if (shouldTransformParameter(env, param, IGM))
+    if (shouldTransformParameter(env, param, IGM,
+                                 /*useResultConvention*/ false))
       return true;
   }
 
   for (auto yield : fnType->getYields()) {
-    if (shouldTransformParameter(env, yield, IGM))
+    if (shouldTransformParameter(env, yield, IGM, /*useResultConvention*/ true))
       return true;
   }
 
@@ -205,7 +246,7 @@ static SILType getNonOptionalType(SILType t) {
 
 bool LargeSILTypeMapper::containsDifferentFunctionSignature(
     GenericEnvironment *genEnv, irgen::IRGenModule &Mod, SILType storageType,
-    SILType newSILType) {
+    SILType newSILType, bool useResultConvention) {
   if (storageType == newSILType) {
     return false;
   }
@@ -218,8 +259,9 @@ bool LargeSILTypeMapper::containsDifferentFunctionSignature(
     for (TupleTypeElt canElem : origType->getElements()) {
       auto origCanType = CanType(canElem.getType());
       auto elem = SILType::getPrimitiveObjectType(origCanType);
-      auto newElem = getNewSILType(genEnv, elem, Mod);
-      if (containsDifferentFunctionSignature(genEnv, Mod, elem, newElem)) {
+      auto newElem = getNewSILType(genEnv, elem, Mod, useResultConvention);
+      if (containsDifferentFunctionSignature(genEnv, Mod, elem, newElem,
+                                             useResultConvention)) {
         return true;
       }
     }
@@ -387,8 +429,8 @@ static bool shouldTransformYields(GenericEnvironment *genEnv,
   for (auto &yield : loweredTy->getYields()) {
     auto yieldStorageType = yield.getSILStorageType(Mod.getSILModule(),
                                                     loweredTy, expansion);
-    auto newYieldStorageType =
-        Mapper.getNewSILType(genEnv, yieldStorageType, Mod);
+    auto newYieldStorageType = Mapper.getNewSILType(
+        genEnv, yieldStorageType, Mod, /*useResultConvention*/ true);
     if (yieldStorageType != newYieldStorageType)
       return true;
   }
@@ -406,7 +448,8 @@ static bool modYieldType(SILFunction *F, irgen::IRGenModule &Mod,
 
 SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
                                                      SILParameterInfo param,
-                                                     irgen::IRGenModule &IGM) {
+                                                     irgen::IRGenModule &IGM,
+                                                     bool useResultConvention) {
   SILType storageType = param.getSILStorageInterfaceType();
   SILType newOptFuncType =
       getNewOptionalFunctionType(env, storageType, IGM);
@@ -421,7 +464,7 @@ SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
     } else {
       return param;
     }
-  } else if (isLargeLoadableType(env, storageType, IGM)) {
+  } else if (isLargeLoadableType(env, storageType, IGM, useResultConvention)) {
     if (param.getConvention() == ParameterConvention::Direct_Owned) {
       return SILParameterInfo(storageType.getASTType(),
                               ParameterConvention::Indirect_In,
@@ -433,7 +476,7 @@ SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
                             ParameterConvention::Indirect_In_Guaranteed,
                             param.getOptions());
   } else {
-    auto newType = getNewSILType(env, storageType, IGM);
+    auto newType = getNewSILType(env, storageType, IGM, useResultConvention);
     return SILParameterInfo(newType.getASTType(), param.getConvention(),
                             param.getOptions());
   }
@@ -445,7 +488,8 @@ LargeSILTypeMapper::getNewParameters(GenericEnvironment *env,
                                      irgen::IRGenModule &IGM) {
   SmallVector<SILParameterInfo, 4> newParams;
   for (SILParameterInfo param : fnType->getParameters()) {
-    auto newParam = getNewParameter(env, param, IGM);
+    auto newParam =
+        getNewParameter(env, param, IGM, /*useResultConvention*/ false);
     newParams.push_back(newParam);
   }
   return newParams;
@@ -457,7 +501,8 @@ LargeSILTypeMapper::getNewYields(GenericEnvironment *env,
                                  irgen::IRGenModule &IGM) {
   SmallVector<SILYieldInfo, 2> newYields;
   for (auto oldYield : fnType->getYields()) {
-    auto newYieldAsParam = getNewParameter(env, oldYield, IGM);
+    auto newYieldAsParam =
+        getNewParameter(env, oldYield, IGM, /*useResultConvention*/ true);
     newYields.push_back(SILYieldInfo(newYieldAsParam.getInterfaceType(),
                                      newYieldAsParam.getConvention()));
   }
@@ -467,14 +512,15 @@ LargeSILTypeMapper::getNewYields(GenericEnvironment *env,
 SILType LargeSILTypeMapper::getNewTupleType(GenericEnvironment *GenericEnv,
                                             irgen::IRGenModule &Mod,
                                             const SILType &nonOptionalType,
-                                            const SILType &storageType) {
+                                            const SILType &storageType,
+                                            bool useResultConvention) {
   auto origType = nonOptionalType.getAs<TupleType>();
   assert(origType && "Expected a tuple type");
   SmallVector<TupleTypeElt, 2> newElems;
   for (TupleTypeElt canElem : origType->getElements()) {
     auto origCanType = CanType(canElem.getType());
     auto elem = SILType::getPrimitiveObjectType(origCanType);
-    auto newElem = getNewSILType(GenericEnv, elem, Mod);
+    auto newElem = getNewSILType(GenericEnv, elem, Mod, useResultConvention);
     newElems.emplace_back(newElem.getASTType(), canElem.getName());
   }
   auto type = TupleType::get(newElems, nonOptionalType.getASTContext());
@@ -494,9 +540,10 @@ SILType LargeSILTypeMapper::getNewTupleType(GenericEnvironment *GenericEnv,
 
 SILType LargeSILTypeMapper::getNewSILType(GenericEnvironment *GenericEnv,
                                           SILType storageType,
-                                          irgen::IRGenModule &Mod) {
+                                          irgen::IRGenModule &Mod,
+                                          bool useResultConvention) {
   // See if the type is already in the cache:
-  auto typePair = std::make_pair(GenericEnv, storageType);
+  NewTypeCacheKey typePair = {GenericEnv, storageType, useResultConvention};
   if (oldToNewTypeMap.find(typePair) != oldToNewTypeMap.end()) {
     return oldToNewTypeMap[typePair];
   }
@@ -506,11 +553,12 @@ SILType LargeSILTypeMapper::getNewSILType(GenericEnvironment *GenericEnv,
     nonOptionalType = optType;
   }
   if (nonOptionalType.getAs<TupleType>()) {
-    SILType newSILType =
-        getNewTupleType(GenericEnv, Mod, nonOptionalType, storageType);
-    auto typeToRet = isLargeLoadableType(GenericEnv, newSILType, Mod)
-                         ? newSILType.getAddressType()
-                         : newSILType;
+    SILType newSILType = getNewTupleType(GenericEnv, Mod, nonOptionalType,
+                                         storageType, useResultConvention);
+    auto typeToRet =
+        isLargeLoadableType(GenericEnv, newSILType, Mod, useResultConvention)
+            ? newSILType.getAddressType()
+            : newSILType;
     oldToNewTypeMap[typePair] = typeToRet;
     return typeToRet;
   }
@@ -525,7 +573,8 @@ SILType LargeSILTypeMapper::getNewSILType(GenericEnvironment *GenericEnv,
       newSILType = SILType::getPrimitiveType(newFnType,
                                              storageType.getCategory());
     }
-  } else if (isLargeLoadableType(GenericEnv, storageType, Mod)) {
+  } else if (isLargeLoadableType(GenericEnv, storageType, Mod,
+                                 useResultConvention)) {
     newSILType = storageType.getAddressType();
   }
   oldToNewTypeMap[typePair] = newSILType;
@@ -592,18 +641,23 @@ struct StructLoweringState {
                       LargeSILTypeMapper &Mapper)
       : F(F), Mod(Mod), Mapper(Mapper) {}
 
-  bool isLargeLoadableType(CanSILFunctionType fnTy, SILType type) {
-    return ::isLargeLoadableType(getSubstGenericEnvironment(fnTy), type, Mod);
+  bool isLargeLoadableType(CanSILFunctionType fnTy, SILType type,
+                           bool useResultConvention = false) {
+    return ::isLargeLoadableType(getSubstGenericEnvironment(fnTy), type, Mod,
+                                 useResultConvention);
   }
 
-  SILType getNewSILType(CanSILFunctionType fnTy, SILType type) {
-    return Mapper.getNewSILType(getSubstGenericEnvironment(fnTy), type, Mod);
+  SILType getNewSILType(CanSILFunctionType fnTy, SILType type,
+                        bool useResultConvention = false) {
+    return Mapper.getNewSILType(getSubstGenericEnvironment(fnTy), type, Mod,
+                                useResultConvention);
   }
 
-  bool containsDifferentFunctionSignature(CanSILFunctionType fnTy,
-                                          SILType type) {
+  bool containsDifferentFunctionSignature(CanSILFunctionType fnTy, SILType type,
+                                          bool useResultConvention = false) {
     return Mapper.containsDifferentFunctionSignature(
-        getSubstGenericEnvironment(fnTy), Mod, type, getNewSILType(fnTy, type));
+        getSubstGenericEnvironment(fnTy), Mod, type,
+        getNewSILType(fnTy, type, useResultConvention), useResultConvention);
   }
 
   bool hasLargeLoadableYields() {
@@ -612,7 +666,8 @@ struct StructLoweringState {
 
     auto env = getSubstGenericEnvironment(fnType);
     for (auto yield : fnType->getYields()) {
-      if (Mapper.shouldTransformParameter(env, yield, Mod))
+      if (Mapper.shouldTransformParameter(env, yield, Mod,
+                                          /*useResultConvention*/ true))
         return true;
     }
     return false;
@@ -1230,7 +1285,8 @@ static bool isYieldUseRewritable(StructLoweringState &pass,
                                   YieldInst *inst, Operand *operand) {
   assert(inst == operand->getUser());
   return pass.isLargeLoadableType(pass.F->getLoweredFunctionType(),
-                                  operand->get()->getType());
+                                  operand->get()->getType(),
+                                  /*useResultConvention*/ true);
 }
 
 /// Does the value's uses contain instructions that *must* be rewrites?
@@ -1918,14 +1974,15 @@ static void allocateAndSet(StructLoweringState &pass,
 static void allocateAndSetAll(StructLoweringState &pass,
                               LoadableStorageAllocation &allocator,
                               SILInstruction *user,
-                              MutableArrayRef<Operand> operands) {
+                              MutableArrayRef<Operand> operands,
+                              bool useResultConvention) {
   PrettyStackTraceSILNode backtrace("Running allocateAndSetAll on ", user);
 
   for (Operand &operand : operands) {
     SILValue value = operand.get();
     SILType silType = value->getType();
-    if (pass.isLargeLoadableType(pass.F->getLoweredFunctionType(),
-                                 silType)) {
+    if (pass.isLargeLoadableType(pass.F->getLoweredFunctionType(), silType,
+                                 useResultConvention)) {
       allocateAndSet(pass, allocator, value, user, operand);
     }
   }
@@ -2104,12 +2161,14 @@ static void rewriteFunction(StructLoweringState &pass,
       }
       ApplySite applySite = ApplySite(applyInst);
       allocateAndSetAll(pass, allocator, applyInst,
-                        applySite.getArgumentOperands());
+                        applySite.getArgumentOperands(),
+                        /*useResultConvention*/ false);
     }
 
     while (!pass.modYieldInsts.empty()) {
       YieldInst *inst = pass.modYieldInsts.pop_back_val();
-      allocateAndSetAll(pass, allocator, inst, inst->getAllOperands());
+      allocateAndSetAll(pass, allocator, inst, inst->getAllOperands(),
+                        /*useResultConvention*/ true);
     }
 
     repeat = !pass.switchEnumInstsToMod.empty() ||
