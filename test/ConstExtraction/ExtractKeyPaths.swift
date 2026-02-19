@@ -61,7 +61,7 @@ public struct KeyPaths: MyProto {
 // CHECK-NEXT:        "isStatic": "true",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractKeyPaths.swift",
-// CHECK-NEXT:       "line": 33,
+// CHECK-NEXT:        "line": 33,
 // CHECK-NEXT:        "valueKind": "KeyPath",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "path": "foo",

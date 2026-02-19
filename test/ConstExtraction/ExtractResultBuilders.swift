@@ -169,6 +169,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "kind": "buildExpression",
 // CHECK-NEXT:               "element": {
+// CHECK-NEXT:               "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:               "line": 74,
 // CHECK-NEXT:                 "valueKind": "InitCall",
 // CHECK-NEXT:                 "value": {
 // CHECK-NEXT:                   "type": "ExtractResultBuilders.Foo",
@@ -176,6 +178,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                     {
 // CHECK-NEXT:                       "label": "name",
 // CHECK-NEXT:                       "type": "Swift.String",
+// CHECK-NEXT:                       "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                       "line": 74,
 // CHECK-NEXT:                       "valueKind": "RawLiteral",
 // CHECK-NEXT:                       "value": "MyFooProvider.foos.1"
 // CHECK-NEXT:                     }
@@ -186,6 +190,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "kind": "buildExpression",
 // CHECK-NEXT:               "element": {
+// CHECK-NEXT:                 "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                 "line": 75,
 // CHECK-NEXT:                 "valueKind": "InitCall",
 // CHECK-NEXT:                 "value": {
 // CHECK-NEXT:                   "type": "ExtractResultBuilders.Foo",
@@ -193,6 +199,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                     {
 // CHECK-NEXT:                       "label": "name",
 // CHECK-NEXT:                       "type": "Swift.String",
+// CHECK-NEXT:                       "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                       "line": 75,
 // CHECK-NEXT:                       "valueKind": "RawLiteral",
 // CHECK-NEXT:                       "value": "MyFooProvider.foos.2"
 // CHECK-NEXT:                     }
@@ -218,6 +226,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "kind": "buildExpression",
 // CHECK-NEXT:               "element": {
+// CHECK-NEXT:                 "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                 "line": 80,
 // CHECK-NEXT:                 "valueKind": "InitCall",
 // CHECK-NEXT:                 "value": {
 // CHECK-NEXT:                   "type": "ExtractResultBuilders.Foo",
@@ -225,6 +235,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                     {
 // CHECK-NEXT:                       "label": "name",
 // CHECK-NEXT:                       "type": "Swift.String",
+// CHECK-NEXT:                       "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                       "line": 80,
 // CHECK-NEXT:                       "valueKind": "RawLiteral",
 // CHECK-NEXT:                       "value": "MyFooProvider.bars.1"
 // CHECK-NEXT:                     }
@@ -235,6 +247,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "kind": "buildExpression",
 // CHECK-NEXT:               "element": {
+// CHECK-NEXT:                 "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                 "line": 81,
 // CHECK-NEXT:                 "valueKind": "InitCall",
 // CHECK-NEXT:                 "value": {
 // CHECK-NEXT:                   "type": "ExtractResultBuilders.Foo",
@@ -242,6 +256,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                     {
 // CHECK-NEXT:                       "label": "name",
 // CHECK-NEXT:                       "type": "Swift.String",
+// CHECK-NEXT:                       "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                       "line": 81,
 // CHECK-NEXT:                       "valueKind": "RawLiteral",
 // CHECK-NEXT:                       "value": "MyFooProvider.bars.2"
 // CHECK-NEXT:                     }
@@ -286,6 +302,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "kind": "buildExpression",
 // CHECK-NEXT:               "element": {
+// CHECK-NEXT:                 "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                 "line": 89,
 // CHECK-NEXT:                 "valueKind": "InitCall",
 // CHECK-NEXT:                 "value": {
 // CHECK-NEXT:                   "type": "ExtractResultBuilders.Foo",
@@ -293,12 +311,16 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                     {
 // CHECK-NEXT:                       "label": "name",
 // CHECK-NEXT:                       "type": "Swift.String",
+// CHECK-NEXT:                       "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                       "line": 89,
 // CHECK-NEXT:                       "valueKind": "RawLiteral",
 // CHECK-NEXT:                       "value": "MyFooProviderInferred.foos.1"
 // CHECK-NEXT:                     },
 // CHECK-NEXT:                     {
 // CHECK-NEXT:                       "label": "baz",
 // CHECK-NEXT:                       "type": "() -> Swift.String",
+// CHECK-NEXT:                       "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                       "line": 88,
 // CHECK-NEXT:                       "valueKind": "Builder",
 // CHECK-NEXT:                       "value": {
 // CHECK-NEXT:                         "type": "",
@@ -306,6 +328,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                           {
 // CHECK-NEXT:                             "kind": "buildExpression",
 // CHECK-NEXT:                             "element": {
+// CHECK-NEXT:                               "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                               "line": 90,
 // CHECK-NEXT:                               "valueKind": "RawLiteral",
 // CHECK-NEXT:                               "value": "Nested.Builder.1"
 // CHECK-NEXT:                             }
@@ -313,6 +337,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                           {
 // CHECK-NEXT:                             "kind": "buildExpression",
 // CHECK-NEXT:                             "element": {
+// CHECK-NEXT:                               "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                               "line": 91,
 // CHECK-NEXT:                               "valueKind": "RawLiteral",
 // CHECK-NEXT:                               "value": "Nested.Builder.2"
 // CHECK-NEXT:                             }
@@ -327,6 +353,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "kind": "buildExpression",
 // CHECK-NEXT:               "element": {
+// CHECK-NEXT:                 "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                 "line": 93,
 // CHECK-NEXT:                 "valueKind": "InitCall",
 // CHECK-NEXT:                 "value": {
 // CHECK-NEXT:                   "type": "ExtractResultBuilders.Foo",
@@ -334,6 +362,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                     {
 // CHECK-NEXT:                       "label": "name",
 // CHECK-NEXT:                       "type": "Swift.String",
+// CHECK-NEXT:                       "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                       "line": 93,
 // CHECK-NEXT:                       "valueKind": "RawLiteral",
 // CHECK-NEXT:                       "value": "MyFooProviderInferred.foos.2"
 // CHECK-NEXT:                     }
@@ -346,6 +376,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:               "ifElements": [
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "element": {
+// CHECK-NEXT:                     "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                     "line": 96,
 // CHECK-NEXT:                     "valueKind": "InitCall",
 // CHECK-NEXT:                     "value": {
 // CHECK-NEXT:                       "type": "ExtractResultBuilders.Foo",
@@ -353,6 +385,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                         {
 // CHECK-NEXT:                           "label": "name",
 // CHECK-NEXT:                           "type": "Swift.String",
+// CHECK-NEXT:                           "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                           "line": 96,
 // CHECK-NEXT:                           "valueKind": "RawLiteral",
 // CHECK-NEXT:                           "value": "MyFooProviderInferred.foos.if.LessThan3"
 // CHECK-NEXT:                         }
@@ -369,6 +403,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                   "ifElements": [
 // CHECK-NEXT:                     {
 // CHECK-NEXT:                       "element": {
+// CHECK-NEXT:                         "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                         "line": 98,
 // CHECK-NEXT:                         "valueKind": "InitCall",
 // CHECK-NEXT:                         "value": {
 // CHECK-NEXT:                           "type": "ExtractResultBuilders.Foo",
@@ -376,6 +412,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                             {
 // CHECK-NEXT:                               "label": "name",
 // CHECK-NEXT:                               "type": "Swift.String",
+// CHECK-NEXT:                               "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                               "line": 98,
 // CHECK-NEXT:                               "valueKind": "RawLiteral",
 // CHECK-NEXT:                               "value": "MyFooProviderInferred.foos.elseif.Between3And6"
 // CHECK-NEXT:                             }
@@ -390,6 +428,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                   "elseElements": [
 // CHECK-NEXT:                     {
 // CHECK-NEXT:                       "element": {
+// CHECK-NEXT:                         "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                         "line": 100,
 // CHECK-NEXT:                         "valueKind": "InitCall",
 // CHECK-NEXT:                         "value": {
 // CHECK-NEXT:                           "type": "ExtractResultBuilders.Foo",
@@ -397,6 +437,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                             {
 // CHECK-NEXT:                               "label": "name",
 // CHECK-NEXT:                               "type": "Swift.String",
+// CHECK-NEXT:                               "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                               "line": 100,
 // CHECK-NEXT:                               "valueKind": "RawLiteral",
 // CHECK-NEXT:                               "value": "MyFooProviderInferred.foos.else.Between7And10"
 // CHECK-NEXT:                             }
@@ -416,6 +458,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:               "elements": [
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "element": {
+// CHECK-NEXT:                     "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                     "line": 104,
 // CHECK-NEXT:                     "valueKind": "InitCall",
 // CHECK-NEXT:                     "value": {
 // CHECK-NEXT:                       "type": "ExtractResultBuilders.Foo",
@@ -423,17 +467,25 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                         {
 // CHECK-NEXT:                           "label": "name",
 // CHECK-NEXT:                           "type": "Swift.String",
+// CHECK-NEXT:                           "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                           "line": 104,
 // CHECK-NEXT:                           "valueKind": "InterpolatedStringLiteral",
 // CHECK-NEXT:                           "value": {
 // CHECK-NEXT:                             "segments": [
 // CHECK-NEXT:                               {
+// CHECK-NEXT:                                 "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                                 "line": 104,
 // CHECK-NEXT:                                 "valueKind": "RawLiteral",
 // CHECK-NEXT:                                 "value": "MyFooProviderInferred.foos.Array."
 // CHECK-NEXT:                               },
 // CHECK-NEXT:                               {
+// CHECK-NEXT:                                 "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                                 "line": 88,
 // CHECK-NEXT:                                 "valueKind": "Runtime"
 // CHECK-NEXT:                               },
 // CHECK-NEXT:                               {
+// CHECK-NEXT:                                 "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                                 "line": 104,
 // CHECK-NEXT:                                 "valueKind": "RawLiteral",
 // CHECK-NEXT:                                 "value": ""
 // CHECK-NEXT:                               }
@@ -451,6 +503,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:               "ifElements": [
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "element": {
+// CHECK-NEXT:                     "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                     "line": 108,
 // CHECK-NEXT:                     "valueKind": "InitCall",
 // CHECK-NEXT:                     "value": {
 // CHECK-NEXT:                       "type": "ExtractResultBuilders.Foo",
@@ -458,6 +512,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                         {
 // CHECK-NEXT:                           "label": "name",
 // CHECK-NEXT:                           "type": "Swift.String",
+// CHECK-NEXT:                           "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                           "line": 108,
 // CHECK-NEXT:                           "valueKind": "RawLiteral",
 // CHECK-NEXT:                           "value": "MyFooProviderInferred.foos.Optional"
 // CHECK-NEXT:                         }
@@ -498,6 +554,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:               "ifElements": [
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "element": {
+// CHECK-NEXT:                     "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                     "line": 112,
 // CHECK-NEXT:                     "valueKind": "InitCall",
 // CHECK-NEXT:                     "value": {
 // CHECK-NEXT:                       "type": "ExtractResultBuilders.Foo",
@@ -505,6 +563,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                         {
 // CHECK-NEXT:                           "label": "name",
 // CHECK-NEXT:                           "type": "Swift.String",
+// CHECK-NEXT:                           "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                           "line": 112,
 // CHECK-NEXT:                           "valueKind": "RawLiteral",
 // CHECK-NEXT:                           "value": "MyFooProviderInferred.foos.limitedAvailability.1"
 // CHECK-NEXT:                         }
@@ -514,6 +574,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                 },
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "element": {
+// CHECK-NEXT:                     "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                     "line": 113,
 // CHECK-NEXT:                     "valueKind": "InitCall",
 // CHECK-NEXT:                     "value": {
 // CHECK-NEXT:                       "type": "ExtractResultBuilders.Foo",
@@ -521,6 +583,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                         {
 // CHECK-NEXT:                           "label": "name",
 // CHECK-NEXT:                           "type": "Swift.String",
+// CHECK-NEXT:                           "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                           "line": 113,
 // CHECK-NEXT:                           "valueKind": "RawLiteral",
 // CHECK-NEXT:                           "value": "MyFooProviderInferred.foos.limitedAvailability.2"
 // CHECK-NEXT:                         }
@@ -538,6 +602,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:               "elseElements": [
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "element": {
+// CHECK-NEXT:                     "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                     "line": 115,
 // CHECK-NEXT:                     "valueKind": "InitCall",
 // CHECK-NEXT:                     "value": {
 // CHECK-NEXT:                       "type": "ExtractResultBuilders.Foo",
@@ -545,6 +611,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                         {
 // CHECK-NEXT:                           "label": "name",
 // CHECK-NEXT:                           "type": "Swift.String",
+// CHECK-NEXT:                           "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                           "line": 115,
 // CHECK-NEXT:                           "valueKind": "RawLiteral",
 // CHECK-NEXT:                           "value": "MyFooProviderInferred.foos.limitedAvailability.else"
 // CHECK-NEXT:                         }
@@ -590,6 +658,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:         "valueKind": "Array",
 // CHECK-NEXT:         "value": [
 // CHECK-NEXT:           {
+// CHECK-NEXT:             "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:             "line": 122,
 // CHECK-NEXT:             "valueKind": "InitCall",
 // CHECK-NEXT:             "value": {
 // CHECK-NEXT:               "type": "ExtractResultBuilders.Foo",
@@ -597,12 +667,16 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "label": "name",
 // CHECK-NEXT:                   "type": "Swift.String",
+// CHECK-NEXT:                   "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                   "line": 122,
 // CHECK-NEXT:                   "valueKind": "RawLiteral",
 // CHECK-NEXT:                   "value": "MyFooProviderInferredWithArrayInitialization.foos.1"
 // CHECK-NEXT:                 },
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "label": "baz",
 // CHECK-NEXT:                   "type": "() -> Swift.String",
+// CHECK-NEXT:                   "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                   "line": 121,
 // CHECK-NEXT:                   "valueKind": "Builder",
 // CHECK-NEXT:                   "value": {
 // CHECK-NEXT:                     "type": "",
@@ -610,6 +684,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                       {
 // CHECK-NEXT:                         "kind": "buildExpression",
 // CHECK-NEXT:                         "element": {
+// CHECK-NEXT:                           "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                           "line": 123,
 // CHECK-NEXT:                           "valueKind": "RawLiteral",
 // CHECK-NEXT:                           "value": "Nested.Builder.1"
 // CHECK-NEXT:                         }
@@ -617,6 +693,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                       {
 // CHECK-NEXT:                         "kind": "buildExpression",
 // CHECK-NEXT:                         "element": {
+// CHECK-NEXT:                           "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                           "line": 124,
 // CHECK-NEXT:                           "valueKind": "RawLiteral",
 // CHECK-NEXT:                           "value": "Nested.Builder.2"
 // CHECK-NEXT:                         }
@@ -628,6 +706,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:             }
 // CHECK-NEXT:           },
 // CHECK-NEXT:           {
+// CHECK-NEXT:             "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:             "line": 126,
 // CHECK-NEXT:             "valueKind": "InitCall",
 // CHECK-NEXT:             "value": {
 // CHECK-NEXT:               "type": "ExtractResultBuilders.Foo",
@@ -635,6 +715,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "label": "name",
 // CHECK-NEXT:                   "type": "Swift.String",
+// CHECK-NEXT:                   "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                   "line": 126,
 // CHECK-NEXT:                   "valueKind": "RawLiteral",
 // CHECK-NEXT:                   "value": "MyFooProviderInferredWithArrayInitialization.foos.2"
 // CHECK-NEXT:                 }
@@ -669,10 +751,12 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:         "isStatic": "true",
 // CHECK-NEXT:         "isComputed": "true",
 // CHECK-NEXT:         "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
-// CHECK-NEXT:         "line": 131,
+// CHECK-NEXT:         "line": 132,
 // CHECK-NEXT:         "valueKind": "Array",
 // CHECK-NEXT:         "value": [
 // CHECK-NEXT:           {
+// CHECK-NEXT:             "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:             "line": 133,
 // CHECK-NEXT:             "valueKind": "InitCall",
 // CHECK-NEXT:             "value": {
 // CHECK-NEXT:               "type": "ExtractResultBuilders.Foo",
@@ -680,6 +764,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "label": "name",
 // CHECK-NEXT:                   "type": "Swift.String",
+// CHECK-NEXT:                   "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                   "line": 133,
 // CHECK-NEXT:                   "valueKind": "RawLiteral",
 // CHECK-NEXT:                   "value": "MyFooProviderInferredWithArrayReturn.foos.1"
 // CHECK-NEXT:                 }
@@ -687,6 +773,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:             }
 // CHECK-NEXT:           },
 // CHECK-NEXT:           {
+// CHECK-NEXT:             "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:             "line": 134,
 // CHECK-NEXT:             "valueKind": "InitCall",
 // CHECK-NEXT:             "value": {
 // CHECK-NEXT:               "type": "ExtractResultBuilders.Foo",
@@ -694,6 +782,8 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "label": "name",
 // CHECK-NEXT:                   "type": "Swift.String",
+// CHECK-NEXT:                   "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:                   "line": 134,
 // CHECK-NEXT:                   "valueKind": "RawLiteral",
 // CHECK-NEXT:                   "value": "MyFooProviderInferredWithArrayInitialization.foos.2"
 // CHECK-NEXT:                 }
