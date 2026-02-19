@@ -18,3 +18,5 @@ let classWithUnimportedMemberFunction = ClassWithUnimportedMemberFunction(varPub
 
 let _ = ClassWithStaticAssert(x: 6, y: 7)
 let _ = ClassWithStaticAssert2(x: 6, y: 7)
+
+let _ = ClassWithConstexprStatic(x: 123)
