@@ -728,12 +728,6 @@ bool typeCheckForCodeCompletion(
     constraints::SyntacticElementTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
-/// Check the key-path expression.
-///
-/// Returns the type of the last component of the key-path.
-std::optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
-                                         bool requireResultType = false);
-
 /// Type check whether the given type declaration includes members of
 /// unsupported recursive value types.
 ///

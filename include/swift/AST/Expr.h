@@ -5927,6 +5927,8 @@ class KeyPathExpr : public Expr {
   /// a contextual root type.
   bool HasLeadingDot = false;
 
+  friend class ObjCKeyPathStringRequest;
+
 public:
   /// A single stored component, which will be one of:
   /// - an unresolved DeclNameRef, which has to be type-checked
@@ -6392,6 +6394,7 @@ public:
   /// Retrieve the string literal expression, which will be \c NULL prior to
   /// type checking and a string literal after type checking for an
   /// @objc key path.
+  /// FIXME: Ideally this would lazily evaluate ObjCKeyPathStringRequest.
   Expr *getObjCStringLiteralExpr() const {
     return ObjCStringLiteralExpr;
   }

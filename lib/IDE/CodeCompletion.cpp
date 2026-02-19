@@ -13,7 +13,6 @@
 #include "swift/IDE/CodeCompletion.h"
 #include "CodeCompletionDiagnostics.h"
 #include "CodeCompletionResultBuilder.h"
-#include "ExprContextAnalysis.h"
 #include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
@@ -132,7 +131,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   bool AttrParamHasLabel;
   bool IsInSil = false;
   bool HasSpace = false;
-  bool PreferFunctionReferencesToCalls = false;
   bool AttTargetIsIndependent = false;
   std::optional<DeclKind> AttTargetDK;
   std::optional<StmtKind> ParentStmtKind;
@@ -141,38 +139,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   SourceLoc introducerLoc;
 
   std::vector<std::pair<std::string, bool>> SubModuleNameVisibilityPairs;
-
-  std::optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
-    assert(ParsedExpr && "should have an expression");
-
-    // Figure out the kind of type-check we'll be performing.
-    auto CheckKind = CompletionTypeCheckKind::Normal;
-    if (Kind == CompletionKind::KeyPathExprObjC)
-      CheckKind = CompletionTypeCheckKind::KeyPath;
-
-    // If we've already successfully type-checked the expression for some
-    // reason, just return the type.
-    // FIXME: if it's ErrorType but we've already typechecked we shouldn't
-    // typecheck again. rdar://21466394
-    if (CheckKind == CompletionTypeCheckKind::Normal &&
-        ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>()) {
-      return getReferencedDecl(ParsedExpr);
-    }
-
-    ConcreteDeclRef ReferencedDecl = nullptr;
-    Expr *ModifiedExpr = ParsedExpr;
-    if (auto T = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
-                                                CheckKind, ModifiedExpr,
-                                                ReferencedDecl)) {
-      // FIXME: even though we don't apply the solution, the type checker may
-      // modify the original expression. We should understand what effect that
-      // may have on code completion.
-      ParsedExpr = ModifiedExpr;
-
-      return std::make_pair(*T, ReferencedDecl);
-    }
-    return std::nullopt;
-  }
 
   /// \returns true on success, false on failure.
   bool typecheckParsedType() {
@@ -330,10 +296,8 @@ void CodeCompletionCallbacksImpl::completeDotExpr(CodeCompletionExpr *E,
     return;
 
   Kind = CompletionKind::DotExpr;
-  if (ParseExprSelectorContext != ObjCSelectorContext::None) {
-    PreferFunctionReferencesToCalls = true;
+  if (ParseExprSelectorContext != ObjCSelectorContext::None)
     CompleteExprSelectorContext = ParseExprSelectorContext;
-  }
 
   ParsedExpr = E->getBase();
   this->DotLoc = DotLoc;
@@ -357,7 +321,6 @@ void CodeCompletionCallbacksImpl::completePostfixExprBeginning(CodeCompletionExp
 
   Kind = CompletionKind::PostfixExprBeginning;
   if (ParseExprSelectorContext != ObjCSelectorContext::None) {
-    PreferFunctionReferencesToCalls = true;
     CompleteExprSelectorContext = ParseExprSelectorContext;
     if (CompleteExprSelectorContext == ObjCSelectorContext::MethodSelector) {
       addSelectorModifierKeywords(CompletionContext.getResultSink());
@@ -393,10 +356,8 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(CodeCompletionExpr *E,
 
   HasSpace = hasSpace;
   Kind = CompletionKind::PostfixExpr;
-  if (ParseExprSelectorContext != ObjCSelectorContext::None) {
-    PreferFunctionReferencesToCalls = true;
+  if (ParseExprSelectorContext != ObjCSelectorContext::None)
     CompleteExprSelectorContext = ParseExprSelectorContext;
-  }
 
   ParsedExpr = E->getBase();
   CodeCompleteTokenExpr = E;
@@ -1644,10 +1605,10 @@ void CodeCompletionCallbacksImpl::readyForTypeChecking(SourceFile *SrcFile) {
 
   assert(ParsedExpr || CurDeclContext);
 
+  auto &Ctx = CurDeclContext->getASTContext();
   SourceLoc CompletionLoc = ParsedExpr
                                 ? ParsedExpr->getLoc()
-                                : CurDeclContext->getASTContext()
-                                      .SourceMgr.getIDEInspectionTargetLoc();
+                                : Ctx.SourceMgr.getIDEInspectionTargetLoc();
   switch (Kind) {
   case CompletionKind::PostfixExpr:
   case CompletionKind::DotExpr: 
@@ -1678,56 +1639,17 @@ void CodeCompletionCallbacksImpl::readyForTypeChecking(SourceFile *SrcFile) {
   default:
     break;
   }
-
-  if (Kind != CompletionKind::TypeSimpleWithDot) {
-    // Type member completion does not need a type-checked AST.
-    swift::typeCheckASTNodeAtLoc(
-        TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
-        ParsedExpr ? ParsedExpr->getLoc()
-                   : CurDeclContext->getASTContext()
-                         .SourceMgr.getIDEInspectionTargetLoc());
-  }
+  ASSERT(!ParsedExpr || Kind == CompletionKind::KeyPathExprObjC
+         && "Should use solver-based completion for expressions");
 
   // Add keywords even if type checking fails completely.
   addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
-
-  std::optional<Type> ExprType;
-  ConcreteDeclRef ReferencedDecl = nullptr;
-  if (ParsedExpr) {
-    if (auto *checkedExpr = findParsedExpr(CurDeclContext,
-                                           ParsedExpr->getSourceRange())) {
-      ParsedExpr = checkedExpr;
-    }
-
-    if (auto typechecked = typeCheckParsedExpr()) {
-      ExprType = typechecked->first;
-      ReferencedDecl = typechecked->second;
-      ParsedExpr->setType(*ExprType);
-    }
-
-    if (!ExprType && Kind != CompletionKind::CallArg &&
-        Kind != CompletionKind::KeyPathExprObjC)
-      return;
-  }
 
   if (!ParsedTypeLoc.isNull() && !typecheckParsedType())
     return;
 
   CompletionLookup Lookup(CompletionContext.getResultSink(), P.Context,
                           CurDeclContext, &CompletionContext);
-  if (ExprType) {
-    Lookup.setIsStaticMetatype(ParsedExpr->isStaticallyDerivedMetatype());
-  }
-  if (auto *DRE = dyn_cast_or_null<DeclRefExpr>(ParsedExpr)) {
-    Lookup.setIsSelfRefExpr(DRE->getDecl()->getName() == Context.Id_self);
-  } else if (isa_and_nonnull<SuperRefExpr>(ParsedExpr)) {
-    Lookup.setIsSuperRefExpr();
-  }
-
-  if (isInsideObjCSelector())
-    Lookup.includeInstanceMembers();
-  if (PreferFunctionReferencesToCalls)
-    Lookup.setPreferFunctionReferencesToCalls();
 
   switch (Kind) {
   case CompletionKind::None:
@@ -1754,15 +1676,25 @@ void CodeCompletionCallbacksImpl::readyForTypeChecking(SourceFile *SrcFile) {
     Lookup.setIsKeyPathExpr();
     Lookup.includeInstanceMembers();
 
-    if (ExprType) {
-      if (isDynamicLookup(*ExprType))
-        Lookup.setIsDynamicLookup();
+    // If we have a parsed expression we're doing member completion, otherwise
+    // unqualified completion.
+    if (auto *KeyPath = cast_or_null<KeyPathExpr>(ParsedExpr)) {
+      // Compute the Obj-C string, which will also type-check the key path.
+      (void)evaluateOrDefault(Ctx.evaluator,
+                              ObjCKeyPathStringRequest{KeyPath, CurDeclContext},
+                              nullptr);
+      if (auto BaseTy = KeyPath->getComponents().back().getComponentType()) {
+        // Use the Obj-C bridged type of the base if available.
+        if (auto BridgedTy = Ctx.getBridgedToObjC(CurDeclContext, BaseTy))
+          BaseTy = BridgedTy;
 
-      Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl(),
-                                     /*IncludeFunctionCallCompletions=*/true);
+        if (isDynamicLookup(BaseTy))
+          Lookup.setIsDynamicLookup();
+
+        Lookup.getValueExprCompletions(BaseTy);
+      }
     } else {
-      SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
-      Lookup.getValueCompletionsInDeclContext(Loc, KeyPathFilter,
+      Lookup.getValueCompletionsInDeclContext(CompletionLoc, KeyPathFilter,
                                               /*LiteralCompletions=*/false);
     }
     break;
