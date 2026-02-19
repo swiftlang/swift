@@ -7834,7 +7834,8 @@ bool ArgumentMismatchFailure::diagnoseAttemptedRegexBuilder() const {
   auto &ctx = getASTContext();
 
   // Should be a lone trailing closure argument.
-  if (!Info.isTrailingClosure() || !Info.getArgList()->isUnary())
+  auto *argList = Info.getArgList();
+  if (!Info.isTrailingClosure() || !argList || !argList->isUnary())
     return false;
 
   // Check if this an application of a Regex initializer, and the user has not
