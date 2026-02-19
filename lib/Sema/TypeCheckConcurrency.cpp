@@ -1791,15 +1791,6 @@ static bool isStoredProperty(ValueDecl const *member) {
   return false;
 }
 
-static bool isNonInheritedStorage(ValueDecl const *member,
-                                  DeclContext const *useDC) {
-  auto *nominal = useDC->getParent()->getSelfNominalTypeDecl();
-  if (!nominal)
-    return false;
-
-  return isStoredProperty(member) && member->getDeclContext() == nominal;
-}
-
 /// Based on the former escaping-use restriction, which was replaced by
 /// flow-isolation. We need this to support backwards compatability in the
 /// type-checker for programs prior to Swift 6.
@@ -1934,103 +1925,6 @@ static void noteIsolatedActorMember(ValueDecl const *decl,
   } else {
     decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
   }
-}
-
-/// An ad-hoc check specific to member isolation checking. assumed to be
-/// queried when a self-member is being accessed in a context which is not
-/// isolated to self. The "special permission" is part of a backwards
-/// compatability with actor inits and deinits that maintains the
-/// permissive nature of the escaping-use restriction, which was only
-/// staged in as a warning. See implementation for more details.
-///
-/// \returns true if this access in the given context should be allowed
-/// in Sema, with the side-effect of emitting a warning as needed.
-/// If false is returned, then the "special permission" was not granted.
-static bool memberAccessHasSpecialPermissionInSwift5(
-    DeclContext const *refCxt, ReferencedActor &baseActor,
-    ValueDecl const *member, SourceLoc memberLoc,
-    std::optional<VarRefUseEnv> useKind) {
-  // no need for this in Swift 6+
-  if (refCxt->getASTContext().isLanguageModeAtLeast(LanguageMode::v6))
-    return false;
-
-  // must be an access to an instance member.
-  if (!member->isInstanceMember())
-    return false;
-
-  // In the history of actor initializers prior to Swift 6, self-isolated
-  // members could be referenced from any init or deinit, even a synchronous
-  // one, with no diagnostics at all.
-  //
-  // When the escaping-use restriction came into place for the release of
-  // 5.5, it was implemented as a warning and only applied to initializers,
-  // which stated that it would become an error in Swift 6.
-  //
-  // Once 5.6 was released, we also added restrictions in the deinits of
-  // actors, at least for accessing members other than stored properties.
-  //
-  // Later on, for 5.7 we introduced flow-isolation as part of SE-327 for
-  // both inits and deinits. This meant that stored property accesses now
-  // are only sometimes going to be problematic. This change also brought
-  // official changes in isolation for the inits and deinits to handle the
-  // the non-stored-property members. Since those isolation changes are
-  // currently in place, the purpose of the code below is to override the
-  // isolation checking, so that the now-mismatched isolation on member
-  // access is still permitted, but with a warning stating that it will
-  // be rejected in Swift 6.
-  //
-  // In the checking below, we let stored-property accesses go ignored,
-  // so that flow-isolation can warn about them only if needed. This helps
-  // prevent needless warnings on property accesses that will actually be OK
-  // with flow-isolation in the future.
-  if (auto oldFn = isActorInitOrDeInitContext(refCxt)) {
-    auto oldFnMut = const_cast<AbstractFunctionDecl*>(oldFn);
-
-    // If function did not have the escaping-use restriction, then it gets
-    // no special permissions here.
-    if (!wasLegacyEscapingUseRestriction(oldFnMut))
-      return false;
-
-    // At this point, the special permission will be granted. But, we
-    // need to warn now about this permission being taken away in Swift 6
-    // for specific kinds of non-stored-property member accesses:
-
-    // If the context in which we consider the access matches between the
-    // old (escaping-use restriction) and new (flow-isolation) contexts,
-    // and it is a stored or init accessor property, then permit it here
-    // without any warning.
-    // Later, flow-isolation pass will check and emit a warning if needed.
-    if (refCxt == oldFn) {
-      if (isStoredProperty(member))
-        return true;
-
-      if (auto *var = dyn_cast<VarDecl>(member)) {
-        // Init accessor properties are permitted to access only stored
-        // properties.
-        if (var->hasInitAccessor())
-          return true;
-      }
-    }
-
-    // Otherwise, it's definitely going to be illegal, so warn and permit.
-    auto &C = refCxt->getASTContext();
-    auto &diags = C.Diags;
-    auto useKindInt = static_cast<unsigned>(
-        useKind.value_or(VarRefUseEnv::Read));
-
-    auto isolation = getActorIsolation(const_cast<ValueDecl *>(member));
-    diags
-        .diagnose(memberLoc, diag::actor_isolated_non_self_reference, member,
-                  useKindInt, baseActor.kind + 1, baseActor.globalActor,
-                  isolation)
-        .warnUntilLanguageMode(LanguageMode::v6);
-
-    noteIsolatedActorMember(member, useKind);
-    maybeNoteMutatingMethodSuggestion(C, member, memberLoc, refCxt, isolation, useKind);
-    return true;
-  }
-
-  return false;
 }
 
 /// Get the actor isolation of the innermost relevant context.
@@ -8280,7 +8174,118 @@ struct ActorReferenceResult::Builder {
                               ReferencedActor &baseActor, ValueDecl *member,
                               SourceLoc memberLoc,
                               std::optional<VarRefUseEnv> useKind);
+
+  static bool isNonInheritedStorage(const ValueDecl *member,
+                                    const DeclContext *useDC) {
+    auto *nominal = useDC->getParent()->getSelfNominalTypeDecl();
+    if (!nominal)
+      return false;
+    return isStoredProperty(member) && member->getDeclContext() == nominal;
+  }
+
+  bool memberAccessHasSpecialPermissionInSwift5(
+      const DeclContext *refCxt, ReferencedActor &baseActor,
+      const ValueDecl *member, SourceLoc memberLoc,
+      std::optional<VarRefUseEnv> useKind);
 };
+
+/// An ad-hoc check specific to member isolation checking. assumed to be
+/// queried when a self-member is being accessed in a context which is not
+/// isolated to self. The "special permission" is part of a backwards
+/// compatability with actor inits and deinits that maintains the
+/// permissive nature of the escaping-use restriction, which was only
+/// staged in as a warning. See implementation for more details.
+///
+/// \returns true if this access in the given context should be allowed
+/// in Sema, with the side-effect of emitting a warning as needed.
+/// If false is returned, then the "special permission" was not granted.
+bool ActorReferenceResult::Builder::memberAccessHasSpecialPermissionInSwift5(
+    const DeclContext *refCxt, ReferencedActor &baseActor,
+    const ValueDecl *member, SourceLoc memberLoc,
+    std::optional<VarRefUseEnv> useKind) {
+  // no need for this in Swift 6+
+  if (refCxt->getASTContext().isLanguageModeAtLeast(LanguageMode::v6))
+    return false;
+
+  // must be an access to an instance member.
+  if (!member->isInstanceMember())
+    return false;
+
+  // In the history of actor initializers prior to Swift 6, self-isolated
+  // members could be referenced from any init or deinit, even a synchronous
+  // one, with no diagnostics at all.
+  //
+  // When the escaping-use restriction came into place for the release of
+  // 5.5, it was implemented as a warning and only applied to initializers,
+  // which stated that it would become an error in Swift 6.
+  //
+  // Once 5.6 was released, we also added restrictions in the deinits of
+  // actors, at least for accessing members other than stored properties.
+  //
+  // Later on, for 5.7 we introduced flow-isolation as part of SE-327 for
+  // both inits and deinits. This meant that stored property accesses now
+  // are only sometimes going to be problematic. This change also brought
+  // official changes in isolation for the inits and deinits to handle the
+  // the non-stored-property members. Since those isolation changes are
+  // currently in place, the purpose of the code below is to override the
+  // isolation checking, so that the now-mismatched isolation on member
+  // access is still permitted, but with a warning stating that it will
+  // be rejected in Swift 6.
+  //
+  // In the checking below, we let stored-property accesses go ignored,
+  // so that flow-isolation can warn about them only if needed. This helps
+  // prevent needless warnings on property accesses that will actually be OK
+  // with flow-isolation in the future.
+  if (auto oldFn = isActorInitOrDeInitContext(refCxt)) {
+    auto oldFnMut = const_cast<AbstractFunctionDecl *>(oldFn);
+
+    // If function did not have the escaping-use restriction, then it gets
+    // no special permissions here.
+    if (!wasLegacyEscapingUseRestriction(oldFnMut))
+      return false;
+
+    // At this point, the special permission will be granted. But, we
+    // need to warn now about this permission being taken away in Swift 6
+    // for specific kinds of non-stored-property member accesses:
+
+    // If the context in which we consider the access matches between the
+    // old (escaping-use restriction) and new (flow-isolation) contexts,
+    // and it is a stored or init accessor property, then permit it here
+    // without any warning.
+    // Later, flow-isolation pass will check and emit a warning if needed.
+    if (refCxt == oldFn) {
+      if (isStoredProperty(member))
+        return true;
+
+      if (auto *var = dyn_cast<VarDecl>(member)) {
+        // Init accessor properties are permitted to access only stored
+        // properties.
+        if (var->hasInitAccessor())
+          return true;
+      }
+    }
+
+    // Otherwise, it's definitely going to be illegal, so warn and permit.
+    auto &C = refCxt->getASTContext();
+    auto &diags = C.Diags;
+    auto useKindInt =
+        static_cast<unsigned>(useKind.value_or(VarRefUseEnv::Read));
+
+    auto isolation = getActorIsolation(const_cast<ValueDecl *>(member));
+    diags
+        .diagnose(memberLoc, diag::actor_isolated_non_self_reference, member,
+                  useKindInt, baseActor.kind + 1, baseActor.globalActor,
+                  isolation)
+        .warnUntilLanguageMode(LanguageMode::v6);
+
+    noteIsolatedActorMember(member, useKind);
+    maybeNoteMutatingMethodSuggestion(C, member, memberLoc, refCxt, isolation,
+                                      useKind);
+    return true;
+  }
+
+  return false;
+}
 
 bool ActorReferenceResult::Builder::checkedByFlowIsolation(
     const DeclContext *refCxt, ReferencedActor &baseActor, ValueDecl *member,
