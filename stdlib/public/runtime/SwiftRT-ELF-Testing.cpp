@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImageInspectionCommon.h"
+
 #include "swift/Runtime/Config.h"
+#include "swift/shims/Visibility.h"
 
 #if defined(__ELF__)
 extern "C" const char __ehdr_start[] __attribute__((__weak__));
@@ -30,8 +32,10 @@ static void _swift_elf_discoverTestContent(void) {
   if (&__ehdr_start != nullptr) {
     sectionBounds.baseAddress = __ehdr_start;
   }
-  sectionBounds.start = reinterpret_cast<uintptr_t>(__start_swift5_tests);
-  sectionBounds.length = __stop_swift5_tests - __start_swift5_tests;
+  sectionBounds.swift5_tests = {
+    reinterpret_cast<uintptr_t>(__start_swift5_tests),
+    __stop_swift5_tests - __start_swift5_tests
+  };
   swift_elf_registerTestContent(&sectionBounds);
 }
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
