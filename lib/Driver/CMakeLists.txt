@@ -20,7 +20,7 @@ set(swiftDriver_targetDefines)
 add_swift_host_library(swiftDriver STATIC
   ${swiftDriver_sources})
 add_dependencies(swiftDriver
-  SwiftOptions)
+  SwiftOptionDefinitions)
 target_link_libraries(swiftDriver PRIVATE
   swiftAST
   swiftBasic
