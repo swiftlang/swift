@@ -3081,10 +3081,10 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
       auto underlyingType = aliasDecl->getUnderlyingType();
       if (auto extendedNominal = underlyingType->getAnyNominal()) {
-        return TypeChecker::isPassThroughTypealias(
-                   aliasDecl, extendedNominal)
-                   ? extendedType
-                   : extendedNominal->getDeclaredType();
+        // Return the typealias type itself to preserve specialization info.
+        // Previously we returned the nominal's declared type which lost
+        // information about partial type specialization. See Issue #68212.
+        return extendedType;
       }
 
       if (underlyingType->is<TupleType>()) {
