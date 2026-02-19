@@ -491,9 +491,6 @@ EXPERIMENTAL_FEATURE(ObjCImplementationWithResilientStorage, true)
 // Enable @sensitive attribute.
 EXPERIMENTAL_FEATURE(Sensitive, true)
 
-// Enable the stdlib @DebugDescription macro.
-EXPERIMENTAL_FEATURE(DebugDescriptionMacro, true)
-
 EXPERIMENTAL_FEATURE(ReinitializeConsumeInMultiBlockDefer, false)
 
 EXPERIMENTAL_FEATURE(SE427NoInferenceOnExtension, true)
