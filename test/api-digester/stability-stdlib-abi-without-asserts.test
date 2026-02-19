@@ -944,4 +944,18 @@ Func _hashValue(for:) has mangled name changing from 'Swift._hashValue<A where A
 Func _hashValue(for:) has parameter 0 changing from Default to Shared
 Func _hashValue(for:) is now with @_preInverseGenerics
 
+// Optional: Equatable, Hashable where Wrapped: ~Copyable
+Accessor Optional.hashValue.Get() has generic signature change from <Wrapped where Wrapped : Swift.Hashable> to <Wrapped where Wrapped : Swift.Hashable, Wrapped : ~Copyable>
+Accessor Optional.hashValue.Get() has mangled name changing from '(extension in Swift):Swift.Optional<A where A: Swift.Hashable>.hashValue.getter : Swift.Int' to '(extension in Swift):Swift.Optional< where A: Swift.Hashable, A: ~Swift.Copyable>.hashValue.getter : Swift.Int'
+
+Func Optional.==(_:_:) has generic signature change from <Wrapped where Wrapped : Swift.Equatable> to <Wrapped where Wrapped : Swift.Equatable, Wrapped : ~Copyable, Wrapped : ~Escapable>
+Func Optional.==(_:_:) has mangled name changing from 'static (extension in Swift):Swift.Optional<A where A: Swift.Equatable>.== infix(Swift.Optional<A>, Swift.Optional<A>) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: Swift.Equatable, A: ~Swift.Copyable, A: ~Swift.Escapable>.== infix(Swift.Optional<A>, Swift.Optional<A>) -> Swift.Bool'
+
+Func Optional.hash(into:) has generic signature change from <Wrapped where Wrapped : Swift.Hashable> to <Wrapped where Wrapped : Swift.Hashable, Wrapped : ~Copyable>
+Func Optional.hash(into:) has mangled name changing from '(extension in Swift):Swift.Optional<A where A: Swift.Hashable>.hash(into: inout Swift.Hasher) -> ()' to '(extension in Swift):Swift.Optional< where A: Swift.Hashable, A: ~Swift.Copyable>.hash(into: inout Swift.Hasher) -> ()'
+Func Optional.hash(into:) is now with @_preInverseGenerics
+
+Var Optional.hashValue has mangled name changing from '(extension in Swift):Swift.Optional<A where A: Swift.Hashable>.hashValue : Swift.Int' to '(extension in Swift):Swift.Optional< where A: Swift.Hashable, A: ~Swift.Copyable>.hashValue : Swift.Int'
+Var Optional.hashValue is now with @_preInverseGenerics
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
