@@ -41,3 +41,9 @@ func ellipsis<T...>(_ x: repeat each T) {}
 func eachEllipsis<each T...>(_ x: repeat each T) {}
 // expected-error@-1 {{ellipsis operator cannot be used with a type parameter pack}}{{25-28=}}
 // expected-error@-2 {{cannot find type 'T' in scope}}
+
+let _ = S1< >()
+foo< >()
+
+let _ = S1<>()
+foo<>()

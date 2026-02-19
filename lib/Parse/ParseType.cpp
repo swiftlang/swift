@@ -1600,7 +1600,8 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
 }
 
 bool Parser::canParseAsGenericArgumentList() {
-  if (!Tok.isAnyOperator() || Tok.getText() != "<")
+  // Expressions of the form T<>() will produce a single <> token, not < and >
+  if (!Tok.isAnyOperator() || (Tok.getText() != "<" && Tok.getText() != "<>"))
     return false;
 
   BacktrackingScope backtrack(*this);
