@@ -2101,44 +2101,69 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
     return false;
   };
 
-  const auto &solution = solutions.front();
   if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
     auto *lhs = binaryOp->getLHS();
     auto *rhs = binaryOp->getRHS();
 
-    auto lhsType =
-        solution.simplifyType(solution.getType(lhs))->getRValueType();
-    auto rhsType =
-        solution.simplifyType(solution.getType(rhs))->getRValueType();
+    const auto &first_solution = solutions.front();
+    auto first_lhsType =
+        first_solution.simplifyType(first_solution.getType(lhs))->getRValueType();
+    auto first_rhsType =
+        first_solution.simplifyType(first_solution.getType(rhs))->getRValueType();
+    
+    bool no_exact_match = llvm::any_of(solutions, [&](const auto &solution) {
+        auto lhsType = solution.simplifyType(solution.getType(lhs))->getRValueType();
+        auto rhsType = solution.simplifyType(solution.getType(rhs))->getRValueType();
+        return !lhsType->isEqual(first_lhsType) || !rhsType->isEqual(first_rhsType);
+    });
 
-    if (lhsType->isEqual(rhsType)) {
-      DE.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_same_args,
-                  operatorName.str(), lhsType)
-          .highlight(lhs->getSourceRange())
-          .highlight(rhs->getSourceRange());
+    if (!no_exact_match) {
+      if (first_lhsType->isEqual(first_rhsType)) {
+        DE.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_same_args,
+                    operatorName.str(), first_lhsType)
+            .highlight(lhs->getSourceRange())
+            .highlight(rhs->getSourceRange());
 
-      if (isStandardComparisonOperator(binaryOp->getFn()) &&
-          isEnumWithAssociatedValues(lhsType)) {
-        DE.diagnose(applyExpr->getLoc(),
-                    diag::no_binary_op_overload_for_enum_with_payload,
-                    operatorName.str());
-        return;
+        if (isStandardComparisonOperator(binaryOp->getFn()) &&
+            isEnumWithAssociatedValues(first_lhsType)) {
+          DE.diagnose(applyExpr->getLoc(),
+                      diag::no_binary_op_overload_for_enum_with_payload,
+                      operatorName.str());
+          return;
+        }
+      } else if (operatorName == ctx.Id_MatchOperator) {
+        DE.diagnose(anchor->getLoc(), diag::cannot_match_expr_pattern_with_value,
+                    first_lhsType, first_rhsType);
+      } else {
+        DE.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_args,
+                    operatorName.str(), first_lhsType, first_rhsType)
+            .highlight(lhs->getSourceRange())
+            .highlight(rhs->getSourceRange());
       }
-    } else if (operatorName == ctx.Id_MatchOperator) {
-      DE.diagnose(anchor->getLoc(), diag::cannot_match_expr_pattern_with_value,
-                  lhsType, rhsType);
     } else {
-      DE.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_args,
-                  operatorName.str(), lhsType, rhsType)
+      DE.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_args_with_no_exact_match,
+                  operatorName.str())
           .highlight(lhs->getSourceRange())
           .highlight(rhs->getSourceRange());
     }
   } else {
     auto *arg = applyExpr->getArgs()->getUnlabeledUnaryExpr();
     assert(arg && "Expected a unary arg");
-    auto argType = solution.simplifyType(solution.getType(arg));
-    DE.diagnose(anchor->getLoc(), diag::cannot_apply_unop_to_arg,
-                operatorName.str(), argType->getRValueType());
+    
+    const auto &first_solution = solutions.front();
+    auto first_argType = first_solution.simplifyType(first_solution.getType(arg));
+    
+    bool no_exact_match = llvm::any_of(solutions, [&](const auto &solution) {
+        return !solution.simplifyType(solution.getType(arg))->isEqual(first_argType);
+    });
+    
+    if (!no_exact_match) {
+      DE.diagnose(anchor->getLoc(), diag::cannot_apply_unop_to_arg,
+                  operatorName.str(), first_argType->getRValueType());
+    } else {
+      DE.diagnose(anchor->getLoc(), diag::cannot_apply_unop_to_arg_with_no_exact_match,
+                  operatorName.str());
+    }
   }
 
   std::set<std::string> parameters;
