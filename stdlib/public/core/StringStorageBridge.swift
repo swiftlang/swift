@@ -518,7 +518,7 @@ extension __SharedStringStorage {
     if rhsCount < lhsByteCount / 3 {
       return 0
     }
-    // Worst case size change for UTF8 -> UTF16 is 1 byte1 -> 1 code unit
+    // Worst case size change for UTF8 -> UTF16 is 1 byte -> 1 code unit
     if rhsCount > lhsByteCount * 2 {
       return 0
     }
@@ -560,7 +560,7 @@ extension __SharedStringStorage {
      
      Smaller chunk sizes mean more call overhead.
      */
-    let chunkSize = Swift.min(32, remainingLHSByteCount)
+    let chunkSize = Swift.min(64, remainingLHSByteCount)
     return unsafe withUnsafeTemporaryAllocation(
       of: UInt8.self,
       capacity: chunkSize
