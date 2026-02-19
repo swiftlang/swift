@@ -133,7 +133,6 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
   // internal funnel method for initialziation
   internal init(emit: Emit) {
     self.emit = emit
-    self.state = _ManagedCriticalState(State())
   }
   
   /// Constructs an asynchronous sequence for a given closure by tracking changes of `@Observable` types.
@@ -167,7 +166,6 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
     // the state ivar serves two purposes:
     // 1) to store a critical region of state of the mutations
     // 2) to idenitify the termination of _this_ sequence
-    var state: _ManagedCriticalState<State>?
     let emit: Emit
     var started = false
     
@@ -277,6 +275,6 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
   }
   
   public func makeAsyncIterator() -> Iterator {
-    Iterator(state: state, emit: emit)
+     Iterator(state: _ManagedCriticalState(State()), emit: emit)
   }
 }
