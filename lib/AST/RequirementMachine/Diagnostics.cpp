@@ -197,26 +197,6 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
-    case RequirementError::Kind::RecursiveRequirement: {
-      auto requirement = error.getRequirement();
-
-      if (requirement.hasError())
-        break;
-
-      ASSERT(requirement.getKind() == RequirementKind::SameType ||
-             requirement.getKind() == RequirementKind::Superclass);
-
-      ctx.Diags.diagnose(loc,
-                         (requirement.getKind() == RequirementKind::SameType ?
-                          diag::recursive_same_type_constraint :
-                          diag::recursive_superclass_constraint),
-                         requirement.getFirstType(),
-                         requirement.getSecondType());
-
-      diagnosedError = true;
-      break;
-    }
-
     case RequirementError::Kind::UnsupportedSameElement: {
       if (error.getRequirement().hasError())
         break;
@@ -326,7 +306,7 @@ getRequirementForDiagnostics(Type subject, Symbol property,
 void RewriteSystem::computeConflictingRequirementDiagnostics(
     SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc,
     const PropertyMap &propertyMap,
-    ArrayRef<GenericTypeParamType *> genericParams) {
+    ArrayRef<GenericTypeParamType *> genericParams) const {
   for (auto pair : ConflictingRules) {
     const auto &firstRule = getRule(pair.first);
     const auto &secondRule = getRule(pair.second);
@@ -360,21 +340,46 @@ void RewriteSystem::computeConflictingRequirementDiagnostics(
   }
 }
 
-void RewriteSystem::computeRecursiveRequirementDiagnostics(
-    SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc,
+void RewriteSystem::diagnoseRecursiveRequirement(
+    SourceLoc signatureLoc,
     const PropertyMap &propertyMap,
-    ArrayRef<GenericTypeParamType *> genericParams) {
-  for (unsigned ruleID : RecursiveRules) {
-    const auto &rule = getRule(ruleID);
+    ArrayRef<GenericTypeParamType *> genericParams,
+    const ProtocolDecl *proto, unsigned ruleID) const {
+  const auto &rule = getRule(ruleID);
 
-    ASSERT(isInMinimizationDomain(rule.getRHS()[0].getRootProtocol()));
+  auto *thisProto = rule.getRHS()[0].getRootProtocol();
+  ASSERT(isInMinimizationDomain(thisProto));
 
-    Type subjectType = propertyMap.getTypeForTerm(rule.getRHS(), genericParams);
-    errors.push_back(RequirementError::forRecursiveRequirement(
-        getRequirementForDiagnostics(subjectType, *rule.isPropertyRule(),
-                                     propertyMap, genericParams, MutableTerm()),
-        signatureLoc));
-  }
+  // We call diagnoseRecursiveRequirement() on each protocol in the component,
+  // but we only emit a diagnostic on the protocol that owns the bad rule.
+  if (thisProto != proto)
+    return;
+
+  Type subjectType = propertyMap.getTypeForTerm(rule.getRHS(), genericParams);
+  auto requirement = getRequirementForDiagnostics(
+      subjectType, *rule.isPropertyRule(),
+      propertyMap, genericParams, MutableTerm());
+
+  if (requirement.hasError())
+    return;
+
+  ASSERT(requirement.getKind() == RequirementKind::SameType ||
+         requirement.getKind() == RequirementKind::Superclass);
+
+  auto &diags = Context.getASTContext().Diags;
+  diags.diagnose(signatureLoc,
+                 (requirement.getKind() == RequirementKind::SameType ?
+                  diag::recursive_same_type_constraint :
+                  diag::recursive_superclass_constraint),
+                 requirement.getFirstType(),
+                 requirement.getSecondType());
+}
+
+void RequirementMachine::diagnoseRecursiveRequirement(
+    SourceLoc signatureLoc, const ProtocolDecl *proto, unsigned ruleID) const {
+  System.diagnoseRecursiveRequirement(signatureLoc, Map,
+                                      getGenericParams(),
+                                      proto, ruleID);
 }
 
 void RequirementMachine::computeRequirementDiagnostics(
@@ -383,8 +388,6 @@ void RequirementMachine::computeRequirementDiagnostics(
     SourceLoc signatureLoc) {
   System.computeConflictingRequirementDiagnostics(errors, signatureLoc, Map,
                                                   getGenericParams());
-  System.computeRecursiveRequirementDiagnostics(errors, signatureLoc, Map,
-                                                getGenericParams());
 
   // Check that the generic parameters with inverses truly lack the conformance.
   for (auto const& inverse : inverses) {

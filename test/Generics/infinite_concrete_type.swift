@@ -49,8 +49,7 @@ class Base<T> {}
 class Derived<T, U> : Base<(T, U)> {}
 
 protocol TooManyDifferences {
-// expected-error@-1 {{cannot build rewrite system for protocol; concrete type difference limit exceeded}}
-// expected-note@-2 {{failed rewrite rule is }}
+// expected-error@-1 {{same-type constraint 'Self.B' == '(Self.B, Self.C)' is recursive}}
   associatedtype A1 where A1: Derived<B, C>, A2: Base<B>, A1 == A2
   associatedtype A2
   associatedtype B
@@ -59,9 +58,8 @@ protocol TooManyDifferences {
 
 struct G2<T> {
     func f2<each A>()
-// expected-error@-1 {{cannot build rewrite system for generic signature; concrete type nesting limit exceeded}}
-// expected-note@-2 {{failed rewrite rule is }}
-// expected-error@-3 {{generic parameter 'A' is not used in function signature}}
+// expected-error@-1 {{same-type constraint 'T' == '(repeat each A, (repeat each A, T))' is recursive}}
+// expected-error@-2 {{generic parameter 'A' is not used in function signature}}
   where (repeat each A, T) == T {}
 // expected-error@-1 {{tuple with noncopyable element type 'repeat each A' is not supported}}
 

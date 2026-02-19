@@ -57,6 +57,9 @@ enum class CompletionResult {
 
   /// Maximum type difference count exceeded.
   MaxTypeDifferences,
+
+  /// Recursive same-type or superclass requirement detected.
+  RecursiveRule,
 };
 
 /// A term rewrite system for working with types in a generic signature.
@@ -246,12 +249,13 @@ public:
   void computeConflictingRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
                                                 SourceLoc signatureLoc,
                                                 const PropertyMap &map,
-                                                ArrayRef<GenericTypeParamType *> genericParams);
+                                                ArrayRef<GenericTypeParamType *> genericParams) const;
 
-  void computeRecursiveRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
-                                              SourceLoc signatureLoc,
-                                              const PropertyMap &map,
-                                              ArrayRef<GenericTypeParamType *> genericParams);
+  void diagnoseRecursiveRequirement(SourceLoc signatureLoc,
+                                    const PropertyMap &propertyMap,
+                                    ArrayRef<GenericTypeParamType *> genericParams,
+                                    const ProtocolDecl *proto,
+                                    unsigned ruleID) const;
 
 private:
   struct CriticalPair {
@@ -388,8 +392,6 @@ private:
   void propagateExplicitBits();
 
   void propagateRedundantRequirementIDs();
-
-  void computeRecursiveRules();
 
   using EliminationPredicate = llvm::function_ref<bool(unsigned loopID,
                                                        unsigned ruleID)>;
