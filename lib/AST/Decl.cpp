@@ -4660,9 +4660,11 @@ bool ValueDecl::isLocalCapture() const {
 }
 
 ArrayRef<ValueDecl *>
-ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
-  // Dig out the nominal type.
-  NominalTypeDecl *NTD = getDeclContext()->getSelfNominalTypeDecl();
+ValueDecl::getSatisfiedProtocolRequirements(bool Sorted,
+                                            NominalTypeDecl *NTD) const {
+  // Dig out the nominal type if needed.
+  if (!NTD)
+    NTD = getDeclContext()->getSelfNominalTypeDecl();
   if (!NTD || isa<ProtocolDecl>(NTD))
     return {};
 
