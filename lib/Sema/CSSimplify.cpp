@@ -9983,8 +9983,7 @@ ConstraintSystem::simplifyForEachElementConstraint(
                              : KnownProtocolKind::IteratorProtocol));
   // FIXME: update this to only use Id_Element once the BorrowingSequence
   // protocol lands.
-  auto *eltAssocTy = iterProto->getAssociatedType(
-      isBorrowing ? Context.Id_BorrowedElement : Context.Id_Element);
+  auto *eltAssocTy = iterProto->getAssociatedType(Context.Id_Element);
   auto eltTy = lookupDependentMember(iterTy, eltAssocTy,
                                      /*openExistential*/ true, contextualLoc);
   if (!eltTy) {
