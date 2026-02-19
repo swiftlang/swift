@@ -463,7 +463,11 @@ bool swift_compareProtocolConformanceDescriptors(
 ///
 /// \returns a metadata pack allocated on the heap, with the least significant
 /// bit set to true.
+#if SWIFT_COMPATIBILITY_PACKS
+SWIFT_RUNTIME_COMPATIBILITY SWIFT_CC(swift)
+#else
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+#endif
 const Metadata * const *
 swift_allocateMetadataPack(const Metadata * const *ptr, size_t count);
 
@@ -478,7 +482,11 @@ swift_allocateMetadataPack(const Metadata * const *ptr, size_t count);
 ///
 /// \returns a witness table pack allocated on the heap, with the least
 /// significant bit set to true.
+#if SWIFT_COMPATIBILITY_PACKS
+SWIFT_RUNTIME_COMPATIBILITY SWIFT_CC(swift)
+#else
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+#endif
 const WitnessTable * const *
 swift_allocateWitnessTablePack(const WitnessTable * const *ptr, size_t count);
 
