@@ -519,8 +519,8 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cs.removePropertyWrapper(TheExpr);
     break;
 
-  case ChangeKind::RecordedClosureType:
-    cs.removeClosureType(TheClosure);
+  case ChangeKind::RecordedClosure:
+    cs.removeClosure(TheClosure);
     break;
 
   case ChangeKind::RecordedImpliedResult:

@@ -854,7 +854,7 @@ ConstraintGraph::computeConnectedComponents(
 bool ConstraintGraph::contractEdges() {
   // Current constraint system doesn't have any closure expressions
   // associated with it so there is nothing to here.
-  if (CS.ClosureTypes.empty())
+  if (CS.Closures.empty())
     return false;
 
   // For a given constraint kind, decide if we should attempt to eliminate its
@@ -870,8 +870,8 @@ bool ConstraintGraph::contractEdges() {
   };
 
   SmallVector<Constraint *, 16> constraints;
-  for (const auto &closure : CS.ClosureTypes) {
-    for (const auto &param : closure.second->getParams()) {
+  for (const auto &[closure, info] : CS.Closures) {
+    for (const auto &param : info.getType()->getParams()) {
       auto paramTy = param.getPlainType()->getAs<TypeVariableType>();
       if (!paramTy)
         continue;

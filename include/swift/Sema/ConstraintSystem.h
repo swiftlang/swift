@@ -1725,6 +1725,36 @@ struct ClosureIsolatedByPreconcurrency {
   bool operator()(const ClosureExpr *expr) const;
 };
 
+/// Describes a closure that is being processed by the constraint solver.
+class ClosureInfo {
+  FunctionType *Type;
+  SmallVector<ReturnStmt *, 2> Returns;
+
+public:
+  ClosureInfo(FunctionType *closureType, ArrayRef<ReturnStmt *> returns)
+      : Type(closureType), Returns(returns.begin(), returns.end()) {}
+
+  FunctionType *getType() const { return Type; }
+  ArrayRef<ReturnStmt *> getReturns() const { return Returns; }
+
+  bool solveReturnIndividually(ReturnStmt *R) const {
+    if (!hasMultipleReturns())
+      return true;
+
+    // Implement the logic to determine whether the return
+    // should be solved separately from others.
+    //
+    // For example: if there are no literal expressions
+    // in the given return statement it should be possible
+    // to solve it separately and simply use the resulting
+    // type in the join.
+
+    return false;
+  }
+
+  bool hasMultipleReturns() const { return Returns.size() > 1; }
+};
+
 /// Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -1843,7 +1873,7 @@ private:
   ///
   /// This is a MapVector because contractEdges() iterates over it and
   /// may depend on order.
-  llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
+  llvm::MapVector<const ClosureExpr *, ClosureInfo> Closures;
 
   /// Maps closures and local functions to the pack expansion expressions they
   /// capture.
@@ -2472,20 +2502,27 @@ public:
     return result->second;
   }
 
-  void setClosureType(const ClosureExpr *closure, FunctionType *type) {
+  void setClosure(const ClosureExpr *closure, ClosureInfo &&info) {
     ASSERT(closure);
-    ASSERT(type);
-    bool inserted = ClosureTypes.insert({closure, type}).second;
+    ASSERT(info.getType());
+    bool inserted = Closures.insert({closure, std::move(info)}).second;
     ASSERT(inserted);
 
     if (solverState) {
-      recordChange(SolverTrail::Change::RecordedClosureType(
-        const_cast<ClosureExpr *>(closure)));
+      recordChange(SolverTrail::Change::RecordedClosure(
+          const_cast<ClosureExpr *>(closure)));
     }
   }
 
-  void removeClosureType(const ClosureExpr *closure) {
-    bool erased = ClosureTypes.erase(closure);
+  NullablePtr<ClosureInfo> getClosureInfo(const ClosureExpr *closure) const {
+    auto result = Closures.find(closure);
+    if (result != Closures.end())
+      return const_cast<ClosureInfo *>(&result->second);
+    return {};
+  }
+
+  void removeClosure(const ClosureExpr *closure) {
+    bool erased = Closures.erase(closure);
     ASSERT(erased);
   }
 
@@ -2496,9 +2533,9 @@ public:
   }
 
   FunctionType *getClosureTypeIfAvailable(const ClosureExpr *closure) const {
-    auto result = ClosureTypes.find(closure);
-    if (result != ClosureTypes.end())
-      return result->second;
+    auto result = Closures.find(closure);
+    if (result != Closures.end())
+      return result->second.getType();
     return nullptr;
   }
 
@@ -5382,7 +5419,10 @@ class TypeVarRefCollector : public ASTWalker {
   ConstraintLocator *Locator;
 
   llvm::SmallSetVector<TypeVariableType *, 4> TypeVars;
+  llvm::SmallVector<ReturnStmt *, 4> Returns;
+
   unsigned DCDepth = 0;
+  unsigned SVEDepth = 0;
 
 public:
   TypeVarRefCollector(ConstraintSystem &cs, DeclContext *dc,
@@ -5410,6 +5450,8 @@ public:
   ArrayRef<TypeVariableType *> getTypeVars() const {
     return TypeVars.getArrayRef();
   }
+
+  ArrayRef<ReturnStmt *> getReturns() const { return Returns; }
 };
 
 /// Determine whether the given type is a PartialKeyPath and
