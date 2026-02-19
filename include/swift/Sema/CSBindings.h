@@ -438,6 +438,10 @@ class BindingSet {
   unsigned GenerationNumber = 0;
   /// Computed early by computeLValueState().
   KnownLValueKind LValueState = KnownLValueKind::Unknown;
+  /// Set when adding a binding that contradicts an existing binding
+  /// or a conformance constraint on the type variable. See addBinding()
+  /// and reduceBinding().
+  bool IsConflicting = 0;
 
 public:
   swift::SmallVector<PotentialBinding, 4> Bindings;
@@ -492,6 +496,12 @@ public:
 
   KnownLValueKind getLValueState() const {
     return LValueState;
+  }
+
+  /// Whether we deduced that the adjacent constraints on this type
+  /// variable are contradictory.
+  bool isConflicting() const {
+    return IsConflicting;
   }
 
   /// Whether this type variable is subject to a ExpressibleByNilLiteral
@@ -707,6 +717,10 @@ private:
 
   void markDirty() {
     IsDirty = true;
+  }
+
+  void markConflicting() {
+    IsConflicting = true;
   }
 
   /// Add a new binding to the set.
