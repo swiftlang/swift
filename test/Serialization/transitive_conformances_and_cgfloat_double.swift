@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module %s -o %t -solver-disable-crash-on-valid-salvage
-// RUN: not --crash %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module %s -o %t -solver-enable-crash-on-valid-salvage
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module %s -o %t -solver-enable-crash-on-valid-salvage -solver-disable-transitive-conformance
 
 // REQUIRES: objc_interop
 
