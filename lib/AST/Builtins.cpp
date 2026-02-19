@@ -1441,11 +1441,10 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
   BuiltinFunctionBuilder::LambdaGenerator firstArgGen{
       // Generator for the function type at the argument position, i.e. the
       // function being differentiated.
-      [=, &fnParamGens](BuiltinFunctionBuilder &builder) -> Type {
+      [=, &fnParamGens](BuiltinFunctionBuilder &builder, AutoDiffDerivativeFunctionKind kind) -> Type {
         auto extInfo =
             FunctionType::ExtInfoBuilder()
-                // TODO: Use `kind.getMinimalDifferentiabilityKind()`.
-                .withDifferentiabilityKind(DifferentiabilityKind::Reverse)
+                .withDifferentiabilityKind(kind.getMinimalDifferentiabilityKind())
                 .withNoEscape()
                 .withThrows(throws, throws? fnThrownTypeGen.build(builder) : Type())
                 .build();
@@ -1457,7 +1456,7 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
   // Eagerly build the type of the first arg, then use that to compute the type
   // of the result.
   auto *diffFnType =
-      firstArgGen.build(builder)->castTo<AnyFunctionType>();
+      firstArgGen.build(builder, kind)->castTo<AnyFunctionType>();
   diffFnType = diffFnType->getWithoutDifferentiability()->withExtInfo(
       diffFnType->getExtInfo().withNoEscape(false));
   auto *paramIndices = IndexSubset::get(
