@@ -96,7 +96,7 @@ do {
   let _: Array<Int>.#^ARRAY_MEMBER_DOT?check=ARRAY^#
   let _: [Int].#^SUGARED_ARRAY_MEMBER_DOT?check=ARRAY^#
 
-  // ARRAY-LABEL: Begin completions, 8 items
+  // ARRAY-LABEL: Begin completions, 9 items
   // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: Index[#Int#]; name=Index
   // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: Indices[#Range<Int>#]; name=Indices
   // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: Iterator[#IndexingIterator<Array<Int>>#]; name=Iterator
@@ -109,8 +109,9 @@ do {
   let _: Dictionary<Int, Int>.#^DICTIONARY_MEMBER_DOT?check=DICTIONARY^#
   let _: [Int : Int].#^SUGARED_DICTIONARY_MEMBER_DOT?check=DICTIONARY^#
 
-  // DICTIONARY-LABEL: Begin completions, 11 items
+  // DICTIONARY-LABEL: Begin completions, 12 items
   // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Element[#(key: Int, value: Int)#]; name=Element
+  // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: BorrowingIterator[#BorrowingIteratorAdapter<Dictionary<Int, Int>.Iterator>#]; name=BorrowingIterator
   // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: SubSequence[#Slice<Dictionary<Int, Int>>#]; name=SubSequence
   // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Indices[#DefaultIndices<Dictionary<Int, Int>>#]; name=Indices
   // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Key[#Int#]; name=Key
@@ -143,20 +144,22 @@ do {
   let _: (any Sequence).#^MEMBER_EXISTENTIAL_DOT^#
 
   // FIXME: Do not show associated types?
-  // MEMBER_EXISTENTIAL_DOT-LABEL: Begin completions, 4 items
+  // MEMBER_EXISTENTIAL_DOT-LABEL: Begin completions, 5 items
   // MEMBER_EXISTENTIAL_DOT-NEXT: Decl[AssociatedType]/CurrNominal/IsSystem: Element; name=Element
   // MEMBER_EXISTENTIAL_DOT-NEXT: Decl[AssociatedType]/CurrNominal/IsSystem: Iterator; name=Iterator
+  // MEMBER_EXISTENTIAL_DOT-NEXT: Decl[AssociatedType]/CurrNominal/IsSystem: BorrowingIterator; name=BorrowingIterator
   // MEMBER_EXISTENTIAL_DOT-NEXT: Keyword/None: Protocol[#(any Sequence).Type#]; name=Protocol
   // MEMBER_EXISTENTIAL_DOT-NEXT: Keyword/None: Type[#any Sequence.Type#]; name=Type
 
   let _: (any Sequence)#^MEMBER_EXISTENTIAL_NO_DOT^#
 
   // FIXME: Do not show associated types?
-  // MEMBER_EXISTENTIAL_NO_DOT-LABEL: Begin completions, 6 items
+  // MEMBER_EXISTENTIAL_NO_DOT-LABEL: Begin completions, 7 items
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Keyword/None: async; name=async
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Keyword[throws]/None: throws; name=throws
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Decl[AssociatedType]/CurrNominal/IsSystem: .Element; name=Element
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Decl[AssociatedType]/CurrNominal/IsSystem: .Iterator; name=Iterator
+  // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Decl[AssociatedType]/CurrNominal/IsSystem: .BorrowingIterator; name=BorrowingIterator
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Keyword/None: .Protocol[#(any Sequence).Type#]; name=Protocol
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Keyword/None: .Type[#any Sequence.Type#]; name=Type
 }
