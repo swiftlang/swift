@@ -1210,4 +1210,4 @@ Added: _$ss4SpanVyxGs18_BorrowingSequencesRi_zrlMc
 Added: _$ss4SpanVyxGs26_BorrowingIteratorProtocolsRi_zrlMc
 
 // CommandLine._executablePathCString
-Added: _$ss11CommandLineO14executablePathSSvgZ
+Added: _$ss11CommandLineO22_executablePathCStrings15ContiguousArrayVys4Int8VGSgvpZMV
