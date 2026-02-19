@@ -5604,9 +5604,9 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
         projection =
             emitLoad(loc, projection.getValue(), origFormalType,
                      substFormalType, rvalueTL, C, IsNotTake, isBaseGuaranteed);
-      } else if (isReadAccessResultOwned(src.getAccessKind()) &&
-          !projection.isPlusOneOrTrivial(*this)) {
-
+      } else if (!projection.isPlusOneOrTrivial(*this) &&
+                 (!C.isImmediatePlusZeroOk() &&
+                  !(C.isGuaranteedPlusZeroOk() && isBaseGuaranteed))) {
         // Before we copy, if we have a move only wrapped value, unwrap the
         // value using a guaranteed moveonlywrapper_to_copyable.
         if (projection.getType().isMoveOnlyWrapped()) {
