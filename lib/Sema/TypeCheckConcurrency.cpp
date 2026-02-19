@@ -8290,9 +8290,8 @@ bool ActorReferenceResult::Builder::memberAccessHasSpecialPermissionInSwift5(
 bool ActorReferenceResult::Builder::checkedByFlowIsolation(
     const DeclContext *refCxt, ReferencedActor &baseActor, ValueDecl *member,
     SourceLoc memberLoc, std::optional<VarRefUseEnv> useKind) {
-  // base of member reference must be `self`
-  if (!baseActor.isSelf())
-    return false;
+  assert(baseActor.isSelf() &&
+         "Should have checked in caller that baseActor is self");
 
   // Must be directly in an init/deinit that uses flow-isolation,
   // or a defer within such a functions.
@@ -8416,26 +8415,27 @@ ActorReferenceResult ActorReferenceResult::Builder::build() {
 
   // If there is an instance and it is checked by flow isolation, treat it
   // as being in the same concurrency domain.
-  if (referencedActor && checkedByFlowIsolation(fromDC, *referencedActor, decl,
-                                                declRefLoc, useKind))
-    return forSameConcurrencyDomain(declIsolation, options);
+  if (referencedActor && referencedActor->isSelf()) {
+    if (checkedByFlowIsolation(fromDC, *referencedActor, decl, declRefLoc,
+                               useKind))
+      return forSameConcurrencyDomain(declIsolation, options);
 
-  // If we are delegating to another initializer, treat them as being in the
-  // same concurrency domain.
-  // FIXME: This has a lot of overlap with both the stored-property checks
-  // below and the flow-isolation checks above.
-  if (referencedActor && referencedActor->isSelf() &&
-      isa<ConstructorDecl>(decl) && isa<ConstructorDecl>(fromDC))
-    return forSameConcurrencyDomain(declIsolation, options);
+    // If we are delegating to another initializer, treat them as being in the
+    // same concurrency domain.
+    // FIXME: This has a lot of overlap with both the stored-property checks
+    // below and the flow-isolation checks above.
+    if (isa<ConstructorDecl>(decl) && isa<ConstructorDecl>(fromDC))
+      return forSameConcurrencyDomain(declIsolation, options);
 
-  // If there is an instance that corresponds to 'self',
-  // we are in a constructor or destructor, and we have a stored property of
-  // global-actor-qualified type, then we have problems if the stored property
-  // type is non-Sendable. Note that if we get here, the type must be Sendable.
-  if (referencedActor && referencedActor->isSelf() &&
-      isNonInheritedStorage(decl, fromDC) && declIsolation.isGlobalActor() &&
-      (isa<ConstructorDecl>(fromDC) || isa<DestructorDecl>(fromDC)))
-    return forSameConcurrencyDomain(declIsolation, options);
+    // If there is an instance that corresponds to 'self',
+    // we are in a constructor or destructor, and we have a stored property of
+    // global-actor-qualified type, then we have problems if the stored property
+    // type is non-Sendable. Note that if we get here, the type must be
+    // Sendable.
+    if (isNonInheritedStorage(decl, fromDC) && declIsolation.isGlobalActor() &&
+        (isa<ConstructorDecl>(fromDC) || isa<DestructorDecl>(fromDC)))
+      return forSameConcurrencyDomain(declIsolation, options);
+  }
 
   // At this point, we are accessing the target from outside the actor.
   // First, check whether it is something that can be accessed directly,
