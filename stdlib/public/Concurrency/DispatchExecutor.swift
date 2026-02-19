@@ -44,10 +44,6 @@ class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
     fatalError("DispatchMainExecutor cannot be stopped")
   }
 
-  var asScheduling: (any SchedulingExecutor)? {
-    return self
-  }
-
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 at instant: C.Instant,
                                 tolerance: C.Duration? = nil,
@@ -63,8 +59,6 @@ extension DispatchMainExecutor: SerialExecutor {
   public func enqueue(_ job: consuming ExecutorJob) {
     _dispatchEnqueueMain(UnownedJob(job))
   }
-
-  public var isMainExecutor: Bool { true }
 
   public func checkIsolated() {
     _dispatchAssertMainQueue()
@@ -84,12 +78,6 @@ class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
 
   public func enqueue(_ job: consuming ExecutorJob) {
     _dispatchEnqueueGlobal(UnownedJob(job))
-  }
-
-  public var isMainExecutor: Bool { false }
-
-  var asScheduling: (any SchedulingExecutor)? {
-    return self
   }
 
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
@@ -162,7 +150,7 @@ fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
 
   guard let (clockID, seconds, nanoseconds) = timestamp(for: instant,
                                                         clock: clock) else {
-    clock.enqueue(job, on: executor, at: instant, tolerance: tolerance)
+    fatalError("Sorry, cannot schedule on an unknown clock")
     return
   }
 
