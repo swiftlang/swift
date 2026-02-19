@@ -668,6 +668,13 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-disable-preallocated-instantiation-caches")
   endif()
 
+  # Catch expressions where the type checker fails in normal mode and then finds a
+  # valid solution in diagnostic mode.
+  #
+  # We're not ready to enable this flag uconditionally yet, but turn it on for the
+  # standard library.
+  list(APPEND swift_flags "-Xfrontend" "-solver-enable-crash-on-valid-salvage")
+
   list(APPEND swift_flags ${SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS})
 
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
