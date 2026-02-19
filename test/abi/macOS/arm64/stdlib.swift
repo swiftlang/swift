@@ -1186,10 +1186,6 @@ Added: _swift_dereferenceBorrow
 Added: _swift_getBorrowTypeMetadata
 Added: _swift_initBorrow
 
-<<<<<<< david/equal_in_the_eyes_of_strcmp
-// Cross-encoding strcmp for Foundation
-Added: _swift_unicodeBuffersEqual_nonNormalizing
-=======
 // BorrowingSequence + supporting symbols
 Added: _$s18_BorrowingIterators01_A8SequencePTl
 Added: _$s8_Elements18_BorrowingSequencePTl
@@ -1212,4 +1208,6 @@ Added: _$ss4SpanVsRi_zrlE05_nextA012maximumCountAByxGSi_tF
 Added: _$ss4SpanVsRi_zrlE22_makeBorrowingIteratorAByxGyF
 Added: _$ss4SpanVyxGs18_BorrowingSequencesRi_zrlMc
 Added: _$ss4SpanVyxGs26_BorrowingIteratorProtocolsRi_zrlMc
->>>>>>> main
+
+// Cross-encoding strcmp for Foundation
+Added: _swift_unicodeBuffersEqual_nonNormalizing
