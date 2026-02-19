@@ -37,6 +37,19 @@ func testClosures() {
     throw .fail // Ok
   }
 
+  let _: () throws(Never) -> Void = { () throws in } // Ok
+  // expected-error@-1 {{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '() throws(Never) -> Void'}}
+
+  let _: () throws(Never) -> Void = {
+    // expected-error@-1 {{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '() throws(Never) -> Void'}}
+    throw MyError.fail
+  }
+
+  let _: () throws(Never) -> Void = { () throws in
+    // expected-error@-1 {{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '() throws(Never) -> Void'}}
+    throw MyError.fail
+  }
+
   // FIXME: Terrible diagnostic.
   // expected-error@+1{{unable to infer closure type without a type annotation}}
   let _ = { () throws(MyBadError) in
@@ -53,3 +66,9 @@ func testClosures() {
   _ = { () throws(GenericError<_>) in } // expected-error {{type placeholder not allowed here}}
 }
 
+func testThrowsMismatch(fn: () throws -> Void) {
+  func test(_: () throws(Never) -> Void) {}
+
+  test(fn)
+  // expected-error@-1 {{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '() throws(Never) -> Void'}}
+}
