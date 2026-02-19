@@ -7,16 +7,16 @@ struct Simple {
               // expected-note @-1 {{'self.x' not initialized}}
   let y: Bool
 
-  init() {
+  init() { // expected-error {{return from initializer without initializing all stored properties}} {{12:3-3=self.x = x\n}} {{8-8=x: Bool}}
     y = false || x // expected-error {{constant 'self.x' used before being initialized}}
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  }
 
-  init(b: Bool) {
+  init(b: Bool) { // expected-error {{return from initializer without initializing all stored properties}} {{19:3-3=self.x = x\n}} {{15-15=, x: Bool}}
     if b {
       x = false
     }
     y = false || x // expected-error {{constant 'self.x' used before being initialized}}
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  } 
 }
 
 struct NestedClosures {
@@ -24,19 +24,19 @@ struct NestedClosures {
   let y: Bool
   let z: Bool
 
-  init(_ a: Bool) {
+  init(_ a: Bool) {// expected-error {{return from initializer without initializing all stored properties}} {{30:3-3=self.x = x\n}} {{17-17=, x: Bool}}
     y = false
     z = false || (y || (x || a)) // expected-error {{constant 'self.x' used before being initialized}}
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  }
 }
 
 class SimpleClass {
   let x: Bool // expected-note {{'self.x' not initialized}}
   let y: Bool
 
-  init() {
+  init() {// expected-error {{return from initializer without initializing all stored properties}} {{39:3-3=self.x = x\n}} {{8-8=x: Bool}}
     y = false || x // expected-error {{constant 'self.x' used before being initialized}}
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  }
 }
 
 func forward(_ b: inout Bool) -> Bool {
@@ -60,8 +60,8 @@ struct Generic<T : P> {
   let x: T // expected-note {{'self.x' not initialized}}
   let y: Bool
 
-  init(_ t: T) {
+  init(_ t: T) {// expected-error {{return from initializer without initializing all stored properties}} {{65:3-3=self.x = x\n}} {{14-14=, x: T}}
     y = false || x.b // expected-error {{constant 'self.x' used before being initialized}}
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  }
 }
 
