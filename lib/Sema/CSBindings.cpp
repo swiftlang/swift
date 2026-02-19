@@ -1267,8 +1267,6 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
       node.initBindingSet();
   }
 
-  bool first = true;
-
   // Now let's see if we could infer something for related type
   // variables based on other bindings.
   for (auto *typeVar : getTypeVariables()) {
@@ -1311,26 +1309,38 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
     if (!isViable)
       continue;
 
-    if (isDebugMode() && bindings.hasViableBindings()) {
-      if (first) {
-        llvm::errs().indent(solverState->getCurrentIndent())
-            << "(Potential Binding(s)\n";
-        first = false;
-      }
-      auto &log = llvm::errs().indent(solverState->getCurrentIndent() + 2);
-      bindings.dump(log, solverState->getCurrentIndent() + 2);
-      log << "\n";
-    }
-
     // If these are the first bindings, or they are better than what
     // we saw before, use them instead.
     if (!bestBindings || bindings < *bestBindings)
       bestBindings = &bindings;
   }
 
-  if (isDebugMode() && !first) {
-    auto &log = llvm::errs().indent(solverState->getCurrentIndent());
-    log << ")\n";
+  if (isDebugMode()) {
+    bool first = true;
+
+    for (auto *typeVar : getTypeVariables()) {
+      auto &node = CG[typeVar];
+      if (!node.hasBindingSet())
+        continue;
+
+      const auto &bindings = node.getBindingSet();
+
+      if (isDebugMode() && bindings.hasViableBindings()) {
+        if (first) {
+          llvm::errs().indent(solverState->getCurrentIndent())
+              << "(Potential Binding(s)\n";
+          first = false;
+        }
+        auto &log = llvm::errs().indent(solverState->getCurrentIndent() + 2);
+        bindings.dump(log, solverState->getCurrentIndent() + 2);
+        log << "\n";
+      }
+
+      if (!first) {
+        auto &log = llvm::errs().indent(solverState->getCurrentIndent());
+        log << ")\n";
+      }
+    }
   }
 
   if (bestBindings)
