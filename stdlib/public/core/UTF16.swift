@@ -434,3 +434,430 @@ extension Unicode.UTF16.ForwardParser: Unicode.Parser, _UTFParser {
     return r
   }
 }
+
+private enum ScalarFallbackResult: UInt8 {
+  case invalid
+  case singleByte
+  case multiByte
+}
+
+#if arch(arm64_32)
+typealias Word = UInt64
+#else
+typealias Word = UInt
+#endif
+//Blocks containing only ASCII will not have any of these bits set
+@_transparent var asciiMask:Word {
+  Word(truncatingIfNeeded: 0xFF80FF80_FF80FF80 as UInt64)
+}
+
+/*
+ Shifting a UInt16 value by 7 bits gets us:
+ <0x80: 0 (ASCII, 1 byte UTF8)
+ 0x80-0x7FF: 1-15 (2 byte UTF8)
+ 0x800-0x3FFF: 16-127 (3 byte UTF8)
+ Which we can use as an index into this table.
+ Values >= 0x4000 are handled via the scalar path to keep the table size down
+ */
+@_transparent func withLengthLUT(
+  _ work: (UnsafeRawBufferPointer) -> Int
+) -> Int {
+  let lut: (
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8
+  ) = (1, //0
+   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, //1-15
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3) //16 - 127
+  return unsafe withUnsafeBytes(of: lut) { lutBuffer in
+    return unsafe work(lutBuffer)
+  }
+}
+//Blocks with values we can use the LUT for don't have any of these bits set
+@_transparent var largeValueMask: Word {
+  Word(truncatingIfNeeded: 0xE000E000_E000E000 as UInt64)
+}
+
+@_transparent var utf8TwoByteMax: UInt32 { 0x7FF }
+@_transparent var utf16LeadSurrogateMin: UInt32 { 0xD800 }
+@_transparent var utf16TrailSurrogateMin: UInt32 { 0xDC00 }
+@_transparent var utf16ReplacementCharacter: UInt32 { 0xFFFD }
+@_transparent var utf16ScalarMax: UInt32 { 0x10FFFF }
+@_transparent var utf16BasicMultilingualPlaneMax: UInt32 { 0xFFFF }
+@_transparent var utf16AstralPlaneMin: UInt32 { 0x10000 }
+
+typealias Block = (Word, Word, Word, Word)
+
+#if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+#if _pointerBitWidth(_32) && !arch(arm64_32)
+@_transparent var blockSize:Int { 8 }
+@_transparent
+func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD8<UInt8>? {
+  let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
+  return unsafe ((block.0 | block.1 | block.2 | block.3) & asciiMask == 0)
+    ? unsafeBitCast(block, to: SIMD16<UInt8>.self).evenHalf : nil
+}
+@_transparent
+func _utf8CountOfBlock(at pointer: UnsafePointer<UInt16>) -> Int? {
+  let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
+  if (block.0 | block.1 | block.2 | block.3) & asciiMask == 0 {
+    return 8
+  }
+  if (block.0 | block.1 | block.2 | block.3) & largeValueMask != 0 {
+    return nil
+  }
+  return unsafe withLengthLUT { lutBuffer in
+    let simdBlock = unsafe unsafeBitCast(block, to: SIMD8<UInt16>.self) &>> 7
+    var count = 0
+    for i in 0 ..< 8 {
+      count &+= unsafe Int(lutBuffer[Int(simdBlock[i])])
+    }
+    return count
+  }
+}
+#else
+@_transparent var blockSize:Int { 16 }
+@_transparent
+func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD16<UInt8>? {
+  let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
+  return unsafe ((block.0 | block.1 | block.2 | block.3) & asciiMask == 0)
+    ? unsafeBitCast(block, to: SIMD32<UInt8>.self).evenHalf : nil
+}
+@_transparent
+func _utf8CountOfBlock(at pointer: UnsafePointer<UInt16>) -> Int? {
+  let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
+  if (block.0 | block.1 | block.2 | block.3) & asciiMask == 0 {
+    return 16
+  }
+  if (block.0 | block.1 | block.2 | block.3) & largeValueMask != 0 {
+    return nil
+  }
+  return unsafe withLengthLUT { lutBuffer in
+    let simdBlock = unsafe unsafeBitCast(block, to: SIMD16<UInt16>.self) &>> 7
+    var count = 0
+    for i in 0 ..< 16 {
+      count &+= unsafe Int(lutBuffer[Int(simdBlock[i])])
+    }
+    return count
+  }
+}
+#endif
+#else
+@_transparent var blockSize:Int { 1 }
+@_transparent
+func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt8>? {
+  let value = unsafe pointer.pointee
+  if value & 0xFF80 == 0 {
+    return CollectionOfOne(UInt8(truncatingIfNeeded: value))
+  }
+  return nil
+}
+@_transparent
+func _utf8CountOfBlock(at pointer: UnsafePointer<UInt16>) -> Int? {
+  return switch unsafe UInt32(pointer.pointee) {
+    case 0 ..< 0x80: 1
+    case 0x80 ..< 0x800 : 2
+    case 0x800 ..< 0x10000: 3
+    default: nil
+  }
+}
+#endif
+
+/*
+ This is expressible in a more concise way using the other transcoding
+ primitives in the stdlib, but at least as of July 2025 doing that makes
+ processing runs of non-ASCII several times slower.
+ */
+@inline(__always)
+private func encodeScalarAsUTF8(
+  _ scalar: UInt32,
+  output: inout UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
+  outputEnd: UnsafePointer<Unicode.UTF8.CodeUnit>,
+) -> ScalarFallbackResult {
+  _debugPrecondition(scalar >= 0x80)
+  _debugPrecondition(scalar <= utf16ScalarMax)
+  if scalar <= utf8TwoByteMax {
+    if unsafe output + 2 > outputEnd { return .invalid }
+    // Scalar fits in 11 bits
+    // 2 byte UTF8 is 0b110[top 5 bits] 0b10[bottom 6 bits]
+    unsafe output.pointee = 0b1100_0000 | UInt8((scalar >> 6) & 0b01_1111)
+    unsafe (output + 1).pointee = 0b1000_0000 | UInt8(scalar & 0b11_1111)
+    unsafe output += 2
+  } else if scalar <= utf16BasicMultilingualPlaneMax {
+    // Scalar fits in 16 bits
+    // 3 byte UTF8 is 0b1110[top 4 bits] 0b10[middle 6 bits] 0b10[bottom 6 bits]
+    if unsafe output + 3 > outputEnd { return .invalid }
+    unsafe output.pointee = 0b1110_0000 | UInt8((scalar >> 12) & 0b1111)
+    unsafe (output + 1).pointee = 0b1000_0000 | UInt8((scalar >> 6) & 0b11_1111)
+    unsafe (output + 2).pointee = 0b1000_0000 | UInt8(scalar & 0b11_1111)
+    unsafe output += 3
+  } else if scalar <= utf16ScalarMax {
+    // Scalar fits in 21 bits.
+    // 0b11110[top 3] 0b10[upper middle 6] 0b10[lower middle 6] 0b10[bottom 6]
+    if unsafe output + 4 > outputEnd { return .invalid }
+    unsafe output.pointee = 0b1111_0000 | UInt8((scalar >> 18) & 0b0111)
+    unsafe (output + 1).pointee = 0b1000_0000 | UInt8((scalar >> 12) & 0b11_1111)
+    unsafe (output + 2).pointee = 0b1000_0000 | UInt8((scalar >> 6) & 0b11_1111)
+    unsafe (output + 3).pointee = 0b1000_0000 | UInt8(scalar & 0b11_1111)
+    unsafe output += 4
+  } else {
+    Builtin.unreachable()
+  }
+  return .multiByte
+}
+
+@inline(__always)
+private func processNonASCIIScalarFallback(
+  _ cu: UInt16,
+  input: inout UnsafePointer<UInt16>,
+  inputEnd: UnsafePointer<UInt16>,
+  output: inout UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
+  outputEnd: UnsafePointer<Unicode.UTF8.CodeUnit>,
+  repairing: Bool
+) -> (ScalarFallbackResult, repairsMade: Bool) {
+  var scalar: UInt32 = 0
+  var invalid = false
+  if UTF16.isLeadSurrogate(cu) {
+    if unsafe input + 1 >= inputEnd {
+      //Leading with no room for trailing
+      invalid = true
+      unsafe input += 1
+    } else {
+      let next = unsafe (input + 1).pointee
+      if !UTF16.isTrailSurrogate(next) {
+        //Leading followed by non-trailing
+        invalid = true
+        unsafe input += 1
+      } else {
+        /*
+         Code points outside the BMP are encoded as:
+         value -= smallest non-BMP code point
+         lead = smallest leading surrogate + high 10 bits of value
+         trail = smallest trailing surrogate + low 10 bits of value
+         */
+        scalar = utf16AstralPlaneMin
+          + ((UInt32(cu) - utf16LeadSurrogateMin) << 10)
+          + (UInt32(next) - utf16TrailSurrogateMin)
+        unsafe input += 2
+      }
+    }
+  } else if UTF16.isTrailSurrogate(cu) {
+    //Trailing with no leading
+    invalid = true
+    unsafe input += 1
+  } else {
+    scalar = UInt32(cu)
+    unsafe input += 1
+  }
+  if _slowPath(invalid || scalar > utf16ScalarMax) {
+    guard repairing else { return (.invalid, repairsMade: false) }
+    return (
+      unsafe encodeScalarAsUTF8(utf16ReplacementCharacter,
+                                output: &output,
+                                outputEnd: outputEnd),
+      repairsMade: true
+    )
+  }
+  return (
+    unsafe encodeScalarAsUTF8(scalar, output: &output, outputEnd: outputEnd),
+    repairsMade: false
+  )
+}
+
+@inline(__always)
+private func processScalarFallback(
+  input: inout UnsafePointer<Unicode.UTF16.CodeUnit>,
+  inputEnd: UnsafePointer<Unicode.UTF16.CodeUnit>,
+  output: inout UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
+  outputEnd: UnsafePointer<Unicode.UTF8.CodeUnit>,
+  repairing: Bool
+) -> (ScalarFallbackResult, repairsMade: Bool) {
+  let cu = unsafe input.pointee
+  if Unicode.UTF16.isASCII(cu) {
+    if unsafe output < outputEnd {
+      unsafe output.initialize(to: UInt8(truncatingIfNeeded: cu))
+      unsafe input += 1
+      unsafe output += 1
+    } else {
+      Builtin.unreachable()
+    }
+  } else {
+    // Scalar fallback for this code unit
+    return unsafe processNonASCIIScalarFallback(
+      cu,
+      input: &input,
+      inputEnd: inputEnd,
+      output: &output,
+      outputEnd: outputEnd,
+      repairing: repairing
+    )
+  }
+  return (.singleByte, repairsMade: false)
+}
+
+func processNonASCIIChunk(
+  input: inout UnsafePointer<UInt16>,
+  inputEnd: UnsafePointer<UInt16>,
+  output: inout UnsafeMutablePointer<UInt8>,
+  outputEnd: UnsafePointer<UInt8>,
+  repairing: Bool
+) -> (Bool, repairsMade: Bool) {
+  for _ in 0 ..< blockSize {
+    switch unsafe processScalarFallback(
+      input: &input,
+      inputEnd: inputEnd,
+      output: &output,
+      outputEnd: outputEnd,
+      repairing: repairing
+    ) {
+    case (.invalid, let repairsMade):
+      return (false, repairsMade: repairsMade)
+    case (.multiByte, let repairsMade):
+      return (true, repairsMade: repairsMade) //found the non-ASCII, try starting a new SIMD batch
+    case (.singleByte, _):
+      continue
+    }
+  }
+  Builtin.unreachable()
+}
+
+internal func transcodeUTF16ToUTF8(
+  UTF16CodeUnits: UnsafeBufferPointer<Unicode.UTF16.CodeUnit>,
+  into outputBuffer: UnsafeMutableBufferPointer<Unicode.UTF8.CodeUnit>,
+  repairing: Bool = true
+) -> (Int, repairsMade: Bool) {
+  let inCount = UTF16CodeUnits.count
+  let outCount = outputBuffer.count
+  guard inCount > 0, outCount > 0 else { return (0, repairsMade: false) }
+  var input = unsafe UTF16CodeUnits.baseAddress.unsafelyUnwrapped
+  let inputEnd = unsafe input + inCount
+  var output = unsafe outputBuffer.baseAddress.unsafelyUnwrapped
+  let outputStart = unsafe output
+  let outputEnd = unsafe output + outCount
+  var repairsMade = false
+  
+  while unsafe input <= (inputEnd - blockSize) && output <= (outputEnd - (blockSize / 2)) {
+    if let asciiBlock = unsafe allASCIIBlock(at: input) {
+      // All ASCII: transcode directly
+      for i in 0 ..< blockSize {
+        unsafe (output + i).initialize(to: asciiBlock[i])
+      }
+      unsafe input += blockSize
+      unsafe output += blockSize
+    } else {
+      let (success, tmpRepairsMade) = unsafe processNonASCIIChunk(
+        input: &input,
+        inputEnd: inputEnd,
+        output: &output,
+        outputEnd: outputEnd,
+        repairing: repairing
+      )
+      repairsMade = repairsMade && tmpRepairsMade
+      if !success {
+        return unsafe (output - outputStart, repairsMade: repairsMade)
+      }
+    }
+  }
+  // Finish any remaining code units using fallback scalar loop
+  while unsafe input < inputEnd && output < outputEnd {
+    switch unsafe processScalarFallback(
+      input: &input,
+      inputEnd: inputEnd,
+      output: &output,
+      outputEnd: outputEnd,
+      repairing: repairing
+    ) {
+    case (.invalid, let tmpRepairsMade):
+      return unsafe (output - outputStart, repairsMade: repairsMade && tmpRepairsMade)
+    case (_, let tmpRepairsMade):
+      repairsMade = repairsMade && tmpRepairsMade
+    }
+  }
+  return unsafe (output - outputStart, repairsMade: repairsMade)
+}
+
+internal func utf8Length(
+  of UTF16CodeUnits: UnsafeBufferPointer<Unicode.UTF16.CodeUnit>,
+  repairing: Bool = true
+) -> (Int, isASCII: Bool)? {
+  let inCount = UTF16CodeUnits.count
+  guard inCount > 0 else { return (0, isASCII: true) }
+  var input = unsafe UTF16CodeUnits.baseAddress.unsafelyUnwrapped
+  let inputEnd = unsafe input + inCount
+  var count = 0
+  while unsafe input < (inputEnd - blockSize) {
+    if let blockCount = unsafe _utf8CountOfBlock(at: input) {
+      unsafe input += blockSize
+      count &+= blockCount
+    } else {
+      let chunkCount = unsafe withUnsafeTemporaryAllocation(
+        of: UInt8.self, capacity: blockSize * 4 /*max 4 bytes per UTF8 element*/
+      ) { outputBuf -> Int? in
+        var output = unsafe outputBuf.baseAddress.unsafelyUnwrapped
+        let outputStart = unsafe output
+        let outputEnd = unsafe output + outputBuf.count
+        if unsafe !processNonASCIIChunk(
+          input: &input,
+          inputEnd: inputEnd,
+          output: &output,
+          outputEnd: outputEnd,
+          repairing: repairing
+        ).0 {
+          return nil
+        }
+        return unsafe output - outputStart
+      }
+      if let chunkCount {
+        count += chunkCount
+      } else {
+        return nil
+      }
+    }
+  }
+  // Finish any remaining input that didn't fit in a SIMD chunk
+  while unsafe input < inputEnd {
+    let trailingCount = unsafe withUnsafeTemporaryAllocation(
+      of: UInt8.self, capacity: 4 /*max 4 bytes per UTF8 element*/
+    ) { outputBuf -> Int? in
+      var output = unsafe outputBuf.baseAddress.unsafelyUnwrapped
+      let outputStart = unsafe output
+      let outputEnd = unsafe output + outputBuf.count
+      let (scalarFallBackResult, _) = unsafe processScalarFallback(
+        input: &input,
+        inputEnd: inputEnd,
+        output: &output,
+        outputEnd: outputEnd,
+        repairing: repairing
+      )
+      if scalarFallBackResult ~= .invalid {
+        return nil
+      }
+      return unsafe output - outputStart
+    }
+    if let trailingCount {
+      count += trailingCount
+    } else {
+      return nil
+    }
+  }
+  return (count, isASCII: count == inCount)
+}
