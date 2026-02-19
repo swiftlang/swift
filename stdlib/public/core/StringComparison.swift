@@ -564,7 +564,7 @@ internal func isEqual<LHSEncoding: _UnicodeEncoding, RHSEncoding: _UnicodeEncodi
 #if _runtime(_ObjC)
 
 // Logically this should go in StringBridge.swift, but I'd have to make the stuff it calls `internal` instead of `fileprivate` to do that
-@c @_spi(Foundation) public func _unicodeBuffersEqual(
+@c @_spi(Foundation) public func _swift_unicodeBuffersEqual_nonNormalizing(
   bytes rawLHS: UnsafeRawPointer,
   count lhsCount: Int,
   encoding lhsEnc: UInt,
