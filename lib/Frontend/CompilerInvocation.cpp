@@ -3684,7 +3684,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_trap_function))
     Opts.TrapFuncName = Args.getLastArgValue(OPT_trap_function).str();
 
-  Opts.FunctionSections = Args.hasArg(OPT_function_sections);
+  Opts.FunctionSections =
+      (Triple.getObjectFormat() == llvm::Triple::ObjectFormatType::ELF);
+  Opts.FunctionSections = Args.hasFlag(
+      OPT_function_sections, OPT_no_function_sections, Opts.FunctionSections);
 
   Opts.VerboseAsm = Args.hasFlag(OPT_verbose_asm, OPT_no_verbose_asm,
                                  /*default*/ true);
