@@ -1199,18 +1199,18 @@ extension Collection {
       return []
     }
 
-    var result = ContiguousArray<T>()
-    result.reserveCapacity(n)
-
-    var i = self.startIndex
-
-    for _ in 0..<n {
-      result.append(try transform(self[i]))
-      formIndex(after: &i)
-    }
-
-    _expectEnd(of: self, is: i)
-    return Array(result)
+    return try unsafe Array(ContiguousArray<T>(unsafeUninitializedCapacity: n) { (
+      storage: inout UnsafeMutableBufferPointer<T>,
+      initializedCount: inout Int
+    ) throws(E) -> Void in
+      var collectionIndex = self.startIndex
+      for bufferIndex in storage.indices {
+        unsafe storage.initializeElement(at: bufferIndex, to: try transform(self[collectionIndex]))
+        formIndex(after: &collectionIndex)
+        initializedCount += 1
+      }
+      _expectEnd(of: self, is: collectionIndex)
+    })
   }
 
 #if !$Embedded
