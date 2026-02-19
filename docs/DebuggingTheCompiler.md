@@ -61,6 +61,7 @@ benefit of all Swift developers.
     - [Multiple Logs at a Time](#multiple-logs-at-a-time)
 - [Compiler Tools/Options for Bug Hunting](#compiler-toolsoptions-for-bug-hunting)
     - [Using `clang-tidy` to run the Static Analyzer](#using-clang-tidy-to-run-the-static-analyzer)
+    - [Multi-Module Compilation](#multi-module-compilation)
 
 # Debugging the Compiler Itself
 
@@ -1355,4 +1356,8 @@ as follows:
 One can also use shell regex to visit multiple files in the same directory. Example:
 
     clang-tidy -p=$PATH_TO_BUILD/swift-macosx-$(uname -m)/compile_commands.json $FULL_PATH_TO_DIR/*.cpp
+
+## Multi-Module Compilation
+
+For information about quickly compiling minimal multi-module projects without setting up Xcode projects or Swift packages, see [Multi-Module Compilation Guide](HowToGuides/MultiModuleCompilation.md).
 
