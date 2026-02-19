@@ -38,6 +38,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -1891,6 +1892,8 @@ private:
 
   llvm::DIType *createType(DebugTypeInfo DbgTy, StringRef MangledName,
                            llvm::DIScope *Scope, llvm::DIFile *File) {
+    PrettyStackTraceStringAction trace("creating debug info type", MangledName);
+
     // FIXME: For SizeInBits, clang uses the actual size of the type on
     // the target machine instead of the storage size that is alloca'd
     // in the LLVM IR. For all types that are boxed in a struct, we are
@@ -4041,6 +4044,9 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     DebugTypeInfo DbgTy, bool IsLocalToUnit, std::optional<SILLocation> Loc) {
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
+
+  PrettyStackTraceStringAction trace("emitting global",
+                                     Var ? Var->getName() : Name);
 
   llvm::DIType *DITy = getOrCreateType(DbgTy);
   VarDecl *VD = nullptr;
