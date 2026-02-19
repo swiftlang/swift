@@ -8371,6 +8371,12 @@ ActorReferenceResult ActorReferenceResult::Builder::build() {
 
   // The declaration we are accessing is actor-isolated. First, check whether
   // we are on the same actor already.
+  //
+  // NOTE: An important but non-obvious property is that we must use an else if
+  // here and not move isIsolated into this check since
+  // equivalentIsolationContext does not take into account actors which have the
+  // same isolation but differ in terms of actor instance. We want to consider
+  // these to not match.
   if (referencedActor && declIsolation == ActorIsolation::ActorInstance &&
       declIsolation.isActorInstanceForSelfParameter()) {
     // If this instance is isolated, we're in the same concurrency domain.
