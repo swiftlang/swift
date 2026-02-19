@@ -2436,6 +2436,12 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   bool allowNSUIntegerAsInt =
       shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
 
+  // If this function uses 'auto' return type, try to deduce the actual type.
+  if (clangDecl->getReturnType()->isUndeducedType())
+    getClangSema().DeduceReturnType(
+        const_cast<clang::FunctionDecl *>(clangDecl), clangDecl->getLocation(),
+        /*Diagnose=*/false);
+
   // Only eagerly import the return type if it's not too expensive (the current
   // heuristic for that is if it's not a record type).
   ImportDiagnosticAdder addDiag(*this, clangDecl,
