@@ -18,8 +18,6 @@
 #include "Common/NormalizationData.h"
 #endif
 
-#else
-#include "swift/Runtime/Debug.h"
 #endif
 
 #include "UnicodeData.h"

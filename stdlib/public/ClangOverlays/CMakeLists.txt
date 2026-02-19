@@ -3,6 +3,7 @@ if(NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT OR NOT SWIFT_BUILD_
     linker-support/magic-symbols-for-install-name.c
   )
 
+  # EMBEDDED float.swift.gyb
   set(BUILTIN_FLOAT_GYB_SOURCES
     float.swift.gyb
   )
