@@ -7786,7 +7786,15 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
 /// Emit the given expression as an r-value, then (if it is a tuple), combine
 /// it together into a single ManagedValue.
 ManagedValue SILGenFunction::emitRValueAsSingleValue(Expr *E, SGFContext C) {
-  return emitRValue(E, C).getAsSingleValue(*this, E);
+  RValue rv = emitRValue(E, C);
+
+  // If there's an Initialization destination, emit into that.
+  if (auto *init = C.getEmitInto()) {
+    std::move(rv).ensurePlusOne(*this, E).forwardInto(*this, E, init);
+    return ManagedValue::forInContext();
+  }
+
+  return std::move(rv).getAsSingleValue(*this, E);
 }
 
 RValue SILGenFunction::emitUndefRValue(SILLocation loc, Type type) {
