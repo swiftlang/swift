@@ -285,6 +285,49 @@ In the following sections, for simplicity, we will assume that you are using a
 `Ninja-RelWithDebInfoAssert` build on macOS, unless explicitly mentioned otherwise.
 You will need to slightly tweak the paths for other build configurations.
 
+### Building LLDB with Swift support
+
+If you want to build LLDB with support for the Swift language, add
+`--lldb` to the invocation, for instance:
+
+```sh
+utils/build-script --lldb
+```
+
+This will create another directory for `lldb` in the build directory
+(matching `Ninja-RelWithDebInfoAssert/lldb-*`).
+
+You can check that LLDB was built with Swift support by running the following command:
+```sh
+$ Ninja-RelWithDebInfoAssert/lldb-*/bin/lldb  # adapt the path to your build directory
+```
+and then:
+```
+(lldb) language
+Commands specific to a source language.
+
+Syntax: language <language-name> <subcommand> [<subcommand-options>]
+
+Language specific subcommands may be used directly (without the `language
+<language-name>` prefix), when stopped on a frame written in that language. For
+example, from a C++ frame, users may run `demangle` directly, instead of
+`language cplusplus demangle`.
+
+Language specific subcommands are only available when the command name cannot be
+misinterpreted. Take the `demangle` command for example, if a Python command
+named `demangle-tree` were loaded, then the invocation `demangle` would run
+`demangle-tree`, not `language cplusplus demangle`.
+
+
+The following subcommands are supported:
+
+      cplusplus -- Commands for operating on the C++ language runtime.
+      objc      -- Commands for operating on the Objective-C language runtime.
+      swift     -- A set of commands for operating on the Swift Language Runtime.
+
+For more help on any particular subcommand, type 'help <command> <subcommand>'.
+```
+
 ### Troubleshooting build issues
 
 - Double-check that all projects are checked out at the right branches.
