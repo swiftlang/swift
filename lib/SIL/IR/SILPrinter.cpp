@@ -824,8 +824,11 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     return *this;
   }
 
-  bool needPrintTypeFor(SILValue V) {
+  bool shouldPrintType(SILValue V) {
     if (SILPrintTypes)
+      return true;
+
+    if (Ctx.printAllTypes())
       return true;
 
     if (!V)
@@ -862,7 +865,7 @@ public:
   }
 
   SILValuePrinterInfo getIDAndType(SILValue V) {
-    return {Ctx.getID(V), V ? V->getType() : SILType(), needPrintTypeFor(V)};
+    return {Ctx.getID(V), V ? V->getType() : SILType(), shouldPrintType(V)};
   }
   SILValuePrinterInfo getIDAndForcedPrintedType(SILValue V) {
     return {Ctx.getID(V), V ? V->getType() : SILType(), /*needPrintType=*/true};
@@ -902,6 +905,14 @@ public:
 
   void markBlockAsPrinted(const SILBasicBlock *block) {
     printedBlocks.insert(block);
+  }
+
+  bool shouldPrintDebugInfo() {
+    if (SILPrintDebugInfo)
+      return true;
+    if (Ctx.printDebugInfo())
+      return true;
+    return false;
   }
 
   //===--------------------------------------------------------------------===//
@@ -1423,8 +1434,8 @@ public:
     visit(const_cast<SILInstruction*>(I));
 
     // Maybe print debugging information.
-    if (Ctx.printDebugInfo() && !I->isDeleted()
-        && !I->isStaticInitializerInst()) {
+    if (shouldPrintDebugInfo() && !I->isDeleted() &&
+        !I->isStaticInitializerInst()) {
       auto &SM = I->getModule().getASTContext().SourceMgr;
       printDebugLocRef(I->getLoc(), SM);
       printDebugScopeRef(I->getDebugScope(), SM);
@@ -1619,7 +1630,7 @@ public:
       else
         *this << ", var";
 
-      if ((Var->Loc || Var->Scope) && SM && Ctx.printDebugInfo()) {
+      if ((Var->Loc || Var->Scope) && SM && shouldPrintDebugInfo()) {
         *this << ", (name \"" << Var->Name << '"';
         if (Var->Loc)
           printDebugLocRef(*Var->Loc, *SM);
@@ -3615,7 +3626,8 @@ void SILBasicBlock::printID(SILPrintContext &Ctx, bool newline) const {
 
 /// Pretty-print the SILFunction to errs.
 void SILFunction::dump(bool Verbose) const {
-  SILPrintContext Ctx(llvm::errs(), Verbose);
+  SILPrintContext Ctx(llvm::errs(),
+                      {{Verbose, SILPrintContext::Flag::Verbose}});
   print(Ctx);
 }
 
@@ -3690,11 +3702,12 @@ static void printClangQualifiedNameCommentIfPresent(llvm::raw_ostream &OS,
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
-  if (PrintCtx.printDebugInfo()) {
+  SILPrinter P(PrintCtx);
+
+  if (P.shouldPrintDebugInfo()) {
     auto &SM = getModule().getASTContext().SourceMgr;
     for (auto &BB : *this)
       for (auto &I : BB) {
-        SILPrinter P(PrintCtx);
         P.printDebugScope(I.getDebugScope(), SM);
       }
     OS << "\n";
@@ -3708,7 +3721,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
 
   OS << "// " << demangleSymbol(getName());
-  if (PrintCtx.printDebugInfo()) {
+  if (P.shouldPrintDebugInfo()) {
     auto &SM = getModule().getASTContext().SourceMgr;
     SILPrinter P(PrintCtx);
     P.printDebugLocRef(getLocation(), SM);
@@ -3974,7 +3987,8 @@ void SILGlobalVariable::printName(raw_ostream &OS) const {
       
 /// Pretty-print the SILModule to errs.
 void SILModule::dump(bool Verbose) const {
-  SILPrintContext Ctx(llvm::errs(), Verbose);
+  SILPrintContext Ctx(llvm::errs(),
+                      {{Verbose, SILPrintContext::Flag::Verbose}});
   print(Ctx);
 }
 
@@ -3989,7 +4003,7 @@ void SILModule::dump(const char *FileName, bool Verbose,
                      bool PrintASTDecls) const {
   std::error_code EC;
   llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::OF_None);
-  SILPrintContext Ctx(os, Verbose);
+  SILPrintContext Ctx(os, {{Verbose, SILPrintContext::Flag::Verbose}});
   print(Ctx, getSwiftModule(), PrintASTDecls);
 }
 
@@ -4928,22 +4942,12 @@ void KeyPathPatternComponent::print(SILPrintContext &ctxt) const {
 // SILPrintContext members
 //===----------------------------------------------------------------------===//
 
-SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
-                                 bool SortedSIL, bool PrintFullConvention)
-    : OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
-      DebugInfo(SILPrintDebugInfo), PrintFullConvention(PrintFullConvention) {}
-
 SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, const SILOptions &Opts)
-    : OutStream(OS), Verbose(Opts.EmitVerboseSIL),
-      SortedSIL(Opts.EmitSortedSIL),
-      DebugInfo(Opts.PrintDebugInfo || SILPrintDebugInfo),
-      PrintFullConvention(Opts.PrintFullConvention) {}
-
-SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
-                                 bool SortedSIL, bool DebugInfo,
-                                 bool PrintFullConvention)
-    : OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
-      DebugInfo(DebugInfo), PrintFullConvention(PrintFullConvention) {}
+    : OutStream(OS),
+      Options({{Opts.EmitVerboseSIL, Flag::Verbose},
+               {Opts.EmitSortedSIL, Flag::SortedSIL},
+               {Opts.PrintDebugInfo, Flag::DebugInfo},
+               {Opts.PrintFullConvention, Flag::PrintFullConvention}}) {}
 
 void SILPrintContext::setContext(const void *FunctionOrBlock) {
   if (FunctionOrBlock != ContextFunctionOrBlock) {

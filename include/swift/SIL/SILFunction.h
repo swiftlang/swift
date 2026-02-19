@@ -1790,7 +1790,7 @@ public:
   ///
   /// \param Verbose Dump SIL location information in verbose mode.
   void print(raw_ostream &OS, bool Verbose = false) const {
-    SILPrintContext PrintCtx(OS, Verbose);
+    SILPrintContext PrintCtx(OS, {{Verbose, SILPrintContext::Flag::Verbose}});
     print(PrintCtx);
   }
 

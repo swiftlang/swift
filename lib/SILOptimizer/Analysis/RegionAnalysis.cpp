@@ -2223,7 +2223,9 @@ public:
                    Demangle::DemangleOptions::SimplifiedUIDemangleOptions())
             << '\n'
             << PER_FUNCTION_SEP_STR << "Dump:\n";
-        function->print(llvm::dbgs()));
+        SILPrintContext printCtx(llvm::dbgs(),
+                                 {SILPrintContext::Flag::PrintAllTypes});
+        function->print(printCtx));
 
     gatherFlowInsensitiveInformationBeforeDataflow();
 
