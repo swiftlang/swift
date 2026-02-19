@@ -454,6 +454,18 @@ public:
       JobPriority oldPriority, JobPriority newPriority);
 };
 
+class TimeSpentRunningStatusRecord : public TaskStatusRecord {
+public:
+  TimeSpentRunningStatusRecord()
+      : TaskStatusRecord(TaskStatusRecordKind::TimeSpentRunning) {}
+
+  uint64_t TimeSpentRunning = 0;
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::TimeSpentRunning;
+  }
+};
+
 } // end namespace swift
 
 #endif

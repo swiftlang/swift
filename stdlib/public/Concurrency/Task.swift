@@ -1095,6 +1095,46 @@ internal func _getCurrentTaskNameString() -> String? {
   }
 }
 
+// MARK: - Time spent running (experimental)
+
+@available(SwiftStdlib 6.3, *)
+@_silgen_name("_swift_task_getTimeSpentRunning")
+internal func _getTimeSpentRunning(
+  _ task: Builtin.NativeObject,
+  _ outNanoseconds: UnsafeMutablePointer<UInt64>
+) -> Bool
+
+@available(SwiftStdlib 6.3, *)
+@unsafe
+private func _getTimeSpentRunning(_ task: Builtin.NativeObject) -> Duration? {
+  var result = UInt64(0)
+  guard unsafe _getTimeSpentRunning(task, &result) else {
+    return nil
+  }
+  return .nanoseconds(result)
+}
+
+@available(SwiftStdlib 6.3, *)
+extension Task {
+  /// Get the time this task has spent scheduled and running.
+  ///
+  /// This interface is experimental. It may be removed in a future release.
+  public var _timeSpentRunning: Duration? {
+    unsafe _getTimeSpentRunning(_task)
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension UnsafeCurrentTask {
+  /// Get the time this task has spent scheduled and running.
+  ///
+  /// This interface is experimental. It may be removed in a future release.
+  public var _timeSpentRunning: Duration? {
+    unsafe _getTimeSpentRunning(_task)
+  }
+}
+
+// MARK: -
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.8, *)

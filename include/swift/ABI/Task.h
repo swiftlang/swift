@@ -404,7 +404,14 @@ public:
   /// runInExecutorContext.
   SWIFT_CC(swiftasync)
   void runInFullyEstablishedContext() {
-    return ResumeTask(ResumeContext); // 'return' forces tail call
+    if (SWIFT_UNLIKELY(isTimeSpentRunningTracked())) {
+      auto begin = getNanosecondsOnSuspendingClock();
+      ResumeTask(ResumeContext);
+      auto end = getNanosecondsOnSuspendingClock();
+      ranForNanoseconds(end - begin);
+    } else {
+      return ResumeTask(ResumeContext); // 'return' forces tail call
+    }
   }
 
   /// A task can have the following states:
@@ -522,6 +529,28 @@ public:
   /// `swift_task_pushTaskExecutorPreference`, and
   /// `swift_task_popTaskExecutorPreference(record)` method pair.
   void dropInitialTaskExecutorPreferenceRecord();
+
+  // ==== Tracking Time Spent Running ------------------------------------------
+
+  /// Whether or not the concurrency library is tracking the time spent running
+  /// tasks.
+  static inline bool isTimeSpentRunningTracked(void) {
+    return _isTimeSpentRunningTracked.load(std::memory_order_relaxed);
+  }
+
+  /// Set whether or not the concurrency library is tracking the time spent
+  /// running tasks. Returns the old value.
+  static inline bool setTimeSpentRunningTracked(bool isTracked) {
+    return _isTimeSpentRunningTracked.exchange(isTracked,
+                                               std::memory_order_relaxed);
+  }
+
+  /// Get the number of nanoseconds spent running this task so far, or `0` if
+  /// task duration tracking isn't enabled.
+  __attribute__((cold)) uint64_t getTimeSpentRunning(void);
+
+  void pushTimeSpentRunningRecord(void);
+  void popTimeSpentRunningRecord(void);
 
   // ==== Task Local Values ----------------------------------------------------
 
@@ -813,6 +842,17 @@ private:
     return reinterpret_cast<AsyncTask *&>(
         SchedulerPrivate[NextWaitingTaskIndex]);
   }
+
+  /// Whether or not the concurrency library is tracking the time spent running
+  /// tasks.
+  static std::atomic<bool> _isTimeSpentRunningTracked;
+
+  /// Record that the task spent an additional `ns` nanoseconds running.
+  void ranForNanoseconds(uint64_t ns);
+
+  /// Get the current instant on the system's suspending clock to use when
+  /// tracking the time spent running tasks.
+  static uint64_t getNanosecondsOnSuspendingClock(void);
 };
 
 // The compiler will eventually assume these.
