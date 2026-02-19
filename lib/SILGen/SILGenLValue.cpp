@@ -3686,6 +3686,15 @@ void LValue::addNonMemberVarComponent(
       }
 
       if (!address.isLValue()) {
+        // When the `projectedValue` is a struct
+        // within a struct property wrapper that has a mutating setter
+        if (!address.getType().isAddress() &&
+            AccessKind == SGFAccessKind::ReadWrite) {
+          LV.add<ValueComponent>(address.materialize(SGF, Loc), std::nullopt,
+                                 typeData,
+                                 /*rvalue*/ true);
+          return;
+        }
         assert((AccessKind == SGFAccessKind::BorrowedObjectRead
                 || AccessKind == SGFAccessKind::BorrowedAddressRead)
                && "non-borrow component requires an address base");
