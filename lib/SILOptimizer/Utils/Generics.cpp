@@ -2130,15 +2130,14 @@ SILFunction *GenericFuncSpecializer::lookupSpecialization() {
                                   SILLinkage::Shared);
   }
   if (SpecializedF) {
-    if (ReInfo.getSpecializedType() != SpecializedF->getLoweredFunctionType()) {
+    auto expectedTy = ReInfo.getSpecializedType()->getCanonicalType();
+    auto foundTy = SpecializedF->getLoweredFunctionType()->getCanonicalType();
+    if (expectedTy != foundTy) {
       llvm::dbgs() << "Looking for a function: " << ClonedName << "\n"
-                   << "Expected type: " << ReInfo.getSpecializedType() << "\n"
-                   << "Found    type: "
-                   << SpecializedF->getLoweredFunctionType() << "\n";
+                   << "Expected type: " << expectedTy << "\n"
+                   << "Found    type: " << foundTy << "\n";
+      llvm_unreachable("Specialized function does not match expected type.");
     }
-    assert(ReInfo.getSpecializedType()
-           == SpecializedF->getLoweredFunctionType() &&
-           "Previously specialized function does not match expected type.");
     LLVM_DEBUG(llvm::dbgs() << "Found an existing specialization for: "
                             << ClonedName << "\n");
     return SpecializedF;
