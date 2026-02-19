@@ -2802,6 +2802,18 @@ public:
   /// issues. It is at the bottom of the file.
   SILFunction *getCalleeFunction() const;
 
+  /// Returns the SILDeclRef for a referenced function after looking through
+  /// partial_apply, convert_function, and thin_to_thick_function.
+  ///
+  /// If we do not find something that we know how to handle, we return an empty
+  /// SILDeclRef.
+  ///
+  /// This is based off of getCalleeOrigin.
+  ///
+  /// This is defined out of line to work around incomplete definition
+  /// issues. It is next to getCalleeFunction at the bottom of the file.
+  SILDeclRef getCalleeDeclRef() const;
+
   bool isCalleeDynamicallyReplaceable() const;
 
   /// Gets the referenced function if the callee is a function_ref instruction.
