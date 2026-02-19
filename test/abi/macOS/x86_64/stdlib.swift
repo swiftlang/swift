@@ -1180,3 +1180,6 @@ Added: __swift_exclusivityAccessSetNext
 Added: _swift_dereferenceBorrow
 Added: _swift_getBorrowTypeMetadata
 Added: _swift_initBorrow
+
+// Cross-encoding strcmp for Foundation
+Added: _swift_unicodeBuffersEqual_nonNormalizing
