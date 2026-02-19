@@ -138,6 +138,8 @@ public:
 
   void checkGlobalActorAccess(const Decl *D);
 
+  void checkAttachedMacroAccess(const Decl *D);
+
   void checkAvailabilityDomains(const Decl *D, AccessScope accessScope,
                                 AccessLevel contextAccess);
 };
@@ -631,6 +633,30 @@ void AccessControlCheckerBase::checkGlobalActorAccess(const Decl *D) {
       });
 }
 
+void AccessControlCheckerBase::checkAttachedMacroAccess(const Decl *D) {
+  auto VD = dyn_cast<ValueDecl>(D);
+  if (!VD)
+    return;
+
+  AccessScope declAccessScope = VD->getFormalAccessScope(
+      /*useDC=*/nullptr, /*treatUsableFromInlineAsPublic=*/true);
+
+  if (!declAccessScope.isPackage())
+    return;
+
+  AccessLevel accessLevel = declAccessScope.accessLevelForDiagnostics();
+
+  for (auto *customAttr : D->getExpandedAttrs().getAttributes<CustomAttr>()) {
+    auto *macroDecl = customAttr->getResolvedMacro();
+    if (!macroDecl)
+      continue;
+
+    recordRequiredImportAccessLevelForDecl(
+        macroDecl, VD->getDeclContext(), accessLevel,
+        customAttr->getLocation());
+  }
+}
+
 void AccessControlCheckerBase::checkAvailabilityDomains(
     const Decl *D, AccessScope accessScope, AccessLevel contextAccess) {
   auto &ctx = D->getASTContext();
@@ -692,6 +718,7 @@ public:
 
     DeclVisitor<AccessControlChecker>::visit(D);
     checkGlobalActorAccess(D);
+    checkAttachedMacroAccess(D);
     checkAvailabilityDomains(D);
   }
 
@@ -1455,6 +1482,7 @@ public:
 
     DeclVisitor<UsableFromInlineChecker>::visit(D);
     checkGlobalActorAccess(D);
+    checkAttachedMacroAccess(D);
     checkAvailabilityDomains(D);
   }
 
