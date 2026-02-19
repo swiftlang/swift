@@ -36,6 +36,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:explicit-sendable-annotations>
 - <doc:preconcurrency-import>
 - <doc:foreign-reference-type>
+- <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>
 - <doc:isolated-conformances>
 - <doc:error-in-future-swift-version>
@@ -62,6 +63,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:explicit-sendable-annotations>
 - <doc:preconcurrency-import>
 - <doc:foreign-reference-type>
+- <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>
 - <doc:isolated-conformances>
 - <doc:error-in-future-swift-version>

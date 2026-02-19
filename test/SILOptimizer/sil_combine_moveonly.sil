@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits -enable-sil-verify-all -sil-combine %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits -enable-experimental-feature Lifetimes -enable-sil-verify-all -sil-combine %s | %FileCheck %s
 
 // REQUIRES: swift_feature_MoveOnlyEnumDeinits
+// REQUIRES: swift_feature_Lifetimes
 
 sil_stage canonical
 
@@ -209,5 +210,22 @@ bb0(%0 : $*MaybeFileDescriptor):
   destroy_addr %1
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_move_mark_dependence_out_of_scope :
+// CHECK:         mark_dependence
+// CHECK-NEXT:    end_borrow
+// CHECK:       } // end sil function 'dont_move_mark_dependence_out_of_scope'
+sil [ossa] @dont_move_mark_dependence_out_of_scope : $@convention(method) <Element where Element : ~Copyable> (Int, @lifetime(copy 1) @inout Span<Element>) -> @lifetime(borrow 1) @owned Span<Element> {
+bb0(%0 : $Int, %1 : $*Span<Element>):
+  %2 = load_borrow %1
+  %3 = struct_extract %2, #Span._pointer
+  %4 = struct $Span<Element> (%3, %0), forwarding: @owned
+  %5 = mark_dependence [nonescaping] %4 on %2
+  end_borrow %2
+  br bb1
+
+bb1:
+  return %5
 }
 

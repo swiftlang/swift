@@ -678,3 +678,73 @@ bb0(%0 : @guaranteed $String):
 sil_vtable C2 {
   #C2.i!modify: (C2) -> () -> () : @devirt_callee
 }
+
+// Ensure no SIL verification error
+
+// CHECK-LABEL: sil [ossa] @test_pa_lifetime_completion1 :
+// CHECK-NOT: apply
+// CHECK-LABEL: } // end sil function 'test_pa_lifetime_completion1'
+sil [ossa] @test_pa_lifetime_completion1 : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = function_ref @closure : $@convention(thin) (@guaranteed String) -> ()
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@guaranteed String) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = apply %2() : $@callee_guaranteed () -> ()
+  destroy_value %2
+  %6 = tuple ()
+  return %6
+
+bb2:
+  %3a = apply %2() : $@callee_guaranteed () -> ()
+  destroy_value %2
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_pa_lifetime_completion2 :
+// CHECK-NOT: apply
+// CHECK-LABEL: } // end sil function 'test_pa_lifetime_completion2'
+sil [ossa] @test_pa_lifetime_completion2 : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = function_ref @closure : $@convention(thin) (@guaranteed String) -> ()
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@guaranteed String) -> ()
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %3 = apply %2() : $@callee_guaranteed () -> ()
+  br bb1
+
+bb3:
+  destroy_value %2
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @test_pa_lifetime_completion3 :
+// CHECK-NOT: apply
+// CHECK-LABEL: } // end sil function 'test_pa_lifetime_completion3'
+sil [ossa] @test_pa_lifetime_completion3 : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = function_ref @closure : $@convention(thin) (@guaranteed String) -> ()
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@guaranteed String) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = apply %2() : $@callee_guaranteed () -> ()
+  destroy_value %2
+  br bb3
+
+bb2:
+  %3a = apply %2() : $@callee_guaranteed () -> ()
+  destroy_value %2
+  br bb3
+
+bb3:
+  %6 = tuple ()
+  return %6
+}
+

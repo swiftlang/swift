@@ -44,25 +44,74 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   /// debug information and may not correspond to the current state of
   /// the filesystem --- it might even hold a path that only works
   /// from an entirely different machine.
-  public struct SourceLocation: CustomStringConvertible, Sendable, Hashable {
+  public struct SourceLocation
+    : CustomStringConvertible, Sendable, Hashable, Equatable
+  {
     /// The path of the source file.
     public var path: String
 
     /// The line number.
-    public var line: Int
+    public var line: Int { lineRange?.lowerBound ?? 0 }
 
     /// The column number.
-    public var column: Int
+    public var column: Int { columnRange?.lowerBound ?? 0 }
+
+    /// The line range.
+    @_spi(LineColumnRanges)
+    public var lineRange: Range<Int>?
+
+    /// The column range.
+    @_spi(LineColumnRanges)
+    public var columnRange: Range<Int>?
+
+    /// Construct a SourceLocation with a single line/column
+    public init(path: String, line: Int, column: Int = 0) {
+      self.path = path
+      if line > 0 {
+        self.lineRange = line..<line
+      } else {
+        self.lineRange = nil
+      }
+      if column > 0 {
+        self.columnRange = column..<column
+      } else {
+        self.columnRange = nil
+      }
+    }
+
+    /// Construct a SourceLocation with a line/column range
+    @_spi(LineColumnRanges)
+    public init(path: String, lineRange: Range<Int>?, columnRange: Range<Int>?) {
+      self.path = path
+      self.lineRange = lineRange
+      self.columnRange = columnRange
+    }
 
     /// Provide a textual description.
     public var description: String {
-      if column > 0 && line > 0 {
-        return "\(path):\(line):\(column)"
-      } else if line > 0 {
-        return "\(path):\(line)"
-      } else {
-        return path
+      var formatted = path
+
+      if let lineRange {
+        let firstLine = lineRange.lowerBound
+        let lastLine = lineRange.upperBound
+        if firstLine == lastLine {
+          formatted += ":\(firstLine)"
+        } else {
+          formatted += ":\(firstLine)-\(lastLine)"
+        }
+
+        if let columnRange {
+          let firstCol = columnRange.lowerBound
+          let lastCol = columnRange.upperBound
+          if firstCol == lastCol {
+            formatted += ":\(firstCol)"
+          } else {
+            formatted += ":\(firstCol)-\(lastCol)"
+          }
+        }
       }
+
+      return formatted
     }
   }
 
@@ -155,6 +204,11 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     public var isSystemFunction: Bool {
       #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
       if rawName == "start", imageName == "dyld" {
+        return true
+      }
+      #endif
+      #if os(Windows)
+      if rawName == "__scrt_common_main_seh" {
         return true
       }
       #endif
@@ -376,16 +430,14 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   #endif
 
   /// Actually symbolicate.
-  /// Note: if you try to symbolicate a Linux backtrace using the macOS symbolicator (for example),
-  /// this will crash, so it's up to you to use the correct platform.
-  internal static func symbolicate(backtrace: Backtrace,
-                                   images: ImageMap?,
-                                   platform symbolicationPlatform: Backtrace.SymbolicationPlatform,
-                                   alternativeSymbolFilePaths: [String],
-                                   options: Backtrace.SymbolicationOptions
-                                   )
-    -> SymbolicatedBacktrace? {
-
+  internal static func symbolicate(
+    backtrace: Backtrace,
+    images: ImageMap?,
+    platform symbolicationPlatform: Backtrace.SymbolicationPlatform,
+    alternativeSymbolFilePaths: [String],
+    options: Backtrace.SymbolicationOptions,
+    symbolLocator: SymbolLocator = DefaultSymbolLocator.shared
+  ) -> SymbolicatedBacktrace? {
     let theImages: ImageMap
     if let images = images {
       theImages = images
@@ -397,10 +449,56 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
     var frames: [Frame] = []
 
+    func lookupSymbol(
+      symbolSource: (any SymbolSource)?,
+      image: Int,
+      named name: String,
+      frame: Backtrace.Frame,
+      address imageAddr: ImageSource.Address,
+      options: Backtrace.SymbolicationOptions
+    ) -> Symbol? {
+      let address = SymbolSource.Address(imageAddr)
+      guard let symbolSource else {
+        return nil
+      }
+      guard let theSymbol = symbolSource.lookupSymbol(address: address) else {
+        return nil
+      }
+
+      var location: SourceLocation?
+
+      if options.contains(.showSourceLocations)
+           || options.contains(.showInlineFrames) {
+        location = symbolSource.sourceLocation(for: address)
+      } else {
+        location = nil
+      }
+
+      if options.contains(.showInlineFrames) {
+        for inline in symbolSource.inlineCallSites(at: address) {
+          let fakeSymbol = Symbol(imageIndex: image,
+                                  imageName: name,
+                                  rawName: inline.rawName ?? "<unknown>",
+                                  offset: 0,
+                                  sourceLocation: location)
+          frames.append(Frame(captured: frame,
+                              symbol: fakeSymbol,
+                              inlined: true))
+
+          location = inline.location
+        }
+      }
+
+      return Symbol(imageIndex: image,
+                    imageName: name,
+                    rawName: theSymbol.name,
+                    offset: theSymbol.offset,
+                    sourceLocation: location)
+    }
+
     switch symbolicationPlatform {
     case .Darwin:
       #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-
       withSymbolicator(images: theImages,
                       useSymbolCache: options.contains(.useSymbolCache)) {
         symbolicator in
@@ -484,79 +582,29 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                       offset: 0,
                                       sourceLocation: nil)
 
-          func lookupSymbol<ElfImage: ElfSymbolLookupProtocol>(
-            image: ElfImage?,
-            at imageNdx: Int,
-            named name: String,
-            address imageAddr: ImageSource.Address
-          ) -> Symbol? {
-            let address = ElfImage.Traits.Address(imageAddr)
-
-            guard let image = image else {
-              return nil
-            }
-            guard let theSymbol = image.lookupSymbol(address: address) else {
-              return nil
-            }
-
-            var location: SourceLocation?
-
-            if options.contains(.showSourceLocations)
-                || options.contains(.showInlineFrames) {
-              location = try? image.sourceLocation(for: address)
-            } else {
-              location = nil
-            }
-
-            if options.contains(.showInlineFrames) {
-              for inline in image.inlineCallSites(at: address) {
-                let fakeSymbol = Symbol(imageIndex: imageNdx,
-                                        imageName: name,
-                                        rawName: inline.rawName ?? "<unknown>",
-                                        offset: 0,
-                                        sourceLocation: location)
-                frames.append(Frame(captured: frame,
-                                    symbol: fakeSymbol,
-                                    inlined: true))
-
-                location = SourceLocation(path: inline.filename,
-                                          line: inline.line,
-                                          column: inline.column)
-              }
-            }
-
-            return Symbol(imageIndex: imageNdx,
-                          imageName: name,
-                          rawName: theSymbol.name,
-                          offset: theSymbol.offset,
-                          sourceLocation: location)
-          }
-
-          if let hit = cache.lookup(
-            path: theImages[imageNdx].path,
-            alternativePaths: alternativeSymbolFilePaths) {
-
+          if let hit = cache.lookup(path: theImages[imageNdx].path,
+                                    alternativePaths: alternativeSymbolFilePaths) {
+            let symbolSource: (any SymbolSource)?
+            let relativeAddress: ImageSource.Address
             switch hit {
               case let .elf32Image(image):
-                let relativeAddress = ImageSource.Address(
+                symbolSource = symbolLocator.findSymbols(for: image)
+                relativeAddress = ImageSource.Address(
                   address - theImages[imageNdx].baseAddress
                 ) + image.imageBase
-                if let theSymbol = lookupSymbol(image: image,
-                                                at: imageNdx,
-                                                named: name,
-                                                address: relativeAddress) {
-                  symbol = theSymbol
-                }
               case let .elf64Image(image):
-                let relativeAddress = ImageSource.Address(
+                symbolSource = symbolLocator.findSymbols(for: image)
+                relativeAddress = ImageSource.Address(
                   address - theImages[imageNdx].baseAddress
                 ) + image.imageBase
-                if let theSymbol = lookupSymbol(image: image,
-                                                at: imageNdx,
-                                                named: name,
-                                                address: relativeAddress) {
-                  symbol = theSymbol
-                }
+            }
+            if let theSymbol = lookupSymbol(symbolSource: symbolSource,
+                                            image: imageNdx,
+                                            named: name,
+                                            frame: frame,
+                                            address: relativeAddress,
+                                            options: options) {
+              symbol = theSymbol
             }
           }
 
@@ -566,8 +614,6 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
         frames.append(Frame(captured: frame, symbol: nil))
       }
-
-      break
 
     case .Windows:
       let cache = PeImageCache.threadLocal
@@ -583,60 +629,18 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                       offset: 0,
                                       sourceLocation: nil)
 
-          func lookupSymbol(
-            image: PeCoffImage?,
-            at imageNdx: Int,
-            named name: String,
-            address: ImageSource.Address
-          ) -> Symbol? {
-            guard let image else {
-              return nil
-            }
-            guard let theSymbol = image.lookupSymbol(address: address) else {
-              return nil
-            }
-
-            var location: SourceLocation?
-
-            if options.contains(.showSourceLocations)
-                || options.contains(.showInlineFrames) {
-              location = try? image.sourceLocation(for: address)
-            } else {
-              location = nil
-            }
-
-            if options.contains(.showInlineFrames) {
-              for inline in image.inlineCallSites(at: address) {
-                let fakeSymbol = Symbol(imageIndex: imageNdx,
-                                        imageName: name,
-                                        rawName: inline.rawName ?? "<unknown>",
-                                        offset: 0,
-                                        sourceLocation: location)
-                frames.append(Frame(captured: frame,
-                                    symbol: fakeSymbol,
-                                    inlined: true))
-
-                location = SourceLocation(path: inline.filename,
-                                          line: inline.line,
-                                          column: inline.column)
-              }
-            }
-
-            return Symbol(imageIndex: imageNdx,
-                          imageName: name,
-                          rawName: theSymbol.name,
-                          offset: theSymbol.offset,
-                          sourceLocation: location)
-          }
-
-          if let image = cache.lookup(path: theImages[imageNdx].path) {
+          if let image = cache.lookup(path: theImages[imageNdx].path,
+                                      alternativePaths: alternativeSymbolFilePaths) {
+            let symbolSource = symbolLocator.findSymbols(for: image)
             let relativeAddress = ImageSource.Address(
               address - theImages[imageNdx].baseAddress
             ) + image.baseAddress
-            if let theSymbol = lookupSymbol(image: image,
-                                            at: imageNdx,
+            if let theSymbol = lookupSymbol(symbolSource: symbolSource,
+                                            image: imageNdx,
                                             named: name,
-                                            address: relativeAddress) {
+                                            frame: frame,
+                                            address: relativeAddress,
+                                            options: options) {
               symbol = theSymbol
             }
           }
@@ -647,8 +651,6 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
         frames.append(Frame(captured: frame, symbol: nil))
       }
-
-      break
 
     }
 

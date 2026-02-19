@@ -217,7 +217,7 @@ public:
 
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0,
-            bool details = true) const;
+            bool details = true) const LLVM_ATTRIBUTE_USED;
 
   void print(llvm::raw_ostream &out) const;
 
