@@ -23,7 +23,7 @@ internal func _swift_stdlib_getUnsafeArgvArgc(_: UnsafeMutablePointer<Int32>)
 private func _withExecutablePath(_ body: (UnsafePointer<CWideChar>, Int) -> Void)
 #else
 @_silgen_name("_swift_stdlib_withExecutablePath")
-private func _withExecutablePath(_ body: (UnsafePointer<CChar, Int) -> Void)
+private func _withExecutablePath(_ body: (UnsafePointer<CChar>, Int) -> Void)
 #endif
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
