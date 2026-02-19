@@ -108,4 +108,6 @@ public func repeatElement<T>(_ element: T, count n: Int) -> Repeated<T> {
   return Repeated(_repeating: element, count: n)
 }
 
+extension Repeated: BitwiseCopyable where Element: BitwiseCopyable {}
+
 extension Repeated: Sendable where Element: Sendable { }
