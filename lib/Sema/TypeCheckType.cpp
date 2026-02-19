@@ -2052,9 +2052,11 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
 
   // Short-circuiting.
   if (repr->isInvalid()) return ErrorType::get(ctx);
-  // Reject explicit syntax like `(some P).T`, but allow member type lookup on
-  // opaque archetypes introduced by generic requirements.
-  if (repr->getBase()->hasOpaque()) {
+  // Reject member type access only when the base is explicitly written as an
+  // opaque type, e.g. `(some P).T`.
+  auto *baseRepr = repr->getBase()->getWithoutParens();
+  if (isa<OpaqueReturnTypeRepr>(baseRepr) ||
+      isa<NamedOpaqueReturnTypeRepr>(baseRepr)) {
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       diags.diagnose(repr->getNameLoc(),
                      diag::opaque_type_member_type,
