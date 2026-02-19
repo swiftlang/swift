@@ -1435,6 +1435,9 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
 bool BindingSet::operator<(const BindingSet &other) {
   if (CS.getASTContext().TypeCheckerOpts.SolverEnableBindingOptimizations &&
       !CS.shouldAttemptFixes()) {
+    if (isConflicting() != other.isConflicting())
+      return isConflicting();
+
     unsigned xExactBindings = getNumExactBindings();
     unsigned yExactBindings = other.getNumExactBindings();
 
@@ -2784,6 +2787,8 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     attributes.push_back("delayed");
   if (isDirty())
     attributes.push_back("dirty");
+  if (isConflicting())
+    attributes.push_back("conflicting");
   if (!attributes.empty()) {
     out << "[attributes: ";
     interleave(attributes, out, ", ");
