@@ -5,10 +5,10 @@ struct BadContainer1 {
 }
 
 func bad_containers_1(bc: BadContainer1) {
-  for e in bc { } // expected-error{{for-in loop requires 'BadContainer1' to conform to 'Sequence'}}
+  for e in bc { } // expected-error {{for-in loop requires 'BadContainer1' to conform to 'BorrowingSequence'}}
 }
 
-struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol 'Sequence'}}
+struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol 'BorrowingSequence'}} expected-error {{type 'BadContainer2' does not conform to protocol 'Sequence'}} expected-note {{add stubs for conformance}}
   var generate : Int
 }
 
@@ -16,7 +16,7 @@ func bad_containers_2(bc: BadContainer2) {
   for e in bc { }
 }
 
-struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}}
+struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol 'BorrowingSequence'}} expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}} expected-note {{add stubs for conformance}}
   func makeIterator() { } // expected-note{{candidate can not infer 'Iterator' = '()' because '()' is not a nominal type and so can't conform to 'IteratorProtocol'}}
 }
 
@@ -26,7 +26,7 @@ func bad_containers_3(bc: BadContainer3) {
 
 struct BadIterator1 {}
 
-struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}} expected-note {{add stubs for conformance}}
+struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'BorrowingSequence'}} expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}} expected-note {{add stubs for conformance}}
   typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'BadContainer4.Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> BadIterator1 { }
 }
@@ -171,7 +171,7 @@ func testMatchingPatterns() {
 // <rdar://problem/21662365> QoI: diagnostic for for-each over an optional sequence isn't great
 func testOptionalSequence() {
   let array : [Int]?
-  for x in array {  // expected-error {{for-in loop requires '[Int]?' to conform to 'Sequence'; did you mean to unwrap optional?}}
+  for x in array {  // expected-error {{for-in loop requires '[Int]?' to conform to 'BorrowingSequence'; did you mean to unwrap optional?}}
   }
 }
 
@@ -260,7 +260,7 @@ func test_no_ambiguity_with_prefix_iterator<C: Collection>(c: C) {
 // Make sure we produce a meaningful diagnostic here.
 do {
   for (x, y) in (0, 0) {}
-  // expected-error@-1 {{for-in loop requires '(Int, Int)' to conform to 'Sequence'}}
+  // expected-error@-1 {{for-in loop requires '(Int, Int)' to conform to 'BorrowingSequence'}}
 }
 
 // rdar://100343275 - Sema is accepting incorrect code which leads to a crash in SILGen
@@ -402,7 +402,7 @@ func testFlatMap() {
 }
 
 func testInvalidContainerNotInScope(){
-  for x in (a,b) {} // expected-error {{for-in loop requires '(_, _)' to conform to 'Sequence'}}
+  for x in (a,b) {} // expected-error {{for-in loop requires '(_, _)' to conform to 'BorrowingSequence'}}
   // expected-error@-1 {{cannot find 'a' in scope}} 
   // expected-error@-2 {{cannot find 'b' in scope}}
 }

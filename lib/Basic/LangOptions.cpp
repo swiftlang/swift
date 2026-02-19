@@ -41,6 +41,7 @@ LangOptions::LangOptions() {
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
 #define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
+  enableFeature(Feature::BorrowingForLoop);
 
   // Special case: remove macro support if the compiler wasn't built with a
   // host Swift.

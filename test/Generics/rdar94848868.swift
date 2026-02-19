@@ -18,6 +18,8 @@ struct MyCollectionIterator<MyCollection: MyCollectionProtocol>: IteratorProtoco
 
 struct MyCollection: MyCollectionProtocol {
 // expected-error@-1 {{type 'MyCollection' does not conform to protocol 'Collection'}}
+// expected-error@-2 {{type 'MyCollection' does not conform to protocol 'Sequence'}}
+// expected-error@-3 {{type 'MyCollection' does not conform to protocol 'BorrowingSequence'}}
     struct Element {}
 
     var startIndex: Int { fatalError() }

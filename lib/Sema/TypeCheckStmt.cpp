@@ -3472,7 +3472,7 @@ public:
         (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
       return nullptr;
 
-    isBorrowing = isBorrowing && !seqType->isExistentialType();
+    isBorrowing = !isAsync && isBorrowing && !seqType->isExistentialType();
 
     sequenceProto =
         isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
@@ -3480,6 +3480,17 @@ public:
                        ? ctx.getProtocol(KnownProtocolKind::BorrowingSequence)
                        : ctx.getProtocol(KnownProtocolKind::Sequence));
     seqConformanceRef = lookupConformance(seqType, sequenceProto);
+    if (isBorrowing && seqConformanceRef.isConcrete() &&
+        seqConformanceRef.getConcrete()->getSourceKind() !=
+            ConformanceEntryKind::Explicit) {
+      ProtocolConformanceRef tmpSeqConf = lookupConformance(
+          seqType, ctx.getProtocol(KnownProtocolKind::Sequence));
+      if (!tmpSeqConf.isInvalid()) {
+        seqConformanceRef = tmpSeqConf;
+        sequenceProto = ctx.getProtocol(KnownProtocolKind::Sequence);
+        isBorrowing = false;
+      }
+    }
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
     buildMakeIteratorVar();

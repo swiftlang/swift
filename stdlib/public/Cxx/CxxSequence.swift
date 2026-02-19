@@ -24,6 +24,11 @@ public protocol CxxSequence<Element>: CxxConvertibleToCollection, Sequence {
     where RawIterator.Pointee == Element
   override associatedtype Iterator = CxxIterator<Self>
 
+  @available(SwiftStdlib 6.3, *)
+  override associatedtype BorrowingIterator:
+    BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable
+      = BorrowingIteratorAdapter<Iterator>
+
   // `begin()` and `end()` have to be mutating, otherwise calling 
   // `self.sequence.begin()` will copy `self.sequence` into a temporary value,
   // and the result will be dangling. This does not mean that the implementing

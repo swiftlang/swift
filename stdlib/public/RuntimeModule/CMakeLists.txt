@@ -102,7 +102,8 @@ set(runtime_compile_flags
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
   "-Xcc;-I${CMAKE_BINARY_DIR}/include"
   "-Xcc;-I${SWIFT_STDLIB_SOURCE_DIR}/public/RuntimeModule/modules"
-  "-disable-upcoming-feature;MemberImportVisibility")
+  "-disable-upcoming-feature;MemberImportVisibility"
+  "-Xfrontend;-disable-availability-checking")
 
 ###TODO: Add these when we add static linking support
 #

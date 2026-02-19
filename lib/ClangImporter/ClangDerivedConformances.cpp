@@ -831,7 +831,7 @@ static void conformToCxxBorrowingSequenceIfNedded(
   // CxxBorrowingSequence protocol. This type is currently
   // `CxxBorrowingIterator<Self>`.
   auto borrowingIteratorDecl = cxxBorrowingSequenceProto->getAssociatedType(
-      ctx.getIdentifier("_BorrowingIterator"));
+      ctx.getIdentifier("BorrowingIterator"));
   if (!borrowingIteratorDecl)
     return;
   auto borrowingIteratorNominal =
@@ -853,7 +853,7 @@ static void conformToCxxBorrowingSequenceIfNedded(
   if (dereferenceResultTy && dereferenceResultTy->getAnyPointerElementType()) {
     // Only conform to CxxBorrowingSequence if `__operatorStar` returns
     // `UnsafePointer<Pointee>`. Otherwise, we can't create a span for pointee.
-    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("_BorrowingIterator"),
+    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("BorrowingIterator"),
                                  borrowingIteratorTy);
     impl.addSynthesizedProtocolAttrs(decl,
                                      {KnownProtocolKind::CxxBorrowingSequence});
@@ -936,7 +936,11 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
         return Type(dependentType);
       },
       LookUpConformanceInModule());
+
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.Id_Iterator, iteratorTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
+                               rawIteratorTy);
 
   // Not conforming the type to CxxSequence protocol here:
   // The current implementation of CxxSequence triggers extra copies of the C++
