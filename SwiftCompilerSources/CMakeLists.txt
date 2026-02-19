@@ -217,7 +217,7 @@ function(add_swift_compiler_modules_library name)
     # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
     list(APPEND swift_compile_options "-Xcc" "-Xclang" "-Xcc" "-fmodule-format=raw")
 
-  elseif(swift_exec_bin_dir MATCHES ".*/swiftly/bin")
+  elseif(swift_exec_bin_dir MATCHES ".*/swiftly/bin" OR swift_exec_bin_dir STREQUAL "$ENV{SWIFTLY_BIN_DIR}")
     # Detect and handle swiftly-managed hosts.
     execute_process(COMMAND swiftly use --print-location
       OUTPUT_VARIABLE swiftly_dir
