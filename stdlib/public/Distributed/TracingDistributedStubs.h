@@ -37,7 +37,11 @@ inline void distributed_execute_distributed_target(HeapObject *localTargetActor,
 
 inline void distributed_find_accessible_function(const char *targetName,
                                                  size_t targetNameLength,
-                                                 const void *func) {
+                                                 const void *accessibleFunctionRecord,
+                                                 const char *funcName,
+                                                 const char *funcType,
+                                                 const void *genericEnv,
+                                                 const void *funcPtr) {
 }
 
 inline void distributed_invoke_result_handler(HeapObject *localTargetActor,

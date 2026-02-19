@@ -26,11 +26,21 @@ using namespace swift;
 
 static const AccessibleFunctionRecord *
 findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
-  auto func = runtime::swift_findAccessibleFunction(targetNameStart, targetNameLength);
-  assert(!func || func->Flags.isDistributed() && "Found distributed accessor was not 'distributed'!");
+  auto record = runtime::swift_findAccessibleFunction(targetNameStart, targetNameLength);
 
-  distributed::trace::distributed_find_accessible_function(targetNameStart, targetNameLength, func);
-  return func;
+  if (distributed::trace::distributed_trace_is_enabled()) {
+    distributed::trace::distributed_find_accessible_function(
+        targetNameStart, targetNameLength,
+        record,
+        record ? record->Name.get()                : nullptr,
+        record ? record->FunctionType.get()        : nullptr,
+        record ? record->GenericEnvironment.get()  : nullptr,
+        record ? *record->Function.get()           : nullptr
+    );
+  }
+
+  assert(!record || record->Flags.isDistributed() && "Found distributed accessor was not 'distributed'!");
+  return record;
 }
 
 

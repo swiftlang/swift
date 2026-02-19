@@ -44,9 +44,10 @@
 // * Change event names.
 // * Change subsystem names.
 
-#define SWIFT_LOG_DISTRIBUTED_FIND_ACCESSIBLE_FUNCTION_NAME "distributed_find_accessible_function"
 #define SWIFT_LOG_DISTRIBUTED_REMOTE_CALL_OUTBOUND_NAME "distributed_remote_call_outbound"
+
 #define SWIFT_LOG_DISTRIBUTED_EXECUTE_TARGET_NAME "distributed_execute_distributed_target"
+#define SWIFT_LOG_DISTRIBUTED_FIND_ACCESSIBLE_FUNCTION_NAME "distributed_find_accessible_function"
 #define SWIFT_LOG_DISTRIBUTED_RESULT_HANDLER_NAME "distributed_invoke_result_handler"
 
 namespace swift {
@@ -138,9 +139,12 @@ inline void distributed_execute_distributed_target(HeapObject *localTargetActor,
       targetIdentifier ? targetIdentifier : "<unknown>");
 }
 
-inline void distributed_find_accessible_function(const char *targetName,
-                                                 size_t targetNameLength,
-                                                 const void *func) {
+inline void distributed_find_accessible_function(const char *targetName, size_t targetNameLength,
+                                                 const void *accessibleFunctionRecord,
+                                                 const char *funcName,
+                                                 const char *funcType,
+                                                 const void *genericEnv,
+                                                 const void *funcPtr) {
   ENSURE_LOGS();
 
   if (!os_signpost_enabled(DistributedLog))
@@ -150,13 +154,18 @@ inline void distributed_find_accessible_function(const char *targetName,
   os_signpost_event_emit(
       DistributedLog, id, SWIFT_LOG_DISTRIBUTED_FIND_ACCESSIBLE_FUNCTION_NAME,
       "inbound"
-      " targetFunction=%{public}.*s"
-      " found=%{bool}d"
+      " targetName=%{public}.*s"
+      " accessibleFunctionRecord=%p"
+      " funcName=%{public}s"
+      " funcType=%{public}s"
+      " genericEnv=%p"
       " funcPtr=%p",
-      (int)targetNameLength,
-      targetName ? targetName : "<unknown>",
-      func != nullptr,
-      func);
+      (int)targetNameLength, targetName ? targetName : "<no-name>",
+      accessibleFunctionRecord,
+      funcName ? funcName : "<not found>",
+      funcType ? funcType : "<not found>",
+      genericEnv,
+      funcPtr);
 }
 
 inline void distributed_invoke_result_handler(HeapObject *localTargetActor,

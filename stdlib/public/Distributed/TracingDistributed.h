@@ -49,7 +49,11 @@ void distributed_execute_distributed_target(HeapObject *localTargetActor,
 /// Emitted when `swift_findAccessibleFunction` has found (or not) a distributed function accessor.
 void distributed_find_accessible_function(const char *targetName,
                                           size_t targetNameLength,
-                                          const void *func);
+                                          const void *accessibleFunctionRecord,
+                                          const char *funcName,
+                                          const char *funcType,
+                                          const void *genericEnv,
+                                          const void *funcPtr);
 
 /// Emitted when a result handler is invoked after execution of a local distributed call target completes.
 ///
