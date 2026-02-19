@@ -1249,6 +1249,13 @@ public:
                                    SourceKitCancellationToken CancellationToken,
                                    CategorizedEditsReceiver Receiver) = 0;
 
+  virtual void getObjCSelector(StringRef PrimaryFilePath,
+                               StringRef InputBufferName,
+                               unsigned Offset,
+                               ArrayRef<const char *> Args,
+                               SourceKitCancellationToken CancellationToken,
+                               std::function<void(const RequestResult<std::string> &)> Receiver) = 0;
+
   virtual void collectExpressionTypes(
       StringRef PrimaryFilePath, StringRef InputBufferName,
       ArrayRef<const char *> Args, ArrayRef<const char *> ExpectedProtocols,
