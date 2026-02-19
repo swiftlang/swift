@@ -130,6 +130,10 @@ struct PotentialBinding {
 
   Constraint *getSource() const { return cast<Constraint *>(BindingSource); }
 
+  PotentialBinding withKind(AllowedBindingKind kind) const {
+    return {BindingType, kind, BindingSource, Originator};
+  }
+
   PotentialBinding withType(Type type) const {
     return {type, Kind, BindingSource, Originator};
   }
@@ -173,18 +177,18 @@ struct LiteralRequirement {
   Constraint *Source;
   /// The default type associated with this literal (if any).
   Type DefaultType;
-  /// Determines whether this literal is a direct requirement
-  /// of the current type variable.
-  bool IsDirectRequirement;
+  /// When set indicates that this is not a direct requirement
+  /// of the current type variable and points to its originator.
+  TypeVariableType *TransitiveFrom;
 
   /// If the literal is covered by existing type binding,
   /// this points to the source of the binding.
   mutable Constraint *CoveredBy = nullptr;
 
-  LiteralRequirement(ProtocolDecl *protocol, Constraint *source,
-                     Type defaultTy, bool isDirect)
+  LiteralRequirement(ProtocolDecl *protocol, Constraint *source, Type defaultTy,
+                     TypeVariableType *transitiveFrom)
       : Protocol(protocol), Source(source), DefaultType(defaultTy),
-        IsDirectRequirement(isDirect) {}
+        TransitiveFrom(transitiveFrom) {}
 
   Constraint *getSource() const { return Source; }
 
@@ -192,11 +196,7 @@ struct LiteralRequirement {
 
   bool isCovered() const { return bool(CoveredBy); }
 
-  bool isDirectRequirement() const { return IsDirectRequirement; }
-
-  void setDirectRequirement(bool isDirectRequirement) {
-    IsDirectRequirement = isDirectRequirement;
-  }
+  bool isDirectRequirement() const { return !TransitiveFrom; }
 
   bool hasDefaultType() const { return bool(DefaultType); }
 
@@ -233,6 +233,10 @@ struct LiteralRequirement {
   /// Determines whether literal protocol associated with this
   /// meta-information is viable for inclusion as a defaultable binding.
   bool viableAsBinding() const { return !isCovered() && hasDefaultType(); }
+
+  LiteralRequirement asTransitive(TypeVariableType *originator) {
+    return {Protocol, Source, DefaultType, originator};
+  }
 
 private:
   bool isCoveredBy(Type type, ConstraintSystem &CS) const;
@@ -310,14 +314,22 @@ struct PotentialBindings {
     return Protocols;
   }
 
-  void inferFromLiteral(Constraint *literal);
+  /// Attempt to infer a literal requirement from the given `LiteralConformsTo`
+  /// constraint.
+  ///
+  /// \param literal The constraint to process.
+  /// \param isDirect Determines whether this is a direct requirement of the
+  /// current type variable or constraint has been transitively inferred.
+  ///
+  /// \returns true if new literal was added to the set and false otherwise.
+  bool inferFromLiteral(Constraint *literal, TypeVariableType *transitiveFrom);
 
   /// Attempt to infer a new binding and other useful information
   /// (i.e. whether bindings should be delayed) from the given
   /// relational constraint.
   std::optional<PotentialBinding> inferFromRelational(Constraint *constraint);
 
-  void infer(Constraint *constraint);
+  std::optional<PotentialBinding> infer(Constraint *constraint);
 
   /// Retract all bindings and other information related to a given
   /// constraint from this binding set.

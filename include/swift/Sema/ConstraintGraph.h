@@ -45,6 +45,11 @@ class ConstraintGraph;
 class ConstraintSystem;
 class TypeVariableBinding;
 
+/// Sets a traversal direction for subtype/supertype chains.
+/// Primarily used in conjunction with the transitive binding
+/// inference.
+enum class ChainDirection : uint8_t { Subtypes, Supertypes };
+
 /// A single node in the constraint graph, which represents a type variable.
 class ConstraintGraphNode {
 public:
@@ -89,6 +94,14 @@ public:
     return Potential;
   }
 
+  ArrayRef<TypeVariableType *> supertypeOf() const {
+    return SupertypeOf.getArrayRef();
+  }
+
+  ArrayRef<TypeVariableType *> subtypeOf() const {
+    return SubtypeOf.getArrayRef();
+  }
+
   void initBindingSet();
 
   inference::BindingSet &getBindingSet() {
@@ -104,13 +117,13 @@ public:
     Set.reset();
   }
 
-private:
   /// Determines whether the type variable associated with this node
   /// is a representative of an equivalence class.
   ///
   /// Note: The smallest equivalence class is of just one variable - itself.
   bool forRepresentativeVar() const;
 
+private:
   /// Retrieve all of the type variables in the same equivalence class
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClassUnsafe() const;
@@ -150,6 +163,37 @@ private:
   /// to a type variable.
   void retractFromInference();
 
+  /// Remove the potential transitive bindings matching the given source
+  /// constraint from the current node and all of its subtypes or supertypes
+  /// depending on the given `direction`.
+  void retractAllTransitiveBindingsFrom(Constraint *constraint,
+                                        ChainDirection direction);
+
+  /// Remove the potential transitive bindings matching the given
+  /// originator type variable from the current node and all of its
+  /// subtypes or supertypes depending on the given `direction`.
+  void retractAllTransitiveBindingsFrom(
+      llvm::SmallPtrSetImpl<TypeVariableType *> &typeVars,
+      ChainDirection direction);
+
+  /// Remove the potential transitive bindings matching the given predicate
+  /// from the current node.
+  void retractTrasitiveBindings(
+      llvm::function_ref<bool(const inference::PotentialBinding &binding)>
+          matching);
+
+  /// Remove the potential transitive bindings matching the given predicate
+  /// from the current node and all of its supertypes.
+  void retractAllTransitiveBindings(
+      llvm::function_ref<bool(const inference::PotentialBinding &binding)>
+          matching,
+      ChainDirection direction);
+
+  /// Attempt to infer bindings from the constraint. The inferred bindings
+  /// would have to be removed once the constraint gets retracted from the
+  /// graph.
+  void introduceToInference(Constraint *constraint);
+
   /// Perform graph updates that must be undone before we bind a fixed type
   /// to a type variable.
   ///
@@ -159,6 +203,13 @@ private:
   /// a conformance lookup), so inference has to be delayed until its clear that
   /// type variable has been bound to a valid type and solver can make progress.
   void introduceToInference(Type fixedType);
+
+  /// Record the potential binding that was transitively inferred from
+  /// one of the chain members and propagate it up or down depending on
+  /// the `propagateTo` parameter.
+  void
+  introduceTransitive(inference::PotentialBinding binding,
+                      std::optional<ChainDirection> propagateTo = std::nullopt);
 
   /// Notify all of the type variables that have this one (or any member of
   /// its equivalence class) referenced in their fixed type.
@@ -175,7 +226,33 @@ private:
   /// Notify all of the type variables referenced by this one about a change.
   void notifyReferencedVars(
       llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
+
+public: // public to enable unit tests.
+  /// Notify all of the type variables that are in a subtype relationship
+  /// with this one.
+  ///
+  /// For example, consider $T1 <: $T2 <: $T3, if current type variable is
+  /// $T3 this method would notify $T2 and $T3.
+  void notifySubtypes(
+      llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
+
+  /// Notify all of the type variables that are in a supertype relationship
+  /// with this one.
+  /// For example, consider $T1 <: $T2 <: $T3, if current type variable is
+  /// $T1 this method would notify $T2 and $T3.
+  void notifySupertypes(
+      llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
   /// }
+
+private:
+  /// If the given constraint represents a subtype/supertype relationship
+  /// between this type variable and some other one, let's note that in the
+  /// node.
+  ///
+  /// \param constraint The constraint that is either added or removed.
+  /// \param retraction Indicates whether the given constraint is being
+  /// removed from the graph.
+  void updateTypeVariableAssociations(Constraint *constraint, bool retraction);
 
   /// The constraint graph this node belongs to.
   ConstraintGraph &CG;
@@ -206,6 +283,13 @@ private:
   /// The set of type variables that occur within the fixed binding of
   /// this type variable.
   llvm::SmallSetVector<TypeVariableType *, 2> References;
+
+  /// The set of type variables that are connected to this type variable
+  /// via a Subtype constraint where this type variable appears on the right.
+  llvm::SmallSetVector<TypeVariableType *, 2> SupertypeOf;
+  /// The set of type variables that are connected to this type variable
+  /// via a Subtype constraint where this type variable appears on the left.
+  llvm::SmallSetVector<TypeVariableType *, 2> SubtypeOf;
 
   /// All of the type variables in the same equivalence class as this
   /// representative type variable.
@@ -275,7 +359,7 @@ public:
   ///
   /// This records graph changes that must be undone after the merge has
   /// been undone.
-  void mergeNodesPre(TypeVariableType *typeVar2);
+  void mergeNodesPre(TypeVariableType *repr, TypeVariableType *member);
 
   /// Merge the two nodes for the two given type variables.
   ///
@@ -386,6 +470,9 @@ public:
     if (orphaned)
       OrphanedConstraints.push_back(orphaned);
   }
+
+  /// Check whether transitive binding feature is enabled for this graph.
+  bool supportsTransitiveInference() const;
 
   /// Print the graph.
   void print(ArrayRef<TypeVariableType *> typeVars, llvm::raw_ostream &out);

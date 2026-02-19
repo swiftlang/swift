@@ -118,24 +118,31 @@ private:
   BindingKind Kind;
   Type BindingType;
   bool Viable;
-  PrintableBinding(BindingKind kind, Type bindingType, bool viable)
-      : Kind(kind), BindingType(bindingType), Viable(viable) {}
+  TypeVariableType *Originator;
+
+  PrintableBinding(BindingKind kind, Type bindingType, bool viable,
+                   TypeVariableType *originator)
+      : Kind(kind), BindingType(bindingType), Viable(viable),
+        Originator(originator) {}
 
 public:
-  static PrintableBinding supertypesOf(Type binding) {
-    return PrintableBinding{BindingKind::Supertypes, binding, true};
+  static PrintableBinding supertypesOf(Type binding,
+                                       TypeVariableType *originator) {
+    return PrintableBinding{BindingKind::Supertypes, binding, true, originator};
   }
 
-  static PrintableBinding subtypesOf(Type binding) {
-    return PrintableBinding{BindingKind::Subtypes, binding, true};
+  static PrintableBinding subtypesOf(Type binding,
+                                     TypeVariableType *originator) {
+    return PrintableBinding{BindingKind::Subtypes, binding, true, originator};
   }
 
-  static PrintableBinding exact(Type binding) {
-    return PrintableBinding{BindingKind::Exact, binding, true};
+  static PrintableBinding exact(Type binding, TypeVariableType *originator) {
+    return PrintableBinding{BindingKind::Exact, binding, true, originator};
   }
 
-  static PrintableBinding literalDefaultType(Type binding, bool viable) {
-    return PrintableBinding{BindingKind::Literal, binding, viable};
+  static PrintableBinding literalDefaultType(Type binding, bool viable,
+                                             TypeVariableType *originator) {
+    return PrintableBinding{BindingKind::Literal, binding, viable, originator};
   }
 
   void print(llvm::raw_ostream &out, const PrintOptions &PO,
@@ -157,6 +164,11 @@ public:
       BindingType.print(out, PO);
     if (!Viable)
       out << " [literal not viable]";
+    if (Originator) {
+      out << " [transitive from ";
+      Originator->print(out, PO);
+      out << "]";
+    }
   }
 };
 
@@ -166,13 +178,13 @@ void PotentialBinding::print(llvm::raw_ostream &out,
                              const PrintOptions &PO) const {
   switch (Kind) {
   case AllowedBindingKind::Exact:
-    PrintableBinding::exact(BindingType).print(out, PO);
+    PrintableBinding::exact(BindingType, Originator).print(out, PO);
     break;
   case AllowedBindingKind::Supertypes:
-    PrintableBinding::supertypesOf(BindingType).print(out, PO);
+    PrintableBinding::supertypesOf(BindingType, Originator).print(out, PO);
     break;
   case AllowedBindingKind::Subtypes:
-    PrintableBinding::subtypesOf(BindingType).print(out, PO);
+    PrintableBinding::subtypesOf(BindingType, Originator).print(out, PO);
     break;
   }
 }
@@ -383,8 +395,19 @@ bool BindingSet::isPotentiallyIncomplete() const {
           Info.EquivalentTo,
           [&](const std::pair<TypeVariableType *, Constraint *> &equivalence) {
             auto *constraint = equivalence.second;
-            return constraint->getKind() == ConstraintKind::BindParam &&
-                   constraint->getSecondType()->isEqual(TypeVar);
+            if (constraint->getKind() == ConstraintKind::BindParam) {
+              if (constraint->getSecondType()->isEqual(TypeVar))
+                return true;
+              // Left-hand side of the bind constraint is an interface
+              // parameter type. If there are no direct bindings,
+              // it's not sufficiently resolved yet.
+              if (!Bindings.empty() &&
+                  llvm::all_of(Bindings, [](const auto &binding) {
+                    return binding.isTransitive();
+                  }))
+                return true;
+            }
+            return false;
           }))
     return true;
 
@@ -659,12 +682,16 @@ void BindingSet::inferTransitiveSupertypeBindings() {
       if (!seenLiterals.insert(protocol).second)
         continue;
 
-      literal.setDirectRequirement(false);
-      Literals.push_back(literal);
+      Literals.push_back(literal.isDirectRequirement()
+                             ? literal.asTransitive(entry.first)
+                             : literal);
     }
 
     // TODO: We shouldn't need this in the future.
     if (entry.second->getKind() != ConstraintKind::Subtype)
+      continue;
+
+    if (CS.Options.contains(ConstraintSystemFlags::EnableTransitiveInference))
       continue;
 
     for (auto &binding : bindings.Bindings) {
@@ -1084,15 +1111,15 @@ void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
   }
 }
 
-void PotentialBindings::inferFromLiteral(Constraint *constraint) {
+bool PotentialBindings::inferFromLiteral(Constraint *constraint,
+                                         TypeVariableType *transitiveFrom) {
   ASSERT(TypeVar);
-  ASSERT(isDirectRequirement(CS, TypeVar, constraint));
 
   auto *protocol = constraint->getProtocol();
 
   for (const auto &literal : Literals) {
     if (literal.getProtocol() == protocol)
-      return;
+      return false;
   }
   
   Type defaultType;
@@ -1106,9 +1133,11 @@ void PotentialBindings::inferFromLiteral(Constraint *constraint) {
   // from `Change::undo`, that's necessary because we only record
   // a constraint.
   if (CS.solverState && !CS.solverState->Trail.isUndoActive())
-    CS.recordChange(SolverTrail::Change::AddedLiteral(TypeVar, constraint));
+    CS.recordChange(
+        SolverTrail::Change::AddedLiteral(TypeVar, constraint, transitiveFrom));
 
-  Literals.emplace_back(protocol, constraint, defaultType, /*isDirect=*/true);
+  Literals.emplace_back(protocol, constraint, defaultType, transitiveFrom);
+  return true;
 }
 
 bool BindingSet::operator==(const BindingSet &other) {
@@ -1136,7 +1165,7 @@ bool BindingSet::operator==(const BindingSet &other) {
 
     if (x.Source != y.Source ||
         x.DefaultType.getPointer() != y.DefaultType.getPointer() ||
-        x.IsDirectRequirement != y.IsDirectRequirement) {
+        x.isDirectRequirement() != y.isDirectRequirement()) {
       return false;
     }
   }
@@ -1201,12 +1230,14 @@ bool BindingSet::operator<(const BindingSet &other) {
   // for "subtype" type variable to attempt more bindings later.
   // This is required because algorithm can't currently infer
   // bindings for subtype transitively through superclass ones.
-  if (!(std::get<0>(xScore) && std::get<0>(yScore))) {
-    if (Info.isSubtypeOf(other.getTypeVariable()))
-      return false;
+  if (!CS.Options.contains(ConstraintSystemFlags::EnableTransitiveInference)) {
+    if (!(std::get<0>(xScore) && std::get<0>(yScore))) {
+      if (Info.isSubtypeOf(other.getTypeVariable()))
+        return false;
 
-    if (other.Info.isSubtypeOf(getTypeVariable()))
-      return true;
+      if (other.Info.isSubtypeOf(getTypeVariable()))
+        return true;
+    }
   }
 
   // As a last resort, let's check if the bindings are
@@ -2060,11 +2091,12 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
-void PotentialBindings::infer(Constraint *constraint) {
+std::optional<PotentialBinding>
+PotentialBindings::infer(Constraint *constraint) {
   ASSERT(TypeVar);
 
   if (!Constraints.insert(constraint))
-    return;
+    return std::nullopt;
 
   // Record the change, if there are active scopes.
   if (CS.solverState)
@@ -2089,7 +2121,7 @@ void PotentialBindings::infer(Constraint *constraint) {
       break;
 
     addPotentialBinding(*binding);
-    break;
+    return binding;
   }
   case ConstraintKind::KeyPathApplication: {
     // If this variable is in the application projected result type, delay
@@ -2143,7 +2175,19 @@ void PotentialBindings::infer(Constraint *constraint) {
     if (!isDirectRequirement(CS, TypeVar, constraint))
       break;
 
-    inferFromLiteral(constraint);
+    if (!inferFromLiteral(constraint, /*transitiveFrom=*/nullptr))
+      break;
+
+    if (CS.Options.contains(ConstraintSystemFlags::EnableTransitiveInference)) {
+      auto defaultType =
+          TypeChecker::getDefaultType(constraint->getProtocol(), CS.DC);
+      // Create a binding and propagate it up supertype chain. This binding
+      // might not have a type but it doesn't matter since it would be converted
+      // to a LiteralRequirement on the other side.
+      return PotentialBinding(defaultType, AllowedBindingKind::Exact,
+                              constraint);
+    }
+
     break;
   }
 
@@ -2253,6 +2297,8 @@ void PotentialBindings::infer(Constraint *constraint) {
     break;
   }
   }
+
+  return std::nullopt;
 }
 
 void PotentialBindings::retract(Constraint *constraint) {
@@ -2291,8 +2337,10 @@ void PotentialBindings::retract(Constraint *constraint) {
                       [&](const LiteralRequirement &literal) {
                         if (literal.getSource() == constraint) {
                           if (CS.solverState) {
-                            CS.recordChange(SolverTrail::Change::RetractedLiteral(
-                                TypeVar, constraint));
+                            CS.recordChange(
+                                SolverTrail::Change::RetractedLiteral(
+                                    TypeVar, constraint,
+                                    literal.TransitiveFrom));
                           }
                           return true;
                         }
@@ -2553,24 +2601,24 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   for (const auto &binding : Bindings) {
     switch (binding.Kind) {
     case AllowedBindingKind::Exact:
-      potentialBindings.push_back(PrintableBinding::exact(binding.BindingType));
+      potentialBindings.push_back(
+          PrintableBinding::exact(binding.BindingType, binding.Originator));
       break;
     case AllowedBindingKind::Supertypes:
-      potentialBindings.push_back(
-          PrintableBinding::supertypesOf(binding.BindingType));
+      potentialBindings.push_back(PrintableBinding::supertypesOf(
+          binding.BindingType, binding.Originator));
       break;
     case AllowedBindingKind::Subtypes:
-      potentialBindings.push_back(
-          PrintableBinding::subtypesOf(binding.BindingType));
+      potentialBindings.push_back(PrintableBinding::subtypesOf(
+          binding.BindingType, binding.Originator));
       break;
     }
   }
   for (const auto &literal : Literals) {
     potentialBindings.push_back(PrintableBinding::literalDefaultType(
-        literal.hasDefaultType()
-        ? literal.getDefaultType()
-        : Type(),
-        literal.viableAsBinding()));
+        literal.hasDefaultType() ? literal.getDefaultType() : Type(),
+        literal.viableAsBinding(),
+        /*originator=*/nullptr));
   }
   if (potentialBindings.empty()) {
     out << "<none>";
@@ -2587,8 +2635,8 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     interleave(
         Defaults,
         [&](Constraint *constraint) {
-          auto defaultBinding =
-              PrintableBinding::exact(constraint->getSecondType());
+          auto defaultBinding = PrintableBinding::exact(
+              constraint->getSecondType(), /*originator=*/nullptr);
           defaultBinding.print(out, PO);
         },
         [&] { out << ", "; });
