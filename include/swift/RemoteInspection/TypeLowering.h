@@ -176,6 +176,14 @@ struct FieldInfo {
   int Value;
   const TypeRef *TR;
   const TypeInfo &TI;
+  /// For indirect enum cases, this stores the declared payload type.
+  const TypeRef *IndirectPayloadTR;
+
+  FieldInfo(const std::string &Name, unsigned Offset, int Value,
+            const TypeRef *TR, const TypeInfo &TI,
+            const TypeRef *IndirectPayloadTR = nullptr)
+      : Name(Name), Offset(Offset), Value(Value), TR(TR), TI(TI),
+        IndirectPayloadTR(IndirectPayloadTR) {}
 };
 
 /// Builtins and (opaque) imported value types
