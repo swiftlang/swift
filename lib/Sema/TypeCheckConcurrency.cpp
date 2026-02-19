@@ -2033,63 +2033,6 @@ static bool memberAccessHasSpecialPermissionInSwift5(
   return false;
 }
 
-/// To support flow-isolation, some member accesses in inits / deinits
-/// must be permitted, despite the isolation of 'self' not being
-/// correct in Sema.
-///
-/// \param refCxt the context in which the member reference happens.
-/// \param baseActor the actor referenced in the base of the member access.
-/// \param member the declaration corresponding to the accessed member.
-/// \param memberLoc the source location of the reference to the member.
-///
-/// \returns true iff the member access is permitted in Sema because it will
-/// be verified later by flow-isolation.
-static bool checkedByFlowIsolation(const DeclContext *refCxt,
-                                   ReferencedActor &baseActor,
-                                   ValueDecl *member, SourceLoc memberLoc,
-                                   std::optional<VarRefUseEnv> useKind) {
-
-  // base of member reference must be `self`
-  if (!baseActor.isSelf())
-    return false;
-
-  // Must be directly in an init/deinit that uses flow-isolation,
-  // or a defer within such a functions.
-  //
-  // NOTE: once flow-isolation can analyze calls to arbitrary local
-  // functions, we should be using isActorInitOrDeInitContext instead
-  // of this ugly loop.
-  AbstractFunctionDecl *fnDecl = nullptr;
-  while (true) {
-    fnDecl = dyn_cast_or_null<AbstractFunctionDecl>(
-        const_cast<DeclContext *>(refCxt)->getAsDecl());
-    if (!fnDecl)
-      break;
-
-    // go up one level if this context is a defer.
-    if (auto *d = dyn_cast<FuncDecl>(fnDecl)) {
-      if (d->isDeferBody()) {
-        refCxt = refCxt->getParent();
-        continue;
-      }
-    }
-    break;
-  }
-
-  if (memberAccessHasSpecialPermissionInSwift5(refCxt, baseActor, member,
-                                               memberLoc, useKind))
-    return true; // then permit it now.
-
-  if (!usesFlowSensitiveIsolation(fnDecl))
-    return false;
-
-  // Stored properties are definitely OK.
-  if (isNonInheritedStorage(member, fnDecl))
-    return true;
-
-  return false;
-}
-
 /// Get the actor isolation of the innermost relevant context.
 static ActorIsolation getInnermostIsolatedContext(
     const DeclContext *dc,
@@ -8321,7 +8264,67 @@ struct ActorReferenceResult::Builder {
 
   ValueDecl *getDecl() const { return declRef.getDecl(); }
   ActorReferenceResult build();
+
+  /// To support flow-isolation, some member accesses in inits / deinits
+  /// must be permitted, despite the isolation of 'self' not being
+  /// correct in Sema.
+  ///
+  /// \param refCxt the context in which the member reference happens.
+  /// \param baseActor the actor referenced in the base of the member access.
+  /// \param member the declaration corresponding to the accessed member.
+  /// \param memberLoc the source location of the reference to the member.
+  ///
+  /// \returns true iff the member access is permitted in Sema because it will
+  /// be verified later by flow-isolation.
+  bool checkedByFlowIsolation(const DeclContext *refCxt,
+                              ReferencedActor &baseActor, ValueDecl *member,
+                              SourceLoc memberLoc,
+                              std::optional<VarRefUseEnv> useKind);
 };
+
+bool ActorReferenceResult::Builder::checkedByFlowIsolation(
+    const DeclContext *refCxt, ReferencedActor &baseActor, ValueDecl *member,
+    SourceLoc memberLoc, std::optional<VarRefUseEnv> useKind) {
+  // base of member reference must be `self`
+  if (!baseActor.isSelf())
+    return false;
+
+  // Must be directly in an init/deinit that uses flow-isolation,
+  // or a defer within such a functions.
+  //
+  // NOTE: once flow-isolation can analyze calls to arbitrary local
+  // functions, we should be using isActorInitOrDeInitContext instead
+  // of this ugly loop.
+  AbstractFunctionDecl *fnDecl = nullptr;
+  while (true) {
+    fnDecl = dyn_cast_or_null<AbstractFunctionDecl>(
+        const_cast<DeclContext *>(refCxt)->getAsDecl());
+    if (!fnDecl)
+      break;
+
+    // go up one level if this context is a defer.
+    if (auto *d = dyn_cast<FuncDecl>(fnDecl)) {
+      if (d->isDeferBody()) {
+        refCxt = refCxt->getParent();
+        continue;
+      }
+    }
+    break;
+  }
+
+  if (memberAccessHasSpecialPermissionInSwift5(refCxt, baseActor, member,
+                                               memberLoc, useKind))
+    return true; // then permit it now.
+
+  if (!usesFlowSensitiveIsolation(fnDecl))
+    return false;
+
+  // Stored properties are definitely OK.
+  if (isNonInheritedStorage(member, fnDecl))
+    return true;
+
+  return false;
+}
 
 ActorReferenceResult ActorReferenceResult::Builder::build() {
   auto *const decl = declRef.getDecl();
