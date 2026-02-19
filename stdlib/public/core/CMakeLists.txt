@@ -334,9 +334,6 @@ endif()
 # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concise-pound-file")
 
-# Temporarily disable availability checking during BorrowingSequence development
-list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-disable-availability-checking")
-
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
