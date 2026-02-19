@@ -315,7 +315,7 @@ do {
 
     for i in min(1,2) { // expected-error{{for-in loop requires 'Int' to conform to 'Sequence'}}
     }
-    let j = min(Int(3), Float(2.5)) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. 'Float')}}
+    let j = min(Int(3), Float(2.5)) // expected-error{{conflicting arguments to generic parameter 'T' ('Float' vs. 'Int')}}
     let k = min(A(), A()) // expected-error{{global function 'min' requires that 'A' conform to 'Comparable'}}
     let oi : Int? = 5
     let l = min(3, oi) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}

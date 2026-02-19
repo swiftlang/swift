@@ -573,42 +573,6 @@ public:
 
   unsigned getNumViableLiteralBindings() const;
 
-  unsigned getNumViableDefaultableBindings() const {
-    if (isDirectHole())
-      return 1;
-
-    auto numDefaultable = llvm::count_if(
-        Defaults, [](Constraint *constraint) {
-          return constraint->getKind() == ConstraintKind::Defaultable;
-        });
-
-    // Short-circuit unviable checks if there are no defaultable bindings.
-    if (numDefaultable == 0)
-      return 0;
-
-    // Defaultable constraint is unviable if its type is covered by
-    // an existing direct or transitive binding.
-    auto unviable =
-        llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
-          auto type = binding.BindingType->getCanonicalType();
-          for (auto *constraint : Defaults) {
-            if (constraint->getSecondType()->isEqual(type)) {
-              return constraint->getKind() == ConstraintKind::Defaultable;
-            }
-          }
-          return false;
-        });
-
-    assert(numDefaultable >= unviable);
-    return numDefaultable - unviable;
-  }
-
-  unsigned getNumExactBindings() const {
-    return llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
-      return binding.Kind == AllowedBindingKind::Exact;
-    });
-  }
-
   ASTNode getAssociatedCodeCompletionToken() const {
     return Info.AssociatedCodeCompletionToken;
   }
@@ -621,10 +585,6 @@ public:
     for (auto *typeVar : AdjacentVars)
       callback(typeVar);
   }
-
-  /// Return a literal requirement that has the most impact on the binding
-  /// score.
-  LiteralBindingKind getLiteralForScore() const;
 
   /// Check if this binding is favored over a disjunction e.g.
   /// if it has only concrete types or would resolve a closure.
@@ -674,8 +634,6 @@ public:
   /// Handle diagnostics of unresolved member chains.
   void finalizeUnresolvedMemberChainResult();
 
-  static BindingScore formBindingScore(const BindingSet &b);
-
   bool operator==(const BindingSet &other) const;
 
   bool operator!=(const BindingSet &other) const {
@@ -710,6 +668,52 @@ private:
   void addBinding(PotentialBinding binding);
 
   void addDefault(Constraint *constraint);
+
+  /// Promote certain bindings into a simpler form based on this type variable's
+  /// adjacent conformance constraints.
+  void checkConformanceConstraints();
+
+  unsigned getNumViableDefaultableBindings() const {
+    if (isDirectHole())
+      return 1;
+
+    auto numDefaultable = llvm::count_if(
+        Defaults, [](Constraint *constraint) {
+          return constraint->getKind() == ConstraintKind::Defaultable;
+        });
+
+    // Short-circuit unviable checks if there are no defaultable bindings.
+    if (numDefaultable == 0)
+      return 0;
+
+    // Defaultable constraint is unviable if its type is covered by
+    // an existing direct or transitive binding.
+    auto unviable =
+        llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
+          auto type = binding.BindingType->getCanonicalType();
+          for (auto *constraint : Defaults) {
+            if (constraint->getSecondType()->isEqual(type)) {
+              return constraint->getKind() == ConstraintKind::Defaultable;
+            }
+          }
+          return false;
+        });
+
+    assert(numDefaultable >= unviable);
+    return numDefaultable - unviable;
+  }
+
+  unsigned getNumExactBindings() const {
+    return llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
+      return binding.Kind == AllowedBindingKind::Exact;
+    });
+  }
+
+  /// Return a literal requirement that has the most impact on the binding
+  /// score.
+  LiteralBindingKind getLiteralForScore() const;
+
+  static BindingScore formBindingScore(const BindingSet &b);
 
   StringRef getLiteralBindingKind(LiteralBindingKind K) const {
 #define ENTRY(Kind, String)                                                    \

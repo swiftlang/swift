@@ -83,6 +83,8 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
     }
   }
 
+  checkConformanceConstraints();
+
   ASSERT(!IsDirty);
 }
 
@@ -1510,6 +1512,129 @@ bool BindingSet::operator<(const BindingSet &other) {
     Storage.emplace_back(typeVar, originator);                                 \
   }
 #include "swift/Sema/CSTrail.def"
+
+void BindingSet::checkConformanceConstraints() {
+  // Disable performance optimization in diagnostic mode.
+  if (CS.shouldAttemptFixes())
+    return;
+
+  if (!CS.getASTContext().TypeCheckerOpts.SolverEnableBindingOptimizations)
+    return;
+
+  if (Protocols.empty())
+    return;
+
+  // FIXME
+  if (canBeNil())
+    return;
+
+  bool conflicting = false;
+  std::optional<PotentialBinding> promoteBinding;
+
+  for (const auto &binding : Bindings) {
+    switch (binding.Kind) {
+    case AllowedBindingKind::Exact: {
+      // If an exact binding type doesn't conform to a protocol, our type
+      // variable's adjacent constraints are mutually unsatisfiable, and
+      // our partial solution so far is contradictory.
+      auto type = binding.BindingType->getWithoutSpecifierType();
+      bool conforms = llvm::all_of(Protocols,
+          [&](ProtocolDecl *proto) -> bool {
+            return !CS.lookupConformance(type, proto).isInvalid();
+          });
+      if (!conforms) {
+        // Our partial solution so far is contradictory. Promote this
+        // binding to attempt immediately.
+        conflicting = true;
+        promoteBinding = binding;
+        // Preserve the binding kind, which is Exact.
+        break;
+      }
+      break;
+    }
+    case AllowedBindingKind::Subtypes: {
+      // It is possible that T does not conform to P, but some subtype of T
+      // does, so in general we cannot do anything here. However, handle
+      // the special case of a subtype binding to T? where T? does not
+      // conform to P, but T does. This reduces to a subtype binding to T.
+      if (auto objectType = binding.BindingType->getOptionalObjectType()) {
+        bool objectConforms = llvm::any_of(Protocols,
+            [&](ProtocolDecl *proto) -> bool {
+              return (!CS.lookupConformance(objectType, proto).isInvalid() &&
+                      CS.lookupConformance(binding.BindingType, proto).isInvalid());
+            });
+        if (objectConforms) {
+          promoteBinding = binding;
+          promoteBinding->BindingType = objectType;
+          // Preserve the binding kind of Subtypes. However, addBinding()
+          // might upgrade it to Exact if the object type has no
+          // proper subtypes.
+          break;
+        }
+      }
+      break;
+    }
+    case AllowedBindingKind::Supertypes: {
+      // If we have X conv $T0, $T0 conforms P, we can check if X
+      // has to conform to P. If it has to, but it doesn't, then
+      // his type variable's adjacent constraints are mutually
+      // unsatisfiable.
+      bool conforms = llvm::all_of(Protocols,
+          [&](ProtocolDecl *proto) -> bool {
+            return checkTransitiveSupertypeConformance(
+                  CS, binding.BindingType, proto);
+          });
+
+      if (!conforms) {
+        // Our partial solution so far is contradictory. Promote this
+        // binding to attempt immediately.
+        conflicting = true;
+        promoteBinding = binding;
+        promoteBinding->Kind = AllowedBindingKind::Exact;
+        break;
+      }
+      
+      // If we have X conv $T0, $T0 conforms P, and X has no
+      // supertypes other than AnyHashable, Optional<T>, and
+      // the existentials, we can promote the binding to an
+      // exact binding.
+      if (!hasProperSupertypes(binding.BindingType)) {
+        bool condition = llvm::any_of(Protocols,
+            [&](ProtocolDecl *proto) {
+          return (!proto->existentialConformsToSelf() &&
+                  CS.isConformanceTransitiveForSupertype(
+                    ConversionBehavior::None, proto));
+        });
+
+        if (condition) {
+          promoteBinding = binding;
+          promoteBinding->Kind = AllowedBindingKind::Exact;
+          break;
+        }
+      }
+      break;
+    }
+    case AllowedBindingKind::Fallback:
+      // FIXME: Figure out what to do here.
+      break;
+    }
+
+    if (promoteBinding.has_value())
+      break;
+  }
+
+  if (!promoteBinding.has_value()) {
+    ASSERT(!conflicting);
+    return;
+  }
+
+  if (conflicting) {
+    ASSERT(promoteBinding->Kind == AllowedBindingKind::Exact);
+    markConflicting();
+  }
+
+  addBinding(*promoteBinding);
+}
 
 const BindingSet *ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.

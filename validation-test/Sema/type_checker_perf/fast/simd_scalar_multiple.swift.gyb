@@ -1,4 +1,4 @@
-// RUN: %scale-test --invert --begin 1 --end 7 --step 1 --select NumLeafScopes %s
+// RUN: %scale-test --begin 1 --end 7 --step 1 --select LargestNumSolverScopes %s
 // REQUIRES: asserts,no_asan
 
 func f(c: Float, a: SIMD2<Float>) -> SIMD2<Float> {
