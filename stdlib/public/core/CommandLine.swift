@@ -20,10 +20,10 @@ internal func _swift_stdlib_getUnsafeArgvArgc(_: UnsafeMutablePointer<Int32>)
 
 #if os(Windows)
 @_silgen_name("_swift_stdlib_withExecutablePath")
-private func _withExecutablePath(_ body: (UnsafePointer<CWideChar>) -> Void)
+private func _withExecutablePath(_ body: (UnsafePointer<CWideChar>, Int) -> Void)
 #else
 @_silgen_name("_swift_stdlib_withExecutablePath")
-private func _withExecutablePath(_ body: (UnsafePointer<CChar>) -> Void)
+private func _withExecutablePath(_ body: (UnsafePointer<CChar, Int) -> Void)
 #endif
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
@@ -157,13 +157,13 @@ extension CommandLine {
     // small and updates its *bufsize argument to the required value. Call it
     // once to get the buffer size before allocating.
     var byteCount = UInt32(0)
-    guard unsafe 0 == _NSGetExecutablePath(nil, &byteCount) else {
+    guard unsafe _NSGetExecutablePath(nil, &byteCount) == 0 else {
       return nil
     }
     let result = unsafe ContiguousArray(
       unsafeUninitializedCapacity: Int(byteCount)
     ) { buffer, initializedCount in
-      if (unsafe 0 == _NSGetExecutablePath(buffer.baseAddress!, &byteCount)) {
+      if unsafe _NSGetExecutablePath(buffer.baseAddress!, &byteCount) == 0 {
         initializedCount = Int(byteCount)
       }
     }
@@ -199,14 +199,9 @@ extension CommandLine {
     var result: ContiguousArray<CChar>?
 #endif
 
-    unsafe _withExecutablePath { path in
+    unsafe _withExecutablePath { path, length in
       if unsafe path.pointee != 0 {
-#if os(Windows)
-        let count = unsafe wcslen(path)
-#else
-        let count = unsafe strlen(path)
-#endif
-        let buffer = unsafe UnsafeBufferPointer(start: path, count: count)
+        let buffer = unsafe UnsafeBufferPointer(start: path, count: length)
         result = unsafe ContiguousArray(buffer)
       }
     }
