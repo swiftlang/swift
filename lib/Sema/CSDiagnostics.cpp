@@ -5102,10 +5102,16 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
     Diag->highlight(getSourceRange());
 
-    if (Name.isSimpleName(DeclBaseName::createConstructor()) &&
-        !baseTy->is<AnyMetatypeType>()) {
-      if (auto ctorRef = getAsExpr<UnresolvedDotExpr>(getRawAnchor())) {
-        SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
+    if (!baseTy->is<AnyMetatypeType>() &&
+        (baseTy->isExistentialType() || baseTy->isOpaqueType())) {
+
+      SourceRange fixItRng;
+      if (const auto *SE = getAsExpr<SubscriptExpr>(getRawAnchor()))
+        fixItRng = SE->getBase()->getSourceRange();
+      else if (const auto UDE = getAsExpr<UnresolvedDotExpr>(getRawAnchor()))
+        fixItRng = UDE->getBase()->getSourceRange();
+
+      if (fixItRng) {
         Diag->fixItInsert(fixItRng.Start, "type(of: ");
         Diag->fixItInsertAfter(fixItRng.End, ")");
         return true;
