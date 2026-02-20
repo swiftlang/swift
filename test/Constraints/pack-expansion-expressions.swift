@@ -783,6 +783,55 @@ do {
       }
     }
   }
+
+  // reject expressions with each applied, that contain an expression with each applied in their sub-expression
+  do {
+    struct G<each T> {
+      func f<U>(_: U) -> (repeat each T) {}
+
+      func g(_ t: repeat each T) {
+      _ = (repeat each f(each t))
+        // expected-error@-1:19 {{'each' cannot be applied to an expression containing 'each'}}
+        // expected-note@-2:26 {{inner 'each' applied here}}
+      }
+    }
+
+    // with wrapping
+    struct G2<each T> {
+        func f<U>(_: U) -> (repeat each T) {}
+        func wrap<U>(_ u: U) -> U { u }
+    
+        func g(_ t: repeat each T) {
+            let _ = (repeat each f(wrap(each t)))
+            // expected-error@-1:29 {{'each' cannot be applied to an expression containing 'each'}}
+            // expected-note@-2:41 {{inner 'each' applied here}}
+        }
+    }
+
+    // multiple args
+    struct G3<each T> {
+        func f<U, V>(_: U, _: V) -> (repeat each T) {}
+    
+        func g(t: repeat each T, u: repeat each T) {
+            let _ = (repeat each f(each t, each u))
+            // expected-error@-1:29 {{'each' cannot be applied to an expression containing 'each'}}
+            // expected-note@-2:36 {{inner 'each' applied here}}
+            // expected-note@-3:44 {{inner 'each' applied here}}
+        }
+    }
+
+    // Test for when a value pack of functions should be wrapped.
+    // This is still caught by value_pack_requires_keyword_each but now we also raise an error for nesting.
+    // TODO: create a specialized diagnostic for packs of functions that need to be wrapped in parens
+    // https://github.com/swiftlang/swift/issues/87223
+    func bar<each I, each O>(a: repeat each I, f: repeat (each I) -> each O) -> (repeat each O) {
+      return (repeat each f(each a));
+      // expected-error@-1 {{'each' cannot be applied to non-pack type 'τ_1_1'}}
+      // expected-error@-2 {{value pack '(each I) -> each O' must be referenced with 'each'}}
+      // expected-error@-3 {{'each' cannot be applied to an expression containing 'each'}}
+      // expected-note@-4 {{inner 'each' applied here}}
+    }
+  }
 }
 
 // https://github.com/swiftlang/swift/issues/79623

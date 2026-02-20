@@ -2010,6 +2010,22 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose \c each applied to a pack that contains another \c each applied
+/// pack as a sub-expression.
+class PackElementWithNesting final : public FailureDiagnostic {
+  llvm::SmallVector<PackElementExpr *, 4> innerPackElements;
+
+public:
+  PackElementWithNesting(
+      const Solution &solution,
+      llvm::SmallVector<PackElementExpr *, 4> innerPackElements,
+      ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        innerPackElements(innerPackElements) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose pack references outside of pack expansion expressions.
 class InvalidPackReference final : public FailureDiagnostic {
   Type packType;

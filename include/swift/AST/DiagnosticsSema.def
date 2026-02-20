@@ -6411,6 +6411,12 @@ ERROR(pack_reference_outside_expansion,none,
 ERROR(each_non_pack,none,
       "'each' cannot be applied to non-pack type %0",
       (Type))
+ERROR(nested_each_not_allowed,none,
+      "'each' cannot be applied to an expression containing 'each'",
+      ())
+NOTE(note_inner_each,none,
+      "inner 'each' applied here",
+      ())
 ERROR(pack_reference_must_be_in_expansion,none,
       "pack reference %0 requires expansion using keyword 'repeat'",
       (TypeRepr*))

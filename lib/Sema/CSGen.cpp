@@ -358,6 +358,9 @@ namespace {
     /// A stack of pack expansions that can open pack elements.
     llvm::SmallVector<PackExpansionExpr *, 1> OuterExpansions;
 
+    /// A stack of pack elements to diagnose illegal nesting.
+    llvm::SmallVector<PackElementExpr *, 1> PackElements;
+
     /// Returns false and emits the specified diagnostic if the member reference
     /// base is a nil literal. Returns true otherwise.
     bool isValidBaseOfMemberRef(Expr *base, Diag<> diagnostic) {
@@ -703,6 +706,10 @@ namespace {
 
       auto expansionType = PackExpansionType::get(patternType, shapeTypeVar);
       CS.setType(expr, expansionType);
+    }
+
+    void pushPackElementExpr(PackElementExpr *expr) {
+      PackElements.push_back(expr);
     }
 
     /// Records a fix for an invalid AST node, and returns a hole for it.
@@ -2774,6 +2781,22 @@ namespace {
       auto *packExpansion = CS.getPackElementExpansion(expr);
       auto elementType = openPackElement(
           packType, CS.getConstraintLocator(expr), packExpansion);
+
+      // This pack element should have been pushed before visit was called.
+      assert(PackElements.size() > 0 &&
+             "Pack element being visited should be in PackElements");
+      PackElements.pop_back();
+
+      // This expression is a sub-expression of another PackElementExpr if there
+      // are still elements on the stack.
+      if (!PackElements.empty()) {
+        PackElementExpr *outerPackElement = PackElements.back();
+        PackElementExpr *innerPackElement = expr;
+
+        CS.recordFix(AllowPackElementWithNesting::create(
+            CS, innerPackElement, CS.getConstraintLocator(outerPackElement)));
+      }
+
       if (packExpansion) {
         auto expansionType =
             CS.getType(packExpansion)->castTo<PackExpansionType>();
@@ -3856,6 +3879,10 @@ namespace {
 
       if (auto *expansion = dyn_cast<PackExpansionExpr>(expr)) {
         CG.pushPackExpansionExpr(expansion);
+      }
+
+      if (auto *element = dyn_cast<PackElementExpr>(expr)) {
+        CG.pushPackElementExpr(element);
       }
 
       return Action::Continue(expr);
