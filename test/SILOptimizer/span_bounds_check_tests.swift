@@ -342,3 +342,13 @@ public func inout_span_sum_iterate_to_unknown_with_trap_dontopt(_ v: inout Span<
   return sum
 }
 
+// CHECK-SIL-LABEL: sil @$s23span_bounds_check_tests0A21_count_propogate_testSiyF : $@convention(thin) () -> Int {
+// CHECK-SIL:  [[ZERO:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK-SIL:  [[ZERO_INT:%.*]] = struct $Int ([[ZERO]])
+// CHECK-SIL:  return [[ZERO_INT]]
+// CHECK-SIL-LABEL: } // end sil function '$s23span_bounds_check_tests0A21_count_propogate_testSiyF'
+public func span_count_propogate_test() -> Int {
+  let array = [0]
+  return array.span[0]
+}
+
