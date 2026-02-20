@@ -871,12 +871,18 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     if (options & TypeResolutionFlags::AllowUnspecifiedTypes)
       return PlaceholderType::get(Context, P);
 
-    Context.Diags.diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
+    // If the variable was already marked invalid (e.g., because a more
+    // specific diagnostic like computed_property_missing_type was already
+    // emitted during parsing), suppress the redundant error.
     if (auto named = dyn_cast<NamedPattern>(P)) {
       if (auto var = named->getDecl()) {
+        if (var->isInvalid())
+          return ErrorType::get(Context);
         var->setInvalid();
       }
     }
+
+    Context.Diags.diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
     return ErrorType::get(Context);
 
   // A tuple pattern propagates its tuple-ness out.

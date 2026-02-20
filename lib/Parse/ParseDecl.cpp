@@ -8671,6 +8671,9 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
       diagnose(pattern->getLoc(), diag::computed_property_missing_type)
         .fixItInsert(locAfterPattern, ": <# Type #>");
       Invalid = true;
+      // Mark the variable invalid so that TypeCheckPattern does not emit a
+      // redundant 'type annotation missing in pattern' diagnostic.
+      PrimaryVar->setInvalid();
     }
   }
 

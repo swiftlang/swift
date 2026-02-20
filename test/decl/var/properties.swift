@@ -270,11 +270,17 @@ var computed_prop_with_init_1: X {
   get {}
 } = X()  // expected-error {{expected expression}} expected-error {{consecutive statements on a line must be separated by ';'}} {{2-2=;}}
 
-var x2 { // expected-error{{computed property must have an explicit type}} {{7-7=: <# Type #>}} expected-error{{type annotation missing in pattern}}
+var x2 { // expected-error{{computed property must have an explicit type}} {{7-7=: <# Type #>}}
   get {
     return _x
   }
 }
+
+// https://github.com/swiftlang/swift/issues/87322
+// https://github.com/swiftlang/swift/issues/87324
+// Computed property missing type should emit a single error with a fix-it,
+// not a redundant 'type annotation missing in pattern' error.
+var int {} // expected-error{{computed property must have an explicit type}} {{8-8=: <# Type #>}}
 
 var (x3): X { // expected-error{{getter/setter can only be defined for a single variable}}
   get {
