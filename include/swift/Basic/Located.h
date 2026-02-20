@@ -72,7 +72,7 @@ struct DenseMapInfo<swift::Located<T>> {
 
   static unsigned getHashValue(const swift::Located<T> &LocatedVal) {
     return detail::combineHashValue(DenseMapInfo<T>::getHashValue(LocatedVal.Item),
-                            DenseMapInfo<swift::SourceLoc>::getHashValue(LocatedVal.Loc));
+        DenseMapInfo<::swift::SourceLoc>::getHashValue(LocatedVal.Loc));
   }
 
   static bool isEqual(const swift::Located<T> &LHS, const swift::Located<T> &RHS) {

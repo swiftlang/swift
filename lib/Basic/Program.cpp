@@ -242,7 +242,7 @@ swift::ExecuteWithPipe(llvm::StringRef program,
     return std::error_code(GetLastError(), std::system_category());
   error.reset(hWrite);
 
-  STARTUPINFO si = {0};
+  STARTUPINFOW si = {0};
   si.cb = sizeof(si);
   si.hStdInput = input[PI_READ].get();
   si.hStdOutput = output[PI_WRITE].get();
