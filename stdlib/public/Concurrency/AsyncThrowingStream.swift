@@ -244,7 +244,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     ///  `AsyncThrowingStream` disposes of the callback.
     public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
-        storage.getOnTermination()
+        return storage.getOnTermination()
       }
       nonmutating set {
         storage.setOnTermination(newValue)

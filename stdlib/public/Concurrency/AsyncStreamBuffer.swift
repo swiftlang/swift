@@ -59,7 +59,6 @@ extension AsyncStream {
 
 @available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream {
-
   @safe
   internal final class _Storage: @unchecked Sendable {
     typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
@@ -142,12 +141,12 @@ extension AsyncThrowingStream {
           if unsafe state.terminal == nil {
             switch limit {
             case .unbounded:
-              unsafe state.pending.append(value)
               result = .enqueued(remaining: .max)
+              unsafe state.pending.append(value)
             case .bufferingOldest(let limit):
               if count < limit {
-                unsafe state.pending.append(value)
                 result = .enqueued(remaining: limit - (count + 1))
+                unsafe state.pending.append(value)
               } else {
                 result = .dropped(value)
               }
@@ -184,9 +183,9 @@ extension AsyncThrowingStream {
           switch limit {
           case .unbounded:
             result = .enqueued(remaining: .max)
-          case .bufferingNewest(let limit):
-            result = .enqueued(remaining: limit)
           case .bufferingOldest(let limit):
+            result = .enqueued(remaining: limit)
+          case .bufferingNewest(let limit):
             result = .enqueued(remaining: limit)
           }
 
@@ -291,7 +290,7 @@ extension AsyncThrowingStream {
     func next() async throws(Failure) -> Element? {
       try await withTaskCancellationHandler {
         unsafe await withUnsafeContinuation {
-          unsafe self.next($0)
+          unsafe next($0)
         }
       } onCancel: { [cancel] in
         cancel()
