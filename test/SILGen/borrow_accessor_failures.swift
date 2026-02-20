@@ -279,3 +279,25 @@ struct ExampleWithLazyProp {
   }
 }
 
+public struct Container<Element: ~Copyable >: ~Copyable {
+  var _storage1: UnsafeMutableBufferPointer<Element>
+  var _storage2: UnsafeMutableBufferPointer<Element>
+
+  var first: Element {
+    @_unsafeSelfDependentResult
+    borrow {
+      if (Int.random(in: 1...1000) % 2 == 0) {
+        return unsafe _storage1.baseAddress.unsafelyUnwrapped.pointee
+      }
+      return unsafe _storage2.baseAddress.unsafelyUnwrapped.pointee // expected-error {{multiple return statements in borrow accessors are not yet supported}}
+    }
+    @_unsafeSelfDependentResult
+    mutate {
+      if (Int.random(in: 1...1000) % 2 == 0) {
+        return unsafe &_storage1.baseAddress.unsafelyUnwrapped.pointee
+      }
+      return unsafe &_storage2.baseAddress.unsafelyUnwrapped.pointee // expected-error {{multiple return statements in borrow accessors are not yet supported}}
+    }
+  }
+}
+
