@@ -168,8 +168,9 @@ extension AsyncThrowingStream {
           unlock()
           unsafe continuation.resume(returning: .success(toSend))
         } else if let terminal = unsafe state.terminal {
-          // FIXME: this case is presumably unreachable
+          // FIXME: this branch should be unreachable
           // We should never be in a terminal state and have pending continuations
+          assertionFailure("Bug in AsyncStream: continuations found in terminal state")
           result = .terminated
           unsafe state.terminal = .finished
           unlock()
@@ -365,8 +366,7 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
 
 // MARK: Conversion Shims
 
-extension AsyncThrowingStream.Continuation.YieldResult {
-
+extension AsyncThrowingStream.Continuation.YieldResult where Failure == Never {
   internal var nonThrowingRepresentation: AsyncStream<Element>.Continuation.YieldResult {
     switch self {
     case .dropped(let element): .dropped(element)
@@ -386,17 +386,6 @@ extension AsyncStream.Continuation.BufferingPolicy {
   }
 }
 
-extension AsyncThrowingStream.Continuation.BufferingPolicy {
-
-  internal var nonThrowingRepresentation: AsyncStream<Element>.Continuation.BufferingPolicy {
-    switch self {
-    case .bufferingNewest(let limit): .bufferingNewest(limit)
-    case .bufferingOldest(let limit): .bufferingOldest(limit)
-    case .unbounded: .unbounded
-    }
-  }
-}
-
 extension AsyncStream.Continuation.Termination {
   internal var throwingRepresentation: AsyncThrowingStream<Element, Never>.Continuation.Termination {
     switch self {
@@ -406,8 +395,7 @@ extension AsyncStream.Continuation.Termination {
   }
 }
 
-extension AsyncThrowingStream.Continuation.Termination {
-
+extension AsyncThrowingStream.Continuation.Termination where Failure == Never {
   internal var nonThrowingRepresentation: AsyncStream<Element>.Continuation.Termination {
     switch self {
     case .finished: .finished
