@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=struct_extract | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=struct_extract -enable-experimental-feature Lifetimes | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Lifetimes
 
 import Swift
 import Builtin
@@ -40,5 +41,60 @@ bb0(%0 : @guaranteed $String, %1 : @guaranteed $String):
   %3 = struct_extract %2 : $S, #S.a
   %4 = copy_value %3 : $String
   return %4 : $String
+}
+
+struct Wrapper : ~Escapable {
+  let pointer: UnsafeRawPointer
+  let object: AnyObject
+  @_hasStorage let count: Int
+  @_lifetime(borrow base)
+  init(base: UnsafeRawPointer, count: Int)
+}
+
+sil @use_wrapper : $@convention(thin) (@guaranteed Wrapper) -> ()
+sil @use_span : $@convention(thin) (@guaranteed Span<Int>) -> ()
+
+// CHECK-LABEL: sil [ossa] @simplify_struct_extract_mdi_guaranteed
+// CHECK:         mark_dependence
+// CHECK-NOT:     struct_extract
+// CHECK:       } // end sil function 'simplify_struct_extract_mdi_guaranteed'
+sil [ossa] @simplify_struct_extract_mdi_guaranteed : $@convention(thin) (UnsafeRawPointer, @guaranteed AnyObject, @guaranteed Array<Int>) -> () {
+bb0(%0 : $UnsafeRawPointer, %1 : @guaranteed $AnyObject, %2 : @guaranteed $Array<Int>):
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = struct $Int (%3)
+  %6 = struct $Wrapper (%0, %1, %5)
+  %7 = mark_dependence [nonescaping] %6 on %1
+  %8 = struct_extract %7, #Wrapper.count
+  %9 = struct_extract %8, #Int._value
+  %10 = builtin "assumeNonNegative_Int64"(%9) : $Builtin.Int64
+  %11 = builtin "cmp_sge_Int64"(%4, %10) : $Builtin.Int1
+  cond_fail %11, "Index out of bounds"
+  %13 = function_ref @use_wrapper : $@convention(thin) (@guaranteed Wrapper) -> ()
+  %14 = apply %13(%7) : $@convention(thin) (@guaranteed Wrapper) -> ()
+  %15 = tuple ()
+  return %15
+}
+
+// CHECK-LABEL: sil [ossa] @simplify_struct_extract_mdi_none
+// CHECK:         mark_dependence
+// CHECK-NOT:     struct_extract
+// CHECK:       } // end sil function 'simplify_struct_extract_mdi_none'
+sil [ossa] @simplify_struct_extract_mdi_none : $@convention(thin) (Optional<UnsafeRawPointer>, @guaranteed Array<Int>) -> () {
+bb0(%0 : $Optional<UnsafeRawPointer>, %1 : @guaranteed $Array<Int>):
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = struct $Int (%2)
+  %5 = struct $Span<Int> (%0, %4)
+  %6 = mark_dependence [nonescaping] %5 on %1
+  %7 = struct_extract %6, #Span._count
+  %8 = struct_extract %7, #Int._value
+  %9 = builtin "assumeNonNegative_Int64"(%8) : $Builtin.Int64
+  %10 = builtin "cmp_sge_Int64"(%3, %9) : $Builtin.Int1
+  cond_fail %10, "Index out of bounds"
+  %12 = function_ref @use_span : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  %13 = apply %12(%6) : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  %14 = tuple ()
+  return %14
 }
 

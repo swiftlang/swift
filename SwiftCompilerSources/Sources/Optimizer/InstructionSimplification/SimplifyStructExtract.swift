@@ -12,9 +12,19 @@
 
 import SIL
 
+private extension Value {
+  var lookThroughMarkDependenceInstructions: Value {
+    if let mdi = self as? MarkDependenceInst {
+      return mdi.value.lookThroughMarkDependenceInstructions
+    }
+    return self
+  }
+}
+
 extension StructExtractInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
-    guard let structInst = self.struct as? StructInst else {
+    let operand = self.struct.lookThroughMarkDependenceInstructions
+    guard let structInst = operand as? StructInst else {
       return
     }
     context.tryReplaceRedundantInstructionPair(first: structInst, second: self,
