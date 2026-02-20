@@ -376,28 +376,28 @@ extension _StringGutsSlice {
 
 fileprivate extension RawSpan {
   @inline(__always)
-  func decodeUTF8(ofWidth width: Int, at index: Int, in bytes: RawSpan) -> UInt32? {
-    guard index < bytes.byteOffsets.upperBound &- width else {
+  func decodeUTF8(ofWidth width: Int, at index: Int) -> UInt32? {
+    guard index < self.byteOffsets.upperBound &- width else {
       return nil
     }
-    var l1 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 0, as: UInt8.self))
+    var l1 = unsafe UInt32(self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 0, as: UInt8.self))
     switch width {
     case 1:
       break
     case 2:
-      let l2 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 1, as: UInt8.self))
+      let l2 = unsafe UInt32(self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 1, as: UInt8.self))
       l1 =  (l1 & 0b00011111) << 6
       l1 |= (l2 & 0b00111111)
     case 3:
-      let l2 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 1, as: UInt8.self))
-      let l3 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 2, as: UInt8.self))
+      let l2 = unsafe UInt32(self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 1, as: UInt8.self))
+      let l3 = unsafe UInt32(self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 2, as: UInt8.self))
       l1 =  (l1 & 0b00011111) << 12
       l1 |= (l2 & 0b00111111) << 6
       l1 |= (l3 & 0b00111111)
     default:
-      let l2 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 1, as: UInt8.self))
-      let l3 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 2, as: UInt8.self))
-      let l4 = unsafe UInt32(bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 3, as: UInt8.self))
+      let l2 = unsafe UInt32(self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 1, as: UInt8.self))
+      let l3 = unsafe UInt32(self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 2, as: UInt8.self))
+      let l4 = unsafe UInt32(self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 3, as: UInt8.self))
       l1 =  (l1 & 0b00011111) << 18
       l1 |= (l2 & 0b00111111) << 12
       l1 |= (l3 & 0b00111111) << 6
@@ -407,19 +407,19 @@ fileprivate extension RawSpan {
   }
   
   @inline(__always)
-  func decodeUTF16(ofWidth width: Int, at index: Int, in bytes: RawSpan) -> UInt32? {
+  func decodeUTF16(ofWidth width: Int, at index: Int) -> UInt32? {
     _debugPrecondition(width == 2 || width == 4)
-    guard index < bytes.byteOffsets.upperBound &- width else {
+    guard index < self.byteOffsets.upperBound &- width else {
       return nil
     }
-    let r1 = unsafe bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index, as: UInt16.self)
+    let r1 = unsafe self.unsafeLoadUnaligned(fromUncheckedByteOffset: index, as: UInt16.self)
     if width == 2 {
       return UInt32(r1)
     }
     if !Unicode.UTF16.isLeadSurrogate(r1) {
       return nil
     }
-    let r2 = unsafe bytes.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 2, as: UInt16.self)
+    let r2 = unsafe self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 2, as: UInt16.self)
     if !Unicode.UTF16.isTrailSurrogate(r2) {
       return nil
     }
@@ -427,15 +427,28 @@ fileprivate extension RawSpan {
   }
   
   @inline(__always)
-  func contentsAreTriviallyIdentical(to rhs: RawSpan) -> Bool? {
-    if self.isIdentical(to: rhs) {
-      return true
-    }
+  func contentsAreTriviallyIdentical<LHSEncoding: _UnicodeEncoding, RHSEncoding: _UnicodeEncoding>(
+    to rhs: RawSpan,
+    lhsEncoding: LHSEncoding.Type,
+    rhsEncoding: LHSEncoding.Type
+  ) -> Bool? {
     if self.byteCount == 0 {
       return rhs.byteCount == 0
     }
     if rhs.byteCount == 0 {
-      return false //already covered lhs.byteCount == 0 above
+      return false //already covered self.byteCount == 0 above
+    }
+    /*
+     Bizarre edge case: an ASCII buffer with embedded null bytes could be
+     bitwise-equal to a UTF16 buffer without embedded null bytes while not
+     being semantically equal
+     */
+    if lhsEncoding != rhsEncoding &&
+        (lhsEncoding == Unicode.UTF16.self || rhsEncoding == Unicode.UTF16.self) {
+      return false
+    }
+    if self.isIdentical(to: rhs) {
+      return true
     }
     return nil //can't decide trivially
   }
@@ -460,7 +473,7 @@ fileprivate func isEqual(
     var rhsIdx = 0
     
     while true {
-      guard let firstUTF8Byte = lhs.decodeUTF8(ofWidth: 1, at: lhsIdx, in: lhs) else {
+      guard let firstUTF8Byte = lhs.decodeUTF8(ofWidth: 1, at: lhsIdx) else {
         // If we've consumed everything in both buffers without finding an inequality, we're equal
         return lhsIdx &+ 1 == lhs.byteOffsets.upperBound && rhsIdx &+ 1 == rhs.byteOffsets.upperBound
       }
@@ -469,7 +482,7 @@ fileprivate func isEqual(
       if firstUTF8Byte < 128 {
         utf8Width = 1
         utf16Width = 2
-        guard let r = rhs.decodeUTF16(ofWidth: utf16Width, at: rhsIdx, in: rhs) else {
+        guard let r = rhs.decodeUTF16(ofWidth: utf16Width, at: rhsIdx) else {
           return false
         }
         if r != firstUTF8Byte {
@@ -479,8 +492,8 @@ fileprivate func isEqual(
         utf8Width = _utf8ScalarLength(UInt8(truncatingIfNeeded: firstUTF8Byte))
         utf16Width = utf8Width == 4 ? 4 : 2
         guard
-          let l = lhs.decodeUTF8(ofWidth: utf8Width, at: lhsIdx, in: lhs),
-          let r = rhs.decodeUTF16(ofWidth: utf16Width, at: rhsIdx, in: rhs) else {
+          let l = lhs.decodeUTF8(ofWidth: utf8Width, at: lhsIdx),
+          let r = rhs.decodeUTF16(ofWidth: utf16Width, at: rhsIdx) else {
           return false
         }
         if (l != r) {
@@ -538,7 +551,10 @@ internal func isEqual<LHSEncoding: _UnicodeEncoding, RHSEncoding: _UnicodeEncodi
   bytes rhs: RawSpan,
   encoding rhsEnc: RHSEncoding.Type
 ) -> Bool {
-  if let trivialCheck = lhs.contentsAreTriviallyIdentical(to: rhs) {
+  if let trivialCheck = lhs.contentsAreTriviallyIdentical(
+    to: rhs,
+    lhsEncoding: lhsEnc,
+    rhsEncoding: rhsEnc) {
     return trivialCheck
   }
   // ASCII == UTF8 can just use memcmp
@@ -564,7 +580,6 @@ internal func isEqual<LHSEncoding: _UnicodeEncoding, RHSEncoding: _UnicodeEncodi
 
 #if _runtime(_ObjC)
 
-// Logically this should go in StringBridge.swift, but I'd have to make the stuff it calls `internal` instead of `fileprivate` to do that
 @_effects(releasenone)
 @c @_spi(Foundation) public func _swift_unicodeBuffersEqual_nonNormalizing(
   bytes rawLHS: UnsafeRawPointer,
@@ -576,7 +591,10 @@ internal func isEqual<LHSEncoding: _UnicodeEncoding, RHSEncoding: _UnicodeEncodi
 ) -> Bool {
   let lhs = unsafe RawSpan(_unsafeStart: rawLHS, byteCount: lhsCount)
   let rhs = unsafe RawSpan(_unsafeStart: rawRHS, byteCount: rhsCount)
-  if let trivialCheck = lhs.contentsAreTriviallyIdentical(to: rhs) {
+  if let trivialCheck = lhs.contentsAreTriviallyIdentical(
+    to: rhs,
+    lhsEncoding: lhsEnc,
+    rhsEncoding: rhsEnc) {
     return trivialCheck
   }
   // ASCII == UTF8 can just use memcmp
