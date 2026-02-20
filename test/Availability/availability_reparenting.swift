@@ -2,7 +2,7 @@
 
 // Build the library with the new protocol available.
 
-// RUN: %target-build-swift -DIncludeNewProto -target %target-cpu-apple-macosx12 -parse-as-library -emit-library -enable-experimental-feature Reparenting \
+// RUN: %target-build-swift -DIncludeNewProto -target %target-cpu-apple-macosx12 -parse-as-library -emit-library -enable-experimental-feature Reparenting -enable-experimental-feature SuppressedAssociatedTypesWithDefaults \
 // RUN:     -emit-module-path %t/Reparenting.swiftmodule -module-name Reparenting -enable-library-evolution %S/Inputs/Reparenting.swift -o %t/%target-library-name(Reparenting)
 // RUN: %target-codesign %t/%target-library-name(Reparenting)
 

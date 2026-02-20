@@ -38,3 +38,30 @@ public func libraryFunc(_ s: some Derived) {
 
   print("libraryFunc end")
 }
+
+
+
+
+
+
+
+@available(macOS 75, *)
+@reparentable
+protocol BorrowSeq<Element> {
+  associatedtype Element: ~Copyable
+  
+  func foo()
+}
+
+struct UMBP<Element> {}
+
+extension UMBP: BorrowSeq {
+  @available(macOS 75, *)
+  func foo() {}
+}
+
+protocol Thingable {}
+
+extension UMBP where Self.Element: Thingable {
+  func doThing() { }
+}
