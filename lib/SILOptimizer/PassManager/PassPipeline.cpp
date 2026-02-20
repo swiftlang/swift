@@ -92,20 +92,6 @@ static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
   P.addMandatoryInlining();
 }
 
-static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("Ownership Model Eliminator");
-  P.addAddressLowering();
-  P.addOwnershipModelEliminator();
-}
-
-/// Passes for performing definite initialization. Must be run together in this
-/// order.
-static void addDefiniteInitialization(SILPassPipelinePlan &P) {
-  P.addDefiniteInitialization();
-  P.addLetPropertyLowering();
-  P.addRawSILInstLowering();
-}
-
 // This pipeline defines a set of mandatory diagnostic passes and a set of
 // supporting optimization passes that enable those diagnostics. These are run
 // before any performance optimizations and in contrast to those optimizations
@@ -137,7 +123,12 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addNoReturnFolding();
   P.addBooleanLiteralFolding();
-  addDefiniteInitialization(P);
+
+  /// Passes for performing definite initialization.
+  /// Must be run together in this order.
+  P.addDefiniteInitialization();
+  P.addLetPropertyLowering();
+  P.addRawSILInstLowering();
 
   P.addAddressLowering();
 
@@ -366,7 +357,9 @@ SILPassPipelinePlan SILPassPipelinePlan::getLowerHopToActorPassPipeline(
 SILPassPipelinePlan SILPassPipelinePlan::getOwnershipEliminatorPassPipeline(
     const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
-  addOwnershipModelEliminatorPipeline(P);
+  P.startPipeline("Ownership Model Eliminator");
+  P.addAddressLowering();
+  P.addOwnershipModelEliminator();
   return P;
 }
 
@@ -785,8 +778,7 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   // take advantage of static dispatch.
   P.addConstantCapturePropagation();
 
-  // TODO: replace this with the new ClosureSpecialization pass once we have OSSA at this point in the pipeline
-  P.addClosureSpecializer();
+  P.addClosureSpecialization();
 
   // Do the second stack promotion on low-level SIL.
   P.addStackPromotion();
@@ -809,6 +801,12 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
 
   // Should be after FunctionSignatureOpts and before the last inliner.
   P.addReleaseDevirtualizer();
+
+  // In OSSA we cannot do all kind of redundant load elimination, yet.
+  // Therefore do it now at the beginning of the non-OSSA pipeline.
+  // TODO: we should be able to remove this RLE run once we can represent all kind
+  //       of eliminated redundant loads in OSSA.
+  P.addRedundantLoadElimination();
 
   addFunctionPasses(P, OptimizationLevelKind::LowLevel);
 
@@ -1019,8 +1017,6 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   }
   P.addAutodiffClosureSpecialization();
 
-  P.addOwnershipModelEliminator();
-
   // After serialization run the function pass pipeline to iteratively lower
   // high-level constructs like @_semantics calls.
   addMidLevelFunctionPipeline(P);
@@ -1029,6 +1025,8 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
 
   // Perform optimizations that specialize.
   addClosureSpecializePassPipeline(P);
+
+  P.addOwnershipModelEliminator();
 
   // Run another iteration of the SSA optimizations to optimize the
   // devirtualized inline caches and constants propagated into closures

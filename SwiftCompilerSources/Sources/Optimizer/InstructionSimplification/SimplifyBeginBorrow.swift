@@ -51,6 +51,12 @@ private func tryReplaceBorrowWithOwnedOperand(beginBorrow: BeginBorrowInst, _ co
   guard forwardedValue.allUsesCanBeConvertedToOwned else {
     return false
   }
+
+  if forwardedValue == beginBorrow {
+    convertAllUsesToOwned(of: beginBorrow, context)
+    return true
+  }
+
   if tryReplaceCopy(of: forwardedValue, withCopiedOperandOf: beginBorrow, context) {
     return true
   }

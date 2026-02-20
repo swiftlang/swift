@@ -589,7 +589,7 @@ bb0:
   return %5 : $()
 }
 
-sil @modify_bool : $@convention(thin) (@inout_aliasable Bool) -> ()
+sil @modify_bool : $@convention(thin) (@in_guaranteed Bool) -> ()
 
 // CHECK: SIL memory lifetime failure in @test_trivial_alloc_stack: memory is not initialized, but should be
 sil [ossa] @test_trivial_alloc_stack : $@convention(thin) (Bool) -> () {
@@ -597,8 +597,8 @@ bb0(%0 : $Bool):
   %1 = alloc_stack $Bool
   store %0 to [trivial] %1 : $*Bool
   dealloc_stack %1 : $*Bool
-  %8 = function_ref @modify_bool : $@convention(thin) (@inout_aliasable Bool) -> ()
-  %9 = apply %8(%1) : $@convention(thin) (@inout_aliasable Bool) -> ()
+  %8 = function_ref @modify_bool : $@convention(thin) (@in_guaranteed Bool) -> ()
+  %9 = apply %8(%1) : $@convention(thin) (@in_guaranteed Bool) -> ()
   %10 = tuple ()
   return %10 : $()
 }
@@ -922,9 +922,10 @@ bb0(%0 : $*GenWrapper<T>):
   return %6
 }
 
-// CHECK: SIL memory lifetime failure in @test_use_after_free_address_only2: memory is not initialized, but should be
-// CHECK: memory location:   %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@inout GenWrapper<τ_0_0>) -> @inout τ_0_0
-// CHECK: at instruction:   %5 = apply %3<T>(%2) : $@convention(thin) <τ_0_0> (@inout τ_0_0) -> ()
+// currently inout is not verified
+// xCHECK: SIL memory lifetime failure in @test_use_after_free_address_only2: memory is not initialized, but should be
+// xCHECK: memory location:   %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@inout GenWrapper<τ_0_0>) -> @inout τ_0_0
+// xCHECK: at instruction:   %5 = apply %3<T>(%2) : $@convention(thin) <τ_0_0> (@inout τ_0_0) -> ()
 sil [ossa] @test_use_after_free_address_only2 : $@convention(thin) <T> (@in GenWrapper<T>) -> () {
 bb0(%0 : $*GenWrapper<T>):
   %1 = function_ref @mutate_addressonly_prop : $@convention(method) <τ_0_0> (@inout GenWrapper<τ_0_0>) -> @inout τ_0_0

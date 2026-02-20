@@ -21,7 +21,7 @@ private extension Value {
   }
 }
 
-extension StructExtractInst : OnoneSimplifiable {
+extension StructExtractInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     let operand = self.struct.lookThroughMarkDependenceInstructions
     guard let structInst = operand as? StructInst else {

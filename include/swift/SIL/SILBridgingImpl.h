@@ -2974,6 +2974,10 @@ BridgedInstruction BridgedBuilder::createMakeAddrBorrow(BridgedValue referent) c
   return {unbridged().createMakeAddrBorrow(regularLoc(), referent.getSILValue())};
 }
 
+BridgedInstruction BridgedBuilder::createFixLifetime(BridgedValue operand) const {
+  return {unbridged().createFixLifetime(regularLoc(), operand.getSILValue())};
+}
+
 //===----------------------------------------------------------------------===//
 //                            BridgedBasicBlockSet
 //===----------------------------------------------------------------------===//

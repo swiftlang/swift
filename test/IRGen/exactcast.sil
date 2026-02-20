@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -enable-objc-interop -emit-ir %s | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-import-type
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
 
 sil_stage canonical
 
@@ -34,6 +34,7 @@ bb1:                                   // Preds: bb2 bb3
   return undef : $Int
 
 bb2(%5 : $ParentNode):                            // Preds: bb0
+  fix_lifetime %5
   br bb1                               // id: %10
 
 bb3:                                              // Preds: bb0
@@ -70,6 +71,7 @@ bb1:
   return undef : $Int
 
 bb2(%5 : $DerivedInt):
+  fix_lifetime %5
   br bb1
 
 bb3:

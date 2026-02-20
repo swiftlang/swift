@@ -1,0 +1,48 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=move_value | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-ONONE %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=move_value | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-O %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// CHECK-LABEL: sil [ossa] @remove_lexical_flag :
+// CHECK-O-NOT:   move_value
+// CHECK-ONONE:   move_value [lexical]
+// CHECK:       } // end sil function 'remove_lexical_flag'
+sil [ossa] @remove_lexical_flag : $@convention(thin) (@owned AnyObject) -> @owned AnyObject {
+bb0(%0 : @owned $AnyObject):
+  %1 = move_value [lexical] %0
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @remove_diag_flag :
+// CHECK-O-NOT:   move_value
+// CHECK-ONONE:   move_value [allows_diagnostics]
+// CHECK:       } // end sil function 'remove_diag_flag'
+sil [ossa] @remove_diag_flag : $@convention(thin) (@owned AnyObject) -> @owned AnyObject {
+bb0(%0 : @owned $AnyObject):
+  %1 = move_value [allows_diagnostics] %0
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @remove_vardecl_flag :
+// CHECK-O-NOT:   move_value
+// CHECK-ONONE:   move_value [var_decl]
+// CHECK:       } // end sil function 'remove_vardecl_flag'
+sil [ossa] @remove_vardecl_flag : $@convention(thin) (@owned AnyObject) -> @owned AnyObject {
+bb0(%0 : @owned $AnyObject):
+  %1 = move_value [var_decl] %0
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_pointer_escape :
+// CHECK:         move_value [pointer_escape]
+// CHECK:       } // end sil function 'dont_remove_pointer_escape'
+sil [ossa] @dont_remove_pointer_escape : $@convention(thin) (@owned AnyObject) -> @owned AnyObject {
+bb0(%0 : @owned $AnyObject):
+  %1 = move_value [pointer_escape] %0
+  return %1
+}
+

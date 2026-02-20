@@ -40,6 +40,20 @@ extension StructInst : Simplifiable, SILCombineSimplifiable {
   ///   %3 = struct $S(%nonTrivialField, %trivialField)
   ///   end_of_lifetime %3
   /// ```
+  ///
+  /// Similarly, split `destructure_struct` of copies:
+  /// ```
+  ///   %3 = struct $S(%1, %2)  // owned
+  ///   ...
+  ///   %4 = copy_value %3
+  ///   (%5, %6) = destructure_struct %5
+  /// ```
+  /// ->
+  /// ```
+  ///   ...
+  ///   %5 = copy_value %1
+  ///   %6 = copy_value %2
+  /// ```
   func simplify(_ context: SimplifyContext) {
     guard ownership == .owned,
           hasOnlyStructExtractUsesInBorrowScopes()
@@ -47,12 +61,19 @@ extension StructInst : Simplifiable, SILCombineSimplifiable {
       return
     }
 
-    for beginBorrow in uses.users(ofType: BeginBorrowInst.self) {
-      splitAndRemoveStructExtracts(beginBorrow: beginBorrow, context)
+    for use in uses {
+      switch use.instruction {
+      case let beginBorrow as BeginBorrowInst:
+        splitAndRemoveStructExtracts(beginBorrow: beginBorrow, context)
+      case let copy as CopyValueInst:
+        splitAndRemoveDestructuresOfCopy(copy: copy, context)
+      case is DebugValueInst:
+        break
+      default:
+        assert(use.endsLifetime)
+        sinkToEndOfLifetime(use: use, context)
+      }
     }
-
-    self.sinkToEndOfLifetime(context)
-
     context.erase(instructionIncludingAllUsers: self)
   }
 
@@ -67,6 +88,15 @@ extension StructInst : Simplifiable, SILCombineSimplifiable {
           case is EndBorrowInst:
             break
           case is StructExtractInst:
+            hasStructExtract = true
+          default:
+            return false
+          }
+        }
+      case let copy as CopyValueInst:
+        for copyUse in copy.uses.ignoreDebugUses {
+          switch copyUse.instruction {
+          case is DestructureStructInst:
             hasStructExtract = true
           default:
             return false
@@ -102,11 +132,33 @@ extension StructInst : Simplifiable, SILCombineSimplifiable {
       }
     }
   }
-  private func sinkToEndOfLifetime(_ context: SimplifyContext) {
-    for use in uses where use.endsLifetime {
-      let builder = Builder(before: use.instruction, context)
-      let delayedStruct = builder.createStruct(type: type, elements: Array(operands.values))
-      use.set(to: delayedStruct, context)
+
+  /// ```
+  ///   %4 = copy_value %3
+  ///   (%5, %6) = destructure_struct %5
+  /// ```
+  /// ->
+  /// ```
+  ///   %5 = copy_value %1
+  ///   %6 = copy_value %2
+  /// ```
+  private func splitAndRemoveDestructuresOfCopy(copy: CopyValueInst, _ context: SimplifyContext) {
+    for (fieldIndex, structField) in self.operands.values.enumerated() {
+      let copiedField = if structField.ownership == .none {
+        structField
+      } else {
+        Builder(before: copy, context).createCopyValue(operand: structField)
+      }
+      for destructure in copy.uses.users(ofType: DestructureStructInst.self) {
+        destructure.results[fieldIndex].uses.replaceAll(with: copiedField, context)
+      }
     }
+    context.erase(instructionIncludingAllUsers: copy)
+  }
+
+  private func sinkToEndOfLifetime(use: Operand, _ context: SimplifyContext) {
+    let builder = Builder(before: use.instruction, context)
+    let delayedStruct = builder.createStruct(type: type, elements: Array(operands.values))
+    use.set(to: delayedStruct, context)
   }
 }

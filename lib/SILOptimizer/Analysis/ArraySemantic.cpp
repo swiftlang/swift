@@ -298,6 +298,19 @@ static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
   if (DT->dominates(SelfBB, InsertBefore->getParent()))
     return true;
 
+  if (auto* lbi = dyn_cast<LoadBorrowInst>(SelfVal)) {
+    // Are we loading a value from an address in a struct defined at a point
+    // dominating the hoist point.
+    auto Val = lbi->getOperand();
+    bool DoesNotDominate;
+    StructElementAddrInst *SEI;
+    while ((DoesNotDominate = !DT->dominates(Val->getParentBlock(),
+                                             InsertBefore->getParent())) &&
+           (SEI = dyn_cast<StructElementAddrInst>(Val)))
+      Val = SEI->getOperand();
+    return !DoesNotDominate;
+  }
+
   // If the self value does not dominate the new insertion point,
   // we have to clone the self value as well.
   // If we have a semantics call that does not consume the self value, then
@@ -384,6 +397,18 @@ static SILValue copySelfValue(SILValue ArrayStructValue,
     return ArrayStructValue;
   }
 
+  if (auto *lbi = dyn_cast<LoadBorrowInst>(ArrayStructValue)) {
+    SILValue Val = lbi->getOperand();
+    auto *InsertPt = InsertBefore;
+    while (!DT->dominates(Val->getParentBlock(), InsertBefore->getParent())) {
+      auto *Inst = cast<StructElementAddrInst>(Val);
+      Inst->moveBefore(InsertPt);
+      Val = Inst->getOperand();
+      InsertPt = Inst;
+    }
+    return SILBuilderWithScope(InsertPt).createLoadBorrow(InsertPt->getLoc(), lbi->getOperand());
+  }
+
   assert(!func->hasOwnership() ||
          ArrayStructValue->getOwnershipKind() == OwnershipKind::Owned);
 
@@ -459,6 +484,18 @@ static SILValue hoistOrCopySelf(ApplyInst *SemanticsCall,
   return NewArrayStructValue;
 }
 
+static void createEndBorrows(SILValue array, ApplyInst *afterCall) {
+  auto *lbi = dyn_cast<LoadBorrowInst>(array);
+  if (!lbi)
+    return;
+  for (Operand *use : lbi->getUses()) {
+    if (use->isLifetimeEnding())
+      return;
+  }
+
+  SILBuilderWithScope(afterCall->getNextInstruction()).createEndBorrow(lbi->getLoc(), lbi);
+}
+
 ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
                                                   DominanceInfo *DT,
                                                   bool LeaveOriginal) {
@@ -479,6 +516,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
     auto *Call =
         hoistOrCopyCall(SemanticsCall, InsertBefore, LeaveOriginal, DT);
     Call->setSelfArgument(HoistedSelf);
+    createEndBorrows(HoistedSelf, Call);
     return Call;
   }
 
@@ -530,7 +568,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
       // Set the array.props argument.
       Call->setArgument(1, NewArrayProps);
     }
-
+    createEndBorrows(HoistedSelf, Call);
 
     return Call;
   }

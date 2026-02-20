@@ -329,14 +329,14 @@ bb3:
 // CHECK:       } // end sil function 'dont_replace_with_other_uses_than_destroy'
 sil [ossa] @dont_replace_with_other_uses_than_destroy : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
-  %1 = begin_borrow %0 : $C
-  %2 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
-  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> ()
+  %1 = begin_borrow %0
+  %2 = struct $S1(%1)
+  %3 = apply undef(%2) : $@convention(thin) (@guaranteed S1) -> ()
   end_borrow %1 : $C
-  %5 = apply %2(%0) : $@convention(thin) (@guaranteed C) -> ()
-  destroy_value %0: $C
-  %7 = tuple ()
-  return %7 : $()
+  %5 = apply undef(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  %9 = tuple ()
+  return %9
 }
 
 // CHECK-LABEL: sil [ossa] @dont_replace_copy_with_other_uses :
@@ -344,14 +344,13 @@ bb0(%0 : @owned $C):
 // CHECK:       } // end sil function 'dont_replace_copy_with_other_uses'
 sil [ossa] @dont_replace_copy_with_other_uses : $@convention(thin) (@owned C) -> @owned C {
 bb0(%0 : @owned $C):
-  %1 = begin_borrow %0 : $C
-  %2 = copy_value %1 : $C
-  %3 = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
-  %4 = apply %3(%2) : $@convention(thin) (@owned C) -> ()
-  %5 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
-  %6 = apply %5(%1) : $@convention(thin) (@guaranteed C) -> ()
-  end_borrow %1 : $C
-  return %0 : $C
+  %1 = begin_borrow %0
+  %2 = struct $S1(%1)
+  %3 = copy_value %2
+  %4 = apply undef(%3) : $@convention(thin) (@owned S1) -> ()
+  %5 = apply undef(%2) : $@convention(thin) (@guaranteed S1) -> ()
+  end_borrow %1
+  return %0
 }
 
 // CHECK-LABEL: sil [ossa] @dont_replace_copy_in_different_bb :
@@ -359,19 +358,19 @@ bb0(%0 : @owned $C):
 // CHECK:       } // end sil function 'dont_replace_copy_in_different_bb'
 sil [ossa] @dont_replace_copy_in_different_bb : $@convention(thin) (@owned C) -> @owned C {
 bb0(%0 : @owned $C):
-  %1 = begin_borrow %0 : $C
+  %1 = begin_borrow %0
+  %2 = struct $S1(%1)
   cond_br undef, bb1, bb2
 bb1:
-  end_borrow %1 : $C
+  end_borrow %1
   br bb3
 bb2:
-  %2 = copy_value %1 : $C
-  %3 = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
-  %4 = apply %3(%2) : $@convention(thin) (@owned C) -> ()
-  end_borrow %1 : $C
+  %3 = copy_value %2
+  %4 = apply undef(%3) : $@convention(thin) (@owned S1) -> ()
+  end_borrow %1
   br bb3
 bb3:
-  return %0 : $C
+  return %0
 }
 
 // CHECK-LABEL: sil [ossa] @dont_replace_destroys_of_original_with_destroys_of_nondominating_forward : {{.*}} {
