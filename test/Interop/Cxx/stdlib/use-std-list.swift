@@ -28,7 +28,7 @@ StdListTestSuite.test("ListOfInt conforms to CxxBorrowingSequence") {
     expectEqual(lst.size(), 3)
     expectFalse(lst.empty())
 
-    var iterator : CxxBorrowingIterator<List> = lst.makeBorrowingIterator()
+    var iterator : CxxBorrowingIterator<List> = lst._makeBorrowingIterator()
     var counter = 0
     while true {
         var span = iterator.nextSpan()
@@ -48,7 +48,7 @@ StdListTestSuite.test("ListOfNonCopyable conforms to CxxBorrowingSequence") {
     expectEqual(lst.size(), 3)
     expectFalse(lst.empty())
 
-    var iterator = lst.makeBorrowingIterator()
+    var iterator = lst._makeBorrowingIterator()
     var counter = 0
     while true {
         var span = iterator.nextSpan()

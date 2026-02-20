@@ -60,7 +60,7 @@ CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.Borro
   let seq = ContiguousNonCopyableSequence()
   let arr : [Int32] = [10, 20, 30, 40, 50]
 
-  var iterator = seq.makeBorrowingIterator()
+  var iterator = seq._makeBorrowingIterator()
   var innerCounter = 0
   var outerCounter = 0
   while true {
@@ -82,7 +82,7 @@ CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.Borro
   let seq = ContiguousNonCopyableSequence()
   let arr : [Int32] = [10, 20, 30, 40, 50]
 
-  var iterator = seq.makeBorrowingIterator()
+  var iterator = seq._makeBorrowingIterator()
   var innerCounter = 0
   var outerCounter = 0
   while true {

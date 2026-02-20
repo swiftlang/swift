@@ -39,7 +39,7 @@ StdVectorBorrowingIteratorTestSuite.test("VecOfInt has contiguous iterator").req
     let arr : [Int32] = [1, 2, 3, 4, 5]
     let v = Vector(arr)
     expectEqual(v.size(), 5)
-    var iterator = v.makeBorrowingIterator()
+    var iterator = v._makeBorrowingIterator()
     var counter = 0
     while true {
         let span = iterator.nextSpan()
@@ -54,7 +54,7 @@ StdVectorBorrowingIteratorTestSuite.test("VectorOfNonCopyable has contiguous ite
     guard #available(SwiftStdlib 6.4, *) else { return }
     let v = makeVectorOfNonCopyable()
     expectEqual(v.size(), 3)
-    var iterator = v.makeBorrowingIterator()
+    var iterator = v._makeBorrowingIterator()
     var counter = 0
     while true {
         let span = iterator.nextSpan()
