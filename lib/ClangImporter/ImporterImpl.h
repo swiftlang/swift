@@ -711,25 +711,34 @@ private:
       unavailableMethods;
 
 public:
-  // Attempt to lookup and import the synthesized .pointee computed property.
+  // Attempt to lookup and import the synthesized .__operatorStar() method.
   //
-  // Requires that \a Record is a (Swift) StructDecl and is import from
+  // Requires that \a Record is a (Swift) StructDecl and is imported from
   // a CXXRecordDecl.
   //
   // This function is idempotent, and if successful, ensures the synthesized
-  // .pointee that it returns is a mamber of \a Record.
+  // .__operatorStar() that it returns is a member of \a Record.
+  FuncDecl *lookupAndImportOperatorStar(NominalTypeDecl *Record);
+  // Attempt to lookup and import the synthesized .pointee computed property.
+  //
+  // Requires that \a Record is a (Swift) StructDecl and is imported from
+  // a CXXRecordDecl.
+  //
+  // This function is idempotent, and if successful, ensures the synthesized
+  // .pointee that it returns is a member of \a Record.
   VarDecl *lookupAndImportPointee(NominalTypeDecl *Record);
 
   // Attempt to lookup and import the synthesized .successor() method.
   //
-  // Requires that \a Record is a (Swift) StructDecl and is import from
+  // Requires that \a Record is a (Swift) StructDecl and is imported from
   // a CXXRecordDecl.
   //
   // This function is idempotent, and if successful, ensures the synthesized
-  // .successor() that it returns is a mamber of \a Record.
+  // .successor() that it returns is a member of \a Record.
   FuncDecl *lookupAndImportSuccessor(NominalTypeDecl *Record);
 
 private:
+  llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedOperatorStarCache;
   llvm::DenseMap<NominalTypeDecl *, VarDecl *> importedPointeeCache;
   llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedSuccessorCache;
 
