@@ -168,10 +168,10 @@ extension AsyncThrowingStream {
           unlock()
           unsafe continuation.resume(returning: .success(toSend))
         } else if let terminal = unsafe state.terminal {
+          // FIXME: this case is presumably unreachable
+          // We should never be in a terminal state and have pending continuations
           result = .terminated
-          // TODO: figure this out
-          // throwing variant zero'd the `continuation` here – what's the analog?
-          unsafe state.terminal = .finished // ?? why do we do this?
+          unsafe state.terminal = .finished
           unlock()
           switch terminal {
           case .finished:
@@ -228,21 +228,17 @@ extension AsyncThrowingStream {
       lock()
       let handler = unsafe state.onTermination
       unsafe state.onTermination = nil
-      if unsafe state.terminal == nil {
-        if let failure = error {
-          unsafe state.terminal = .failed(failure)
-        } else {
-          unsafe state.terminal = .finished
-        }
-      }
+      let terminal = unsafe state.terminal ?? {
+        let terminal  = error.map { Terminal.failed($0) } ?? .finished
+        unsafe state.terminal = terminal
+        return terminal
+      }()
 
       guard unsafe !state.continuations.isEmpty else {
         unlock()
         handler?(.finished(error))
         return
       }
-
-      let terminal = unsafe state.terminal! // FIXME: don't force
 
       // Hold on to the continuations to resume outside the lock.
       let continuations = unsafe state.continuations
@@ -251,14 +247,13 @@ extension AsyncThrowingStream {
       unlock()
       handler?(.finished(error))
 
-      // TODO: verify the appropriate unification of the two impls
+      let result: Result<Element?, Failure> = switch terminal {
+      case .finished: .success(nil)
+      case .failed(let error): .failure(error)
+      }
+
       for unsafe continuation in unsafe continuations {
-        switch terminal {
-        case .finished:
-          unsafe continuation.resume(returning: .success(nil))
-        case .failed(let error):
-          unsafe continuation.resume(returning: .failure(error))
-        }
+        unsafe continuation.resume(returning: result)
       }
     }
 
@@ -272,8 +267,6 @@ extension AsyncThrowingStream {
         unsafe cont.resume(returning: .success(toSend))
       } else if let terminal = unsafe state.terminal {
         let cont = unsafe state.continuations.removeFirst()
-        // TODO: throwing variant does this state transition here...
-        // why, and do we need to do it?
         unsafe state.terminal = .finished
         unlock()
         switch terminal {
