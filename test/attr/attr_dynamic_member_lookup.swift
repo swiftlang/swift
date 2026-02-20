@@ -1019,3 +1019,21 @@ let selfRecurse6 = SelfRecursiveLookup { selfRecurse6[terminator: 0] }
 
 let selfRecurse7 = SelfRecursiveLookup { \.terminator }
 let selfRecurse8 = SelfRecursiveLookup { \.[terminator: 0] }
+
+// https://github.com/swiftlang/swift/issues/83344
+// Fix-it to add subscript(dynamicMember:) stub when no subscript exists.
+
+@dynamicMemberLookup // expected-error {{'@dynamicMemberLookup' requires 'EmptyStruct_83344' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+struct EmptyStruct_83344 {}
+
+@dynamicMemberLookup // expected-error {{'@dynamicMemberLookup' requires 'EmptyClass_83344' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+class EmptyClass_83344 {}
+
+@dynamicMemberLookup // expected-error {{'@dynamicMemberLookup' requires 'EmptyEnum_83344' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+enum EmptyEnum_83344 {}
+
+@dynamicMemberLookup // expected-error {{'@dynamicMemberLookup' requires 'StructWithUnrelatedMembers_83344' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+struct StructWithUnrelatedMembers_83344 {
+  var x: Int = 0
+  func foo() {}
+}

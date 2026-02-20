@@ -2267,9 +2267,19 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
     return isValidDynamicMemberLookupSubscript(cand, /*ignoreLabel*/ true);
   });
 
-  // If there were no potentially valid candidates, then throw an error.
+  // If there were no potentially valid candidates, then throw an error and
+  // offer a fix-it to insert a subscript(dynamicMember:) stub.
   if (newCandidates.empty()) {
-    emitInvalidTypeDiagnostic(attr->getLocation());
+    auto diag = diagnose(attr->getLocation(),
+                         diag::invalid_dynamic_member_lookup_type, type);
+    auto braces = decl->getBraces();
+    if (braces.Start.isValid()) {
+      diag.fixItInsertAfter(braces.Start,
+          "\n  subscript(dynamicMember member: String) -> <#Value#> {\n"
+          "    <#code#>\n"
+          "  }");
+    }
+    attr->setInvalid();
     return;
   }
 
