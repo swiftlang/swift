@@ -28,20 +28,25 @@ actor Manager {
 
 
 @available(SwiftStdlib 5.1, *)
-func test() {
-    detach {
+func test() async -> [Task<(), Never>] {
+    let t1 = Task.detached {
         let x = await Manager.shared.manage()
         print(x)
     }
-    detach {
+    let t2 = Task.detached {
         let x = await Manager.shared.other()
         print(x)
     }
+
+    return [t1, t2]
 }
 
 if #available(SwiftStdlib 5.1, *) {
- test()
- sleep(30)
+  let ts = await test()
+
+  for t in ts {
+    await t.value
+  }
 } else {
  print("manage")
  print("0")

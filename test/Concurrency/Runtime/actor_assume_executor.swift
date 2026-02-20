@@ -140,6 +140,7 @@ final class MainActorEcho {
       #endif
 
       tests.test("assumeOnActorExecutor: assume someone's executor, from SomeoneOnDefaultExecutor") {
+        print("Before: someone.callCheckSomeone()")
         await someone.callCheckSomeone()
       }
 
