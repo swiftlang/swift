@@ -547,6 +547,12 @@ static void swift::enumerateUnsafeArgv(const F& body) { }
 
 namespace swift {
 /// A C++ string that can contain an executable path.
+///
+/// We don't use `llvm::SmallVector` or `llvm::SmallString` here because we want
+/// string manipulation functions (precluding `llvm::SmallVector`), need to
+/// pre-reserve space (precluding `llvm::SmallString`), and need to use `WCHAR`
+/// on Windows (precluding `llvm::SmallString` again). As well, this string is
+/// generally constructed once and immediately cached, so it's not a hot path.
 #if defined(_WIN32)
 using ExecutablePath = std::basic_string<
   WCHAR, std::char_traits<WCHAR>, cxx_allocator<WCHAR>
