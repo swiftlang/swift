@@ -13,12 +13,12 @@ public class Derived: Base {
 }
 
 // CHECK-LABEL: public class Base {
-// CHECK-NEXT:    public init(x: Swift.Int)
+// CHECK-NEXT:    public init(x: Swift::Int)
 // CHECK-NEXT:    {{(@objc )?}}deinit
 // CHECK-NEXT: }
 
-// CHECK-LABEL: public class Derived : test.Base {
-// CHECK-NEXT:    public init(z: Swift.Int)
+// CHECK-LABEL: public class Derived : test::Base {
+// CHECK-NEXT:    public init(z: Swift::Int)
 // CHECK-NEXT:    {{(@objc )?}}deinit
 // CHECK-NEXT: }
 

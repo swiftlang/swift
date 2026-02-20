@@ -61,6 +61,6 @@ public func run() -> Int {
 // CHECK-PKG-INTERFACE-NOT: @usableFromInline
 // CHECK-INTERFACE-NOT: @usableFromInline
 // CHECK-PKG-INTERFACE: package class PkgKlass {
-// CHECK-PKG-INTERFACE:   @inline(never) package func bar() -> Swift.Int
-// CHECK-PKG-INTERFACE:   @inline(never) package func foo(_ arg: Lib.PkgKlass) -> Swift.Int?
-// CHECK-INTERFACE: public func run() -> Swift.Int
+// CHECK-PKG-INTERFACE:   @inline(never) package func bar() -> Swift::Int
+// CHECK-PKG-INTERFACE:   @inline(never) package func foo(_ arg: Lib::PkgKlass) -> Swift::Int?
+// CHECK-INTERFACE: public func run() -> Swift::Int

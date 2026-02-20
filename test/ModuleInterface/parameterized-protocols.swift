@@ -9,6 +9,6 @@ public protocol HasPrimaryAssociatedTypes<T, U> {
 }
 
 // CHECK:      public protocol HasPrimaryAssociatedTypes<T, U> {
-// CHECK-NEXT:   associatedtype T : Swift.Collection
-// CHECK-NEXT:   associatedtype U : Swift.Equatable where Self.U == Self.T.Element
+// CHECK-NEXT:   associatedtype T : Swift::Collection
+// CHECK-NEXT:   associatedtype U : Swift::Equatable where Self.U == Self.T.Element
 // CHECK-NEXT: }

@@ -8,11 +8,11 @@
 
 // CHECK: @_hasMissingDesignatedInitializers open class Base {
 open class Base {
-  // CHECK-NEXT: public init(arg: Swift.Int)
+  // CHECK-NEXT: public init(arg: Swift::Int)
   public init(arg: Int) {
     print("public init from Base")
   }
-  // CHECK-NOT: init(secret: Swift.Int)
+  // CHECK-NOT: init(secret: Swift::Int)
   internal init(secret: Int) {
     print("secret init from Base")
   }
@@ -28,12 +28,12 @@ open class Base {
 // CHECK-NOT: @_hasMissingDesignatedInitializers
 // CHECK: open class InlineBase {
 open class InlineBase {
-  // CHECK-NEXT: public init(arg: Swift.Int)
+  // CHECK-NEXT: public init(arg: Swift::Int)
   public init(arg: Int) {
     print("public init from Inline Base")
   }
 
-  // CHECK-NOT: @usableFromInline init(secret: Swift.Int)
+  // CHECK-NOT: @usableFromInline init(secret: Swift::Int)
   @usableFromInline
   internal init(secret: Int) {
     print("secret init from Inline Base")
@@ -46,14 +46,14 @@ open class InlineBase {
   // CHECK: }
 }
 
-// CHECK: @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers public class Sub : Module.Base {
+// CHECK: @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers public class Sub : Module::Base {
 public class Sub : Base {
-  // CHECK: override public init(arg: Swift.Int)
+  // CHECK: override public init(arg: Swift::Int)
   public override init(arg: Int) {
     print("public init from Sub")
     super.init(arg: arg)
   }
-  // CHECK-NOT: init(secret: Swift.Int)
+  // CHECK-NOT: init(secret: Swift::Int)
   internal override init(secret: Int) {
     print("secret init from Sub")
     super.init(secret: secret)
@@ -61,9 +61,9 @@ public class Sub : Base {
 // CHECK: }
 }
 
-// CHECK: @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers public class SubSub : Module.Sub {
+// CHECK: @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers public class SubSub : Module::Sub {
 public class SubSub: Sub {
-  // CHECK: override public init(arg: Swift.Int)
+  // CHECK: override public init(arg: Swift::Int)
   public override init(arg: Int) {
     print("public init from SubSub")
     super.init(arg: arg)

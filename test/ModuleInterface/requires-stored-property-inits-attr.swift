@@ -5,7 +5,7 @@
 // CHECK: @requires_stored_property_inits public class RequiresStoredPropertyInits
 @requires_stored_property_inits
 public class RequiresStoredPropertyInits {
-  // CHECK: final public let a: Swift.Int{{$}}
+  // CHECK: final public let a: Swift::Int{{$}}
   public let a: Int = 0
 
   public init() {}
