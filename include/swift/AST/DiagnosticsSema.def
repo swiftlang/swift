@@ -6575,6 +6575,10 @@ ERROR(differentiable_function_type_no_differentiability_parameters,
       "'Differentiable'%select{| with its 'TangentVector' equal to itself}0",
       (/*isLinear*/ bool))
 
+ERROR(function_type_unlabeled_param_after_variadic_pack,none,
+      "function type cannot have an unlabeled parameter following a variadic "
+      "parameter pack; this signature is not supported", ())
+
 // SIL
 ERROR(opened_bad_constraint_type,none,
       "'@opened' constraint type %0 is not a protocol or protocol composition",
