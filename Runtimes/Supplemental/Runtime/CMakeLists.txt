@@ -184,7 +184,7 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     endif()
   else()
     # Other platforms can use the shared `.S` file.
-    target_sources(swiftRuntime
+    target_sources(swiftRuntime PRIVATE
       get-cpu-context.S)
   endif()
 
