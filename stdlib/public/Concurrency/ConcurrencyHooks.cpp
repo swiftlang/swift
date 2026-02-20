@@ -215,6 +215,21 @@ swift_task_donateThreadToGlobalExecutorUntilOrig(bool (*condition)(void *),
   return swift_task_donateThreadToGlobalExecutorUntilImpl(condition, context);
 }
 
+SWIFT_CC(swift) static void
+swift_asyncstream_on_multiple_awaitersOrig() {
+  swift_reportError(0, "SWIFT ASYNCSTREAM: used by multiple awaiters!");
+}
+
+
+SWIFT_CC(swift) void
+swift::swift_asyncstream_multiple_awaiters() {
+  if (SWIFT_UNLIKELY(swift_asyncstream_multiple_awaiters_hook)) {
+    swift_asyncstream_multiple_awaiters_hook(swift_asyncstream_on_multiple_awaitersOrig);
+  } else {
+    swift_asyncstream_on_multiple_awaitersOrig();
+  }
+}
+
 void swift::
 swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
                                              void *context) {
