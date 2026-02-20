@@ -427,11 +427,7 @@ fileprivate extension RawSpan {
   }
   
   @inline(__always)
-  func contentsAreTriviallyIdentical<LHSEncoding: _UnicodeEncoding, RHSEncoding: _UnicodeEncoding>(
-    to rhs: RawSpan,
-    lhsEncoding: LHSEncoding.Type,
-    rhsEncoding: LHSEncoding.Type
-  ) -> Bool? {
+  func contentsAreTriviallyIdentical(to rhs: RawSpan, possibleUTF16EdgeCase: Bool) -> Bool? {
     if self.byteCount == 0 {
       return rhs.byteCount == 0
     }
@@ -443,9 +439,8 @@ fileprivate extension RawSpan {
      bitwise-equal to a UTF16 buffer without embedded null bytes while not
      being semantically equal
      */
-    if lhsEncoding != rhsEncoding &&
-        (lhsEncoding == Unicode.UTF16.self || rhsEncoding == Unicode.UTF16.self) {
-      return false
+    if possibleUTF16EdgeCase {
+      return nil
     }
     if self.isIdentical(to: rhs) {
       return true
@@ -551,10 +546,11 @@ internal func isEqual<LHSEncoding: _UnicodeEncoding, RHSEncoding: _UnicodeEncodi
   bytes rhs: RawSpan,
   encoding rhsEnc: RHSEncoding.Type
 ) -> Bool {
+  let possibleUTF16EdgeCase = lhsEnc != rhsEnc &&
+      (lhsEnc == Unicode.UTF16.self || rhsEnc == Unicode.UTF16.self)
   if let trivialCheck = lhs.contentsAreTriviallyIdentical(
     to: rhs,
-    lhsEncoding: lhsEnc,
-    rhsEncoding: rhsEnc) {
+    possibleUTF16EdgeCase: possibleUTF16EdgeCase) {
     return trivialCheck
   }
   // ASCII == UTF8 can just use memcmp
@@ -591,10 +587,11 @@ internal func isEqual<LHSEncoding: _UnicodeEncoding, RHSEncoding: _UnicodeEncodi
 ) -> Bool {
   let lhs = unsafe RawSpan(_unsafeStart: rawLHS, byteCount: lhsCount)
   let rhs = unsafe RawSpan(_unsafeStart: rawRHS, byteCount: rhsCount)
+  let possibleUTF16EdgeCase = lhsEnc != rhsEnc &&
+      (lhsEnc == _cocoaUTF16Encoding || rhsEnc == _cocoaUTF16Encoding)
   if let trivialCheck = lhs.contentsAreTriviallyIdentical(
     to: rhs,
-    lhsEncoding: lhsEnc,
-    rhsEncoding: rhsEnc) {
+    possibleUTF16EdgeCase: possibleUTF16EdgeCase) {
     return trivialCheck
   }
   // ASCII == UTF8 can just use memcmp
