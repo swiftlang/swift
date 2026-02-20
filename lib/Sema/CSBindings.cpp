@@ -29,6 +29,9 @@
 
 #define DEBUG_TYPE "PotentialBindings"
 
+STATISTIC(NumBindingSetsSkipped, "binding sets that did not need recomputation");
+STATISTIC(NumBindingSetsRecomputed, "binding sets that required recomputation");
+
 using namespace swift;
 using namespace constraints;
 using namespace inference;
@@ -1259,16 +1262,40 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
   BindingSet *bestBindings = nullptr;
 
-  // First, let's collect all of the possible bindings.
+  // First, let's construct a BindingSet for each type variable,
+  // from its PotentialBindings.
   for (auto *typeVar : getTypeVariables()) {
     auto &node = CG[typeVar];
-    node.resetBindingSet();
-    if (!typeVar->getImpl().hasRepresentativeOrFixed())
+
+    // If the type variable has been bound to a fixed type, we won't
+    // be considering it any further. Clear its binding set if it
+    // has one and move on.
+    if (typeVar->getImpl().hasRepresentativeOrFixed()) {
+      node.resetBindingSet();
+      continue;
+    }
+
+    // If we don't have a binding set yet, compute one.
+    if (!node.hasBindingSet()) {
       node.initBindingSet();
+      continue;
+    }
+
+    // If the node has a binding set already, check if it needs to
+    // be recomputed. This is the case if the PotentialBindings
+    // changed since last time, or if any of the "transitive inference"
+    // steps below changed the BindingSet for any reason.
+    if (!node.getBindingSet().isUpToDate()) {
+      ++NumBindingSetsRecomputed;
+      node.resetBindingSet();
+      node.initBindingSet();
+    } else {
+      ++NumBindingSetsSkipped;
+      node.getBindingSet().resetTransitiveProtocols();
+    }
   }
 
-  // Now let's see if we could infer something for related type
-  // variables based on other bindings.
+  // Now let's perform transitive inference and ranking.
   for (auto *typeVar : getTypeVariables()) {
     auto &node = CG[typeVar];
     if (!node.hasBindingSet())
@@ -1280,6 +1307,21 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
     // If any of the below change the binding set, they must also call
     // markDirty().
     // ****
+
+#define EXPENSIVE_CHECK 0
+#if EXPENSIVE_CHECK
+    BindingSet saved(*this, typeVar, node.getPotentialBindings());
+    ASSERT(bindings.getGenerationNumber() == saved.getGenerationNumber());
+    if (bindings != saved) {
+      ABORT([&](auto &out) {
+        out << "Binding set differs from freshly-recomputed one\n";
+        out << "\nold: ";
+        bindings.dump(out, 0);
+        out << "\nnew: ";
+        saved.dump(out, 0);
+      });
+    }
+#endif
 
     // Special handling for key paths.
     bindings.inferTransitiveKeyPathBindings();
@@ -1305,6 +1347,18 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
 
     bindings.inferTransitiveSupertypeBindings();
     bindings.determineLiteralCoverage();
+
+#if EXPENSIVE_CHECK
+    if (!bindings.isDirty() && saved != bindings) {
+      ABORT([&](auto &out) {
+        out << "Binding set changed but wasn't dirty\n";
+        out << "\nold: ";
+        saved.dump(out, 0);
+        out << "\nnew: ";
+        bindings.dump(out, 0);
+      });
+    }
+#endif
 
     if (!isViable)
       continue;
