@@ -839,6 +839,8 @@ ERROR(sil_coverage_invalid_operator, none,
 
 ERROR(expected_type,PointsToFirstBadToken,
       "expected type", ())
+ERROR(confusing_some_any_optional_composition,none,
+      "confusing use of optional after a 'some' or 'any' composition; use parentheses to clarify precedence", ())
 ERROR(expected_init_value,PointsToFirstBadToken,
       "expected initial value after '='", ())
 
