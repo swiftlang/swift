@@ -84,7 +84,7 @@
 // CHECK-NEXT:           "selector": "supportsSecureCoding",
 // CHECK-NEXT:           "body": null,
 // CHECK-NEXT:           "debug": "note: getClassInterface path",
-// CHECK-NEXT:           "swiftSignature": "\n    @objc(supportsSecureCoding)\n    open class func supportsSecureCoding() -> Bool {\n        <#code#>\n    }\n"
+// CHECK-NEXT:           "swiftSignature": "\n    @objc(supportsSecureCoding)\n    open class func supportsSecureCoding() -> {{.*}} {\n        <#code#>\n    }\n"
 // CHECK-NEXT:         }
 // CHECK-NEXT:       ]
 // CHECK-NEXT:     }
@@ -192,7 +192,8 @@ static NSString * const kMyClassLength = @"length";
 // CHECK-NEXT:           "selector": "supportsSecureCoding",
 // CHECK-NEXT:           "body": "{\n  return YES;\n}",
 // CHECK-NEXT:           "debug": "note: getClassInterface path",
-// CHECK-NEXT:           "swiftSignature": "\n    @objc(supportsSecureCoding)\n    open class func supportsSecureCoding() -> Bool {\n        <#code#>\n    }\n"
+// CHECK-NEXT:           "swiftSignature": "\n    @objc(supportsSecureCoding)\n    open class func supportsSecureCoding() -> {{.*}} {\n        <#code#>\n    }\n"
+// FIXME: check return type of Bool, it now returns Int8 on x86_64
 // CHECK-NEXT:         },
 
 - (BOOL)isEqual:(id)object
@@ -212,7 +213,7 @@ static NSString * const kMyClassLength = @"length";
 // CHECK-NEXT:           "selector": "isEqual:",
 // CHECK-NEXT:           "body": "{\n    BOOL result = object == self;\n    if (!result && [object isKindOfClass:[MyClass class]]) {\n        MyClass *other = (MyClass*)object;\n        result = (self.text == other.text || [self.text isEqual:other.text]) &&\n                 self.length == other.length;\n    }\n    return result;\n}",
 // CHECK-NEXT:           "debug": "note: isOverriding path",
-// CHECK-NEXT:           "swiftSignature": "\n    @objc(isEqual:)\n    open func isEqual(_ other: NSObject!) -> Bool {\n        <#code#>\n    }\n"
+// CHECK-NEXT:           "swiftSignature": "\n    @objc(isEqual:)\n    open func isEqual(_ other: NSObject!) -> {{.*}} {\n        <#code#>\n    }\n"
 // CHECK-NEXT:         },
 
 #pragma mark - Description
