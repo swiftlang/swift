@@ -20,10 +20,10 @@ internal func _swift_stdlib_getUnsafeArgvArgc(_: UnsafeMutablePointer<Int32>)
 
 #if os(Windows)
 @_silgen_name("_swift_stdlib_withExecutablePath")
-private func _withExecutablePath(_ body: (UnsafePointer<CWideChar>, Int) -> Void)
+private func _withExecutablePath(_ body: (UnsafePointer<CWideChar>) -> Void)
 #else
 @_silgen_name("_swift_stdlib_withExecutablePath")
-private func _withExecutablePath(_ body: (UnsafePointer<CChar>, Int) -> Void)
+private func _withExecutablePath(_ body: (UnsafePointer<CChar>) -> Void)
 #endif
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
@@ -199,9 +199,15 @@ extension CommandLine {
     var result: ContiguousArray<CChar>?
 #endif
 
-    unsafe _withExecutablePath { path, length in
-      if unsafe path.pointee != 0 {
-        let buffer = unsafe UnsafeBufferPointer(start: path, count: length)
+    unsafe _withExecutablePath { path in
+#if os(Windows)
+      let count = unsafe wcslen(path)
+#else
+      let count = unsafe strlen(path)
+#endif
+      if count > 0 {
+
+        let buffer = unsafe UnsafeBufferPointer(start: path, count: count + 1)
         result = unsafe ContiguousArray(buffer)
       }
     }

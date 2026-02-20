@@ -567,13 +567,12 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_stdlib_withExecutablePath(
   void SWIFT_CC(swift) (* body)(
     const ExecutablePath::value_type *path,
-    size_t length, // including trailing null
     SWIFT_CONTEXT void *context
   ),
-  SWIFT_CONTEXT void *context
+  void *bodyContext
 ) {
   auto path = getExecutablePath();
-  (* body)(path.c_str(), path.size() + 1, context);
+  (* body)(path.c_str(), bodyContext);
 }
 
 #if defined(__APPLE__)
@@ -617,7 +616,7 @@ ExecutablePath getExecutablePath(void) {
 ExecutablePath getExecutablePath(void) {
   int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
   size_t bufferCount = 0;
-  if (sysctl(mib, std::size(mib), nullptr, &bufferCount, nullptr, 0) != 0) {
+  if (sysctl(mib, std::size(mib), nullptr, &bufferCount, nullptr, 0) == 0) {
     ExecutablePath result(bufferCount, '\0');
     if (sysctl(mib, std::size(mib), result.data(), &bufferCount, nullptr, 0) == 0) {
       return result;
