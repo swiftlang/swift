@@ -1,11 +1,8 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000 -solver-enable-performance-hacks
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=15000 -solver-disable-performance-hacks
 // REQUIRES: tools-release,no_asan
 
 // UNSUPPORTED: OS=linux-gnu
-
-// expected-no-diagnostics
-
-// REQUIRES: 33958047
 
 let a: [Double] = []
 _ = a.map { $0 - 1.0 }
