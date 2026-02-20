@@ -1828,7 +1828,7 @@ ERROR(functions_mutating_and_not,none,
       (SelfAccessKind, SelfAccessKind))
 
 ERROR(static_functions_not_mutating,none,
-      "static functions must not be declared mutating", ())
+      "static functions must not be declared %0", (SelfAccessKind))
 
 ERROR(modifier_invalid_borrow_mutate_accessor, none,
       "%0 cannot be declared %1", (StringRef, StringRef))

@@ -20,8 +20,8 @@ func useMyStruct() {
 
 struct BadStruct {
   static subscript(_ i: Int) -> String {
-    nonmutating get { fatalError() } // expected-error{{static functions must not be declared mutating}}
-    mutating set { fatalError() } // expected-error{{static functions must not be declared mutating}}
+    nonmutating get { fatalError() } // expected-error{{static functions must not be declared 'nonmutating'}}
+    mutating set { fatalError() } // expected-error{{static functions must not be declared 'mutating'}}
   }
 }
 
