@@ -2342,17 +2342,31 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       Write-Warning "Test-Compilers invoked without specifying test target(s)."
     }
 
-    Build-CMakeProject `
-      -Src $SourceCache\llvm-project\llvm `
-      -Bin $(Get-ProjectBinaryCache $Platform Compilers) `
-      -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
-      -Platform $Platform `
-      -UseMSVCCompilers $(if ($UseHostToolchain) { @("C", "CXX") } else { @("") }) `
-      -UsePinnedCompilers $(if ($UseHostToolchain) { @("Swift") } else { @("C", "CXX", "Swift") }) `
-      -SwiftSDK (Get-PinnedToolchainSDK -OS $Platform.OS) `
-      -BuildTargets $Targets `
-      -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake `
-      -Defines $TestingDefines
+    function Test-Target([string] $Target) {
+      Build-CMakeProject `
+        -Src $SourceCache\llvm-project\llvm `
+        -Bin $(Get-ProjectBinaryCache $Platform Compilers) `
+        -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+        -Platform $Platform `
+        -UseMSVCCompilers $(if ($UseHostToolchain) { @("C", "CXX") } else { @("") }) `
+        -UsePinnedCompilers $(if ($UseHostToolchain) { @("Swift") } else { @("C", "CXX", "Swift") }) `
+        -SwiftSDK (Get-PinnedToolchainSDK -OS $Platform.OS) `
+        -BuildTargets @($Target) `
+        -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake `
+        -Defines $TestingDefines
+    }
+
+    $FailedTests = [System.Collections.ArrayList]@()
+    foreach($Target in $Targets) {
+      try {
+        Test-Target $Target
+      } catch {
+        [void]$FailedTests.Add($Target)
+      }
+    }
+    if ($FailedTests.Count -ne 0) {
+      throw "The following tests failed: " + ($FailedTests -join ", ")
+    }
   }
 }
 
