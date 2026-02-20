@@ -1759,9 +1759,8 @@ public:
 
 /// Given that we've allocated space to hold a scalar value, try to rewrite
 /// the uses of the scalar to be uses of the address.
-static void rewriteUsesOfSscalar(StructLoweringState &pass,
-                                 SILValue address, SILValue scalar,
-                                 StoreInst *storeToAddress) {
+static void rewriteUsesOfScalar(StructLoweringState &pass, SILValue address,
+                                SILValue scalar, StoreInst *storeToAddress) {
   // Copy the uses, since we're going to edit them.
   SmallVector<Operand *, 8> uses(scalar->getUses());
   for (Operand *scalarUse : uses) {
@@ -1812,7 +1811,7 @@ static void allocateAndSetForInstResult(StructLoweringState &pass,
   auto store = createStoreInit(pass, II, inst->getLoc(), instResult, alloc);
 
   // Traverse all the uses of instResult - see if we can replace
-  rewriteUsesOfSscalar(pass, alloc, instResult, store);
+  rewriteUsesOfScalar(pass, alloc, instResult, store);
 }
 
 static void allocateAndSetForArgument(StructLoweringState &pass,
@@ -1832,7 +1831,7 @@ static void allocateAndSetForArgument(StructLoweringState &pass,
   auto store = createStoreInit(pass, II, loc, value, alloc);
 
   // Traverse all the uses of value - see if we can replace
-  rewriteUsesOfSscalar(pass, alloc, value, store);
+  rewriteUsesOfScalar(pass, alloc, value, store);
 }
 
 static bool allUsesAreReplaceable(StructLoweringState &pass,
