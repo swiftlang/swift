@@ -713,6 +713,53 @@ private:
            ClangRefCountedSmartPointerDescriptor desc) const;
 };
 
+/// Input type for requests that act upon a (defined) C++ record decl.
+struct CxxRecordDeclDescriptor final {
+  const clang::CXXRecordDecl *decl;
+  clang::Sema &sema;
+
+  CxxRecordDeclDescriptor(const clang::CXXRecordDecl *decl, clang::Sema &sema)
+      : decl(decl), sema(sema) {
+    ASSERT(decl->hasDefinition());
+  }
+
+  friend llvm::hash_code
+  hash_value(const CxxRecordDeclDescriptor &desc) {
+    return llvm::hash_combine(desc.decl);
+  }
+
+  friend bool operator==(const CxxRecordDeclDescriptor &lhs,
+                         const CxxRecordDeclDescriptor &rhs) {
+    return lhs.decl == rhs.decl;
+  }
+
+  friend bool operator!=(const CxxRecordDeclDescriptor &lhs,
+                         const CxxRecordDeclDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const CxxRecordDeclDescriptor &desc);
+SourceLoc
+extractNearestSourceLoc(const CxxRecordDeclDescriptor &desc);
+
+/// Uses ClangDirectLookup to find a named member inside of the given namespace.
+class CxxIteratorInfoRequest
+    : public SimpleRequest<CxxIteratorInfoRequest,
+                           importer::CxxIteratorInfo(CxxRecordDeclDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  bool isCached() const { return true; }
+
+private:
+  friend SimpleRequest;
+
+  importer::CxxIteratorInfo evaluate(Evaluator &evaluator,
+                                     CxxRecordDeclDescriptor desc) const;
+};
+
 #define SWIFT_TYPEID_ZONE ClangImporter
 #define SWIFT_TYPEID_HEADER "swift/ClangImporter/ClangImporterTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
