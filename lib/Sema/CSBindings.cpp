@@ -53,6 +53,7 @@ static bool isDirectRequirement(ConstraintSystem &cs,
 BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
                        const PotentialBindings &info)
     : CS(CS), TypeVar(TypeVar), Info(info) {
+  GenerationNumber = Info.GenerationNumber;
 
   for (const auto &binding : info.Bindings)
     addBinding(binding);
@@ -68,6 +69,8 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
 
   for (auto &entry : info.AdjacentVars)
     AdjacentVars.insert(entry.first);
+
+  ASSERT(!IsDirty);
 }
 
 bool BindingSet::forClosureResult() const {
@@ -604,11 +607,17 @@ void BindingSet::inferTransitiveKeyPathBindings() {
                 AdjacentVars.insert(contextualRootVar);
                 AdjacentVars.insert(bindings.AdjacentVars.begin(),
                                     bindings.AdjacentVars.end());
+
+                // Note the fact that we modified the binding set.
+                markDirty();
               }
             } else {
               auto newBinding = binding.withSameSource(
                   inferredRootTy, AllowedBindingKind::Exact);
               addBinding(newBinding.asTransitiveFrom(keyPathTy));
+
+              // Note the fact that we modified the binding set.
+              markDirty();
             }
           }
         }
@@ -661,6 +670,9 @@ void BindingSet::inferTransitiveSupertypeBindings() {
 
       literal.setDirectRequirement(false);
       Literals.push_back(literal);
+
+      // Note the fact that we modified the binding set.
+      markDirty();
     }
 
     // TODO: We shouldn't need this in the future.
@@ -687,6 +699,9 @@ void BindingSet::inferTransitiveSupertypeBindings() {
       auto newBinding =
           binding.withSameSource(type, AllowedBindingKind::Supertypes);
       addBinding(newBinding.asTransitiveFrom(entry.first));
+
+      // Note the fact that we modified the binding set.
+      markDirty();
     }
   }
 }
@@ -736,6 +751,9 @@ void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
             }
 
             addBinding({protocolTy, AllowedBindingKind::Exact, constraint});
+
+            // Note the fact that we modified the binding set.
+            markDirty();
           }
         }
       }
@@ -880,6 +898,9 @@ bool BindingSet::finalizeKeyPathBindings() {
 
       Bindings = std::move(updatedBindings);
       Defaults.clear();
+
+      // Note the fact that we modified the binding set.
+      markDirty();
     }
   }
 
@@ -907,6 +928,9 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
         Bindings.remove_if([](const PotentialBinding &binding) {
           return binding.Kind == AllowedBindingKind::Supertypes;
         });
+
+        // Note the fact that we modified the binding set.
+        markDirty();
       }
     }
   }
@@ -1053,6 +1077,9 @@ void BindingSet::determineLiteralCoverage() {
         auto newBinding = binding->withType(adjustedTy);
         (void)Bindings.erase(binding);
         Bindings.insert(newBinding);
+
+        // Note the fact that we modified the binding set.
+        markDirty();
       }
 
       break;
@@ -1150,9 +1177,6 @@ bool BindingSet::operator==(const BindingSet &other) const {
     if (x != y)
       return false;
   }
-
-  if (TransitiveProtocols != other.TransitiveProtocols)
-    return false;
 
   return true;
 }
@@ -1253,6 +1277,11 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
       continue;
 
     auto &bindings = node.getBindingSet();
+
+    // ****
+    // If any of the below change the binding set, they must also call
+    // markDirty().
+    // ****
 
     // Special handling for key paths.
     bindings.inferTransitiveKeyPathBindings();
@@ -2489,6 +2518,8 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     attributes.push_back("delayed");
   if (isSubtypeOfExistentialType())
     attributes.push_back("subtype_of_existential");
+  if (isDirty())
+    attributes.push_back("dirty");
   if (!attributes.empty()) {
     out << "[attributes: ";
     interleave(attributes, out, ", ");
