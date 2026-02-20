@@ -28,6 +28,15 @@ struct Struct {
       return &_k
     }
   }
+
+  var k3: Klass {
+    borrowing borrow {
+      return _k
+    }
+    borrowing mutate { // expected-error{{a 'mutate' accessor cannot be declared borrowing}}
+      return &_k // expected-error{{}}
+    }
+  }
 }
 
 extension Klass {
