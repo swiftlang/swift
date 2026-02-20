@@ -242,6 +242,9 @@ struct PotentialBindings {
   /// The constraint system this type variable and its bindings belong to.
   ConstraintSystem &CS;
 
+  /// This must be incremented whenever any of the below state changes.
+  unsigned GenerationNumber = 0;
+
   /// The type variable this bindings are associated with. Note that his
   /// property could change when associated with a constraint graph node
   /// that is being re-used. Calling \c reset sets it to `nullptr`.

@@ -2066,6 +2066,8 @@ void PotentialBindings::infer(Constraint *constraint) {
   if (!Constraints.insert(constraint))
     return;
 
+  ++GenerationNumber;
+
   // Record the change, if there are active scopes.
   if (CS.solverState)
     CS.recordChange(
@@ -2261,6 +2263,8 @@ void PotentialBindings::retract(Constraint *constraint) {
   if (!Constraints.remove(constraint))
     return;
 
+  ++GenerationNumber;
+
   // Record the change, if there are active scopes.
   if (CS.solverState)
     CS.recordChange(SolverTrail::Change::RetractedConstraintFromInference(
@@ -2357,6 +2361,8 @@ void PotentialBindings::dump(llvm::raw_ostream &out, unsigned indent) const {
   } else {
     out << "<<No type variable assigned>>\n";
   }
+
+  out << "generation: " << GenerationNumber << " ";
 
   out << "[constraints: ";
   interleave(
