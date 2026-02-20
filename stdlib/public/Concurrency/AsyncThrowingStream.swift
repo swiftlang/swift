@@ -393,10 +393,8 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
 extension AsyncThrowingStream: AsyncSequence {
   /// The asynchronous iterator for iterating an asynchronous stream.
   ///
-  /// This type is not `Sendable`. Don't use it from multiple
-  /// concurrent contexts. It is a programmer error to invoke `next()` from a
-  /// concurrent context that contends with another such call, which
-  /// results in a call to `fatalError()`.
+  /// This type is not `Sendable`. Don't use it from multiple concurrent
+  /// contexts.
   public struct Iterator: AsyncIteratorProtocol {
     let context: _Context
 
@@ -404,10 +402,6 @@ extension AsyncThrowingStream: AsyncSequence {
     ///
     /// When `next()` returns `nil`, this signifies the end of the
     /// `AsyncThrowingStream`.
-    ///
-    /// It is a programmer error to invoke `next()` from a concurrent context
-    /// that contends with another such call, which results in a call to
-    ///  `fatalError()`.
     ///
     /// If you cancel the task this iterator is running in while `next()` is
     /// awaiting a value, the `AsyncThrowingStream` terminates. In this case,
@@ -421,10 +415,6 @@ extension AsyncThrowingStream: AsyncSequence {
     ///
     /// When `next()` returns `nil`, this signifies the end of the
     /// `AsyncThrowingStream`.
-    ///
-    /// It is a programmer error to invoke `next()` from a concurrent
-    /// context that contends with another such call, which results in a call to
-    /// `fatalError()`.
     ///
     /// If you cancel the task this iterator is running in while `next()`
     /// is awaiting a value, the `AsyncThrowingStream` terminates. In this case,
