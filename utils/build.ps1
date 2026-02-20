@@ -4347,13 +4347,15 @@ if (-not $SkipBuild) {
     foreach ($Build in $WindowsSDKBuilds) {
       if (-not $Build.LinkModes.Contains("static")) { continue }
 
-      $SDKROOT = Get-SwiftSDK -OS $Build.OS -Identifier "$($Build.OS)Experimental"
-      $SwiftResourceDir = "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)"
-      Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\brotlicommon.lib" -Destination "${SwiftResourceDir}\brotlicommon.lib" | Out-Null
-      Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\brotlidec.lib" -Destination "${SwiftResourceDir}\brotlidec.lib" | Out-Null
-      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.lib" -Destination "${SwiftResourceDir}\libcurl.lib" | Out-Null
-      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2s.lib" -Destination "${SwiftResourceDir}\libxml2s.lib" | Out-Null
-      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\zlib\zlibstatic.lib" -Destination "${SwiftResourceDir}\zlibstatic.lib" | Out-Null
+      if ($SDK -eq "WindowsExperimental") {
+        $SDKROOT = Get-SwiftSDK -OS $Build.OS -Identifier "$($Build.OS)Experimental"
+        $SwiftResourceDir = "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)"
+        Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\brotlicommon.lib" -Destination "${SwiftResourceDir}\brotlicommon.lib" | Out-Null
+        Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\brotlidec.lib" -Destination "${SwiftResourceDir}\brotlidec.lib" | Out-Null
+        Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.lib" -Destination "${SwiftResourceDir}\libcurl.lib" | Out-Null
+        Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2s.lib" -Destination "${SwiftResourceDir}\libxml2s.lib" | Out-Null
+        Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\zlib\zlibstatic.lib" -Destination "${SwiftResourceDir}\zlibstatic.lib" | Out-Null
+      }
     }
   }
 
@@ -4424,13 +4426,15 @@ if (-not $SkipBuild) {
     foreach ($Build in $AndroidSDKBuilds) {
       if (-not $Build.LinkModes.Contains("static")) { continue }
 
-      $SDKROOT = Get-SwiftSDK -OS $Build.OS -Identifier "$($Build.OS)Experimental"
-      $SwiftResourceDir = "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)"
-      Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\libbrotlicommon.a" -Destination "${SwiftResourceDir}\libbrotlicommon.a" | Out-Null
-      Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\libbrotlidec.a" -Destination "${SwiftResourceDir}\libbrotlidec.a" | Out-Null
-      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.a" -Destination "${SwiftResourceDir}\libcurl.a" | Out-Null
-      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2.a" -Destination "${SwiftResourceDir}\libxml2.a" | Out-Null
-      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\zlib\libz.a" -Destination "${SwiftResourceDir}\libz.a" | Out-Null
+      if ($SDK -eq "WindowsExperimental") {
+        $SDKROOT = Get-SwiftSDK -OS $Build.OS -Identifier "$($Build.OS)Experimental"
+        $SwiftResourceDir = "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)"
+        Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\libbrotlicommon.a" -Destination "${SwiftResourceDir}\libbrotlicommon.a" | Out-Null
+        Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\libbrotlidec.a" -Destination "${SwiftResourceDir}\libbrotlidec.a" | Out-Null
+        Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.a" -Destination "${SwiftResourceDir}\libcurl.a" | Out-Null
+        Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2.a" -Destination "${SwiftResourceDir}\libxml2.a" | Out-Null
+        Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\zlib\libz.a" -Destination "${SwiftResourceDir}\libz.a" | Out-Null
+      }
     }
   }
 
