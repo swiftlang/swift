@@ -196,6 +196,22 @@ LONG reallyHandleException(EXCEPTION_POINTERS *ExceptionInfo) {
   return EXCEPTION_CONTINUE_SEARCH;
 }
 
+#define MIN_FD_TO_CLOSE 0
+#define MAX_FD_TO_CLOSE 1000
+
+void
+closeFds() {
+  let stdOutFd = _fileno(stdout);
+  let stdErrFd = _fileno(stderr);
+  for (int i = MIN_FD_TO_CLOSE; i < MAX_FD_TO_CLOSE; i++) {
+    if (i != stdOutFd && i != stdErrFd) {
+      // _close should close the underlying file handle
+      // https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/close
+      _close(i);
+    }
+  }
+}
+
 void *pcFromContext(PCONTEXT Context) {
 #if defined(_M_X64)
   return (void *)(Context->Rip);

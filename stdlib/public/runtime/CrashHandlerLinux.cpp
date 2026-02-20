@@ -269,6 +269,10 @@ handle_fatal_signal(int signum,
 
   _swift_displayCrashMessage(signum, pc);
 
+  if (_swift_backtraceSettings.closeFds) {
+    closeFds(fd);
+  }
+  
   // Actually start the backtracer
   if (!_swift_spawnBacktracer(&crashInfo, fd)) {
     const char *message = _swift_backtraceSettings.color == OnOffTty::On
@@ -667,6 +671,22 @@ wait_paused(uint32_t expected, const struct timespec *timeout)
            || errno == EAGAIN);
 }
 
+#define MIN_FD_TO_CLOSE 0
+#define MAX_FD_TO_CLOSE 1000
+
+void
+closeFds(int fd) {
+  for (int i = MIN_FD_TO_CLOSE; i < MAX_FD_TO_CLOSE; i++) {
+    // we don't attempt to close memserver_fd, if the mem server is in process
+    // we need to leave it open, if it's in a sub process then this function
+    // should be running on the parent (crashing) process and should already
+    // have closed it
+    if (i != STDOUT_FILENO && i != STDERR_FILENO && i != fd) {
+      close(i);
+    }
+  }
+}
+
 // .. Memory server ............................................................
 
 /* The memory server exists so that we can gain access to the crashing
@@ -720,6 +740,7 @@ memserver_start()
   prctl(PR_SET_PTRACER, ret);
 
   close(fds[0]);
+  memserver_fd = 0;
 #else
   memserver_pid = getpid();
 #endif
