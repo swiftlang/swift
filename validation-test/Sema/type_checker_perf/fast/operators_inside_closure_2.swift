@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -solver-scope-threshold=10000
+// RUN: %target-swift-frontend -typecheck %s -solver-scope-threshold=300
 // REQUIRES: tools-release,no_asan
 
 // Selecting operators from the closure before arguments to `zip` makes this "too complex"

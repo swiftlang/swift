@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=200
 // REQUIRES: objc_interop,no_asan
 
 // REQUIRES: OS=macosx
