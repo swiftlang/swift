@@ -466,7 +466,8 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
         type, cast<TypeAliasDecl>(typeDecl), fromDC, options);
   };
 
-  if (!isSpecialized) {
+  if (!isSpecialized &&
+        !options.contains(TypeResolutionFlags::HasModuleSelector)) {
     // If we are referring to a type within its own context, and we have either
     // a generic type with no generic arguments or a non-generic type, use the
     // type within the context.
@@ -5279,7 +5280,13 @@ TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
 
   if (auto *unqualIdentTR = dyn_cast<UnqualifiedIdentTypeRepr>(repr)) {
     // The base component uses unqualified lookup.
-    result = resolveUnqualifiedIdentTypeRepr(resolution.withOptions(options),
+    auto newOpts = options;
+    if (unqualIdentTR->getNameRef().hasModuleSelector())
+      newOpts |= TypeResolutionFlags::HasModuleSelector;
+    else
+      newOpts -= TypeResolutionFlags::HasModuleSelector;
+
+    result = resolveUnqualifiedIdentTypeRepr(resolution.withOptions(newOpts),
                                              silContext, unqualIdentTR);
 
     if (result && result->isParameterPack() &&
@@ -5317,7 +5324,13 @@ TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
       return ErrorType::get(ctx);
     }
 
-    result = resolveQualifiedIdentTypeRepr(resolution.withOptions(options),
+    auto newOpts = options;
+    if (qualIdentTR->getNameRef().hasModuleSelector())
+      newOpts |= TypeResolutionFlags::HasModuleSelector;
+    else
+      newOpts -= TypeResolutionFlags::HasModuleSelector;
+
+    result = resolveQualifiedIdentTypeRepr(resolution.withOptions(newOpts),
                                            silContext, baseTy, qualIdentTR);
   }
 

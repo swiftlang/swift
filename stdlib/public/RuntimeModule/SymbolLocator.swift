@@ -55,6 +55,7 @@ public protocol SymbolLocator {
   typealias Image = SymbolLoader.Image
   typealias ImageFormat = SymbolLoader.ImageFormat
 
+  func find(image: any Image) -> String?
   func findSymbols(for image: any Image) -> (any SymbolSource)?
   func findSymbols(for image: any Image,
                    format: ImageFormat) -> (any SymbolSource)?

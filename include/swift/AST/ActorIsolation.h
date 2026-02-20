@@ -453,7 +453,7 @@ ActorIsolation getActorIsolationOfContext(
 bool isSameActorIsolated(ValueDecl *value, DeclContext *dc);
 
 /// Determines whether this function's body uses flow-sensitive isolation.
-bool usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn);
+bool usesFlowSensitiveIsolation(AbstractFunctionDecl *fn);
 
 void simple_display(llvm::raw_ostream &out, const ActorIsolation &state);
 

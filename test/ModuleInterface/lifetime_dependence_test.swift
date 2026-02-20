@@ -24,31 +24,31 @@
 
 import lifetime_dependence
 // CHECK: @lifetime(borrow a)
-// CHECK-NEXT: @inlinable internal init(_ ptr: Swift.UnsafeRawBufferPointer, _ a: borrowing Swift.Array<Swift.Int>) {
+// CHECK-NEXT: @inlinable internal init(_ ptr: Swift::UnsafeRawBufferPointer, _ a: borrowing Swift::Array<Swift::Int>) {
 // CHECK: @lifetime(copy a)
-// CHECK-NEXT: @inlinable internal init(_ ptr: Swift.UnsafeRawBufferPointer, _ a: consuming lifetime_dependence.AnotherView) {
+// CHECK-NEXT: @inlinable internal init(_ ptr: Swift::UnsafeRawBufferPointer, _ a: consuming lifetime_dependence::AnotherView) {
 
 // CHECK: @lifetime(copy x)
-// CHECK-NEXT: @inlinable public func derive(_ x: consuming lifetime_dependence.BufferView) -> lifetime_dependence.BufferView {
+// CHECK-NEXT: @inlinable public func derive(_ x: consuming lifetime_dependence::BufferView) -> lifetime_dependence::BufferView {
 
 // CHECK: @lifetime(copy view)
-// CHECK-NEXT: @inlinable public func consumeAndCreate(_ view: consuming lifetime_dependence.BufferView) -> lifetime_dependence.BufferView {
+// CHECK-NEXT: @inlinable public func consumeAndCreate(_ view: consuming lifetime_dependence::BufferView) -> lifetime_dependence::BufferView {
 
 // CHECK: @lifetime(copy this, copy that)
-// CHECK-NEXT: @inlinable public func deriveThisOrThat(_ this: consuming lifetime_dependence.BufferView, _ that: consuming lifetime_dependence.BufferView) -> lifetime_dependence.BufferView {
+// CHECK-NEXT: @inlinable public func deriveThisOrThat(_ this: consuming lifetime_dependence::BufferView, _ that: consuming lifetime_dependence::BufferView) -> lifetime_dependence::BufferView {
 
 // Check that an implicitly dependent variable accessor is guarded by LifetimeDependence.
 //
-// CHECK: extension lifetime_dependence.Container {
+// CHECK: extension lifetime_dependence::Container {
 // CHECK-NEXT: #if compiler(>=5.3) && $LifetimeDependence
-// CHECK-NEXT:   public var storage: lifetime_dependence.BufferView {
+// CHECK-NEXT:   public var storage: lifetime_dependence::BufferView {
 
-// CHECK-LABEL: extension Swift.UnsafeMutableBufferPointer where Element : ~Copyable {
+// CHECK-LABEL: extension Swift::UnsafeMutableBufferPointer where Element : ~Copyable {
 // CHECK:   #if compiler(>=5.3) && $LifetimeDependence
-// CHECK:   public var span: Swift.Span<Element> {
+// CHECK:   public var span: Swift::Span<Element> {
 // CHECK:     @lifetime(borrow self)
 // CHECK:     @_alwaysEmitIntoClient get {
 // CHECK:   #if compiler(>=5.3) && $NonescapableAccessorOnTrivial && $LifetimeDependence
-// CHECK:   public var mutableSpan: Swift.MutableSpan<Element> {
+// CHECK:   public var mutableSpan: Swift::MutableSpan<Element> {
 // CHECK:     @lifetime(borrow self)
 // CHECK:     @_alwaysEmitIntoClient get {

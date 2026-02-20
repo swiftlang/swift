@@ -37,14 +37,14 @@ final class PeImageCache {
     cache = [:]
   }
 
-  func lookup(path: String?, alternativePaths: [String] = []) -> PeCoffImage? {
+  func lookup(path: String?) -> PeCoffImage? {
     guard let path = path else {
       return nil
     }
     if let image = cache[path] {
       return image
     }
-    if let source = try? ImageSource(path: path, alternativePaths: alternativePaths),
+    if let source = try? ImageSource(path: path),
        let image = try? PeCoffImage(source: source) {
       cache[path] = image
       return image

@@ -3415,8 +3415,12 @@ public:
   }
 
   /// Returns the protocol requirements that this decl conforms to.
+  ///
+  /// \param NTD If specified, the nominal to use for conformance lookup. This
+  /// is useful if you want to query for a subclass.
   ArrayRef<ValueDecl *>
-  getSatisfiedProtocolRequirements(bool Sorted = false) const;
+  getSatisfiedProtocolRequirements(bool Sorted = false,
+                                   NominalTypeDecl *NTD = nullptr) const;
 
   /// Determines the kind of access that should be performed by a
   /// DeclRefExpr or MemberRefExpr use of this value in the specified
@@ -4429,7 +4433,8 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   friend class DirectLookupRequest;
   friend class LookupAllConformancesInContextRequest;
   friend ArrayRef<ValueDecl *>
-  ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
+  ValueDecl::getSatisfiedProtocolRequirements(bool Sorted,
+                                              NominalTypeDecl *) const;
 
 protected:
   Type DeclaredTy;

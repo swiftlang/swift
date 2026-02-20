@@ -114,7 +114,7 @@ public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
 
 @available(SwiftStdlib 6.4, *)
 extension BorrowingSequence where Self: BorrowingIteratorProtocol & ~Escapable,
-  BorrowingIterator == Self
+  BorrowingIterator == Self, Element: ~Copyable
 {
   @lifetime(borrow self)
   public func makeBorrowingIterator() -> BorrowingIterator {

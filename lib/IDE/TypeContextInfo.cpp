@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/TypeContextInfo.h"
-#include "ExprContextAnalysis.h"
 #include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"

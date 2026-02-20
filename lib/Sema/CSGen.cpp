@@ -2451,7 +2451,8 @@ namespace {
         // so we need to set a non-compound reference to make sure that e.g.
         // `case test(x: Int, y: Int)` gets the labels preserved when matched
         // with `case let .test(tuple)`.
-        auto functionRefInfo = FunctionRefInfo::unappliedBaseName();
+        auto functionRefInfo = FunctionRefInfo::unappliedBaseName(
+                                    enumPattern->getName().hasModuleSelector());
         if (enumPattern->hasSubPattern())
           functionRefInfo = functionRefInfo.addingApplicationLevel();
 
@@ -2461,7 +2462,8 @@ namespace {
         // arguments (tuple-to-tuple conversion).
         // FIXME: We ought to be preserving labels and matching in the solver.
         if (dyn_cast_or_null<TuplePattern>(enumPattern->getSubPattern()))
-          functionRefInfo = FunctionRefInfo::singleCompoundNameApply();
+          functionRefInfo = FunctionRefInfo::singleCompoundNameApply(
+                                    enumPattern->getName().hasModuleSelector());
 
         auto patternLocator =
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern));
@@ -3571,7 +3573,8 @@ namespace {
       // Look up the macros with this name.
       auto moduleIdent = expr->getModuleName().getBaseName();
       auto macroIdent = expr->getMacroName().withoutArgumentLabels(ctx);
-      FunctionRefInfo functionRefInfo = FunctionRefInfo::singleBaseNameApply();
+      FunctionRefInfo functionRefInfo =
+          FunctionRefInfo::singleBaseNameApply(macroIdent.hasModuleSelector());
       auto macros = lookupMacros(moduleIdent, macroIdent, functionRefInfo,
                                  expr->getMacroRoles());
       if (macros.empty()) {
@@ -3579,7 +3582,8 @@ namespace {
         if (macroIdent.hasModuleSelector()) {
           auto anyMacroIdent = DeclNameRef(macroIdent.getFullName());
           ModuleSelectorCorrection correction(
-            lookupMacros(moduleIdent, anyMacroIdent, functionRefInfo,
+            lookupMacros(moduleIdent, anyMacroIdent,
+                         FunctionRefInfo::singleBaseNameApply(),
                          expr->getMacroRoles()));
           if (correction.diagnose(ctx, expr->getMacroNameLoc(), macroIdent))
             return Type();
@@ -3803,7 +3807,8 @@ namespace {
       if (auto keyPath = dyn_cast<KeyPathExpr>(expr)) {
         if (keyPath->isObjC()) {
           auto &cs = CG.getConstraintSystem();
-          (void)TypeChecker::checkObjCKeyPathExpr(cs.DC, keyPath);
+          ObjCKeyPathStringRequest req{keyPath, cs.DC};
+          (void)evaluateOrDefault(cs.getASTContext().evaluator, req, nullptr);
         }
       }
 

@@ -69,8 +69,8 @@ struct exportedClangType {};
 @_exported import Exported
 
 public func foo(a: exportedClangType) {}
-// CHECK-USE-EXPORTED: Exported.exportedClangType
-// CHECK-USE-EXPORTER: Exporter.exportedClangType
+// CHECK-USE-EXPORTED: Exported::exportedClangType
+// CHECK-USE-EXPORTER: Exporter::exportedClangType
 
 //--- Exporter.swift
 @_exported import Exported

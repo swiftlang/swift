@@ -217,10 +217,13 @@ SwiftModuleScanner::scanInterfaceFile(Identifier moduleID,
                /*static=*/false, /*force_load=*/true});
         }
         bool isStatic = llvm::find(ArgsRefs, "-static") != ArgsRefs.end();
+        bool isStrictMemorySafety =
+            llvm::find(ArgsRefs, "-strict-memory-safety") != ArgsRefs.end();
 
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(
             InPath, compiledCandidatesRefs, ArgsRefs, {}, {}, linkLibraries,
-            isFramework, isStatic, {}, /*module-cache-key*/ "", UserModVer);
+            isFramework, isStatic, isStrictMemorySafety, {},
+            /*module-cache-key*/ "", UserModVer);
 
         // Walk the source file to find the import declarations.
         llvm::StringSet<> alreadyAddedModules;
@@ -356,6 +359,9 @@ llvm::ErrorOr<ModuleDependencyInfo> SwiftModuleScanner::scanBinaryModuleFile(
       serializedSearchPaths, binaryModuleImports->headerImport,
       definingModulePath, isFramework, loadedModuleFile->isStaticLibrary(),
       loadedModuleFile->isBuiltWithCxxInterop(),
+      loadedModuleFile->getResilienceStrategy() ==
+          ResilienceStrategy::Resilient,
+      loadedModuleFile->strictMemorySafety(),
       /*module-cache-key*/ "", userModuleVer);
 
   for (auto &macro : loadedModuleFile->getExternalMacros()) {

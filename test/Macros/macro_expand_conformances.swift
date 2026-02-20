@@ -33,7 +33,7 @@ public struct PublicEquatable {
 
 // INTERFACE-NOT: @Equatable
 // INTERFACE: public struct PublicEquatable
-// INTERFACE: extension ModuleWithEquatable.PublicEquatable : Swift.Equatable
+// INTERFACE: extension ModuleWithEquatable::PublicEquatable : Swift::Equatable
 
 #else
 import ModuleWithEquatable

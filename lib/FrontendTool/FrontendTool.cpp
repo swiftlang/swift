@@ -21,7 +21,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/FrontendTool/FrontendTool.h"
-#include "Dependencies.h"
 #include "TBD.h"
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTDumper.h"
@@ -63,6 +62,7 @@
 #include "swift/Frontend/MakeStyleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/FrontendTool/Dependencies.h"
 #include "swift/IRGen/TBDGen.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"

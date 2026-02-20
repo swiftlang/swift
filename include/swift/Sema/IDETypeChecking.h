@@ -122,21 +122,6 @@ namespace swift {
   /// \returns True on applied, false on not applied.
   bool isMemberDeclApplied(const DeclContext *DC, Type Ty, const ValueDecl *VD);
 
-  /// The kind of type checking to perform for code completion.
-  enum class CompletionTypeCheckKind {
-    /// Type check the expression as normal.
-    Normal,
-
-    /// Type check the argument to an Objective-C #keyPath.
-    KeyPath,
-  };
-
-  /// Return the type of an expression parsed during code completion, or
-  /// None on error.
-  std::optional<Type> getTypeOfCompletionContextExpr(
-      ASTContext &Ctx, DeclContext *DC, CompletionTypeCheckKind kind,
-      Expr *&parsedExpr, ConcreteDeclRef &referencedDecl);
-
   /// Type check a function body element which is at \p TagetLoc.
   bool typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
                              SourceLoc TargetLoc);

@@ -28,7 +28,7 @@ import Foundation
 // @_objcImplementation class
 //
 
-// CHECK-LABEL: extension objc_implementation.ImplClass {
+// CHECK-LABEL: extension objc_implementation::ImplClass {
 @_objcImplementation extension ImplClass {
   // CHECK-NOT: init()
   @objc public override init() {
@@ -45,13 +45,13 @@ import Foundation
   // CHECK-NOT: var letProperty1:
   @objc public let letProperty1: Int32
 
-  // CHECK-DAG: @nonobjc public var letProperty2: Swift.Int32 { get }
+  // CHECK-DAG: @nonobjc public var letProperty2: Swift::Int32 { get }
   @nonobjc public let letProperty2: Int32
 
-  // CHECK-DAG: final public var implProperty2: ObjectiveC.NSObject? { get set }
+  // CHECK-DAG: final public var implProperty2: ObjectiveC::NSObject? { get set }
   public final var implProperty2: NSObject?
 
-  // CHECK-DAG: final public var implProperty3: ObjectiveC.NSObject? {
+  // CHECK-DAG: final public var implProperty3: ObjectiveC::NSObject? {
   public final var implProperty3: NSObject? {
     didSet { }
   }
@@ -68,7 +68,7 @@ import Foundation
 //
 
 // Empty category should be omitted, so there's only one `extension ImplClass`.
-// CHECK-NOT: extension objc_implementation.ImplClass {
+// CHECK-NOT: extension objc_implementation::ImplClass {
 @_objcImplementation(Category1) extension ImplClass {
   // NEGATIVE-NOT: func category1Method
   @objc public func category1Method(_: Int32) {
@@ -80,7 +80,7 @@ import Foundation
 // Second @_objcImplementation class, inherited initializer
 //
 
-// NEGATIVE-NOT: extension objc_implementation.NoInitImplClass
+// NEGATIVE-NOT: extension objc_implementation::NoInitImplClass
 @_objcImplementation extension NoInitImplClass {
   // NEGATIVE-NOT: var s1:
   @objc public let s1 = "s1v"
@@ -96,7 +96,7 @@ import Foundation
 // @objc subclass of @_objcImplementation class
 //
 
-// CHECK-LABEL: @objc @_inheritsConvenienceInitializers open class SwiftSubclass : objc_implementation.ImplClass {
+// CHECK-LABEL: @objc @_inheritsConvenienceInitializers open class SwiftSubclass : objc_implementation::ImplClass {
 open class SwiftSubclass: ImplClass {
   // CHECK-DAG: @objc override dynamic open func mainMethod
   override open func mainMethod(_: Int32) {

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=200
 // REQUIRES: tools-release,no_asan
 
 func wrap<T>(_ key: String, _ value: T) -> T { return value }

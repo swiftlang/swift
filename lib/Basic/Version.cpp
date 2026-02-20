@@ -112,6 +112,9 @@ Version::Version(const llvm::VersionTuple &version) {
       Components.emplace_back(*subminor);
       if (auto build = version.getBuild()) {
         Components.emplace_back(*build);
+        if (auto subbuild = version.getSubbuild()) {
+          Components.emplace_back(*subbuild);
+        }
       }
     }
   }
@@ -132,11 +135,14 @@ Version::operator llvm::VersionTuple() const
                               (unsigned)Components[1],
                               (unsigned)Components[2]);
  case 4:
- case 5:
    return llvm::VersionTuple((unsigned)Components[0],
                               (unsigned)Components[1],
                               (unsigned)Components[2],
                               (unsigned)Components[3]);
+ case 5:
+   return llvm::VersionTuple((unsigned)Components[0], (unsigned)Components[1],
+                             (unsigned)Components[2], (unsigned)Components[3],
+                             (unsigned)Components[4]);
  default:
    llvm_unreachable("swift::version::Version with 6 or more components");
   }

@@ -937,6 +937,7 @@ enum Project {
   ExperimentalStaticVolatile
   ExperimentalStaticDispatch
   ExperimentalStaticFoundation
+  ExperimentalBacktrace
 }
 
 function Get-ProjectBinaryCache([Hashtable] $Platform, [Project] $Project) {
@@ -3368,6 +3369,32 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
   }
   if ($Platform.LinkModes.Contains("static")) {
     Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
+
+    # NOTE: we only build this if static variants are enabled to ensure that we
+    # can statically link the runtime.
+    Record-OperationTime $Platform "Build-ExperimentalBacktrace" {
+      Invoke-IsolatingEnvVars {
+        $env:Path = "$(Get-CMarkBinaryCache $Platform)\src;$(Get-PinnedToolchainRuntime);${env:Path}"
+
+        $SDKRoot = Get-SwiftSDK -OS $Platform.OS -Identifier "$($Platform.OS)Experimental"
+
+        Build-CMakeProject `
+          -Src $SourceCache\swift\Runtimes\Supplemental\StackWalker `
+          -Bin (Get-ProjectBinaryCache $Platform ExperimentalBacktrace) `
+          -InstallTo "${SDKRoot}\usr" `
+          -Platform $Platform `
+          -UseBuiltCompilers CXX,Swift `
+          -SwiftSDK $null `
+          -UseGNUDriver `
+          -Defines @{
+            CMAKE_Swift_FLAGS = @("-static-stdlib");
+            SwiftCore_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalStaticRuntime)\cmake\SwiftCore";
+            SwiftCxxOverlay_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalStaticOverlay)\Cxx\cmake\SwiftCxxOverlay";
+            SwiftOverlay_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalStaticOverlay)\cmake\SwiftOverlay";
+            SwiftRuntime_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalStaticRuntimeModule)\cmake\SwiftRuntime";
+          }
+      }
+    }
   }
 
   $SDKROOT = Get-SwiftSDK -OS $Platform.OS -Identifier "$($Platform.OS)Experimental"

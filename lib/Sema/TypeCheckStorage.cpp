@@ -2821,8 +2821,6 @@ createBorrowMutateAccessorPrototype(AbstractStorageDecl *storage,
       params, Type(), dc);
   accessor->setSynthesized();
 
-  // TODO: Update self access kind when ownership variations are introduced for
-  // borrow and mutate accessors.
   if (kind == AccessorKind::Mutate) {
     accessor->setSelfAccessKind(SelfAccessKind::Mutating);
   } else {
@@ -2832,22 +2830,20 @@ createBorrowMutateAccessorPrototype(AbstractStorageDecl *storage,
   if (!storage->requiresOpaqueAccessor(kind))
     accessor->setForcedStaticDispatch(true);
 
-  // Make sure the coroutine is available enough to access
+  // Make sure the borrow/mutate accessor is available enough to access
   // the storage.
   SmallVector<const Decl *, 2> asAvailableAs;
   asAvailableAs.push_back(storage);
 
-  if (auto var = dyn_cast<VarDecl>(storage)) {
-    addPropertyWrapperAccessorAvailability(var, kind, asAvailableAs);
-  }
+  // Property wrappers should never appear during borrow/mutate synthesis.
+  // We only synthesize borrow/mutate accessors for stored properties when
+  // a protocol has borrow/mutate requirement. Since property wrappers are
+  // transformed into computed properties with get/set accessors, they cannot
+  // satisfy the protocol requirement.
+  ASSERT(!isa<VarDecl>(storage) ||
+         !cast<VarDecl>(storage)->hasAttachedPropertyWrapper());
 
   AvailabilityInference::applyInferredAvailableAttrs(accessor, asAvailableAs);
-
-  // A mutate accessor should have the same SPI visibility as the setter.
-  if (kind == AccessorKind::Mutate) {
-    if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set))
-      applyInferredSPIAccessControlAttr(accessor, setter, ctx);
-  }
 
   finishImplicitAccessor(accessor, ctx);
 

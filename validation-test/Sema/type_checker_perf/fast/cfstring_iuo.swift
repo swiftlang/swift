@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=8000 -solver-enable-prune-disjunctions
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=100 -solver-enable-prune-disjunctions
 
 // REQUIRES: objc_interop
 

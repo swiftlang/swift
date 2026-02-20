@@ -8940,6 +8940,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   if (type->isTypeVariableOrMember())
     return formUnsolved();
 
+  // If we have a function type and are checking for Sendable conformance we
+  // need to delay if we have Sendable dependence.
+  if (auto *fnTy = type->getAs<FunctionType>()) {
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      if (fnTy->getSendableDependentType()) {
+        fnTy = simplifyType(fnTy)->castTo<FunctionType>();
+        type = fnTy;
+      }
+      if (fnTy->getSendableDependentType())
+        return formUnsolved();
+    }
+  }
+
   auto conformsToSubKind = kind;
   if (kind != ConstraintKind::NonisolatedConformsTo)
     conformsToSubKind = ConstraintKind::ConformsTo;

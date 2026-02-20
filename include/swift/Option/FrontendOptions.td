@@ -989,6 +989,9 @@ def import_module : Separate<["-"], "import-module">,
 def testable_import_module : Separate<["-"], "testable-import-module">,
   HelpText<"Implicitly import the specified module with @testable">;
 
+def dependency_only_import : Separate<["-"], "dependency-only-import">,
+                             HelpText<"Import the module as a dependency only">;
+
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
 

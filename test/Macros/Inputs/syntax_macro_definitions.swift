@@ -2,7 +2,7 @@ import SwiftDiagnostics
 import SwiftOperators
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 import SwiftSyntaxBuilder
-@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntaxMacros
 
 /// Replace the label of the first element in the tuple with the given
 /// new label.
@@ -2662,7 +2662,6 @@ extension FunctionParameterSyntax {
   }
 }
 
-@_spi(ExperimentalLanguageFeature)
 public struct RemoteBodyMacro: BodyMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2701,7 +2700,6 @@ public struct RemoteBodyMacro: BodyMacro {
   }
 }
 
-@_spi(ExperimentalLanguageFeature)
 public struct BodyMacroWithControlFlow: BodyMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2743,7 +2741,7 @@ struct EmptyBodyMacro: BodyMacro {
   }
 }
 
-@_spi(ExperimentalLanguageFeature)
+@_spi(ExperimentalLanguageFeatures)
 public struct TracedPreambleMacro: PreambleMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2784,7 +2782,7 @@ public struct TracedPreambleMacro: PreambleMacro {
   }
 }
 
-@_spi(ExperimentalLanguageFeature)
+@_spi(ExperimentalLanguageFeatures)
 public struct LoggerMacro: PreambleMacro {
   public static func expansion(
     of node: AttributeSyntax,

@@ -13,7 +13,7 @@
 
 // RUN: %target-swift-frontend-plain -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache %t/main.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   -o %t/deps.json -I %t -cache-compile-job -cas-path %t/cas -swift-version 5
+// RUN:   -o %t/deps.json -I %t -cache-compile-job -cas-path %t/cas -swift-version 5 -emit-loaded-module-trace -emit-loaded-module-trace-path %t/test.trace.json 
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json A > %t/A.cmd
 // RUN: %swift_frontend_plain @%t/A.cmd
@@ -33,7 +33,7 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -module-name Test -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   -emit-reference-dependencies-path %t/test.swiftdeps -emit-dependencies \
-// RUN:   -primary-file %t/main.swift @%t/MyApp.cmd -emit-loaded-module-trace -emit-loaded-module-trace-path %t/test.trace.json 2>&1 \
+// RUN:   -primary-file %t/main.swift @%t/MyApp.cmd 2>&1 \
 // RUN:     | %FileCheck %s --check-prefix=WARNING --allow-empty
 
 // WARNING-NOT: WARNING:

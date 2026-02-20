@@ -3520,6 +3520,7 @@ public:
       printRecArbitrary([&](Label label) {
         printHead("function_ref_info", ExprModifierColor, label);
         printFlag(info.isCompoundName(), "is_compound_name");
+        printFlag(info.hasModuleSelector(), "has_module_selector");
         printField(info.getApplyLevel(), Label::always("apply_level"));
         printFoot();
       }, label);
