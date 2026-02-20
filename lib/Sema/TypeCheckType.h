@@ -87,6 +87,9 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Whether the immediate context has an @escaping attribute.
   DirectEscaping = 1 << 14,
+
+  /// Whether the name being resolved has a module selector or not.
+  HasModuleSelector = 1 << 15,
 };
 
 /// Type resolution contexts that require special handling.

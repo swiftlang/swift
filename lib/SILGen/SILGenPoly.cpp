@@ -7454,6 +7454,14 @@ void SILGenFunction::emitProtocolWitness(
   // Grab the type of our thunk.
   auto thunkTy = F.getLoweredFunctionType();
 
+  // The protocol conditional conformance itself might bring some T :
+  // Differentiable conformances. They are already added to the derivative
+  // generic signature. Update witness substitution map generic signature to
+  // have them as well.
+  if (auto *derivativeId = witness.getDerivativeFunctionIdentifier())
+    witnessSubs = SubstitutionMap::get(derivativeId->getDerivativeGenericSignature(),
+                                       witnessSubs);
+  
   // Then get the type of the witness.
   auto witnessKind = getWitnessDispatchKind(witness, isSelfConformance);
   auto witnessInfo = getConstantInfo(getTypeExpansionContext(), witness);

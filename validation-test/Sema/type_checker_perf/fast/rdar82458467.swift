@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=2000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=700
 
 func test() {
   let _ = (1 + 2) + (3 + 4) + (5 + 6) + 0.5

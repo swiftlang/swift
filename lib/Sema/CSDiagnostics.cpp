@@ -4476,8 +4476,8 @@ bool MissingMemberFailure::diagnoseAsError() {
       auto result = cs.performMemberLookup(
           ConstraintKind::ValueMember,
           getName().withoutArgumentLabels(getASTContext()), metatypeTy,
-          FunctionRefInfo::doubleBaseNameApply(), getLocator(),
-          /*includeInaccessibleMembers=*/true);
+          FunctionRefInfo::doubleBaseNameApply(getName().hasModuleSelector()),
+          getLocator(), /*includeInaccessibleMembers=*/true);
 
       // If there are no `init` members at all produce a tailored
       // diagnostic for that, otherwise fallback to generic

@@ -82,6 +82,8 @@ struct TestCoroAccessorOfCoroAccessor<T : ~Escapable> : ~Copyable & ~Escapable {
   }
 }
 
+extension TestCoroAccessorOfCoroAccessor: Escapable where T: Escapable {}
+
 @usableFromInline
 internal func unsafeBitCast<T: ~Escapable & ~Copyable, U>(
    _ x: consuming T, to type: U.Type

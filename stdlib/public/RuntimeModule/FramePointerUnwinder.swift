@@ -89,25 +89,28 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   private mutating func isAsyncPC(_ pc: Address) -> Bool {
     // On Linux, we need to examine the PC to see if this is an async frame
     #if os(Linux)
-    let address = MemoryReader.Address(pc)
+    guard let address = Backtrace.Address(pc) else {
+      return false
+    }
 
     if let images = images,
-       let imageNdx = images.indexOfImage(at: Backtrace.Address(address)) {
-      let base = MemoryReader.Address(images[imageNdx].baseAddress)!
-      let relativeAddress = address - base
+       let imageNdx = images.indexOfImage(at: address) {
+      let base = images[imageNdx].baseAddress
+      let relativeAddress: ImageSource.Address
       let cache = ElfImageCache.threadLocal
 
       if let hit = cache.lookup(path: images[imageNdx].path) {
         switch hit {
           case let .elf32Image(image):
-            if let theSymbol = image.lookupSymbol(
-                 address: Elf32Image.Traits.Address(relativeAddress)
-               ) {
+            relativeAddress = ImageSource.Address(address - base)
+              + image.imageBase
+            if let theSymbol = image.lookupSymbol(address: relativeAddress) {
               return isAsyncSymbol(theSymbol.name)
             }
           case let .elf64Image(image):
-            if let theSymbol = image.lookupSymbol(
-                 address: Elf64Image.Traits.Address(relativeAddress)) {
+            relativeAddress = ImageSource.Address(address - base)
+              + image.imageBase
+            if let theSymbol = image.lookupSymbol(address: relativeAddress) {
               return isAsyncSymbol(theSymbol.name)
             }
         }

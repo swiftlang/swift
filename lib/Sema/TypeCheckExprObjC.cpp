@@ -16,20 +16,16 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 
 using namespace swift;
 
-std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
-                                                      KeyPathExpr *expr,
-                                                      bool requireResultType) {
-  // TODO: Native keypaths
-  assert(expr->isObjC() && "native keypaths not type-checked this way");
-  
-  // If there is already a semantic expression, do nothing.
-  if (expr->getObjCStringLiteralExpr() && !requireResultType)
-    return std::nullopt;
+Expr *
+ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
+                                   DeclContext *dc) const {
+  ASSERT(expr->isObjC() && "native keypaths not type-checked this way");
 
   // ObjC #keyPath only makes sense when we have the Objective-C runtime.
   auto &Context = dc->getASTContext();
@@ -37,10 +33,8 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   if (!Context.LangOpts.EnableObjCInterop) {
     diags.diagnose(expr->getLoc(), diag::expr_keypath_no_objc_runtime);
 
-    expr->setObjCStringLiteralExpr(
-      new (Context) StringLiteralExpr("", expr->getSourceRange(),
-                                      /*Implicit=*/true));
-    return std::nullopt;
+    return new (Context) StringLiteralExpr("", expr->getSourceRange(),
+                                           /*Implicit=*/true);
   }
 
   // The key path string we're forming.
@@ -165,9 +159,10 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   auto performLookup = [&](DeclNameRef componentName,
                            SourceLoc componentNameLoc,
                            Type &lookupType) -> LookupResult {
-    if (state == Beginning)
-      return lookupUnqualified(dc, componentName, componentNameLoc);
-
+    if (state == Beginning) {
+      return TypeChecker::lookupUnqualified(dc, componentName,
+                                            componentNameLoc);
+    }
     assert(currentType && "Non-beginning state must have a type");
     if (!currentType->mayHaveMembers())
       return LookupResult();
@@ -181,7 +176,7 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       lookupType = currentType;
 
     // Look for a member with the given name within this type.
-    return lookupMember(dc, lookupType, componentName);
+    return TypeChecker::lookupMember(dc, lookupType, componentName);
   };
 
   // Local function to print a component to the string.
@@ -413,15 +408,7 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   if (keyPathString.empty() && !isInvalid)
     diags.diagnose(expr->getLoc(), diag::expr_keypath_empty);
 
-  // Set the string literal expression for the ObjC key path.
-  if (!expr->getObjCStringLiteralExpr()) {
-    expr->setObjCStringLiteralExpr(
-      new (Context) StringLiteralExpr(Context.AllocateCopy(keyPathString),
-                                      expr->getSourceRange(),
-                                      /*Implicit=*/true));
-  }
-
-  if (!currentType)
-    return std::nullopt;
-  return currentType;
+  return new (Context) StringLiteralExpr(Context.AllocateCopy(keyPathString),
+                                         expr->getSourceRange(),
+                                         /*Implicit=*/true);
 }

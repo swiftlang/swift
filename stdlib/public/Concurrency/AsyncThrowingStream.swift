@@ -242,6 +242,11 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// iterator. This means that you can perform needed cleanup in the
     ///  cancellation handler. After reaching a terminal state, the
     ///  `AsyncThrowingStream` disposes of the callback.
+    ///
+    /// - Note: Because the system might call the `onTermination` callback as
+    /// part of task cancellation, it's subject to the same considerations for
+    /// avoiding deadlock as outlined in the documentation for
+    /// ``withTaskCancellationHandler(operation:onCancel:)``.
     public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
         return storage.getOnTermination()

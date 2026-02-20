@@ -5251,6 +5251,27 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Computes the string literal expression for an Obj-C `#keyPath`.
+class ObjCKeyPathStringRequest
+    : public SimpleRequest<ObjCKeyPathStringRequest,
+                           Expr *(KeyPathExpr *, DeclContext *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Expr *evaluate(Evaluator &evaluator, KeyPathExpr *keyPath,
+                 DeclContext *dc) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<Expr *> getCachedResult() const;
+  void cacheResult(Expr *) const;
+};
+
 /// Finds the import declaration that effectively imports a given module in a
 /// source file.
 class ImportDeclRequest

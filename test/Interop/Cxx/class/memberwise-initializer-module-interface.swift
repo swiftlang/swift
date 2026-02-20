@@ -64,3 +64,8 @@
 // CHECK-NEXT:   var x: Int32
 // CHECK-NEXT:   var y: Int32
 // CHECK-NEXT: }
+// CHECK-NEXT: struct ClassWithConstexprStatic {
+// CHECK-NEXT:   init(x: Int32)
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   var x: Int32
+// CHECK-NEXT: }

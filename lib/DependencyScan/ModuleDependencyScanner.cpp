@@ -326,10 +326,9 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenModules) {
   diagnosticReporter.registerNamedClangModuleQuery();
-  auto clangModuleDependencies = clangScanningTool.getModuleDependencies(
-      moduleName.str(), clangScanningModuleCommandLineArgs,
-      clangScanningWorkingDirectoryPath, alreadySeenModules,
-      lookupModuleOutput);
+  auto clangModuleDependencies =
+      clangScanningTool.computeDependenciesByNameWithContext(
+          moduleName.str(), alreadySeenModules, lookupModuleOutput);
   if (!clangModuleDependencies) {
     llvm::handleAllErrors(
         clangModuleDependencies.takeError(),
@@ -783,6 +782,20 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
           }
         });
     mainDependencies.updateCommandLine(buildArgs);
+  }
+
+  // Dependency only imports
+  {
+    for (auto &m : ScanASTContext.SearchPathOpts.DependencyOnlyModuleImports) {
+      // If module is seen, then it is not dependency only, ignore.
+      if (alreadyAddedModules.contains(m))
+        continue;
+
+      mainDependencies.addModuleImport(
+          m,
+          /*isExported=*/false, AccessLevel::Public, &alreadyAddedModules);
+      mainDependencies.addDependencyOnlyImport(m);
+    }
   }
 
   return mainDependencies;

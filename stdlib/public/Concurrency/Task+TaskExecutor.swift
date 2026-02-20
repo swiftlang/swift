@@ -25,7 +25,7 @@ import Swift
 /// For an in depth discussion of this topic, see ``TaskExecutor``.
 ///
 /// ### Disabling task executor preference
-/// Passing `nil` as executor means disabling any preference preference (if it was set) and the task hierarchy
+/// Passing `nil` as executor means disabling any preference (if it was set) and the task hierarchy
 /// will execute without any executor preference until a different preference is set.
 ///
 /// ### Asynchronous function execution semantics in presence of task executor preferences

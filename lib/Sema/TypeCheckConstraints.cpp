@@ -663,6 +663,23 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                 initializer, DC, patternType, pattern,
                 /*bindPatternVarsOneWay=*/false);
 
+  // Bindings cannot be type-checked independently from their context in a
+  // closure. If we want to be able to lazily type-check these we'll need to
+  // type-check the entire surrounding expression.
+  if (auto *CE = dyn_cast<ClosureExpr>(DC)) {
+    if (!pattern->isImplicit()) {
+      // Completion may trigger lazy type-checking, just decline to type-check.
+      auto &ctx = CE->getASTContext();
+      if (ctx.SourceMgr.hasIDEInspectionTargetBuffer()) {
+        target.markInvalid();
+        return true;
+      }
+      // FIXME: Once we ban forward references to bindings in closures, we can
+      // add this assert (https://github.com/swiftlang/swift/pull/85141).
+      // ABORT("Cannot type-check PatternBindingDecl without closure context");
+    }
+  }
+
   // Type-check the initializer.
   auto resultTarget = typeCheckExpression(target, options);
 

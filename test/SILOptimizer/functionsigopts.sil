@@ -1840,6 +1840,8 @@ struct NE<T> : ~Escapable where T : ~Escapable {
   init(_ t: borrowing T)
 }
 
+extension NE: Escapable where T: Escapable {}
+
 // CHECK-NOT: sil [serialized] [signature_optimized_thunk] [heuristic_always_inline] @neinit :
 sil [noinline] @neinit : $@convention(method) <T where T : ~Escapable> (@in_guaranteed T, @thin NE<T>.Type) -> @lifetime(copy 0) @owned NE<T> {
 bb0(%0 : @noImplicitCopy $*T, %1 : $@thin NE<T>.Type):

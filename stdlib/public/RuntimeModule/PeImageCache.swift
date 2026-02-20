@@ -27,7 +27,7 @@ internal import Glibc
 internal import Musl
 #endif
 
-/// Provides a per-thread image cache for ELF image processing.  This means
+/// Provides a per-thread image cache for PE-COFF image processing.  This means
 /// if you take multiple backtraces from a thread, you won't load the same
 /// image multiple times.
 final class PeImageCache {
@@ -37,14 +37,14 @@ final class PeImageCache {
     cache = [:]
   }
 
-  func lookup(path: String?) -> PeCoffImage? {
+  func lookup(path: String?, alternativePaths: [String] = []) -> PeCoffImage? {
     guard let path = path else {
       return nil
     }
     if let image = cache[path] {
       return image
     }
-    if let source = try? ImageSource(path: path),
+    if let source = try? ImageSource(path: path, alternativePaths: alternativePaths),
        let image = try? PeCoffImage(source: source) {
       cache[path] = image
       return image
