@@ -803,3 +803,37 @@ bool swift::isWrappedValueOfPropWrapper(VarDecl *var) {
 
   return false;
 }
+
+
+//new applied changes
+
+#include "TypeChecker.h"
+#include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/Types.h"
+
+/// Add support for applying property wrappers to variadic parameters
+Type TypeChecker::applyPropertyWrapperToVariadicParam(ParamDecl *param,
+                                                    Type paramType,
+                                                    CustomAttr *attr) {
+  // Early exit if this isn't a variadic parameter
+  if (!param->isVariadic())
+    return paramType;
+    
+  // Get the array type that represents the variadic parameter
+  auto arrayType = paramType->getAs<BoundGenericType>();
+  if (!arrayType)
+    return paramType;
+    
+  // Get the element type of the array
+  Type elementType = arrayType->getGenericArgs()[0];
+  
+  // Create the property wrapper type for the element
+  Type wrappedElementType = applyPropertyWrapperToType(elementType, attr);
+  if (!wrappedElementType)
+    return paramType;
+    
+  // Create a new array type with the wrapped element type
+  return BoundGenericType::get(arrayType->getDecl(),
+                              arrayType->getParent(),
+                              { wrappedElementType });
+}
