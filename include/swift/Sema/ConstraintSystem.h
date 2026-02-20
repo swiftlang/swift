@@ -1767,9 +1767,6 @@ public:
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
 
-  /// The total number of disjunctions created.
-  unsigned CountDisjunctions = 0;
-
 private:
   bool PreparingOverload = false;
 
