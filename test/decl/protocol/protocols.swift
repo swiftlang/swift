@@ -315,6 +315,12 @@ func StaticProtocolGenericFunc<t : StaticP>(_: t) {
   t.f()
 }
 
+// https://github.com/swiftlang/swift/issues/85157
+// Suggest type(of:) for static member access on opaque type instance
+func staticMemberOnOpaqueType(p: some StaticP) {
+  p.f() // expected-error{{static member 'f' cannot be used on instance of type 'some StaticP'}} {{3-3=type(of: }} {{4-4=)}}
+}
+
 //===----------------------------------------------------------------------===//
 // Operators
 //===----------------------------------------------------------------------===//

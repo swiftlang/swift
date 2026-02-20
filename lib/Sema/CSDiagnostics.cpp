@@ -5155,8 +5155,16 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     // An implicit 'self' reference base expression means we should
     // prepend with qualification.
     if (baseExpr && !baseExpr->isImplicit()) {
-      Diag->fixItReplace(baseExpr->getSourceRange(),
-                         diag::replace_with_type, baseTy);
+      // If the base type involves archetypes (e.g. 'some P') or type
+      // parameters, it cannot be spelled directly as a type qualifier.
+      // Suggest wrapping in type(of:) instead.
+      if (baseTy->hasArchetype() || baseTy->hasTypeParameter()) {
+        Diag->fixItInsert(baseExpr->getStartLoc(), "type(of: ");
+        Diag->fixItInsertAfter(baseExpr->getEndLoc(), ")");
+      } else {
+        Diag->fixItReplace(baseExpr->getSourceRange(),
+                           diag::replace_with_type, baseTy);
+      }
     } else {
       Diag->fixItInsert(loc, diag::insert_type_qualification, baseTy);
     }
