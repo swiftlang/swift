@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 import StdlibUnittest
 
@@ -652,7 +653,7 @@ suite.test("Span Sendability")
 }
 
 @available(SwiftStdlib 6.3, *)
-extension _BorrowingSequence where Self: ~Copyable & ~Escapable {
+extension _BorrowingSequence where Self: ~Copyable & ~Escapable, _Element: ~Copyable {
   func reduce<T: ~Copyable>(
     _ initial: consuming T,
     _ nextPartialResult: @escaping (consuming T, borrowing _Element) -> T
@@ -713,7 +714,7 @@ extension NoncopyableInt: Equatable {
 }
 
 @available(SwiftStdlib 6.3, *)
-extension _BorrowingSequence where Self: ~Escapable & ~Copyable, _Element: Equatable {
+extension _BorrowingSequence where Self: ~Escapable & ~Copyable, _Element: Equatable & ~Copyable {
   func elementsEqual<S: _BorrowingSequence<_Element>>(
     _ rhs: borrowing S
   ) -> Bool
