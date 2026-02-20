@@ -2141,8 +2141,13 @@ static void rewriteFunction(StructLoweringState &pass,
     SILType currSILType = instr->getType();
     SILType newSILType = pass.getNewSILType(pass.F->getLoweredFunctionType(),
                                             currSILType);
-    auto *newInstr = allocBuilder.createAllocStack(instr->getLoc(), newSILType,
-                                                   instr->getVarInfo());
+    auto varInfo = instr->getVarInfo();
+    // Update the debug variable type to match the new SSA type so the
+    // SIL verifier does not see a mismatch between the two.
+    if (varInfo && varInfo->Type)
+      varInfo->Type = newSILType.getObjectType();
+    auto *newInstr =
+        allocBuilder.createAllocStack(instr->getLoc(), newSILType, varInfo);
     instr->replaceAllUsesWith(newInstr);
     instr->getParent()->erase(instr);
   }
