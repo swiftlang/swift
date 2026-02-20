@@ -18,6 +18,7 @@
 
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/CSTrail.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "swift/Basic/Assertions.h"
@@ -351,6 +352,17 @@ SolverTrail::Change::RetractedBinding(TypeVariableType *typeVar,
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::PrunedDisjunction(Constraint *disjunction,
+                                       FunctionType *argFuncType) {
+  Change result;
+  result.Kind = ChangeKind::PrunedDisjunction;
+  result.Disjunction.Disjunction = disjunction;
+  result.Disjunction.ArgFuncType = argFuncType;
+
+  return result;
+}
+
 SyntacticElementTargetKey
 SolverTrail::Change::getSyntacticElementTargetKey() const {
   ASSERT(Kind == ChangeKind::RecordedTarget);
@@ -628,7 +640,13 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     bindings.Bindings.push_back(binding);
     break;
   }
+
+  case ChangeKind::PrunedDisjunction: {
+    cs.getRemainingDisjunction(Disjunction.Disjunction)
+        .undoArgFuncTypeChange(Disjunction.ArgFuncType);
+    break;
   }
+}
 }
 
 void SolverTrail::Change::dump(llvm::raw_ostream &out,
@@ -860,6 +878,14 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << " with type ";
     Binding.BindingType->print(out, PO);
     out << " and kind " << Options << ")\n";
+    break;
+
+  case ChangeKind::PrunedDisjunction:
+    out << "(PrunedDisjunction ";
+    Disjunction.Disjunction->print(out, &cs.getASTContext().SourceMgr, indent + 2);
+    out << " with type ";
+    Disjunction.ArgFuncType->print(out, PO);
+    out << ")\n";
     break;
   }
 }
