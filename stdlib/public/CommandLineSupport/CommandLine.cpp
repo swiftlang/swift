@@ -546,6 +546,7 @@ static void swift::enumerateUnsafeArgv(const F& body) { }
 #pragma mark - CommandLine.executablePath
 
 namespace swift {
+#if !defined(__APPLE__)
 /// A C++ string that can contain an executable path.
 ///
 /// We don't use `llvm::SmallVector` or `llvm::SmallString` here because we want
@@ -577,14 +578,14 @@ void _swift_stdlib_withExecutablePath(
   ),
   void *bodyContext
 ) {
-  auto path = getExecutablePath();
-  (* body)(path.c_str(), bodyContext);
+  (* body)(getExecutablePath().c_str(), bodyContext);
 }
+#endif
 
 #if defined(__APPLE__)
 // Implemented in Swift on Darwin so it can be back-deployed.
 #elif defined(__linux__) || defined(__ANDROID__)
-ExecutablePath getExecutablePath(void) {
+static ExecutablePath getExecutablePath(void) {
   size_t byteCount = PATH_MAX;
   while (true) {
     ExecutablePath result(byteCount, '\0');
@@ -600,7 +601,7 @@ ExecutablePath getExecutablePath(void) {
   }
 }
 #elif defined(_WIN32)
-ExecutablePath getExecutablePath(void) {
+static ExecutablePath getExecutablePath(void) {
   DWORD charCount = MAX_PATH;
   while (true) {
     ExecutablePath result(charCount, L'\0');
@@ -619,7 +620,7 @@ ExecutablePath getExecutablePath(void) {
   }
 }
 #elif defined(__FreeBSD__)
-ExecutablePath getExecutablePath(void) {
+static ExecutablePath getExecutablePath(void) {
   int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
   size_t bufferCount = 0;
   if (sysctl(mib, std::size(mib), nullptr, &bufferCount, nullptr, 0) == 0) {
@@ -663,7 +664,7 @@ static bool checkExecutablePath(const char *executablePath) {
   return false;
 }
 
-ExecutablePath getExecutablePath(void) {
+static ExecutablePath getExecutablePath(void) {
   ExecutablePath result;
 
   int argc = 0;
@@ -695,7 +696,7 @@ ExecutablePath getExecutablePath(void) {
   return result;
 }
 #else // Add your favorite OS's executable path getter here.
-ExecutablePath getExecutablePath(void) {
+static ExecutablePath getExecutablePath(void) {
   swift::fatalError(
     0,
     "Fatal error: Executable path not available on this platform.\n");
