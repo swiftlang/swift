@@ -19,5 +19,5 @@ protocol Q1 : Q2 {}
 
 public protocol Q2 {}
 
-// CHECK: extension ParameterizedProtocols.S1 : ParameterizedProtocols.P2 {}
-// CHECK-NEXT: extension ParameterizedProtocols.S2 : ParameterizedProtocols.Q2 {}
+// CHECK: extension ParameterizedProtocols::S1 : ParameterizedProtocols::P2 {}
+// CHECK-NEXT: extension ParameterizedProtocols::S2 : ParameterizedProtocols::Q2 {}

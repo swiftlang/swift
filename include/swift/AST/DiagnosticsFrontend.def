@@ -199,6 +199,12 @@ WARNING(ignoring_option_requires_option,none,
         "ignoring %0 (requires %1)", (StringRef, StringRef))
 WARNING(warn_ignore_option_overridden_by,none,
         "ignoring %0 (overridden by %1)", (StringRef, StringRef))
+WARNING(ignoring_option_obsolete_module_selectors,none,
+        "ignoring '%0'; this option has been obsoleted by module selectors "
+        "(add '-disable-module-selectors-in-module-interface' to restore "
+        "original behavior)",
+        (StringRef))
+
 
 WARNING(warn_implicit_concurrency_import_failed,none,
         "unable to perform implicit import of \"_Concurrency\" module: no such module found", ())

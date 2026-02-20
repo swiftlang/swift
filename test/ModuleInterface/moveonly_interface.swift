@@ -13,12 +13,12 @@ public struct FileDescriptor: ~Copyable {
 }
 
 public class FileHandle {
-  // INTERFACE: public var _stored: test.FileDescriptor
+  // INTERFACE: public var _stored: test::FileDescriptor
 
   // SILGEN: @_hasStorage @_hasInitialValue public var _stored: FileDescriptor { get set }
   public var _stored: FileDescriptor = FileDescriptor()
 
-  // INTERFACE:       public var file: test.FileDescriptor {
+  // INTERFACE:       public var file: test::FileDescriptor {
   // INTERFACE-NEXT:    _read
   // INTERFACE-NEXT:    _modify
   // INTERFACE-NEXT:  }

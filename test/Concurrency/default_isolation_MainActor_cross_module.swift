@@ -23,25 +23,26 @@
 
 //--- A.swift
 
-// CHECK-NOT: @_Concurrency.MainActor @preconcurrency public var x: Swift.Int
+// CHECK-NOT: @_Concurrency::MainActor @preconcurrency public var x: Swift::Int
+// CHECK: {{^}}public var x: Swift::Int
 public var x: Int = 42
 
-// CHECK: @_Concurrency.MainActor @preconcurrency public protocol P
+// CHECK: @_Concurrency::MainActor @preconcurrency public protocol P
 public protocol P {
 }
 
-// CHECK: nonisolated public protocol Q : Swift.Sendable
+// CHECK: nonisolated public protocol Q : Swift::Sendable
 nonisolated public protocol Q: Sendable {
 }
 
-// CHECK: @_Concurrency.MainActor @preconcurrency public struct S : A.P {
+// CHECK: @_Concurrency::MainActor @preconcurrency public struct S : A::P {
 public struct S: P {
-  // CHECK: @_Concurrency.MainActor @preconcurrency public enum E : Swift.String {
+  // CHECK: @_Concurrency::MainActor @preconcurrency public enum E : Swift::String {
   // CHECK:   case a
   // CHECK:   case b
-  // CHECK:   nonisolated public init?(rawValue: Swift.String)
-  // CHECK:   public typealias RawValue = Swift.String
-  // CHECK:   nonisolated public var rawValue: Swift.String {
+  // CHECK:   nonisolated public init?(rawValue: Swift::String)
+  // CHECK:   public typealias RawValue = Swift::String
+  // CHECK:   nonisolated public var rawValue: Swift::String {
   // CHECK:     get
   // CHECK:   }
   // CHECK: }
@@ -50,19 +51,19 @@ public struct S: P {
     case b
   }
 
-  // CHECK:   @_Concurrency.MainActor @preconcurrency public func f()
+  // CHECK:   @_Concurrency::MainActor @preconcurrency public func f()
   public func f() {}
 
-  // CHECK: @_Concurrency.MainActor @preconcurrency public struct Inner {
+  // CHECK: @_Concurrency::MainActor @preconcurrency public struct Inner {
   public struct Inner {
-    // CHECK: @_Concurrency.MainActor @preconcurrency public init()
+    // CHECK: @_Concurrency::MainActor @preconcurrency public init()
     public init() {}
   }
   // CHECK: }
 }
 // CHECK: }
 
-// CHECK: public struct R : A.Q {
+// CHECK: public struct R : A::Q {
 public struct R: Q {
   // CHECK: public struct Inner {
   public struct Inner {
@@ -71,37 +72,37 @@ public struct R: Q {
   }
   // CHECK: }
 
-  // CHECK: @_Concurrency.MainActor @preconcurrency public struct InnerIsolated : A.P {
+  // CHECK: @_Concurrency::MainActor @preconcurrency public struct InnerIsolated : A::P {
   // CHECK: }
   public struct InnerIsolated: P {}
 }
 // CHECK: }
 
-// CHECK: @_Concurrency.MainActor @preconcurrency public func testGlobal()
+// CHECK: @_Concurrency::MainActor @preconcurrency public func testGlobal()
 public func testGlobal() {}
 
-// CHECK: @_Concurrency.MainActor @preconcurrency public class C {
+// CHECK: @_Concurrency::MainActor @preconcurrency public class C {
 public class C {
-  // CHECK: @_Concurrency.MainActor @preconcurrency public init()
+  // CHECK: @_Concurrency::MainActor @preconcurrency public init()
   public init() {}
 
-  // CHECK: @_Concurrency.MainActor @preconcurrency public static var value: Swift.Int
+  // CHECK: @_Concurrency::MainActor @preconcurrency public static var value: Swift::Int
   public static var value = 42
 
-  // CHECK: {{(@objc )?}} @_Concurrency.MainActor deinit
+  // CHECK: {{(@objc )?}} @_Concurrency::MainActor deinit
 }
 // CHECK: }
 
-// CHECK: @_Concurrency.MainActor @preconcurrency open class IsolatedDeinitTest {
+// CHECK: @_Concurrency::MainActor @preconcurrency open class IsolatedDeinitTest {
 open class IsolatedDeinitTest {
   // CHECK:   {{(@objc )?}} isolated deinit
   isolated deinit {}
 }
 // CHECK: }
 
-// CHECK: @_Concurrency.MainActor @preconcurrency public struct TestAccessors {
+// CHECK: @_Concurrency::MainActor @preconcurrency public struct TestAccessors {
 public struct TestAccessors {
-  // CHECK: @_Concurrency.MainActor @preconcurrency public var test: Swift.Int {
+  // CHECK: @_Concurrency::MainActor @preconcurrency public var test: Swift::Int {
   // CHECK:   get
   // CHECK:   set
   // CHECK: }

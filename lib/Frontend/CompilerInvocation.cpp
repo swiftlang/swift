@@ -614,21 +614,19 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
             .Default(true);
   } else {
     // Any heuristics we might add would go here.
-    Opts.UseModuleSelectors = false;
+    Opts.UseModuleSelectors = true;
   }
 
   if (Opts.PreserveTypesAsWritten && Opts.UseModuleSelectors) {
     Opts.PreserveTypesAsWritten = false;
-    diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
-                   "-module-interface-preserve-types-as-written",
-                   "-enable-module-selectors-in-module-interface");
+    diags.diagnose(SourceLoc(), diag::ignoring_option_obsolete_module_selectors,
+                   "-module-interface-preserve-types-as-written");
   }
 
   if (Opts.AliasModuleNames && Opts.UseModuleSelectors) {
     Opts.AliasModuleNames = false;
-    diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
-                   "-alias-module-names-in-module-interface",
-                   "-enable-module-selectors-in-module-interface");
+    diags.diagnose(SourceLoc(), diag::ignoring_option_obsolete_module_selectors,
+                   "-alias-module-names-in-module-interface");
   }
 }
 

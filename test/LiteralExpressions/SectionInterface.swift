@@ -7,4 +7,4 @@
 @section("mysection") public let intBinaryArithOp1 = 1 + 1
 
 // As of today, the values do not get printed in the textual interface
-// CHECK: @section("mysection") public let intBinaryArithOp1: Swift.Int
+// CHECK: @section("mysection") public let intBinaryArithOp1: Swift::Int

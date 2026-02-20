@@ -25,7 +25,7 @@
 // RUN: %FileCheck %s --check-prefix CHECK-A < %t/ClientA.private.swiftinterface
 // CHECK-A-NOT: @_spi(_) import Lib
 // CHECK-A: import Lib
-// CHECK-A: @_spi(_) public func useImplicit() -> Lib._Klass
+// CHECK-A: @_spi(_) public func useImplicit() -> Lib::_Klass
 
 // RUN: %target-swift-frontend -emit-module %t/ClientB.swift \
 // RUN:   -module-name ClientB -swift-version 5 -I %t \
@@ -36,8 +36,8 @@
 // CHECK-B-NOT: @_spi(_) @_spi(core) import Lib
 // CHECK-B-NOT: @_spi(core) @_spi(_) import Lib
 // CHECK-B: @_spi(core) import Lib
-// CHECK-B: @_spi(_) public func useImplicit() -> Lib._Klass
-// CHECK-B: @_spi(core) public func useSPICore() -> Lib.CoreStruct
+// CHECK-B: @_spi(_) public func useImplicit() -> Lib::_Klass
+// CHECK-B: @_spi(core) public func useSPICore() -> Lib::CoreStruct
 
 // RUN: %target-swift-frontend -emit-module %t/ClientZ.swift \
 // RUN:   -module-name ClientZ -swift-version 5 -I %t \
@@ -46,7 +46,7 @@
 // RUN:   -emit-private-module-interface-path %t/ClientZ.private.swiftinterface
 // RUN: %FileCheck %s --check-prefix CHECK-Z < %t/ClientZ.private.swiftinterface
 // CHECK-Z: @_spi(_) import Lib
-// CHECK-Z: @_spi(_) public func useImplicit() -> Lib._Klass
+// CHECK-Z: @_spi(_) public func useImplicit() -> Lib::_Klass
 
 
 //--- Lib.swift
