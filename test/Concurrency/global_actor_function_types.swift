@@ -438,3 +438,82 @@ func testGlobalActorAutoclosure(_ x: HasMainActorFns) {
   takesMainActorFn(HasMainActorFns.instanceFn(x))
   takesMainActorFn(x.instanceFn)
 }
+
+// https://github.com/swiftlang/swift/issues/79836
+
+@available(SwiftStdlib 5.1, *)
+func test_gh79836() {
+  func f(_ a: sending @escaping () -> Void) {
+      Task.detached { a() }
+  }
+
+  @MainActor
+  func main() async {
+      // expected-warning@+1 {{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'; this is an error in the Swift 6 language mode}}
+      f { @MainActor in
+          MainActor.shared.assertIsolated()
+      }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func send(x: sending @escaping () -> Void) {}
+func send2(
+  x: @escaping @MainActor () -> Void,
+  y: sending @escaping () -> Void
+) {}
+func sendGeneric<T>(
+  x: sending @escaping () -> T
+) {}
+
+@MainActor
+final class C {
+  func sendStatic(x: sending @escaping () -> Void) {}  
+  func sendMethod(x: sending @escaping () -> Void) {}  
+}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+func test_gh79836_variants() async {
+  do {
+    let op: @MainActor @Sendable () -> Void = { @MainActor in }
+    send(x: op)
+    // expected-warning@-1 {{converting function value of type '@MainActor @Sendable () -> Void' to '() -> Void' loses global actor 'MainActor'; this is an error in the Swift 6 language mode}}    
+  }
+
+  do {
+    let op: @MainActor @Sendable () -> Void = { @MainActor in }
+    send2(x: op, y: op)
+    // expected-warning@-1 {{converting function value of type '@MainActor @Sendable () -> Void' to '() -> Void' loses global actor 'MainActor'; this is an error in the Swift 6 language mode}}        
+  }
+
+  do {
+    let op: @MainActor @Sendable () -> Int = { @MainActor in 42 }
+    sendGeneric(x: op)
+    // expected-warning@-1 {{converting function value of type '@MainActor @Sendable () -> Int' to '() -> Int' loses global actor 'MainActor'; this is an error in the Swift 6 language mode}}        
+  }
+
+  do {
+    @MainActor
+    func fn<U>(
+      _ f: @escaping @MainActor @Sendable () -> U
+    ) {
+      sendGeneric(x: f)
+      // expected-warning@-1 {{converting function value of type '@MainActor @Sendable () -> U' to '() -> U' loses global actor 'MainActor'; this is an error in the Swift 6 language mode}}          
+    }
+  }
+
+  do {
+    let op: @MainActor @Sendable () -> Void = { @MainActor in }
+    let c = C()
+    c.sendMethod(x: op)
+    // expected-warning@-1 {{converting function value of type '@MainActor @Sendable () -> Void' to '() -> Void' loses global actor 'MainActor'; this is an error in the Swift 6 language mode}}        
+  }
+
+  do {
+    let op: @MainActor @Sendable () -> Void = { @MainActor in }
+    let c = C()
+    c.sendStatic(x: op)
+    // expected-warning@-1 {{converting function value of type '@MainActor @Sendable () -> Void' to '() -> Void' loses global actor 'MainActor'; this is an error in the Swift 6 language mode}}        
+  }
+}

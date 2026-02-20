@@ -2164,6 +2164,55 @@ void swift::introduceUnsafeInheritExecutorReplacements(
   }
 }
 
+// TODO: docs
+static bool
+isConversionPassedToSendingParameter(ImplicitConversionExpr *conversion,
+                                     ApplyExpr *call) {
+  // If a closure literal is being converted, try checking directly.
+  if (auto *CE = dyn_cast<ClosureExpr>(conversion->getSubExpr())) {
+    // TODO: what if it's not passed in parameter position?
+    // i.e. is it possible this could be a false-negative?
+    return CE->isPassedToSendingParameter();
+  }
+
+  if (!call)
+    return false;
+
+  // Otherwise, if the call has arguments...
+  auto *args = call->getArgs();
+  if (!args || args->empty())
+    return false;
+
+  // ...and the conversion expr is passed as one...
+  const auto idx = args->findArgumentExpr(conversion);
+  // TODO: double check passing same thing to multiple params
+  // i assume the AST has separate nodes for each...
+  if (!idx)
+    return false;
+
+  // ...and we can locate the called value's type...
+  auto calledValue = call->getCalledValue(/*skipFunctionConversions*/ true);
+  if (!calledValue)
+    return false;
+
+  auto *FnTy = calledValue->getInterfaceType()->getAs<AnyFunctionType>();
+  if (!FnTy)
+    return false;
+
+  // TODO: is there a better way to do this?
+  // Look through one level of currying, so methods are handled appropriately.
+  if (calledValue->hasCurriedSelf()) {
+    auto *withoutCurriedSelf = FnTy->getResult()->getAs<AnyFunctionType>();
+    ASSERT(withoutCurriedSelf && "Curried self without function result?");
+    FnTy = withoutCurriedSelf;
+  }
+
+  // ...then check if the corresponding parameter is sending.
+  ASSERT(idx < FnTy->getNumParams() && "Parameter mismatch?");
+  auto param = FnTy->getParams()[*idx];
+  return param.isSending();
+}
+
 /// Check if it is safe for the \c globalActor qualifier to be removed from
 /// \c ty, when the function value of that type is isolated to that actor.
 ///
@@ -2176,8 +2225,10 @@ void swift::introduceUnsafeInheritExecutorReplacements(
 /// \param globalActor global actor that was dropped from \c ty.
 /// \param ty a function type where \c globalActor was removed from it.
 /// \return true if it is safe to drop the global-actor qualifier.
-static bool safeToDropGlobalActor(
-    DeclContext *dc, Type globalActor, Type ty, ApplyExpr *call) {
+static bool safeToDropGlobalActor(DeclContext *dc, Type globalActor, Type ty,
+                                  ApplyExpr *call,
+                                  ImplicitConversionExpr *fnConv) {
+  // TODO: update doc comment
   auto funcTy = ty->getAs<AnyFunctionType>();
   if (!funcTy)
     return false;
@@ -2202,9 +2253,13 @@ static bool safeToDropGlobalActor(
   if (call && call->getIsolationCrossing())
     return false;
 
-  // fundamentally cannot be sendable if we want to drop isolation info
-  if (funcTy->isSendable())
+  // It's unsafe to drop global actor information if the destination type of
+  // the conversion is `@Sendable` or passed to a `sending` parameter, since
+  // the resulting values may cross isolation boundaries.
+  if (funcTy->isSendable() ||
+      isConversionPassedToSendingParameter(fnConv, call)) {
     return false;
+  }
 
   // finally, must be in a context with matching isolation.
   auto dcIsolation = getActorIsolationOfContext(dc);
@@ -2524,7 +2579,7 @@ namespace {
               //    isolation to determine whether it's okay or not or
               //    diagnose if types are not-async.
               if (safeToDropGlobalActor(dc, fromActor, toType,
-                                        getImmediateApply())) {
+                                        getImmediateApply(), funcConv)) {
                 return;
               }
 
