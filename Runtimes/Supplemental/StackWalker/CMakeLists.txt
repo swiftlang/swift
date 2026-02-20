@@ -60,30 +60,43 @@ add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 # Ensure all symbols are fully resolved on Linux
 add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
-add_executable(swift-backtrace
-  main.swift
-  AnsiColor.swift
-  JSON.swift
-  TargetMacOS.swift
-  TargetLinux.swift
-  TargetWindows.swift
-  Themes.swift
-  Timing.swift
-  Utils.swift)
-set_target_properties(swift-backtrace PROPERTIES
-  Swift_MODULE_NAME swift_backtrace)
-target_compile_options(swift-backtrace PRIVATE
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -I${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/include>")
-target_link_libraries(swift-backtrace PRIVATE
-  swiftShims
-  swiftCore
-  swift_Builtin_float
-  swiftRuntime
-  swiftCxx
-  $<$<PLATFORM_ID:Darwin>:swiftDarwin>
-  $<$<PLATFORM_ID:Linux>:swiftGlibc>
-  $<$<PLATFORM_ID:Windows>:swiftCRT>
-  $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
+# Don't build on 32-bit Windows; it doesn't work there
+set(should_build_backtracer YES)
+if(WIN32)
+  string(TOUPPER "${CMAKE_SYSTEM_PROCESSOR}" processor)
+  if(processor STREQUAL "X86" OR processor STREQUAL "I686")
+    set(should_build_backtracer NO)
+  endif()
+endif()
 
-install(TARGETS swift-backtrace
-  RUNTIME DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}/swift")
+if(should_build_backtracer)
+
+  add_executable(swift-backtrace
+    main.swift
+    AnsiColor.swift
+    JSON.swift
+    TargetMacOS.swift
+    TargetLinux.swift
+    TargetWindows.swift
+    Themes.swift
+    Timing.swift
+    Utils.swift)
+  set_target_properties(swift-backtrace PROPERTIES
+    Swift_MODULE_NAME swift_backtrace)
+  target_compile_options(swift-backtrace PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -I${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/include>")
+  target_link_libraries(swift-backtrace PRIVATE
+    swiftShims
+    swiftCore
+    swift_Builtin_float
+    swiftRuntime
+    swiftCxx
+    $<$<PLATFORM_ID:Darwin>:swiftDarwin>
+    $<$<PLATFORM_ID:Linux>:swiftGlibc>
+    $<$<PLATFORM_ID:Windows>:swiftCRT>
+    $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
+
+  install(TARGETS swift-backtrace
+    RUNTIME DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}/swift")
+
+endif()
