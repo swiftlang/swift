@@ -635,7 +635,11 @@ public:
 
   static BindingScore formBindingScore(const BindingSet &b);
 
-  bool operator==(const BindingSet &other);
+  bool operator==(const BindingSet &other) const;
+
+  bool operator!=(const BindingSet &other) const {
+    return !(*this == other);
+  }
 
   /// Compare two sets of bindings, where \c this < other indicates that
   /// \c this is a better set of bindings that \c other.

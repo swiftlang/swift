@@ -1111,7 +1111,7 @@ void PotentialBindings::inferFromLiteral(Constraint *constraint) {
   Literals.emplace_back(protocol, constraint, defaultType, /*isDirect=*/true);
 }
 
-bool BindingSet::operator==(const BindingSet &other) {
+bool BindingSet::operator==(const BindingSet &other) const {
   if (AdjacentVars != other.AdjacentVars)
     return false;
 
