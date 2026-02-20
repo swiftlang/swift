@@ -139,14 +139,14 @@ internal func _withUnsafeTemporaryAllocation<
   // Builtin.stackDealloc() will end up blowing it away (and the verifier will
   // notice and complain.)
   let result: R
-  
+
 #if compiler(>=5.5) && $BuiltinStackAlloc
   let stackAddress = Builtin.stackAlloc(
     capacity._builtinWordValue,
     MemoryLayout<T>.stride._builtinWordValue,
     alignment._builtinWordValue
   )
-  
+
   // The multiple calls to Builtin.stackDealloc() are because defer { } produces
   // a child function at the SIL layer and that conflicts with the verifier's
   // idea of a stack allocation's lifetime.
@@ -265,6 +265,25 @@ public func withUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
   }
 
   return try result.get()
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_alwaysEmitIntoClient @_transparent
+public func withTemporaryAllocation<T: ~Copyable, R: ~Copyable, E: Error>(
+  of type: T.Type,
+  capacity: Int,
+  _ body: (inout OutputSpan<T>) throws(E) -> R
+) throws(E) -> R where T : ~Copyable, R : ~Copyable {
+  try withUnsafeTemporaryAllocation(of: type, capacity: capacity) { (buffer) throws(E) in
+    var span = OutputSpan(buffer: buffer, initializedCount: 0)
+    defer {
+      let initializedCount = span.finalize(for: buffer)
+      span = OutputSpan()
+      buffer.extracting(..<initializedCount).deinitialize()
+    }
+
+    return try body(&span)
+  }
 }
 
 /// Provides scoped access to a raw buffer pointer with the specified byte count
