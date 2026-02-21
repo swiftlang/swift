@@ -1114,9 +1114,9 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
 ///   remain valid.
 /// - true: the possibly modified new binding subsumes old binding.
 /// - false: discard new binding
-static std::optional<bool> subsumeBinding(PotentialBinding &binding,
-                                          const PotentialBinding &existing,
-                                          bool isClosureParameterType) {
+std::optional<bool>
+BindingSet::subsumeBinding(PotentialBinding &binding,
+                           const PotentialBinding &existing) {
   if (binding.BindingType->isEqual(existing.BindingType)) {
     if (binding.Kind == existing.Kind) {
       return false;
@@ -1195,7 +1195,7 @@ static std::optional<bool> subsumeBinding(PotentialBinding &binding,
     }
   }
 
-  if (!isClosureParameterType) {
+  if (!TypeVar->getImpl().isClosureParameterType()) {
     // Since Double and CGFloat are effectively the same type due to an
     // implicit conversion between them, always prefer Double over CGFloat
     // when possible.
@@ -1411,7 +1411,6 @@ void BindingSet::addBinding(PotentialBinding binding) {
 
   reduceBinding(binding);
 
-  bool isClosureParameterType = TypeVar->getImpl().isClosureParameterType();
   llvm::SmallSetVector<PotentialBinding, 1> joined;
 
   // Prevent against checking against the same opened nominal type
@@ -1421,7 +1420,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
   // resolution.
   auto existing = Bindings.begin();
   while (existing != Bindings.end()) {
-    auto result = subsumeBinding(binding, *existing, isClosureParameterType);
+    auto result = subsumeBinding(binding, *existing);
     if (result == std::nullopt) {
       // Record a new binding, unless it subsumed by something else.
        ++existing;
