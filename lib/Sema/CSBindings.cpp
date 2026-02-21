@@ -59,14 +59,27 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
   GenerationNumber = Info.GenerationNumber;
   computeLValueState();
 
+  // Collect protocols first, so that addBinding() can make use of them.
+  for (auto *constraint : Info.Protocols) {
+    if (auto *protoTy = constraint->getSecondType()->getAs<ProtocolType>()) {
+      auto *protoDecl = protoTy->getDecl();
+      Protocols.insert(protoDecl);
+    }
+  }
+
+  // Literal protocols next.
+  for (const auto &literal : info.Literals) {
+    Literals.push_back(literal);
+    if (literal.IsDirectRequirement)
+      Protocols.insert(literal.getProtocol());
+  }
+
+  // Now, the subtype and supertype bindings.
   for (const auto &binding : info.Bindings)
     addBinding(binding);
 
-  for (const auto &literal : info.Literals)
-    Literals.push_back(literal);
-
+  // Finally, the defaults.
   for (auto *constraint : info.Defaults) {
-    // Do these in a separate pass.
     if (isDirectRequirement(CS, TypeVar, constraint))
       addDefault(constraint);
   }
