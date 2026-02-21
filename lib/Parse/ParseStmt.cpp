@@ -2057,12 +2057,18 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
     }
   }
 
-  // Parse the 'else'.  If it is missing, and if the following token isn't a {
+  // Parse the 'else'.  If it is missing, and if the following token isn't
+  // a '{', 'return', 'throw', or 'fatalError'
   // then the parser is hopelessly lost - just give up instead of spewing.
   if (!consumeIf(tok::kw_else)) {
     checkForInputIncomplete();
     auto diag = diagnose(Tok, diag::expected_else_after_guard);
     if (Tok.is(tok::l_brace))
+      diag.fixItInsert(Tok.getLoc(), "else ");
+    else if (Tok.isAny(tok::kw_return, tok::kw_throw, tok::kw_break,
+                       tok::kw_continue, tok::kw_fallthrough))
+      diag.fixItInsert(Tok.getLoc(), "else ");
+    else if (Tok.is(tok::identifier) && Tok.getText() == "fatalError")
       diag.fixItInsert(Tok.getLoc(), "else ");
     else
       return recoverWithCond(Status, Condition);
