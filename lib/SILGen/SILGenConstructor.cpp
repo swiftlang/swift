@@ -399,6 +399,22 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
   auto subs = getSubstitutionsForPropertyInitializer(decl, decl);
 
+  /// If the stored property has an attached result builder and its
+  /// type is not a function type, the argument is a noescape closure
+  /// that needs to be called.
+  auto emitResultBuilderCallIfNeeded = [&](VarDecl *field, RValue &&arg) -> RValue {
+    if (field->getResultBuilderType()) {
+      if (!field->getValueInterfaceType()
+              ->lookThroughAllOptionalTypes()->is<AnyFunctionType>()) {
+        auto resultTy = cast<FunctionType>(arg.getType()).getResult();
+        arg = SGF.emitMonomorphicApply(
+            Loc, std::move(arg).getAsSingleValue(SGF, Loc), {}, resultTy,
+            resultTy, ApplyOptions(), std::nullopt, std::nullopt);
+      }
+    }
+    return std::move(arg);
+  };
+
   // If we have an indirect return slot, initialize it in-place.
   if (resultSlot) {
     auto elti = elements.begin(), eltEnd = elements.end();
@@ -457,19 +473,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
 
         RValue arg = std::move(*elti);
-
-        // If the stored property has an attached result builder and its
-        // type is not a function type, the argument is a noescape closure
-        // that needs to be called.
-        if (field->getResultBuilderType()) {
-          if (!field->getValueInterfaceType()
-                  ->lookThroughAllOptionalTypes()->is<AnyFunctionType>()) {
-            auto resultTy = cast<FunctionType>(arg.getType()).getResult();
-            arg = SGF.emitMonomorphicApply(
-                Loc, std::move(arg).getAsSingleValue(SGF, Loc), {}, resultTy,
-                resultTy, ApplyOptions(), std::nullopt, std::nullopt);
-          }
-        }
+        arg = emitResultBuilderCallIfNeeded(field, std::move(arg));
 
         maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
                                               std::move(arg))
@@ -544,6 +548,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
       value = std::move(*elti);
+      value = emitResultBuilderCallIfNeeded(field, std::move(value));
       ++elti;
     } else {
       // Otherwise, use its initializer.
