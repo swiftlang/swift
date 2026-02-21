@@ -3002,21 +3002,16 @@ static bool isBoundToFullyConcreteType(TypeAliasDecl *typealias,
     return false;
   }
 
-  auto nominalInterface = nominal->getDeclaredInterfaceType();
-  auto typealiasUnderlying = typealias->getUnderlyingType();
+  auto nominalBound = nominal->getDeclaredInterfaceType()->getAs<BoundGenericType>();
+  auto typealiasBound = typealias->getUnderlyingType()->getAs<BoundGenericType>();
 
-  auto nominalBound = nominalInterface ? nominalInterface->getAs<BoundGenericType>() : nullptr;
-  auto typealiasBound = typealiasUnderlying ? typealiasUnderlying->getAs<BoundGenericType>() : nullptr;
-
-
-  // If either is not bound generic, we cannot infer, so return false
-  if (!nominalBound || !typealiasBound) {
+  if ((nominalBound == nullptr) || (typealiasBound == nullptr))
     return false;
-  }
 
-
-  auto nominalGenericArguments = nominalBound->getGenericArgs();
-  auto typealiasGenericArguments = typealiasBound->getGenericArgs();
+  auto nominalGenericArguments =
+      nominalBound->getGenericArgs();
+  auto typealiasGenericArguments =
+       typealiasBound->getGenericArgs();
   for (size_t i = 0; i < nominalGenericArguments.size(); i++) {
     auto nominalBoundGenericType = nominalGenericArguments[i];
     auto typealiasBoundGenericType = typealiasGenericArguments[i];
