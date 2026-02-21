@@ -558,6 +558,15 @@ function Get-CMake {
   throw "CMake not found on Path nor in the Visual Studio Installation. Please Install CMake to continue."
 }
 
+$cmake = Get-CMake
+$CMakeVersionString = & $cmake --version | Select-String -Pattern 'cmake version ([\d\.]+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+$CMakeVersion = [Version]$CMakeVersionString
+# Starting with CMake 3.30, CMake propagates linker flags to Swift.
+$CMakePassesSwiftLinkerFlags = $CMakeVersion -ge [version]'3.30'
+# CMP0181 enables support for the `LINKER:flag1,flag2,...` syntax in
+# `CMAKE_[EXE|SHARED|MODULE]_LINKER_FLAGS[_<CONFIG>]` variables.
+$CMakeSupportsCMP0181 = $CMakeVersion -ge [version]'4.0'
+
 function Get-Ninja {
   try {
     return (Get-Command "Ninja.exe" -ErrorAction Stop).Source
@@ -569,7 +578,6 @@ function Get-Ninja {
   throw "Ninja not found on Path nor in the Visual Studio Installation. Please Install Ninja to continue."
 }
 
-$cmake = Get-CMake
 $ninja = Get-Ninja
 
 $NugetRoot = "$BinaryCache\nuget"
@@ -1504,8 +1512,31 @@ function Build-CMakeProject {
     $UseCXX = $UseBuiltCompilers.Contains("CXX") -or $UseMSVCCompilers.Contains("CXX") -or $UsePinnedCompilers.Contains("CXX")
     $UseSwift = $UseBuiltCompilers.Contains("Swift") -or $UsePinnedCompilers.Contains("Swift")
 
+    # We need to manually prefix linker flags with `-Xlinker` if we are using
+    # the GNU driver or if Swift is used as the linker driver.
+    # This is not necessary with CMake 4.0+ as CMP0181 simplifies the handling
+    # of linker arguments.
+    $PrefixLinkerFlags = if ($Platform.OS -eq [OS]::Android) {
+      # We pass the linker location to the driver, not to the linker.
+      $false
+    } elseif ($CMakeSupportsCMP0181) {
+      # Not necessary if CMP0181 is supported.
+      $false
+    } elseif ($UseGnuDriver) {
+      # Always necessary with the GNU driver.
+      $true
+    } else {
+      # Only necessary with Swift projects, when CMake is not passing the linker flags.
+      $UseSwift -and $CMakePassesSwiftLinkerFlags
+    }
+
     # Add additional defines (unless already present)
     $Defines = $Defines.Clone()
+
+    # Always enable CMP0181 if available.
+    if ($CMakeSupportsCMP0181) {
+      Add-KeyValueIfNew $Defines CMAKE_POLICY_DEFAULT_CMP0181 NEW
+    }
 
     Add-KeyValueIfNew $Defines CMAKE_BUILD_TYPE Release
 
@@ -1690,22 +1721,30 @@ function Build-CMakeProject {
             @("-gnone")
           }
 
-          # Disable EnC as that introduces padding in the conformance tables
-          $SwiftFlags += @("-Xlinker", "/INCREMENTAL:NO")
-          # Swift requires COMDAT folding and de-duplication
-          $SwiftFlags += @("-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF")
+          if (-not $CMakePassesSwiftLinkerFlags) {
+            # Disable EnC as that introduces padding in the conformance tables
+            $SwiftFlags += @("-Xlinker", "/INCREMENTAL:NO")
+            # Swift requires COMDAT folding and de-duplication
+            $SwiftFlags += @("-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF")
+          }
 
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftFlags
           # Workaround CMake 3.26+ enabling `-wmo` by default on release builds
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS_RELEASE "-O"
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS_RELWITHDEBINFO "-O"
+
+          if ($CMakePassesSwiftLinkerFlags) {
+            # CMake 3.30+ passes all linker flags to Swift as the linker driver,
+            # including those from the internal CMake modules files, without
+            # a `-Xlinker` prefix. This causes build failures as Swift cannot
+            # parse linker flags.
+            # Overwrite the release linker flags to be empty to avoid this.
+            Add-KeyValueIfNew $Defines CMAKE_EXE_LINKER_FLAGS_RELEASE ""
+            Add-KeyValueIfNew $Defines CMAKE_SHARED_LINKER_FLAGS_RELEASE ""
+          }
         }
 
-        $LinkerFlags = if ($UseGNUDriver) {
-          @("-Xlinker", "/INCREMENTAL:NO", "-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF")
-        } else {
-          @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF")
-        }
+        $LinkerFlags = @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF")
 
         if ($DebugInfo) {
           if ($UseASM -or $UseC -or $UseCXX) {
@@ -1716,22 +1755,14 @@ function Build-CMakeProject {
             Add-KeyValueIfNew $Defines CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded
             Add-KeyValueIfNew $Defines CMAKE_POLICY_DEFAULT_CMP0141 NEW
 
-            $LinkerFlags += if ($UseGNUDriver) {
-              @("-Xlinker", "/DEBUG")
-            } else {
-              @("/DEBUG")
-            }
+            $LinkerFlags += @("/DEBUG")
 
             # The linker flags are shared across every language, and `/IGNORE:longsections` is an
             # `lld-link.exe` argument, not `link.exe`, so this can only be enabled when we use
             # `lld-link.exe` for linking.
             # TODO: Investigate supporting fission with PE/COFF, this should avoid this warning.
-            if ($SwiftDebugFormat -eq "dwarf") {
-              if ($UseGNUDriver) {
-                $LinkerFlags += @("-Xlinker", "/IGNORE:longsections")
-              } elseif (-not $UseMSVCCompilers.Contains("C") -and -not $UseMSVCCompilers.Contains("CXX")) {
-                $LinkerFlags += @("/IGNORE:longsections")
-              }
+            if ($SwiftDebugFormat -eq "dwarf" -and -not ($UseMSVCCompilers.Contains("C") -or $UseMSVCCompilers.Contains("CXX"))) {
+              $LinkerFlags += @("/IGNORE:longsections")
             }
           }
         }
@@ -1862,24 +1893,33 @@ function Build-CMakeProject {
         $Value = $Define.Value.Replace("\", "/")
       } else {
         # Flags array, multiple tokens, quoting needed for tokens containing spaces
-        $Value = ""
-        foreach ($Arg in $Define.Value) {
-          if ($Value.Length -gt 0) {
-            $Value += " "
-          }
-
-          $ArgWithForwardSlashes = $Arg.Replace("\", "/")
-          if ($ArgWithForwardSlashes.Contains(" ")) {
+        $EscapedArgs = $Define.Value | ForEach-Object {
+          $Arg = $_.Replace("\", "/")
+          if ($Arg.Contains(" ")) {
             # Escape the quote so it makes it through. PowerShell 5 and Core
             # handle quotes differently, so we need to check the version.
             $quote = if ($PSEdition  -eq "Core") { '"' } else { '\"' }
-            $Value += "$quote$ArgWithForwardSlashes$quote"
+            "$quote$Arg$quote"
           } else {
-            $Value += $ArgWithForwardSlashes
+            $Arg
           }
         }
-      }
 
+        # Linker flags are handled differently depending on the CMake version.
+        $IsLinkerFlag = $Define.Key -match "_LINKER_FLAGS" -and ($Platform.OS -ne [OS]::Android)
+        $Value = if ($IsLinkerFlag) {
+          if ($CMakeSupportsCMP0181) { "LINKER:" } elseif ($PrefixLinkerFlags) { "-Xlinker " } else { "" }
+        } else {
+          ""
+        }
+        $Separator = if ($IsLinkerFlag) {
+          if ($CMakeSupportsCMP0181) { "," } elseif ($PrefixLinkerFlags) { " -Xlinker " } else { " " }
+        } else {
+          " "
+        }
+
+        $Value += $EscapedArgs -join $Separator
+      }
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
