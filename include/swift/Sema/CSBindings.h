@@ -242,6 +242,9 @@ struct PotentialBindings {
   /// The constraint system this type variable and its bindings belong to.
   ConstraintSystem &CS;
 
+  /// This must be incremented whenever any of the below state changes.
+  unsigned GenerationNumber = 0;
+
   /// The type variable this bindings are associated with. Note that his
   /// property could change when associated with a constraint graph node
   /// that is being re-used. Calling \c reset sets it to `nullptr`.
@@ -406,6 +409,12 @@ class BindingSet {
 
   llvm::SmallPtrSet<TypeVariableType *, 4> AdjacentVars;
 
+  /// Set whenever transitive inference changes the binding set
+  /// after the constructor.
+  bool IsDirty = false;
+  /// Generation number of PotentialBindings.
+  unsigned GenerationNumber = 0;
+
 public:
   swift::SmallSetVector<PotentialBinding, 4> Bindings;
 
@@ -440,6 +449,25 @@ public:
   /// that represents a generic parameter.
   bool forGenericParameter() const;
 
+  /// Whether the binding set has changed after construction, in which
+  /// case we must recompute it on the next call to determineBestBindings().
+  bool isDirty() const {
+    return IsDirty;
+  }
+
+  /// Return the generation number of the corresponding potential bindings
+  /// at the time this binding set was constructed.
+  unsigned getGenerationNumber() const {
+    return GenerationNumber;
+  }
+
+  /// Check if this binding set is known to be up to date.
+  bool isUpToDate() const {
+    return (GenerationNumber == Info.GenerationNumber && !IsDirty);
+  }
+
+  /// Whether this type variable is subject to a ExpressibleByNilLiteral
+  /// requirement. These require special handling.
   bool canBeNil() const;
 
   /// If this type variable doesn't have any viable bindings, or
@@ -632,7 +660,11 @@ public:
 
   static BindingScore formBindingScore(const BindingSet &b);
 
-  bool operator==(const BindingSet &other);
+  bool operator==(const BindingSet &other) const;
+
+  bool operator!=(const BindingSet &other) const {
+    return !(*this == other);
+  }
 
   /// Compare two sets of bindings, where \c this < other indicates that
   /// \c this is a better set of bindings that \c other.
@@ -640,7 +672,15 @@ public:
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
 
+  void resetTransitiveProtocols() {
+    TransitiveProtocols.reset();
+  }
+
 private:
+  void markDirty() {
+    IsDirty = true;
+  }
+
   /// Add a new binding to the set.
   ///
   /// \param binding The binding to add.

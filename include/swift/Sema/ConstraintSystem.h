@@ -71,6 +71,9 @@ struct PreparedOverloadBuilder;
 // Subtyping.h
 enum class ConversionBehavior : unsigned;
 
+// CSDisjunction.h
+class SolverDisjunction;
+
 } // end namespace constraints
 
 // Forward declare some TypeChecker related functions
@@ -1764,9 +1767,6 @@ public:
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
 
-  /// The total number of disjunctions created.
-  unsigned CountDisjunctions = 0;
-
 private:
   bool PreparingOverload = false;
 
@@ -1962,6 +1962,10 @@ private:
 
   /// The constraint graph.
   ConstraintGraph CG;
+
+  /// Information about the remaining disjunctions we have yet to attempt
+  /// in this path.
+  llvm::DenseMap<Constraint *, SolverDisjunction> RemainingDisjunctions;
 
   /// A mapping from constraint locators to the set of opened types associated
   /// with that locator.
@@ -4790,6 +4794,8 @@ public:
     TypeVariableType *tyvar,
     unsigned *numOptionalUnwraps = nullptr);
 
+  SolverDisjunction &getRemainingDisjunction(Constraint *disjunction);
+
 private:
   /// Solve the system of constraints after it has already been
   /// simplified.
@@ -4804,9 +4810,6 @@ private:
   /// \returns The selected disjunction and a set of it's favored choices.
   std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
   selectDisjunction();
-
-  void pruneDisjunction(Constraint *disjunction,
-                        Constraint *applicableFn);
 
   /// Pick a conjunction from the InactiveConstraints list.
   ///

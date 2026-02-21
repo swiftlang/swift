@@ -2134,6 +2134,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_crash_on_valid_salvage,
                    Opts.CrashOnValidSalvage);
 
+  Opts.SolverEnableTransitiveConformance =
+      Args.hasFlag(OPT_solver_enable_transitive_conformance,
+                   OPT_solver_disable_transitive_conformance,
+                   Opts.SolverEnableTransitiveConformance);
+
   Opts.SolverEnablePreparedOverloads =
       Args.hasFlag(OPT_solver_enable_prepared_overloads,
                    OPT_solver_disable_prepared_overloads,
