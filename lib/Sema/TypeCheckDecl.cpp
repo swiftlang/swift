@@ -3002,13 +3002,21 @@ static bool isTypeInferredByTypealias(TypeAliasDecl *typealias,
     return false;
   }
 
-  auto nominalGenericArguments = nominal->getDeclaredInterfaceType()
-                                     ->getAs<BoundGenericType>()
-                                     ->getGenericArgs();
-  auto typealiasGenericArguments = typealias->getUnderlyingType()
-                                       ->getAs<BoundGenericType>()
-                                       ->getGenericArgs();
+  auto nominalInterface = nominal->getDeclaredInterfaceType();
+  auto typealiasUnderlying = typealias->getUnderlyingType();
 
+  auto nominalBound = nominalInterface ? nominalInterface->getAs<BoundGenericType>() : nullptr;
+  auto typealiasBound = typealiasUnderlying ? typealiasUnderlying->getAs<BoundGenericType>() : nullptr;
+
+
+  // If either is not bound generic, we cannot infer, so return false
+  if (!nominalBound || !typealiasBound) {
+    return false;
+  }
+
+
+  auto nominalGenericArguments = nominalBound->getGenericArgs();
+  auto typealiasGenericArguments = typealiasBound->getGenericArgs();
   for (size_t i = 0; i < nominalGenericArguments.size(); i++) {
     auto nominalBoundGenericType = nominalGenericArguments[i];
     auto typealiasBoundGenericType = typealiasGenericArguments[i];
