@@ -2993,6 +2993,37 @@ AllMembersRequest::evaluate(
   return evaluateMembersRequest(idc, MembersRequestKind::All);
 }
 
+static bool isBoundToFullyConcreteType(TypeAliasDecl *typealias,
+                                       NominalTypeDecl *nominal) {
+  if (!nominal->hasGenericParamList()){
+    return false;
+  }
+
+  auto nominalBound = nominal->getDeclaredInterfaceType()->getAs<BoundGenericType>();
+  auto typealiasBound = typealias->getUnderlyingType()->getAs<BoundGenericType>();
+
+  if ((nominalBound == nullptr) || (typealiasBound == nullptr))
+    return false;
+
+  auto nominalGenericArguments =
+      nominalBound->getGenericArgs();
+  auto typealiasGenericArguments =
+       typealiasBound->getGenericArgs();
+  for (size_t i = 0; i < nominalGenericArguments.size(); i++) {
+    auto nominalBoundGenericType = nominalGenericArguments[i];
+    auto typealiasBoundGenericType = typealiasGenericArguments[i];
+    if (nominalBoundGenericType->isEqual(typealiasBoundGenericType)) {
+      continue;
+    }
+
+    if (typealiasBoundGenericType->hasTypeParameter()) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
                                          NominalTypeDecl *nominal) {
   // Pass-through only makes sense when the typealias refers to a nominal
@@ -3013,17 +3044,39 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   // If neither is generic, we're done: it's a pass-through alias.
   if (!nominalSig) return true;
 
-  // Check that the type parameters are the same the whole way through.
   auto nominalGenericParams = nominalSig.getGenericParams();
   auto typealiasGenericParams = typealiasSig.getGenericParams();
-  if (nominalGenericParams.size() != typealiasGenericParams.size())
+
+  if (nominalGenericParams.size() != typealiasGenericParams.size()) {
+    unsigned nominalMaxDepth = nominalGenericParams.back()->getDepth();
+    unsigned typealiasMaxDepth = typealiasGenericParams.back()->getDepth();
+    unsigned maxDepth = std::max(nominalMaxDepth, typealiasMaxDepth);
+
+    while (!nominalGenericParams.empty() &&
+           nominalGenericParams.back()->getDepth() == maxDepth) {
+      nominalGenericParams = nominalGenericParams.drop_back();
+    }
+
+    while (!typealiasGenericParams.empty() &&
+           typealiasGenericParams.back()->getDepth() == maxDepth) {
+      typealiasGenericParams = typealiasGenericParams.drop_back();
+    }
+  }
+
+  if (nominalGenericParams.size() != typealiasGenericParams.size()) {
     return false;
+  }
+
   if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
                   typealiasGenericParams.begin(),
                   [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
                     return gp1->isEqual(gp2);
-                  }))
+                  })) {
     return false;
+  }
+
+  if (isBoundToFullyConcreteType(typealias, nominal))
+    return true;
 
   // If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->hasGenericParamList())
