@@ -2996,8 +2996,8 @@ AllMembersRequest::evaluate(
   return evaluateMembersRequest(idc, MembersRequestKind::All);
 }
 
-static bool isTypeInferredByTypealias(TypeAliasDecl *typealias,
-                                      NominalTypeDecl *nominal) {
+static bool isBoundToFullyConcreteType(TypeAliasDecl *typealias,
+                                       NominalTypeDecl *nominal) {
   if (!nominal->hasGenericParamList()){
     return false;
   }
@@ -3083,7 +3083,7 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
     return false;
   }
 
-  if (isTypeInferredByTypealias(typealias, nominal))
+  if (isBoundToFullyConcreteType(typealias, nominal))
     return true;
 
   // If neither is generic at this level, we have a pass-through typealias.
