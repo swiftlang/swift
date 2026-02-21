@@ -317,10 +317,25 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
     // Don't look at the overrides of operators in protocols. The global
     // lookup of operators means that we can find overriding operators that
     // aren't relevant to the types in hand, and will fail to type check.
-    if (isa<ProtocolDecl>(decl->getDeclContext())) {
-      if (auto func = dyn_cast<FuncDecl>(decl))
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+      if (auto func = dyn_cast<FuncDecl>(decl)) {
         if (func->isOperator())
           continue;
+      } else if (isa<AssociatedTypeDecl>(decl)) {
+        // Associated type members of a @reparentable protocol are "overridden"
+        // in the sense of name-lookup, preferring one in a downstream protocol.
+        //
+        // See a corresponding bit of code in `computeOverriddenAssociatedTypes`
+        // that backs `ValueDecl::getOverriddenDecls`. There, we say that
+        // a @reparentable associated type is never overridden, so that the
+        // associated type root (or anchor) remains with the downstream
+        // protocols as well, because type parameter ordering happens based on
+        // the root.
+        if (proto->getAttrs().hasAttribute<ReparentableAttr>()) {
+          overridden.insert(decl);
+          continue;
+        }
+      }
     }
 
     while (auto overrides = decl->getOverriddenDecl()) {
