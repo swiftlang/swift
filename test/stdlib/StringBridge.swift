@@ -223,6 +223,26 @@ fileprivate extension String {
   }
 }
 
+struct EqualityTestInput: CustomStringConvertible {
+  let string: String
+  let encoding: UInt
+  let bytes: UnsafeRawBufferPointer
+  
+  var description: String {
+    let encodingName = switch encoding {
+    case NSASCIIStringEncoding:
+      "ASCII"
+    case NSUTF8StringEncoding:
+      "UTF8"
+    case NSUTF16StringEncoding:
+      "UTF16"
+    default:
+      fatalError("Unreachable")
+    }
+    return "(\(string), scalar count: \(string.unicodeScalars.count), encoding: \(encodingName), bytes: \(bytes))"
+  }
+}
+
 // We don't run the Foundation tests, so make sure we have coverage for _swift_unicodeBuffersEqual_nonNormalizing ourselves
 StringBridgeTests.test("Foundation Buffer Comparison SPI") {
   let asciiString = "Hello"                           // ASCII (1-byte UTF-8, 2-byte UTF-16)
@@ -244,9 +264,9 @@ StringBridgeTests.test("Foundation Buffer Comparison SPI") {
     rhsEncoding: UInt,
     expectedEqual: Bool
   ) {
-    let result = lhs.withBytesInEncoding(lhsEncoding) { lhsPtr, lhsCount in
+    let (equal, lhsInput, rhsInput) = lhs.withBytesInEncoding(lhsEncoding) { lhsPtr, lhsCount in
       rhs.withBytesInEncoding(rhsEncoding) { rhsPtr, rhsCount in
-        _swift_unicodeBuffersEqual_nonNormalizing(
+        let equal = _swift_unicodeBuffersEqual_nonNormalizing(
           bytes: lhsPtr,
           count: lhsCount,
           encoding: lhsEncoding,
@@ -254,10 +274,24 @@ StringBridgeTests.test("Foundation Buffer Comparison SPI") {
           count: rhsCount,
           encoding: rhsEncoding
         )
+        let lhsInput = EqualityTestInput(
+          string: lhs,
+          encoding: lhsEncoding,
+          bytes: UnsafeRawBufferPointer(start: lhsPtr, count: lhsCount),
+        )
+        let rhsInput = EqualityTestInput(
+          string: rhs,
+          encoding: rhsEncoding,
+          bytes: UnsafeRawBufferPointer(start: rhsPtr, count: rhsCount),
+        )
+        return (equal, lhsInput, rhsInput)
       }
     }
-    
-    expectEqual(result, expectedEqual)
+    if expectedEqual {
+      expectTrue(equal, "\(rhsInput) and \(lhsInput) should compare equal")
+    } else {
+      expectFalse(equal, "\(rhsInput) and \(lhsInput) should not compare equal")
+    }
   }
   
   // ASCII vs ASCII - Equal content
