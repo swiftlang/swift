@@ -998,6 +998,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   static ForceOptional *create(ConstraintSystem &cs, Type fromType, Type toType,
                                ConstraintLocator *locator);
 
