@@ -5,6 +5,21 @@
 
 ## Swift (next)
 
+* [SE-0508][]:
+  Trailing closures syntax is now supported following array literals. This enables support for
+  calling `Array` and `Dictionary` trailing closure initializers using sugared type syntax:
+
+  ```swift
+  let value = [String] {
+    "a"
+  }
+
+  let value = [String: Int] {
+    (key: "a", value: 42)
+  }
+  ```
+
+
 * [SE-0504][]:
   Introduced Task Cancellation Shields which temporarily prevent the observation of task
   cancellation in a given scope. This functionality is intended for use with cleanup actions which
@@ -11007,6 +11022,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
 [SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
+[SE-0508]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0508-array-expression-trailing-closures.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
