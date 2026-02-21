@@ -345,7 +345,7 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
   if (!literal || literal->getValue().getSignificantBits() > 32)
     return false;
   int numDestroyed = literal->getValue().getSExtValue();
-  
+
   SILFunction *func = destroyArray->getFunction();
   SILBasicBlock *storesBlock = nullptr;
 
@@ -388,7 +388,7 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
     // We don't care about trivial stores.
     if (store->getSrc()->getType().isTrivial(*func))
       continue;
-    
+
     // Check if it's a store to the tail elements.
     if (!destroyPath.contains(storePath.withOffset(0)))
       return false;
@@ -787,7 +787,7 @@ class DeadObjectElimination : public SILFunctionTransform {
   DominanceInfo *domInfo = nullptr;
 
   void removeInstructions(ArrayRef<SILInstruction*> toRemove);
-  
+
   /// Try to salvage the debug info for a dead instruction removed by
   /// DeadObjectElimination.
   ///

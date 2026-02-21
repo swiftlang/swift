@@ -206,7 +206,7 @@ void InteriorLiveness::dump() const { print(llvm::dbgs()); }
 // =============================================================================
 // ExtendedLinearLiveness
 // =============================================================================
-  
+
 struct ExtendedLinearLivenessVisitor
     : public OwnershipUseVisitor<ExtendedLinearLivenessVisitor> {
 

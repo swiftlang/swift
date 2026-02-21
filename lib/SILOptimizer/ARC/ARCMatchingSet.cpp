@@ -235,7 +235,7 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
       LLVM_DEBUG(llvm::dbgs() << "    NOT CODE MOTION SAFE!\n");
       CodeMotionSafeTD = false;
     }
-      
+
     NewIncrements.clear();
 
     // If we do not have any decrements to attempt to match up with, bail.

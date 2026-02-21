@@ -119,7 +119,7 @@ void GenericSignatureImpl::forEachParam(
     bool isCanonical = false;
     switch (req.getKind()) {
     case RequirementKind::SameType: {
-      if (req.getSecondType()->isParameterPack() != 
+      if (req.getSecondType()->isParameterPack() !=
           req.getFirstType()->isParameterPack()) {
         // This is a same-element requirement, which does not make
         // type parameters non-canonical.

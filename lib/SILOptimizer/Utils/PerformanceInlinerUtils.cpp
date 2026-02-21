@@ -274,18 +274,18 @@ ConstantTracker::IntConst ConstantTracker::getIntConst(SILValue val, int depth) 
   // Don't spend too much time with constant evaluation.
   if (depth >= 10)
     return IntConst();
-  
+
   SILInstruction *I = getDef(val);
   if (!I)
     return IntConst();
-  
+
   if (auto *IL = dyn_cast<IntegerLiteralInst>(I)) {
     return IntConst(IL->getValue(), IL->getFunction() != F);
   }
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
     if (constCache.count(BI) != 0)
       return constCache[BI];
-    
+
     IntConst builtinConst = getBuiltinConst(BI, depth + 1);
     constCache[BI] = builtinConst;
     return builtinConst;

@@ -283,7 +283,7 @@ namespace {
       return new FuncTypeInfo(formalType, storageType, size, align,
                               std::move(spareBits), pod);
     }
-    
+
     // Function types do not satisfy allowsOwnership.
 #define REF_STORAGE(Name, name, ...) \
     const TypeInfo * \
@@ -492,7 +492,7 @@ namespace {
           *this, T, ScalarKind::BlockReference);
     }
   };
-  
+
   /// The type info class for the on-stack representation of an ObjC block.
   ///
   /// TODO: May not be fixed-layout if we capture generics.
@@ -509,7 +509,7 @@ namespace {
                          IsFixedSize, IsABIAccessible),
         CaptureOffset(captureOffset)
     {}
-    
+
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,
                           SILType T,
@@ -523,15 +523,15 @@ namespace {
     // The lowered type should be an LLVM struct comprising the block header
     // (IGM.ObjCBlockStructTy) as its first element and the capture as its
     // second.
-    
+
     Address projectBlockHeader(IRGenFunction &IGF, Address storage) const {
       return IGF.Builder.CreateStructGEP(storage, 0, Size(0));
     }
-    
+
     Address projectCapture(IRGenFunction &IGF, Address storage) const {
       return IGF.Builder.CreateStructGEP(storage, 1, CaptureOffset);
     }
-    
+
     // TODO
     // The frontend will currently never emit copy_addr or destroy_addr for
     // block storage.
@@ -555,7 +555,7 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
   // The block storage consists of the block header (ObjCBlockStructTy)
   // followed by the lowered type of the capture.
   auto &capture = IGM.getTypeInfoForLowered(T->getCaptureType());
-  
+
   // TODO: Support dynamic-sized captures.
   const auto *fixedCapture = dyn_cast<FixedTypeInfo>(&capture);
   llvm::Type *fixedCaptureTy;
@@ -623,7 +623,7 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
                              IGM.getPointerSize(),
                              IGM.getHeapObjectSpareBits(),
                              IGM.getPointerAlignment());
-      
+
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::Method:
   case SILFunctionType::Representation::CXXMethod:
@@ -654,7 +654,7 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
     // contexts into the pointer value, so let's not take any spare bits from
     // it.
     spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
-    
+
     if (T->isNoEscape()) {
       // @noescape thick functions are trivial types.
       return FuncTypeInfo::create(
@@ -800,12 +800,12 @@ static void emitApplyArgument(IRGenFunction &IGF,
   if (silConv.isSILIndirect(origParam)) {
     // This address is of the substituted type.
     auto addr = in.claimNext();
-    
+
     // If a substitution is in play, just bitcast the address.
     if (isSubstituted) {
       addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.PtrTy);
     }
-    
+
     out.add(addr);
     return;
   }
@@ -1504,7 +1504,7 @@ public:
           unsubstType->mapTypeOutOfEnvironment()->getCanonicalType()),
         origType->getInvocationGenericSignature()));
 
-    
+
     // Use free as our allocator.
     auto deallocFn = subIGF.IGM.getOpaquePtr(subIGF.IGM.getFreeFn());
 
@@ -1821,7 +1821,7 @@ static llvm::Value *emitPartialApplicationForwarder(
   bool dependsOnContextLifetime = false;
   bool consumesContext;
   bool needsAllocas = false;
-  
+
   switch (outType->getCalleeConvention()) {
   case ParameterConvention::Direct_Owned:
     consumesContext = true;
@@ -2034,7 +2034,7 @@ static llvm::Value *emitPartialApplicationForwarder(
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
       auto &fieldTI = fieldLayout.getType();
       lastCapturedFieldPtr = fieldAddr.getAddress();
-      
+
       Explosion param;
       switch (fieldConvention) {
       case ParameterConvention::Indirect_In_CXX:
@@ -2111,7 +2111,7 @@ static llvm::Value *emitPartialApplicationForwarder(
         cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, param);
         break;
       }
-      
+
       // Reemit the capture params as unsubstituted.
 
       // Skip empty parameters.
@@ -2154,9 +2154,9 @@ static llvm::Value *emitPartialApplicationForwarder(
         }
         ++extraFieldIndex;
       }
-      
+
     }
-    
+
     // If the parameters can live independent of the context, release it now
     // so we can tail call. The safety of this assumes that neither this release
     // nor any of the loads can throw.
@@ -2279,7 +2279,7 @@ static llvm::Value *emitPartialApplicationForwarder(
   for (auto &entry : addressesToDeallocate) {
     entry.TI.deallocateStack(subIGF, entry.Addr, entry.Type);
   }
-  
+
   // If the parameters depended on the context, consume the context now.
   if (rawData && consumesContext && dependsOnContextLifetime) {
     assert(!outType->isNoEscape() && "Trivial context must not be released");
@@ -2358,15 +2358,15 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     // out.
     if (hasSingleSwiftRefcountedContext == No)
       return;
-    
-    
+
+
     // Adding nonempty values when we already have a single refcounted pointer
     // means we don't have a single value anymore.
     if (hasSingleSwiftRefcountedContext != Maybe) {
       hasSingleSwiftRefcountedContext = No;
       return;
     }
-      
+
     if (ti.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       hasSingleSwiftRefcountedContext = Yes;
       singleRefcountedConvention = param.getConvention();
@@ -2430,7 +2430,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
       origType->hasErrorResult()) {
     hasSingleSwiftRefcountedContext = Thunkable;
   }
-  
+
   // If the function pointer is a witness method call, include the witness
   // table in the context.
   if (origType->getRepresentation() ==
@@ -2465,7 +2465,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
   }
 
   auto outAuthInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, outType);
-  
+
   // If we have a single refcounted pointer context (and no polymorphic args
   // to capture), and the dest ownership semantics match the parameter's,
   // skip building the box and thunk and just take the pointer as
@@ -2588,7 +2588,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
         data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets);
     }
     Address dataAddr = layout.emitCastTo(IGF, data);
-    
+
     // Store the context arguments.
     for (unsigned i : indices(layout.getElements())) {
       auto &fieldLayout = layout.getElement(i);
@@ -2660,7 +2660,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     }
   }
   assert(args.empty() && "unused args in partial application?!");
-  
+
   // Create the forwarding stub.
   auto origSig = IGF.IGM.getSignature(origType);
 
@@ -2680,7 +2680,7 @@ static llvm::Function *emitBlockCopyHelper(IRGenModule &IGM,
                                            const BlockStorageTypeInfo &blockTL){
   // See if we've produced a block copy helper for this type before.
   // TODO
-  
+
   // Create the helper.
   llvm::Type *args[] = {
       IGM.PtrTy,
@@ -2695,7 +2695,7 @@ static llvm::Function *emitBlockCopyHelper(IRGenModule &IGM,
   IRGenFunction IGF(IGM, func);
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, func);
-  
+
   // Copy the captures from the source to the destination.
   Explosion params = IGF.collectParameters();
   auto dest = Address(params.claimNext(), blockTL.getStorageType(),
@@ -2710,7 +2710,7 @@ static llvm::Function *emitBlockCopyHelper(IRGenModule &IGM,
                                blockTy->getCaptureAddressType(), false);
 
   IGF.Builder.CreateRetVoid();
-  
+
   return func;
 }
 
@@ -2720,7 +2720,7 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
                                            const BlockStorageTypeInfo &blockTL){
   // See if we've produced a block destroy helper for this type before.
   // TODO
-  
+
   // Create the helper.
   auto destroyTy = llvm::FunctionType::get(IGM.VoidTy, IGM.PtrTy,
                                            /*vararg*/ false);
@@ -2734,7 +2734,7 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
   assert(!func->hasFnAttribute(llvm::Attribute::SanitizeThread));
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, func);
-  
+
   // Destroy the captures.
   Explosion params = IGF.collectParameters();
   auto storage = Address(params.claimNext(), blockTL.getStorageType(),
@@ -2744,7 +2744,7 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
   captureTL.destroy(IGF, capture, blockTy->getCaptureAddressType(),
                     false /*block storage code path: never outlined*/);
   IGF.Builder.CreateRetVoid();
-  
+
   return func;
 }
 
@@ -2780,22 +2780,22 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   bool isTriviallyDestroyable = captureTL.isTriviallyDestroyable(ResilienceExpansion::Maximal);
   if (!isTriviallyDestroyable)
     flags |= 1 << 25;
-  
+
   // - HAS_STRET, if the invoke function is sret
   assert(foreignInfo.ClangInfo);
   if (foreignInfo.ClangInfo->getReturnInfo().isIndirect())
     flags |= 1 << 29;
-  
+
   // - HAS_SIGNATURE
   flags |= 1 << 30;
-  
+
   auto flagsVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags);
-  
+
   // Collect the reserved and invoke pointer fields.
   auto reserved = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
   llvm::Value *invokeVal = llvm::ConstantExpr::getBitCast(invokeFunction,
                                                       IGF.IGM.FunctionPtrTy);
-  
+
   // Build the block descriptor.
   ConstantInitBuilder builder(IGF.IGM);
   auto descriptorFields = builder.beginStruct();
@@ -2807,7 +2807,7 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   descriptorFields.addInt(UnsignedLongTy, 0);
   descriptorFields.addInt(UnsignedLongTy,
                           storageTL.getFixedSize().getValue());
-  
+
   if (!isTriviallyDestroyable) {
     // Define the copy and dispose helpers.
     descriptorFields.addSignedPointer(
@@ -2819,10 +2819,10 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
                        IGF.getOptions().PointerAuth.BlockHelperFunctionPointers,
                        PointerAuthEntity::Special::BlockDisposeHelper);
   }
-  
+
   // Build the descriptor signature.
   descriptorFields.add(getBlockTypeExtendedEncoding(IGF.IGM, invokeTy));
-  
+
   // Create the descriptor.
   auto descriptor =
     descriptorFields.finishAndCreateGlobal("block_descriptor",
@@ -2831,7 +2831,7 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
 
   auto descriptorVal = llvm::ConstantExpr::getBitCast(descriptor,
                                                       IGF.IGM.Int8PtrTy);
-  
+
   // Store the block header.
   auto layout = IGF.IGM.DataLayout.getStructLayout(IGF.IGM.ObjCBlockStructTy);
   IGF.Builder.CreateStore(NSConcreteStackBlock,

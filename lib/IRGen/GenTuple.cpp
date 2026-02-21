@@ -89,18 +89,18 @@ namespace {
     StringRef getFieldName() const {
       return Name;
     }
-    
+
     const TupleTypeElt &getField(SILType T) const {
       auto tup = T.castTo<TupleType>();
-      
+
       return tup->getElement(Index);
     }
-    
+
     SILType getType(IRGenModule&, SILType t) const {
       return t.getTupleElementType(Index);
     }
   };
-  
+
   /// Project a tuple offset from a tuple metadata structure.
   static llvm::Value *loadTupleOffsetFromMetadata(IRGenFunction &IGF,
                                                   llvm::Value *metadata,
@@ -159,7 +159,7 @@ namespace {
       // If the field requires no storage, there's nothing to do.
       if (field.isEmpty())
         return IGF.emitFakeExplosion(field.getTypeInfo(), out);
-  
+
       // Otherwise, project from the base.
       auto fieldRange = field.getProjectionRange();
       ArrayRef<llvm::Value *> element = tuple.getRange(fieldRange.first,
@@ -220,7 +220,7 @@ namespace {
                               bool isOutlined) const override {
       llvm_unreachable("unexploded tuple as argument?");
     }
-    
+
     void verify(IRGenTypeVerifierFunction &IGF,
                 llvm::Value *metadata,
                 SILType tupleType) const override {
@@ -232,7 +232,7 @@ namespace {
           // Check that the fixed layout matches the layout in the tuple
           // metadata.
           auto fixedOffset = field.getFixedByteOffset();
-          
+
           auto runtimeOffset = loadTupleOffsetFromMetadata(IGF, metadata, i);
 
           IGF.verifyValues(metadata, runtimeOffset,
@@ -240,7 +240,7 @@ namespace {
                      llvm::Twine("offset of tuple element ") + llvm::Twine(i));
           break;
         }
-        
+
         case ElementLayout::Kind::Empty:
         case ElementLayout::Kind::EmptyTailAllocatedCType:
         case ElementLayout::Kind::InitialNonFixedSize:
@@ -600,7 +600,7 @@ Address irgen::projectTupleElementAddressByDynamicIndex(IRGenFunction &IGF,
     // Test if the runtime length of the pack type is exactly 1.
     CanPackType packType = loweredTupleType.getInducedPackType();
     auto *shapeExpression = IGF.emitPackShapeExpression(packType);
-  
+
     auto *one = llvm::ConstantInt::get(IGF.IGM.SizeTy, 1);
     auto *isOne = IGF.Builder.CreateICmpEQ(shapeExpression, one);
 

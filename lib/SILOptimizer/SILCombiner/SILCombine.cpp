@@ -200,7 +200,7 @@ SILCombiner::SILCombiner(SILFunctionTransform *trans,
                 use->set(newValue);
                 Worklist.add(use->getUser());
               })),
-  DEBA(trans->getPassManager()->getAnalysis<DeadEndBlocksAnalysis>()), 
+  DEBA(trans->getPassManager()->getAnalysis<DeadEndBlocksAnalysis>()),
   MadeChange(false), RemoveCondFails(removeCondFails),
   enableCopyPropagation(enableCopyPropagation), Iteration(0),
   Builder(*trans->getFunction(), &TrackingList),

@@ -150,7 +150,7 @@ public:
   SourceLoc getEndLoc() const {
     return NumArgumentLabels == 0 ? getBaseNameLoc() : getRParenLoc();
   }
-  
+
   /// Retrieve the complete source range for this declaration name.
   SourceRange getSourceRange() const {
     return SourceRange(getStartLoc(), getEndLoc());

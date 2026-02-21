@@ -386,7 +386,7 @@ public:
         Async, true, ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
         HasSendingResult);
   }
-  
+
   ImplFunctionTypeFlags
   withPseudogeneric() const {
     return ImplFunctionTypeFlags(
@@ -1602,7 +1602,7 @@ protected:
         genericArgs.emplace_back(genericArgsBuf.data() + start,
                                  end - start);
       }
-      
+
       return Builder.resolveOpaqueType(descriptor, genericArgs, ordinal);
     }
 

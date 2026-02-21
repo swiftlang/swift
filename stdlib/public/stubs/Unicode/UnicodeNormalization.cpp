@@ -32,7 +32,7 @@ __swift_uint16_t _swift_stdlib_getNormData(__swift_uint32_t scalar) {
   if (scalar < 0xC0) {
     return 0;
   }
-  
+
 #if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
   swift::swift_abortDisabledUnicodeSupport();
 #else
@@ -101,30 +101,30 @@ __swift_uint32_t _swift_stdlib_getComposition(__swift_uint32_t x,
 
   while (high >= low) {
     auto idx = low + (high - low) / 2;
-  
+
     auto entry = array[idx];
-  
+
     // Shift the range count out of the scalar.
     auto lower = (entry << 15) >> 15;
-  
+
     bool isNegative = entry >> 31;
     auto rangeCount = (entry << 1) >> 18;
-  
+
     if (isNegative) {
       rangeCount = -rangeCount;
     }
-  
+
     auto composed = lower + rangeCount;
-  
+
     if (x == lower) {
       return composed;
     }
-  
+
     if (x > lower) {
       low = idx + 1;
       continue;
     }
-  
+
     if (x < lower) {
       high = idx - 1;
       continue;

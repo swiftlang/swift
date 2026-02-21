@@ -417,7 +417,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return SymbolicValue::getAddress(memObject, accessPath,
                                      evaluator.getAllocator());
   }
-  
+
   // `convert_function` instructions that only change substitutions can be
   // looked through to the original function.
   //

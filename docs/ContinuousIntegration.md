@@ -25,7 +25,7 @@
 
 ## Introduction
 
-This page is designed to assist in the understanding of proper practices for testing for the Swift project. 
+This page is designed to assist in the understanding of proper practices for testing for the Swift project.
 
 ## Pull Request Testing
 
@@ -193,7 +193,7 @@ preset=buildbot_incremental,tools=RA,stdlib=RD,smoketest=macosx,single-thread
 
 ### Specific Preset Testing against a Snapshot Toolchain
 
-One can also run an arbitrary preset against a snapshot toolchain 
+One can also run an arbitrary preset against a snapshot toolchain
 
 Platform       | Comment | Check Status
 ------------   | ------- | ------------

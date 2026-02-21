@@ -78,7 +78,7 @@ print(b[1]) // prints "2"
     **bridged** to Objective-C and **bridged back** to Swift via the
     identity transformation, i.e. it is **bridged verbatim**.
 
--   A type `T` that is not [bridged verbatim](#bridging-rules-and-terminology-for-all-types) 
+-   A type `T` that is not [bridged verbatim](#bridging-rules-and-terminology-for-all-types)
     can conform to `BridgedToObjectiveC`, which specifies its conversions to
     and from Objective-C:
 

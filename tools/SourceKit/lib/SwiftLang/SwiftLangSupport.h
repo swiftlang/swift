@@ -128,7 +128,7 @@ public:
                                       EditorConsumer &Consumer);
 
   std::string getFilePath() const;
-      
+
   /// Returns the virtual filesystem associated with this document.
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() const;
 };

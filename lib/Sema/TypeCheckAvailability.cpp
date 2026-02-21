@@ -1286,8 +1286,8 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
       // replace with a "call" to the type (instead of writing `.init`)
       diag.fixItReplace(CE->getFn()->getSourceRange(), parsed.ContextName);
     } else if (auto *dotCall = dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
-      // if it's a dot call, and the left side is a type (and not `self` or 
-      // `super`, for example), just remove the dot and the right side, again 
+      // if it's a dot call, and the left side is a type (and not `self` or
+      // `super`, for example), just remove the dot and the right side, again
       // in order to make it a "call" to the type
       if (isa<TypeExpr>(dotCall->getBase())) {
         SourceLoc removeLoc = dotCall->getDotLoc();
@@ -2468,7 +2468,7 @@ public:
       diagnoseTypeAvailability(CE->getCastTypeRepr(), CE->getCastType(),
                                E->getLoc(), Where);
     }
-    
+
     if (auto EE = dyn_cast<ErasureExpr>(E)) {
       checkTypeMetadataAvailability(EE->getSubExpr()->getType(),
                                     EE->getLoc(), Where.getDeclContext());
@@ -3158,7 +3158,7 @@ ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R)
     replacement = " = " + SM.extractText(CSR).str();
     replacement += isInc ? ".successor()" : ".predecessor()";
   }
-  
+
   if (!replacement.empty()) {
     // If we emit a deprecation diagnostic, produce a fixit hint as well.
     auto diag =

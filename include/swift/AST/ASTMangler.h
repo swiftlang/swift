@@ -163,7 +163,7 @@ protected:
   /// reference a given entity. If null, the mangler acts as if it's set to
   /// always return true.
   std::function<bool (SymbolicReferent)> CanSymbolicReference;
-  
+
   bool canSymbolicReference(SymbolicReferent referent) {
     // Marker protocols cannot ever be symbolically referenced.
     if (referent.isNominalType()) {
@@ -178,7 +178,7 @@ protected:
   }
 
   std::vector<std::pair<SymbolicReferent, unsigned>> SymbolicReferences;
-  
+
 public:
   enum class SymbolKind {
     Default,
@@ -392,9 +392,9 @@ public:
   std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl);
 
   std::string mangleOpaqueTypeDescriptorRecord(const OpaqueTypeDecl *decl);
-  
+
   std::string mangleDeclType(const ValueDecl *decl);
-  
+
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
 
   std::string mangleTypeWithoutPrefix(Type type) {
@@ -467,7 +467,7 @@ protected:
 
   void appendType(Type type, GenericSignature sig,
                   const ValueDecl *forDecl = nullptr);
-  
+
   void appendDeclName(
       const ValueDecl *decl, DeclBaseName name = DeclBaseName(),
       bool skipLocalDiscriminator = false);
@@ -503,7 +503,7 @@ protected:
                                   SubstitutionMap subs,
                                   bool &isFirstArgList,
                                   const ValueDecl *forDecl = nullptr);
-  
+
   /// Append the bound generic arguments as a flat list, disregarding depth.
   void appendFlatGenericArgs(SubstitutionMap subs,
                              GenericSignature sig,
@@ -727,7 +727,7 @@ protected:
                                 GenericSignature sig);
 
   void appendClosureEntity(const SerializedAbstractClosureExpr *closure);
-  
+
   void appendClosureEntity(const AbstractClosureExpr *closure);
 
   void appendClosureComponents(CanType Ty, unsigned discriminator, bool isImplicit,
@@ -745,7 +745,7 @@ protected:
                                  GenericSignature &genericSig,
                                  GenericSignature &parentGenericSig);
 
-  
+
 
   void appendDeclType(const ValueDecl *decl,
                     BaseEntitySignature &base,
@@ -785,18 +785,18 @@ protected:
   void appendDependentProtocolConformance(const ConformancePath &path,
                                           GenericSignature sig);
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
-  
+
   void appendSymbolicExtendedExistentialType(SymbolicReferent shapeReferent,
                                              Type type,
                                              GenericSignature sig,
                                              const ValueDecl *forDecl);
   void appendSymbolicReference(SymbolicReferent referent);
-  
+
   void appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl);
 
   void beginManglingWithAutoDiffOriginalFunction(
       const AbstractFunctionDecl *afd);
-  void appendAutoDiffFunctionParts(StringRef op, 
+  void appendAutoDiffFunctionParts(StringRef op,
                                    Demangle::AutoDiffFunctionKind kind,
                                    const AutoDiffConfig &config);
   void appendIndexSubset(IndexSubset *indexSubset);

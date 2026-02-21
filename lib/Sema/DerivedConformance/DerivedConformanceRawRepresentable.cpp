@@ -293,7 +293,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   //     }
   //   }
   // }
-  
+
   auto parentDC = initDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
   auto availabilityContext = AvailabilityContext::forDeploymentTarget(C);
@@ -329,7 +329,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
       // In case of a string enum we are calling the _findStringSwitchCase
       // function from the library and switching on the returned Int value.
       stringExprs.push_back(litExpr);
-      litExpr = IntegerLiteralExpr::createFromUnsigned(C, Idx, SourceLoc()); 
+      litExpr = IntegerLiteralExpr::createFromUnsigned(C, Idx, SourceLoc());
     }
     auto *litPat = ExprPattern::createImplicit(C, litExpr, /*DC*/ initDecl);
 
@@ -347,7 +347,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     auto metaTyRef = TypeExpr::createImplicit(enumType, C);
     auto valueExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(),
                                            elt, DeclNameLoc(), /*implicit*/true);
-    
+
     // assignment = "self = \(valueExpr)"
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                        /*implicit*/true,
@@ -356,7 +356,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
                                          /*implicit*/ true);
 
     stmts.push_back(ASTNode(assignment));
-    
+
     // body = "{ \(stmts) }" (the braces are silent)
     auto body = BraceStmt::create(C, SourceLoc(),
                                   stmts, SourceLoc());
@@ -422,7 +422,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   rawDecl->setInterfaceType(rawInterfaceType);
   rawDecl->setImplicit();
   auto paramList = ParameterList::createWithoutLoc(rawDecl);
-  
+
   DeclName name(C, DeclBaseName::createConstructor(), paramList);
 
   auto initDecl =

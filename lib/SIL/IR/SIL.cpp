@@ -132,7 +132,7 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
     // Public declarations are accessible from everywhere.
     case FormalLinkage::PublicUnique:
     case FormalLinkage::PublicNonUnique:
-    case FormalLinkage::PackageUnique: 
+    case FormalLinkage::PackageUnique:
       return false;
 
     // Hidden declarations are inaccessible from different modules.
@@ -208,7 +208,7 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
 /// type declaration.
 FormalLinkage swift::getTypeLinkage(CanType t) {
   assert(t->isLegalFormalType());
-  
+
   class Walker : public TypeWalker {
   public:
     FormalLinkage Linkage;
@@ -219,7 +219,7 @@ FormalLinkage swift::getTypeLinkage(CanType t) {
       auto decl = ty->getNominalOrBoundGenericNominal();
       if (!decl)
         return Action::Continue;
-      
+
       Linkage = std::max(Linkage, getDeclLinkage(decl));
       return Action::Continue;
     }
@@ -316,17 +316,17 @@ bool SILModule::isTypeMetadataForLayoutAccessible(SILType type) {
 static std::optional<GenericSignature>
 getKeyPathSupportingGenericSignature(Type ty, GenericSignature contextSig) {
   auto &C = ty->getASTContext();
-  
+
   // If the type is already unconditionally Copyable and Escapable, we don't
   // need any further requirements.
   if (ty->isCopyable() && ty->isEscapable()) {
     return contextSig;
   }
-  
+
   ProtocolConformanceRef copyable, escapable;
   auto copyableProtocol = C.getProtocol(KnownProtocolKind::Copyable);
   auto escapableProtocol = C.getProtocol(KnownProtocolKind::Escapable);
-  
+
   // If the type is an archetype, then it just needs Copyable and Escapable
   // constraints imposed.
   if (ty->is<ArchetypeType>()) {
@@ -344,7 +344,7 @@ getKeyPathSupportingGenericSignature(Type ty, GenericSignature contextSig) {
   if (copyable.isInvalid() || escapable.isInvalid()) {
     return std::nullopt;
   }
-  
+
   // Otherwise, let's see if we get a viable generic signature combining the
   // requirements for those conformances with the requirements of the
   // declaration context.
@@ -360,12 +360,12 @@ getKeyPathSupportingGenericSignature(Type ty, GenericSignature contextSig) {
               ty->mapTypeOutOfEnvironment(), escapableProtocol->getDeclaredType()));
       return;
     }
-    
+
     if (!ref.isConcrete()) {
       return;
     }
     auto conformance = ref.getConcrete();
-    
+
     for (auto reqt : conformance->getRootConformance()
                                 ->getConditionalRequirements()) {
       ceRequirements.push_back(reqt);
@@ -379,13 +379,13 @@ getKeyPathSupportingGenericSignature(Type ty, GenericSignature contextSig) {
                                                {},
                                                std::move(ceRequirements),
                                                /*allowInverses*/ false);
-  
+
   // If the resulting signature has conflicting requirements, then it is
   // impossible for the type to be copyable and equatable.
   if (regularSignature.getInt()) {
     return std::nullopt;
   }
-  
+
   // Otherwise, we have the signature we're looking for.
   return regularSignature.getPointer();
 }
@@ -394,7 +394,7 @@ static std::optional<GenericSignature>
 getKeyPathSupportingGenericSignatureForValueType(Type ty,
                                                  GenericSignature sig) {
   std::optional<GenericSignature> contextSig = sig;
-  
+
   // Visit lowered positions.
   if (auto tupleTy = ty->getAs<TupleType>()) {
     for (auto eltTy : tupleTy->getElementTypes()) {
@@ -447,10 +447,10 @@ std::optional<GenericSignature>
 AbstractStorageDecl::getPropertyDescriptorGenericSignature() const {
   // The storage needs a descriptor if it sits at a module's ABI boundary,
   // meaning it has public linkage, and it is eligible to be part of a key path.
-  
+
   auto contextTy = getDeclContext()->getDeclaredTypeInContext();
   auto contextSig = getInnermostDeclContext()->getGenericSignatureOfContext();
-  
+
   // If the root type is never `Copyable` or `Escapable`, then instance
   // members can't be used in key paths, at least as they are implemented
   // today.
@@ -467,7 +467,7 @@ AbstractStorageDecl::getPropertyDescriptorGenericSignature() const {
   // as key paths from ().
   if (!getDeclContext()->isTypeContext())
     return std::nullopt;
-  
+
   // Protocol requirements do not need property descriptors.
   if (isa<ProtocolDecl>(getDeclContext()))
     return std::nullopt;
@@ -497,7 +497,7 @@ AbstractStorageDecl::getPropertyDescriptorGenericSignature() const {
 
   // Check the linkage of the declaration.
   auto getterLinkage = SILDeclRef(getter).getLinkage(ForDefinition);
-  
+
   switch (getterLinkage) {
   case SILLinkage::Public:
   case SILLinkage::PublicNonABI:
@@ -505,13 +505,13 @@ AbstractStorageDecl::getPropertyDescriptorGenericSignature() const {
   case SILLinkage::PackageNonABI:
     // We may need a descriptor.
     break;
-    
+
   case SILLinkage::Shared:
   case SILLinkage::Private:
   case SILLinkage::Hidden:
     // Don't need a public descriptor.
     return std::nullopt;
-    
+
   case SILLinkage::HiddenExternal:
   case SILLinkage::PublicExternal:
   case SILLinkage::PackageExternal:
@@ -534,21 +534,21 @@ AbstractStorageDecl::getPropertyDescriptorGenericSignature() const {
       if (index->isInOut()) {
         return std::nullopt;
       }
-      
+
       auto indexTy = index->getInterfaceType()
                         ->getReducedType(sub->getGenericSignatureOfContext());
-      
+
       // TODO: Handle reabstraction and tuple explosion in thunk generation.
       // This wasn't previously a concern because anything that was Hashable
       // had only one abstraction level and no explosion.
-      
+
       if (isa<TupleType>(indexTy))
         return std::nullopt;
-      
+
       auto indexObjTy = indexTy;
       if (auto objTy = indexObjTy.getOptionalObjectType())
         indexObjTy = objTy;
-      
+
       if (isa<AnyFunctionType>(indexObjTy)
           || isa<AnyMetatypeType>(indexObjTy))
         return std::nullopt;

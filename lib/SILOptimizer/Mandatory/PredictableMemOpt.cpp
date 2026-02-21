@@ -100,7 +100,7 @@ static unsigned getNumSubElements(SILType T, SILFunction &F,
           getNumSubElements(T.getTupleElementType(index), F, context);
     return NumElements;
   }
-  
+
   if (auto *SD = getFullyReferenceableStruct(T)) {
     if (SD->isResilient(F.getModule().getSwiftModule(),
                         F.getResilienceExpansion())) {
@@ -118,7 +118,7 @@ static unsigned getNumSubElements(SILType T, SILFunction &F,
     if (NumElements > 0 || T.isTrivial(F))
       return NumElements;
   }
-  
+
   // If this isn't a tuple or struct, it is a single element.
   return 1;
 }
@@ -162,7 +162,7 @@ static unsigned computeSubelement(SILValue Pointer,
                                   SingleValueInstruction *RootInst) {
   unsigned SubElementNumber = 0;
   auto &F = *RootInst->getFunction();
-  
+
   while (1) {
     // If we got to the root, we're done.
     if (RootInst == Pointer)
@@ -180,7 +180,7 @@ static unsigned computeSubelement(SILValue Pointer,
 
     if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
       SILType TT = TEAI->getOperand()->getType();
-      
+
       // Keep track of what subelement is being referenced.
       for (unsigned i = 0, e = TEAI->getFieldIndex(); i != e; ++i) {
         SubElementNumber +=
@@ -193,7 +193,7 @@ static unsigned computeSubelement(SILValue Pointer,
 
     if (auto *SEAI = dyn_cast<StructElementAddrInst>(Pointer)) {
       SILType ST = SEAI->getOperand()->getType();
-      
+
       // Keep track of what subelement is being referenced.
       StructDecl *SD = SEAI->getStructDecl();
       for (auto *D : SD->getStoredProperties()) {
@@ -203,7 +203,7 @@ static unsigned computeSubelement(SILValue Pointer,
           getNumSubElements(ST.getFieldType(D, F.getModule(), context), F,
                             context);
       }
-      
+
       Pointer = SEAI->getOperand();
       continue;
     }
@@ -419,10 +419,10 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
 
       SubElementNumber -= NumSubElt;
     }
-    
+
     llvm_unreachable("Didn't find field");
   }
-  
+
   // Extract struct elements.
   if (auto *SD = getFullyReferenceableStruct(ValTy)) {
     for (auto *D : SD->getStoredProperties()) {
@@ -442,9 +442,9 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
           B.createEndBorrow(Loc, BorrowedVal.getValue());
         return result;
       }
-      
+
       SubElementNumber -= NumSubElt;
-      
+
     }
     llvm_unreachable("Didn't find field");
   }
@@ -530,7 +530,7 @@ SILValue AvailableValueDataflowFixup::getSingleOwnedValue(
   ArrayRef<SILInstruction *> insertPts = availableVal.getInsertionPoints();
   if (insertPts.size() > 1)
     return SILValue();
-  
+
   return SILBuilderWithScope(insertPts[0], &insertedInsts)
     .emitCopyValueOperation(insertPts[0]->getLoc(), value);
 }
@@ -552,7 +552,7 @@ deleteInsertedInsts(InstructionDeleter  &deleter) {
   for (auto *inst : insertedInsts) {
     if (inst->isDeleted())
       continue;
-    
+
     deleter.forceDeleteWithUsers(inst);
   }
   insertedInsts.clear();
@@ -562,7 +562,7 @@ deleteInsertedInsts(InstructionDeleter  &deleter) {
 // values.
 struct AvailableValueAggregationFixup: AvailableValueFixup {
   DeadEndBlocks &deadEndBlocks;
-  
+
   /// The list of phi nodes inserted by the SSA updater.
   SmallVector<SILPhiArgument *, 16> insertedPhiNodes;
 
@@ -620,7 +620,7 @@ SILValue AvailableValueAggregationFixup::mergeCopies(
     SILValue eltVal = emitValue(insertPts[0]);
     if (isFullyAvailable)
       return eltVal;
-    
+
     return SILBuilderWithScope(availableAtInst, &insertedInsts)
       .emitCopyValueOperation(availableAtInst->getLoc(), eltVal);
   }
@@ -1075,7 +1075,7 @@ public:
   void verifyOwnership(DeadEndBlocks &deBlocks) {
     ownershipFixup.verifyOwnership(deBlocks);
   }
-  
+
   void deleteInsertedInsts(InstructionDeleter &deleter) {
     ownershipFixup.deleteInsertedInsts(deleter);
   }
@@ -1188,7 +1188,7 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
       HasAnyEscape = true;
     }
   }
-  
+
   // If isn't really a use, but we account for the alloc_box/mark_uninitialized
   // as a use so we see it in our dataflow walks.
   NonLoadUses[TheMemory] = ~0U;
@@ -1405,7 +1405,7 @@ void AvailableValueDataflowContext::updateAvailableValues(
     // just continue with an unmodified load mask.
     if (!AnyRequired)
       return;
-    
+
     // If the copyaddr is of a non-loadable type, we can't promote it.  Just
     // consider it to be a clobber.
     if (CAI->getSrc()->getType().isLoadable(*CAI->getFunction())) {
@@ -1413,7 +1413,7 @@ void AvailableValueDataflowContext::updateAvailableValues(
       // we need to explode it to its component pieces.  This only expands one
       // level of the copyaddr.
       explodeCopyAddr(CAI);
-      
+
       // The copy_addr doesn't provide any values, but we've arranged for our
       // iterators to visit the newly generated instructions, which do.
       return;
@@ -1439,7 +1439,7 @@ void AvailableValueDataflowContext::updateAvailableValues(
     // just continue with an unmodified load mask.
     if (!AnyRequired)
       return;
-    
+
     // If the mark_dependence is loadable, promote it.
     if (MD->getValue()->getType().isLoadable(*MD->getFunction())) {
       updateMarkDependenceValues(MD, RequiredElts, Result, VisitedBlocks,
@@ -1529,22 +1529,22 @@ void AvailableValueDataflowContext::computeAvailableValuesFrom(
       // need.
       updateAvailableValues(TheInst, RequiredElts, Result, VisitedBlocks,
                             ConflictingValues);
-      
+
       // If this satisfied all of the demanded values, we're done.
       if (RequiredElts.none())
         return;
-      
+
       // Otherwise, keep scanning the block.  If the instruction we were looking
       // at just got exploded, don't skip the next instruction.
       if (&*std::prev(BBI) == TheInst)
         --BBI;
     }
   }
-  
+
   // Otherwise, we need to scan up the CFG looking for available values.
   for (auto PI = BB->pred_begin(), E = BB->pred_end(); PI != E; ++PI) {
     SILBasicBlock *PredBB = *PI;
-    
+
     // If the predecessor block has already been visited (potentially due to a
     // cycle in the CFG), don't revisit it.  We can do this safely because we
     // are optimistically assuming that all incoming elements in a cycle will be
@@ -1557,19 +1557,19 @@ void AvailableValueDataflowContext::computeAvailableValuesFrom(
       const auto &PrevRequired = Entry.first->second;
       if (PrevRequired != RequiredElts) {
         ConflictingValues |= (PrevRequired ^ RequiredElts);
-        
+
         RequiredElts &= ~ConflictingValues;
         if (RequiredElts.none())
           return;
       }
       continue;
     }
-    
+
     // Make sure to pass in the same set of required elements for each pred.
     SmallBitVector Elts = RequiredElts;
     computeAvailableValuesFrom(PredBB->end(), PredBB, Elts, Result,
                                VisitedBlocks, ConflictingValues);
-    
+
     // If we have any conflicting values, don't bother searching for them.
     RequiredElts &= ~ConflictingValues;
     if (RequiredElts.none())
@@ -1968,7 +1968,7 @@ private:
 
   void promoteMarkDepAddrBase(MarkDependenceAddrInst *md,
                               ArrayRef<AvailableValue> availableValues);
-  
+
   /// Promote a load take cleaning up everything except for RAUWing the
   /// instruction with the aggregated result. The routine returns the new
   /// aggregated result to the caller and expects the caller to eventually RAUW

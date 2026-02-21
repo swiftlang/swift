@@ -325,7 +325,7 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
                                                     /*low bit*/false,
     [&](ConstantInitBuilder &B) {
       llvm::Function *accessor;
-      
+
       // Otherwise, we need to emit a helper function to bind the arguments
       // out of the demangler's argument buffer.
       auto fnTy = llvm::FunctionType::get(IGM.TypeMetadataPtrTy,
@@ -334,7 +334,7 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
         llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
                                symbolName, IGM.getModule());
       accessor->setAttributes(IGM.constructInitialAttributes());
-      
+
       SmallVector<GenericRequirement, 4> requirements;
       auto *genericEnv = sig.getGenericEnvironment();
       enumerateGenericSignatureRequirements(sig,
@@ -375,7 +375,7 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
           // for now, we can unconditionally lie.
           bool useForwardCompatibility =
             IGM.Context.LangOpts.Target.isOSDarwin();
-          
+
           llvm::Instruction *br = nullptr;
           llvm::BasicBlock *supportedBB = nullptr;
           if (useForwardCompatibility) {
@@ -401,7 +401,7 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
               cast<llvm::GlobalVariable>(runtimeSupportsNoncopyableTypesSymbol)
                   ->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
             }
-              
+
             auto runtimeSupportsNoncopyableTypes
               = IGF.Builder.CreateIsNotNull(runtimeSupportsNoncopyableTypesSymbol,
                                             "supports.noncopyable");
@@ -410,10 +410,10 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
             br = IGF.Builder.CreateCondBr(runtimeSupportsNoncopyableTypes,
                                      supportedBB,
                                      unsupportedBB);
-                                     
+
             IGF.Builder.emitBlock(unsupportedBB);
           }
-          
+
           // If the runtime does not yet support noncopyable types, lie that the
           // field is an empty tuple, so the runtime doesn't try to do anything
           // with the actual value.
@@ -423,7 +423,7 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
           if (!useForwardCompatibility) {
             goto done_building_function;
           }
-          
+
           // Emit the type metadata normally otherwise.
           IGF.Builder.SetInsertPoint(br);
           IGF.Builder.emitBlock(supportedBB);
@@ -485,7 +485,7 @@ getTypeRefImpl(IRGenModule &IGM,
   case MangledTypeRefRole::FlatUnique:
     useFlatUnique = true;
     break;
-    
+
   case MangledTypeRefRole::FieldMetadata: {
     // We want to keep fields of noncopyable type from being exposed to
     // in-process runtime reflection libraries in older Swift runtimes, since
@@ -601,7 +601,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
                                       bool shouldSetLowBit) {
   type = substOpaqueTypesWithUnderlyingTypes(type);
   conformance = substOpaqueTypesWithUnderlyingTypes(conformance);
-  
+
   auto origType = type;
   auto genericSig = origGenericSig.getCanonicalSignature();
 
@@ -626,7 +626,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
           llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
                                  symbolName, getModule());
         accessorThunk->setAttributes(constructInitialAttributes());
-        
+
         {
           IRGenFunction IGF(*this, accessorThunk);
           if (DebugInfo)
@@ -741,7 +741,7 @@ protected:
     : IGM(IGM), InitBuilder(IGM), B(InitBuilder.beginStruct()) {}
 
   virtual ~ReflectionMetadataBuilder() {}
-  
+
   // Collect any builtin types referenced from this type.
   void addBuiltinTypeRefs(CanType type) {
     if (IGM.getSwiftModule()->isStdlibModule()) {
@@ -912,7 +912,7 @@ public:
 class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 public:
   static const uint32_t FieldRecordSize = 12;
-  
+
 private:
   const NominalTypeDecl *NTD;
 
@@ -1121,7 +1121,7 @@ public:
 static bool
 deploymentTargetHasRemoteMirrorZeroSizedTypeDescriptorBug(IRGenModule &IGM) {
   auto target = IGM.Context.LangOpts.Target;
-  
+
   if (target.isMacOSX() && target.isMacOSXVersionLT(10, 15, 4)) {
     return true;
   }
@@ -1131,7 +1131,7 @@ deploymentTargetHasRemoteMirrorZeroSizedTypeDescriptorBug(IRGenModule &IGM) {
   if (target.isWatchOS() && target.isOSVersionLT(6, 2)) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -1139,7 +1139,7 @@ deploymentTargetHasRemoteMirrorZeroSizedTypeDescriptorBug(IRGenModule &IGM) {
 /// a workaround for a RemoteMirror crash in older OSes.
 class EmptyStructMetadataBuilder : public ReflectionMetadataBuilder {
   const NominalTypeDecl *NTD;
-  
+
   void layout() override {
     addNominalRef(NTD);
     B.addInt32(0);
@@ -1147,7 +1147,7 @@ class EmptyStructMetadataBuilder : public ReflectionMetadataBuilder {
     B.addInt16(FieldTypeMetadataBuilder::FieldRecordSize);
     B.addInt32(0);
   }
-  
+
 public:
   EmptyStructMetadataBuilder(IRGenModule &IGM,
                              const NominalTypeDecl *NTD)
@@ -1191,7 +1191,7 @@ public:
     ti = &cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(
         nominalDecl->getDeclaredTypeInContext()->getCanonicalType()));
   }
-  
+
   void layout() override {
     if (type->isAnyObject()) {
       // AnyObject isn't actually a builtin type; we're emitting it as the old
@@ -1570,7 +1570,7 @@ public:
           return std::nullopt;
         })->getCanonicalType();
       }
-      
+
       // TODO: We should preserve substitutions in SILFunctionType captures
       // once the runtime MetadataReader can understand them, since they can
       // affect representation.
@@ -1884,7 +1884,7 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
       builder.emit();
       return;
     }
-    
+
     FixedTypeMetadataBuilder builder(*this, D);
     builder.emit();
   }

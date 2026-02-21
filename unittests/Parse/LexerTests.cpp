@@ -124,15 +124,15 @@ TEST_F(LexerTest, StringLiteralWithNUL1) {
 
 TEST_F(LexerTest, ContentStartHashbangSkip) {
   const char *Source = "#!/usr/bin/swift\naaa";
-  
+
   LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
-  
+
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
-  
+
   Token Tok;
-  
+
   L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("aaa", Tok.getText());
@@ -141,15 +141,15 @@ TEST_F(LexerTest, ContentStartHashbangSkip) {
 
 TEST_F(LexerTest, ContentStartHashbangSkipUTF8BOM) {
   const char *Source = "\xEF\xBB\xBF" "#!/usr/bin/swift\naaa";
-  
+
   LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
-  
+
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
-  
+
   Token Tok;
-  
+
   L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("aaa", Tok.getText());
@@ -158,15 +158,15 @@ TEST_F(LexerTest, ContentStartHashbangSkipUTF8BOM) {
 
 TEST_F(LexerTest, ContentStartOperatorLeftBound) {
   const char *Source = "+a";
-  
+
   LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
-  
+
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
-  
+
   Token Tok;
-  
+
   L.lex(Tok);
   ASSERT_EQ(tok::oper_prefix, Tok.getKind());
   ASSERT_EQ("+", Tok.getText());
@@ -175,15 +175,15 @@ TEST_F(LexerTest, ContentStartOperatorLeftBound) {
 
 TEST_F(LexerTest, ContentStartOperatorLeftBoundUTF8BOM) {
   const char *Source = "\xEF\xBB\xBF" "+a";
-  
+
   LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
-  
+
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
-  
+
   Token Tok;
-  
+
   L.lex(Tok);
   ASSERT_EQ(tok::oper_prefix, Tok.getKind());
   ASSERT_EQ("+", Tok.getText());
@@ -198,15 +198,15 @@ TEST_F(LexerTest, ContentStartConflictMarker) {
     "yyy\n"
     ">>>>>>> 12345670\n"
     "aaa";
-  
+
   LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
-  
+
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
-  
+
   Token Tok;
-  
+
   L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("aaa", Tok.getText());
@@ -221,15 +221,15 @@ TEST_F(LexerTest, ContentStartConflictMarkerUTF8BOM) {
   "yyy\n"
   ">>>>>>> 12345670\n"
   "aaa";
-  
+
   LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
-  
+
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
-  
+
   Token Tok;
-  
+
   L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("aaa", Tok.getText());
@@ -237,15 +237,15 @@ TEST_F(LexerTest, ContentStartConflictMarkerUTF8BOM) {
 
 TEST_F(LexerTest, ContentStartTokenIsStartOfLine) {
   const char *Source = "aaa";
-  
+
   LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
-  
+
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
-  
+
   Token Tok;
-  
+
   L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("aaa", Tok.getText());
@@ -255,15 +255,15 @@ TEST_F(LexerTest, ContentStartTokenIsStartOfLine) {
 
 TEST_F(LexerTest, ContentStartTokenIsStartOfLineUTF8BOM) {
   const char *Source = "\xEF\xBB\xBF" "aaa";
-  
+
   LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
-  
+
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
-  
+
   Token Tok;
-  
+
   L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("aaa", Tok.getText());
@@ -273,14 +273,14 @@ TEST_F(LexerTest, ContentStartTokenIsStartOfLineUTF8BOM) {
 
 TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   const char *Source = "\xEF\xBB\xBF" "// comment\naaa //xx \n/* x */";
-  
+
   LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
-  
+
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens);
-  
+
   Token Tok;
 
   L.lex(Tok);
@@ -289,28 +289,28 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  
+
   L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("aaa", Tok.getText());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  
+
   L.lex(Tok);
   ASSERT_EQ(tok::comment, Tok.getKind());
   ASSERT_EQ("//xx \n", Tok.getText());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  
+
   L.lex(Tok);
   ASSERT_EQ(tok::comment, Tok.getKind());
   ASSERT_EQ("/* x */", Tok.getText());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 24), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 24), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  
+
   L.lex(Tok);
   ASSERT_EQ(tok::eof, Tok.getKind());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
@@ -320,14 +320,14 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
 
 TEST_F(LexerTest, BOMAttachCommentNoTrivia) {
   const char *Source = "\xEF\xBB\xBF" "// comment\naaa //xx \n/* x */";
-  
+
   LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
-  
+
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken);
-  
+
   Token Tok;
 
   L.lex(Tok);
@@ -336,7 +336,7 @@ TEST_F(LexerTest, BOMAttachCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getCommentRange().getStart());
   ASSERT_EQ(10u, Tok.getCommentRange().getByteLength());
-  
+
   L.lex(Tok);
   ASSERT_EQ(tok::eof, Tok.getKind());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());

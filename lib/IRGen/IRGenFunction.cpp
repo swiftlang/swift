@@ -423,7 +423,7 @@ void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
     } else {
       elementType = element.getScalarType();
     }
-    
+
     explosion.add(llvm::UndefValue::get(elementType));
   }
 }

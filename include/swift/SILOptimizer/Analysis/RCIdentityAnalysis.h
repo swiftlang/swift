@@ -95,7 +95,7 @@ public:
   }
 
   virtual void initialize(SILPassManager *PM) override;
-  
+
   virtual std::unique_ptr<RCIdentityFunctionInfo>
   newFunctionAnalysis(SILFunction *F) override {
     return std::make_unique<RCIdentityFunctionInfo>(DA);

@@ -93,7 +93,7 @@ public:
     }
     llvm_unreachable("bad kind");
   }
-  
+
   static bool isReabstractionKind(KindTy kind) {
     switch (kind) {
     case Reabstract:
@@ -266,7 +266,7 @@ public:
   bool isBridging() const {
     return isBridgingKind(getKind());
   }
-  
+
   bool isReabstraction() const {
     return isReabstractionKind(getKind());
   }
@@ -492,7 +492,7 @@ private:
   StateTy getState() const {
     return State;
   }
-  
+
   InitializationPtr OwnedSubInitialization;
 
 public:
@@ -507,7 +507,7 @@ public:
     OwnedSubInitialization = std::move(subInitialization);
   }
 
-  
+
   /// Return the conversion to apply to the unconverted value.
   const Conversion &getConversion() const {
     return TheConversion;
@@ -588,7 +588,7 @@ public:
   ConvertingInitialization *getAsConversion() override {
     return this;
   }
-  
+
   // Bookkeeping.
   void finishInitialization(SILGenFunction &SGF) override {
     if (getState() == PackExpanding) {

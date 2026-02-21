@@ -1572,7 +1572,7 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
     Node *kindNd = node->getChild(idx++);
     if (kindNd->getKind() != Node::Kind::FunctionSignatureSpecializationParamKind)
       continue;
-  
+
     unsigned kindValue = kindNd->getIndex();
 
     switch (FunctionSigSpecializationParamKind(kindValue)) {
@@ -4097,7 +4097,7 @@ ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
   }
 
   if (genSig) {
-    RETURN_IF_ERROR(mangle(genSig, depth + 1));  
+    RETURN_IF_ERROR(mangle(genSig, depth + 1));
   }
   RETURN_IF_ERROR(mangle(type, depth + 1));
 

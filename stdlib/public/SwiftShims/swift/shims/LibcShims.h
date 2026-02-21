@@ -140,7 +140,7 @@ static inline SWIFT_ALWAYS_INLINE
 float _stdlib_remainderf(float _self, float _other) {
   return __builtin_remainderf(_self, _other);
 }
-  
+
 static inline SWIFT_ALWAYS_INLINE
 float _stdlib_squareRootf(float _self) {
 #if defined(_WIN32) && (defined(_M_IX86) || defined(__i386__))
@@ -166,7 +166,7 @@ static inline SWIFT_ALWAYS_INLINE
 long double _stdlib_remainderl(long double _self, long double _other) {
   return __builtin_remainderl(_self, _other);
 }
-  
+
 static inline SWIFT_ALWAYS_INLINE
 long double _stdlib_squareRootl(long double _self) {
   return __builtin_sqrtl(_self);

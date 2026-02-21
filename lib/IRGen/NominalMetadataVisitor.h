@@ -47,7 +47,7 @@ public:
   void addGenericFields(NominalTypeDecl *typeDecl, T &&...args) {
     // The archetype order here needs to be consistent with
     // NominalTypeDescriptorBase::addGenericParams.
-    
+
     // Note that we intentionally don't std::forward 'args'.
     asImpl().noteStartOfGenericRequirements(args...);
 

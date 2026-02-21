@@ -106,7 +106,7 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
                        diag::alignment_more_than_maximum,
                        MinimumAlign.getValue());
       }
-      
+
       MinimumSize = size;
       SpareBits.extendWithClearBits(MinimumSize.getValueInBits());
       IsFixedLayout = true;
@@ -174,7 +174,7 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
         }
       }
     }
-    
+
     // Set the LLVM struct type for a fixed layout according to the stride and
     // alignment we determined.
     if (IsKnownAlwaysFixedSize) {
@@ -259,7 +259,7 @@ void irgen::applyLayoutAttributes(IRGenModule &IGM,
     auto value = alignment->getValue();
     assert(value != 0 && ((value - 1) & value) == 0
            && "alignment not a power of two!");
-    
+
     if (!IsFixedLayout)
       Diags.diagnose(alignment->getLocation(),
                      diag::alignment_dynamic_type_layout_unsupported);
@@ -523,7 +523,7 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
   elt.completeFixed(elt.getType().isTriviallyDestroyable(ResilienceExpansion::Maximal),
                     CurSize, StructFields.size());
   StructFields.push_back(elt.getType().getStorageType());
-  
+
   // Carry over the spare bits from the element.
   CurSpareBits.push_back(eltTI.getSpareBits());
 }

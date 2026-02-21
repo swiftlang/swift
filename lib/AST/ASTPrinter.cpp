@@ -1213,7 +1213,7 @@ public:
   }
 
   /// The default generic signature flags for printing requirements.
-  static unsigned 
+  static unsigned
   defaultGenericRequirementFlags(const PrintOptions &options) {
     return PrintRequirements | PrintInverseRequirements;
   }
@@ -3596,7 +3596,7 @@ namespace {
 struct ExcludeAttrRAII {
   std::vector<AnyAttrKind> &ExcludeAttrList;
   unsigned OriginalExcludeAttrCount;
-  
+
   ExcludeAttrRAII(std::vector<AnyAttrKind> &ExcludeAttrList,
                   DeclAttrKind excluded)
     : ExcludeAttrList(ExcludeAttrList),
@@ -3604,7 +3604,7 @@ struct ExcludeAttrRAII {
   {
     ExcludeAttrList.push_back(excluded);
   }
-  
+
   ~ExcludeAttrRAII() {
     ExcludeAttrList.resize(OriginalExcludeAttrCount);
   }
@@ -4268,7 +4268,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
 
     // Map all non-let specifiers to 'var'.  This is not correct, but
     // SourceKit relies on this for info about parameter decls.
-    
+
     bool printAsVar = (introducer != VarDecl::Introducer::Let ||
                        isInObjCImpl(decl));
     Printer.printIntroducerKeyword(printAsVar ? "var" : "let", Options, " ");
@@ -5019,7 +5019,7 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
 }
 
 void PrintAST::visitModuleDecl(ModuleDecl *decl) {
-  
+
 }
 
 void PrintAST::visitMissingDecl(MissingDecl *missing) {
@@ -5212,7 +5212,7 @@ void PrintAST::visitIsExpr(IsExpr *expr) {
 }
 
 void PrintAST::visitTapExpr(TapExpr *expr) {
-  
+
 }
 
 void PrintAST::visitTryExpr(TryExpr *expr) {
@@ -5385,7 +5385,7 @@ void PrintAST::visitCoerceExpr(CoerceExpr *expr) {
 }
 
 void PrintAST::printClosure(AbstractClosureExpr *closure, CaptureListExpr *captureList) {
-  
+
 }
 
 void PrintAST::visitClosureExpr(ClosureExpr *expr) {
@@ -5428,7 +5428,7 @@ void PrintAST::visitErasureExpr(ErasureExpr *expr) {
 
 void PrintAST::printKeyPathComponents(KeyPathExpr *expr, ArrayRef<KeyPathExpr::Component> components) {
   using ComponentKind = KeyPathExpr::Component::Kind;
-  
+
   if (!components.empty()) {
     for (auto &component: components) {
       auto kind = component.getKind();
@@ -7585,7 +7585,7 @@ public:
     if (T->getLayout()->capturesGenericEnvironment()) {
       Printer << "@captures_generics ";
     }
-    
+
     {
       // A box layout has its own independent generic environment. Don't try
       // to print it with the environment's generic params.
@@ -8337,7 +8337,7 @@ void SILParameterInfo::print(
     options -= SILParameterInfo::Isolated;
     Printer << "@sil_isolated ";
   }
-      
+
   if (options.contains(SILParameterInfo::Const)) {
     options -= SILParameterInfo::Const;
     Printer << "@const ";

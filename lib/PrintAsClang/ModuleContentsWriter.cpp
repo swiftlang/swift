@@ -544,7 +544,7 @@ public:
       return;
 
     assert(ED->isCCompatibleEnum() || ED->hasClangNode());
-    
+
     forwardDeclare(ED, [&]{
       // Forward declare in a way to be compatible with older C standards.
       os << "SWIFT_ENUM_FWD_DECL(";
@@ -882,7 +882,7 @@ public:
     printer.print(ED);
     return true;
   }
-  
+
   bool writeEnum(const EnumDecl *ED) {
     if (addImport(ED))
       return true;

@@ -62,7 +62,7 @@ enum ForUnwind_t : bool {
 enum class CleanupState {
   /// The cleanup is inactive but may be activated later.
   Dormant,
-  
+
   /// The cleanup is inactive and will not be activated later.
   Dead,
 
@@ -70,7 +70,7 @@ enum class CleanupState {
 
   /// The cleanup is currently active.
   Active,
-  
+
   /// The cleanup is currently active.  When it's forwarded, it should
   /// be placed in a dormant state, not a dead state.
   PersistentlyActive
@@ -110,7 +110,7 @@ public:
   /// Return the allocated size of this object.  This is required by
   /// DiverseStack for iteration.
   size_t allocated_size() const { return allocatedSize; }
-  
+
   CleanupState getState() const { return state; }
   virtual void setState(SILGenFunction &SGF, CleanupState newState) {
     state = newState;
@@ -166,7 +166,7 @@ typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupHandle;
 class LLVM_LIBRARY_VISIBILITY CleanupManager {
   friend class Scope;
   friend class CleanupCloner;
-  
+
   SILGenFunction &SGF;
 
   /// Stack - Currently active cleanups in this scope tree.
@@ -208,7 +208,7 @@ public:
     assert(!stack.empty());
     return stack.stable_begin();
   }
-  
+
   Cleanup &getCleanup(CleanupHandle iter) {
     return *stack.find(iter);
   }
@@ -260,7 +260,7 @@ public:
 
     T &cleanup = stack.push<T, A...>(::std::forward<A>(args)...);
     T &result = static_cast<T&>(initCleanup(cleanup, sizeof(T), state));
-    
+
 #ifndef NDEBUG
     auto newTop = stack.begin();
     ++newTop;

@@ -27,7 +27,7 @@ struct SourceFileExtras {
   /// warning for.
   llvm::DenseSet<const ConstructorDecl *> DiagnosedCompatMemberwiseInits;
 };
-  
+
 }
 
 #endif // SWIFT_AST_SOURCEFILEEXTRAS_H

@@ -86,7 +86,7 @@ public:
   }
 
   SILPassManager *getPassManager() const { return passManager; }
-  
+
   SILTransform *getTransform() const { return transform; }
 
   SILFunction *getFunction() const { return function; }
@@ -205,7 +205,7 @@ class SILPassManager {
   /// the pass doesn't need to run, because nothing has changed since the
   /// previous run of that pass.
   typedef std::bitset<(size_t)PassKind::numPasses> CompletedPasses;
-  
+
   /// A completed-passes mask for each function.
   llvm::DenseMap<SILFunction *, CompletedPasses> CompletedPassesMap;
 
@@ -323,7 +323,7 @@ public:
     for (auto AP : Analyses)
       if (!AP->isLocked())
         AP->invalidate(F, K);
-    
+
     CurrentPassHasInvalidated = true;
     // Any change let all passes run again.
     CompletedPassesMap[F].reset();

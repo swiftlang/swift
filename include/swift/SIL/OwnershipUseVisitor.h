@@ -208,7 +208,7 @@ bool OwnershipUseVisitor<Impl>::visitConsumes(SILValue ssaDef) {
     if (use->isConsuming()) {
       if (PhiOperand(use) && !asImpl().handleOwnedPhi(use))
         return false;
-        
+
       if (!handleUsePoint(use, UseLifetimeConstraint::LifetimeEnding))
         return false;
     }

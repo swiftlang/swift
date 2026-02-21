@@ -246,7 +246,7 @@ public:
 
   /// Does this pattern have any mutable 'var' bindings?
   bool hasAnyMutableBindings() const;
-  
+
   /// Get the ownership behavior of this pattern on the value being matched
   /// against it.
   ///
@@ -460,12 +460,12 @@ public:
   SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
 
-  /// True if this is an "async let _ pattern since `async let _` could be a 
-  /// subPattern of a \c TypedPattern represented as \c AnyPattern e.g. 
-  /// "async let _: Type = <expr>" or simply just an \c AnyPattern in 
+  /// True if this is an "async let _ pattern since `async let _` could be a
+  /// subPattern of a \c TypedPattern represented as \c AnyPattern e.g.
+  /// "async let _: Type = <expr>" or simply just an \c AnyPattern in
   /// "async let _ = <expr>" case.
   bool isAsyncLet() const { return bool(Bits.AnyPattern.IsAsyncLet); }
-  
+
   void setIsAsyncLet() {
     Bits.AnyPattern.IsAsyncLet = static_cast<uint64_t>(true);
   }

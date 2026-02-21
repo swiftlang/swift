@@ -855,7 +855,7 @@ static void performCancellationAction(ActiveTaskStatus status, TaskStatusRecord 
       cast<CancellationNotificationStatusRecord>(record);
     if (status.hasCancellationShield()) {
       SWIFT_TASK_DEBUG_LOG("cancellation shielded: skip cancellation handler invocation in task = %p", swift_task_getCurrent());
-      return; 
+      return;
     }
     notification->run();
     return;
@@ -893,7 +893,7 @@ static void swift_task_cancelImpl(AsyncTask *task) {
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
   while (true) {
-    // Are we already cancelled? 
+    // Are we already cancelled?
     // Even if we have a cancellation shield active, we do want to set the isCancelled flag.
     if (oldStatus.isCancelled(/*ignoreShield=*/false)) {
       return;

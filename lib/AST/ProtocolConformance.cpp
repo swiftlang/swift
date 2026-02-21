@@ -239,13 +239,13 @@ bool ProtocolConformance::isReparented() const {
 bool ProtocolConformance::isRetroactive() const {
   auto extensionModule = getDeclContext()->getParentModule();
   auto protocolModule = getProtocol()->getParentModule();
-  
-  auto isSameRetroactiveContext = 
+
+  auto isSameRetroactiveContext =
     [](ModuleDecl *moduleA, ModuleDecl *moduleB) -> bool {
       return moduleA->isSameModuleLookingThroughOverlays(moduleB) ||
         moduleA->inSamePackage(moduleB);
     };
-  
+
   if (isSameRetroactiveContext(extensionModule, protocolModule)) {
     return false;
   }
@@ -923,7 +923,7 @@ bool SpecializedProtocolConformance::hasTypeWitness(
 
 TypeWitnessAndDecl
 SpecializedProtocolConformance::getTypeWitnessAndDecl(
-                      AssociatedTypeDecl *assocType, 
+                      AssociatedTypeDecl *assocType,
                       SubstOptions options) const {
   assert(getProtocol() == cast<ProtocolDecl>(assocType->getDeclContext()) &&
          "associated type in wrong protocol");

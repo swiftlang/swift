@@ -33,7 +33,7 @@ namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
 
 class CharVector;
-  
+
 /// The allocator for demangling nodes and other demangling-internal stuff.
 ///
 /// It implements a simple bump-pointer allocator.
@@ -50,7 +50,7 @@ class NodeFactory {
     AllocatedSlab *Previous;
     // Tail allocated memory starts here.
   };
-  
+
   /// The head of the single-linked slab list.
   AllocatedSlab *CurrentSlab = nullptr;
 
@@ -132,9 +132,9 @@ public:
       BorrowedFrom->isBorrowed = false;
     }
   }
-  
+
   virtual void clear();
-  
+
   /// Allocates an object of type T or an array of objects of type T.
   template<typename T> T *Allocate(size_t NumObjects = 1) {
     assert(!isBorrowed);
@@ -273,7 +273,7 @@ public:
   /// The \p Text string is already allocated with the Factory and therefore
   /// it is _not_ copied.
   NodePointer createNode(Node::Kind K, const CharVector &Text);
-  
+
   /// Creates a node of kind \p K with a \p Text payload, which must be a C
   /// string literal.
   ///
@@ -308,7 +308,7 @@ public:
     NumElems = 0;
     Capacity = InitialCapacity;
   }
-  
+
   void free() {
     Capacity = 0;
     Elems = 0;
@@ -320,7 +320,7 @@ public:
 
   iterator begin() { return Elems; }
   iterator end() { return Elems + NumElems; }
-  
+
   T &operator[](size_t Idx) {
     assert(Idx < NumElems);
     return Elems[Idx];
@@ -330,7 +330,7 @@ public:
     assert(Idx < NumElems);
     return Elems[Idx];
   }
-  
+
   size_t size() const { return NumElems; }
 
   bool empty() const { return NumElems == 0; }
@@ -420,7 +420,7 @@ protected:
   static const int MaxNumWords = 26;
   StringRef Words[MaxNumWords];
   int NumWords = 0;
-  
+
   std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
 
   bool nextIf(StringRef str) {
@@ -485,7 +485,7 @@ protected:
     Node::Kind NdKind = NodeStack.back()->getKind();
     if (!pred(NdKind))
       return nullptr;
-    
+
     return popNode();
   }
 
@@ -499,14 +499,14 @@ protected:
     StringRef Text;
     size_t Pos;
     std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
-    
+
   public:
     DemangleInitRAII(Demangler &Dem, StringRef MangledName,
          std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver);
     ~DemangleInitRAII();
   };
   friend DemangleInitRAII;
-  
+
   void addSubstitution(NodePointer Nd) {
     if (Nd) {
       Substitutions.push_back(Nd, *this);
@@ -656,7 +656,7 @@ protected:
 
 public:
   Demangler() {}
-  
+
   void clear() override;
 
   /// Demangle the given symbol and return the parse tree.

@@ -108,7 +108,7 @@ static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &SGF,
   assert(substitutions.getReplacementTypes().size() == 1 &&
          "load should have single substitution");
   assert(args.size() == 1 && "load should have a single argument");
-  
+
   // The substitution gives the type of the load.  This is always a
   // first-class type; there is no way to e.g. produce a @weak load
   // with this builtin.
@@ -185,7 +185,7 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &SGF,
          "destroy should have a single substitution");
   // The substitution determines the type of the thing we're destroying.
   auto &ti = SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
-  
+
   // Destroy is a no-op for trivial types.
   if (ti.isTrivial())
     return ManagedValue::forObjectRValueWithoutOwnership(
@@ -199,7 +199,7 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &SGF,
                                  destroyType.getAddressType(),
                                  /*isStrict*/ true,
                                  /*isInvariant*/ false);
-  
+
   // Destroy the value indirectly. Canonicalization will promote to loads
   // and releases if appropriate.
   SGF.B.createDestroyAddr(loc, addr);
@@ -300,7 +300,7 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &SGF,
   assert(args.size() == 1 && "cast should have a single argument");
   assert(substitutions.getReplacementTypes().size() == 1 &&
          "cast should have a type substitution");
-  
+
   // Bail if the source type is not a class reference of some kind.
   Type argTy = substitutions.getReplacementTypes()[0];
   if (!argTy->mayHaveSuperclass() && !argTy->isClassExistentialType()) {
@@ -362,7 +362,7 @@ static ManagedValue emitCastFromReferenceType(SILGenFunction &SGF,
   // The substitution determines the destination type.
   SILType destType =
     SGF.getLoweredType(substitutions.getReplacementTypes()[0]);
-  
+
   // Bail if the source type is not a class reference of some kind.
   if (!substitutions.getReplacementTypes()[0]->isBridgeableObjectType()
       || !destType.isObject()) {
@@ -391,7 +391,7 @@ static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &SGF,
                                         ArrayRef<ManagedValue> args,
                                         SGFContext C) {
   assert(args.size() == 1 && "bridge should have a single argument");
-  
+
   // Take the reference type argument and cast it to RawPointer.
   // RawPointers do not have ownership semantics, so the cleanup on the
   // argument remains.
@@ -410,7 +410,7 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
   assert(substitutions.getReplacementTypes().size() == 1 &&
          "bridge should have a single substitution");
   assert(args.size() == 1 && "bridge should have a single argument");
-  
+
   // The substitution determines the destination type.
   // FIXME: Archetype destination type?
   auto &destLowering =
@@ -446,10 +446,10 @@ static ManagedValue emitBuiltinAddressOfBuiltins(SILGenFunction &SGF,
     SGF.SGM.diagnose(argument->getLoc(), diag::non_physical_addressof);
     return SGF.emitUndef(rawPointerType);
   }
-  
+
   auto addr = SGF.emitAddressOfLValue(argument, std::move(lv))
                  .getLValueAddress();
-  
+
   // Take the address argument and cast it to RawPointer.
   SILValue result = SGF.B.createAddressToPointer(loc, addr, rawPointerType,
                                                  stackProtected);
@@ -517,10 +517,10 @@ static ManagedValue emitBuiltinAddressOfBorrowBuiltins(SILGenFunction &SGF,
       SGF.SGM.diagnose(argument->getLoc(), diag::non_borrowed_indirect_addressof);
       return SGF.emitUndef(rawPointerType);
     }
-  
+
     addr = borrow.getValue();
   }
-  
+
   // Take the address argument and cast it to RawPointer.
   SILValue result = SGF.B.createAddressToPointer(loc, addr, rawPointerType,
                                                  stackProtected);
@@ -554,7 +554,7 @@ static ManagedValue emitBuiltinGepRaw(SILGenFunction &SGF,
                                       ArrayRef<ManagedValue> args,
                                       SGFContext C) {
   assert(args.size() == 2 && "gepRaw should be given two arguments");
-  
+
   SILValue offsetPtr = SGF.B.createIndexRawPointer(loc,
                                                  args[0].getUnmanagedValue(),
                                                  args[1].getUnmanagedValue());
@@ -798,10 +798,10 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
   assert(args.size() == 1 && "reinterpretCast should be given one argument");
   assert(substitutions.getReplacementTypes().size() == 2 &&
          "reinterpretCast should have two subs");
-  
+
   auto &fromTL = SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
   auto &toTL = SGF.getTypeLowering(substitutions.getReplacementTypes()[1]);
-  
+
   // If casting between address types, cast the address.
   if (fromTL.isAddress() || toTL.isAddress()) {
     SILValue fromAddr;
@@ -816,7 +816,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
     }
     auto toAddr = SGF.B.createUncheckedAddrCast(loc, fromAddr,
                                       toTL.getLoweredType().getAddressType());
-    
+
     // Load and retain the destination value if it's loadable. Leave the cleanup
     // on the original value since we don't know anything about it's type.
     if (!toTL.isAddress()) {
@@ -851,7 +851,7 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
   assert(args.size() == 2 && "cast should have two arguments");
   assert(subs.getReplacementTypes().size() == 1 &&
          "cast should have a type substitution");
-  
+
   // Take the reference type argument and cast it to BridgeObject.
   SILType objPointerType = SILType::getBridgeObjectType(SGF.F.getASTContext());
 
@@ -866,7 +866,7 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
 
   ManagedValue ref = args[0];
   SILValue bits = args[1].getUnmanagedValue();
-  
+
   // If the argument is existential, open it.
   if (sourceType->isClassExistentialType()) {
     auto openedTy = ExistentialArchetypeType::get(sourceType->getCanonicalType());
@@ -891,7 +891,7 @@ static ManagedValue emitBuiltinCastReferenceFromBridgeObject(
   // The substitution determines the destination type.
   auto destTy = subs.getReplacementTypes()[0];
   SILType destType = SGF.getLoweredType(destTy);
-  
+
   // Bail if the source type is not a class reference of some kind.
   if (!destTy->isBridgeableObjectType() || !destType.isObject()) {
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
@@ -1150,11 +1150,11 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
          && "type trait should take a single type parameter");
   assert(args.size() == 1
          && "type trait should take a single argument");
-  
+
   unsigned result;
-  
+
   auto traitTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
-  
+
   switch ((traitTy.getPointer()->*Trait)()) {
   // If the type obviously has or lacks the trait, emit a constant result.
   case TypeTraitResult::IsNot:
@@ -1163,7 +1163,7 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
   case TypeTraitResult::Is:
     result = 1;
     break;
-      
+
   // If not, emit the builtin call normally. Specialization may be able to
   // eliminate it later, or we'll lower it away at IRGen time.
   case TypeTraitResult::CanBe: {
@@ -1176,7 +1176,7 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
     return ManagedValue::forObjectRValueWithoutOwnership(apply);
   }
   }
-  
+
   // Produce the result as an integer literal constant.
   auto val = SGF.B.createIntegerLiteral(
       loc, SILType::getBuiltinIntegerType(8, SGF.getASTContext()),
@@ -2095,7 +2095,7 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
                                        ArrayRef<ManagedValue> args,
                                        SGFContext C) {
   // TODO: deal with reabstraction of the result type
-  
+
   auto &Ctx = SGF.getASTContext();
   auto resultASTTy = subs.getReplacementTypes()[0];
   auto &loweredBufferTy = SGF.getTypeLowering(AbstractionPattern::getOpaque(),
@@ -2104,7 +2104,7 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
   Initialization *dest;
   TemporaryInitialization *destTemporary = nullptr;
   InitializationPtr destOwner;
-  
+
   // Use the context destination if available.
   if (C.getEmitInto()
       && C.getEmitInto()->canPerformInPlaceInitialization()) {
@@ -2116,9 +2116,9 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
     dest = destTemporary = destTempOwner.get();
     destOwner = std::move(destTempOwner);
   }
-  
+
   auto buffer = dest->getAddressForInPlaceInitialization(SGF, loc);
-  
+
   // Mark the buffer as initializedto communicate to DI that the memory
   // is considered initialized from this point.
   auto markInit = getBuiltinValueDecl(Ctx, BuiltinNames::PrepareInitialization);
@@ -2165,22 +2165,22 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
   }
 
   dest->finishInitialization(SGF);
-  
+
   if (didEmitInto) {
     return ManagedValue::forInContext();
   }
-  
+
   assert(destTemporary
          && "didn't emit into context but also didn't emit into temporary?");
   auto result = destTemporary->getManagedAddress();
   auto resultTy = SGF.getLoweredType(subs.getReplacementTypes()[0]);
-  
+
   // If the result is naturally address-only, then we can adopt the stack slot
   // as the value directly.
   if (resultTy == loweredBufferTy.getLoweredType().getAddressType()) {
     return result;
   }
-  
+
   // If the result is loadable, load it.
   return SGF.B.createLoadTake(loc, result);
 }
@@ -2238,7 +2238,7 @@ static ManagedValue emitBuiltinMakeBorrow(SILGenFunction &SGF,
     if (referent.getType().isAddress()) {
       referent = SGF.B.createLoadBorrow(loc, referent);
     }
-    
+
     auto borrow = SGF.B.createMakeBorrow(loc, referent.getValue());
     return ManagedValue::forUnmanagedOwnedValue(borrow);
   }
@@ -2255,10 +2255,10 @@ static ManagedValue emitBuiltinMakeBorrow(SILGenFunction &SGF,
       referent = SGF.B.createStoreBorrowOrTrivial(loc, referent, temp);
     }
   }
-  
+
   if (loweredBorrowTy.isLoadable(SGF.F)) {
     // Address referent, loadable borrow.
-    // 
+    //
     auto borrow = SGF.B.createMakeAddrBorrow(loc, referent.getValue());
     return ManagedValue::forUnmanagedOwnedValue(borrow);
   }

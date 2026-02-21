@@ -37,7 +37,7 @@ class TermInst;
 class SILSuccessor {
   /// The terminator instruction that contains this SILSuccessor.
   TermInst *ContainingInst = nullptr;
-  
+
   /// If non-null, this is the BasicBlock that the terminator branches to.
   SILBasicBlock *SuccessorBlock = nullptr;
 
@@ -67,13 +67,13 @@ public:
       : ContainingInst(CI), Count(Count) {
     *this = Succ;
   }
-  
+
   ~SILSuccessor() {
     *this = nullptr;
   }
 
   void operator=(SILBasicBlock *BB);
-  
+
   operator SILBasicBlock*() const { return SuccessorBlock; }
   SILBasicBlock *getBB() const { return SuccessorBlock; }
   TermInst *getContainingInst() const { return ContainingInst; }

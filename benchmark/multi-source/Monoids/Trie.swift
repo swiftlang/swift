@@ -6,7 +6,7 @@ struct Trie {
   var freeList: [Node] = []
 
   let emptyNode: [Node]
-  
+
   init(alphabet: Int) {
     self.emptyNode = Array(repeating: -1, count: alphabet)
     _ = try! createNode()  // The root node

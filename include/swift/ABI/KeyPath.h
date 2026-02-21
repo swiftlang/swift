@@ -29,9 +29,9 @@ namespace swift {
 /// Header layout for a key path's data buffer header.
 class KeyPathBufferHeader {
   uint32_t Data;
-  
+
   constexpr KeyPathBufferHeader(unsigned Data) : Data(Data) {}
-  
+
   static constexpr uint32_t validateSize(uint32_t size) {
     return assert(size <= _SwiftKeyPathBufferHeader_SizeMask
                   && "size too big!"),
@@ -43,14 +43,14 @@ public:
                                 bool hasReferencePrefix)
     : Data((validateSize(size) & _SwiftKeyPathBufferHeader_SizeMask)
            | (trivialOrInstantiableInPlace ? _SwiftKeyPathBufferHeader_TrivialFlag : 0)
-           | (hasReferencePrefix ? _SwiftKeyPathBufferHeader_HasReferencePrefixFlag : 0)) 
+           | (hasReferencePrefix ? _SwiftKeyPathBufferHeader_HasReferencePrefixFlag : 0))
   {
   }
-  
+
   constexpr KeyPathBufferHeader withSize(unsigned size) const {
     return (Data & ~_SwiftKeyPathBufferHeader_SizeMask) | validateSize(size);
   }
-  
+
   constexpr KeyPathBufferHeader withIsTrivial(bool isTrivial) const {
     return (Data & ~_SwiftKeyPathBufferHeader_TrivialFlag)
       | (isTrivial ? _SwiftKeyPathBufferHeader_TrivialFlag : 0);
@@ -73,7 +73,7 @@ public:
 /// Header layout for a key path component's header.
 class KeyPathComponentHeader {
   uint32_t Data;
-  
+
   constexpr KeyPathComponentHeader(unsigned Data) : Data(Data) {}
 
   static constexpr uint32_t validateInlineOffset(uint32_t offset) {
@@ -100,7 +100,7 @@ public:
       | validateInlineOffset(offset)
       | isLetBit(isLet));
   }
-  
+
   constexpr static KeyPathComponentHeader
   forStructComponentWithOutOfLineOffset(bool isLet) {
     return KeyPathComponentHeader(
@@ -118,7 +118,7 @@ public:
       | _SwiftKeyPathComponentHeader_UnresolvedFieldOffsetPayload
       | isLetBit(isLet));
   }
-  
+
   constexpr static KeyPathComponentHeader
   forClassComponentWithInlineOffset(bool isLet,
                                     unsigned offset) {
@@ -137,7 +137,7 @@ public:
       | _SwiftKeyPathComponentHeader_OutOfLineOffsetPayload
       | isLetBit(isLet));
   }
-  
+
   constexpr static KeyPathComponentHeader
   forClassComponentWithUnresolvedFieldOffset(bool isLet) {
     return KeyPathComponentHeader(
@@ -146,7 +146,7 @@ public:
       | _SwiftKeyPathComponentHeader_UnresolvedFieldOffsetPayload
       | isLetBit(isLet));
   }
-  
+
   constexpr static KeyPathComponentHeader
   forClassComponentWithUnresolvedIndirectOffset(bool isLet) {
     return KeyPathComponentHeader(
@@ -155,7 +155,7 @@ public:
       | _SwiftKeyPathComponentHeader_UnresolvedIndirectOffsetPayload
       | isLetBit(isLet));
   }
-  
+
   constexpr static KeyPathComponentHeader
   forOptionalChain() {
     return KeyPathComponentHeader(
@@ -177,26 +177,26 @@ public:
       << _SwiftKeyPathComponentHeader_DiscriminatorShift)
       | _SwiftKeyPathComponentHeader_OptionalForcePayload);
   }
-  
+
   enum ComputedPropertyKind {
     GetOnly,
     SettableNonmutating,
     SettableMutating,
   };
-  
+
   enum ComputedPropertyIDKind {
     Pointer,
     StoredPropertyIndex,
     VTableOffset,
   };
-  
+
   enum ComputedPropertyIDResolution {
     Resolved,
     ResolvedAbsolute,
     IndirectPointer,
     FunctionCall,
   };
-  
+
   constexpr static KeyPathComponentHeader
   forComputedProperty(ComputedPropertyKind kind,
                       ComputedPropertyIDKind idKind,
@@ -220,7 +220,7 @@ public:
        : resolution == FunctionCall ? _SwiftKeyPathComponentHeader_ComputedIDUnresolvedFunctionCall
        : (assert(false && "invalid resolution"), 0)));
   }
-  
+
   constexpr static KeyPathComponentHeader
   forExternalComponent(unsigned numSubstitutions) {
     return assert(numSubstitutions <
@@ -231,7 +231,7 @@ public:
           << _SwiftKeyPathComponentHeader_DiscriminatorShift)
         | numSubstitutions);
   }
-  
+
   constexpr uint32_t getData() const { return Data; }
 };
 

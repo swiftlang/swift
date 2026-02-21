@@ -456,7 +456,7 @@ eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
   if (bbi->isLexical() && (bbi->getModule().getStage() == SILStage::Raw ||
                            !isNestedLexicalBeginBorrow(bbi)))
     return next;
-    
+
   // Fixed borrow scopes can't be eliminated during the raw stage since they
   // control move checker behavior.
   if (bbi->isFixed() && bbi->getModule().getStage() == SILStage::Raw) {

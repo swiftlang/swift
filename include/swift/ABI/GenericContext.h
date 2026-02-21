@@ -91,7 +91,7 @@ struct TargetGenericContextDescriptorHeader {
   /// as they remains zero in code which must be compatible with
   /// older Swift runtimes.
   GenericContextDescriptorFlags Flags;
-  
+
   uint32_t getNumArguments() const {
     // Note: this used to be NumKeyArguments + NumExtraArguments,
     // and flags was named NumExtraArguments, which is why Flags
@@ -131,18 +131,18 @@ public:
     ///
     /// Only valid if the requirement has SameType or BaseClass kind.
     RelativeDirectPointer<const char, /*nullable*/ false> Type;
-    
+
     /// The protocol the param is constrained to.
     ///
     /// Only valid if the requirement has Protocol kind.
     RelativeTargetProtocolDescriptorPointer<Runtime> Protocol;
-    
+
     /// The conformance the param is constrained to use.
     ///
     /// Only valid if the requirement has SameConformance kind.
     RelativeIndirectablePointer<TargetProtocolConformanceDescriptor<Runtime>,
                                 /*nullable*/ false> Conformance;
-    
+
     /// The kind of layout constraint.
     ///
     /// Only valid if the requirement has Layout kind.
@@ -544,7 +544,7 @@ protected:
 // MSVC 2017 trips parsing an using of an using, of a variadic template
 #define OverloadToken typename TrailingObjects::template OverloadToken
 #endif
-  
+
   const Self *asSelf() const {
     return static_cast<const Self *>(this);
   }
@@ -657,14 +657,14 @@ public:
     return {this->template getTrailingObjects<GenericParamDescriptor>(),
             getGenericContextHeader().NumParams};
   }
-  
+
   llvm::ArrayRef<GenericRequirementDescriptor> getGenericRequirements() const {
     if (!asSelf()->isGeneric())
       return {};
     return {this->template getTrailingObjects<GenericRequirementDescriptor>(),
             getGenericContextHeader().NumRequirements};
   }
-  
+
   GenericPackShapeHeader getGenericPackShapeHeader() const {
     if (!asSelf()->isGeneric())
       return {0, 0};
@@ -723,7 +723,7 @@ protected:
   size_t numTrailingObjects(OverloadToken<GenericContextHeaderType>) const {
     return asSelf()->isGeneric() ? 1 : 0;
   }
-  
+
   size_t numTrailingObjects(OverloadToken<GenericParamDescriptor>) const {
     return asSelf()->isGeneric() ? getGenericContextHeader().NumParams : 0;
   }

@@ -125,7 +125,7 @@ public:
     assert(kind == DescriptorKind::Ordered);
     return value.Ordered.index;
   }
-  
+
   IsAddressable_t isAddressable() const {
     return kind == DescriptorKind::Ordered
       ? value.Ordered.isAddress
@@ -390,7 +390,7 @@ public:
   bool operator!=(const LifetimeDependenceInfo &other) const {
     return !(*this == other);
   }
-  
+
   SWIFT_DEBUG_DUMPER(dump());
 };
 

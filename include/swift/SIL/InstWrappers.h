@@ -71,7 +71,7 @@ struct LoadOperation {
 
 /// A wrapper type for writing generic code against conversion instructions.
 ///
-/// Forwards a single operand in first operand position to a single result. 
+/// Forwards a single operand in first operand position to a single result.
 struct ConversionOperation {
   SingleValueInstruction *inst = nullptr;
 

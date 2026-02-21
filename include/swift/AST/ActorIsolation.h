@@ -353,7 +353,7 @@ public:
   void print(llvm::raw_ostream &os) const;
 
   void printForSIL(llvm::raw_ostream &os) const;
-  
+
   /// Print the given isolation for diagnostics. If \c asNoun is \c false,
   /// the participle adjective form is printed, e.g. "main actor-isolated".
   /// Otherwise, the noun form is printed, e.g. "main actor isolation".

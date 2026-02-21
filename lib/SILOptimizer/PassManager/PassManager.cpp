@@ -705,7 +705,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
                        SILForceVerifyAroundPass.end(), MatchFun)) {
     forcePrecomputeAnalyses(F);
   }
-  
+
   llvm::sys::TimePoint<> startTime = std::chrono::system_clock::now();
   std::chrono::nanoseconds duration(0);
 
@@ -736,7 +736,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
         invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
         F->restoreFromSnapshot(SnapshotID);
       }
-      
+
       // Continue time measurement (including flushing deleted instructions).
       startTime = std::chrono::system_clock::now();
     } else {
@@ -925,12 +925,12 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   SMT->run();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
-  
+
   if (!CurrentPassHasInvalidated && Mod->hasInstructionsScheduledForDeletion()) {
     // Last chance for invalidating analysis if the pass forgot to call invalidateAnalysis.
     invalidateAllAnalysis();
   }
-  
+
   Mod->flushDeletedInsts();
   swiftPassInvocation.finishedModulePassRun();
 
@@ -993,7 +993,7 @@ void SILPassManager::verifyAnalyses() const {
 void SILPassManager::verifyAnalyses(SILFunction *F) const {
   if (Mod->getOptions().VerifyNone)
     return;
-    
+
   for (auto *A : Analyses) {
     A->verify(F);
   }
@@ -1290,7 +1290,7 @@ namespace {
       using value_type = Node*;
       using difference_type = std::ptrdiff_t;
       using pointer = value_type*;
-      using reference = value_type&;    
+      using reference = value_type&;
 
       SmallVectorImpl<Edge>::iterator baseIter;
 

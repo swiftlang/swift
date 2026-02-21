@@ -36,7 +36,7 @@ An extremely efficient implementation of a set of instructions.
 #### `BasicBlockWorklist`
 To be used for all kind of basic-block work-list algorithms.
 
-**Uses:** `Stack`, `BasicBlockSet`  
+**Uses:** `Stack`, `BasicBlockSet`
 **Related C++ utilities:** `BasicBlockWorklist`
 **Status:** done
 
@@ -45,7 +45,7 @@ To be used for all kind of basic-block work-list algorithms.
 #### `SmallProjectionPath`
 Describes a path of projections.
 
-**Related C++ utilities:** `AccessPath`, `ProjectionPath`  
+**Related C++ utilities:** `AccessPath`, `ProjectionPath`
 **Status:** done
 
 ### `ProjectedValue`
@@ -76,8 +76,8 @@ This consists of four protocols, which can be implemented to walk up or down the
 * `ValueUseDefWalker`
 * `AddressUseDefWalker`
 
-**Uses:** instruction classifications  
-**Related C++ utilities:** `AccessPath`, `RCIdentityAnalysis`, various def-use/use-def walkers in optimization passes.  
+**Uses:** instruction classifications
+**Related C++ utilities:** `AccessPath`, `RCIdentityAnalysis`, various def-use/use-def walkers in optimization passes.
 **Status:** done
 
 #### Escape Utilities
@@ -90,7 +90,7 @@ Escape analysis is usable through the following methods of `ProjectedValue` and 
 * `visitAddress()`
 
 **Uses:** Walk Utilities, `ProjectedValue`
-**Related C++ utilities:** `EscapeAnalysis`, various def-use walkers in optimization passes.  
+**Related C++ utilities:** `EscapeAnalysis`, various def-use walkers in optimization passes.
 **Status:** done
 
 #### Access Utils
@@ -154,22 +154,22 @@ A utility for finding dead-end blocks.
 Dead-end blocks are blocks from which there is no path to the function exit (`return`, `throw` or unwind).
 These are blocks which end with an unreachable instruction and blocks from which all paths end in "unreachable" blocks.
 
-**Uses:** `BasicBlockWorklist`  
-**Related C++ utilities:** `DeadEndBlocks`  
+**Uses:** `BasicBlockWorklist`
+**Related C++ utilities:** `DeadEndBlocks`
 **Status:** done
 
 #### `BasicBlockRange`
 Defines a range from a dominating "begin" block to one or more "end" blocks. To be used for all kind of backward block reachability analysis.
 
-**Uses:** `Stack`, `BasicBlockSet`, `BasicBlockWorklist`  
-**Related C++ utilities:** `PrunedLiveBlocks`, `findJointPostDominatingSet()`  
+**Uses:** `Stack`, `BasicBlockSet`, `BasicBlockWorklist`
+**Related C++ utilities:** `PrunedLiveBlocks`, `findJointPostDominatingSet()`
 **Status:** done
 
 #### `InstructionRange`
 Like `BasicBlockRange`, but at the granularity of instructions.
 
-**Uses:** `BasicBlockRange`  
-**Related C++ utilities:** `PrunedLiveness`, `ValueLifetimeAnalysis`  
+**Uses:** `BasicBlockRange`
+**Related C++ utilities:** `PrunedLiveness`, `ValueLifetimeAnalysis`
 **Status:** done
 
 ## Utilities for Inter-procedural Analysis
@@ -177,7 +177,7 @@ Like `BasicBlockRange`, but at the granularity of instructions.
 ### `FunctionUses`
 Provides a list of instructions, which reference a function. This utility performs an analysis of all functions in the module and collects instructions which reference other functions. It can be used to do inter-procedural caller-analysis.
 
-**Related C++ utilities:** `CallerAnalysis` 
+**Related C++ utilities:** `CallerAnalysis`
 **Status:** done
 
 ## OSSA Utilities
@@ -185,8 +185,8 @@ Provides a list of instructions, which reference a function. This utility perfor
 #### `Value.makeAvailable()` and `Value.copy(at:)`
 To be used where a value is copied in one block and used in another block.
 
-**Uses:** `BasicBlockRange`  
-**Related C++ utilities:** `makeValueAvailable()`, `OwnershipLifetimeExtender`  
+**Uses:** `BasicBlockRange`
+**Related C++ utilities:** `makeValueAvailable()`, `OwnershipLifetimeExtender`
 **Status:** done
 
 ## Instruction classifications
@@ -197,39 +197,39 @@ In Swift we can easily do this by introducing protocols to which instruction cla
 #### `ApplySite`
 
 **Related C++ utilities:** `ApplySite`
-**Status:** exists; to-do: complete member variables/functions  
+**Status:** exists; to-do: complete member variables/functions
 
 #### `CastInstruction`
 Details need to be decided.
 
-**Conforming instructions:** `UpcastInst`, `UncheckedRefCastInst`, etc.  
-**Members:** ownership behavior, e.g. forwarding, etc.   
-**Status:** to-do  
+**Conforming instructions:** `UpcastInst`, `UncheckedRefCastInst`, etc.
+**Members:** ownership behavior, e.g. forwarding, etc.
+**Status:** to-do
 
 #### `AddressProjectionInstruction`
 Details need to be decided.
 
-**Conforming instructions:** `StructElementAddrInst`, `TupleElementAddrInst`  
-**Members:** `var fieldIndex: Int`  
-**Related C++ utilities:** `skipAddrProjections`  
-**Status:** to-do  
+**Conforming instructions:** `StructElementAddrInst`, `TupleElementAddrInst`
+**Members:** `var fieldIndex: Int`
+**Related C++ utilities:** `skipAddrProjections`
+**Status:** to-do
 
 #### `AggregateInstruction`
 Details need to be decided.
 
-**Conforming instructions:** `StructInst`, `TupleInst`  
-**Status:** to-do  
+**Conforming instructions:** `StructInst`, `TupleInst`
+**Status:** to-do
 
 #### `ExtractInstruction`
 Details need to be decided.
 
-**Conforming instructions:** `StructExtractInst`, `TupleExtractInst`  
-**Status:** to-do  
+**Conforming instructions:** `StructExtractInst`, `TupleExtractInst`
+**Status:** to-do
 
 #### `BorrowScope`
 Details need to be decided.
 Maybe it's better to not do this as a protocol but just add an extension function `Value.introducesBorrowScope`. Reason: an `Argument` can be guaranteed or owned.
 
-**Conforming instructions:** `BeginBorrowInst`, `Argument` with guaranteed ownership (however will do that), `LoadBorrowInst`  
-**Status:** to-do  
+**Conforming instructions:** `BeginBorrowInst`, `Argument` with guaranteed ownership (however will do that), `LoadBorrowInst`
+**Status:** to-do
 

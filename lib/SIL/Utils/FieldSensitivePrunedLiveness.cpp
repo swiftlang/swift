@@ -376,7 +376,7 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
       projectionDerivedFromRoot = enumData->getOperand();
       continue;
     }
-    
+
     // …or via the bb arg of a `switch_enum` successor.
     if (auto bbArg = dyn_cast<SILArgument>(projectionDerivedFromRoot)) {
       if (auto pred = bbArg->getParent()->getSinglePredecessorBlock()) {
@@ -865,7 +865,7 @@ void FieldSensitivePrunedLivenessBoundary::print(llvm::raw_ostream &OS) const {
   for (auto pair : lastUsers) {
     auto *user = pair.first;
     auto bits = pair.second;
-    OS << "last user: " << *user 
+    OS << "last user: " << *user
        << "\tat " << bits << "\n";
   }
   for (auto pair : boundaryEdges) {
@@ -879,7 +879,7 @@ void FieldSensitivePrunedLivenessBoundary::print(llvm::raw_ostream &OS) const {
     for (auto pair : deadDefs) {
       auto *deadDef = pair.first;
       auto bits = pair.second;
-      OS << "dead def: " << *deadDef 
+      OS << "dead def: " << *deadDef
          << "\tat " << bits << "\n";
     }
   }
@@ -1411,7 +1411,7 @@ void findBoundaryInSSADefBlock(SILNode *ssaDef, unsigned bitNo,
     boundary.getDeadDefsBits(deadArg).set(bitNo);
     return;
   }
-  
+
   // If we searched the success branch of a try_apply and found no uses, then
   // the try_apply itself is a dead def.
   if (isa<TryApplyInst>(ssaDef)) {
@@ -1419,7 +1419,7 @@ void findBoundaryInSSADefBlock(SILNode *ssaDef, unsigned bitNo,
     boundary.getDeadDefsBits(ssaDef).set(bitNo);
     return;
   }
-  
+
   llvm_unreachable("def not found?!");
 }
 

@@ -90,7 +90,7 @@ getStoredPropertiesForDifferentiation(
     // Skip `let` stored properties with a mutating `move(by:)` if requested.
     // `mutating func move(by:)` cannot be synthesized to update `let`
     // properties.
-    if (!includeLetPropertiesWithNonmutatingMoveBy && 
+    if (!includeLetPropertiesWithNonmutatingMoveBy &&
         !canInvokeMoveByOnProperty(vd, conformance))
       continue;
     result.push_back(vd);
@@ -553,7 +553,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
     auto varType = DC->mapTypeIntoEnvironment(vd->getValueInterfaceType());
     auto diffableConformance = checkConformance(varType, diffableProto);
     // If stored property should not be diagnosed, continue.
-    if (diffableConformance && 
+    if (diffableConformance &&
         canInvokeMoveByOnProperty(vd, diffableConformance))
       continue;
     // Otherwise, add an implicit `@noDerivative` attribute.

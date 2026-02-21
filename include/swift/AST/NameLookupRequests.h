@@ -419,14 +419,14 @@ class GenericParamListRequest :
                          RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
-  
+
 private:
   friend SimpleRequest;
-  
+
   // Evaluation.
   GenericParamList *
   evaluate(Evaluator &evaluator, GenericContext *value) const;
-  
+
 public:
   // Separate caching.
   bool isCached() const { return true; }

@@ -129,7 +129,7 @@ void PrintingDiagnosticConsumer::printDiagnostic(SourceManager &SM,
   ColoredStream coloredErrs{Stream};
   raw_ostream &out = ForceColors ? coloredErrs : Stream;
   const llvm::SourceMgr &rawSM = SM.getLLVMSourceMgr();
-  
+
   // Actually substitute the diagnostic arguments into the diagnostic text.
   llvm::SmallString<256> Text;
   {

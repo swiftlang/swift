@@ -335,7 +335,7 @@ createSubstitutionMapFromGenericArgs(GenericSignature genericSig,
                                      ArrayRef<Type> args) {
   if (!genericSig)
     return SubstitutionMap();
-  
+
   if (genericSig.getGenericParams().size() != args.size())
     return SubstitutionMap();
 

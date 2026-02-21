@@ -24,9 +24,9 @@ bb0(<...>, %meta : $@thin MyStruct.Type):
   %b = mark_uninitialized [rootself] %a : ${ var MyStruct }
   %c = begin_borrow [lexical] %b : ${ var MyStruct }
   %d = project_box %c : ${ var MyStruct }, 0
-  
+
   // ... initialize properties, etc ...
-  
+
   %end = load [trivial] %d : $*MyStruct
   end_borrow %c : ${ var MyStruct }
   destroy_value %b : ${ var MyStruct }
@@ -42,12 +42,12 @@ bb0(<...>, %meta : $@thin MyStruct.Type):
   %b = mark_uninitialized [rootself] %a : ${ var MyStruct }
   %c = begin_borrow [lexical] %b : ${ var MyStruct }
   %d = project_box %c : ${ var MyStruct }, 0
-  
+
   // ... delegate to MyStruct.init(final:) ...
-  
+
   %ctor = function_ref @$s4test8MyStructV5finalACSi_tcfC : $@convention(method) (Int, @thin MyStruct.Type) -> MyStruct
   %ret = apply %ctor(<...>, %meta) : $@convention(method) (Int, @thin MyStruct.Type) -> MyStruct
-  
+
   assign %ret to %d : $*MyStruct
   %end = load [trivial] %d : $*MyStruct
   end_borrow %c : ${ var MyStruct }
@@ -56,16 +56,16 @@ bb0(<...>, %meta : $@thin MyStruct.Type):
 }
 ```
 
-It's important to note that all initializers take a metadata argument, 
+It's important to note that all initializers take a metadata argument,
 regardless of whether it is a delegating initializer. There is also no
 separation between allocating and non-allocating initializer entrypoints.
 All initializers may perform allocation.
 
 # Classes
 
-Every designated initializer has two entry-points. One performs allocation 
-(i.e., the "allocating" entry) before continuing at the second entrypoint 
-which does the initialization (i.e., the "initializing" entrypoint). 
+Every designated initializer has two entry-points. One performs allocation
+(i.e., the "allocating" entry) before continuing at the second entrypoint
+which does the initialization (i.e., the "initializing" entrypoint).
 Here's an example of `MyClass.init(final:)`, which is a designated initializer,
 with its two entry-points:
 
@@ -84,9 +84,9 @@ bb0(%0 : $Int, %1 : $@thick MyClass.Type):
 sil hidden [ossa] @$s4test7MyClassC5finalACSi_tcfc : $@convention(method) (Int, @owned MyClass) -> @owned MyClass {
 bb0(<...>, %1 : @owned $MyClass):
   %4 = mark_uninitialized [rootself] %1 : $MyClass
-  
+
   // ... initialize MyClass ...
-  
+
   %11 = copy_value %4 : $MyClass
   destroy_value %4 : $MyClass
   return %11 : $MyClass
@@ -94,7 +94,7 @@ bb0(<...>, %1 : @owned $MyClass):
 ```
 
 In the mangling of these entrypoint labels, the uppercase `C` suffix indicates
-that it's the allocating entrypoint, whereas the lowercase `c` is the 
+that it's the allocating entrypoint, whereas the lowercase `c` is the
 initializing entrypoint. Only the allocating entrypoint is published in the
 type's vtable:
 
@@ -145,9 +145,9 @@ bb0(%0 : $Int, %1 : @owned $MyDerivedClass):
   %5 = project_box %4 : ${ var MyDerivedClass }, 0
   debug_value %0 : $Int, let, name "y", argno 1
   store %1 to [init] %5 : $*MyDerivedClass
-  
+
   // ... initialize self.y ...
-  
+
   // perform the super call. notice the ownership transfer to the super.init.
   %14 = load [take] %5 : $*MyDerivedClass
   %15 = upcast %14 : $MyDerivedClass to $MyClass
@@ -156,7 +156,7 @@ bb0(%0 : $Int, %1 : @owned $MyDerivedClass):
   %17 = apply %16(%0, %15) : $@convention(method) (Int, @owned MyClass) -> @owned MyClass // user: %18
   %18 = unchecked_ref_cast %17 : $MyClass to $MyDerivedClass
   store %18 to [init] %5 : $*MyDerivedClass       // id: %19
-  
+
   // return as usual
   %20 = load [copy] %5 : $*MyDerivedClass
   end_borrow %4 : ${ var MyDerivedClass }
@@ -168,11 +168,11 @@ bb0(%0 : $Int, %1 : @owned $MyDerivedClass):
 # Actors
 
 There does not exist a sub-actor that inherits from some other actor in the type
-system. As a result, the `convenience` keyword is not required for actor 
+system. As a result, the `convenience` keyword is not required for actor
 initializers in the source code. Without inheritance, only the allocating
-entry-points can ever be used by an actor. 
+entry-points can ever be used by an actor.
 
-Nevertheless, internally the compiler will still differentiate between 
+Nevertheless, internally the compiler will still differentiate between
 convenience and designated initializers. So everything discussed
 earlier for classes also apply to actors. The body of the initializer determines
 whether the compiler internally treats it as `convenience` or not. For example,
@@ -181,4 +181,4 @@ but the initializing entrypoint is exclusively used by its corresponding
 allocating entrypoint.
 
 
- 
+

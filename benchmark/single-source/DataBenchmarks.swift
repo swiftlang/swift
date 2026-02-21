@@ -313,7 +313,7 @@ public let benchmarks = [
 let emptyString = ""
 let smallString = "\r\n"
 let mediumString = "\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n"
-let largeUnicodeString = 
+let largeUnicodeString =
   "Swiftに大幅な改良が施され、𓀀𓀁𓀂𓀃, 🇺🇸🇨🇦🇲🇽" + mediumString
 let emptyData = Data()
 let smallData = Data(smallString.utf8)

@@ -112,7 +112,7 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   // MARK: - SourceEntityWalker
 
   virtual bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
-    
+
   // MARK: - Utilities
 
   /// Walk the given decl and add its children as synthesized children of the
@@ -122,7 +122,7 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   /// Returns whether the given declaration was itself imported via an `@_exported import`
   /// statement, or if it is an extension or child symbol of something else that was.
   virtual bool isConsideredExportedImported(const Decl *D) const;
-  
+
   /// Returns whether the given declaration comes from an `@_exported import` module.
   ///
   /// If `countUnderlyingClangModule` is `false`, decls from Clang modules will not be considered

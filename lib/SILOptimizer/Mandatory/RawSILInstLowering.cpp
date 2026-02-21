@@ -393,7 +393,7 @@ static void deleteDeadClosureArg(LoadInst *load) {
   if (load->getOwnershipQualifier() != LoadOwnershipQualifier::Trivial &&
       load->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
     return;
-    
+
   for (Operand *use : load->getUses()) {
     if (!isa<DestroyValueInst>(use->getUser()))
       return;

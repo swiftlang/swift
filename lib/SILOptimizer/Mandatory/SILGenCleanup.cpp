@@ -229,7 +229,7 @@ void SILGenCleanup::run() {
       auto invalidKind = SILAnalysis::InvalidationKind::Instructions;
       invalidateAnalysis(&function, invalidKind);
     }
- 
+
     getPassManager()->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
   }
 }

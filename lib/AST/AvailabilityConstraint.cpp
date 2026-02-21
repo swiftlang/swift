@@ -126,7 +126,7 @@ DeclAvailabilityConstraints::getPrimaryConstraint() const {
     // Pick the constraint from the broader domain.
     if (lhs.getDomain() != rhs.getDomain())
       return rhs.getDomain().contains(lhs.getDomain());
-    
+
     return false;
   };
 

@@ -443,10 +443,10 @@ void verifyKeyPathComponent(SILModule &M,
         auto equals = component.getIndexEquals();
         require(equals, "key path pattern with indexes must have equals "
                         "operator");
-        
+
         auto substEqualsType = equals->getLoweredFunctionType()
           ->substGenericArgs(M, patternSubs, TypeExpansionContext::minimal());
-        
+
         require(substEqualsType->getRepresentation() ==
                   SILFunctionTypeRepresentation::KeyPathAccessorEquals,
                 "equals should be a keypath equals convention");
@@ -459,10 +459,10 @@ void verifyKeyPathComponent(SILModule &M,
                     == ParameterConvention::Indirect_In_Guaranteed,
                   "indices pointer should be in_guaranteed");
         }
-        
+
         require(substEqualsType->getResults().size() == 1,
                 "must have one result");
-        
+
         require(substEqualsType->getResults()[0].getConvention()
                   == ResultConvention::Unowned,
                 "result should be unowned");
@@ -475,10 +475,10 @@ void verifyKeyPathComponent(SILModule &M,
         auto hash = component.getIndexHash();
         require(hash, "key path pattern with indexes must have hash "
                       "operator");
-        
+
         auto substHashType = hash->getLoweredFunctionType()
           ->substGenericArgs(M, patternSubs, TypeExpansionContext::minimal());
-        
+
         require(substHashType->getRepresentation() ==
                   SILFunctionTypeRepresentation::KeyPathAccessorHash,
                 "hash should be a keypath hash convention");
@@ -491,7 +491,7 @@ void verifyKeyPathComponent(SILModule &M,
 
         require(substHashType->getResults().size() == 1,
                 "must have one result");
-        
+
         require(substHashType->getResults()[0].getConvention()
                   == ResultConvention::Unowned,
                 "result should be unowned");
@@ -532,7 +532,7 @@ void verifyKeyPathComponent(SILModule &M,
             "formal type");
     break;
   }
-    
+
   case KeyPathPatternComponent::Kind::GettableProperty:
   case KeyPathPatternComponent::Kind::SettableProperty:
   case KeyPathPatternComponent::Kind::Method: {
@@ -548,9 +548,9 @@ void verifyKeyPathComponent(SILModule &M,
       require(hasIndices == !component.getArguments().empty(),
               "component for subscript should have indices");
     }
-    
+
     auto normalArgConvention = ParameterConvention::Indirect_In_Guaranteed;
-  
+
     // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
     {
       auto getter = component.getComputedPropertyForGettable();
@@ -566,7 +566,7 @@ void verifyKeyPathComponent(SILModule &M,
       require(substGetterType->getRepresentation() ==
                 SILFunctionTypeRepresentation::KeyPathAccessorGetter,
               "getter should be a keypath getter convention");
-      
+
       require(substGetterType->getNumParameters() == 1 + hasIndices,
               "getter should have one parameter");
       auto baseParam = substGetterType->getParameters()[0];
@@ -595,7 +595,7 @@ void verifyKeyPathComponent(SILModule &M,
               "getter result should match the maximal abstraction of the "
               "formal component type");
     }
-    
+
     if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
       // Setter should be
       // <Sig...> @convention(thin) (@in_guaranteed Result, @in Base) -> ()
@@ -610,11 +610,11 @@ void verifyKeyPathComponent(SILModule &M,
 
       auto substSetterType = setter->getLoweredFunctionType()
         ->substGenericArgs(M, patternSubs, TypeExpansionContext::minimal());
-      
+
       require(substSetterType->getRepresentation() ==
                 SILFunctionTypeRepresentation::KeyPathAccessorSetter,
               "setter should be keypath setter convention");
-      
+
       require(substSetterType->getNumParameters() == 2 + hasIndices,
               "setter should have two parameters");
 
@@ -630,7 +630,7 @@ void verifyKeyPathComponent(SILModule &M,
                   ParameterConvention::Indirect_Inout,
               "setter base parameter should be normal arg convention "
               "or @inout");
-      
+
       if (hasIndices) {
         auto indicesParam = substSetterType->getParameters()[2];
         require(indicesParam.getConvention()
@@ -647,7 +647,7 @@ void verifyKeyPathComponent(SILModule &M,
       require(substSetterType->getNumResults() == 0,
               "setter should have no results");
     }
-    
+
     if (!forPropertyDescriptor) {
       for (auto &index : component.getArguments()) {
         auto opIndex = index.Operand;
@@ -663,7 +663,7 @@ void verifyKeyPathComponent(SILModule &M,
 
       checkIndexEqualsAndHash();
     }
-    
+
     break;
   }
   case KeyPathPatternComponent::Kind::OptionalChain: {
@@ -687,23 +687,23 @@ void verifyKeyPathComponent(SILModule &M,
   case KeyPathPatternComponent::Kind::TupleElement: {
     require(baseTy->is<TupleType>(),
             "invalid baseTy, should have been a TupleType");
-      
+
     auto tupleTy = baseTy->castTo<TupleType>();
     auto eltIdx = component.getTupleIndex();
-      
+
     require(eltIdx < tupleTy->getNumElements(),
             "invalid element index, greater than # of tuple elements");
 
     auto eltTy = tupleTy->getElementType(eltIdx)
       ->getReferenceStorageReferent();
-    
+
     require(eltTy->isEqual(componentTy),
             "tuple element type should match the type of the component");
 
     break;
   }
   }
-  
+
   baseTy = componentTy;
 }
 
@@ -1279,9 +1279,9 @@ public:
   void requireReferenceOrOptionalReferenceValue(SILValue value,
                                                 const Twine &valueDescription) {
     require(value->getType().isObject(), valueDescription +" must be an object");
-    
+
     auto objectTy = value->getType().unwrapOptionalType();
-    
+
     // Immortal C++ foreign reference types are represented as trivially lowered
     // types since they do not require retain/release calls.
     bool isImmortalFRT = objectTy.isForeignReferenceType() &&
@@ -1291,7 +1291,7 @@ public:
     require(objectTy.isReferenceCounted(F.getModule()) || isImmortalFRT,
             valueDescription + " must have reference semantics");
   }
-  
+
   // Require that the operand is a type that supports reference storage
   // modifiers.
   void requireReferenceStorageCapableValue(SILValue value,
@@ -1632,7 +1632,7 @@ public:
                   "instruction isn't dominated by its operand");
         }
       }
-      
+
       if (auto *valueBBA = dyn_cast<SILArgument>(operand.get())) {
         require(!I->isStaticInitializerInst(),
                 "static initializer inst cannot refer to SILArgument");
@@ -1799,7 +1799,7 @@ public:
     default:
       llvm_unreachable("impossible instruction kind");
     }
-    
+
     SILType DebugVarTy = varInfo->Type ? *varInfo->Type :
       SSAType.getObjectType();
     if (!varInfo->DIExpr && !isa<SILBoxType>(SSAType.getASTType())) {
@@ -2588,7 +2588,7 @@ public:
       // Should only be one context argument.
       require(PAI->getArguments().size() == 1,
               "partial_apply should have a single context argument");
-      
+
       // Callee should already have the thin convention, and result should be
       // thick.
       require(resultInfo->getRepresentation() ==
@@ -2598,19 +2598,19 @@ public:
                 ->getRepresentation() ==
               SILFunctionTypeRepresentation::Thin,
               "partial_apply callee should have thin convention");
-      
+
       // TODO: Check that generic signature matches box's generic signature,
       // once we have boxes with generic signatures.
       require(!PAI->getCalleeFunction()->getGenericEnvironment(),
               "partial_apply context must capture generic environment for "
               "callee");
-      
+
       // Result's callee convention should match context argument's convention.
       require(substTy->getParameters().back().getConvention()
                 == resultInfo->getCalleeConvention(),
               "partial_apply context argument must have the same convention "
               "as the resulting function's callee convention");
-      
+
       auto isSwiftRefcounted = [](SILType t) -> bool {
         if (t.is<SILBoxType>())
           return true;
@@ -2621,7 +2621,7 @@ public:
           return clazz->hasKnownSwiftImplementation();
         return false;
       };
-      
+
       // The context argument must be a swift-refcounted box or class.
       require(isSwiftRefcounted(PAI->getArguments().front()->getType()),
               "partial_apply context argument must be swift-refcounted");
@@ -3792,7 +3792,7 @@ public:
     requireSameType(I->getReference()->getType(), I->getType(),
                     "result of begin_dealloc_ref should be same type as operand");
   }
-  
+
   void checkEndInitLetRefInst(EndInitLetRefInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
@@ -3868,7 +3868,7 @@ public:
               "concrete type of its alloc_existential_box");
     }
   }
-  
+
   void checkStructInst(StructInst *SI) {
     auto *structDecl = SI->getType().getStructOrBoundGenericStruct();
     require(structDecl, "StructInst must return a struct");
@@ -4037,7 +4037,7 @@ public:
     return loweredType.isLoweringOf(F.getTypeExpansionContext(), F.getModule(),
                                     formalType);
   }
-  
+
   void checkMetatypeInst(MetatypeInst *MI) {
     require(MI->getType().is<MetatypeType>(),
             "metatype instruction must be of metatype type");
@@ -4631,7 +4631,7 @@ public:
             "operand must be of a class type");
     require(getMethodSelfType(methodType).isClassOrClassMetatype(),
             "result must be a method of a class");
-    
+
     require(!member.isForeign,
             "foreign method cannot be dispatched natively");
     require(!isa<ExtensionDecl>(member.getDecl()->getDeclContext()),
@@ -4676,7 +4676,7 @@ public:
 
     // The method ought to appear in the class vtable.
     require(VerifyClassMethodVisitor(member).Seen,
-            "method does not appear in the class's vtable");    
+            "method does not appear in the class's vtable");
   }
 
   void checkObjCMethodInst(ObjCMethodInst *OMI) {
@@ -4874,7 +4874,7 @@ public:
 
     CanType operandInstTy =
       operandType.castTo<ExistentialMetatypeType>().getInstanceType();
-    CanType resultInstTy = 
+    CanType resultInstTy =
       resultType.castTo<MetatypeType>().getInstanceType();
 
     while (auto operandMetatype =
@@ -4927,7 +4927,7 @@ public:
                                              AEBI->getFormalConcreteType()),
             "alloc_existential_box must be used with a boxed existential "
             "type");
-    
+
     checkExistentialProtocolConformances(exType.getASTType(),
                                          AEBI->getFormalConcreteType(),
                                          AEBI->getConformances());
@@ -4943,14 +4943,14 @@ public:
                                        AEI->getFormalConcreteType()),
             "init_existential_addr must be used with an opaque "
             "existential type");
-    
+
     // The lowered type must be the properly-abstracted form of the AST type.
     auto archetype = ExistentialArchetypeType::get(exType.getASTType());
 
     auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
                                       AEI->getFormalConcreteType())
                       .getAddressType();
-    
+
     requireSameType(loweredTy, AEI->getLoweredConcreteType(),
                     "init_existential_addr result type must be the lowered "
                     "concrete type at the right abstraction level");
@@ -4959,7 +4959,7 @@ public:
                          AEI->getFormalConcreteType()),
             "init_existential_addr payload must be a lowering of the formal "
             "concrete type");
-    
+
     checkExistentialProtocolConformances(exType.getASTType(),
                                          AEI->getFormalConcreteType(),
                                          AEI->getConformances());
@@ -5003,7 +5003,7 @@ public:
             "init_existential_ref must be used with a class existential type");
     require(IEI->getType().isObject(),
             "init_existential_ref result must not be an address");
-    
+
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
     auto archetype = ExistentialArchetypeType::get(exType.getASTType());
@@ -5012,12 +5012,12 @@ public:
     requireSameType(concreteType, loweredTy,
                     "init_existential_ref operand must be lowered to the right "
                     "abstraction level for the existential");
-    
+
     require(isLoweringOf(IEI->getOperand()->getType(),
                          IEI->getFormalConcreteType()),
             "init_existential_ref operand must be a lowering of the formal "
             "concrete type");
-    
+
     checkExistentialProtocolConformances(exType.getASTType(),
                                          IEI->getFormalConcreteType(),
                                          IEI->getConformances());
@@ -5042,7 +5042,7 @@ public:
             ExistentialRepresentation::Opaque),
         "deinit_existential_value must be applied to an opaque existential");
   }
-  
+
   void checkDeallocExistentialBoxInst(DeallocExistentialBoxInst *DEBI) {
     SILType exType = DEBI->getOperand()->getType();
     require(exType.isObject(),
@@ -5137,7 +5137,7 @@ public:
     while (isa<AnyMetatypeType>(fromCanTy) && isa<AnyMetatypeType>(toCanTy)) {
       auto fromMetaty = cast<AnyMetatypeType>(fromCanTy);
       auto toMetaty = cast<AnyMetatypeType>(toCanTy);
-      
+
       // Check representations only for the top-level metatypes as only
       // those are SIL-lowered.
       if (!MetatyLevel) {
@@ -5369,7 +5369,7 @@ public:
       auto instClass = instTy->getClassOrBoundGenericClass();
       require(instClass,
               "upcast must convert a class metatype to a class metatype");
-      
+
       if (instClass->isTypeErasedGenericClass()) {
         require(instClass->getDeclaredTypeInContext()
                   ->isBindableToSuperclassOf(opInstTy),
@@ -5420,7 +5420,7 @@ public:
                               AI->getType().getASTContext().TheRawPointerType),
             "address-to-pointer result type must be RawPointer");
   }
-  
+
   void checkUncheckedRefCastInst(UncheckedRefCastInst *AI) {
     verifyLocalArchetype(AI, AI->getType().getASTType());
     require(AI->getOperand()->getType().isObject(),
@@ -5444,7 +5444,7 @@ public:
     // (as a result of specialization). These cases will never be promoted to
     // value bitcast, thus will cause the subsequent runtime cast to fail.
   }
-  
+
   void checkUncheckedAddrCastInst(UncheckedAddrCastInst *AI) {
     verifyLocalArchetype(AI, AI->getType().getASTType());
 
@@ -5456,7 +5456,7 @@ public:
                 AI->getType().isMoveOnlyWrapped(),
             "Unchecked addr cast cannot be used to remove move only wrapped?!");
   }
-  
+
   void checkUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *BI) {
     verifyLocalArchetype(BI, BI->getType().getASTType());
     require(BI->getOperand()->getType().isObject(),
@@ -5501,7 +5501,7 @@ public:
                     AI->getType().getASTContext().TheRawPointerType,
                     "raw-pointer-to-ref operand must be NativeObject");
   }
-  
+
   void checkRefToBridgeObjectInst(RefToBridgeObjectInst *RI) {
     require(RI->getOperand(0)->getType().isObject(),
             "ref_to_bridge_object must convert from a value");
@@ -5515,7 +5515,7 @@ public:
                     SILType::getBridgeObjectType(F.getASTContext()),
                     "ref_to_bridge_object must produce a BridgeObject");
   }
-  
+
   void checkBridgeObjectToRefInst(BridgeObjectToRefInst *RI) {
     verifyLocalArchetype(RI, RI->getType().getASTType());
     requireSameType(RI->getOperand()->getType(),
@@ -5644,7 +5644,7 @@ public:
         functionResultType, instResultType,
         "throw operand type does not match error result type of function");
   }
-  
+
   void checkUnwindInst(UnwindInst *UI) {
     require(F.getLoweredFunctionType()->isCoroutine(),
             "unwind in non-coroutine function");
@@ -5745,8 +5745,8 @@ public:
     require(Ty.is<BuiltinIntegerType>(),
             "switch_value operand should be an integer");
 
-    auto ult = [](const SILValue &a, const SILValue &b) { 
-      return a == b || a < b; 
+    auto ult = [](const SILValue &a, const SILValue &b) {
+      return a == b || a < b;
     };
 
     std::set<SILValue, decltype(ult)> cases(ult);
@@ -6034,7 +6034,7 @@ public:
             "operand must be an address");
     auto storageTy = PBSI->getOperand()->getType().getAs<SILBlockStorageType>();
     require(storageTy, "operand must be a @block_storage type");
-    
+
     require(PBSI->getType().isAddress(),
             "result must be an address");
     auto captureTy = PBSI->getType().getASTType();
@@ -6042,7 +6042,7 @@ public:
         storageTy->getCaptureType(), captureTy,
         "result must be the capture type of the @block_storage type");
   }
-  
+
   void checkInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *IBSHI) {
     auto storage = IBSHI->getBlockStorage();
     require(storage->getType().isAddress(),
@@ -6085,10 +6085,10 @@ public:
     require(!invokeTy->getInvocationGenericSignature() ||
             invokeTy->getExtInfo().isPseudogeneric(),
             "invoke function must not take reified generic parameters");
-    
+
     invokeTy = checkApplySubstitutions(IBSHI->getSubstitutions(),
                                     SILType::getPrimitiveObjectType(invokeTy));
-    
+
     auto storageParam = invokeTy->getParameters()[0];
     require(storageParam.getConvention() ==
             ParameterConvention::Indirect_InoutAliasable,
@@ -6157,7 +6157,7 @@ public:
     require(classDecl->getModuleContext()->getName() == F.getASTContext().Id_ObjectiveC,
             "objc_protocol must produce an instance of ObjectiveC.Protocol class");
   }
-  
+
   void checkObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *OMOI) {
     require(OMOI->getOperand()->getType().isObject(),
             "objc_metatype_to_object must take a value");
@@ -6185,10 +6185,10 @@ public:
     require(OMOI->getType().getASTType()->isAnyObject(),
             "objc_metatype_to_object must produce an AnyObject value");
   }
-  
+
   void checkKeyPathInst(KeyPathInst *KPI) {
     auto kpTy = KPI->getType();
-    
+
     require(kpTy.isObject(), "keypath result must be an object type");
 
     auto *kpBGT = KPI->getKeyPathType();
@@ -6198,7 +6198,7 @@ public:
             kpBGT->isWritableKeyPath() ||
             kpBGT->isReferenceWritableKeyPath(),
             "keypath result must be a key path type");
-    
+
     auto baseTy = CanType(kpBGT->getGenericArgs()[0]);
     auto pattern = KPI->getPattern();
     SubstitutionMap patternSubs = KPI->getSubstitutions();
@@ -6225,7 +6225,7 @@ public:
         case KeyPathPatternComponent::Kind::Method:
           hasIndices = !component.getArguments().empty();
           break;
-        
+
         case KeyPathPatternComponent::Kind::StoredProperty:
         case KeyPathPatternComponent::Kind::OptionalChain:
         case KeyPathPatternComponent::Kind::OptionalWrap:
@@ -6234,7 +6234,7 @@ public:
           hasIndices = false;
           break;
         }
-      
+
         verifyKeyPathComponent(F.getModule(),
                                F.getTypeExpansionContext(),
                                F.getSerializedKind(),
@@ -6391,17 +6391,17 @@ public:
                     "Type of witness instruction does not match actual type of "
                     "witnessed function");
   }
-  
+
   void checkGetAsyncContinuationInstBase(GetAsyncContinuationInstBase *GACI) {
     auto resultTy = GACI->getType();
     require(resultTy.is<BuiltinRawUnsafeContinuationType>(),
             "Instruction type must be a continuation type");
   }
-  
+
   void checkGetAsyncContinuationInst(GetAsyncContinuationInst *GACI) {
     checkGetAsyncContinuationInstBase(GACI);
   }
-  
+
   void checkGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *GACI) {
     checkGetAsyncContinuationInstBase(GACI);
 
@@ -6409,7 +6409,7 @@ public:
                     GACI->getLoweredResumeType().getAddressType(),
                     "Operand type must match continuation resume type");
   }
-  
+
   void checkAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *AACI) {
     // The operand must be a GetAsyncContinuation* instruction.
     auto cont = dyn_cast<GetAsyncContinuationInstBase>(AACI->getOperand());
@@ -6417,7 +6417,7 @@ public:
     bool isAddressForm = isa<GetAsyncContinuationAddrInst>(cont);
 
     auto &C = cont->getType().getASTContext();
-    
+
     // The shape of the successors depends on the continuation instruction being
     // awaited.
     require((bool)AACI->getErrorBB() == cont->throws(),
@@ -6430,7 +6430,7 @@ public:
       requireSameType(arg->getType(),
                       SILType::getPrimitiveObjectType(errorType),
               "error successor argument must have Error type");
-      
+
       if (AACI->getFunction()->hasOwnership()) {
         require(arg->getOwnershipKind() == OwnershipKind::Owned,
                 "error successor argument must be owned");
@@ -7271,7 +7271,7 @@ public:
         continue;
       }
       if (DS != LastSeenScope) {
-        llvm::errs() << "Broken instruction!\n"; 
+        llvm::errs() << "Broken instruction!\n";
         SI.dump();
 #ifndef NDEBUG
         llvm::errs() << "in scope\n";
@@ -7658,7 +7658,7 @@ void SILProperty::verify(const SILModule &M) const {
 void SILVTable::verify(const SILModule &M) const {
   if (!verificationEnabled(M))
     return;
-  
+
   // Compare against the base class vtable if there is one.
   const SILVTable *superVTable = nullptr;
   auto superclass = getClass()->getSuperclassDecl();
@@ -7670,14 +7670,14 @@ void SILVTable::verify(const SILModule &M) const {
       }
     }
   }
-  
+
   for (unsigned i : indices(getEntries())) {
     auto &entry = getEntries()[i];
-    
+
     // Make sure the module's lookup cache is consistent.
     assert(entry == *getEntry(const_cast<SILModule &>(M), entry.getMethod())
            && "vtable entry is out of sync with method's vtable cache");
-    
+
     // All vtable entries must be decls in a class context.
     assert(entry.getMethod().hasDecl() && "vtable entry is not a decl");
     auto baseInfo = M.Types.getConstantInfo(TypeExpansionContext::minimal(),
@@ -7725,7 +7725,7 @@ void SILVTable::verify(const SILModule &M) const {
               "vtable entry for " + baseName + " must be ABI-compatible",
               *entry.getImplementation());
     }
-    
+
     // Validate the entry against its superclass vtable.
     if (!superclass) {
       // Root methods should not have inherited or overridden entries.
@@ -7734,7 +7734,7 @@ void SILVTable::verify(const SILModule &M) const {
       case Entry::Normal:
         validKind = true;
         break;
-        
+
       case Entry::Inherited:
       case Entry::Override:
         validKind = false;
@@ -7766,7 +7766,7 @@ void SILVTable::verify(const SILModule &M) const {
         assert(entry.isNonOverridden() == superEntry->isNonOverridden()
                && "inherited vtable entry must share overridden-ness of superclass entry");
         break;
-          
+
       case Entry::Override:
         assert(!entry.isNonOverridden()
                && "override entry can't claim to be nonoverridden");
@@ -8010,7 +8010,7 @@ void SILModule::verify(CalleeCache *calleeCache,
     }
     wt.verify(*this);
   }
-  
+
   // Check property descriptors.
   LLVM_DEBUG(llvm::dbgs() << "*** Checking property descriptors ***\n");
   for (auto &prop : getPropertyList()) {

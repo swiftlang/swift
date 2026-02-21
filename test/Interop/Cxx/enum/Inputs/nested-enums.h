@@ -20,9 +20,9 @@ enum EnumInNestedNS {
   kNestedB
 };
 
-enum EnumInNS { 
-  kA = 0, 
-  kB 
+enum EnumInNS {
+  kA = 0,
+  kB
 };
 
 }
@@ -31,21 +31,21 @@ enum EnumInNS {
 
 namespace nsB {
 
-enum EnumInNS { 
-  kA = 0, 
-  kB 
+enum EnumInNS {
+  kA = 0,
+  kB
 };
 
-enum class ScopedEnumInNS { 
-  scopeA, 
-  scopeB 
+enum class ScopedEnumInNS {
+  scopeA,
+  scopeB
 };
 
 namespace nestedNS {
 
-enum EnumInNS { 
-  kA = 0, 
-  kB 
+enum EnumInNS {
+  kA = 0,
+  kB
 };
 
 }

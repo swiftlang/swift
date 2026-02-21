@@ -340,7 +340,7 @@ copyOrInitValueIntoSingleBuffer(SILGenFunction &SGF, SILLocation loc,
     value.copyInto(SGF, loc, accessAddr);
     return;
   }
-  
+
   // If we didn't evaluate into the initialization buffer, do so now.
   if (value.getValue() != destAddr) {
     SILValue accessAddr =
@@ -732,7 +732,7 @@ public:
     if (!addressableBuffer) {
       return;
     }
-    
+
     // Reflect the state of the variable's original cleanup.
     CleanupState cleanupState = CleanupState::Active;
     if (destroyVarHandle.isValid()) {
@@ -871,7 +871,7 @@ public:
   bool isInPlaceInitializationOfGlobal() const override {
     return isa<GlobalAddrInst>(address);
   }
-  
+
   SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
                                               SILLocation loc) override {
     // Emit into the buffer that 'let's produce for address-only values if
@@ -889,7 +889,7 @@ public:
   bool canSplitIntoTupleElements() const override {
     return hasAddress();
   }
-  
+
   MutableArrayRef<InitializationPtr>
   splitIntoTupleElements(SILGenFunction &SGF, SILLocation loc, CanType type,
                          SmallVectorImpl<InitializationPtr> &buf) override {
@@ -1070,7 +1070,7 @@ public:
   void finishUninitialized(SILGenFunction &SGF) override {
     ReferenceStorageInitialization::finishInitialization(SGF);
   }
-  
+
   void finishInitialization(SILGenFunction &SGF) override {
     VarInit->finishInitialization(SGF);
   }
@@ -1434,7 +1434,7 @@ void IsPatternInitialization::copyOrInitValueIntoImpl(SILGenFunction &SGF,
                                                       ManagedValue value,
                                                       bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
-  
+
   // Try to perform the cast to the destination type, producing an optional that
   // indicates whether we succeeded.
   auto destType = OptionalType::get(pattern->getCastType());
@@ -1723,7 +1723,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD, unsigned idx,
     SILValue resultBufPtr = B.createAddressToPointer(loc, resultBuf,
                           SILType::getPrimitiveObjectType(C.TheRawPointerType),
                           /*needsStackProtection=*/ false);
-    
+
     // Emit the closure for the child task.
     // Prepare the opaque `AsyncLet` representation.
     SILValue alet;
@@ -1744,7 +1744,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD, unsigned idx,
           resultBufPtr
         ).forward(*this);
     }
-    
+
     // Push a cleanup to destroy the AsyncLet along with the task and child record.
     enterAsyncLetCleanup(alet, resultBufPtr);
 
@@ -1963,7 +1963,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     assert(booleanTestValue->getType().
            castTo<BuiltinIntegerType>()->isFixedWidth(1) &&
            "Sema forces conditions to have Builtin.i1 type");
-    
+
     // Just branch on the condition.  On failure, we unwind any active cleanups,
     // on success we fall through to a new block.
     auto FailBB = Cleanups.emitBlockForCleanups(FalseDest, loc);
@@ -2049,7 +2049,7 @@ namespace {
       : existentialAddr(existentialAddr),
         concreteFormalType(concreteFormalType),
         repr(repr) {}
-    
+
     void emit(SILGenFunction &SGF, CleanupLocation l,
               ForUnwind_t forUnwind) override {
       switch (repr) {
@@ -2408,7 +2408,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
         return;
       }
     }
-  }  
+  }
   llvm_unreachable("unhandled case");
 }
 
@@ -2437,7 +2437,7 @@ SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
                                              SILLocation curLoc,
                                              ValueOwnership ownership) {
   // For locals, we might be able to retroactively produce a local addressable
-  // representation. 
+  // representation.
   auto foundVarLoc = VarLocs.find(decl);
   if (foundVarLoc == VarLocs.end()) {
     // If it's not local, is it at least a global stored variable?
@@ -2446,7 +2446,7 @@ SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
       if (!decl->isLet()) {
         return SILValue();
       }
-    
+
       // Does the storage naturally have a fully abstracted representation?
       if (!isNaturallyFullyAbstractedType(*this, decl->getTypeInContext())) {
         return SILValue();
@@ -2457,14 +2457,14 @@ SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
     }
     return SILValue();
   }
-  
+
   auto value = foundVarLoc->second.value;
   auto access = foundVarLoc->second.access;
   auto *state = getAddressableBufferInfo(decl)->getState();
-  
+
   SILType fullyAbstractedTy = getLoweredType(AbstractionPattern::getOpaque(),
                                      decl->getTypeInContext()->getRValueType());
-  
+
   // Check whether the bound value is inherently suitable for addressability.
   // It must already be in memory and fully abstracted.
   if (value->getType().isAddress()
@@ -2480,21 +2480,21 @@ SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
     }
     return address;
   }
-  
+
   // We can't retroactively introduce a reabstracted representation for a
   // mutable binding (since we would now have two mutable memory locations
   // representing the same value).
   if (access != SILAccessEnforcement::Unknown) {
     return SILValue();
   }
-  
+
   assert(ownership == ValueOwnership::Shared);
-  
+
   // Check whether the in-memory representation has already been forced.
   if (state) {
     return state->storeBorrow;
   }
-  
+
   // Otherwise, force the addressable representation.
   SILValue reabstraction, allocStack, storeBorrow;
   {
@@ -2535,7 +2535,7 @@ SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
       llvm_unreachable("unexpected value source!");
     }
     auto declarationLoc = value->getDefiningInsertionPoint()->getLoc();
-    
+
     // Reabstract if necessary.
     auto newValue = value;
     reabstraction = SILValue();
@@ -2550,7 +2550,7 @@ SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
     }
     storeBorrow = B.createStoreBorrow(declarationLoc, newValue, allocStack);
   }
-  
+
   // Record the addressable representation.
   auto *addressableBuffer = getAddressableBufferInfo(decl);
   auto *newState
@@ -2561,14 +2561,14 @@ SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
   // the addressable representation if it had been forced earlier.
   decltype(addressableBuffer->cleanupPoints) cleanupPoints;
   cleanupPoints.swap(addressableBuffer->cleanupPoints);
-  
+
   for (auto &cleanupPoint : cleanupPoints) {
     SavedInsertionPointRAII insertCleanup(B, cleanupPoint.inst);
     deallocateAddressable(*this, cleanupPoint.inst->getLoc(), *newState,
                           cleanupPoint.state);
     cleanupPoint.inst->eraseFromParent();
   }
-  
+
   return storeBorrow;
 }
 

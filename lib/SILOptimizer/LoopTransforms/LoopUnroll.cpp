@@ -227,7 +227,7 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount,
   // inside a loop.
   const uint64_t InsnsPerBB = 4;
   // Use command-line threshold for unrolling.
-  const uint64_t SILLoopUnrollThreshold = Loop->getBlocks().empty() ? 0 : 
+  const uint64_t SILLoopUnrollThreshold = Loop->getBlocks().empty() ? 0 :
     (Loop->getBlocks())[0]->getParent()->getModule().getOptions().UnrollThreshold;
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {

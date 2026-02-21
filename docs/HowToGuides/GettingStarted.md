@@ -55,7 +55,7 @@ toolchain as a one-off, there are a couple of differences:
    Build artifacts take anywhere between 5 GB to 100 GB, depending on the
    build settings. It is recommended to have at least 150 GB of available disk space.
 5. RAM:
-   It is recommended to have at least 8 GB for building a toolchain and 16 GB 
+   It is recommended to have at least 8 GB for building a toolchain and 16 GB
    for development. When building for development on a virtual machine or
    emulator, you might need more than 32 GB.
 6. Time:
@@ -71,11 +71,11 @@ toolchain as a one-off, there are a couple of differences:
    mkdir swift-project
    cd swift-project
    ```
-   
-    > **Warning**  
-    > Make sure the absolute path to your `swift-project` directory **does not** contain spaces, 
+
+    > **Warning**
+    > Make sure the absolute path to your `swift-project` directory **does not** contain spaces,
         since that might cause issues during the build step.
-    
+
 2. Clone the sources:
    - Via SSH (recommended):
      If you plan on contributing regularly, cloning over SSH provides a better
@@ -615,7 +615,7 @@ printed to stderr. It will likely look something like:
   Select the current scheme 'swift-frontend' → Edit Scheme → Run → Arguments
   tab. Under "Arguments Passed on Launch", copy-paste the `<args>` and make sure
   that "Expand Variables Based On" is set to swift-frontend. Close the scheme
-  editor. If you now run the compiler (<kbd>⌘</kbd>+<kbd>R</kbd> or 
+  editor. If you now run the compiler (<kbd>⌘</kbd>+<kbd>R</kbd> or
   Product → Run), you will be able to use the Xcode debugger.
 
   Xcode also has the ability to attach to and debug Swift processes launched

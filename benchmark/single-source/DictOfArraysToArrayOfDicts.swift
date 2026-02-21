@@ -79,7 +79,7 @@ public struct ZipSequence3<A: Sequence,B: Sequence,C: Sequence> {
     self.a = a
     self.b = b
     self.c = c
-  }  
+  }
 }
 
 extension ZipSequence3 {
@@ -98,7 +98,7 @@ extension ZipSequence3 {
 
 extension ZipSequence3.Iterator: IteratorProtocol {
   public typealias Element = (A.Element,B.Element,C.Element)
-  
+
   public mutating func next() -> Element? {
     switch (a.next(), b.next(), c.next()) {
     case let (aValue?, bValue?, cValue?):
@@ -122,7 +122,7 @@ extension ZipSequence3: Sequence {
 func zipWith<
   A: Sequence, B: Sequence, C: Sequence, T
 >(
-  _ a: A, _ b: B, _ c: C, 
+  _ a: A, _ b: B, _ c: C,
   _ combine: (A.Element,B.Element,C.Element) -> T
 ) -> [T] {
   return zip3(a,b,c).map(combine)

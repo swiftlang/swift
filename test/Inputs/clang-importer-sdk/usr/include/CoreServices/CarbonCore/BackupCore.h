@@ -6,7 +6,7 @@
 #endif
 #include <MacTypes.h>
 
-extern Boolean 
+extern Boolean
 CSBackupIsItemExcluded(
   CFURLRef   item,
   Boolean *  excludeByPath);

@@ -1857,7 +1857,7 @@ ImportedType ClangImporter::Implementation::importType(
   if (auto nullability = type->getNullability()) {
     bool stripNonResultOptionality =
         importKind == ImportTypeKind::CompletionHandlerResultParameter;
-    
+
     optionality = translateNullability(*nullability, stripNonResultOptionality);
   }
 
@@ -2902,13 +2902,13 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
           return typePart->isEqual(genericParam->getDeclaredInterfaceType());
         });
   };
-  
+
   // Make sure all generic parameters are accounted for in the function signature.
   for (auto genericParam : genericParams) {
     bool shouldCheckResultType = resultType && resultType->hasTypeParameter();
     if (genericParamTypeUsedInSignature(genericParam, shouldCheckResultType))
       continue;
-    
+
     // If this generic parameter is not used in the function signature,
     // add a new parameter that accepts a metatype corresponding to that
     // generic parameter.

@@ -24,7 +24,7 @@ Throughout this document there will be references to GitHub issues denoted by `#
 
 At runtime, Swift program binaries interact with other libraries and components through an ABI. ABI is Application Binary Interface, or the specification to which independently compiled binary entities must conform to be linked together and executed. These binary entities must agree on many low level details: how to call functions, how their data is represented in memory, and even where their metadata is and how to access it.
 
-ABI is per-platform, as it is a low level concern influenced by both the architecture and the OS. Most platform vendors define a "standard ABI" which is used for C code and built on by C-family languages. Swift, however, is a very different language from C and has its own per-platform ABI. While most of this document is platform-agnostic, platform-specific concerns have influenced details of the design and implementation of Swift's ABI. For details on each platform's standard ABI, refer to the [Appendix](#platform-abis). 
+ABI is per-platform, as it is a low level concern influenced by both the architecture and the OS. Most platform vendors define a "standard ABI" which is used for C code and built on by C-family languages. Swift, however, is a very different language from C and has its own per-platform ABI. While most of this document is platform-agnostic, platform-specific concerns have influenced details of the design and implementation of Swift's ABI. For details on each platform's standard ABI, refer to the [Appendix](#platform-abis).
 
 ### What Is ABI Stability?
 
@@ -38,13 +38,13 @@ ABI changes that are new and orthogonal are called *ABI-additive* changes. ABI-a
 
 ### What Does ABI Stability Enable?
 
-ABI stability enables OS vendors to embed a Swift standard library and runtime that is compatible with applications built with older or newer versions of Swift. This would remove the need for apps to distribute their own copy of these libraries on those platforms. It also allows for better decoupling of tools and better integration into the OS. 
+ABI stability enables OS vendors to embed a Swift standard library and runtime that is compatible with applications built with older or newer versions of Swift. This would remove the need for apps to distribute their own copy of these libraries on those platforms. It also allows for better decoupling of tools and better integration into the OS.
 
 As noted earlier, ABI stability is necessary, though not sufficient, for binary frameworks. Module format stability is also required and is beyond the scope of this document.
 
 ### Library Evolution
 
-Expressive and performance-focused languages which have binary interfaces tend to exhibit the [fragile binary interface problem](https://en.wikipedia.org/wiki/Fragile_binary_interface_problem), which makes it difficult for any library or component to change over time without requiring every user to recompile with new versions of that library. A major push in Swift currently is the plan for [Library Evolution](https://github.com/swiftlang/swift/blob/main/docs/LibraryEvolution.rst), which aims to grant flexibility for library authors to maintain backwards and forwards binary compatibility. Many implementation concerns therein could have an impact on ABI. 
+Expressive and performance-focused languages which have binary interfaces tend to exhibit the [fragile binary interface problem](https://en.wikipedia.org/wiki/Fragile_binary_interface_problem), which makes it difficult for any library or component to change over time without requiring every user to recompile with new versions of that library. A major push in Swift currently is the plan for [Library Evolution](https://github.com/swiftlang/swift/blob/main/docs/LibraryEvolution.rst), which aims to grant flexibility for library authors to maintain backwards and forwards binary compatibility. Many implementation concerns therein could have an impact on ABI.
 
 One of the goals of rolling out ABI stability is to remain flexible enough to accommodate library evolution changes without limiting the design space. Library evolution concerns will be addressed in each individual section, though a common refrain will be that the details are still undecided.
 
@@ -56,7 +56,7 @@ In practice, ABI concerns can be tightly coupled. But, as a conceptual model, I'
 
 2. Type metadata is used extensively by Swift programs, the Swift runtime, reflection, and tools such as debuggers and visualizers. This metadata must either have a defined memory layout, or have a set of defined APIs for querying the metadata of a type. Type metadata is discussed in the [Type Metadata](#metadata) section.
 
-3. Every exported or external symbol in a library needs a unique name upon which binary entities can agree. Swift provides function overloading and contextual name spaces (such as modules and types), which means that any name in source code might not be globally unique. A unique name is produced through a technique called *name mangling*. Swift's name mangling scheme is discussed in the [Mangling](#mangling) section. 
+3. Every exported or external symbol in a library needs a unique name upon which binary entities can agree. Swift provides function overloading and contextual name spaces (such as modules and types), which means that any name in source code might not be globally unique. A unique name is produced through a technique called *name mangling*. Swift's name mangling scheme is discussed in the [Mangling](#mangling) section.
 
 4. Functions must know how to call each other, which entails such things as the layout of the call stack, what registers are preserved, and ownership conventions. Calling conventions are discussed in the [Calling Convention](#calling-convention) section.
 
@@ -70,7 +70,7 @@ In practice, ABI concerns can be tightly coupled. But, as a conceptual model, I'
 
 First, let's define some common terminology.
 
-* An *object* is a stored entity of some type, meaning it has a location in memory or in registers. Objects can be values of struct/enum type, class instances, references to class instances, values of protocol type, or even closures. This is [in contrast to](https://en.wikipedia.org/wiki/Object_(computer_science)) the class-based-OO definition of object as being an instance of a class. 
+* An *object* is a stored entity of some type, meaning it has a location in memory or in registers. Objects can be values of struct/enum type, class instances, references to class instances, values of protocol type, or even closures. This is [in contrast to](https://en.wikipedia.org/wiki/Object_(computer_science)) the class-based-OO definition of object as being an instance of a class.
 * A *data member* of an object is any value that requires layout within the object itself. Data members include an object's stored properties and associated values.
 * A *spare bit* is a bit that is unused by objects of a given type. These often arise due to things such as alignment, padding, and address spaces, further described below.
 * An *extra inhabitant* is a bit pattern that does not represent a valid value for objects of a given type. For example, a simple C-like enum with 3 cases can fit in 2 bits, where it will have one extra inhabitant: the fourth unused bit pattern.
@@ -86,7 +86,7 @@ For every type `T` in Swift with statically known layout, the ABI specifies a me
 * The *alignment* for that type: for `x : T`, the address of `x` modulo alignment is always zero.
 * The *size* for that type: the byte size (possibly 0) without padding at the end.
 * The *offset* for each data member (if applicable): the address at which every member resides, relative to the object's base address.
- 
+
 Derived from alignment and size is the *stride* of the type, which is the size of objects of that type rounded up to alignment (minimum 1). The stride is mostly useful for objects laid out contiguously in memory, such as in arrays.
 
 <a name="type-properties"></a>Some types have interesting properties:
@@ -94,13 +94,13 @@ Derived from alignment and size is the *stride* of the type, which is the size o
   * A type is *trivial*, also known as POD ("plain ol' data"), if it merely stores data and has no extra copy, move, or destruction semantics. Trivial objects can be copied by replicating their bits, and are destroyed through deallocation. A type is trivial only if all data members are also trivial.
   * A type is *bitwise movable* if there are no side table references dependent on its address. A [move](https://doc.rust-lang.org/book/ownership.html#move-semantics) operation can occur when an object is copied from one location into another and the original location is no longer used. Bitwise movable objects are moved by performing a bitwise copy and then invalidating the original location. A type is bitwise movable only if all its data members are also bitwise movable. All trivial types are bitwise movable.
 
-An example of a trivial type is a Point struct that contains two Double fields: an x coordinate and a y coordinate. This struct is trivial, as it can be copied merely by copying its bits and its destruction performs no extra operations. 
+An example of a trivial type is a Point struct that contains two Double fields: an x coordinate and a y coordinate. This struct is trivial, as it can be copied merely by copying its bits and its destruction performs no extra operations.
 
 An example of a bitwise movable, but non-trivial, type is a struct that contains a reference to a class instance. Objects of that type cannot be copied merely by copying their bits, because a retain operation must be performed on the reference. Upon destruction, such objects must perform a release. However, the object can be moved from one address to another by copying its bits provided the original location is invalidated, keeping the overall retain count unchanged.
 
 An example of a type that is neither trivial nor bitwise movable is a struct containing a weak reference. Weak references are tracked in a side table so that they can be nil-ed out when the referenced object is destroyed. When moving an object of such type from one address to another, the side table must be updated to refer to the weak reference's new address.
 
-#### <a name="opaque-layout"></a>Opaque Layout 
+#### <a name="opaque-layout"></a>Opaque Layout
 
 Opaque layout occurs whenever the layout is not known until runtime. This can come up for unspecialized generics, which do not have a known layout at compilation time. It can also come up for resilient types, which are described in the [next section](#layout-library-evolution).
 
@@ -110,9 +110,9 @@ In practice, layout might be partially-known at compilation time. An example is 
 
 #### <a name="layout-library-evolution"></a>Library Evolution
 
-Library evolution introduces *resilient* layouts of public types by default and provides new annotations that freeze the layout for performance. A resilient layout avoids many of the pitfalls of the fragile binary problem by making the layout opaque. Resilient types have far more freedom to change and evolve without breaking binary compatibility: public data members can be rearranged, added, and even removed (by providing a computed getter/setter instead). The new annotations provide the ability to relinquish these freedoms by making stricter guarantees about their layout in order to be more efficiently compiled and accessed. 
+Library evolution introduces *resilient* layouts of public types by default and provides new annotations that freeze the layout for performance. A resilient layout avoids many of the pitfalls of the fragile binary problem by making the layout opaque. Resilient types have far more freedom to change and evolve without breaking binary compatibility: public data members can be rearranged, added, and even removed (by providing a computed getter/setter instead). The new annotations provide the ability to relinquish these freedoms by making stricter guarantees about their layout in order to be more efficiently compiled and accessed.
 
-In order to allow for cross-module optimizations for modules that are distributed together, there is the concept of a *resilience domain*. A resilience domain is a grouping of modules which are version-locked with each other and thus do not have binary compatibility across multiple version requirements with each other. See [Resilience Domains](https://github.com/swiftlang/swift/blob/main/docs/LibraryEvolution.rst#resilience-domains) for more details. 
+In order to allow for cross-module optimizations for modules that are distributed together, there is the concept of a *resilience domain*. A resilience domain is a grouping of modules which are version-locked with each other and thus do not have binary compatibility across multiple version requirements with each other. See [Resilience Domains](https://github.com/swiftlang/swift/blob/main/docs/LibraryEvolution.rst#resilience-domains) for more details.
 
 Resilient types are required to have opaque layout when exposed outside their resilience domain. Inside a resilience domain, this requirement is lifted and their layout may be statically known or opaque as determined by their type (see [previous section](#opaque-layout)).
 
@@ -121,7 +121,7 @@ Annotations may be applied to a library's types in future versions of that libra
 
 #### <a name="abstraction-levels"></a>Abstraction Levels
 
-All types in Swift conceptually exist at multiple levels of abstraction. For example, an `Int` value is of a concrete type and can be passed to functions in registers. But, that same value might be passed to a function expecting a generic type `T`, which has opaque layout. Since the function is expecting its argument to be passed indirectly, the integer value must be promoted to the stack. When that value has type `T`, it is said to be at a higher abstraction level than when it was an integer. Moving between abstraction levels is done through a process called *reabstraction*. 
+All types in Swift conceptually exist at multiple levels of abstraction. For example, an `Int` value is of a concrete type and can be passed to functions in registers. But, that same value might be passed to a function expecting a generic type `T`, which has opaque layout. Since the function is expecting its argument to be passed indirectly, the integer value must be promoted to the stack. When that value has type `T`, it is said to be at a higher abstraction level than when it was an integer. Moving between abstraction levels is done through a process called *reabstraction*.
 
 For many types in Swift, reabstraction involves directly copying the value to memory so that it is addressable. Reabstraction may be more complicated for tuples and higher-order functions, explained later in the [tuples layout section](#tuples) and the [function signature lowering section](#lowering-higher-order-functions).
 
@@ -157,7 +157,7 @@ A value of enum type exists as one of many variants or cases. Determining which 
 * Single payload - an enum where only one case has associated values
 * Multi-payload - an enum that has multiple cases with associated values
 
-Degenerate enums take zero space. Trivial enums are just their discriminator. 
+Degenerate enums take zero space. Trivial enums are just their discriminator.
 
 Single payload enums try to fit their discriminator in the payload's extra inhabitants for the non-payload cases, otherwise they will store the discriminator after the payload. When the discriminator is stored after the payload, the bits are not set for the payload case. The payload is guaranteed to be layout compatible with the enum as the payload case does not use any extra inhabitants. Storing the discriminator after the payload may also result in more efficient layout of aggregates containing the enum, due to alignment.
 
@@ -181,9 +181,9 @@ Class instances will, as part of ABI-stability, guarantee a word-sized field of 
 
 ##### References
 
-Classes are reference types. This means that Swift code dealing with class instances does so through references, which are pointers at the binary level. These references participate in [automatic reference counting](https://en.wikipedia.org/wiki/Automatic_Reference_Counting) (ARC). 
+Classes are reference types. This means that Swift code dealing with class instances does so through references, which are pointers at the binary level. These references participate in [automatic reference counting](https://en.wikipedia.org/wiki/Automatic_Reference_Counting) (ARC).
 
-References to Objective-C-compatible class instances (i.e. those that inherit from an Objective-C class or are imported from Objective-C) must provide the same bit-level guarantees to the Objective-C runtime as Objective-C references. Thus, such references are opaque: they have no guarantees other than that nil is 0 and provide no extra inhabitants. 
+References to Objective-C-compatible class instances (i.e. those that inherit from an Objective-C class or are imported from Objective-C) must provide the same bit-level guarantees to the Objective-C runtime as Objective-C references. Thus, such references are opaque: they have no guarantees other than that nil is 0 and provide no extra inhabitants.
 
 References to native, non-Objective-C-compatible Swift class instances do not have this constraint. The alignment of native Swift class instances is part of ABI, providing spare bits in the lower bits of references. Platforms may also provide spare bits (typically upper bits) and extra inhabitants (typically lower addresses) for references due to limited address spaces.
 
@@ -191,7 +191,7 @@ We may want to explore using spare bits in references to store local reference c
 
 #### <a name="existential-containers"></a>Existential Containers
 
-Any discussion of existentials quickly becomes bogged down in obscure terminology, so let's first establish some background surrounding the terms *existential values*, *existential containers*, and *witness tables*. 
+Any discussion of existentials quickly becomes bogged down in obscure terminology, so let's first establish some background surrounding the terms *existential values*, *existential containers*, and *witness tables*.
 
 In type theory, an [existential type](https://en.wikipedia.org/wiki/Type_system#Existential_types) describes an interface of an abstract type. Values of an existential type are *existential values*. These arise in Swift when an object's type is a protocol: storing or passing an object of protocol type means that the actual run-time type is opaque (not known at compile time, and thus neither is its layout). But, that opaque type has known interfaces because that type conforms to the protocol.
 
@@ -201,7 +201,7 @@ A type's conformance to a protocol consists of functions (whether methods or get
 
 * the value itself: either in an inline buffer or as a pointer to out-of-line storage
 * a pointer to the type metadata
-* a witness table pointer for every conformance. 
+* a witness table pointer for every conformance.
 
 Class-constrained existentials omit the metadata pointer (as the object itself contains a pointer to its type), as well as any excess inline buffer space. `Any`, which is an existential value without any conformances, has no witness table pointer.
 
@@ -316,7 +316,7 @@ For rationale and potentially-out-of-date details, see the [Swift Calling Conven
 
 This section will be using the terms *callee-saved* and *scratch* to classify registers as part of a register convention.
 
-* A *callee-saved register* must be preserved over the duration of a function call. If a called function (the *callee*) wishes to change the value stored in the register, it must restore it before returning. 
+* A *callee-saved register* must be preserved over the duration of a function call. If a called function (the *callee*) wishes to change the value stored in the register, it must restore it before returning.
 * A *scratch* register, also known as caller-saved or callee-clobbered, is not preserved over the duration of a function call. If the register's value must be preserved, code surrounding a function call must save and restore the value.
 
 Swift uses roughly the same categorization of registers as the standard calling convention. But, for some platforms, the Swift calling convention adds additional situational uses of some callee-saved registers: the *call context* register and the *error* register.
@@ -357,7 +357,7 @@ Parameter ownership is not reflected in the physical calling convention, though 
 
 #### <a name="lowering-higher-order-functions"></a>Lowering Higher-Order Functions
 
-Passing or returning higher-order functions may involve undergoing [reabstraction](#abstraction-levels), which requires that the compiler creates a thunk mapping between the actual calling convention and the expected calling convention. 
+Passing or returning higher-order functions may involve undergoing [reabstraction](#abstraction-levels), which requires that the compiler creates a thunk mapping between the actual calling convention and the expected calling convention.
 
 For example, let's say there are two functions:
 
@@ -366,7 +366,7 @@ func add1(_ i: Int) -> Int { return i+1 }
 func apply<T,U>(_ f: (T) -> U, _ x: T) -> U { return f(x) }
 ```
 
-`apply`'s function parameter `f` must take and return its values indirectly, as `T` and `U` have opaque layout. If `add1` is passed to `apply`, the compiler will create a thunk for `apply` to call that takes a parameter indirectly and calls `add1` by passing it in register. The thunk will then receive the result in register and return it indirectly back to `apply`. 
+`apply`'s function parameter `f` must take and return its values indirectly, as `T` and `U` have opaque layout. If `add1` is passed to `apply`, the compiler will create a thunk for `apply` to call that takes a parameter indirectly and calls `add1` by passing it in register. The thunk will then receive the result in register and return it indirectly back to `apply`.
 
 ### Stack Invariants
 
@@ -385,7 +385,7 @@ Swift exposes a runtime that provides APIs for compiled code. Calls into the Swi
 
 Every existing runtime function will need to be audited for its desirability and behavior [[#46320](https://github.com/swiftlang/swift/issues/46320)]. For every function, we need to evaluate whether we want the API as is:
 
-* If yes, then we need to precisely specify the semantics and guarantees of the API. 
+* If yes, then we need to precisely specify the semantics and guarantees of the API.
 * If not, we need to either change, remove, or replace the API, and precisely specify the new semantics.
 
 The runtime is also responsible for lazily creating new type metadata entries at run time, either for generic type instantiations or for resilient constructs. Library evolution in general introduces a whole new category of needs from the runtime by making data and metadata more opaque, requiring interaction to be done through runtime APIs. Additionally, ownership semantics may require new runtime APIs or modifications to existing APIs. These new runtime needs are still under investigation [[#46931](https://github.com/swiftlang/swift/issues/46931)].
@@ -420,7 +420,7 @@ Another goal of Swift is to improve the applicability of Swift to systems progra
 
 ## Next Steps
 
-All progress and issue tracking will be done through JIRA on [bugs.swift.org](https://bugs.swift.org), using the "AffectsABI" label. We will make an ABI stability dashboard to more easily monitor specifics and progress. The next step is to start making issues for everything that needs fixing and issues for the directions we want to explore. 
+All progress and issue tracking will be done through JIRA on [bugs.swift.org](https://bugs.swift.org), using the "AffectsABI" label. We will make an ABI stability dashboard to more easily monitor specifics and progress. The next step is to start making issues for everything that needs fixing and issues for the directions we want to explore.
 
 This document will be a living document until ABI stability is reached, updated with new findings and JIRA issues as they come up. After ABI stability is achieved, this document should be succeeded by technical specifications of Swift's ABI.
 

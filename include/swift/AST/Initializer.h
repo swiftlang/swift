@@ -54,7 +54,7 @@ class Initializer : public DeclContext {
   unsigned Kind : 2;
 protected:
   unsigned SpareBits : 30;
-  
+
   Initializer(InitializerKind kind, DeclContext *parent)
     : DeclContext(DeclContextKind::Initializer, parent),
       Kind(unsigned(kind)) {

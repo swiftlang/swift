@@ -161,7 +161,7 @@ void Symbol::serializeNames(llvm::json::OStream &OS) const {
     } else if (const auto *VD = dyn_cast<ValueDecl>(D)) {
       Decl = VD;
     }
-      
+
     if (isa<GenericTypeDecl>(Decl) || isa<EnumElementDecl>(Decl)) {
       SmallString<64> FullyQualifiedTitle;
 
@@ -171,7 +171,7 @@ void Symbol::serializeNames(llvm::json::OStream &OS) const {
         }
         FullyQualifiedTitle.append(It->Title);
       }
-      
+
       OS.attribute("title", FullyQualifiedTitle.str());
     } else {
       OS.attribute("title", PathComponents.back().Title);
@@ -609,7 +609,7 @@ void Symbol::serializeLocationMixin(llvm::json::OStream &OS) const {
       return;
     }
   }
-    
+
   auto FileName = getFileNameForDecl(D);
   if (FileName.empty()) {
     return;

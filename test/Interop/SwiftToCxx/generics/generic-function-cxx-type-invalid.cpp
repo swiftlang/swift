@@ -14,7 +14,7 @@ struct CxxStruct { int x = 0; };
 
 int main() {
   using namespace Functions;
-    
+
   USE_TYPE value = {};
   genericPrintFunction(value);
   return 0;

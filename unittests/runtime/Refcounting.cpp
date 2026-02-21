@@ -261,7 +261,7 @@ TEST(RefcountingTest, immortal_retain_release) {
     EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
     swift_nonatomic_release_n(&ImmortalTestObject, amount);
     EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
-    
+
     swift_unownedRetain_n(&ImmortalTestObject, amount);
     EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
     swift_unownedRelease_n(&ImmortalTestObject, amount);

@@ -157,19 +157,19 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
       nodeKind = Node::Kind::ProtocolSymbolicReference;
       isType = false;
       break;
-    
+
     case ContextDescriptorKind::OpaqueType:
       nodeKind = Node::Kind::OpaqueTypeDescriptorSymbolicReference;
       isType = false;
       break;
-        
+
     default:
       if (isa<TypeContextDescriptor>(descriptor)) {
         nodeKind = Node::Kind::TypeSymbolicReference;
         isType = true;
         break;
       }
-      
+
       // References to other kinds of context aren't yet implemented.
       return nullptr;
     }
@@ -211,7 +211,7 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
     isType = false;
     break;
   }
-  
+
   auto node = Dem.createNode(nodeKind, ptr);
   if (isType) {
     auto typeNode = Dem.createNode(Node::Kind::Type);
@@ -264,7 +264,7 @@ _buildDemanglingForSymbolicReference(SymbolicReferenceKind kind,
 
   swift_unreachable("invalid symbolic reference kind");
 }
-  
+
 NodePointer
 ResolveToDemanglingForContext::operator()(SymbolicReferenceKind kind,
                                           Directness isIndirect,
@@ -436,7 +436,7 @@ _findExtendedTypeContextDescriptor(const ContextDescriptor *maybeExtension,
   Demangle::NodePointer &node = demangledNode ? *demangledNode : localNode;
 
   auto mangledName = extension->getMangledExtendedContext();
-  
+
   // A extension of the form `extension Protocol where Self == ConcreteType`
   // is formally a protocol extension, so the formal generic parameter list
   // is `<Self>`, but because of the same type constraint, the extended context
@@ -467,7 +467,7 @@ _findExtendedTypeContextDescriptor(const ContextDescriptor *maybeExtension,
       return nullptr;
     }
   }
-  
+
   node = demangler.demangleType(mangledName,
                                 ResolveAsSymbolicReference(demangler));
   if (!node)
@@ -628,7 +628,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
   while (context) {
     if (node->getKind() == Demangle::Node::Kind::Type)
       node = node->getChild(0);
-    
+
     // We can directly match symbolic references to the current context.
     if (node) {
       if (node->getKind() == Demangle::Node::Kind::TypeSymbolicReference
@@ -648,20 +648,20 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         return false;
       if (!stringRefEqualsCString(node->getText(), module->Name.get()))
         return false;
-      
+
       node = nullptr;
       break;
     }
-    
+
     case ContextDescriptorKind::Extension: {
       auto extension = cast<ExtensionContextDescriptor>(context);
-      
+
       // Check whether the extension context matches the mangled context.
       if (node->getKind() != Demangle::Node::Kind::Extension)
         return false;
       if (node->getNumChildren() < 2)
         return false;
-      
+
       // Check that the context being extended matches as well.
       auto extendedContextNode = node->getChild(1);
       DemanglerForRuntimeTypeResolution<> demangler;
@@ -679,7 +679,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         extendedDescriptorFromNode && extendedDescriptorFromDemangled &&
         equalContexts(extendedDescriptorFromNode,
                       extendedDescriptorFromDemangled);
-      
+
 #if SWIFT_OBJC_INTEROP
       // If we have manglings of the same Objective-C type, the contexts match.
       if (!contextsMatch &&
@@ -692,7 +692,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 
       if (!contextsMatch)
         return false;
-      
+
       // Check whether the generic signature of the extension matches the
       // mangled constraints, if any.
 
@@ -701,10 +701,10 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         // like `extension <T> Array where Element == Optional<T>`, we'd need
         // to look at the mangled context name to match up generic arguments.
         // That would probably need a new extension mangling form, though.
-        
+
         // TODO
       }
-      
+
       // The parent context of the extension should match in the mangling and
       // context descriptor.
       node = node->getChild(0);
@@ -765,30 +765,30 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         }
 
         auto nameNode = node->getChild(1);
-        
+
         // Declarations synthesized by the Clang importer get a small tag
         // string in addition to their name.
-        if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){          
+        if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){
           if (!getIdentity().isRelatedEntity(
                                         nameNode->getFirstChild()->getText()))
             return false;
-          
+
           nameNode = nameNode->getChild(1);
         } else if (getIdentity().isAnyRelatedEntity()) {
           return false;
         }
-        
+
         // We should only match public or internal declarations with stable
         // names. The runtime metadata for private declarations would be
         // anonymized.
         if (nameNode->getKind() == Demangle::Node::Kind::Identifier) {
           if (nameNode->getText() != getIdentity().getABIName())
             return false;
-          
+
           node = node->getChild(0);
           break;
         }
-        
+
         return false;
 
       }
@@ -797,15 +797,15 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       // name we can match to.
       return false;
     }
-    
+
     context = context->Parent;
   }
-  
+
   // We should have reached the top of the node tree at the same time we reached
   // the top of the context tree.
   if (node)
     return false;
-  
+
   return true;
 }
 
@@ -1007,7 +1007,7 @@ _findContextDescriptor(Demangle::NodePointer node,
 
   if (auto *standardDescriptor = descriptorFromStandardMangling(symbolicNode))
     return standardDescriptor;
-  
+
   const ContextDescriptor *foundContext = nullptr;
   auto &T = TypeMetadataRecords.get();
 
@@ -1032,15 +1032,15 @@ _findContextDescriptor(Demangle::NodePointer node,
       return Value->getDescription();
   }
 
-  // Check type metadata records		   
+  // Check type metadata records
   // Scan any newly loaded images for context descriptors, then try the context
   foundContext = _searchTypeMetadataRecords(T, node);
-  
-  // Check protocol conformances table. Note that this has no support for		
+
+  // Check protocol conformances table. Note that this has no support for
   // resolving generic types yet.
   if (!foundContext)
     foundContext = _searchConformancesByMangledTypeName(node);
-  
+
   if (foundContext)
     T.NominalCache.getOrInsert(mangledName, [&](NominalTypeDescriptorCacheEntry
                                                     *entry,
@@ -1430,7 +1430,7 @@ _gatherGenericParameters(const ContextDescriptor *context,
   unsigned numTotalGenericParams =
     genericParamCounts.empty() ? context->getNumGenericParams()
                                : genericParamCounts.back();
-  
+
   // Check whether we have the right number of generic arguments.
   if (genericArgs.size() == getLocalGenericParams(context).size()) {
     // Okay: genericArgs is the innermost set of generic arguments.
@@ -1447,7 +1447,7 @@ _gatherGenericParameters(const ContextDescriptor *context,
              " total params";
     });
   }
-  
+
   // If there are generic parameters at any level, check the generic
   // requirements and fill in the generic arguments vector.
   if (!genericParamCounts.empty()) {
@@ -1490,11 +1490,11 @@ _gatherGenericParameters(const ContextDescriptor *context,
         });
       }
     }
-    
+
     // Add the generic arguments we were given.
     allGenericArgs.insert(allGenericArgs.end(),
                           genericArgs.begin(), genericArgs.end());
-    
+
     // Copy the generic arguments needed for metadata from the generic
     // arguments "as written".
     {
@@ -1716,7 +1716,7 @@ _findOpaqueTypeDescriptor(NodePointer demangleNode,
     }
     return orig;
   }
-  
+
   // TODO: Find non-symbolic-referenced opaque decls.
   return nullptr;
 }
@@ -1838,7 +1838,7 @@ public:
         .getType();
   }
 
-  Mangle::ManglingFlavor getManglingFlavor() { 
+  Mangle::ManglingFlavor getManglingFlavor() {
     return Mangle::ManglingFlavor::Default;
   }
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
@@ -1855,7 +1855,7 @@ public:
     llvm::SmallVector<MetadataPackOrValue, 8> allGenericArgs;
     for (auto argSet : genericArgs)
       allGenericArgs.append(argSet.begin(), argSet.end());
-    
+
     // Gather the generic parameters we need to parameterize the opaque decl.
     llvm::SmallVector<unsigned, 8> genericParamCounts;
     llvm::SmallVector<const void *, 8> allGenericArgsVec;
@@ -2510,7 +2510,7 @@ swift_getTypeByMangledNodeImpl(MetadataRequest request, Demangler &demangler,
     return TypeInfo{MetadataResponse{type, MetadataState::Complete},
                     TypeReferenceOwnership()};
   }
-    
+
   // TODO: propagate the request down to the builder instead of calling
   // swift_checkMetadataState after the fact.
   DecodedMetadataBuilder builder(demangler, substGenericParam,
@@ -2555,7 +2555,7 @@ swift_getTypeByMangledNameImpl(MetadataRequest request, StringRef typeName,
           return llvm::StringRef::npos;
         }
       }
-      
+
       // Should not contain symbolic references.
       if ((unsigned char)typeName[i] <= '\x1F') {
         return llvm::StringRef::npos;

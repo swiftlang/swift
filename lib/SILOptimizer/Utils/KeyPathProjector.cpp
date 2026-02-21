@@ -33,7 +33,7 @@ class RootProjector : public KeyPathProjector {
 public:
     RootProjector(SILValue root, SILLocation loc, SILBuilder &builder)
         : KeyPathProjector(loc, builder), root(root) {}
-    
+
     void project(AccessType accessType,
                  std::function<void (SILValue)> callback) override {
         if (accessType == AccessType::Set) {
@@ -43,7 +43,7 @@ public:
         }
         callback(root);
     }
-    
+
     bool isStruct() override {
         return root->getType().getStructOrBoundGenericStruct() != nullptr;
     }
@@ -59,18 +59,18 @@ protected:
                        SILLocation loc, SILBuilder &builder)
         : KeyPathProjector(loc, builder),
           component(component), parent(std::move(parent)) {}
-    
+
     /// The key path component.
     const KeyPathPatternComponent &component;
-    
+
     /// The projector for the previous components.
     std::unique_ptr<KeyPathProjector> parent;
-    
+
     bool isStruct() override {
         auto type = component.getComponentType();
         return type.getStructOrBoundGenericStruct() != nullptr;
     }
-    
+
     ~ComponentProjector() override {};
 };
 
@@ -94,14 +94,14 @@ public:
                             SILLocation loc, SILBuilder &builder)
         : ComponentProjector(component, std::move(parent), loc, builder),
           beginAccess(beginAccess) {}
-  
+
   void project(AccessType accessType,
                std::function<void(SILValue addr)> callback) override {
     assert(component.getKind() ==
            KeyPathPatternComponent::Kind::StoredProperty);
-    
+
     VarDecl *storedProperty = component.getStoredPropertyDecl();
-    
+
     if (parent->isStruct()) {
       // Reading a struct field -> reading the struct
       // Writing or modifying a struct field -> modifying the struct
@@ -110,7 +110,7 @@ public:
         parentAccessType = AccessType::Get;
       else
         parentAccessType = AccessType::Modify;
-      
+
       parent->project(parentAccessType, [&](SILValue parentValue) {
         auto addr = builder.createStructElementAddr(loc, parentValue, storedProperty);
         // If we're setting, destroy the old value (the callback expects uninitialized memory)
@@ -128,10 +128,10 @@ public:
         } else {
           Ref = builder.createLoad(loc, parentValue, LoadOwnershipQualifier::Unqualified);
         }
-        
+
         // If we were previously accessing a class member, we're done now.
         insertEndAccess(beginAccess, builder);
-        
+
         // Handle the case where the storedProperty is in a super class.
         while (Ref->getType().getClassOrBoundGenericClass() !=
                storedProperty->getDeclContext()) {
@@ -139,9 +139,9 @@ public:
           ASSERT(superCl && "the property should be in the decl or in a superclass of it");
           Ref = builder.createUpcast(loc, Ref, superCl);
         }
-        
+
         SILValue addr = builder.createRefElementAddr(loc, Ref, storedProperty);
-        
+
         // Class members need access enforcement.
         if (builder.getModule().getOptions().EnforceExclusivityDynamic) {
           beginAccess = builder.createBeginAccess(loc, addr, SILAccessKind::Read,
@@ -152,18 +152,18 @@ public:
             beginAccess->setAccessKind(SILAccessKind::Modify);
           addr = beginAccess;
         }
-        
+
         // If we're setting, destroy the old value (the callback expects uninitialized memory)
         if (accessType == AccessType::Set)
           builder.createDestroyAddr(loc, addr);
         callback(addr);
-        
+
         // if a child hasn't started a new access (i.e. beginAccess is unchanged),
         // end the access now
         if (beginAccess == addr) {
           insertEndAccess(beginAccess, builder);
         }
-        
+
         if (Borrow) {
           builder.createEndBorrow(loc, Borrow);
         }
@@ -180,12 +180,12 @@ public:
                         std::unique_ptr<KeyPathProjector> parent,
                         SILLocation loc, SILBuilder &builder)
         : ComponentProjector(component, std::move(parent), loc, builder) {}
-  
+
   void project(AccessType accessType,
                std::function<void(SILValue addr)> callback) override {
     assert(component.getKind() ==
            KeyPathPatternComponent::Kind::TupleElement);
-    
+
     // Reading a tuple field -> reading the tuple
     // Writing or modifying a tuple field -> modifying the tuple
     AccessType parentAccessType;
@@ -193,7 +193,7 @@ public:
       parentAccessType = AccessType::Get;
     else
       parentAccessType = AccessType::Modify;
-    
+
     parent->project(parentAccessType, [&](SILValue parentValue) {
       auto addr = builder.createTupleElementAddr(loc, parentValue, component.getTupleIndex());
       // If we're setting, destroy the old value (the callback expects uninitialized memory)
@@ -213,7 +213,7 @@ public:
                               SILLocation loc, SILBuilder &builder)
         : ComponentProjector(component, std::move(parent), loc, builder),
           keyPath(keyPath), subs(subs), beginAccess(beginAccess) {}
-  
+
   void project(AccessType accessType,
                std::function<void(SILValue addr)> callback) override {
     assert(component.getKind() ==
@@ -233,18 +233,18 @@ public:
       SILType type = function.getLoweredType(
                          Lowering::AbstractionPattern::getOpaque(), substType);
       auto addr = builder.createAllocStack(loc, type);
-      
+
       assertHasNoContext();
       assert(getter->getConventions().getNumSILArguments());
-      
+
       auto ref = builder.createFunctionRef(loc, getter);
       builder.createApply(loc, ref, subs, {addr, parentValue});
-      
+
       // If we were previously accessing a class member, we're done now.
       insertEndAccess(beginAccess, builder);
-      
+
       callback(addr);
-      
+
       builder.createDestroyAddr(loc, addr);
       builder.createDeallocStack(loc, addr);
     });
@@ -253,7 +253,7 @@ protected:
   KeyPathInst *keyPath;
   SubstitutionMap subs;
   BeginAccessInst *&beginAccess;
-  
+
   void assertHasNoContext() {
     assert(component.getArguments().empty() &&
            component.getExternalSubstitutions().empty() &&
@@ -271,20 +271,20 @@ public:
                               SILLocation loc, SILBuilder &builder)
         : GettablePropertyProjector(keyPath, component, std::move(parent),
                                     subs, beginAccess, loc, builder) {}
-  
-  
+
+
   void project(AccessType accessType,
                std::function<void(SILValue addr)> callback) override {
     assert(component.getKind() ==
            KeyPathPatternComponent::Kind::GettableProperty ||
            component.getKind() ==
            KeyPathPatternComponent::Kind::SettableProperty);
-    
+
     switch (accessType) {
       case AccessType::Get:
         GettablePropertyProjector::project(accessType, callback);
         break;
-        
+
       case AccessType::Modify:
       case AccessType::Set:
         AccessType parentAccessType;
@@ -314,21 +314,21 @@ public:
           assertHasNoContext();
           assert(getter->getConventions().getNumSILArguments());
           assert(setter->getConventions().getNumSILArguments());
-          
+
           // If this is a modify, we need to call the getter and
           // store the result in the writeback buffer.
           if (accessType == AccessType::Modify) {
             auto getterRef = builder.createFunctionRef(loc, getter);
             builder.createApply(loc, getterRef, subs, {addr, parentValue});
           }
-          
+
           // The callback function will write into the writeback buffer.
           callback(addr);
-          
+
           // Pass the value from the writeback buffer to the setter.
           auto setterRef = builder.createFunctionRef(loc, setter);
           builder.createApply(loc, setterRef, subs, {addr, parentValue});
-          
+
           // Deallocate the writeback buffer.
           builder.createDestroyAddr(loc, addr);
           builder.createDeallocStack(loc, addr);
@@ -346,13 +346,13 @@ public:
                         SILLocation loc, SILBuilder &builder)
         : ComponentProjector(component, std::move(parent), loc, builder),
           keyPath(kpInst) {}
-  
+
   void project(AccessType accessType,
                std::function<void(SILValue addr)> callback) override {
     assert(component.getKind() ==
            KeyPathPatternComponent::Kind::OptionalWrap);
     assert(accessType == AccessType::Get && "optional wrap components are immutable");
-    
+
     parent->project(AccessType::Get, [&](SILValue parentValue) {
       auto &function = builder.getFunction();
       auto substType = component.getComponentType().subst(
@@ -360,23 +360,23 @@ public:
       SILType optType = function.getLoweredType(
                          Lowering::AbstractionPattern::getOpaque(), substType);
       SILType objType = optType.getOptionalObjectType().getAddressType();
-      
+
       assert(objType && "optional wrap must return an optional");
 
       // Allocate a buffer for the result.
       auto optAddr = builder.createAllocStack(loc, optType);
-      
+
       // Store the parent result in the enum payload address.
       auto someDecl = builder.getASTContext().getOptionalSomeDecl();
       auto objAddr = builder.createInitEnumDataAddr(loc, optAddr,
                                                     someDecl, objType);
       builder.createCopyAddr(loc, parentValue, objAddr, IsNotTake, IsInitialization);
-      
+
       // Initialize the Optional enum.
       builder.createInjectEnumAddr(loc, optAddr, someDecl);
-      
+
       callback(optAddr);
-      
+
       // Destroy the Optional.
       builder.createDestroyAddr(loc, optAddr);
       builder.createDeallocStack(loc, optAddr);
@@ -393,45 +393,45 @@ public:
                          std::unique_ptr<KeyPathProjector> parent,
                          SILLocation loc, SILBuilder &builder)
         : ComponentProjector(component, std::move(parent), loc, builder) {}
-  
+
   void project(AccessType accessType,
                std::function<void(SILValue addr)> callback) override {
     assert(component.getKind() ==
            KeyPathPatternComponent::Kind::OptionalForce);
-    
+
     parent->project(accessType, [&](SILValue optAddr) {
       auto &ctx = builder.getASTContext();
-      
+
       auto noneDecl = ctx.getOptionalNoneDecl();
       auto someDecl = ctx.getOptionalSomeDecl();
-      
+
       SILType optType = optAddr->getType();
       SILType objType = optType.getOptionalObjectType();
-      
+
       if (accessType != AccessType::Set) {
         // We're getting (or modifying), so we need to unwrap the optional.
         auto int1Type = SILType::getBuiltinIntegerType(1, ctx);
         auto falseLiteral = builder.createIntegerLiteral(loc, int1Type, false);
         auto trueLiteral = builder.createIntegerLiteral(loc, int1Type, true);
-        
+
         auto isNil = builder.createSelectEnumAddr(loc, optAddr, int1Type, SILValue(), {
           {noneDecl, trueLiteral}, {someDecl, falseLiteral}
         });
         builder.createCondFail(loc, isNil, "unexpectedly found nil while "
                                "unwrapping an Optional key-path expression");
       }
-      
+
       switch (accessType) {
         case AccessType::Get: {
           // We have to copy the optional, since unwrapping is destructive.
           auto tempAddr = builder.createAllocStack(loc, optType);
           builder.createCopyAddr(loc, optAddr, tempAddr, IsNotTake, IsInitialization);
-          
+
           // Unwrap the optional.
           auto objAddr = builder.createUncheckedTakeEnumDataAddr(loc, tempAddr, someDecl, objType);
-          
+
           callback(objAddr);
-          
+
           builder.createDestroyAddr(loc, objAddr);
           builder.createDeallocStack(loc, tempAddr);
           break;
@@ -439,9 +439,9 @@ public:
         case AccessType::Set: {
           // Write the new value directly into optAddr.
           auto objAddr = builder.createInitEnumDataAddr(loc, optAddr, someDecl, objType);
-          
+
           callback(objAddr);
-          
+
           // Finish creating the enum.
           builder.createInjectEnumAddr(loc, optAddr, someDecl);
           break;
@@ -450,13 +450,13 @@ public:
           // We have to copy the old value out, perform the modification,
           // and copy the new value back in.
           auto objAddr = builder.createAllocStack(loc, objType);
-          
+
           // Unwrap the optional and copy it to the new buffer.
           auto unwrappedAddr = builder.createUncheckedTakeEnumDataAddr(loc, optAddr, someDecl, objType);
           builder.createCopyAddr(loc, unwrappedAddr, objAddr, IsTake, IsInitialization);
-          
+
           callback(objAddr);
-          
+
           auto initAddr = builder.createInitEnumDataAddr(loc, optAddr, someDecl, objType);
           builder.createCopyAddr(loc, objAddr, initAddr, IsTake, IsInitialization);
           builder.createDeallocStack(loc, objAddr);
@@ -477,23 +477,23 @@ public:
                          SILLocation loc, SILBuilder &builder)
         : ComponentProjector(component, std::move(parent), loc, builder),
           optionalChainResult(optionalChainResult), beginAccess(beginAccess) {}
-  
+
   void project(AccessType accessType,
                std::function<void(SILValue addr)> callback) override {
     assert(component.getKind() ==
            KeyPathPatternComponent::Kind::OptionalChain);
     assert(accessType == AccessType::Get &&
            "Optional chain components are immutable");
-    
+
     parent->project(accessType, [&](SILValue optAddr) {
       auto &ctx = builder.getASTContext();
-      
+
       auto noneDecl = ctx.getOptionalNoneDecl();
       auto someDecl = ctx.getOptionalSomeDecl();
-      
+
       SILType optType = optAddr->getType();
       SILType objType = optType.getOptionalObjectType();
-      
+
       // Continue projecting only if the optional is non-nil
       // i.e. if let objAddr = optAddr {
       auto continuation = builder.splitBlockForFallthrough();
@@ -501,24 +501,24 @@ public:
       auto ifNone = builder.getFunction().createBasicBlockAfter(ifSome);
       builder.createSwitchEnumAddr(loc, optAddr, /*defaultBB*/ nullptr,
                                    {{noneDecl, ifNone}, {someDecl, ifSome}});
-      
+
       assert(ifSome->empty());
       builder.setInsertionPoint(ifSome);
-      
+
       // We have to copy the optional, since unwrapping is destructive.
       auto tempAddr = builder.createAllocStack(loc, optType);
       builder.createCopyAddr(loc, optAddr, tempAddr, IsNotTake, IsInitialization);
-      
+
       // Unwrap the optional.
       auto objAddr = builder.createUncheckedTakeEnumDataAddr(loc, tempAddr, someDecl, objType);
       BeginAccessInst *origBeginAccess = beginAccess;
-      
+
       // at the end of the projection, callback will store a value in optionalChainResult
       callback(objAddr);
-      
+
       builder.createDestroyAddr(loc, objAddr);
       builder.createDeallocStack(loc, tempAddr);
-      
+
       builder.createBranch(loc, continuation);
       // else, store nil in the result
       builder.setInsertionPoint(ifNone);
@@ -529,13 +529,13 @@ public:
         builder.createEndAccess(loc, origBeginAccess, /*aborted*/ false);
 
       builder.createInjectEnumAddr(loc, optionalChainResult, noneDecl);
-      
+
       builder.createBranch(loc, continuation);
       // end if, allow parents to clean up regardless of whether the chain continued
       builder.setInsertionPoint(continuation, continuation->begin());
     });
   }
-  
+
 private:
   SILValue optionalChainResult;
   BeginAccessInst *&beginAccess;
@@ -551,7 +551,7 @@ public:
   void project(AccessType accessType,
                std::function<void (SILValue)> callback) override {
     auto components = keyPath->getPattern()->getComponents();
-    
+
     // Check if the keypath has an optional chain.
     bool isOptionalChain = false;
     for (const KeyPathPatternComponent &comp : components) {
@@ -560,15 +560,15 @@ public:
         break;
       }
     }
-    
+
     // Root projector
     auto rootProjector = std::make_unique<RootProjector>(root, loc, builder);
-    
+
     BeginAccessInst *beginAccess = nullptr;
-    
+
     if (isOptionalChain) {
       assert(accessType == AccessType::Get && "Optional chains are read-only");
-      
+
       // If we're reading an optional chain, create an optional result.
       auto resultCanType = components.back().getComponentType();
       auto &function = builder.getFunction();
@@ -576,22 +576,22 @@ public:
           resultCanType.subst(keyPath->getSubstitutions(), std::nullopt);
       auto optType = function.getLoweredType(
                          Lowering::AbstractionPattern::getOpaque(), substType);
-      
+
       assert(optType.getOptionalObjectType() &&
              "Optional-chained key path should result in an optional");
       SILValue optionalChainResult = builder.createAllocStack(loc, optType);
-      
+
       // Get the (conditional) result projector.
       auto projector = create(0, std::move(rootProjector),
                               beginAccess, optionalChainResult);
-      
+
       projector->project(accessType, [&](SILValue result) {
         // This will only run if all optional chains succeeded.
         // Store the result in optionalChainResult.
         builder.createCopyAddr(loc, result, optionalChainResult,
                                IsNotTake, IsInitialization);
       });
-      
+
       // If the optional chain succeeded, optionalChainResult will have
       // .some(result). Otherwise, projectOptionalChain will have written .none.
       callback(optionalChainResult);
@@ -607,29 +607,29 @@ public:
     assert(beginAccess == nullptr &&
            "key path projector returned with dangling access enforcement");
   }
-  
+
   bool isStruct() override {
     auto components = keyPath->getPattern()->getComponents();
     auto resultType = components.back().getComponentType();
     return resultType.getStructOrBoundGenericStruct() != nullptr;
   }
-  
+
 private:
   KeyPathInst *keyPath;
   SILValue root;
-  
+
   /// Recursively creates a chain of key path projectors
   /// for components from index..<components.end()
   std::unique_ptr<KeyPathProjector>
   create(size_t index, std::unique_ptr<KeyPathProjector> parent,
          BeginAccessInst *&beginAccess, SILValue optionalChainResult) {
     auto components = keyPath->getPattern()->getComponents();
-    
+
     if (index >= components.size()) return parent;
-    
+
     auto &comp = components[index];
     std::unique_ptr<KeyPathProjector> projector;
-    
+
     // Create a projector for this component.
     switch (comp.getKind()) {
       case KeyPathPatternComponent::Kind::StoredProperty:
@@ -665,7 +665,7 @@ private:
              builder);
         break;
     }
-    
+
     // Project the rest of the chain on top of this component.
     return create(index + 1, std::move(projector),
                   beginAccess, optionalChainResult);
@@ -688,7 +688,7 @@ KeyPathProjector::create(SILValue keyPath, SILValue root,
   auto *kpInst = getLiteralKeyPath(keyPath);
   if (!kpInst || !kpInst->hasPattern())
     return nullptr;
-  
+
   // Check if the keypath only contains patterns which we support.
   auto components = kpInst->getPattern()->getComponents();
   for (const KeyPathPatternComponent &comp : components) {

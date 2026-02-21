@@ -250,7 +250,7 @@ SourceLoc extractNearestSourceLoc(const ClangCategoryLookupDescriptor &desc);
 ///
 /// \li a single \c swift::ExtensionDecl backed by a \c clang::ObjCCategoryDecl
 /// \li a \c swift::ClassDecl backed by a \c clang::ObjCInterfaceDecl, plus
-///     zero or more \c swift::ExtensionDecl s backed by 
+///     zero or more \c swift::ExtensionDecl s backed by
 ///     \c clang::ObjCCategoryDecl s (representing ObjC class extensions).
 /// \li an empty list if the class is not imported from Clang or it does not
 ///     have a category by that name.

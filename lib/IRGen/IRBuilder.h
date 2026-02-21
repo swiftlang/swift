@@ -101,7 +101,7 @@ public:
     ClearedIP = nullptr;
     IRBuilderBase::SetInsertPoint(BB);
   }
-  
+
   void SetInsertPoint(llvm::BasicBlock *BB, llvm::BasicBlock::iterator before) {
     ClearedIP = nullptr;
     IRBuilderBase::SetInsertPoint(BB, before);
@@ -185,7 +185,7 @@ public:
   llvm::LoadInst *CreateLoad(llvm::Value *addr,
                              const llvm::Twine &name = "") = delete;
   llvm::StoreInst *CreateStore(llvm::Value *value, llvm::Value *addr) = delete;
-  
+
   using IRBuilderBase::CreateStructGEP;
   Address CreateStructGEP(Address address, unsigned index, Size offset,
                           const llvm::Twine &name = "") {
@@ -293,13 +293,13 @@ public:
     return CreateMemSet(dest.getAddress(), value, size,
                         llvm::MaybeAlign(dest.getAlignment().getValue()));
   }
-  
+
   using IRBuilderBase::CreateLifetimeStart;
   llvm::CallInst *CreateLifetimeStart(Address buf, Size size) {
     return CreateLifetimeStart(buf.getAddress(),
                    llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
   }
-  
+
   using IRBuilderBase::CreateLifetimeEnd;
   llvm::CallInst *CreateLifetimeEnd(Address buf, Size size) {
     return CreateLifetimeEnd(buf.getAddress(),
@@ -400,7 +400,7 @@ public:
         cast<llvm::FunctionType>(intrinsicFn->getValueType()), intrinsicFn,
         args, name);
   }
-  
+
   /// Create an expect intrinsic call.
   llvm::CallInst *CreateExpect(llvm::Value *value,
                                llvm::Value *expected,

@@ -76,7 +76,7 @@ enum {
     = unsigned(ValueWitness::Last_RequiredValueWitness) + 1,
   NumRequiredValueWitnessFunctions
     = unsigned(ValueWitness::Last_RequiredValueWitnessFunction) + 1,
-  
+
   MaxNumValueWitnesses
     = unsigned(ValueWitness::Last_ValueWitness) + 1,
   MaxNumTypeLayoutWitnesses

@@ -39,7 +39,7 @@ class PruneVTables : public SILModuleTransform {
     }
 
     for (auto &entry : vtable->getMutableEntries()) {
-      
+
       // We don't need to worry about entries that are overridden,
       // or have already been found to have no overrides.
       if (entry.isNonOverridden()) {
@@ -48,12 +48,12 @@ class PruneVTables : public SILModuleTransform {
                    llvm::dbgs() << " is already nonoverridden\n");
         continue;
       }
-      
+
       switch (entry.getKind()) {
       case SILVTable::Entry::Normal:
       case SILVTable::Entry::Inherited:
         break;
-          
+
       case SILVTable::Entry::Override:
         LLVM_DEBUG(llvm::dbgs() << "-- entry for ";
                    entry.getMethod().print(llvm::dbgs());
@@ -86,7 +86,7 @@ class PruneVTables : public SILModuleTransform {
                      llvm::dbgs() << " does not have statically-knowable callees\n");
           continue;
         }
-        
+
         // Does the method have any overrides in this module?
         if (methodDecl->isOverridden()) {
           LLVM_DEBUG(llvm::dbgs() << "-- entry for ";
@@ -103,10 +103,10 @@ class PruneVTables : public SILModuleTransform {
       vtable->updateVTableCache(entry);
     }
   }
-  
+
   void run() override {
     SILModule *M = getModule();
-    
+
     for (auto &vtable : M->getVTables()) {
       runOnVTable(M, vtable);
     }

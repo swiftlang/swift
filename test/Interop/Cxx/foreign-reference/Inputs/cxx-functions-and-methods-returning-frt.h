@@ -335,7 +335,7 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 namespace DefaultOwnershipConventionOnCXXForeignRefType {
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:defRetain2")))
-__attribute__((swift_attr("release:defRelease2"))) 
+__attribute__((swift_attr("release:defRelease2")))
 __attribute__((swift_attr("returned_as_unretained_by_default"))) RefTyDefUnretained {};
 
 RefTyDefUnretained *returnRefTyDefUnretained() {
@@ -377,7 +377,7 @@ RefType *returnRefType() { return new RefType(); } // expected-note {{annotate '
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:dretain")))
-__attribute__((swift_attr("release:drelease"))) 
+__attribute__((swift_attr("release:drelease")))
 __attribute__((swift_attr("returned_as_unretained_by_default"))) RefTyDefUnretained {};
 
 RefTyDefUnretained *returnRefTyDefUnretainedd() { return new RefTyDefUnretained(); }

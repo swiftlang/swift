@@ -36,7 +36,7 @@ struct TypeInfoProvider {
   virtual const reflection::TypeInfo *
   getTypeInfo(llvm::StringRef mangledName) = 0;
 
-  /// A key that can be used to identify the type info provider (for example, 
+  /// A key that can be used to identify the type info provider (for example,
   /// for caching purposes).
   virtual IdType getId() {
     // Default implementation is the instance's ID.

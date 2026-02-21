@@ -1253,7 +1253,7 @@ public:
   /// Update stored dependencies for the given module.
   void updateDependency(ModuleDependencyID moduleID,
                         ModuleDependencyInfo dependencyInfo);
-  
+
   /// Remove a given dependency info from the cache.
   void removeDependency(ModuleDependencyID moduleID);
 

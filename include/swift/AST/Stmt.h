@@ -102,7 +102,7 @@ protected:
     : NumPadBits,
     CaseCount : 32
   );
-    
+
   SWIFT_INLINE_BITFIELD(ReturnStmt, Stmt, 1,
     /// Whether the result is an implied return, e.g for an implicit single
     /// expression return.
@@ -146,10 +146,10 @@ public:
 
   /// Return the location of the start of the statement.
   SourceLoc getStartLoc() const;
-  
+
   /// Return the location of the end of the statement.
   SourceLoc getEndLoc() const;
-  
+
   SourceRange getSourceRange() const;
   SourceLoc TrailingSemiLoc;
 
@@ -323,7 +323,7 @@ public:
     return Result;
   }
   void setResult(Expr *e) { Result = e; }
-  
+
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Return;}
 };
 
@@ -365,7 +365,7 @@ public:
   MutableArrayRef<Expr*> getMutableYields() {
     return getTrailingObjects(static_cast<size_t>(Bits.YieldStmt.NumYields));
   }
-  
+
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Yield; }
 };
 
@@ -420,7 +420,7 @@ public:
 ///
 class DeferStmt : public Stmt {
   SourceLoc DeferLoc;
-  
+
   /// This is the bound temp function.
   FuncDecl *tempDecl;
 
@@ -441,7 +441,7 @@ public:
   static DeferStmt *create(DeclContext *dc, SourceLoc deferLoc);
 
   SourceLoc getDeferLoc() const { return DeferLoc; }
-  
+
   SourceLoc getStartLoc() const { return DeferLoc; }
   SourceLoc getEndLoc() const;
 
@@ -451,7 +451,7 @@ public:
 
   /// Dig the original user's body of the defer out for AST fidelity.
   BraceStmt *getBodyAsWritten() const;
-  
+
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Defer; }
 };
 
@@ -764,11 +764,11 @@ public:
 struct LabeledStmtInfo {
   Identifier Name;
   SourceLoc Loc;
-  
+
   // Evaluates to true if set.
   operator bool() const { return !Name.empty(); }
 };
-  
+
 /// LabeledStmt - Common base class between the labeled statements (loops and
 /// switch).
 class LabeledStmt : public Stmt {
@@ -780,7 +780,7 @@ protected:
 public:
   LabeledStmt(StmtKind Kind, bool Implicit, LabeledStmtInfo LabelInfo)
     : Stmt(Kind, Implicit), LabelInfo(LabelInfo) {}
-  
+
   LabeledStmtInfo getLabelInfo() const { return LabelInfo; }
   void setLabelInfo(LabeledStmtInfo L) { LabelInfo = L; }
 
@@ -811,7 +811,7 @@ public:
 class DoStmt : public LabeledStmt {
   SourceLoc DoLoc;
   BraceStmt *Body;
-  
+
 public:
   DoStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc, BraceStmt *body,
          std::optional<bool> implicit = std::nullopt)
@@ -823,10 +823,10 @@ public:
                                 ArrayRef<ASTNode> body);
 
   SourceLoc getDoLoc() const { return DoLoc; }
-  
+
   SourceLoc getStartLoc() const;
   SourceLoc getEndLoc() const;
-  
+
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *s) { Body = s; }
 
@@ -867,8 +867,8 @@ public:
            S->getKind() <= StmtKind::Last_LabeledConditionalStmt;
   }
 };
-  
-  
+
+
 /// IfStmt - if/then/else statement.  If no 'else' is specified, then the
 /// ElseLoc location is not specified and the Else statement is null. After
 /// type-checking, the condition is of type Builtin.Int1.
@@ -877,7 +877,7 @@ class IfStmt : public LabeledConditionalStmt {
   SourceLoc ElseLoc;
   BraceStmt *Then;
   Stmt *Else;
-  
+
 public:
   IfStmt(LabeledStmtInfo LabelInfo, SourceLoc IfLoc, StmtCondition Cond,
          BraceStmt *Then, SourceLoc ElseLoc, Stmt *Else,
@@ -929,7 +929,7 @@ public:
 class GuardStmt : public LabeledConditionalStmt {
   SourceLoc GuardLoc;
   BraceStmt *Body;
-  
+
 public:
   GuardStmt(SourceLoc GuardLoc, StmtCondition Cond, BraceStmt *Body,
             std::optional<bool> implicit = std::nullopt)
@@ -942,17 +942,17 @@ public:
             std::optional<bool> implicit, ASTContext &Ctx);
 
   SourceLoc getGuardLoc() const { return GuardLoc; }
-  
+
   SourceLoc getStartLoc() const {
     return getLabelLocOrKeywordLoc(GuardLoc);
   }
   SourceLoc getEndLoc() const {
     return Body->getEndLoc();
   }
-  
+
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *s) { Body = s; }
-  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Guard; }
 };
@@ -997,7 +997,7 @@ class RepeatWhileStmt : public LabeledStmt {
   SourceLoc RepeatLoc, WhileLoc;
   Stmt *Body;
   Expr *Cond;
-  
+
 public:
   RepeatWhileStmt(LabeledStmtInfo LabelInfo, SourceLoc RepeatLoc, Expr *Cond,
                   SourceLoc WhileLoc, Stmt *Body,
@@ -1009,13 +1009,13 @@ public:
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(RepeatLoc); }
   SourceLoc getEndLoc() const;
   SourceLoc getRepeatLoc() const { return RepeatLoc; }
-  
+
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
 
   Expr *getCond() const { return Cond; }
   void setCond(Expr *e) { Cond = e; }
-  
+
   static bool classof(const Stmt *S) {return S->getKind() == StmtKind::RepeatWhile;}
 };
 
@@ -1079,12 +1079,12 @@ public:
   SourceLoc getAwaitLoc() const { return AwaitLoc; }
   SourceLoc getTryLoc() const { return TryLoc; }
   SourceLoc getUnsafeLoc() const { return UnsafeLoc; }
-  
+
   /// getPattern - Retrieve the pattern describing the iteration variables.
   /// These variables will only be visible within the body of the loop.
   Pattern *getPattern() const { return Pat; }
   void setPattern(Pattern *p);
-  
+
   Expr *getWhere() const { return WhereExpr; }
   void setWhere(Expr *W) { WhereExpr = W; }
 
@@ -1108,7 +1108,7 @@ public:
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *B) { Body = B; }
-  
+
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(ForLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
 
@@ -1486,7 +1486,7 @@ public:
   SourceLoc getLBraceLoc() const { return LBraceLoc; }
   /// Get the source location of the closing brace.
   SourceLoc getRBraceLoc() const { return RBraceLoc; }
-  
+
   SourceLoc getLoc() const { return SwitchLoc; }
 
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(SwitchLoc); }
@@ -1664,9 +1664,9 @@ public:
 
   /// Retrieve the target statement being jumped to.
   LabeledStmt *getTarget() const;
-  
+
   SourceLoc getLoc() const { return Loc; }
-  
+
   SourceLoc getStartLoc() const { return Loc; }
   SourceLoc getEndLoc() const {
     return (TargetLoc.isValid() ? TargetLoc : Loc);
@@ -1705,7 +1705,7 @@ public:
 class ThrowStmt : public Stmt {
   Expr *SubExpr;
   SourceLoc ThrowLoc;
-  
+
 public:
   explicit ThrowStmt(SourceLoc throwLoc, Expr *subExpr)
   : Stmt(StmtKind::Throw, /*Implicit=*/false),
@@ -1718,10 +1718,10 @@ public:
   SourceRange getSourceRange() const {
     return SourceRange(ThrowLoc, getEndLoc());
   }
-  
+
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
-  
+
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Throw;
   }

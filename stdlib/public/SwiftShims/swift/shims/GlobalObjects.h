@@ -89,7 +89,7 @@ struct _SwiftHashingParameters {
   __swift_uint64_t seed1;
   __swift_bool deterministic;
 };
-  
+
 SWIFT_RUNTIME_STDLIB_API
 struct _SwiftHashingParameters _swift_stdlib_Hashing_parameters;
 

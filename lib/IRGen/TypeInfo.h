@@ -62,10 +62,10 @@ namespace irgen {
 enum class FixedPacking {
   /// It fits at offset zero.
   OffsetZero,
-  
+
   /// It doesn't fit and needs to be side-allocated.
   Allocate,
-  
+
   /// It needs to be checked dynamically.
   Dynamic
 };
@@ -111,7 +111,7 @@ protected:
 
       /// Whether this type is known to be trivially destructible.
       TriviallyDestroyable : 1,
-      
+
       /// Whether this type is known to be bitwise-takable.
       BitwiseTakable : 1,
 
@@ -230,12 +230,12 @@ public:
   IsTriviallyDestroyable_t isTriviallyDestroyable(ResilienceExpansion expansion) const {
     return IsTriviallyDestroyable_t(Bits.TypeInfo.TriviallyDestroyable);
   }
-  
+
   /// Whether this type is known to be copyable.
   IsCopyable_t isCopyable(ResilienceExpansion expansion) const {
     return IsCopyable_t(Bits.TypeInfo.Copyable);
   }
-  
+
   /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
   /// is equivalent to a memcpy, and possibly bitwise-borrowable, i.e.,
   /// a borrowed argument can be passed by value rather than by reference.
@@ -243,13 +243,13 @@ public:
     return IsBitwiseTakable_t(
       Bits.TypeInfo.BitwiseTakable | (Bits.TypeInfo.BitwiseBorrowable << 1));
   }
-  
+
   /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
   /// is equivalent to a memcpy
   bool isBitwiseTakable(ResilienceExpansion expansion) const {
     return Bits.TypeInfo.BitwiseTakable;
   }
-  
+
   /// Whether this type is known to be bitwise-borrowable, i.e.,
   /// a borrowed argument can be passed by value rather than by reference.
   bool isBitwiseBorrowable(ResilienceExpansion expansion) const {
@@ -319,7 +319,7 @@ public:
 
   /// Produce an undefined pointer to an object of this type.
   Address getUndefAddress() const;
-    
+
   /// Return the size and alignment of this type.
   virtual llvm::Value *getSize(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const = 0;
@@ -462,7 +462,7 @@ public:
   /// on the enum tag for value witness operations.
   virtual bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
                                                    unsigned index) const;
-  
+
   /// Get the tag of a single payload enum with a payload of this type (\p T) e.g
   /// Optional<T>.
   virtual llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
@@ -509,26 +509,26 @@ public:
   /// fit or because it is not bit-wise takable. Non bit-wise takable values are
   /// not stored inline by convention.
   FixedPacking getFixedPacking(IRGenModule &IGM) const;
-  
+
   /// Index into an array of objects of this type.
   Address indexArray(IRGenFunction &IGF, Address base, llvm::Value *offset,
                      SILType T) const;
 
-  /// Round up the address value \p base to the alignment of type \p T. 
+  /// Round up the address value \p base to the alignment of type \p T.
   Address roundUpToTypeAlignment(IRGenFunction &IGF, Address base,
                                  SILType T) const;
 
   /// Destroy an array of objects of this type in memory.
   virtual void destroyArray(IRGenFunction &IGF, Address base,
                             llvm::Value *count, SILType T) const;
-  
+
   /// Initialize an array of objects of this type in memory by copying the
   /// values from another array. The arrays must not overlap.
   virtual void initializeArrayWithCopy(IRGenFunction &IGF,
                                        Address dest,
                                        Address src,
                                        llvm::Value *count, SILType T) const;
-  
+
   /// Initialize an array of objects of this type in memory by taking the
   /// values from another array. The array must not overlap.
   virtual void initializeArrayWithTakeNoAlias(IRGenFunction &IGF,
@@ -542,7 +542,7 @@ public:
   virtual void initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
                                        Address dest, Address src,
                                        llvm::Value *count, SILType T) const;
-  
+
   /// Initialize an array of objects of this type in memory by taking the
   /// values from another array. The destination array may overlap the tail of
   /// the source array because the elements are taken as if in back-to-front
@@ -589,7 +589,7 @@ public:
 
   /// Get the native (abi) convention for a parameter value of this type.
   const NativeConventionSchema &nativeParameterValueSchema(IRGenModule &IGM) const;
-  
+
   /// Emit verifier code that compares compile-time constant knowledge of
   /// this kind of type's traits to its runtime manifestation.
   virtual void verify(IRGenTypeVerifierFunction &IGF,

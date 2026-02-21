@@ -1102,7 +1102,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       }
     }
   }
-  
+
   if (!diagnostic)
     return false;
 
@@ -1579,7 +1579,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   auto unwrappedBaseType = baseType->getOptionalObjectType();
   if (!unwrappedBaseType)
     return false;
-  
+
   auto sourceRange = getSourceRange();
 
   auto componentPathElt =
@@ -1620,7 +1620,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
         }
       }
     }
-    
+
     emitDiagnostic(diag::optional_base_not_unwrapped, baseType, Member,
                    unwrappedBaseType);
 
@@ -4376,7 +4376,7 @@ bool MissingMemberFailure::diagnoseAsError() {
 
   if (diagnoseForDynamicCallable())
     return true;
-  
+
   if (diagnoseInLiteralCollectionContext())
     return true;
 
@@ -4526,9 +4526,9 @@ bool MissingMemberFailure::diagnoseAsError() {
           .fixItInsertAfter(range.End, " as AnyObject)");
       return true;
     }
-    
+
     tryTypoCorrection(baseType);
-    
+
     // If locator points to the member found via key path dynamic member lookup,
     // we provide a custom diagnostic and emit typo corrections for the wrapper type too.
     if (getLocator()->isForKeyPathDynamicMemberLookup()) {
@@ -4962,9 +4962,9 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         TypeDC = TypeDC->getParent();
         propertyInitializer = false;
       }
-      
+
       assert(TypeDC->isTypeContext() && "Expected type decl context!");
-      
+
       if (TypeDC->getSelfNominalTypeDecl() == instanceTy->getAnyNominal()) {
         if (propertyInitializer) {
           emitDiagnostic(diag::instance_member_in_initializer, Name);
@@ -5131,7 +5131,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         if (!overloadedFn->getDecls().empty()) {
           // Fetch any declaration to check if the name is '~='
           ValueDecl *decl0 = overloadedFn->getDecls()[0];
-          
+
           if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator) {
             // If the rhs of '~=' is the enum type, a single dot suffixes
             // since the type can be inferred
@@ -5454,15 +5454,15 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
     // fn(argX, argY):
     //   fn(argX, argY[, argMissing])
     if (args->empty()) {
-      if (args->getRParenLoc().isInvalid()) { 
+      if (args->getRParenLoc().isInvalid()) {
         // Extend fix-it if no parenthesis and no args
         insertBuf.insert(insertBuf.begin(), '(');
         insertBuf.insert(insertBuf.end(), ')');
         insertLoc =
           Lexer::getLocForEndOfToken(ctx.SourceMgr, fnExpr->getEndLoc());
-        if (insertLoc.isInvalid()) 
+        if (insertLoc.isInvalid())
           return false;
-      } else 
+      } else
         insertLoc = args->getRParenLoc();
     } else if (position != 0) {
       auto argPos = std::min(args->size(), position) - 1;
@@ -8758,7 +8758,7 @@ void MissingRawValueFailure::fixIt(InFlightDiagnostic &diagnostic) const {
 bool MissingOptionalUnwrapKeyPathFailure::diagnoseAsError() {
   emitDiagnostic(diag::optional_not_unwrapped, getFromType(),
                  getFromType()->lookThroughSingleOptionalType());
-  
+
   emitDiagnostic(diag::optional_keypath_application_base)
       .fixItInsertAfter(getLoc(), "?");
   emitDiagnostic(diag::unwrap_with_force_value)

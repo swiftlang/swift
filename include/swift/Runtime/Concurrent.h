@@ -95,7 +95,7 @@ private:
       return reinterpret_cast<ElemTy *>(&Elem);
     }
   };
-  
+
   size_t Capacity;
   std::atomic<size_t> ReaderCount;
   std::atomic<Storage *> Elements;
@@ -105,31 +105,31 @@ private:
   void incrementReaders() {
     ReaderCount.fetch_add(1, std::memory_order_acquire);
   }
-  
+
   void decrementReaders() {
     ReaderCount.fetch_sub(1, std::memory_order_release);
   }
-  
+
   void deallocateFreeList() {
     ConcurrentFreeListNode::freeAll(&FreeList, [](void *ptr) {
       reinterpret_cast<Storage *>(ptr)->deallocate();
     });
   }
-  
+
 public:
   struct Snapshot {
     ConcurrentReadableArray *Array;
     const ElemTy *Start;
     size_t Count;
-    
+
     Snapshot(ConcurrentReadableArray *array, const ElemTy *start, size_t count)
       : Array(array), Start(start), Count(count) {}
-    
+
     Snapshot(const Snapshot &other)
       : Array(other.Array), Start(other.Start), Count(other.Count) {
       Array->incrementReaders();
     }
-    
+
     ~Snapshot() {
       Array->decrementReaders();
     }
@@ -151,15 +151,15 @@ public:
   ConcurrentReadableArray(const ConcurrentReadableArray &) = delete;
   ConcurrentReadableArray(ConcurrentReadableArray &&) = delete;
   ConcurrentReadableArray &operator=(const ConcurrentReadableArray &) = delete;
-  
+
   ConcurrentReadableArray() : Capacity(0), ReaderCount(0), Elements(nullptr) {}
-  
+
   ~ConcurrentReadableArray() {
     assert(ReaderCount.load(std::memory_order_acquire) == 0 &&
            "deallocating ConcurrentReadableArray with outstanding snapshots");
     deallocateFreeList();
   }
-  
+
   void push_back(const ElemTy &elem) {
     Mutex::ScopedLock guard(WriterLock);
 
@@ -173,16 +173,16 @@ public:
         newStorage->Count.store(count, std::memory_order_release);
         ConcurrentFreeListNode::add(&FreeList, storage);
       }
-      
+
       storage = newStorage;
       Capacity = newCapacity;
 
       Elements.store(storage, std::memory_order_release);
     }
-    
+
     new(&storage->data()[count]) ElemTy(elem);
     storage->Count.store(count + 1, std::memory_order_release);
-    
+
     // The standard says that std::memory_order_seq_cst only applies to
     // read-modify-write operations, so we need an explicit fence:
     std::atomic_thread_fence(std::memory_order_seq_cst);
@@ -196,7 +196,7 @@ public:
     if (storage == nullptr) {
       return Snapshot(this, nullptr, 0);
     }
-    
+
     auto count = storage->Count.load(std::memory_order_acquire);
     const auto *ptr = storage->data();
     return Snapshot(this, ptr, count);
@@ -602,7 +602,7 @@ private:
     auto *elements = Elements.load(std::memory_order_relaxed);
     auto *elementsPtr = elements ? elements->data() : nullptr;
 
-    
+
     auto found = this->find(key, indices, elementCount, elementsPtr);
     if (found.first) {
       call(found.first, false);

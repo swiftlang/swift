@@ -126,7 +126,7 @@ bool TypeBase::isUninhabited() {
 
 bool TypeBase::isStructurallyUninhabited() {
   if (isUninhabited()) return true;
-  
+
   // Tuples of uninhabited types are uninhabited
   if (auto *TTy = getAs<TupleType>())
     for (auto eltTy : TTy->getElementTypes())
@@ -1459,7 +1459,7 @@ Type TypeBase::withCovariantResultType() {
                                     fnType->getParams(), resultFnType,
                                     fnType->getExtInfo());
   }
-  
+
   return FunctionType::get(fnType->getParams(), resultFnType,
                            fnType->getExtInfo());
 }
@@ -1744,7 +1744,7 @@ static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols,
     protocols[i] = nullptr;
     zappedAny = true;
   }
-  
+
   // Walk the inheritance hierarchies of all of the protocols. If we run into
   // one of the known protocols, zap it from the original list.
   for (unsigned i : indices(protocols)) {
@@ -1771,7 +1771,7 @@ static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols,
       }
     }
   }
-  
+
   if (zappedAny) {
     protocols.erase(std::remove(protocols.begin(), protocols.end(), nullptr),
                     protocols.end());
@@ -2333,7 +2333,7 @@ Identifier GenericTypeParamType::getName() const {
   auto cached = names.find(key);
   if (cached != names.end())
     return cached->second;
-  
+
   llvm::SmallString<10> nameBuf;
   llvm::raw_svector_ostream os(nameBuf);
 
@@ -2505,9 +2505,9 @@ class IsBindableVisitor : public TypeVisitor<IsBindableVisitor, CanType, CanType
 public:
   using VisitBindingCallback =
     llvm::function_ref<CanType (ArchetypeType *, CanType)>;
-    
+
   VisitBindingCallback VisitBinding;
-  
+
   IsBindableVisitor(VisitBindingCallback visit) : VisitBinding(visit) {}
 
   CanType visitArchetypeType(ArchetypeType *orig, CanType subst) {
@@ -2526,24 +2526,24 @@ public:
 
       // TODO: If the archetype has a superclass constraint, check that the
       // substitution is a subclass.
-      
+
       // TODO: For private types or protocols, we might be able to definitively
       // deny bindings.
-      
+
       // Otherwise, there may be an external retroactive conformance that
       // allows the binding.
     }
     // Let the binding succeed.
     return VisitBinding(orig, subst);
   }
-  
+
   CanType visitType(TypeBase *orig, CanType subst) {
     if (CanType(orig) == subst)
       return subst;
-    
+
     return CanType();
   }
-  
+
   CanType visitDynamicSelfType(DynamicSelfType *orig, CanType subst) {
     // A "dynamic self" type can be bound to another dynamic self type, or the
     // non-dynamic base class type.
@@ -2554,13 +2554,13 @@ public:
       }
       return CanType();
     }
-    
+
     if (auto newNonDynBase = visit(orig->getSelfType(), subst)) {
       return newNonDynBase;
     }
     return CanType();
   }
-  
+
   /// Handle a nominal type with generic parameters anywhere in its context.
   /// \c origType and \c substType must already have been established to be
   /// instantiations of the same \c NominalTypeDecl.
@@ -2569,41 +2569,41 @@ public:
                                    CanType substType) {
     assert(origType->getAnyNominal() == decl
            && substType->getAnyNominal() == decl);
-    
+
     LLVM_DEBUG(llvm::dbgs() << "\n---\nTesting bindability of:\n";
                origType->print(llvm::dbgs());
                llvm::dbgs() << "\nto subst type:\n";
                substType->print(llvm::dbgs()););
-    
+
     auto origSubMap = origType->getContextSubstitutionMap(
         decl, decl->getGenericEnvironment());
     auto substSubMap = substType->getContextSubstitutionMap(
         decl, decl->getGenericEnvironment());
 
     auto genericSig = decl->getGenericSignature();
-    
+
     SmallVector<Type, 4> newParams;
     llvm::DenseMap<SubstitutableType *, Type> newParamsMap;
     bool didChange = false;
-    
+
     LLVM_DEBUG(llvm::dbgs() << "\nNominal type generic signature:\n";
                genericSig.print(llvm::dbgs()));
-    
+
     for (auto gpTy : genericSig.getGenericParams()) {
       auto gp = gpTy->getCanonicalType();
-      
+
       auto orig = gp.subst(origSubMap)->getCanonicalType();
       auto subst = gp.subst(substSubMap)->getCanonicalType();
-      
+
       auto newParam = visit(orig, subst);
       if (!newParam)
         return CanType();
-      
+
       newParams.push_back(newParam);
       newParamsMap.insert({gp->castTo<GenericTypeParamType>(), newParam});
       didChange |= (newParam != subst);
     }
-    
+
     SmallVector<ProtocolConformanceRef, 4> newConformances;
 
     // Collect conformances for the new substitutions, and verify that they don't
@@ -2612,7 +2612,7 @@ public:
       if (req.getKind() != RequirementKind::Conformance) continue;
 
       auto canTy = req.getFirstType()->getCanonicalType();
-      
+
       // Verify the generic requirements, if the subst type is bound to
       // concrete type.
       auto *proto = req.getProtocolDecl();
@@ -2628,13 +2628,13 @@ public:
             return CanType();
         }
       }
-      
+
       // Gather the conformances for the new binding type, if the type changed.
       if (didChange) {
         auto newSubstTy = req.getFirstType().subst(
           QueryTypeSubstitutionMap{newParamsMap},
           LookUpConformanceInModule());
-        
+
         auto newConformance
           = lookupConformance(newSubstTy, proto, /*allowMissing=*/true);
         if (!newConformance)
@@ -2645,7 +2645,7 @@ public:
 
     if (!didChange)
       return substType;
-    
+
     // Build the new substituted generic type.
     auto newSubMap = SubstitutionMap::get(genericSig,
                                           newParams,
@@ -2653,13 +2653,13 @@ public:
     return decl->getDeclaredInterfaceType().subst(newSubMap)
                ->getCanonicalType();
   }
-  
+
   CanType visitNominalType(NominalType *nom, CanType subst) {
     if (auto substNom = dyn_cast<NominalType>(subst)) {
       auto nomDecl = nom->getDecl();
       if (nom->getDecl() != substNom->getDecl())
         return CanType();
-      
+
       // If the type is generic (because it's a nested type in a generic context),
       // process the generic type bindings.
       if (!isa<ProtocolDecl>(nomDecl) && nomDecl->isGenericContext()) {
@@ -2670,27 +2670,27 @@ public:
     }
     return CanType();
   }
-  
+
   CanType visitAnyMetatypeType(AnyMetatypeType *meta, CanType subst) {
     if (auto substMeta = dyn_cast<AnyMetatypeType>(subst)) {
       if (substMeta->getKind() != meta->getKind())
         return CanType();
-      
+
       auto substInstance = visit(meta->getInstanceType()->getCanonicalType(),
                                substMeta->getInstanceType()->getCanonicalType());
       if (!substInstance)
         return CanType();
-      
+
       if (substInstance == substMeta.getInstanceType())
         return subst;
-      
+
       return isa<ExistentialMetatypeType>(substMeta)
         ? CanType(CanExistentialMetatypeType::get(substInstance))
         : CanType(CanMetatypeType::get(substInstance));
     }
     return CanType();
   }
-  
+
   CanType visitTupleType(TupleType *tuple, CanType subst) {
     if (auto substTuple = dyn_cast<TupleType>(subst)) {
       // Tuple elements must match.
@@ -2718,19 +2718,19 @@ public:
     }
     return CanType();
   }
-  
+
   CanType visitDependentMemberType(DependentMemberType *dt, CanType subst) {
     return subst;
   }
   CanType visitGenericTypeParamType(GenericTypeParamType *dt, CanType subst) {
     return subst;
   }
-  
+
   CanType visitFunctionType(FunctionType *func, CanType subst) {
     if (auto substFunc = dyn_cast<FunctionType>(subst)) {
       if (!func->hasSameExtInfoAs(substFunc))
         return CanType();
-      
+
       if (func->getParams().size() != substFunc->getParams().size())
         return CanType();
 
@@ -2741,16 +2741,16 @@ public:
         auto substParam = substFunc.getParams()[i];
         if (param.getParameterFlags() != substParam.getParameterFlags())
           return CanType();
-        
+
         auto newParamTy =
           visit(param.getPlainType(), substParam.getPlainType());
         if (!newParamTy)
           return CanType();
-        
+
         newParams.push_back(substParam.withType(newParamTy));
         didChange = didChange | (newParamTy != substParam.getPlainType());
       }
-      
+
       auto newReturn = visit(func->getResult()->getCanonicalType(),
                              substFunc->getResult()->getCanonicalType());
       if (!newReturn)
@@ -2762,7 +2762,7 @@ public:
     }
     return CanType();
   }
-  
+
   CanType visitSILFunctionType(SILFunctionType *func, CanType subst) {
     if (auto substFunc = dyn_cast<SILFunctionType>(subst)) {
       if (!func->hasSameExtInfoAs(substFunc))
@@ -2804,48 +2804,48 @@ public:
         if (func->getPatternGenericSignature()
               != substFunc->getPatternGenericSignature())
           return CanType();
-        
+
         auto sig = func->getPatternGenericSignature();
-        
+
         auto origSubs = func->getPatternSubstitutions();
         auto substSubs = substFunc->getPatternSubstitutions();
-        
+
         for (unsigned i : indices(origSubs.getReplacementTypes())) {
           auto origType =
             origSubs.getReplacementTypes()[i]->getReducedType(sig);
           auto substType =
             substSubs.getReplacementTypes()[i]->getReducedType(sig);
-          
+
           auto newType = visit(origType, substType);
-          
+
           if (!newType)
             return CanType();
-          
+
           // We can test SILFunctionTypes for bindability, but we can't
           // transform them.
           assert(newType == substType
                  && "cannot transform SILFunctionTypes");
         }
-        
+
         return subst;
       }
-      
+
       if (func->getParameters().size() != substFunc->getParameters().size())
         return CanType();
       if (func->getResults().size() != substFunc->getResults().size())
         return CanType();
-      
+
       for (unsigned i : indices(func->getParameters())) {
         if (func->getParameters()[i].getConvention()
               != substFunc->getParameters()[i].getConvention())
           return CanType();
-        
+
         auto origParam = func->getParameters()[i].getInterfaceType();
         auto substParam = substFunc->getParameters()[i].getInterfaceType();
         auto newParam = visit(origParam, substParam);
         if (!newParam)
           return CanType();
-        
+
         // We can test SILFunctionTypes for bindability, but we can't
         // transform them.
         assert(newParam == substParam
@@ -2868,18 +2868,18 @@ public:
         assert(newResult == substResult
                && "cannot transform SILFunctionTypes");
       }
-      
+
       return subst;
     }
-    
+
     return CanType();
   }
-  
+
   CanType visitBoundGenericType(BoundGenericType *bgt, CanType subst) {
     auto substBGT = dyn_cast<BoundGenericType>(subst);
     if (!substBGT)
       return CanType();
-    
+
     if (bgt->getDecl() != substBGT->getDecl())
       return CanType();
 
@@ -2901,7 +2901,7 @@ bool TypeBase::isBindableTo(Type ty) {
   // different types to the same type parameter, e.g.
   // `Foo<T,T>`.isBindableTo(`Foo<Int, String>`).
   llvm::DenseMap<ArchetypeType *, CanType> Bindings;
-  
+
   return !substituteBindingsTo(ty,
     [&](ArchetypeType *archetype, CanType binding) -> CanType {
       // If we already bound this archetype, make sure the new binding candidate
@@ -2922,7 +2922,7 @@ bool TypeBase::isBindableToSuperclassOf(Type ty) {
   // Do an exact match if no archetypes are involved.
   if (!hasArchetype())
     return isExactSuperclassOf(ty);
-  
+
   // For there to be a superclass relationship,
   // the potential subtype must be a class or superclass-bounded archetype.
   if (!ty->mayHaveSuperclass())
@@ -3107,7 +3107,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
                                    ProtocolConformance *> {
     return { ForeignRepresentableKind::None, nullptr };
   };
-  
+
   // If type has an error let's fail early.
   if (type->hasError())
     return failure();
@@ -3228,7 +3228,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     // Note: works around a broken Unmanaged<> definition.
     if (!boundGenericType || boundGenericType->getGenericArgs().size() != 1)
       return failure();
-    
+
     auto typeArgument = boundGenericType->getGenericArgs()[0];
     if (typeArgument->isTriviallyRepresentableIn(language, dc))
       return { ForeignRepresentableKind::Trivial, nullptr };
@@ -3334,7 +3334,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
   if (wasOptional && !result.isRepresentableAsOptional())
     return failure();
-  
+
   // If our nominal type has type arguments, make sure they are
   // representable as well. Because type arguments are not actually
   // translated separately, whether they are trivially representable
@@ -3370,16 +3370,16 @@ getForeignRepresentable(Type type, ForeignLanguage language,
               break;
           }
         }
-        
+
         return failure();
-        
+
       case ForeignRepresentableKind::Object:
       case ForeignRepresentableKind::Bridged:
       case ForeignRepresentableKind::BridgedError:
         break;
       }
     }
-    
+
     // Specialize the conformance we were given for the type we're testing.
     if (result.getKind() == ForeignRepresentableKind::Bridged
         && !result.getConformance()->getType()->isEqual(type)) {
@@ -4538,7 +4538,7 @@ TypeTraitResult TypeBase::canBeClass() {
     return TypeTraitResult::CanBe;
   if (isa<DependentMemberType>(self))
     return TypeTraitResult::CanBe;
-  
+
   return TypeTraitResult::IsNot;
 }
 
@@ -5360,18 +5360,18 @@ TypeBase::getMatchingParamKind() {
   if (auto gtpt = dyn_cast<GenericTypeParamType>(this)) {
     return gtpt->getParamKind();
   }
-  
+
   if (auto arch = dyn_cast<ArchetypeType>(this)) {
     return arch->mapTypeOutOfEnvironment()->getMatchingParamKind();
   }
-  
+
   if (isa<IntegerType>(this)) {
     return GenericTypeParamKind::Value;
   }
-  
+
   if (isa<PackType>(this)) {
     return GenericTypeParamKind::Pack;
   }
-  
+
   return GenericTypeParamKind::Type;
 }

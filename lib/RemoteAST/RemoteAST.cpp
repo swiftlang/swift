@@ -621,7 +621,7 @@ public:
     }
     llvm_unreachable("invalid type kind");
   }
-  
+
   Result<Type>
   getUnderlyingTypeForOpaqueType(remote::RemoteAddress opaqueDescriptor,
                                  SubstitutionMap substitutions,
@@ -633,7 +633,7 @@ public:
 
     if (!underlyingType)
       return getFailure<Type>();
-    
+
     return underlyingType.subst(substitutions);
   }
 };

@@ -1261,7 +1261,7 @@ public:
   using value_type = Operand*;
   using difference_type = std::ptrdiff_t;
   using pointer = value_type*;
-  using reference = value_type&;    
+  using reference = value_type&;
 
   ValueBaseUseIterator() = default;
   explicit ValueBaseUseIterator(Operand *cur) : Cur(cur) {}

@@ -364,7 +364,7 @@ struct ASTContext::Implementation {
 
   /// The declaration of Optional<T>.TangentVector.value
   VarDecl *OptionalTanValueDecl = nullptr;
-  
+
   /// The declaration of Swift.Void.
   TypeAliasDecl *VoidDecl = nullptr;
 
@@ -376,10 +376,10 @@ struct ASTContext::Implementation {
 
   /// The declaration of Swift.UnsafeMutablePointer<T>.memory.
   VarDecl *UnsafeMutablePointerMemoryDecl = nullptr;
-  
+
   /// The declaration of Swift.UnsafePointer<T>.memory.
   VarDecl *UnsafePointerMemoryDecl = nullptr;
-  
+
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.memory.
   VarDecl *AutoreleasingUnsafeMutablePointerMemoryDecl = nullptr;
 
@@ -396,10 +396,10 @@ struct ASTContext::Implementation {
   // Declare cached declarations for each of the known declarations.
 #define KNOWN_SDK_FUNC_DECL(Module, Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownSDKDecls.def"
-  
+
   /// func <Int, Int) -> Bool
   FuncDecl *LessThanIntDecl = nullptr;
-  
+
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
@@ -722,7 +722,7 @@ struct ASTContext::Implementation {
     }
     llvm_unreachable("bad AllocationArena");
   }
-  
+
   llvm::FoldingSet<SILLayout> SILLayouts;
 
   llvm::DenseMap<OverrideSignatureKey, GenericSignature> overrideSigCache;
@@ -2829,7 +2829,7 @@ bool ASTContext::canImportModuleImpl(
     // If this module has already been successfully imported, it is importable.
     if (getLoadedModule(ModuleName) != nullptr)
       return true;
-    
+
     if (!isSourceCanImport)
       return lookupModule();
 
@@ -3262,7 +3262,7 @@ bool ASTContext::hasDelayedConformanceErrors(
 
     return false; // unknown conformance, so no delayed diags either.
   }
-  
+
   // check all conformances for any delayed errors
   for (const auto &entry : getImpl().DelayedConformanceDiags) {
     auto const& diagnostics = entry.getSecond();
@@ -3404,12 +3404,12 @@ size_t ASTContext::getTotalMemory() const {
 
 size_t ASTContext::getSolverMemory() const {
   size_t Size = 0;
-  
+
   if (getImpl().CurrentConstraintSolverArena) {
     Size += getImpl().CurrentConstraintSolverArena->getTotalMemory();
     Size += getImpl().CurrentConstraintSolverArena->Allocator.getBytesAllocated();
   }
-  
+
   return Size;
 }
 
@@ -3843,7 +3843,7 @@ BuiltinUnboundGenericType::get(TypeKind genericTypeKind,
                                const ASTContext &C) {
   BuiltinUnboundGenericType *&Result
     = C.getImpl().BuiltinUnboundGenericTypes[unsigned(genericTypeKind)];
-  
+
   if (Result == nullptr) {
     Result = new (C, AllocationArena::Permanent)
       BuiltinUnboundGenericType(C, genericTypeKind);
@@ -4186,7 +4186,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
                                                bool wantDynamicSelf) {
   auto *dc = AFD->getDeclContext();
   auto &Ctx = dc->getASTContext();
-  
+
   // Determine the type of the container.
   auto containerTy = dc->getDeclaredInterfaceType();
   if (!containerTy || containerTy->hasError())
@@ -4297,7 +4297,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // The default flagless state.
     break;
   }
-  
+
   if (AFD->getAttrs().hasAttribute<AddressableSelfAttr>()) {
     flags = flags.withAddressable(true);
   }
@@ -4754,7 +4754,7 @@ ModuleType *ModuleType::get(ModuleDecl *M) {
 DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
   assert(selfType->isMaterializable()
          && "non-materializable dynamic self?");
-  
+
   auto properties = selfType->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -5435,13 +5435,13 @@ SILFunctionType::SILFunctionType(
   // Make sure the type follows invariants.
   assert((!invocationSubs || genericSig)
          && "can only have substitutions with a generic signature");
-        
+
   if (invocationSubs) {
     assert(invocationSubs.getGenericSignature().getCanonicalSignature() ==
                genericSig.getCanonicalSignature() &&
            "substitutions must match generic signature");
   }
-        
+
   if (genericSig) {
     assert(!genericSig->areAllParamsConcrete() &&
            "If all generic parameters are concrete, SILFunctionType should "
@@ -5555,10 +5555,10 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
   auto found = ctx.getImpl().SILBlockStorageTypes.find(captureType);
   if (found != ctx.getImpl().SILBlockStorageTypes.end())
     return CanSILBlockStorageType(found->second);
-  
+
   void *mem = ctx.Allocate(sizeof(SILBlockStorageType),
                            alignof(SILBlockStorageType));
-  
+
   SILBlockStorageType *storageTy = new (mem) SILBlockStorageType(captureType);
   ctx.getImpl().SILBlockStorageTypes.insert({captureType, storageTy});
   return CanSILBlockStorageType(storageTy);
@@ -5596,7 +5596,7 @@ CanSILFunctionType SILFunctionType::get(
   // with generic parameters)
   if (isThinRepresentation(ext.getRepresentation()))
     ext = ext.intoBuilder().withNoEscape(false);
-  
+
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,
                            yields, normalResults, errorResult,
@@ -5636,7 +5636,7 @@ CanSILFunctionType SILFunctionType::get(
     properties |= result.getInterfaceType()->getRecursiveProperties();
   if (errorResult)
     properties |= errorResult->getInterfaceType()->getRecursiveProperties();
-  
+
   // FIXME: If we ever have first-class polymorphic values, we'll need to
   // revisit this.
   if (genericSig || patternSubs) {
@@ -5698,7 +5698,7 @@ VariadicSequenceType *VariadicSequenceType::get(Type base) {
 }
 
 DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
-  auto properties = keyType->getRecursiveProperties() 
+  auto properties = keyType->getRecursiveProperties()
                   | valueType->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -5708,7 +5708,7 @@ DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
     = C.getImpl().getArena(arena).DictionaryTypes[{keyType, valueType}];
   if (entry) return entry;
 
-  return entry = new (C, arena) DictionaryType(C, keyType, valueType, 
+  return entry = new (C, arena) DictionaryType(C, keyType, valueType,
                                                properties);
 }
 
@@ -6346,7 +6346,7 @@ void DeclName::initialize(ASTContext &C, DeclBaseName baseName,
 DeclName::DeclName(ASTContext &C, DeclBaseName baseName,
                    ParameterList *paramList) {
   SmallVector<Identifier, 4> names;
-  
+
   for (auto P : *paramList)
     names.push_back(P->getArgumentName());
   initialize(C, baseName, names);
@@ -6386,7 +6386,7 @@ void DeclNameRef::initialize(ASTContext &C, Identifier moduleSelector,
 }
 
 /// Find the implementation of the named type in the given module.
-static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx, 
+static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx,
                                                    Identifier name,
                                                    ModuleDecl *module) {
   // Find all of the declarations with this name in the Swift module.
@@ -6510,7 +6510,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
           addTrivial(getIdentifier(name), simd);                        \
         }                                                               \
       }
-#include "swift/ClangImporter/SIMDMappedTypes.def"      
+#include "swift/ClangImporter/SIMDMappedTypes.def"
     }
   }
 
@@ -6587,12 +6587,12 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     // If we didn't find anything, mark the result as "None".
     if (!result)
       result = ForeignRepresentationInfo::forNone(CurrentGeneration);
-    
+
     // Cache the result.
     known = getImpl().ForeignRepresentableCache.insert({ nominal, *result }).first;
   }
 
-  // Map a cache entry to a result for this specific 
+  // Map a cache entry to a result for this specific
   auto entry = known->second;
   if (entry.getKind() == ForeignRepresentableKind::None)
     return entry;
@@ -6671,14 +6671,14 @@ bool ASTContext::isObjCClassWithMultipleSwiftBridgedTypes(Type t) {
   auto clazz = t->getClassOrBoundGenericClass();
   if (!clazz)
     return false;
-  
+
   if (clazz == getNSErrorDecl())
     return true;
   if (clazz == getNSNumberDecl())
     return true;
   if (clazz == getNSValueDecl())
     return true;
-  
+
   return false;
 }
 
@@ -6909,7 +6909,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
   return elementSig;
 }
 
-GenericSignature 
+GenericSignature
 ASTContext::getOverrideGenericSignature(const ValueDecl *base,
                                         const ValueDecl *derived) {
   assert(isa<AbstractFunctionDecl>(base) || isa<SubscriptDecl>(base));
@@ -7043,22 +7043,22 @@ SILLayout *SILLayout::get(ASTContext &C,
   if (!Generics || Generics->areAllParamsConcrete()) {
     CapturesGenericEnvironment = false;
   }
-  
+
   // Profile the layout parameters.
   llvm::FoldingSetNodeID id;
   Profile(id, Generics, Fields, CapturesGenericEnvironment);
-  
+
   // Return an existing layout if there is one.
   void *insertPos;
   auto &Layouts = C.getImpl().SILLayouts;
-  
+
   if (auto existing = Layouts.FindNodeOrInsertPos(id, insertPos))
     return existing;
-  
+
   // Allocate a new layout.
   void *memory = C.Allocate(totalSizeToAlloc<SILField>(Fields.size()),
                             alignof(SILLayout));
-  
+
   auto newLayout = ::new (memory) SILLayout(Generics, Fields,
                                             CapturesGenericEnvironment);
   Layouts.InsertNode(newLayout, insertPos);

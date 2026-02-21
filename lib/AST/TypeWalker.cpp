@@ -46,7 +46,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     for (const auto &arg : ty->getDirectGenericArgs())
       if (doIt(arg))
         return true;
-    
+
     return false;
 
   }
@@ -104,7 +104,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitModuleType(ModuleType *ty) { return false; }
-  bool visitDynamicSelfType(DynamicSelfType *ty) { 
+  bool visitDynamicSelfType(DynamicSelfType *ty) {
     return doIt(ty->getSelfType());
   }
   bool visitSubstitutableType(SubstitutableType *ty) { return false; }
@@ -175,7 +175,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
       return false;
     }
-    
+
     for (auto param : ty->getParameters())
       if (doIt(param.getInterfaceType()))
         return true;
@@ -284,7 +284,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitTypeVariableType(TypeVariableType *ty) { return false; }
-  
+
   bool visitErrorUnionType(ErrorUnionType *ty) {
     for (auto term : ty->getTerms())
       if (doIt(term))
@@ -316,7 +316,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     }
     return false;
   }
-  
+
 public:
   explicit Traversal(TypeWalker &walker) : Walker(walker) {}
 

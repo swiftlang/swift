@@ -34,11 +34,11 @@ public:
     /// the Error? parameter that makes this async function also
     /// throwing.
     unsigned CompletionHandlerErrorParamIndexPlusOneOrZero;
-    
+
     /// When non-zero, indicates that the presence of an error is determined by
     /// an integral argument to the completion handler being zero or nonzero.
     unsigned CompletionHandlerFlagParamIndexPlusOneWithPolarityOrZero;
-    
+
   public:
     Info()
       : CompletionHandlerParamIndex(0),
@@ -65,7 +65,7 @@ public:
     unsigned completionHandlerParamIndex() const {
       return CompletionHandlerParamIndex;
     }
-    
+
     /// Retrieve the index of the \c Error? parameter in the completion handler's
     /// parameter list.
     ///

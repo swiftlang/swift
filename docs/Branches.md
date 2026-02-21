@@ -59,11 +59,11 @@ You can use any of the branch names as the argument to `--scheme`, such as `main
 - LLVM Project: the destination branch depends on the kind of change that must be made:
 
   1) LLVM Project changes that don't depend on Swift
-  
+
      - New commits go to `main` in the upstream [llvm-project](https://github.com/llvm/llvm-project).
 
      - Then cherry-pick these commits to an appropriate, `swift/main` aligned `apple/stable/*` branch in Apple's fork of [llvm-project](https://github.com/apple/llvm-project). Please see [Apple's branching scheme](https://github.com/apple/llvm-project/blob/apple/main/apple-docs/AppleBranchingScheme.md) document to determine which `apple/stable/*` branch you should cherry-pick to.
-  
+
      Note that **no new changes should be submitted directly to `apple/main`**. We are actively working on eliminating the differences from upstream LLVM.
 
   2) Changes that depend on Swift (this only applies to LLDB)

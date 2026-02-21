@@ -60,7 +60,7 @@ void swift::simple_display(llvm::raw_ostream &out,
   }
 }
 
-PolymorphicEffectRequirementList 
+PolymorphicEffectRequirementList
 ProtocolDecl::getPolymorphicEffectRequirements(EffectKind kind) const {
   return evaluateOrDefault(getASTContext().evaluator,
     PolymorphicEffectRequirementsRequest{kind, const_cast<ProtocolDecl *>(this)},

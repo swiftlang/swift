@@ -320,7 +320,7 @@ ValidationInfo validateSerializedAST(
 ///   (\ref validateSerializedAST). Note that loadInfo.Status must not be
 ///   Status::Valid.
 /// - \p moduleBufferID and \p moduleDocBufferID are the buffer identifiers
-///   of the module input and doc input buffers respectively (\ref 
+///   of the module input and doc input buffers respectively (\ref
 ///   SerializedModuleLoaderBase::loadAST, \ref ModuleFile::load).
 /// - \p loadedModuleFile is an invalid loaded module.
 /// - \p ModuleName is the name used to refer to the module in diagnostics.

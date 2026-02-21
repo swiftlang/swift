@@ -8,7 +8,7 @@ This document is intended to discuss current issues in and possible future expan
 # Open Issues
 
 
-## Recompiling changes a protocol's implementation		
+## Recompiling changes a protocol's implementation
 
 ```swift
 // Library, version 1
@@ -187,7 +187,7 @@ Related to the concept of a resilience domain is a _deployment._ While a resilie
 
 The use of deployments allows clients to only have to think about aggregate dependencies, instead of listing every library they might depend on. It also allows library authors to build [many versions of a library][Foundation version numbers] within a larger release cycle, as well as allowing a vendor to bundle together many libraries with uncoordinated release schedules and release them as a logical unit.
 
-[Foundation version numbers]:  https://developer.apple.com/library/ios/documentation/Cocoa/Reference/Foundation/Miscellaneous/Foundation_Constants/index.html#//apple_ref/doc/constant_group/Foundation_Framework_Version_Numbers		
+[Foundation version numbers]:  https://developer.apple.com/library/ios/documentation/Cocoa/Reference/Foundation/Miscellaneous/Foundation_Constants/index.html#//apple_ref/doc/constant_group/Foundation_Framework_Version_Numbers
 
 There are lots of details to figure out here, including how to distribute this information. In particular, just like libraries publish the history of their own APIs, a deployment must publish the history of their included library versions, i.e. not just that OS X 10.10 contains Foundation 1151.16 and AppKit 1343, but also that OS X 10.9 contains Foundation 1056 and AppKit 1265, and that OS X 10.8 contains Foundation 945.0 and AppKit 1187, and so on, back to the earliest version of the deployment that is supported.
 

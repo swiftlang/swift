@@ -19,7 +19,7 @@ namespace swift {
 
 class ASTContext;
 class ModuleDecl;
-  
+
 /// Imports serialized Swift modules into an ASTContext.
 class SourceLoader : public ModuleLoader {
 private:

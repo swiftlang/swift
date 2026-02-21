@@ -364,7 +364,7 @@ The differentiation transform is triggered by:
 //   sil_differentiability_witness hidden [parameters 0] [results 0]
 //       @$s12diff_witness3fooyS2fF : $@convention(thin) (Float) -> Float {
 //   }
-// 
+//
 // The differentiation transform generates derivative functions to fill in the
 // attribute:
 //
@@ -467,7 +467,7 @@ bb0(%x):
 
 In the Swift compiler, we have a class called [`JVPCloner`](../include/swift/SILOptimizer/Differentiation/JVPCloner.h) which subclasses [`TypeSubstCloner`](../include/swift/SIL/TypeSubstCloner.h). This uses the [visitor pattern](https://en.wikipedia.org/wiki/Visitor_pattern) to visit the original function and generate the JVP function. Taking a look at the `JVPCloner` class, there are methods like `visitApplyInst`, `visitStructExtractInst`, etc. Each of these methods visit an instruction that is important in the generation of the JVP and differential, and emits a newly mapped version. We handle each type of instruction differently, explained below.
 
-One important note is that in the JVP, we visit every single instruction in the original function - sometimes it’s an exact copy, and other times there is some special logic we wrote to handle it differently (e.g. like control-flow discussed below). This is so that the JVP function behaves just like the original function. With this, if the original function has a print statement, the JVP will as well. However, when we consider the differential, we will only transform SIL instructions from the original that we deem to be fit (so no print statement in the differential!). These instructions are those that should be differentiated, which uses the activity analysis calculated earlier to determine which SIL instructions are important in computing the tangent values of a function. 
+One important note is that in the JVP, we visit every single instruction in the original function - sometimes it’s an exact copy, and other times there is some special logic we wrote to handle it differently (e.g. like control-flow discussed below). This is so that the JVP function behaves just like the original function. With this, if the original function has a print statement, the JVP will as well. However, when we consider the differential, we will only transform SIL instructions from the original that we deem to be fit (so no print statement in the differential!). These instructions are those that should be differentiated, which uses the activity analysis calculated earlier to determine which SIL instructions are important in computing the tangent values of a function.
 
 In Swift code, the generated differential function can be written as a closure, capturing the "callee differentials" from the JVP. But in SIL, all functions are top-level; closures are represented as top-level functions with captured values as an explicit argument. This requires a differential struct which will be discussed in the next section. What’s important here is that the `JVPCloner` emits code both in a top level JVP function, but also a corresponding top level differential function.
 
@@ -601,14 +601,14 @@ func m(_ x: Float) -> Float {
 
 bb0(args...):
   // ...
-  // %diff_func is the differential of `f` gotten from a JVP call earlier in the 
+  // %diff_func is the differential of `f` gotten from a JVP call earlier in the
   // basic block code.
   // %condition is the `cond_br` condition calculated earlier.
   %bb0_struct = alloc_stack $StructBB0
   %bb0_diff_field = struct_element_addr %bb0_struct.diff_f
   store %diff_func to %bb0_diff_field // store diff func.
   %bb0_payload_ptr = address_to_pointer %bb0_struct
-  cond_br %condition, bb0_bb1_tramp(args..., %bb0_payload_ptr), 
+  cond_br %condition, bb0_bb1_tramp(args..., %bb0_payload_ptr),
                       bb0_bb2_tramp(args..., %bb0_payload_ptr)
 
 bb0_bb1_trampbb1(args..., %bb0_payload_ptr):
@@ -635,7 +635,7 @@ bb0_bb2_tramp(args..., %bb0_struct):
 
 bb1(args..., %bb1_payload_ptr):
   // ...
-  // %diff_func_ is the differential of `g` gotten from a JVP call earlier in the 
+  // %diff_func_ is the differential of `g` gotten from a JVP call earlier in the
   // basic block code.
   %bb1_diff_field = struct_element_addr %bb1_payload_ptr.diff_g
   store %diff_func to %bb1_diff_field : $*(Float) -> Float // store diff func.
@@ -655,7 +655,7 @@ bb1_bb3_trampbb1(args..., %bb1_payload_ptr):
 
 bb2(args..., %bb2_payload_ptr):
   // ...
-  // %diff_func_h is the differential of `h` gotten from a JVP call earlier in the 
+  // %diff_func_h is the differential of `h` gotten from a JVP call earlier in the
   // basic block code.
   %bb2_diff_field = struct_element_addr %bb2_payload_ptr.diff_h
   store %diff_func_h to %bb2_diff_field // store diff func.
@@ -674,7 +674,7 @@ bb2_bb3_tramp(args..., %bb0_struct, %bb2_payload_ptr):
   br bb3(args..., %bb3_payload_ptr)
 
 bb3(args..., %bb3_payload_ptr):
-  // %diff_func_j is the differential of `j` gotten from a JVP call earlier in the 
+  // %diff_func_j is the differential of `j` gotten from a JVP call earlier in the
   // basic block code.
   %bb3_diff_field = struct_element_addr %bb3_payload_ptr.diff_j
   store %diff_func_j to %bb3_diff_field // store diff func.
@@ -792,7 +792,7 @@ Multiple basic blocks and control flow basic block terminators (`cond_br`, `swit
 Many of these instructions have well-defined corresponding tangent instructions (for the differential) and adjoint instructions (for the pullback). It turns out that supporting transformations of a few common instructions is sufficient for many use cases. Here is a short table listing some of these instruction transformation rules:
 
 | Original | Tangent (differential) | Adjoint (pullback)
-| -------- | ---------------------- | ------------------ 
+| -------- | ---------------------- | ------------------
 | `y = load x` | `tan[y] = load tan[x]` | `adj[x] += adj[y]` [(code)](https://github.com/swiftlang/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5346)
 | `store x to y` | `store tan[x] to tan[y]` | `adj[x] += load adj[y]; adj[y] = 0` [(code)](https://github.com/swiftlang/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5365)
 | `copy_addr x to y` | `copy_addr tan[x] to tan[y]` | `adj[x] += adj[y]; adj[y] = 0` [(code)](https://github.com/swiftlang/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5382)

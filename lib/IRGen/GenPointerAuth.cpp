@@ -510,12 +510,12 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
       cache = ::getTypeDiscriminator(IGM, fnType);
       return cache;
     }
-    
+
     // C function pointers are undiscriminated.
     case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::CFunctionPointer:
       return llvm::ConstantInt::get(IGM.Int64Ty, 0);
-      
+
     case SILFunctionTypeRepresentation::ObjCMethod:
     case SILFunctionTypeRepresentation::Block: {
       llvm_unreachable("not type discriminated");

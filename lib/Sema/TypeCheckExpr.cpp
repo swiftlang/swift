@@ -121,7 +121,7 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E,
     return loc.isValid() ? groups.getSingleOrDiagnose(loc, /*forBuiltin*/ true)
                          : groups.getSingle();
   };
-  
+
   auto &Context = DC->getASTContext();
   if (auto *ternary = dyn_cast<TernaryExpr>(E)) {
     // Ternary has fixed precedence.
@@ -301,12 +301,12 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
     assign->setSrc(RHS);
     return assign;
   }
-  
+
   if (auto *as = dyn_cast<ExplicitCastExpr>(Op)) {
     // Resolve the 'as' or 'is' expression.
     ASSERT(!as->isFolded() && "already folded 'as' expr in sequence?!");
     assert(RHS == as && "'as' with non-type RHS?!");
-    as->setSubExpr(LHS);    
+    as->setSubExpr(LHS);
     return as;
   }
 
@@ -317,7 +317,7 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
     arrow->setResultExpr(RHS);
     return arrow;
   }
-  
+
   // Build the operation.
   return BinaryExpr::create(Ctx, LHS, Op, RHS, Op->isImplicit());
 }
@@ -351,14 +351,14 @@ static Expr *foldSequence(DeclContext *DC,
   // Invariant: All elements at even indices are operator references.
   assert(!S.empty());
   assert((S.size() & 1) == 0);
-  
+
   struct Op {
     Expr *op;
     PrecedenceGroupDecl *precedence;
-    
+
     explicit operator bool() const { return op != nullptr; }
   };
-  
+
   /// Get the operator, if appropriate to this pass.
   auto getNextOperator = [&]() -> Op {
     Expr *op = S[0];
@@ -374,7 +374,7 @@ static Expr *foldSequence(DeclContext *DC,
   // Extract out the first operator.
   Op op1 = getNextOperator();
   if (!op1) return LHS;
-  
+
   // We will definitely be consuming at least one operator.
   // Pull out the prospective RHS and slice off the first two elements.
   Expr *RHS = S[1];
@@ -395,7 +395,7 @@ static Expr *foldSequence(DeclContext *DC,
       S = S.slice(2);
       continue;
     }
-    
+
     // Pull out the next binary operator.
     Op op2 = getNextOperator();
     if (!op2) break;
@@ -467,9 +467,9 @@ static Expr *foldSequence(DeclContext *DC,
       Ctx.Diags.diagnose(op1.op->getLoc(),
                          diag::unordered_adjacent_operators,
                          op1.precedence->getName(), op2.precedence->getName())
-        .highlight(SourceRange(op2.op->getLoc(), op2.op->getLoc()));      
+        .highlight(SourceRange(op2.op->getLoc(), op2.op->getLoc()));
     }
-    
+
     // Recover by arbitrarily binding the first two.
     LHS = makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
     return foldSequence(DC, LHS, S, precedenceBound);
@@ -521,7 +521,7 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
   }
 
   Decls = Context.AllocateCopy(Decls);
-  auto result = new (Context) OverloadedDeclRefExpr(Decls, NameLoc, 
+  auto result = new (Context) OverloadedDeclRefExpr(Decls, NameLoc,
                                                     functionRefInfo,
                                                     Implicit);
   return result;
@@ -539,7 +539,7 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();
-  
+
   if (TD->isInvalid())
     return Type();
 

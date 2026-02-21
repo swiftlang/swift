@@ -567,11 +567,11 @@ struct TypeRefIsConcrete
   bool visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OC) {
     return true;
   }
-  
+
   bool visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return true;
   }
-    
+
   bool visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     for (auto Args : O->getArgumentLists()) {
       for (auto *Arg : Args) {
@@ -1157,34 +1157,34 @@ public:
   Demangle::NodePointer visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return Dem.createNode(Node::Kind::OpaqueType);
   }
-      
+
   Demangle::NodePointer visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     auto decl = Dem.demangleType(O->getID());
     if (!decl)
       return nullptr;
-    
+
     auto index = Dem.createNode(Node::Kind::Index, O->getOrdinal());
-    
+
     auto argNodeLists = Dem.createNode(Node::Kind::TypeList);
     for (auto argList : O->getArgumentLists()) {
       auto argNodeList = Dem.createNode(Node::Kind::TypeList);
-      
+
       for (auto arg : argList) {
         auto argNode = visit(arg);
         if (!argNode)
           return nullptr;
-        
+
         argNodeList->addChild(argNode, Dem);
       }
-      
+
       argNodeLists->addChild(argNodeList, Dem);
     }
-    
+
     auto node = Dem.createNode(Node::Kind::OpaqueType);
     node->addChild(decl, Dem);
     node->addChild(index, Dem);
     node->addChild(argNodeLists, Dem);
-    
+
     return node;
   }
 

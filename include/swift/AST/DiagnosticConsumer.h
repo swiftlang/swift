@@ -92,7 +92,7 @@ struct DiagnosticInfo {
         ChildDiagnosticInfo(ChildDiagnosticInfo), Ranges(Ranges),
         FixIts(FixIts), IsChildNote(IsChildNote) {}
 };
-  
+
 /// Abstract interface for classes that present diagnostics to the user.
 class DiagnosticConsumer {
 protected:
@@ -136,7 +136,7 @@ public:
 
   virtual void informDriverOfIncompleteBatchModeCompilation() {}
 };
-  
+
 /// DiagnosticConsumer that discards all diagnostics.
 class NullDiagnosticConsumer : public DiagnosticConsumer {
 public:

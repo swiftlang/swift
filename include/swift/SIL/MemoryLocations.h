@@ -223,7 +223,7 @@ public:
   const Location *getLocation(unsigned index) const {
     return &locations[index];
   }
-  
+
   /// Returns the root location of \p index.
   const Location *getRootLocation(unsigned index) const;
 
@@ -245,7 +245,7 @@ public:
     if (auto *loc = getLocation(addr))
       bits.reset(loc->subLocations);
   }
-  
+
   void genBits(Bits &genSet, Bits &killSet, SILValue addr) const {
     if (auto *loc = getLocation(addr)) {
       killSet.reset(loc->subLocations);

@@ -652,7 +652,7 @@ bool Parser::isAtAttributeLParen(bool isCustomAttr) {
 
 SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len) {
   // Consumes prefix of token and returns its location.
-  // (like '?', '<', '>' or '!' immediately followed by '<') 
+  // (like '?', '<', '>' or '!' immediately followed by '<')
   assert(Len >= 1);
 
   // Current token can be either one-character token we want to consume...
@@ -726,13 +726,13 @@ ParserStatus Parser::skipSingle() {
     consumeToken();
     // skipUntil also implicitly stops at tok::pound_endif.
     status |= skipUntil(tok::pound_else, tok::pound_elseif);
-      
+
     if (Tok.isAny(tok::pound_else, tok::pound_elseif))
       status |= skipSingle();
     else
       consumeIf(tok::pound_endif);
     break;
-      
+
   default:
     if (Tok.is(tok::code_complete))
       status.setHasCodeCompletionAndIsError();
@@ -801,7 +801,7 @@ SourceLoc Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
     default:
       if (Tok.isAnyOperator() && startsWithGreater(Tok))
         return consumeStartingGreater();
-      
+
       break;
     }
     skipSingle();
@@ -822,10 +822,10 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
                    tok::pound_else, tok::pound_elseif)) {
     bool hasDelimiter = Tok.getLoc() == startLoc || consumeIf(tok::comma);
     bool possibleDeclStartsLine = Tok.isAtStartOfLine();
-    
+
     if (isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false)) {
-      
-      // Could have encountered something like `_ var:` 
+
+      // Could have encountered something like `_ var:`
       // or `let foo:` or `var:`
       if (Tok.isAny(tok::kw_var, tok::kw_let) ||
           (Context.LangOpts.hasFeature(Feature::ReferenceBindings) &&
@@ -837,7 +837,7 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
         Parser::CancellableBacktrackingScope backtrack(*this);
         // Consume the let or var
         consumeToken();
-        
+
         // If the following token is either <identifier> or :, it means that
         // this `var` or `let` should be interpreted as a label
         if ((Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) ||
@@ -1093,13 +1093,13 @@ Parser::parseListItem(ParserStatus &Status, tok RightK, SourceLoc LeftLoc,
     if (!AllowSepAfterLast) {
       diagnose(Tok, diag::unexpected_separator, ",").fixItRemove(PreviousLoc);
     }
-    
+
     // Enable trailing comma in string literal interpolation
     if (tokIsStringInterpolationEOF(Tok, RightK)) {
       RightLoc = Tok.getLoc();
       return ParseListItemResult::FinishedInStringInterpolation;
     }
-    
+
     return ParseListItemResult::Finished;
   }
   // If we're in a comma-separated list, the next token is at the

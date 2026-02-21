@@ -213,7 +213,7 @@ typedef unsigned int swift_uint4  __attribute__((__ext_vector_type__(4)));
 #endif
 #else
 #if defined_replacement(SWIFT_NOEXCEPT)
-# define SWIFT_NOEXCEPT 
+# define SWIFT_NOEXCEPT
 #endif
 #endif
 #if defined(__cplusplus)

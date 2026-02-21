@@ -58,7 +58,7 @@ class CrossModuleOptimization {
   llvm::SmallPtrSet<TypeBase *, 16> typesHandled;
 
   SILModule &M;
-  
+
   /// True, if CMO runs by default.
   /// In this case, serialization decisions are made very conservatively to
   /// avoid code size increase.
@@ -348,7 +348,7 @@ static bool isSerializeCandidate(SILFunction *F, SILOptions options) {
   return linkage == SILLinkage::Public;
 }
 
-bool CrossModuleOptimization::isReferenceSerializeCandidate(SILFunction *F, 
+bool CrossModuleOptimization::isReferenceSerializeCandidate(SILFunction *F,
                                                             SILOptions options) {
   if (isPackageCMOEnabled(F->getModule().getSwiftModule())) {
     if (isSerializedWithRightKind(F->getModule(), F))
@@ -787,7 +787,7 @@ static bool couldBeLinkedStatically(DeclContext *funcCtxt, SILModule &module) {
   // could be linked statically.
   if (module.getSwiftModule() == funcModule)
     return false;
-    
+
   // The stdlib module is always linked dynamically.
   if (funcModule == module.getASTContext().getStdlibModule())
     return false;
@@ -818,7 +818,7 @@ bool CrossModuleOptimization::canUseFromInline(DeclContext *declCtxt) {
   /// conservative here.
   if (conservative && M.getOptions().emitTBD && couldBeLinkedStatically(declCtxt, M))
     return false;
-    
+
   return true;
 }
 
@@ -1043,7 +1043,7 @@ void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function
 /// Make a nominal type, including its context, usable from inline.
 void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
   if (decl->getEffectiveAccess() >= AccessLevel::Package)
-    return;  
+    return;
 
   // This function should not be called in Package CMO mode.
   assert(!isPackageCMOEnabled(M.getSwiftModule()));

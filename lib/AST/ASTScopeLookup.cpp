@@ -692,7 +692,7 @@ lookupEnclosingABIAttributeScope(SourceFile *sourceFile, SourceLoc loc) {
       return abiAttrScope->attr;
     }
   } while ((scope = scope->getParent().getPtrOrNull()));
-  
+
   return nullptr;
 }
 

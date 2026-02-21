@@ -389,7 +389,7 @@ void CallerAnalysis::notifyWillDeleteFunction(SILFunction *f) {
   auto iter = funcInfos.find(f);
   if (iter == funcInfos.end())
     return;
-    
+
   invalidateAllInfo(f, iter->second);
   recomputeFunctionList.remove(f);
   // Now that we have invalidated all references to the function, delete it.

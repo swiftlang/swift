@@ -431,7 +431,7 @@ public:
   /// a partial_apply, the argument ownership convention at the partial_apply
   /// instruction itself is different from the argument convention of the
   /// callee.
-  /// 
+  ///
   /// For details see the partial_apply documentation in SIL.rst.
   SILArgumentConvention getCaptureConvention(const Operand &oper) const {
     SILArgumentConvention conv = getArgumentConvention(oper);

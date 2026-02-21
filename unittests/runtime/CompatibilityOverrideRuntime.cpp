@@ -81,7 +81,7 @@ protected:
     EnableOverride = true;
     Ran = false;
   }
-  
+
   virtual void TearDown() {
     EnableOverride = false;
     ASSERT_TRUE(Ran);

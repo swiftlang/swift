@@ -228,7 +228,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     llvm::errs()
       << "Couldn't load module '" << ModuleName << '\''
       << " in the current SDK and search paths.\n";
-    
+
     SmallVector<Identifier, 32> VisibleModuleNames;
     CI.getASTContext().getVisibleTopLevelModuleNames(VisibleModuleNames);
 
@@ -246,7 +246,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     }
     return EXIT_FAILURE;
   }
-  
+
   if (M->failedToLoad()) {
     llvm::errs() << "Error: Failed to load the module '" << ModuleName
                  << "'. Are you missing build dependencies or "
@@ -260,31 +260,31 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   if (M->isNonSwiftModule())
     expectedKind = FileUnitKind::ClangModule;
   const auto &MainFile = M->getMainFile(expectedKind);
-  
+
   if (Options.PrintMessages)
     llvm::errs() << "Emitting symbol graph for module file: " << MainFile.getModuleDefiningPath() << '\n';
-  
+
   int Success = symbolgraphgen::emitSymbolGraphForModule(M, Options);
-  
+
   // Look for cross-import overlays that the given module imports.
-  
+
   // Clear out the diagnostic printer before looking for cross-import overlay modules,
   // since some SDK modules can cause errors in the getModuleByName() call. The call
   // itself will properly return nullptr after this failure, so for our purposes we
   // don't need to print these errors.
   CI.removeDiagnosticConsumer(&DiagPrinter);
-  
+
   SmallVector<ModuleDecl *> Overlays;
   M->findDeclaredCrossImportOverlaysTransitive(Overlays);
   for (const auto *OM : Overlays) {
     auto CIM = CI.getASTContext().getModuleByName(OM->getNameStr());
     if (CIM) {
       const auto &CIMainFile = CIM->getMainFile(FileUnitKind::SerializedAST);
-      
+
       if (Options.PrintMessages)
         llvm::errs() << "Emitting symbol graph for cross-import overlay module file: "
           << CIMainFile.getModuleDefiningPath() << '\n';
-      
+
       Success |= symbolgraphgen::emitSymbolGraphForModule(CIM, Options);
     }
   }

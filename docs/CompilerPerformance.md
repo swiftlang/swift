@@ -153,7 +153,7 @@ For example: if your module has 100 files in it:
 
   - Running `swiftc *.swift` will compile in **single-file mode**, and will thus
     run 100 frontend subprocesses, each of which will parse all 100 inputs (for
-    a total of 10,000 parses), and then each subprocess will (in parallel) 
+    a total of 10,000 parses), and then each subprocess will (in parallel)
     compile the definitions in its single primary file.
 
   - Running `swiftc -enable-batch-mode *.swift` will compile in **batch** mode,

@@ -160,7 +160,7 @@ public:
     assert(Start.isValid() == End.isValid() &&
            "Start and end should either both be valid or both be invalid!");
   }
-  
+
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return !isValid(); }
 

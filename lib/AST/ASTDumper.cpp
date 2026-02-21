@@ -406,7 +406,7 @@ static StringRef getDumpString(ImportKind value) {
   case ImportKind::Var: return "var";
   case ImportKind::Func: return "func";
   }
-  
+
   llvm_unreachable("Unhandled ImportKind in switch.");
 }
 
@@ -512,7 +512,7 @@ static StringRef getDumpString(LifetimeAnnotation lifetime) {
   case LifetimeAnnotation::None:
     return "";
   }
-  
+
   llvm_unreachable("Unhandled LifetimeAnnotation in switch.");
 }
 static StringRef getDumpString(AccessorKind kind) {
@@ -2713,7 +2713,7 @@ namespace {
         printCaptureInfoField(PD->getCachedDefaultArgumentCaptureInfo(),
                               Label::optional("default_arg_capture_info"));
       }
-      
+
       printFlag(PD->getAttrs().hasAttribute<KnownToBeLocalAttr>(),
                 "known_to_be_local", DeclModifierColor);
 
@@ -3408,7 +3408,7 @@ public:
       printRecArbitrary([&](Label label) {
         printHead("case_label_item", StmtColor, label);
         printFlag(LabelItem.isDefault(), "default");
-        
+
         if (auto *CasePattern = LabelItem.getPattern()) {
           switch (CasePattern->getOwnership()) {
           case ValueOwnership::Default:
@@ -3514,7 +3514,7 @@ public:
 
     printFlag(E->TrailingSemiLoc.isValid(), "trailing_semi");
   }
-  
+
   void printFunctionRefInfo(const FunctionRefInfo &info, Label label) {
     if (Writer.isParsable()) {
       printRecArbitrary([&](Label label) {
@@ -3556,7 +3556,7 @@ public:
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E, Label label) {
     printCommon(E, "integer_literal_expr", label);
-    
+
     printFlag(E->isNegative(), "negative", LiteralValueColor);
     Type T = GetTypeOfExpr(E);
     if (T.isNull() || !T->is<BuiltinIntegerType>())
@@ -3572,7 +3572,7 @@ public:
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E, Label label) {
     printCommon(E, "float_literal_expr", label);
-    
+
     printFlag(E->isNegative(), "negative", LiteralValueColor);
     printFieldQuoted(E->getDigitsText(), Label::always("value"),
                      LiteralValueColor);
@@ -3583,13 +3583,13 @@ public:
       printFieldQuoted(E->getBuiltinType(), Label::always("builtin_type"),
                        ExprModifierColor);
     }
-    
+
     printFoot();
   }
 
   void visitBooleanLiteralExpr(BooleanLiteralExpr *E, Label label) {
     printCommon(E, "boolean_literal_expr", label);
-    
+
     printField(E->getValue(), Label::always("value"), LiteralValueColor);
     printInitializerField(E->getBuiltinInitializer(),
                           Label::always("builtin_initializer"));
@@ -3600,7 +3600,7 @@ public:
 
   void visitStringLiteralExpr(StringLiteralExpr *E, Label label) {
     printCommon(E, "string_literal_expr", label);
-    
+
     printField(E->getEncoding(), Label::always("encoding"), ExprModifierColor);
     printFieldQuoted(E->getValue(), Label::always("value"), LiteralValueColor);
     printInitializerField(E->getBuiltinInitializer(),
@@ -3625,7 +3625,7 @@ public:
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, Label label) {
     printCommon(E, "magic_identifier_literal_expr", label);
-    
+
     printField(E->getKind(), Label::always("kind"), ExprModifierColor);
 
     if (E->isString()) {
@@ -3655,7 +3655,7 @@ public:
     printInitializerField(E->getInitializer(), Label::always("initializer"));
 
     printRec(E->getArgs(), Label::optional("args"));
-    
+
     printFoot();
   }
 
@@ -4209,7 +4209,7 @@ public:
     if (auto captureInfo = E->getCachedCaptureInfo()) {
       printCaptureInfoField(captureInfo, Label::optional("captures"));
     }
-    // Printing a function type doesn't indicate whether it's escaping because it doesn't 
+    // Printing a function type doesn't indicate whether it's escaping because it doesn't
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
     if (auto Ty = GetTypeOfExpr(E)) {
       if (auto fType = Ty->getAs<AnyFunctionType>()) {
@@ -4869,7 +4869,7 @@ public:
     printRec(T->getBase(), Label::optional("base"));
     printFoot();
   }
-  
+
   void visitIsolatedTypeRepr(IsolatedTypeRepr *T, Label label) {
     printCommon("isolated", label);
     printRec(T->getBase(), Label::optional("base"));
@@ -4893,7 +4893,7 @@ public:
     printRec(T->getBase(), Label::optional("base"));
     printFoot();
   }
-                        
+
   void visitConstValueTypeRepr(ConstValueTypeRepr *T, Label label) {
     printCommon("@const", label);
     printRec(T->getBase(), Label::optional("base"));
@@ -5643,7 +5643,7 @@ public:
     }
     printFoot();
   }
-                         
+
   void visitWarnAttr(WarnAttr *Attr, Label label) {
     printCommon(Attr, "warn", label);
     auto &diagGroupInfo = getDiagGroupInfoByID(Attr->DiagnosticGroupID);
@@ -6274,14 +6274,14 @@ namespace {
       printRec(T->getElementType(), Label::optional("element_type"));
       printFoot();
     }
-    
+
     void visitBuiltinUnboundGenericType(BuiltinUnboundGenericType *T,
                                         Label label) {
       printCommon("builtin_unbound_generic_type", label);
       printField(T->getBuiltinTypeNameString(), Label::always("name"));
       printFoot();
     }
-    
+
     void visitBuiltinFixedArrayType(BuiltinFixedArrayType *T,
                                     Label label) {
       printCommon("builtin_fixed_array_type", label);
@@ -6474,7 +6474,7 @@ namespace {
       printRec(T->getSelfType(), Label::optional("self_type"));
       printFoot();
     }
-    
+
     void printArchetypeCommon(ArchetypeType *T,
                               StringRef className,
                               Label label) {

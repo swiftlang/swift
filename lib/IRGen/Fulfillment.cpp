@@ -366,7 +366,7 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
   if (type.getAnyNominal()->hasClangNode()) {
     return false;
   }
-  
+
   auto *nominal = type.getAnyNominal();
   if (!nominal->isGenericContext() || isa<ProtocolDecl>(nominal)) {
     return false;
@@ -495,7 +495,7 @@ bool FulfillmentMap::searchShapeRequirement(IRGenModule &IGM, CanType argType,
   path.addPackExpansionCountComponent(0);
 
   auto parameter = expansion.getCountType();
-  
+
   // Add the fulfillment.
   return addFulfillment(GenericRequirement::forShape(parameter),
                         source, std::move(path), MetadataState::Complete);
@@ -519,7 +519,7 @@ bool FulfillmentMap::addFulfillment(GenericRequirement key,
 
     // Consider cost only if the fulfillments are equivalent in state.
     // TODO: this is potentially suboptimal, but it generally won't matter.
-    if (metadataState == existingState && 
+    if (metadataState == existingState &&
         path.cost() >= it->second.Path.cost()) {
       return false;
     }

@@ -307,7 +307,7 @@ namespace {
       return CheckedCastInstOptions()
         .withIsolatedConformances(computedIsolatedConformances());
     }
-    
+
     CastingIsolatedConformances computedIsolatedConformances() const {
       // Non-existential types don't carry conformances, so we always allow
       // isolated conformances.
@@ -403,20 +403,20 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
                                        SILGenFunction &SGF) {
   // Reabstract to the most general abstraction, and put it into a
   // temporary if necessary.
-  
+
   // Figure out if we need the value to be in a temporary.
   bool requiresAddress =
     !canSILUseScalarCheckedCastInstructions(SGF.SGM.M, sourceType, targetType);
-  
+
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
   auto &srcAbstractTL = SGF.getTypeLowering(abstraction, sourceType);
-  
+
   bool hasAbstraction = (src.getType() != srcAbstractTL.getLoweredType());
-  
+
   // Fast path: no re-abstraction required.
   if (!hasAbstraction && (!requiresAddress || src.getType().isAddress()))
     return src;
-  
+
   TemporaryInitializationPtr init;
   if (requiresAddress) {
     init = SGF.emitTemporary(loc, srcAbstractTL);
@@ -431,11 +431,11 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
     init->finishInitialization(SGF);
     return init->getManagedAddress();
   }
-  
+
   assert(hasAbstraction);
   assert(src.getType().isObject() &&
          "address-only type with abstraction difference?");
-  
+
   // Produce the value at +1.
   return SGF.emitSubstToOrigValue(loc, src, abstraction, sourceType);
 }

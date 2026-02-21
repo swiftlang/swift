@@ -33,7 +33,7 @@ class AnyFunctionRef {
   PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *> TheFunction;
 
   friend struct llvm::DenseMapInfo<AnyFunctionRef>;
-  
+
   AnyFunctionRef(decltype(TheFunction) TheFunction)
     : TheFunction(TheFunction) {}
 
@@ -170,11 +170,11 @@ public:
       return AFD;
     return cast<AbstractClosureExpr *>(TheFunction);
   }
-  
+
   AbstractFunctionDecl *getAbstractFunctionDecl() const {
     return TheFunction.dyn_cast<AbstractFunctionDecl*>();
   }
-  
+
   AbstractClosureExpr *getAbstractClosureExpr() const {
     return TheFunction.dyn_cast<AbstractClosureExpr*>();
   }
@@ -205,7 +205,7 @@ public:
     }
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
-  
+
   SourceLoc getLoc(bool SerializedOK = true) const {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->getLoc(SerializedOK);
@@ -230,7 +230,7 @@ public:
     }
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
-  
+
   GenericEnvironment *getGenericEnvironment() const {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->getGenericEnvironment();

@@ -217,7 +217,7 @@ ClangImporter::resolveStableSerializationPath(
 
   // Perform a lookup in the current context (`decl` if set, and
   // otherwise the translation unit).
-  auto lookup = [&](Identifier name) -> clang::DeclContext::lookup_result {    
+  auto lookup = [&](Identifier name) -> clang::DeclContext::lookup_result {
     if (name.empty()) return clang::DeclContext::lookup_result();
 
     const clang::DeclContext *dc;
@@ -269,7 +269,7 @@ ClangImporter::resolveStableSerializationPath(
       // Ignore unacceptable declarations.
       if (!isAcceptable(lookupDecl, step.first))
         continue;
-  
+
       // Bail out if we find multiple matching declarations.
       // TODO: make an effort to filter by the target module?
       if (resultDecl && !isSameDecl(resultDecl, lookupDecl))

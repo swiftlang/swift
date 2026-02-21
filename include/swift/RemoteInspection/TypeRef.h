@@ -495,7 +495,7 @@ class OpaqueArchetypeTypeRef final : public TypeRef {
       for (auto arg : argList)
         ID.addPointer(arg);
     }
-    
+
     return ID;
   }
 
@@ -506,7 +506,7 @@ public:
       : TypeRef(TypeRefKind::OpaqueArchetype), ID(id), Description(description),
         Ordinal(ordinal) {
     std::vector<unsigned> argumentListLengths;
-    
+
     for (auto argList : argumentLists) {
       argumentListLengths.push_back(argList.size());
       AllArgumentsBuf.insert(AllArgumentsBuf.end(),
@@ -535,17 +535,17 @@ public:
   unsigned getOrdinal() const {
     return Ordinal;
   }
-  
+
   /// A stable identifier for the opaque type.
   StringRef getID() const {
     return ID;
   }
-  
+
   /// A human-digestible, but not necessarily stable, description of the opaque type.
   StringRef getDescription() const {
     return Description;
   }
-  
+
   static bool classof(const TypeRef *T) {
     return T->getKind() == TypeRefKind::OpaqueArchetype;
   }
@@ -631,7 +631,7 @@ public:
   const TypeRef *getThrownError() const {
     return ThrownError;
   }
-  
+
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Function;
   }

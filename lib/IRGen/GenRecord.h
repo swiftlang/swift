@@ -81,7 +81,7 @@ public:
                          NonFixedOffsets offsets) const {
     return Layout.project(IGF, seq, offsets, "." + asImpl()->getFieldName());
   }
-  
+
   ElementLayout::Kind getKind() const {
     return Layout.getKind();
   }
@@ -89,7 +89,7 @@ public:
   bool hasFixedByteOffset() const {
     return Layout.hasByteOffset();
   }
-  
+
   Size getFixedByteOffset() const {
     return Layout.getByteOffset();
   }
@@ -130,7 +130,7 @@ private:
 protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
 
-  template <class... As> 
+  template <class... As>
   RecordTypeInfoImpl(ArrayRef<FieldImpl> fields,
                      FieldsAreABIAccessible_t fieldsABIAccessible,
                      As&&...args)
@@ -379,7 +379,7 @@ public:
     }
     return *MayHaveExtraInhabitants;
   }
-  
+
   // Perform an operation using the field that provides extra inhabitants for
   // the aggregate, whether that field is known statically or dynamically.
   llvm::Value *withExtraInhabitantProvidingField(IRGenFunction &IGF,
@@ -394,7 +394,7 @@ public:
     if (auto field = asImpl().getFixedExtraInhabitantProvidingField(IGF.IGM)){
       return body(*field, knownStructNumXI);
     }
-    
+
     // Otherwise, we have to figure out which field at runtime.
 
     // The number of extra inhabitants the instantiated type has can be used
@@ -415,7 +415,7 @@ public:
     for (auto &field : asImpl().getFields()) {
       if (!field.getTypeInfo().mayHaveExtraInhabitants(IGF.IGM))
         continue;
-      
+
       if (const FixedTypeInfo *fixed =
             dyn_cast<FixedTypeInfo>(&field.getTypeInfo())) {
         auto fieldCount = fixed->getFixedExtraInhabitantCount(IGF.IGM);
@@ -425,24 +425,24 @@ public:
         }
       }
     }
-    
+
     // Loop through checking to see whether we picked the fixed candidate
     // (if any) or one of the unknown-layout fields.
     llvm::Value *instantiatedCount
       = (knownStructNumXI
            ? knownStructNumXI
            : emitLoadOfExtraInhabitantCount(IGF, structType));
-    
+
     auto contBB = IGF.createBasicBlock("chose_field_for_xi");
     llvm::PHINode *contPhi = nullptr;
     if (resultTy != IGF.IGM.VoidTy)
       contPhi = llvm::PHINode::Create(resultTy,
                                       asImpl().getFields().size());
-    
+
     // If two fields have the same type, they have the same extra inhabitant
     // count, and we'll pick the first. We don't have to check both.
     SmallPtrSet<SILType, 4> visitedTypes;
-    
+
     for (auto &field : asImpl().getFields()) {
       if (!field.getTypeInfo().mayHaveExtraInhabitants(IGF.IGM))
         continue;
@@ -455,7 +455,7 @@ public:
         // extra inhabitants we picked above.
         if (&field != fixedCandidate)
           continue;
-        
+
         fieldCount = IGF.IGM.getInt32(fixedCount);
       } else {
         auto fieldTy = field.getType(IGF.IGM, structType);
@@ -463,34 +463,34 @@ public:
         // we'll never pick this one, since they both have the same count.
         if (!visitedTypes.insert(fieldTy).second)
           continue;
-      
+
         fieldCount = emitLoadOfExtraInhabitantCount(IGF, fieldTy);
       }
       auto equalsCount = IGF.Builder.CreateICmpEQ(instantiatedCount,
                                                   fieldCount);
-      
+
       auto yesBB = IGF.createBasicBlock("");
       auto noBB = IGF.createBasicBlock("");
-      
+
       IGF.Builder.CreateCondBr(equalsCount, yesBB, noBB);
-      
+
       IGF.Builder.emitBlock(yesBB);
       auto value = body(field, instantiatedCount);
       if (contPhi)
         contPhi->addIncoming(value, IGF.Builder.GetInsertBlock());
       IGF.Builder.CreateBr(contBB);
-      
+
       IGF.Builder.emitBlock(noBB);
     }
-    
+
     // We shouldn't have picked a number of extra inhabitants inconsistent
     // with any individual field.
     IGF.Builder.CreateUnreachable();
-    
+
     IGF.Builder.emitBlock(contBB);
     if (contPhi)
       IGF.Builder.Insert(contPhi);
-   
+
     return contPhi;
   }
 
@@ -506,12 +506,12 @@ public:
       // both. However, we don't always have access to the substituted struct
       // type from this context, which would be necessary to make that
       // judgment reliably.
-      
+
       for (auto &field : asImpl().getFields()) {
         auto &ti = field.getTypeInfo();
         if (!ti.mayHaveExtraInhabitants(IGM))
           continue;
-        
+
         auto *fixed = dyn_cast<FixedTypeInfo>(&field.getTypeInfo());
         // If any field is non-fixed, we can't definitively pick a best one,
         // unless it happens to be the only non-fixed field and none of the
@@ -523,20 +523,20 @@ public:
             singleNonFixedField = fieldWithMost = nullptr;
             break;
           }
-          
+
           // Otherwise, note this field for later. If we have no fixed
           // candidates, it may be the only choice for extra inhabitants.
           singleNonFixedField = &field;
           continue;
         }
-        
+
         unsigned count = fixed->getFixedExtraInhabitantCount(IGM);
         if (count > mostExtraInhabitants) {
           mostExtraInhabitants = count;
           fieldWithMost = &field;
         }
       }
-      
+
       if (fieldWithMost) {
         if (singleNonFixedField) {
           // If we have a non-fixed and fixed candidate, we can't know for
@@ -667,7 +667,7 @@ class RecordTypeInfo<Impl, Base, FieldImpl,
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
   using super = RecordTypeInfoImpl<Impl, Base, FieldImpl>;
 protected:
-  template <class... As> 
+  template <class... As>
   RecordTypeInfo(ArrayRef<FieldImpl> fields, As &&...args)
     : super(fields, std::forward<As>(args)...) {}
 
@@ -679,7 +679,7 @@ public:
       auto &fieldTI = cast<FixedTypeInfo>(field->getTypeInfo());
       return fieldTI.getFixedExtraInhabitantCount(IGM);
     }
-    
+
     return 0;
   }
 
@@ -701,7 +701,7 @@ public:
       return field->getTypeInfo()
         .canValueWitnessExtraInhabitantsUpTo(IGM, index);
     }
-    
+
     return false;
   }
 
@@ -768,7 +768,7 @@ public:
   }
 };
 
-/// An implementation of RecordTypeInfo for loadable types. 
+/// An implementation of RecordTypeInfo for loadable types.
 template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ true, /*IsLoadable*/ true>
@@ -780,7 +780,7 @@ class RecordTypeInfo<Impl, Base, FieldImpl,
 protected:
   using super::asImpl;
 
-  template <class... As> 
+  template <class... As>
   RecordTypeInfo(ArrayRef<FieldImpl> fields,
                  unsigned explosionSize,
                  As &&...args)
@@ -897,7 +897,7 @@ public:
     for (auto &field : getFields())
       cast<LoadableTypeInfo>(field.getTypeInfo()).fixLifetime(IGF, src);
   }
-  
+
   void packIntoEnumPayload(IRGenModule &IGM,
                            IRBuilder &builder,
                            EnumPayload &payload,
@@ -912,7 +912,7 @@ public:
       }
     }
   }
-  
+
   void unpackFromEnumPayload(IRGenFunction &IGF, const EnumPayload &payload,
                              Explosion &dest, unsigned startOffset)
                             const override {
@@ -997,7 +997,7 @@ public:
       return asImpl()->createNonFixed(fields, fieldsABIAccessible,
                                       std::move(layout));
     }
-  }  
+  }
 };
 
 } // end namespace irgen

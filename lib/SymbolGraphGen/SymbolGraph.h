@@ -250,6 +250,6 @@ struct SymbolGraph {
 };
 
 } // end namespace symbolgraphgen
-} // end namespace swift 
+} // end namespace swift
 
 #endif // SWIFT_SYMBOLGRAPHGEN_SYMBOLGRAPH_H

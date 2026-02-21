@@ -114,7 +114,7 @@ manglePrespecialized(GenericSignature sig, SubstitutionMap subs) {
   appendSpecializationOperator("Ts");
   return finalize();
 }
-                                  
+
 std::string GenericSpecializationMangler::
 mangleNotReabstracted(SubstitutionMap subs,
                       const SmallBitVector &paramsRemoved) {
@@ -125,7 +125,7 @@ mangleNotReabstracted(SubstitutionMap subs,
   appendSpecializationOperator("G");
   return finalize();
 }
-                                  
+
 std::string GenericSpecializationMangler::
 mangleReabstracted(SubstitutionMap subs, bool alternativeMangling,
                    const SmallBitVector &paramsRemoved) {

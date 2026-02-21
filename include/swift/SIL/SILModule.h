@@ -77,7 +77,7 @@ private:
 
   /// The payload.
   char data[capacity];
-  
+
   /// Used for a cheap buffer overflow check - in the spirit of libgmalloc.
   uintptr_t overflowGuard = magicNumber;
 
@@ -206,7 +206,7 @@ private:
 
   /// The list of freed slabs, which can be reused.
   SlabList freeSlabs;
-  
+
   /// For consistency checking.
   size_t numAllocatedSlabs = 0;
 
@@ -1082,13 +1082,13 @@ public:
   /// done with the BPA.
   /// Subsequent allocations are reusing the already freed slabs.
   FixedSizeSlab *allocSlab();
-  
+
   /// Frees a slab.
   ///
   /// This has (almost) zero cost, because the slab is just put into the
   /// freeSlabs list.
   void freeSlab(FixedSizeSlab *slab);
-  
+
   /// Frees all slabs of a list.
   void freeAllSlabs(SlabList &slabs);
 

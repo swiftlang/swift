@@ -855,7 +855,7 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
         BaseExpr, SourceLoc(), Name, UDRE->getNameLoc(), UDRE->isImplicit(),
         Context.AllocateCopy(outerAlternatives));
   }
-  
+
   // FIXME: If we reach this point, the program we're being handed is likely
   // very broken, but it's still conceivable that this may happen due to
   // invalid shadowed declarations.
@@ -1380,7 +1380,7 @@ public:
           lastInnerParenLoc = PE->getLParenLoc();
           parent = nextParent;
         }
-        
+
         if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent) ||
             isa<MacroExpansionExpr>(parent)) {
           // If outermost paren is associated with a call or
@@ -2287,7 +2287,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
     assert(!TyExpr->isImplicit() && InnerTypeRepr &&
            "This doesn't work on implicit TypeExpr's, "
            "the TypeExpr should have been built correctly in the first place");
-    
+
     // The optional evaluation is passed through.
     if (isa<OptionalEvaluationExpr>(E))
       return TyExpr;
@@ -2317,7 +2317,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
   if (auto *PE = dyn_cast<ParenExpr>(E)) {
     auto *TyExpr = dyn_cast<TypeExpr>(PE->getSubExpr());
     if (!TyExpr) return nullptr;
-    
+
     TupleTypeReprElement InnerTypeRepr[] = { TyExpr->getTypeRepr() };
     assert(!TyExpr->isImplicit() && InnerTypeRepr[0].Type &&
            "SubscriptExpr doesn't work on implicit TypeExpr's, "
@@ -2327,7 +2327,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
                                               PE->getSourceRange());
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
-  
+
   // Fold a tuple expr like (T1,T2) into a tuple type (T1,T2).
   if (auto *TE = dyn_cast<TupleExpr>(E)) {
     // FIXME: Decide what to do about ().  It could be a type or an expr.
@@ -2361,7 +2361,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
         Ctx, Elts, TE->getSourceRange());
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
-  
+
 
   // Fold [T] into an array type.
   if (auto *AE = dyn_cast<ArrayExpr>(E)) {
@@ -2384,7 +2384,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
       return nullptr;
 
     TypeRepr *keyTypeRepr, *valueTypeRepr;
-    
+
     if (auto EltTuple = dyn_cast<TupleExpr>(DE->getElement(0))) {
       auto *KeyTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(0));
       if (!KeyTyExpr)
@@ -2393,13 +2393,13 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
       auto *ValueTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(1));
       if (!ValueTyExpr)
         return nullptr;
-     
+
       keyTypeRepr = KeyTyExpr->getTypeRepr();
       valueTypeRepr = ValueTyExpr->getTypeRepr();
     } else {
       auto *TE = dyn_cast<TypeExpr>(DE->getElement(0));
       if (!TE) return nullptr;
-      
+
       auto *TRE = dyn_cast_or_null<TupleTypeRepr>(TE->getTypeRepr());
       while (TRE->isParenType()) {
         TRE = dyn_cast_or_null<TupleTypeRepr>(TRE->getElementType(0));
@@ -2508,7 +2508,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
                          ResultTypeRepr);
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
-  
+
   // Fold '~P' into a composition type.
   if (auto *unaryExpr = dyn_cast<PrefixUnaryExpr>(E)) {
     if (isTildeOperator(unaryExpr->getFn())) {
@@ -2579,7 +2579,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
 void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
   if (KPE->isObjC())
     return;
-  
+
   if (!KPE->getComponents().empty())
     return;
 

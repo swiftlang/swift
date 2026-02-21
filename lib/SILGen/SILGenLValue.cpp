@@ -296,7 +296,7 @@ SILGenFunction::getDynamicEnforcement(VarDecl *var) {
       return SILAccessEnforcement::Unsafe;
     }
   }
-  
+
   return std::nullopt;
 }
 
@@ -317,10 +317,10 @@ class LLVM_LIBRARY_VISIBILITY SILGenLValue
 public:
   SILGenFunction &SGF;
   SILGenLValue(SILGenFunction &SGF) : SGF(SGF) {}
-  
+
   LValue visitRec(Expr *e, SGFAccessKind accessKind, LValueOptions options,
                   AbstractionPattern orig = AbstractionPattern::getInvalid());
-  
+
   /// Dummy handler to log unimplemented nodes.
   LValue visitExpr(Expr *e, SGFAccessKind accessKind, LValueOptions options);
 
@@ -338,7 +338,7 @@ public:
                         LValueOptions options);
 
   // Nodes that make up components of lvalue paths
-  
+
   LValue visitMemberRefExpr(MemberRefExpr *e, SGFAccessKind accessKind,
                             LValueOptions options);
   LValue visitSubscriptExpr(SubscriptExpr *e, SGFAccessKind accessKind,
@@ -364,7 +364,7 @@ public:
                                     LValueOptions options);
 
   // Expressions that wrap lvalues
-  
+
   LValue visitLoadExpr(LoadExpr *e, SGFAccessKind accessKind,
                         LValueOptions options);
   LValue visitInOutExpr(InOutExpr *e, SGFAccessKind accessKind,
@@ -1237,7 +1237,7 @@ namespace {
       Value.dump(OS, indent + 2);
     }
   };
-  
+
   class BorrowValueComponent : public PhysicalPathComponent {
   public:
     BorrowValueComponent(LValueTypeData typeData)
@@ -1290,11 +1290,11 @@ static bool isReadNoneFunction(const Expr *e) {
             (name.getArgumentNames()[0].str() == "integerLiteral" ||
              name.getArgumentNames()[0].str() == "_builtinIntegerLiteral"));
   }
-  
+
   // Look through DotSyntaxCallExpr, since the literal functions are curried.
   if (auto *CRCE = dyn_cast<ConstructorRefCallExpr>(e))
     return isReadNoneFunction(CRCE->getFn());
-  
+
   return false;
 }
 
@@ -1442,7 +1442,7 @@ namespace {
 
       if (!Indices.isNull())
         result.Indices = std::move(Indices);
-      
+
       return result;
     }
 
@@ -1475,7 +1475,7 @@ namespace {
       return accessorSelf.getInterfaceType()
         && accessorSelf.isIndirectMutating();
     }
-    
+
     void printBase(raw_ostream &OS, unsigned indent, StringRef name) const {
       OS.indent(indent) << name << "(" << Storage->getBaseName() << ")";
       if (ArgListForDiagnostics) {
@@ -1921,7 +1921,7 @@ namespace {
 
       return rvalue;
     }
-    
+
     std::unique_ptr<LogicalPathComponent>
     clone(SILGenFunction &SGF, SILLocation loc) const override {
       LogicalPathComponent *clone = new GetterSetterComponent(*this, SGF, loc);
@@ -2044,7 +2044,7 @@ namespace {
                                       /*actorIsolation=*/std::nullopt);
         }
       }
-      
+
       if (lv.getTypeOfRValue() != getTypeOfRValue()) {
         lv.addOrigToSubstComponent(getTypeOfRValue());
       }
@@ -2057,7 +2057,7 @@ namespace {
   class AddressorComponent
       : public AccessorBasedComponent<PhysicalPathComponent> {
     SILType SubstFieldType;
-    
+
     static SGFAccessKind getAccessKindForAddressor(SGFAccessKind accessKind) {
       // Addressors cannot be consumed through.
       switch (accessKind) {
@@ -2069,7 +2069,7 @@ namespace {
       case SGFAccessKind::Write:
       case SGFAccessKind::ReadWrite:
         return accessKind;
-        
+
       case SGFAccessKind::OwnedAddressConsume:
       case SGFAccessKind::OwnedObjectConsume:
         return SGFAccessKind::ReadWrite;
@@ -2340,9 +2340,9 @@ makeBaseConsumableMaterializedRValue(SILGenFunction &SGF,
       && !base.isLValue()) {
     return SGF.emitLoad(loc, base.getValue(),
                         SGF.getTypeLowering(base.getType()), SGFContext(),
-                        IsNotTake);    
+                        IsNotTake);
   }
-  
+
   bool isBorrowed = base.isPlusZeroRValueOrTrivial()
     && !base.getType().isTrivial(SGF.F);
 
@@ -3029,7 +3029,7 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
       }
     }
   }
-  
+
   if (SGF.SGM.Types.isIndirectPlusZeroSelfParameter(e->getType())) {
     ctx = SGFContext::AllowGuaranteedPlusZero;
   }
@@ -3105,7 +3105,7 @@ public:
       e = le->getSubExpr();
       // fall through...
     }
-    
+
     if (auto *de = dyn_cast<DeclRefExpr>(e)) {
       // Noncopyable type is obviously noncopyable.
       if (de->getType()->isNoncopyable()) {
@@ -3148,7 +3148,7 @@ public:
                                  LValueOptions options,
                                  AccessStrategy &strategy) {
     auto storage = cast<AbstractStorageDecl>(e->getMember().getDecl());
-    
+
     assert(!e->getType()->is<LValueType>());
 
     auto pair = std::make_pair<>(e->getSourceRange(), SGF.FunctionDC);
@@ -3189,7 +3189,7 @@ public:
 
     auto storageCanType = SGF.prepareStorageType(subscript, subs);
     auto indices = SGF.prepareIndices(e, storageCanType, strategy, e->getArgs());
-  
+
     lv.addMemberSubscriptComponent(SGF, e, subscript, subs,
                                    options, e->isSuper(), accessKind, strategy,
                                    getSubstFormalRValueType(e),
@@ -3204,7 +3204,7 @@ public:
     LValue lv = getLookupExprBaseLValue(e, e->getAccessSemantics(),
                                         accessKind, options,
                                         strategy);
-    
+
     auto var = cast<VarDecl>(e->getMember().getDecl());
 
     std::optional<ActorIsolation> actorIso;
@@ -3313,7 +3313,7 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   if (e->getType()->is<LValueType>() || e->isSemanticallyInOutExpr()) {
     return visitRecInOut(*this, e, accessKind, options, orig);
   }
-  
+
   // If the component wants an addressable base, see whether we can provide
   // one.
   if (options.TryAddressable) {
@@ -3334,7 +3334,7 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
       return lv;
     }
   }
-  
+
   // If the base is a load of a noncopyable type (or, eventually, when we have
   // a `borrow x` operator, the operator is used on the base here), we want to
   // apply the lvalue within a formal access to the original value instead of
@@ -3392,7 +3392,7 @@ LValue SILGenLValue::visitApplyExpr(ApplyExpr *e, SGFAccessKind accessKind,
                                    SGFContext::AllowGuaranteedPlusZero)
         .getAsSingleValue(SGF, e);
     }
-    
+
     ManagedValue deref;
     // Project the borrow of the value from there.
     if (borrowValue.getType().isAddress()) {
@@ -3769,9 +3769,9 @@ SILGenFunction::emitAddressOfLocalVarDecl(SILLocation loc, VarDecl *var,
   assert(var->getDeclContext()->isLocalContext());
   assert(var->getImplInfo().isSimpleStored());
   AccessKind astAccessKind = mapAccessKind(accessKind);
-  
+
   assert(!var->isAsyncLet() && "async let does not have an address");
-  
+
   auto address = maybeEmitValueOfLocalVarDecl(var, astAccessKind);
   assert(address.isLValue());
   return address;
@@ -4236,7 +4236,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
           /*useOldABI=*/false);
     }
   }
-  
+
   CanType substFormalRValueType = getSubstFormalRValueType(e);
   CanType baseTy = getBaseFormalType(e->getBase());
   AbstractionPattern orig = AbstractionPattern::getInvalid();
@@ -4248,7 +4248,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
     addressable = true;
     orig = AbstractionPattern::getOpaque();
   }
-  
+
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(SGF.SGM, var, accessKind, strategy,
                                          baseTy,
@@ -4314,7 +4314,7 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
                                BaseFormalType, typeData, varStorageType,
                                ArgListForDiagnostics, std::move(Indices),
                                IsOnSelfParameter);
-    
+
   }
 
   void emitUsingCoroutineAccessor(SILDeclRef accessor, bool isDirect,
@@ -4699,7 +4699,7 @@ LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e,
               "borrow or consume");
     subExpr = load->getSubExpr();
   }
-                                         
+
   // Like BindOptional, this is a read even if we only write to the result.
   // (But it's unnecessary to use a force this way!)
   LValue lv = visitRec(e->getSubExpr(),
@@ -4708,7 +4708,7 @@ LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e,
   LValueTypeData typeData =
     getOptionalObjectTypeData(SGF, accessKind, lv.getTypeData());
   bool isImplicitUnwrap = e->isImplicit() &&
-    e->isForceOfImplicitlyUnwrappedOptional(); 
+    e->isForceOfImplicitlyUnwrappedOptional();
   lv.add<ForceOptionalObjectComponent>(typeData, isImplicitUnwrap);
   return lv;
 }
@@ -4724,7 +4724,7 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
     // TODO: deal more efficiently with an object-preferring access.
     baseAccessKind = getAddressAccessKind(baseAccessKind);
   }
-  
+
   // Do formal evaluation of the base l-value.
   LValue optLV = visitRec(e->getSubExpr(), baseAccessKind,
                           options.forComputedBaseLValue());
@@ -4736,11 +4736,11 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
     getOptionalObjectTypeData(SGF, accessKind, optTypeData);
 
   // The chaining operator immediately evaluates the base.
-  
+
   ManagedValue optBase;
   if (isBorrowAccess(baseAccessKind)) {
     optBase = SGF.emitBorrowedLValue(e, std::move(optLV));
-    
+
     if (optBase.getType().isMoveOnly()) {
       if (optBase.getType().isAddress()) {
         // Strip the move-only wrapper if any.
@@ -4749,7 +4749,7 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
             SGF.B.createMoveOnlyWrapperToCopyableAddr(e,
                                                       optBase.getValue()));
         }
-      
+
         optBase = enterAccessScope(SGF, e, ManagedValue(),
                                    optBase, optTypeData,
                                    baseAccessKind,
@@ -4772,14 +4772,14 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
   } else {
     optBase = SGF.emitAddressOfLValue(e, std::move(optLV));
     bool isMoveOnly = optBase.getType().isMoveOnly();
-    
+
     // Strip the move-only wrapper if any.
     if (optBase.getType().isMoveOnlyWrapped()) {
       optBase = ManagedValue::forLValue(
         SGF.B.createMoveOnlyWrapperToCopyableAddr(e,
                                                   optBase.getValue()));
     }
-    
+
     if (isConsumeAccess(baseAccessKind)) {
       if (isMoveOnly) {
         optBase = enterAccessScope(SGF, e, ManagedValue(),
@@ -4811,7 +4811,7 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
   // Reset the insertion point at the end of hasValueBB so we can
   // continue to emit code there.
   SGF.B.setInsertionPoint(someBB);
-  
+
   // Project out the payload on the success branch.  We can just use a
   // naked ValueComponent here; this is effectively a separate l-value.
   ManagedValue optPayload =
@@ -4899,7 +4899,7 @@ LValue SILGenLValue::visitABISafeConversionExpr(ABISafeConversionExpr *e,
   auto typeData = getValueTypeData(SGF, accessKind, e);
   auto subExprType = e->getSubExpr()->getType()->getRValueType();
   auto loweredSubExprType = SGF.getLoweredType(subExprType);
-  
+
   // Ensure the lvalue is re-abstracted to the substituted type, since that's
   // the type with which we have ABI compatibility.
   if (lval.getTypeOfRValue().getASTType() != loweredSubExprType.getASTType()) {
@@ -5979,7 +5979,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   ManagedValue destAddr;
   PathComponent &&component =
     drillToLastComponent(loc, std::move(dest), destAddr);
-  
+
   // Write to the tail component.
   if (component.isPhysical()) {
     std::move(component.asPhysical()).set(*this, loc, std::move(src), destAddr);
@@ -5999,7 +5999,7 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
     if (!loaded.isInContext())
       std::move(loaded).forwardInto(*this, loc, dest);
   };
-  
+
   // If the source is a physical lvalue, the destination is a single address,
   // and there's no semantic conversion necessary, do a copy_addr from the
   // lvalue into the destination.

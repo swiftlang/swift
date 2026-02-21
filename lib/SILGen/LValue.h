@@ -118,7 +118,7 @@ public:
     OpenNonOpaqueExistentialKind,  // opened class or metatype existential
     LogicalKeyPathApplicationKind, // applying a key path
     InitAccessorKind,           // init accessor
-    
+
     // Translation LValue kinds (a subtype of logical)
     OrigToSubstKind,            // generic type substitution
     SubstToOrigKind,            // generic type substitution
@@ -266,7 +266,7 @@ public:
   /// Clone the path component onto the heap.
   virtual std::unique_ptr<LogicalPathComponent>
   clone(SILGenFunction &SGF, SILLocation l) const = 0;
-  
+
   /// Set the property.
   ///
   /// \param base - always an address, but possibly an r-value
@@ -341,7 +341,7 @@ public:
   virtual RValue untranslate(SILGenFunction &SGF, SILLocation loc,
                              RValue &&value,
                              SGFContext ctx = SGFContext()) && = 0;
-  
+
 };
 
 inline TranslationPathComponent &PathComponent::asTranslation() {
@@ -395,7 +395,7 @@ public:
         return false;
     return true;
   }
-  
+
   /// Is the lvalue's final component physical?
   bool isLastComponentPhysical() const {
     assert(isValid());
@@ -535,7 +535,7 @@ public:
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 };
-  
+
 /// RAII object used to enter an inout conversion scope. Writeback scopes formed
 /// during the inout conversion scope will be no-ops.
 class InOutConversionScope {

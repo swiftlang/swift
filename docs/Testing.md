@@ -52,16 +52,16 @@ time to a debug cycle.
 
 #### Using utils/run-test
 
-Using `utils/run-test` allows the user to run a single test or tests in a specific directory. 
-This can significantly speed up the debug cycle.  One can use this tool 
+Using `utils/run-test` allows the user to run a single test or tests in a specific directory.
+This can significantly speed up the debug cycle.  One can use this tool
 instead of invoking `lit.py` directly as described in the next section.
 
 Here is an example of running the `test/Parse` tests:
 ```
     % ${swift_SOURCE_ROOT}/utils/run-test --build-dir ${SWIFT_BUILD_DIR} ${swift_SOURCE_ROOT}/test/Parse
 ```
-Note that one example of a valid `${SWIFT_BUILD_DIR}` is 
-`{swift_SOURCE_ROOT}/../build/Ninja-DebugAssert/swift-linux-x86_64`.  
+Note that one example of a valid `${SWIFT_BUILD_DIR}` is
+`{swift_SOURCE_ROOT}/../build/Ninja-DebugAssert/swift-linux-x86_64`.
 It differs based on your build options and on which directory you invoke the script from.
 
 For full help options, pass `-h` to `utils/run-test` utility.
@@ -330,7 +330,7 @@ code for the target that is not the build machine:
 * ``%target-swift-autolink-extract``: run ``swift-autolink-extract`` for the
   target to extract its autolink flags on platforms that support them (when the
   autolink-extract feature flag is set)
-  
+
 * ``%target-swift-emit-module-interface(`` *swift interface path* ``)``
   *other arguments*: run ``swift-frontend`` for the target, emitting a
   swiftinterface to the given path and passing additional default flags

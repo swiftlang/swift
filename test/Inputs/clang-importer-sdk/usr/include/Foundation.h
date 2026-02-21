@@ -213,7 +213,7 @@ void availableOnIOSAppExtensionButDeprecatedOnmacCatalystAppExtension() __attrib
 - (void)removeObject:(KeyType)obj;
 @end
 
-@interface NSCountedSet<KeyType> : NSMutableSet<KeyType> 
+@interface NSCountedSet<KeyType> : NSMutableSet<KeyType>
 - (instancetype)initWithCapacity:(NSUInteger)numItems NS_DESIGNATED_INITIALIZER;
 - (instancetype)initWithArray:(NSArray<KeyType> *)array;
 @end
@@ -797,7 +797,7 @@ typedef NS_OPTIONS(NSUInteger, NSExplicitlyUnavailableOnOSXOptions) {
 @protocol NSWobbling
 -(void)wobble;
 
-- (instancetype)returnMyself; 
+- (instancetype)returnMyself;
 
 @optional
 -(void)wibble;

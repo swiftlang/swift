@@ -600,7 +600,7 @@ static bool shouldIgnoreHoleForCodeCompletion(ConstraintSystem &cs,
                                               ConstraintLocator *srcLocator) {
   if (!cs.isForCodeCompletion())
     return false;
-  
+
   // Don't penalize solutions with unresolved generics.
   if (typeVar->getImpl().getGenericParameter())
     return true;
@@ -625,7 +625,7 @@ static bool shouldIgnoreHoleForCodeCompletion(ConstraintSystem &cs,
       }
     }
   }
-  
+
   // Don't penalize solutions with holes due to missing arguments after the
   // code completion position.
   auto argLoc = srcLocator->findLast<LocatorPathElt::SynthesizedArgument>();
@@ -700,7 +700,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto reportHole = [&]() {
     if (shouldIgnoreHoleForCodeCompletion(cs, TypeVar, srcLocator))
       return false;
-    
+
     // Reflect in the score that this type variable couldn't be
     // resolved and had to be bound to a placeholder "hole" type.
     cs.increaseScore(SK_Hole, srcLocator);

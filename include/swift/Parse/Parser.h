@@ -612,7 +612,7 @@ public:
     return !peekToken().isAtStartOfLine()
       && peekToken().isAny(tok::identifier, tok::kw_self, tok::kw_Self);
   }
-  
+
   /// Read tokens until we get to one of the specified tokens, then
   /// return without consuming it.  Because we cannot guarantee that the token
   /// will ever occur, this skips to some likely good stopping point.
@@ -640,9 +640,9 @@ public:
   }
 
   void skipUntilDeclRBrace(tok T1, tok T2);
-  
+
   void skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2);
-  
+
   /// Skip a single token, but match parentheses, braces, and square brackets.
   ///
   /// Note: this does \em not match angle brackets ("<" and ">")! These are
@@ -729,7 +729,7 @@ public:
     return diagnose(Tok.getLoc(),
                     {DiagID, {std::forward<ArgTypes>(Args)...}});
   }
-    
+
   /// Add a fix-it to remove the space in consecutive identifiers.
   /// Add a camel-cased option if it is different than the first option.
   void diagnoseConsecutiveIDs(StringRef First, SourceLoc FirstLoc,
@@ -812,7 +812,7 @@ public:
     return parseIdentifier(Result, L, {ID, {Args...}},
                            diagnoseDollarPrefix);
   }
-  
+
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseSpecificIdentifier(StringRef expected,
                                Diag<DiagArgTypes...> ID, ArgTypes... Args) {
@@ -844,7 +844,7 @@ public:
   ///
   /// If the input is malformed, this emits the specified error diagnostic.
   bool parseToken(tok K, SourceLoc &TokLoc, DiagRef D);
-  
+
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseToken(tok K, Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     SourceLoc L;
@@ -855,7 +855,7 @@ public:
                   Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     return parseToken(K, L, {ID, {Args...}});
   }
-  
+
   /// Parse the specified expected token and return its location on success.  On failure, emit the specified
   /// error diagnostic,  a note at the specified note location, and return the location of the previous token.
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, DiagRef ErrorDiag,
@@ -911,7 +911,7 @@ public:
                            IsFollowingGuard);
   }
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
-  
+
   //===--------------------------------------------------------------------===//
   // Decl Parsing
 
@@ -1492,7 +1492,7 @@ public:
   ParserResult<TypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
                                          ParsedTypeAttributeList &attrs);
-  
+
   ParserResult<TypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(ParserResult<TypeRepr> Base);
 
@@ -1517,7 +1517,7 @@ public:
 
   bool isOptionalToken(const Token &T) const;
   SourceLoc consumeOptionalToken();
-  
+
   bool isImplicitlyUnwrappedOptionalToken(const Token &T) const;
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
 
@@ -1528,7 +1528,7 @@ public:
   /// arguments of a context.
   struct DefaultArgumentInfo {
     unsigned NextIndex : 31;
-    
+
     /// Track whether or not one of the parameters in a signature's argument
     /// list accepts a default argument.
     unsigned HasDefaultArgument : 1;
@@ -1550,7 +1550,7 @@ public:
 
     /// The location of the 'inout' keyword, if present.
     SourceLoc SpecifierLoc;
-    
+
     /// The parsed specifier kind, if present.
     ParamDecl::Specifier SpecifierKind = ParamDecl::Specifier::Default;
 
@@ -1692,7 +1692,7 @@ public:
 
   ParserResult<Pattern> parseTypedPattern();
   ParserResult<Pattern> parsePattern();
-  
+
   /// Parse a tuple pattern element.
   ///
   /// \code
@@ -1704,7 +1704,7 @@ public:
   std::pair<ParserStatus, std::optional<TuplePatternElt>>
   parsePatternTupleElement();
   ParserResult<Pattern> parsePatternTuple();
-  
+
   ParserResult<Pattern>
   parseOptionalPatternTypeAnnotation(ParserResult<Pattern> P);
   ParserResult<Pattern> parseMatchingPattern(bool isExprBasic);
@@ -1714,7 +1714,7 @@ public:
 
   Pattern *createBindingFromPattern(SourceLoc loc, Identifier name,
                                     VarDecl::Introducer introducer);
-  
+
 
   /// Determine whether this token can only start a matching pattern
   /// production and not an expression.
@@ -1723,7 +1723,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Speculative type list parsing
   //===--------------------------------------------------------------------===//
-  
+
   /// Returns true if we can parse a generic argument list at the current
   /// location in expression context. This parses types without generating
   /// AST nodes from the '<' at the current location up to a matching '>'. If
@@ -1880,7 +1880,7 @@ public:
 
   /// Parse a declaration name that results in a `DeclNameRef` in the syntax
   /// tree.
-  /// 
+  ///
   /// Without \c DeclNameFlag::AllowCompoundNames, parse an
   /// unqualified-decl-base-name.
   ///

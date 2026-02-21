@@ -83,7 +83,7 @@ struct RawValueKey {
   enum class Kind : uint8_t {
     String, Float, Int, Bool, Tombstone, Empty
   } kind;
-  
+
   struct IntValueTy {
     uint64_t v0;
     uint64_t v1;
@@ -109,7 +109,7 @@ struct RawValueKey {
     FloatValueTy floatValue;
     bool boolValue;
   };
-  
+
   explicit RawValueKey(LiteralExpr *expr) {
     switch (expr->getKind()) {
     case ExprKind::IntegerLiteral:
@@ -153,13 +153,13 @@ struct RawValueKey {
       llvm_unreachable("not a valid literal expr for raw value");
     }
   }
-  
+
   explicit RawValueKey(Kind k) : kind(k) {
     assert((k == Kind::Tombstone || k == Kind::Empty)
            && "this ctor is only for creating DenseMap special values");
   }
 };
-  
+
 /// Used during enum raw value checking to identify the source of a raw value,
 /// which may have been derived by auto-incrementing, for diagnostic purposes.
 struct RawValueSource {
@@ -229,7 +229,7 @@ public:
     llvm_unreachable("Unhandled RawValueKey in switch.");
   }
 };
-  
+
 } // namespace llvm
 
 static bool canSkipCircularityCheck(NominalTypeDecl *decl) {
@@ -529,7 +529,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       // Don't walk into further nominal decls.
       return Action::SkipNodeIf(isa<NominalTypeDecl>(D));
     }
-    
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Don't walk into closures.
       if (isa<ClosureExpr>(E))
@@ -542,7 +542,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
 
       auto *argList = apply->getArgs();
       auto Callee = apply->getSemanticFn();
-      
+
       Expr *arg;
 
       if (isa<OtherConstructorDeclRefExpr>(Callee)) {
@@ -584,7 +584,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
             myKind = BodyInitKind::Delegating;
         }
       }
-      
+
       if (myKind == BodyInitKind::None)
         return Action::Continue(E);
 
@@ -1043,7 +1043,7 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   // Destructors always use a fixed vtable entry.
   if (isa<DestructorDecl>(decl))
     return false;
-  
+
   assert(isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl));
 
   // Final members are always be called directly.
@@ -1171,7 +1171,7 @@ std::optional<AutomaticEnumValueKind>
 swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   Type rawTy = ED->getRawType();
   assert(rawTy && "Cannot compute value kind without raw type!");
-  
+
   if (ED->getGenericEnvironmentOfContext() != nullptr)
     rawTy = ED->mapTypeIntoEnvironment(rawTy);
 
@@ -1186,7 +1186,7 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
     KnownProtocolKind::ExpressibleByUnicodeScalarLiteral,
     KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral,
   };
-  
+
   if (conformsToProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral)) {
     return AutomaticEnumValueKind::Integer;
   } else if (conformsToProtocol(KnownProtocolKind::ExpressibleByStringLiteral)){
@@ -1206,7 +1206,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
   if (!rawTy) {
     return std::make_tuple<>();
   }
-  
+
   // Avoid computing raw values for enum cases in swiftinterface files since raw
   // values are intentionally omitted from them (unless the enum is @objc).
   // Without bailing here, incorrect raw values can be automatically generated
@@ -1253,7 +1253,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
           return std::make_tuple<>();
         }
       }
-      
+
       // If the enum element has no explicit raw value, try to
       // autoincrement from the previous value, or start from zero if this
       // is the first element.
@@ -1325,7 +1325,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
 
     // Diagnose the duplicate value.
     Diags.diagnose(diagLoc, diag::enum_raw_value_not_unique);
-    
+
     if (lastExplicitValueElt != elt &&
         valueKind == AutomaticEnumValueKind::Integer) {
       Diags.diagnose(uncheckedRawValueOf(lastExplicitValueElt)->getLoc(),
@@ -1337,7 +1337,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
     diagLoc = uncheckedRawValueOf(foundElt)->isImplicit()
         ? foundElt->getLoc() : uncheckedRawValueOf(foundElt)->getLoc();
     Diags.diagnose(diagLoc, diag::enum_raw_value_used_here);
-    
+
     if (foundElt != prevSource.lastExplicitValueElt &&
         valueKind == AutomaticEnumValueKind::Integer) {
       if (prevSource.lastExplicitValueElt)
@@ -1837,7 +1837,7 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
 /// Bind the given function declaration, which declares an operator, to the
 /// corresponding operator declaration.
 OperatorDecl *
-FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {  
+FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   auto &C = FD->getASTContext();
   auto &diags = C.Diags;
   const auto operatorName = FD->getBaseIdentifier();

@@ -11,14 +11,14 @@ far, with just this short blurb in the
 > to improve the programming model for it, without jeopardizing the goals of
 > providing a unicode-correct-by-default model.  Our goal is to be better at
 > string processing than Perl!
-   
+
 For Swift 4 and beyond we want to improve three dimensions of text processing:
 
   1. Ergonomics
   2. Correctness
   3. Performance
 
-This document is meant to both provide a sense of the long-term vision 
+This document is meant to both provide a sense of the long-term vision
 (including undecided issues and possible approaches), and to define the scope of
 work that could be done in the Swift 4 timeframe.
 
@@ -148,7 +148,7 @@ Two major factors play into this design choice:
 
 1. Machine processing of text is important, so we should have first-class,
    accessible functions appropriate to that use case.
-   
+
 2. The most general localized operations require a locale parameter not required
    by their un-localized counterparts.  This naturally skews complexity towards
    localized operations.
@@ -357,25 +357,25 @@ unlikely to disturb the semantics of any plausible algorithms. We can handle
 these cases by documenting them, explicitly stating that the elements of a
 `String` are an emergent property based on Unicode rules.
 
-The benefits of restoring `Collection` conformance are substantial: 
+The benefits of restoring `Collection` conformance are substantial:
 
   * Collection-like operations encourage experimentation with strings to
     investigate and understand their behavior. This is useful for teaching new
     programmers, but also good for experienced programmers who want to
     understand more about strings/unicode.
-    
+
   * Extended grapheme clusters form a natural element boundary for Unicode
     strings.  For example, searching and matching operations will always produce
     results that line up on grapheme cluster boundaries.
-    
+
   * Character-by-character processing is a legitimate thing to do in many real
     use-cases, including parsing, pattern matching, and language-specific
     transformations such as transliteration.
-    
+
   * `Collection` conformance makes a wide variety of powerful operations
     available that are appropriate to `String`'s default role as the vehicle for
     machine processed text.
-    
+
     The methods `String` would inherit from `Collection`, where similar to
     higher-level string algorithms, have the right semantics.  For example,
     grapheme-wise `lexicographicalCompare`, `elementsEqual`, and application of
@@ -388,7 +388,7 @@ The benefits of restoring `Collection` conformance are substantial:
     on `String`, but we don't consider that to be a problem worth solving, in
     the same way that we wouldn't try to suppress `min` and `max` on a
     `Set([UInt8])` that was used to store IP addresses.
-    
+
   * Many of the higher-level operations that we want to provide for `String`s,
     such as parsing and pattern matching, should apply to any `Collection`, and
     many of the benefits we want for `Collections`, such
@@ -396,27 +396,27 @@ The benefits of restoring `Collection` conformance are substantial:
     equally to `String`.  Making `String` part of the same protocol hierarchy
     allows us to write these operations once and not worry about keeping the
     benefits in sync.
-    
+
   * Slicing strings into substrings is a crucial part of the vocabulary of
     string processing, and all other sliceable things are `Collection`s.
     Because of its collection-like behavior, users naturally think of `String`
     in collection terms, but run into frustrating limitations where it fails to
     conform and are left to wonder where all the differences lie.  Many simply
     "correct" this limitation by declaring a trivial conformance:
-    
+
     ```swift
     extension String : BidirectionalCollection {}
     ```
-    
+
     Even if we removed indexing-by-element from `String`, users could still do
     this:
-    
+
     ```swift
     extension String : BidirectionalCollection {
       subscript(i: Index) -> Character { return characters[i] }
     }
     ```
-    
+
     It would be much better to legitimize the conformance to `Collection` and
     simply document the oddity of any concatenation corner-cases, than to deny
     users the benefits on the grounds that a few cases are confusing.
@@ -457,14 +457,14 @@ their naming:
 
   * Slices with two explicit endpoints are done with subscript, and support
     in-place mutation:
-    
+
     ```swift
     s[i..<j].mutate()
     ```
 
   * Slicing from an index to the end, or from the start to an index, is done
     with a method and does not support in-place mutation:
-    
+
     ```swift
     s.prefix(upTo: i).readOnly()
     ```
@@ -615,8 +615,8 @@ the `Collection`), we propose the following "empty subscript" operation,
 
 ```swift
 extension Collection {
-  subscript() -> SubSequence { 
-    return self[startIndex..<endIndex] 
+  subscript() -> SubSequence {
+    return self[startIndex..<endIndex]
   }
 }
 ```
@@ -665,8 +665,8 @@ For example, this code could be optimized to pull the invariant substring out
 of the loop:
 
 ```swift
-for _ in 0..<lots { 
-  someFunc(takingString: bigString[bigRange]) 
+for _ in 0..<lots {
+  someFunc(takingString: bigString[bigRange])
 }
 ```
 
@@ -710,7 +710,7 @@ extension String {
 
 The pattern of passing a string/range pair is common in several Objective-C
 APIs, and is made especially awkward in Swift by the non-interchangeability of
-`Range<String.Index>` and `NSRange`.  
+`Range<String.Index>` and `NSRange`.
 
 ```swift
 s2.find(s2, sourceRange: NSRange(j..<s2.endIndex, in: s2))
@@ -751,23 +751,23 @@ call that protocol `Unicode`:
 
 **Note:** The following assumes several features that are planned but not yet implemented in
   Swift, and should be considered a sketch rather than a final design.
-  
+
 ```swift
-protocol Unicode 
+protocol Unicode
   : Comparable, BidirectionalCollection where Element == Character {
-  
+
   associatedtype Encoding : UnicodeEncoding
   var encoding: Encoding { get }
-  
-  associatedtype CodeUnits 
+
+  associatedtype CodeUnits
     : RandomAccessCollection where Element == Encoding.CodeUnit
   var codeUnits: CodeUnits { get }
-  
-  associatedtype UnicodeScalars 
+
+  associatedtype UnicodeScalars
     : BidirectionalCollection where Element == UnicodeScalar
   var unicodeScalars: UnicodeScalars { get }
 
-  associatedtype ExtendedASCII 
+  associatedtype ExtendedASCII
     : BidirectionalCollection where Element == UInt32
   var extendedASCII: ExtendedASCII { get }
 
@@ -789,9 +789,9 @@ extension Unicode {
 extension Unicode : RangeReplaceableCollection where CodeUnits :
   RangeReplaceableCollection {
   // Satisfy protocol requirement
-  mutating func replaceSubrange<C : Collection>(_: Range<Index>, with: C) 
+  mutating func replaceSubrange<C : Collection>(_: Range<Index>, with: C)
     where C.Element == Element
-  
+
   // ... define high-level mutating string operations, e.g. replace ...
 }
 
@@ -933,7 +933,7 @@ by accident.
 
  - `String.index(after:)` should advance to the next grapheme, even when the
    index points partway through a grapheme.
-   
+
  - `String.index(before:)` should move to the start of the grapheme before
    the current position.
 
@@ -1034,7 +1034,7 @@ fixing the interpolation protocols per the previous item, and supporting
 localization.
 
 To be able to use formatting effectively inside interpolations, it needs to be
-both lightweight (because it all happens in-situ) and discoverable.  One 
+both lightweight (because it all happens in-situ) and discoverable.  One
 approach would be to standardize on `format` methods, e.g.:
 
 ```swift
@@ -1053,10 +1053,10 @@ do the inverse.  These APIs should be replaced with the following
 extension String {
   /// Constructs a `String` having the same contents as `nulTerminatedUTF8`.
   ///
-  /// - Parameter nulTerminatedUTF8: a sequence of contiguous UTF-8 encoded 
+  /// - Parameter nulTerminatedUTF8: a sequence of contiguous UTF-8 encoded
   ///   bytes ending just before the first zero byte (NUL character).
   init(cString nulTerminatedUTF8: UnsafePointer<CChar>)
-  
+
   /// Constructs a `String` having the same contents as `nulTerminatedCodeUnits`.
   ///
   /// - Parameter nulTerminatedCodeUnits: a sequence of contiguous code units in
@@ -1066,7 +1066,7 @@ extension String {
   init<Encoding: UnicodeEncoding>(
     cString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     encoding: Encoding)
-    
+
   /// Invokes the given closure on the contents of the string, represented as a
   /// pointer to a null-terminated sequence of UTF-8 code units.
   func withCString<Result>(
@@ -1178,7 +1178,7 @@ wrapper around an instance of `Unicode`:
 struct StringFacade<U: Unicode> : BidirectionalCollection {
 
   // ...APIs for high-level string processing here...
-  
+
   var unicode: U // access to lower-level unicode details
 }
 
@@ -1196,11 +1196,11 @@ An interesting variation on this design is possible if defaulted generic
 parameters are introduced to the language:
 
 ```swift
-struct String<U: Unicode = StringStorage> 
+struct String<U: Unicode = StringStorage>
   : BidirectionalCollection {
 
   // ...APIs for high-level string processing here...
-  
+
   var unicode: U // access to lower-level unicode details
 }
 

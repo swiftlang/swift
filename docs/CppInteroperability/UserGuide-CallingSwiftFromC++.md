@@ -259,7 +259,7 @@ For example, given the following structure with two initializers:
 ```swift
 struct Color {
   let red, green, blue: Float
-  
+
   public init(red: Float, green: Float, blue: Float) {
     self.red = red
     self.green = green
@@ -523,7 +523,7 @@ You can use the static `init` method to construct an optional enumeration from a
 void constructRoute() {
   swift::Optional<Airport> arrivingTo = Airport::init("LAX");
   // arrivingTo is now Airport::LosAngeles
-  
+
   auto departingFrom = Airport::init("HTX");
   // departingFrom is none
 }
@@ -553,7 +553,7 @@ public:
 
   inline const static struct { ... } qrCode;
   inline const static struct { ... } upc;
- 
+
   bool isUpc() const;
 
   using UpcType = swift::Tuple<swift::Int, swift::Int, swift::Int, swift::Int>;
@@ -1023,7 +1023,7 @@ extension Rect {
   init(size: Int) {
     self.init(x: 0, y: 0, width: size, height: size)
   }
-  
+
   func squareThatFits() -> Rect {
     let size = max(width, height)
     return Rect(x: x, y: y, width: size, height: size)
@@ -1046,12 +1046,12 @@ class Rect {
 public:
   // init(x:,y:,width:,height:)
   static Rect init(double x, double y, double width, double height);
-  
+
   // init(size:)
   static Rect init(double size);
-  
+
   Rect squareThatFits() const { ... }
-  
+
   swift::String getDebugDescription() const { ... }
 };
 ```
@@ -1082,7 +1082,7 @@ The members from the extension of `Shape` are then added to the C++ class that c
 class Rect {
 public:
   ...
-  
+
   bool fits(double inArea) const { ... }
 };
 ```
@@ -1283,7 +1283,7 @@ void useStackInCxx() {
   Datastructures::Stack<MyModule::SomeSwiftStruct> stack;
 
   stack.push(MyModule::SomeSwiftStruct()); // ok
-  
+
   stack.isTop(MyModule::SomeSwiftStruct());
   // error: invalid reference to function 'isTop': constraints not satisfied
   // note: because 'swift::conformsTo<MyModule::SomeSwiftStruct, swift::Equatable>' evaluated to false

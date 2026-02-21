@@ -778,8 +778,8 @@ The following types of test arguments are supported:
 
 -   argument:
     -  `@argument` <-- the first argument of the current block
-    -  `@argument[uint]` <-- the argument at index `uint` of the current block 
-    -  `@{block}.{argument}` <-- the indicated argument in the indicated block 
+    -  `@argument[uint]` <-- the argument at index `uint` of the current block
+    -  `@{block}.{argument}` <-- the indicated argument in the indicated block
     -  `@{function}.{argument}` <-- the indicated argument in the entry block of the indicated function
 
 -   instruction:
@@ -1064,7 +1064,7 @@ a sequence that also correctly destroys the current value.
 This instruction is only valid in Raw SIL and is rewritten as
 appropriate by the definitive initialization pass.
 
-### assign_or_init 
+### assign_or_init
 
 ```
 sil-instruction ::= 'assign_or_init' mode? attached-property ',' self-or-local ',' sil-operand ',' 'value' ',' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
@@ -1075,17 +1075,17 @@ self-or-local ::= 'self' | 'local'
 
 // Nominal Context:
 assign_or_init #MyStruct.x, self %A, value %V, init %I, set %S
-// Local Context (only emitted with compiler synthesized thunks currently):   
+// Local Context (only emitted with compiler synthesized thunks currently):
 assign_or_init #x, local %L, value %V, init %I, set %S
 ```
 
-Assigns or initializes a computed property with an attached init accessor. 
-This instruction is emitted during SILGen without an explicit mode. 
+Assigns or initializes a computed property with an attached init accessor.
+This instruction is emitted during SILGen without an explicit mode.
 The definitive initialization (DI) pass resolves the mode and rewrites
 the instruction accordingly:
 
-- `[init]`: In this mode, the init accessor `%I` is called with `%V` 
-as an argument. 
+- `[init]`: In this mode, the init accessor `%I` is called with `%V`
+as an argument.
 - `[assign]`: In this mode, the setter function `%S` is called with `%V`
 as an argument.
 
@@ -1093,17 +1093,17 @@ This instruction is only valid in Raw SIL and is rewritten as appropriate by
 the DI pass.
 
 Operand Roles:
-- `attached-property`: The property being written to. For nominal contexts, this 
-refers to a property with an attached init accessor (e.g. `#MyStruct.x`). For local 
+- `attached-property`: The property being written to. For nominal contexts, this
+refers to a property with an attached init accessor (e.g. `#MyStruct.x`). For local
 contexts, it refers to a local variable name (e.g. `#x`).
-- `self-or-local`: 
-  - `self %A`: Refers to the instance of the type that owns the property with the 
+- `self-or-local`:
+  - `self %A`: Refers to the instance of the type that owns the property with the
   attached init accessor.
-  - `local %L`: Indicates the assignment is to a local variable (`%L`) rather than 
-  a property of a nominal type. While init accessors are not currently available to be 
+  - `local %L`: Indicates the assignment is to a local variable (`%L`) rather than
+  a property of a nominal type. While init accessors are not currently available to be
   used in local contexts in user-authored code, the compiler can synthesize an `assign_or_init`
   in local contexts using an init accessor thunk in special cases.
-- `value %V`: The input value passed to either the `init` or `set` function, depending on 
+- `value %V`: The input value passed to either the `init` or `set` function, depending on
 the selected DI mode.
 - `init %I`: A partially applied function implementing the property's init accessor.
 - `set %S`: A partially applied function implementing the property's setter.
@@ -1149,7 +1149,7 @@ the mark_uninitialized instruction refers to:
 
 -   `delegatingselfallocated`: designates `self` on a class convenience
     initializer's initializing entry point
-    
+
 -   `out`: designates an indirectly returned result.
 
 The purpose of the `mark_uninitialized` instruction is to enable
@@ -1207,8 +1207,8 @@ sil-instruction ::= 'unchecked_ownership' sil-operand
 unchecked_ownership %1 : $T
 ```
 
-unchecked_ownership disables the ownership verification of it's operand. This used in cases 
-we cannot resolve ownership until a mandatory pass runs. This is only valid in Raw SIL. 
+unchecked_ownership disables the ownership verification of it's operand. This used in cases
+we cannot resolve ownership until a mandatory pass runs. This is only valid in Raw SIL.
 
 ### copy_addr
 
@@ -2511,7 +2511,7 @@ This instruction performs an Objective-C message send using
 sil-instruction ::= 'witness_method' sil-method-attributes?
                       sil-type ',' sil-decl-ref ':' sil-type
 
-%1 = witness_method $T, #Proto.method 
+%1 = witness_method $T, #Proto.method
   : $@convention(witness_method) <Self: Proto> U -> V
 // $T must be an archetype
 // #Proto.method must be a reference to a method of one of the protocol
@@ -2771,7 +2771,7 @@ entry(%x : $Int):
 
   // Create the bar closure
   %bar_uncurried = function_ref @bar : $(Int, Int) -> Int
-  %bar = partial_apply %bar_uncurried(%x_box, %x_addr) 
+  %bar = partial_apply %bar_uncurried(%x_box, %x_addr)
     : $(Int, Builtin.NativeObject, *Int) -> Int
 
   // Apply it
@@ -3604,7 +3604,7 @@ enum Foo<T> { case A(T), B(String) }
 
 sil @switch_foo : $<T> (Foo<T>) -> () {
 entry(%foo : $*Foo<T>):
-  switch_enum_addr %foo : $*Foo<T>, case #Foo.A!enumelt: a_dest, 
+  switch_enum_addr %foo : $*Foo<T>, case #Foo.A!enumelt: a_dest,
     case #Foo.B!enumelt: b_dest
 
 a_dest:
@@ -3749,9 +3749,9 @@ sil-instruction ::= 'select_enum' sil-operand sil-select-case*
                     (',' 'default' sil-value)?
                     ':' sil-type
 
-%n = select_enum %0 : $U,      
-  case #U.Case1!enumelt: %1,           
-  case #U.Case2!enumelt: %2, /* ... */ 
+%n = select_enum %0 : $U,
+  case #U.Case1!enumelt: %1,
+  case #U.Case2!enumelt: %2, /* ... */
   default %3 : $T
 
 // $U must be an enum type
@@ -3766,9 +3766,9 @@ an enum value. This is equivalent to a trivial
 
 ```
 entry:
-  switch_enum %0 : $U,            
-    case #U.Case1!enumelt: bb1,           
-    case #U.Case2!enumelt: bb2, /* ... */ 
+  switch_enum %0 : $U,
+    case #U.Case1!enumelt: bb1,
+    case #U.Case2!enumelt: bb2, /* ... */
     default bb_default
 bb1:
   br cont(%1 : $T) // value for #U.Case1
@@ -3795,9 +3795,9 @@ sil-instruction ::= 'select_enum_addr' sil-operand sil-select-case*
                     (',' 'default' sil-value)?
                     ':' sil-type
 
-%n = select_enum_addr %0 : $*U,      
-  case #U.Case1!enumelt: %1,           
-  case #U.Case2!enumelt: %2, /* ... */ 
+%n = select_enum_addr %0 : $*U,
+  case #U.Case1!enumelt: %1,
+  case #U.Case2!enumelt: %2, /* ... */
   default %3 : $T
 
 // %0 must be the address of an enum type $*U
@@ -4922,7 +4922,7 @@ on whether the cast succeeds or not.
 ### unconditional_checked_cast
 
 ```
-sil-instruction ::= 'unconditional_checked_cast' 
+sil-instruction ::= 'unconditional_checked_cast'
                     sil-prohibit-isolated-conformances?
                     sil-operand 'to' sil-type
 
@@ -5135,7 +5135,7 @@ sil-terminator ::= 'cond_br' sil-operand ','
                      sil-identifier '(' (sil-operand (',' sil-operand)*)? ')' ','
                      sil-identifier '(' (sil-operand (',' sil-operand)*)? ')'
 
-cond_br %0 : $Builtin.Int1, true_label (%a : $A, %b : $B, ...), 
+cond_br %0 : $Builtin.Int1, true_label (%a : $A, %b : $B, ...),
                                false_label (%x : $X, %y : $Y, ...)
 // %0 must be of $Builtin.Int1 type
 // `true_label` and `false_label` must refer to block labels within the
@@ -5160,9 +5160,9 @@ sil-terminator ::= 'switch_value' sil-operand
 sil-switch-value-case ::= 'case' sil-value ':' sil-identifier
 sil-switch-default ::= 'default' sil-identifier
 
-switch_value %0 : $Builtin.Int<n>, case %1: label1, 
-                                   case %2: label2, 
-                                   ...,            
+switch_value %0 : $Builtin.Int<n>, case %1: label1,
+                                   case %2: label2,
+                                   ...,
                                    default labelN
 
 // %0 must be a value of builtin integer type $Builtin.Int<n>
@@ -5187,9 +5187,9 @@ sil-terminator ::= 'switch_enum' sil-operand
                      (',' sil-switch-default)?
 sil-switch-enum-case ::= 'case' sil-decl-ref ':' sil-identifier
 
-switch_enum %0 : $U, case #U.Foo!enumelt: label1, 
-                      case #U.Bar!enumelt: label2, 
-                      ...,                 
+switch_enum %0 : $U, case #U.Foo!enumelt: label1,
+                      case #U.Bar!enumelt: label2,
+                      ...,
                       default labelN
 
 // %0 must be a value of enum type $U
@@ -5224,9 +5224,9 @@ enum Foo {
 
 sil @sum_of_foo : $Foo -> Int {
 entry(%x : $Foo):
-  switch_enum %x : $Foo,       
-    case #Foo.Nothing!enumelt: nothing, 
-    case #Foo.OneInt!enumelt:  one_int, 
+  switch_enum %x : $Foo,
+    case #Foo.Nothing!enumelt: nothing,
+    case #Foo.OneInt!enumelt:  one_int,
     case #Foo.TwoInts!enumelt: two_ints
 
 nothing:
@@ -5268,9 +5268,9 @@ sil-terminator ::= 'switch_enum_addr' sil-operand
                      (',' sil-switch-enum-case)*
                      (',' sil-switch-default)?
 
-switch_enum_addr %0 : $*U, case #U.Foo!enumelt: label1, 
-                                        case #U.Bar!enumelt: label2, 
-                                        ...,                 
+switch_enum_addr %0 : $*U, case #U.Foo!enumelt: label1,
+                                        case #U.Bar!enumelt: label2,
+                                        ...,
                                         default labelN
 
 // %0 must be the address of an enum type $*U
@@ -5463,7 +5463,7 @@ sil-differentiable-derivative-functions-clause ::=
     'with_derivative'
     '{' sil-value ':' sil-type ',' sil-value ':' sil-type '}'
 
-differentiable_function [parameters 0] %0 : $(T) -> T 
+differentiable_function [parameters 0] %0 : $(T) -> T
   with_derivative {%1 : $(T) -> (T, (T) -> T), %2 : $(T) -> (T, (T) -> T)}
 ```
 
@@ -5529,7 +5529,7 @@ sil-differentiable-function-extractee ::= 'original' | 'jvp' | 'vjp'
 differentiable_function_extract [original] %0 : $@differentiable (T) -> T
 differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T
 differentiable_function_extract [vjp] %0 : $@differentiable (T) -> T
-differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T 
+differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T
   as $(@in_constant T) -> (T, (T.TangentVector) -> T.TangentVector)
 ```
 
@@ -5573,7 +5573,7 @@ sil-instruction ::=
 sil-differentiability-witness-function-kind ::= 'jvp' | 'vjp' | 'transpose'
 sil-differentiability-witness-function-index-list ::= [0-9]+ (' ' [0-9]+)*
 
-differentiability_witness_function [vjp] [reverse] [parameters 0] [results 0] 
+differentiability_witness_function [vjp] [reverse] [parameters 0] [results 0]
   <T where T: Differentiable> @foo : $(T) -> T
 ```
 

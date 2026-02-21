@@ -70,7 +70,7 @@ int main() {
   }
 // CHECK:      init ClassWithIntField
 // CHECK-NEXT: destroy ClassWithIntField
-    
+
   {
     auto x = returnClassWithIntField();
     {

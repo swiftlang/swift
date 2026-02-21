@@ -476,7 +476,7 @@ public:
   /// \returns A result that contains a potentially re-written expression,
   /// along with the walk action to perform. The default implementation
   /// returns \c Action::Continue(E).
-  /// 
+  ///
   virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) {
     return Action::Continue(E);
   }

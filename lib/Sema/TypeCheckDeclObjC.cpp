@@ -1163,7 +1163,7 @@ bool swift::isRepresentableInLanguage(
 
 bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsClang.
-  
+
   if (VD->isInvalid())
     return false;
 
@@ -2157,7 +2157,7 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
         }
       }
     }
-    
+
     for (auto req : findWitnessedObjCRequirements(method)) {
       auto reqMethod = dyn_cast<AbstractFunctionDecl>(req);
       if (!reqMethod) continue;
@@ -2352,7 +2352,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
   if (name.getArgumentNames().size()
           != targetName.getArgumentNames().size())
     return false;
-  
+
   auto params = func->getParameters();
   for (unsigned i = 0, n = name.getArgumentNames().size(); i != n; ++i) {
     auto origArg = name.getArgumentNames()[i];
@@ -2859,7 +2859,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
   for (const auto &conflictSet : conflictSets) {
     // Diagnose the conflict.
     anyConflicts = true;
-    
+
     const auto &conflict = conflictSet.first;
     const auto &methods = conflictSet.second;
 

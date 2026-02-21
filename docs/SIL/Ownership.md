@@ -116,7 +116,7 @@ This lattice is applied to SIL by requiring well formed SIL to:
     our model `Any` represents an unknown ownership
     semantics and since our model is strict, we do not allow for values
     to have unknown ownership.
-    
+
 2.  Define a map from each operand of a SILInstruction, `i`,
     to a constant Ownership Kind, Boolean pair called the operand's
     [Ownership Constraint](#ownership-constraint). The Ownership Kind

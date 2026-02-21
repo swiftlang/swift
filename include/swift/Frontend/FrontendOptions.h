@@ -155,7 +155,7 @@ public:
 
   /// Include local definitions/references in the index data.
   bool IndexIncludeLocals = false;
-  
+
   /// Whether to compress the record and unit files in the index store.
   bool IndexStoreCompress = false;
 

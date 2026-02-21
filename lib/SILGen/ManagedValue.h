@@ -61,7 +61,7 @@ class ManagedValue {
   /// whether it represents an lvalue.  InContext is represented with the lvalue
   /// flag set but with a null SILValue.
   llvm::PointerIntPair<SILValue, 1, bool> valueAndFlag;
-  
+
   /// A handle to the cleanup that destroys this value, or
   /// CleanupHandle::invalid() if the value has no cleanup.
   CleanupHandle cleanup;
@@ -243,14 +243,14 @@ public:
            "lvalues always have isAddress() type");
     return ManagedValue(value, true, CleanupHandle::invalid());
   }
-  
+
   /// Create a managed value that indicates that the value you're looking for
   /// got stored into an initialization specified by an SGFContext, instead of
   /// being represented by this ManagedValue.
   static ManagedValue forInContext() {
     return ManagedValue(SILValue(), true, CleanupHandle::invalid());
   }
-  
+
   /// Creates a managed value for an address that is undergoing a formal
   /// access. This will be `forLValue` if the `accessKind` is a mutating
   /// (exclusive) access or `forBorrowedAddressRValue` if the
@@ -273,7 +273,7 @@ public:
   bool isPlusZeroRValueOrTrivial() const {
     // If this is an lvalue or isInContext() then it is not an RValue.
     if (isLValue() || isInContext()) return false;
-    
+
     // If this has a cleanup attached, then it is +1 rvalue.  If not, it is
     // either +0 or trivial (in which case +0 vs +1 doesn't matter).
     return !hasCleanup();
@@ -324,7 +324,7 @@ public:
     assert(isLValue() && "This isn't an lvalue");
     return getValue();
   }
-  
+
   SILValue getUnmanagedValue() const {
     assert(!hasCleanup());
     return getValue();
@@ -333,7 +333,7 @@ public:
   /// debugging without needing to interpret the flag field.
   LLVM_ATTRIBUTE_USED
   SILValue getValue() const { return valueAndFlag.getPointer(); }
-  
+
   SILType getType() const { return getValue()->getType(); }
 
   ValueOwnershipKind getOwnershipKind() const {
@@ -404,11 +404,11 @@ public:
 
   /// Disable the cleanup for this value.
   void forwardCleanup(SILGenFunction &SGF) const;
-  
+
   /// Forward this value, deactivating the cleanup and returning the
   /// underlying value.
   SILValue forward(SILGenFunction &SGF) const;
-  
+
   /// Forward this value into memory by storing it to the given address.
   ///
   /// \param SGF - The SILGenFunction.
@@ -422,7 +422,7 @@ public:
   /// \param loc - the AST location to associate with emitted instructions.
   /// \param dest - the destination to forward into
   void forwardInto(SILGenFunction &SGF, SILLocation loc, Initialization *dest);
-  
+
   /// Assign this value into memory, destroying the existing
   /// value at the destination address.
   ///

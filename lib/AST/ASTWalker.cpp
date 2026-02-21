@@ -81,20 +81,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   typedef ASTVisitor<Traversal, Expr*, Stmt*, bool, Pattern*, bool> inherited;
 
   ASTWalker &Walker;
-  
-  /// RAII object that sets the parent of the walk context 
+
+  /// RAII object that sets the parent of the walk context
   /// appropriately.
   class SetParentRAII {
     ASTWalker &Walker;
     decltype(ASTWalker::Parent) PriorParent;
-    
+
   public:
     template<typename T>
     SetParentRAII(ASTWalker &walker, T *newParent)
       : Walker(walker), PriorParent(walker.Parent) {
       walker.Parent = newParent;
     }
-    
+
     ~SetParentRAII() {
       Walker.Parent = PriorParent;
     }
@@ -302,7 +302,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     return WalkGenerics && visitTrailingRequirements(TAD);
   }
-  
+
   bool visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
     if (Walker.shouldWalkIntoGenericParams() && OTD->getGenericParams()) {
       if (doIt(OTD->getGenericParams()))
@@ -635,7 +635,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
     return E;
   }
-  
+
   Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) { return E; }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
 
@@ -707,7 +707,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
     return E;
   }
-  
+
   Expr *visitMemberRefExpr(MemberRefExpr *E) {
     if (Expr *Base = doIt(E->getBase())) {
       E->setBase(Base);
@@ -778,7 +778,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     } else {
       return nullptr;
     }
-    
+
     return E;
   }
   Expr *visitKeyPathApplicationExpr(KeyPathApplicationExpr *E) {
@@ -786,12 +786,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       E->setBase(Base);
     else
       return nullptr;
-    
+
     if (Expr *KeyPath = doIt(E->getKeyPath()))
       E->setKeyPath(KeyPath);
     else
       return nullptr;
-    
+
     return E;
   }
   Expr *visitDynamicSubscriptExpr(DynamicSubscriptExpr *E) {
@@ -805,13 +805,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     } else {
       return nullptr;
     }
-    
+
     return E;
   }
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     if (!E->getBase())
       return E;
-    
+
     if (Expr *E2 = doIt(E->getBase())) {
       E->setBase(E2);
       return E;
@@ -821,7 +821,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
     if (!E->getSubExpr())
       return E;
-    
+
     if (Expr *Sub = doIt(E->getSubExpr()))
       E->setSubExpr(Sub);
     else
@@ -834,7 +834,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     return E;
   }
-  
+
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     if (Expr *E2 = doIt(E->getBase())) {
       E->setBase(E2);
@@ -869,7 +869,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return nullptr;
       }
     }
-    
+
     return E;
   }
 
@@ -904,7 +904,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     return E;
   }
-  
+
   Expr *visitDestructureTupleExpr(DestructureTupleExpr *E) {
     if (auto *src = doIt(E->getSubExpr())) {
       E->setSubExpr(src);
@@ -952,7 +952,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return nullptr;
   }
-  
+
   Expr *visitVarargExpansionExpr(VarargExpansionExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
       E->setSubExpr(E2);
@@ -1062,7 +1062,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return nullptr;
   }
-  
+
   Expr *visitApplyExpr(ApplyExpr *E) {
     if (E->getFn()) {
       Expr *E2 = doIt(E->getFn());
@@ -1099,11 +1099,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     Expr *E2 = doIt(E->getLHS());
     if (E2 == nullptr) return nullptr;
     E->setLHS(E2);
-    
+
     E2 = doIt(E->getRHS());
     if (E2 == nullptr) return nullptr;
     E->setRHS(E2);
-    return E;      
+    return E;
   }
 
   Expr *visitExplicitCastExpr(ExplicitCastExpr *E) {
@@ -1143,10 +1143,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     Expr *Sub = doIt(E->getSubExpr());
     if (!Sub) return nullptr;
     E->setSubExpr(Sub);
-    
+
     return E;
   }
-  
+
   Expr *visitAssignExpr(AssignExpr *AE) {
     if (Expr *Dest = AE->getDest()) {
       if (!(Dest = doIt(Dest)))
@@ -1159,10 +1159,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return nullptr;
       AE->setSrc(Src);
     }
-    
+
     return AE;
   }
-  
+
   Expr *visitEnumIsCaseExpr(EnumIsCaseExpr *E) {
     if (Expr *Sub = E->getSubExpr()) {
       if (!(Sub = doIt(Sub)))
@@ -1183,24 +1183,24 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       if (!Cond) return nullptr;
       E->setCondExpr(Cond);
     }
-    
+
     Expr *Then = doIt(E->getThenExpr());
     if (!Then) return nullptr;
     E->setThenExpr(Then);
-    
+
     if (Expr *Else = E->getElseExpr()) {
       Else = doIt(Else);
       if (!Else) return nullptr;
       E->setElseExpr(Else);
     }
-    
+
     return E;
   }
 
   Expr *visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
     Pattern *sub = doIt(E->getSubPattern());
     if (!sub) return nullptr;
-    
+
     E->setSubPattern(sub);
     return E;
   }
@@ -1252,7 +1252,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     E->setSubExpr(sub);
     return E;
   }
-  
+
   Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
     return E;
   }
@@ -1590,7 +1590,7 @@ public:
         [&](Stmt *S) { return visit(S); },
         [&](Stmt *S) { return Walker.walkToStmtPost(S); });
   }
-  
+
   bool shouldSkip(Decl *D) {
     if (!Walker.shouldWalkMacroArgumentsAndExpansion().second &&
         Walker.isDeclInMacroExpansion(D) && !Walker.Parent.isNull())
@@ -1659,7 +1659,7 @@ public:
         elt.setBoolean(E);
         break;
       }
-          
+
       case StmtConditionElement::CK_PatternBinding: {
         auto *P = doIt(elt.getPattern());
         if (!P) return true;
@@ -2000,7 +2000,7 @@ Stmt *Traversal::visitIfStmt(IfStmt *IS) {
 Stmt *Traversal::visitGuardStmt(GuardStmt *US) {
   if (doIt(US->getCond()))
     return nullptr;
-  
+
   if (BraceStmt *S2 = cast_or_null<BraceStmt>(doIt(US->getBody())))
     US->setBody(S2);
   else

@@ -38,7 +38,7 @@ private:
   /// The spare bit mask for this type. SpareBits[0] is the LSB of the first
   /// byte. This may be empty if the type has no spare bits.
   SpareBitVector SpareBits;
-  
+
 protected:
   FixedTypeInfo(llvm::Type *type, Size size,
                 const SpareBitVector &spareBits,
@@ -140,7 +140,7 @@ public:
       s = Size(1);
     return s;
   }
-  
+
   /// Returns the fixed number of "extra inhabitants" (that is, bit
   /// patterns that don't represent valid values of the type) in the type
   /// representation.
@@ -172,12 +172,12 @@ public:
                                              unsigned index) const {
     return getSpareBitFixedExtraInhabitantValue(IGM, bits, index);
   }
-  
+
   /// Create an extra inhabitant constant using the spare bits of the type.
   APInt getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
                                              unsigned bits,
                                              unsigned index) const;
-  
+
   /// Map an extra inhabitant representation in memory to a unique 31-bit
   /// identifier, and map a valid representation of the type to -1.
   virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
@@ -185,12 +185,12 @@ public:
                                                bool isOutlined) const {
     return getSpareBitExtraInhabitantIndex(IGF, src);
   }
-  
+
   /// Map an extra inhabitant representation derived from spare bits to an
   /// index.
   llvm::Value *getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
                                                Address src) const;
-  
+
   /// Store the extra inhabitant representation indexed by a 31-bit identifier
   /// to memory.
   virtual void storeExtraInhabitant(IRGenFunction &IGF,
@@ -199,20 +199,20 @@ public:
                                     bool isOutlined) const {
     storeSpareBitExtraInhabitant(IGF, index, dest);
   }
-  
+
   /// Store the indexed spare-bit-derived extra inhabitant to memory.
   void storeSpareBitExtraInhabitant(IRGenFunction &IGF,
                                     llvm::Value *index,
                                     Address dest) const;
-  
+
   /// Get the spare bit mask for the type.
   const SpareBitVector &getSpareBits() const { return SpareBits; }
-  
+
   /// True if the type representation has statically "spare" unused bits.
   bool hasFixedSpareBits() const {
     return SpareBits.any();
   }
-  
+
   /// Applies the fixed spare bits mask for this type to the given BitVector,
   /// clearing any bits used by valid representations of the type.
   ///

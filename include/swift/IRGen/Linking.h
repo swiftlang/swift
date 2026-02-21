@@ -801,7 +801,7 @@ class LinkEntity {
   static bool isValidResilientMethodRef(SILDeclRef declRef) {
     if (declRef.isForeign)
       return false;
-    
+
     auto *decl = declRef.getDecl();
     return (isa<ClassDecl>(decl->getDeclContext()) ||
             isa<ProtocolDecl>(decl->getDeclContext()));
@@ -1657,7 +1657,7 @@ public:
     assert(isDeclKind(getKind()));
     return reinterpret_cast<ValueDecl*>(Pointer);
   }
-  
+
   const ExtensionDecl *getExtension() const {
     assert(getKind() == Kind::ExtensionDescriptor);
     return reinterpret_cast<ExtensionDecl*>(Pointer);
@@ -1703,7 +1703,7 @@ public:
     assert(isProtocolConformanceKind(getKind()));
     return getProtocolConformance()->getRootConformance();
   }
-  
+
   const ProtocolConformance *getProtocolConformance() const {
     assert(isProtocolConformanceKind(getKind()));
     return reinterpret_cast<ProtocolConformance*>(SecondaryPointer);
@@ -1841,14 +1841,14 @@ public:
 
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(ModuleDecl *module) const;
-  
+
   /// Return the module scope context whose codegen should trigger emission
   /// of this link entity, if one can be identified.
   DeclContext *getDeclContextForEmission() const;
-  
+
   /// Get the preferred alignment for the definition of this entity.
   Alignment getAlignment(IRGenModule &IGM) const;
-  
+
   /// Get the default LLVM type to use for forward declarations of this
   /// entity.
   llvm::Type *getDefaultDeclarationType(IRGenModule &IGM) const;

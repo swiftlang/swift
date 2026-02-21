@@ -27,21 +27,21 @@ __swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar) 
   auto index = 1; //0th element is a dummy element
   while (index < GRAPHEME_BREAK_DATA_COUNT) {
     auto entry = _swift_stdlib_graphemeBreakProperties[index];
-    
+
     // Shift the enum and range count out of the value.
     auto lower = (entry << 11) >> 11;
-    
+
     // Shift the enum out first, then shift out the scalar value.
     auto upper = lower + ((entry << 3) >> 24);
-    
+
     // Shift everything out.
     auto enumValue = (__swift_uint8_t)(entry >> 29);
-    
+
     // Special case: extendedPictographic who used an extra bit for the range.
     if (enumValue == 5) {
       upper = lower + ((entry << 2) >> 23);
     }
-    
+
     //If we want the left child of the current node in our virtual tree,
     //that's at index * 2, if we want the right child it's at (index * 2) + 1
     if (scalar < lower) {

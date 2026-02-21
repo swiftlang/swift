@@ -56,9 +56,9 @@ void swift::rewriting::applyInverses(
   const bool allowInverseOnAssocType =
       ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypes) ||
       ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypesWithDefaults);
-      
+
   llvm::DenseMap<CanType, CanType> representativeGPs;
-  
+
   // Start with an identity mapping.
   for (auto gp : gps) {
     auto canGP = stripBoundDependentMemberTypes(gp)->getCanonicalType();
@@ -77,11 +77,11 @@ void swift::rewriting::applyInverses(
       if (found->second == CanType()) {
         return CanType();
       }
-      
+
       if (found->second == gp) {
         return gp;
       }
-      
+
       gp = found->second;
     }
   };
@@ -141,7 +141,7 @@ void swift::rewriting::applyInverses(
         smaller = secondTy;
         larger = firstTy;
       }
-      
+
       hadSameTypeConstraintInScope = true;
       representativeGPs.insert_or_assign(larger, representativeGPFor(smaller));
       continue;
@@ -156,7 +156,7 @@ void swift::rewriting::applyInverses(
     if (typeOutOfScope->isTypeParameter()) {
       continue;
     }
-    
+
     // If the out-of-scope type contains errors, then similarly, ignore the
     // same type constraint. Any additional diagnostics arising from the type
     // parameter being left ~Copyable or ~Escapable might be misleading if the
@@ -164,7 +164,7 @@ void swift::rewriting::applyInverses(
     if (typeOutOfScope->hasError()) {
       continue;
     }
-    
+
     representativeGPs.insert_or_assign(representativeGPFor(typeInScope),
                                        CanType());
     hadSameTypeConstraintInScope = true;
@@ -212,7 +212,7 @@ void swift::rewriting::applyInverses(
     }
 
     auto representativeSubject = representativeGPFor(canSubject);
-    
+
     // If the subject is in scope, but same-type constrained to a type out of
     // scope, then allow inverses to be stated even though they are redundant.
     // This is because older versions of Swift not only accepted but required
@@ -260,7 +260,7 @@ void swift::rewriting::applyInverses(
     if (representative == representativeGPs.end()) {
       return false;
     }
-      
+
     // If this type is same-type constrained into another equivalence class,
     // then it doesn't need its own defaulted requirements.
     if (representative->second != subject) {

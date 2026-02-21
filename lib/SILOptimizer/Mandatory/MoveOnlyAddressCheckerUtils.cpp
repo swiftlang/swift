@@ -1293,7 +1293,7 @@ void UseState::initializeLiveness(
                             << *livenessInstAndValue.first;
                liveness.print(llvm::dbgs()));
   }
-  
+
   auto updateForLivenessAccess = [&](BeginAccessInst *beginAccess,
                                      const SmallBitVector &livenessMask) {
     for (auto *endAccess : beginAccess->getEndAccesses()) {
@@ -1867,7 +1867,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
         && !targetType.getEnumOrBoundGenericEnum()) {
       LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType in deinit! "
                                  "Not allowed yet");
-      
+
       return {PartialMutationError::consumeDuringDeinit(iterType)};
     }
 
@@ -2069,7 +2069,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
   /// base address that we are checking which should be the operand of the mark
   /// must check value.
   SILValue getRootAddress() const { return markedValue; }
-  
+
   ASTContext &getASTContext() {
     return markedValue->getFunction()->getASTContext();
   }
@@ -2111,7 +2111,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
     }
     return emittedError;
   }
-  
+
   void onError(Operand *op) {
       LLVM_DEBUG(llvm::dbgs() << "    Found use unrecognized by the walker!\n";
                  op->getUser()->print(llvm::dbgs()));
@@ -2207,7 +2207,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // Ignore end_access.
   if (isa<EndAccessInst>(user))
     return true;
-  
+
   // Ignore end_cow_mutation_addr.
   if (isa<EndCOWMutationAddrInst>(user)) {
     return true;
@@ -2431,7 +2431,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         auto operand = stripAccessAndIdentityCasts(markedValue->getOperand());
         auto *fArg = dyn_cast<SILFunctionArgument>(operand);
         auto *ptrToAddr = dyn_cast<PointerToAddressInst>(operand);
-            
+
         // If we have a closure captured that we specialized, we should have a
         // no consume or assign and should emit a normal guaranteed diagnostic.
         if (fArg && fArg->isClosureCapture() &&
@@ -2766,7 +2766,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     }
     return true;
   }
-  
+
   if (auto *access = dyn_cast<BeginAccessInst>(op->getUser())) {
     switch (access->getAccessKind()) {
     // Treat an opaque read access as a borrow liveness use for the duration

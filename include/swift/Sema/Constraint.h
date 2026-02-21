@@ -373,7 +373,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// Whether the choice of this disjunction should be recorded in the
   /// solver state.
   unsigned RememberChoice : 1;
-  
+
   /// Whether or not this constraint is 'favored' in the sense that, if
   /// successfully applied, it should be preferred over any other constraints
   /// in its disjunction.
@@ -542,7 +542,7 @@ public:
                             ArrayRef<TypeVariableType *> extraTypeVars = {});
 
   /// Create a new constraint.
-  static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
+  static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind,
                             Type First, Type Second, Type Third,
                             ConstraintLocator *locator,
                             ArrayRef<TypeVariableType *> extraTypeVars = { });
@@ -562,15 +562,15 @@ public:
                                   ConstraintLocator *locator);
 
   /// Create an overload-binding constraint, possibly with a fix.
-  static Constraint *createBindOverload(ConstraintSystem &cs, Type type, 
-                                        OverloadChoice choice, 
+  static Constraint *createBindOverload(ConstraintSystem &cs, Type type,
+                                        OverloadChoice choice,
                                         DeclContext *useDC, ConstraintFix *fix,
                                         ConstraintLocator *locator);
 
   /// Create a restricted relational constraint.
   static Constraint *createRestricted(ConstraintSystem &cs, ConstraintKind kind,
                                       ConversionRestrictionKind restriction,
-                                      Type first, Type second, 
+                                      Type first, Type second,
                                       ConstraintLocator *locator);
 
   /// Create a relational constraint with a fix.

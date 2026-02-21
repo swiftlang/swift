@@ -67,7 +67,7 @@ DerivedOutOfOrder : public BaseT, public DerivedWithVirtualDestructor {
     // DerivedWithVirtualDestructor is the primary base class despite being the
     // second one the list.
 
-    int leafField = 789; 
+    int leafField = 789;
 
     DerivedOutOfOrder() = default;
     ~DerivedOutOfOrder() override {}
@@ -397,6 +397,6 @@ void forestRetain(InheritingTemplatedRefType::IntrusiveRefCountedTemplate<
 void forestRelease(InheritingTemplatedRefType::IntrusiveRefCountedTemplate<
                     InheritingTemplatedRefType::Forest> *forest) {
     forest->release();
-}  
+}
 
 SWIFT_END_NULLABILITY_ANNOTATIONS

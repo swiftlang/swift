@@ -28,7 +28,7 @@
 namespace swift {
   class PatternBindingDecl;
   class SILBasicBlock;
-  
+
 namespace Lowering {
 
 /// A condition is the result of evaluating a boolean expression as
@@ -41,13 +41,13 @@ class LLVM_LIBRARY_VISIBILITY Condition {
   /// are initialized non-null and set to null after being emitted.
   SILBasicBlock *TrueBB;
   SILBasicBlock *FalseBB;
-  
+
   /// The continuation block if both branches are possible.
   SILBasicBlock *ContBB;
 
   /// The location wrapping the originator conditional expression.
   SILLocation Loc;
-  
+
 public:
   Condition(SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
             SILBasicBlock *ContBB,
@@ -94,23 +94,23 @@ protected:
 class ConditionalValue {
   SILGenFunction &SGF;
   const TypeLowering &tl;
-  
+
   /// The continuation block that receives the conditional value.
   SILBasicBlock *contBB;
-  
+
   /// The location associated with the value.
   SILLocation loc;
 
   /// The buffer to receive an address-only result, or the BB argument that
   /// a loadable result is passed to.
   SILValue result;
-  
+
   /// The Scope for the current branch.
   std::optional<Scope> scope;
 
   /// A place to hold conditional Initializations of our result.
   InitializationPtr currentInitialization;
-  
+
 public:
   /// Begins a conditional computation of the type represented by the given
   /// type lowering. This potentially emits a temporary allocation for the
@@ -118,7 +118,7 @@ public:
   /// any branches that will be involved in the computation.
   ConditionalValue(SILGenFunction &SGF, SGFContext C, SILLocation loc,
                    const TypeLowering &valueTL);
-  
+
   /// Enter a branch of the conditional value computation. Expression evaluation
   /// within this branch may use the returned SGFContext to potentially find a
   /// buffer to emit into. If a basic block is given, the insertion point must
@@ -126,21 +126,21 @@ public:
   /// insertion point will be inside it. If the basic block is null, then
   /// codegen proceeds in the current basic block.
   SGFContext enterBranch(SILBasicBlock *bb = nullptr);
-  
+
   /// Exit a branch of the conditional value computation, using the given value
   /// as the result of the computation on this branch. Branches to the
   /// continuation block for the conditional value. On return, the insertion
   /// point will be invalid.
   void exitBranch(RValue &&result);
-  
+
   /// Complete the conditional computation. The insertion point must be invalid.
   /// On return, the continuation block for the conditional will be emitted, and
   /// the insertion point will be inside it. The result of the conditional
   /// computation will be returned.
   ManagedValue complete();
 };
-  
+
 } // end namespace Lowering
 } // end namespace swift
-  
+
 #endif

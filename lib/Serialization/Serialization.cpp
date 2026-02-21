@@ -3098,7 +3098,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                        (unsigned)theAttr->exportKind);
       return;
     }
-        
+
     case DeclAttrKind::NonSendable: {
       auto *theAttr = cast<NonSendableAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[NonSendableDeclAttrLayout::Code];
@@ -3714,7 +3714,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                   isCompoundName, hasModuleSelector,
                                   rawPieceIDs);
   }
-  
+
   size_t addConformances(const IterableDeclContext *declContext,
                          ConformanceLookupKind lookupKind,
                          SmallVectorImpl<uint64_t> &data) {
@@ -5578,7 +5578,7 @@ getRawSILParameterInfoOptions(swift::SILParameterInfo::Options options) {
     options -= SILParameterInfo::ImplicitLeading;
     result |= SILParameterInfoFlags::ImplicitLeading;
   }
-  
+
   if (options.contains(SILParameterInfo::Const)) {
     options -= SILParameterInfo::Const;
     result |= SILParameterInfoFlags::Const;

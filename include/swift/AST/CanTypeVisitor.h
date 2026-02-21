@@ -47,7 +47,7 @@ public:
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
-  
+
   // Provide default implementations of abstract "visit" implementations that
   // just chain to their base class.  This allows visitors to just implement
   // the base behavior and handle all subclasses if they desire.  Since this is
@@ -135,5 +135,5 @@ public:
 };
 
 } // end namespace swift
-  
+
 #endif

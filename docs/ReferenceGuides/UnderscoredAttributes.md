@@ -590,7 +590,7 @@ anything if the closure is synchronous.
 
 This works with global actors as expected:
 
-```swift 
+```swift
 @MainActor
 func test() {
   Task { /* main actor isolated */ }
@@ -600,19 +600,19 @@ func test() {
 However, for the inference to work with instance actors (i.e. `isolated` parameters),
 the closure must capture the isolated parameter explicitly:
 
-```swift 
+```swift
 func test(actor: isolated (any Actor)) {
   Task { /* non isolated */ } // !!!
 }
 
 func test(actor: isolated (any Actor)) {
   Task { // @_inheritActorContext
-    _ = actor // 'actor'-isolated 
+    _ = actor // 'actor'-isolated
   }
 }
 ```
 
-The attribute takes an optional modifier '`always`', which changes this behavior 
+The attribute takes an optional modifier '`always`', which changes this behavior
 and *always* captures the enclosing isolated context, rather than forcing developers
 to perform the explicit capture themselfes:
 
@@ -660,7 +660,7 @@ on the function subsequently.
 ## `@_noEagerMove`
 
 When applied to a value, indicates that the value's lifetime is lexical, that
-releases of the value may not be hoisted over deinit barriers.  
+releases of the value may not be hoisted over deinit barriers.
 
 This is the default behavior, unless the value's type is annotated
 `@_eagerMove`, in which case this attribute overrides that type-level
@@ -758,7 +758,7 @@ func baz() {
 Additionally, if they are of a tuple or struct type, their stored members
 without observers may also be passed inout as non-ephemeral pointers.
 
-For more details, see the diagnostic group 
+For more details, see the diagnostic group
 [temporary pointer usage](/userdocs/diagnostics/temporary-pointers.md).
 
 ## `@_nonoverride`
@@ -813,7 +813,7 @@ of a header as non-`Sendable` so that you can make spot exceptions with
 
 A pre-stable form of `@implementation`. The main difference between them is that
 many things that are errors with `@implementation` are warnings with
-`@_objcImplementation`, which permitted workarounds for compiler bugs and 
+`@_objcImplementation`, which permitted workarounds for compiler bugs and
 changes in compiler behavior.
 
 Declares an extension that defines an implementation for the Objective-C
@@ -824,13 +824,13 @@ This attribute is used to write fully Objective-C-compatible implementations in
 Swift. Normal Objective-C interop allows Objective-C clients to use instances of
 the subclass, but not to subclass them, and uses a generated header that is not
 meant to be read by humans. `@_objcImplementation`, on the other hand, creates
-classes that are virtually indistinguishable from classes implemented in native 
+classes that are virtually indistinguishable from classes implemented in native
 Objective-C: they do not have a Swift vtable or any other Swift-specific
-metadata, Swift does not use any special knowledge of the class's "Swiftiness" 
-when using the class so ObjC runtime calls work correctly and they can even be 
-subclassed by Objective-C code, and you write a header for the class by hand 
-that looks exactly like an equivalent ObjC class. Clients should not notice if 
-you replace a native Objective-C `@implementation Foo (Bar)` with a Swift 
+metadata, Swift does not use any special knowledge of the class's "Swiftiness"
+when using the class so ObjC runtime calls work correctly and they can even be
+subclassed by Objective-C code, and you write a header for the class by hand
+that looks exactly like an equivalent ObjC class. Clients should not notice if
+you replace a native Objective-C `@implementation Foo (Bar)` with a Swift
 `@_objcImplementation(Bar) extension Foo`.
 
 You create a class with this feature very differently from normal ObjC interop:
@@ -841,7 +841,7 @@ You create a class with this feature very differently from normal ObjC interop:
    splitting them across multiple files, grouping related declarations together,
    adding comments, declaring Swift behavior using C attributes or API notes,
    etc.
-   
+
 2. Import your headers into Swift using a bridging header or umbrella header so
    Swift can see them.
 
@@ -853,22 +853,22 @@ You create a class with this feature very differently from normal ObjC interop:
 
    * To implement the main `@interface` of a class in Swift, use
      `@_objcImplementation extension ClassName`.
-     
+
    * To implement a category in Swift, use
      `@_objcImplementation(CategoryName) extension ClassName`.
-     
+
 The members of an `@_objcImplementation` extension should fall into one of
 three categories:
-   
+
 * **Swift-only members** include any member marked `final`. These are not
   `@objc` or `dynamic` and are only callable from Swift. Use these for
-  Swift-only APIs, random helper methods, etc. 
-    
+  Swift-only APIs, random helper methods, etc.
+
 * **ObjC helper members** include any non-`final` member marked `fileprivate`
   or `private`. These are implicitly `@objc dynamic`. Use these for action
   methods, selector-based callbacks, and other situations where you need a
   helper method to be accessible from an Objective-C message.
-  
+
 * **Member implementations** include any other non-`final` member. These are
   implicitly `@objc dynamic` and must match a member declared in the
   Objective-C header. Use these to implement the APIs declared in your
@@ -879,7 +879,7 @@ Notes:
 * We don't currently plan to support ObjC generics.
 
 * We should think about ObjC "direct" members, but that would probably
-  require a way to spell this in Swift. 
+  require a way to spell this in Swift.
 
 ## `@_objc_non_lazy_realization`
 
@@ -953,7 +953,7 @@ for some storage (a subscript or a property) should use the `get` accessor inste
 
 This attribute is particularly useful for accessors returning noncopyable values.
 By default, all explicitly-declared `get` accessors that return a noncopyable value and are declared in
-resilient libraries, or accessed opaquely via a protocol, are treated as if they return a borrowed value, 
+resilient libraries, or accessed opaquely via a protocol, are treated as if they return a borrowed value,
 rather than one that is valid to consume:
 
 ```swift
@@ -961,7 +961,7 @@ rather than one that is valid to consume:
 
 public protocol Giver {
   var mutableSpan: MutableSpan { get } // has 'yielding borrow' semantics
-} 
+}
 
 func example(_ s: some Giver) {
   let x = s.mutableSpan // error
@@ -986,7 +986,7 @@ Adding or removing this attribute is potentially an ABI and Source breaking chan
 
 ## `@_preInverseGenerics`
 
-By default when mangling a generic signature, the presence of a conformance 
+By default when mangling a generic signature, the presence of a conformance
 requirement for an invertible protocol, like Copyable and Escapable, is not
 explicitly mangled. Only the _absence_ of those conformance requirements for
 each generic parameter appears in the mangled name.
@@ -1018,7 +1018,7 @@ The purpose of this attribute is to aid in adopting noncopyable generics
 only.
 
 > **WARNING:** Before applying this attribute, you _must manually verify_ that
-> there never were any implementations of `foo` that contained a copy of `t`, 
+> there never were any implementations of `foo` that contained a copy of `t`,
 > to ensure correctness. There is no way to prove this by simply inspecting the
 > Swift source code! You actually have to **check the assembly code** in all of
 > your existing libraries containing `foo`, because an older version of the
@@ -1188,7 +1188,7 @@ ways to misuse it:
   be reliably recovered through C interfaces like `dlsym`. If you want to
   implement a plugin-style interface, use `Bundle`/`NSBundle` if available, or
   export your plugin entry points as C entry points using `@_cdecl`.
-  
+
 Legitimate uses may include:
 
 - Use `@_silgen_name` if you're implementing the Swift runtime.
@@ -1356,8 +1356,8 @@ the client, the symbol will be weakly linked, but checking for `@available` and
 
 ## `_local`
 
-A distributed actor can be marked as "known to be local" which allows avoiding 
+A distributed actor can be marked as "known to be local" which allows avoiding
 the distributed actor isolation checks. This is used for things like `whenLocal`
-where the actor passed to the closure is known-to-be-local, and similarly a 
-`self` of obtained from an _isolated_ function inside a distributed actor is 
+where the actor passed to the closure is known-to-be-local, and similarly a
+`self` of obtained from an _isolated_ function inside a distributed actor is
 also guaranteed to be local by construction.

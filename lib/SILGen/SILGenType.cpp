@@ -1312,7 +1312,7 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
   // sil @shim : $@convention(method) @yield_once_2 (As...) -> (@yields Ys...) {
   // entry(%as... : $As...):
   //   %method = class_method
-  //   (%ys... : $Ys..., %token) = begin_apply %method(%as...) 
+  //   (%ys... : $Ys..., %token) = begin_apply %method(%as...)
   //                               : $@convention(method) @yield_once (As...) -> (@yields Ys...)
   //   yield %ys : $Ys..., normal normal_block, error error_block
   // normal_block:
@@ -1768,7 +1768,7 @@ public:
   void visitAbstractStorageDecl(AbstractStorageDecl *asd) {
     if (asd->isObjC())
       SGM.emitObjCPropertyMethodThunks(asd);
-    
+
     SGM.tryEmitPropertyDescriptor(asd);
     visitAccessors(asd);
   }

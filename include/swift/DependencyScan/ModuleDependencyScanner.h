@@ -235,7 +235,7 @@ public:
   SwiftDependencyTracker(std::shared_ptr<llvm::cas::ObjectStore> CAS,
                          llvm::PrefixMapper *Mapper,
                          const CompilerInvocation &CI);
-  
+
   void startTracking(bool includeCommonDeps = true);
 
   /// Track a file with path.
@@ -243,16 +243,16 @@ public:
   bool trackFile(const Twine &path);
 
   llvm::Expected<llvm::cas::ObjectProxy> createTreeFromDependencies();
-  
+
 private:
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS;
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
   llvm::PrefixMapper *Mapper;
-  
+
   struct FileEntry {
     llvm::cas::ObjectRef FileRef;
     size_t Size;
-    
+
     FileEntry(llvm::cas::ObjectRef FileRef, size_t Size)
     : FileRef(FileRef), Size(Size) {}
   };
@@ -452,7 +452,7 @@ private:
   std::string ModuleOutputPath;
   /// The location of where the explicitly-built SDK modules will be output to
   std::string SDKModuleOutputPath;
-  
+
   /// Reference to a module dependency cache
   ModuleDependenciesCache &DependencyCache;
 

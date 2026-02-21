@@ -935,7 +935,7 @@ struct alledge_iterator {
   using value_type = LoopRegionWrapper;
   using difference_type = std::ptrdiff_t;
   using pointer = value_type*;
-  using reference = value_type&;    
+  using reference = value_type&;
 
   LoopRegionWrapper *Wrapper;
   LoopRegion::subregion_iterator SubregionIter;

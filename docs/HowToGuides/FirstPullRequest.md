@@ -102,7 +102,7 @@ Alright! You've implemented a change and would like to submit it.
 
 ### Tidying up
 
-> **Note**  
+> **Note**
 > If you intend to create a [draft pull request][draft-pr], you can tidy up
 > later *before* marking it as ready for review.
 
@@ -182,7 +182,7 @@ That's totally okay! There is no shame in that. You only have limited time and
 energy in a day. If you can, leave a comment on the bug report/pull request
 that you will not be able to continue and unassign yourself from the issue on
 GitHub. Don't worry about trying to explain _why_ you aren't
-able to contribute further. We understand. Unanticipated things come up all 
+able to contribute further. We understand. Unanticipated things come up all
 the time and you should do what _works for you_.
 
 This point also applies if you don't have time right now but hope to get to

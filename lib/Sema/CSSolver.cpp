@@ -680,7 +680,7 @@ ConstraintSystem::SolverState::~SolverState() {
 
 #if LLVM_ENABLE_STATS
   // Update the "largest" statistics if this system is larger than the
-  // previous one.  
+  // previous one.
   // FIXME: This is not at all thread-safe.
   if (NumSolverScopes > LargestNumSolverScopes.getValue()) {
     LargestSolutionAttemptNumber = SolutionAttempt-1;

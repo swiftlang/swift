@@ -308,7 +308,7 @@ struct State {
     for (auto &entry : allocations) {
       entry.setUndeallocatable();
     }
-  } 
+  }
 
 #ifndef NDEBUG
   SWIFT_ATTRIBUTE_NORETURN

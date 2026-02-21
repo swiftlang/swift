@@ -268,7 +268,7 @@ void SILFunctionBuilder::addFunctionAttributes(
     return;
 
   // Only assign replacements when the thing being replaced is function-like and
-  // explicitly declared.  
+  // explicitly declared.
   auto *origDecl = decl->getDynamicallyReplacedDecl();
   if (auto *replacedDecl = dyn_cast_or_null<AbstractFunctionDecl>(origDecl)) {
     // For @objc method replacement we normally use categories to perform the
@@ -400,12 +400,12 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 
       addFunctionAttributes(F, storage->getAttrs(), mod,
                             getOrCreateDeclaration);
-                            
+
       auto *varDecl = dyn_cast<VarDecl>(storage);
       if (varDecl && varDecl->getAttrs().hasAttribute<LazyAttr>() &&
           accessor->getAccessorKind() == AccessorKind::Get) {
         F->setSpecialPurpose(SILFunction::Purpose::LazyPropertyGetter);
-        
+
         // Lazy property getters should not get inlined because they are usually
         // non-trivial functions (otherwise the user would not implement it as
         // lazy property). Inlining such getters would most likely not benefit

@@ -127,18 +127,18 @@ SILValue swift::stripSinglePredecessorArgs(SILValue V) {
     auto *A = dyn_cast<SILArgument>(V);
     if (!A)
       return V;
-    
+
     SILBasicBlock *BB = A->getParent();
-    
+
     // First try and grab the single predecessor of our parent BB. If we don't
     // have one, bail.
     SILBasicBlock *Pred = BB->getSinglePredecessorBlock();
     if (!Pred)
       return V;
-    
+
     // Then grab the terminator of Pred...
     TermInst *PredTI = Pred->getTerminator();
-    
+
     // And attempt to find our matching argument.
     //
     // *NOTE* We can only strip things here if we know that there is no semantic
@@ -152,14 +152,14 @@ SILValue swift::stripSinglePredecessorArgs(SILValue V) {
       V = BI->getArg(A->getIndex());
       continue;
     }
-    
+
     if (auto *CBI = dyn_cast<CondBranchInst>(PredTI)) {
       if (SILValue Arg = CBI->getArgForDestBB(BB, A)) {
         V = Arg;
         continue;
       }
     }
-    
+
     return V;
   }
 }
@@ -206,9 +206,9 @@ SILValue swift::stripCasts(SILValue v) {
 SILValue swift::stripUpCasts(SILValue v) {
   assert(v->getType().isClassOrClassMetatype() &&
          "Expected class or class metatype!");
-  
+
   v = stripSinglePredecessorArgs(v);
-  
+
   while (true) {
     if (auto *ui = dyn_cast<UpcastInst>(v)) {
       v = ui->getOperand();
@@ -230,7 +230,7 @@ SILValue swift::stripClassCasts(SILValue v) {
       v = ui->getOperand();
       continue;
     }
-    
+
     if (auto *ucci = dyn_cast<UnconditionalCheckedCastInst>(v)) {
       v = ucci->getOperand();
       continue;
@@ -658,7 +658,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
     return RuntimeEffect::NoEffect;
   }
-      
+
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialBoxInst:
   case SILInstructionKind::OpenExistentialValueInst:
@@ -1061,7 +1061,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
 
     if (isa<BeginApplyInst>(inst))
-      rt |= RuntimeEffect::Allocating;      
+      rt |= RuntimeEffect::Allocating;
 
     if (auto *pa = dyn_cast<PartialApplyInst>(inst)) {
       if (pa->isOnStack()) {

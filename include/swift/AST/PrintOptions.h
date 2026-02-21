@@ -180,7 +180,7 @@ public:
 
   /// Whether to print expressions.
   bool PrintExprs = false;
-  
+
   /// Whether to print '{ get set }' on readwrite computed properties.
   bool PrintGetSetOnRWProperties = true;
 
@@ -386,7 +386,7 @@ public:
 
   /// Whether to skip placeholder members.
   bool SkipMissingMemberPlaceholders = true;
-  
+
   /// Whether to print a long attribute like '\@available' on a separate line
   /// from the declaration or other attributes.
   bool PrintLongAttrsOnSeparateLines = false;
@@ -636,7 +636,7 @@ public:
   bool MapCrossImportOverlaysToDeclaringModule = false;
 
   bool PrintAsMember = false;
-  
+
   /// Whether to print parameter specifiers as 'let' and 'var'.
   bool PrintParameterSpecifiers = false;
 

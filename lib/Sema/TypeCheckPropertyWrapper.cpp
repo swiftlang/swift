@@ -454,7 +454,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       result.push_back(attr);
       continue;
     }
-      
+
     // Check various restrictions on which properties can have wrappers
     // attached to them.
 
@@ -561,7 +561,7 @@ Type AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   // If there isn't an attached property wrapper at this index, we're done.
   if (index >= customAttrVal.size())
     return Type();
-                                               
+
   auto customAttr = customAttrVal[index];
   if (!customAttr)
     return Type();
@@ -662,7 +662,7 @@ Type swift::computeWrappedValueType(const VarDecl *var, Type backingStorageType,
   unsigned realLimit = var->hasImplicitPropertyWrapper() ? 1 : wrapperAttrs.size();
   if (limit)
     realLimit = std::min(*limit, realLimit);
-                                    
+
   // Follow the chain of wrapped value properties.
   Type wrappedValueType = backingStorageType;
   while (realLimit--) {
@@ -680,7 +680,7 @@ Type swift::computeWrappedValueType(const VarDecl *var, Type backingStorageType,
     if (wrappedValueType->hasError())
       break;
   }
-                                    
+
   return wrappedValueType;
 }
 

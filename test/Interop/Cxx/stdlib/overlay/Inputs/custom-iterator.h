@@ -867,7 +867,7 @@ using TemplatedIteratorOutOfLineEqInt = TemplatedIteratorOutOfLineEq<int>;
 template <typename T>
 struct TemplatedRACIteratorOutOfLineEq {
   T value;
-  
+
   using iterator_category = std::random_access_iterator_tag;
   using value_type = T;
   using pointer = T *;
@@ -1095,7 +1095,7 @@ struct BaseTemplatedRACIteratorOutOfLineOps {
   using value_type = T;
   using reference = const T &;
   using difference_type = int;
-  
+
   T value;
 
   BaseTemplatedRACIteratorOutOfLineOps(T value) : value(value) {}

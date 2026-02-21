@@ -604,7 +604,7 @@ public:
     return insert(new (getModule()) EndApplyInst(getSILDebugLocation(loc),
                                                  beginApply, ResultType));
   }
-  
+
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionMap Subs,
                              ArrayRef<SILValue> Args) {
@@ -794,7 +794,7 @@ public:
     return insert(new (getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }
-  
+
   KeyPathInst *createKeyPath(SILLocation Loc,
                              KeyPathPattern *Pattern,
                              SubstitutionMap Subs,
@@ -2704,7 +2704,7 @@ public:
         YieldInst::create(getSILDebugLocation(loc), yieldedValues,
                           resumeBB, unwindBB, getFunction()));
   }
-  
+
   AwaitAsyncContinuationInst *createAwaitAsyncContinuation(SILLocation loc,
                                                            SILValue continuation,
                                                            SILBasicBlock *resumeBB,
@@ -2714,7 +2714,7 @@ public:
                                                      continuation,
                                                      resumeBB, errorBB));
   }
-  
+
   CondBranchInst *
   createCondBranch(SILLocation Loc, SILValue Cond, SILBasicBlock *Target1,
                    SILBasicBlock *Target2,
@@ -2846,7 +2846,7 @@ public:
                           CheckedCastInstOptions options,
                           SILValue op,
                           CanType srcFormalTy, SILType destLoweredTy,
-                          CanType destFormalTy, SILBasicBlock *successBB, 
+                          CanType destFormalTy, SILBasicBlock *successBB,
                           SILBasicBlock *failureBB,
                           ValueOwnershipKind forwardingOwnershipKind,
                           ProfileCounter Target1Count = ProfileCounter(),

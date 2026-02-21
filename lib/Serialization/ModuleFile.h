@@ -501,7 +501,7 @@ private:
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
   llvm::Expected<ParameterList *> readParameterList();
-  
+
   /// Reads a generic param list from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a generic param list, returns null
@@ -777,7 +777,7 @@ public:
 
   /// Searches the module's local type decls for the given mangled name.
   TypeDecl *lookupLocalType(StringRef MangledName);
-      
+
   /// Search the module's opaque return type decls for the one corresponding to
   /// the given mangled name.
   OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName);
@@ -882,7 +882,7 @@ public:
 
   /// Adds all local type decls to the given vector.
   void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results);
-      
+
   /// Add all opaque return type decls in the module to the given vector.
   void getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl*> &Results);
 

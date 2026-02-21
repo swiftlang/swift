@@ -69,21 +69,21 @@ We also have an [FAQ](/docs/HowToGuides/FAQ.md) that answers common questions.
 Swift toolchains are created using the script
 [build-toolchain](https://github.com/apple/swift/blob/main/utils/build-toolchain). This
 script is used by swift.org's CI to produce snapshots and can allow for one to
-locally reproduce such builds for development or distribution purposes. A typical 
+locally reproduce such builds for development or distribution purposes. A typical
 invocation looks like the following:
 
 ```sh
   $ ./swift/utils/build-toolchain $BUNDLE_PREFIX
 ```
 
-where ``$BUNDLE_PREFIX`` is a string that will be prepended to the build 
-date to give the bundle identifier of the toolchain's ``Info.plist``. For 
-instance, if ``$BUNDLE_PREFIX`` was ``com.example``, the toolchain 
-produced will have the bundle identifier ``com.example.YYYYMMDD``. It 
-will be created in the directory you run the script with a filename 
+where ``$BUNDLE_PREFIX`` is a string that will be prepended to the build
+date to give the bundle identifier of the toolchain's ``Info.plist``. For
+instance, if ``$BUNDLE_PREFIX`` was ``com.example``, the toolchain
+produced will have the bundle identifier ``com.example.YYYYMMDD``. It
+will be created in the directory you run the script with a filename
 of the form: ``swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz``.
 
-Beyond building the toolchain, ``build-toolchain`` also supports the 
+Beyond building the toolchain, ``build-toolchain`` also supports the
 following (non-exhaustive) set of useful options:
 
 - ``--dry-run``: Perform a dry run build. This is off by default.

@@ -244,7 +244,7 @@ class ModuleDecl
 
   mutable Identifier PublicModuleName;
 
-  /// Indicates a version of the Swift compiler used to generate 
+  /// Indicates a version of the Swift compiler used to generate
   /// .swiftinterface file that this module was produced from (if any).
   mutable version::Version InterfaceCompilerVersion;
 
@@ -910,7 +910,7 @@ public:
   /// Look up an opaque return type by the mangled name of the declaration
   /// that defines it.
   OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName);
-  
+
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
   /// This does a simple local lookup, not recursively looking through imports.

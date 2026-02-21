@@ -93,7 +93,7 @@ namespace irgen {
     CanSILFunctionType originalType;
     CanSILFunctionType substitutedType;
     SubstitutionMap substitutionMap;
-  
+
     unsigned getParentIndex() { return (unsigned)FixedIndex::Parent; }
     unsigned getResumeParentIndex() {
       return (unsigned)FixedIndex::ResumeParent;

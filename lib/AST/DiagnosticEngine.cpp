@@ -317,7 +317,7 @@ InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
     if (isspace(extractCharBefore(SM, charRange.getStart())))
       Str = Str.drop_front();
   }
-  
+
   return fixItReplace(R, "%0", {Str});
 }
 
@@ -549,7 +549,7 @@ InFlightDiagnostic::wrapIn(const Diagnostic &wrapper) {
 void InFlightDiagnostic::flush() {
   if (!IsActive)
     return;
-  
+
   IsActive = false;
   if (Engine)
     Engine->endDiagnostic(*this);
@@ -637,7 +637,7 @@ void DiagnosticState::setWarningGroupControlRules(
 ///
 /// \returns The string leading up to the delimiter, or the empty string
 /// if no delimiter is found.
-static StringRef 
+static StringRef
 skipToDelimiter(StringRef &Text, char Delim, bool *FoundDelim = nullptr) {
   unsigned Depth = 0;
   if (FoundDelim)
@@ -654,7 +654,7 @@ skipToDelimiter(StringRef &Text, char Delim, bool *FoundDelim = nullptr) {
         --Depth;
       continue;
     }
-    
+
     if (Text[I] == Delim) {
       if (FoundDelim)
         *FoundDelim = true;
@@ -689,7 +689,7 @@ static void formatSelectionArgument(StringRef ModifierArguments,
     }
     --SelectedIndex;
   } while (true);
-  
+
 }
 
 static bool isInterestingTypealias(Type type) {
@@ -975,7 +975,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
       assert(Modifier.empty() && "Improper modifier for Type argument");
       TypeFormatOpts.emplace(FormatOpts);
     }
-    
+
     // Strip extraneous parentheses; they add no value.
     Type type;
     bool needsQualification = false;
@@ -1221,12 +1221,12 @@ void DiagnosticEngine::formatDiagnosticText(
       Out.write(InText.data(), InText.size());
       break;
     }
-    
+
     // Write the string up to (but not including) the %, then drop that text
     // (including the %).
     Out.write(InText.data(), Percent);
     InText = InText.substr(Percent + 1);
-    
+
     // '%%' -> '%'.
     if (InText[0] == '%') {
       Out.write('%');
@@ -1241,7 +1241,7 @@ void DiagnosticEngine::formatDiagnosticText(
       Modifier = InText.substr(0, Length);
       InText = InText.substr(Length);
     }
-    
+
     if (Modifier == "error") {
       Out << StringRef("<<INTERNAL ERROR: encountered %error in diagnostic text>>");
       continue;
@@ -1253,10 +1253,10 @@ void DiagnosticEngine::formatDiagnosticText(
       InText = InText.substr(1);
       ModifierArguments = skipToDelimiter(InText, '}');
     }
-    
+
     // Find the digit sequence, and parse it into an argument index.
     size_t Length = InText.find_if_not(isdigit);
-    unsigned ArgIndex;      
+    unsigned ArgIndex;
     bool IndexParseFailed = InText.substr(0, Length).getAsInteger(10, ArgIndex);
 
     if (IndexParseFailed) {
@@ -1438,7 +1438,7 @@ DiagnosticState::determineBehavior(const Diagnostic &diag,
     if (suppressNotes)
       lvl = DiagnosticBehavior::Ignore;
   }
-  
+
   if (lvl == DiagnosticBehavior::Remark) {
     if (suppressRemarks)
       lvl = DiagnosticBehavior::Ignore;
@@ -1730,7 +1730,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     auto groupID = diagnostic.getGroupID();
     if (groupID != DiagGroupID::no_group) {
       const auto &diagGroup = getDiagGroupInfoByID(groupID);
-      
+
       std::string docURL(getDiagnosticDocumentationPath());
       if (!docURL.empty() && docURL.back() != '/')
         docURL += "/";

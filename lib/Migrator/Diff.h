@@ -491,7 +491,7 @@ class diff_match_patch {
     const int max_d = (text1_length + text2_length + 1) / 2;
     const int v_offset = max_d;
     const int v_length = 2 * max_d;
-    std::vector<int> v1(v_length, -1), 
+    std::vector<int> v1(v_length, -1),
                      v2(v_length, -1);
     v1[v_offset + 1] = 0;
     v2[v_offset + 1] = 0;
@@ -1115,7 +1115,7 @@ class diff_match_patch {
           blankLine2 = true;
       }
     }
-  
+
     if (blankLine1 || blankLine2) {
       // Five points for blank lines.
       return 5;
@@ -1301,7 +1301,7 @@ class diff_match_patch {
             prevEqual->text += (*cur_diff).text;
             diffs.erase(cur_diff--);
           }
-          
+
           count_insert = 0;
           count_delete = 0;
           text_delete.clear();
@@ -1647,7 +1647,7 @@ class diff_match_patch {
     }
 
     // Initialise the alphabet.
-    std::map<char_t, int> s; 
+    std::map<char_t, int> s;
     match_alphabet(pattern, s);
 
     // Highest score beyond which we give up.
@@ -2420,7 +2420,7 @@ class diff_match_patch {
         c = traits::to_utf32(c, end, u);
         unsigned char* pt = utf8;
         if (u < 0x80)
-          *pt++ = (unsigned char)u;  
+          *pt++ = (unsigned char)u;
         else if (u < 0x800) {
           *pt++ = (unsigned char)((u >> 6) | 0xC0);
           *pt++ = (unsigned char)((u & 0x3F) | 0x80);
@@ -2502,7 +2502,7 @@ class diff_match_patch {
         if (++s3 == s2 || (*s3 & 0xC0) != 0x80) continue;
         u += (*s3 & 0x3F) << 6;
         if (++s3 == s2 || (*s3 & 0xC0) != 0x80) continue;
-        u += *s3 & 0x3F; 
+        u += *s3 & 0x3F;
       }
       else {
         ++s3;

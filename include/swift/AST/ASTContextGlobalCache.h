@@ -90,4 +90,4 @@ struct ASTContext::GlobalCache {
   void *StaticBuildConfiguration = nullptr;
 };
 
-} // end namespace 
+} // end namespace

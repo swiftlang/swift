@@ -43,7 +43,7 @@ protected:
   /// The head of the list is SILFunction::newestAliveBlockBitfield and
   /// SILFunction::newestAliveNodeBitfield, respectively.
   Impl *parent;
-  
+
   /// The bitfield is "added" to the blocks/nodes of this function.
   SILFunction *function;
 
@@ -149,7 +149,7 @@ public:
   }
 
   bool empty() const { return numElements == 0; }
-  
+
   size_t size() const { return numElements; }
 };
 

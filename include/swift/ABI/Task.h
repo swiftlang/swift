@@ -469,7 +469,7 @@ public:
   /// Check whether this task has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
   ///
-  /// \param ignoreShield if cancellation shield should be ignored. 
+  /// \param ignoreShield if cancellation shield should be ignored.
   ///        Cancellation shields prevent the observation of the isCancelled flag while active.
   bool isCancelled(bool ignoreShield) const;
 
@@ -537,7 +537,7 @@ public:
   // ==== Cancellation Shields -------------------------------------------------
 
   /// Install a cancellation shield in this task.
-  /// Returns true if the shield was installed, and false if there was already 
+  /// Returns true if the shield was installed, and false if there was already
   /// one active and this action didn't change anything.
   bool cancellationShieldPush();
 

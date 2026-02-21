@@ -51,10 +51,10 @@ class DiagnoseLifetimeIssues {
   enum State {
     /// There are no hidden uses which could keep the object alive.
     DoesNotEscape,
-    
+
     /// For example, in case the object is stored somewhere.
     CanEscape,
-    
+
     /// The object is stored to a weak reference field.
     /// Implies ``DoesNotEscape``.
     IsStoredWeakly
@@ -103,19 +103,19 @@ static bool isAllocation(SILInstruction *inst) {
 
   if (isa<AllocRefInst>(svi))
     return true;
-  
+
   // Check if it's a call to an allocating initializer.
   if (auto *applyInst = dyn_cast<ApplyInst>(svi)) {
     SILFunction *callee = applyInst->getReferencedFunctionOrNull();
     if (!callee)
       return false;
-    
+
     Demangle::StackAllocatedDemangler<1024> demangler;
     Demangle::Node *root = demangler.demangleSymbol(callee->getName());
     return root && root->getKind() == Demangle::Node::Kind::Global &&
            root->getFirstChild()->getKind() == Demangle::Node::Kind::Allocator;
   }
-    
+
   return false;
 }
 
@@ -124,14 +124,14 @@ static bool isStoreObjcWeak(SILInstruction *inst, Operand *op) {
   auto *apply = dyn_cast<ApplyInst>(inst);
   if (!apply || apply->getNumArguments() < 1)
     return false;
-  
+
   if (&apply->getArgumentOperands()[0] != op)
     return false;
-  
+
   auto *method = dyn_cast<ObjCMethodInst>(apply->getCallee());
   if (!method)
     return false;
-  
+
   Decl *decl = method->getMember().getDecl();
   auto *accessor = dyn_cast<AccessorDecl>(decl);
   if (!accessor)
@@ -144,7 +144,7 @@ static bool isStoreObjcWeak(SILInstruction *inst, Operand *op) {
   ClangNode clangNode = var->getClangNode();
   if (!clangNode)
     return false;
-  
+
   auto *objcDecl = dyn_cast_or_null<clang::ObjCPropertyDecl>(clangNode.getAsDecl());
   if (!objcDecl)
     return false;
@@ -285,11 +285,11 @@ getArgumentState(ApplySite ai, Operand *applyOperand, int callDepth) {
 
   if (!FullApplySite::isa(ai.getInstruction()))
     return CanEscape;
-  
+
   SILFunction *callee = ai.getReferencedFunctionOrNull();
   if (!callee || callee->empty())
     return CanEscape;
-  
+
   if (!ai.isArgumentOperand(*applyOperand))
     return CanEscape;
 
@@ -301,7 +301,7 @@ getArgumentState(ApplySite ai, Operand *applyOperand, int callDepth) {
   auto iter = argumentStates.find(arg);
   if (iter != argumentStates.end())
     return iter->second;
-  
+
   // Before we continue with the recursion, already set a (conservative) state.
   // This avoids infinite recursion in case of a cycle in the callgraph.
   argumentStates[arg] = CanEscape;

@@ -341,7 +341,7 @@ static void copyOrInitValuesInto(Initialization *init,
     init->finishInitialization(SGF);
     return;
   }
-  
+
   bool implodeTuple = false;
 
   if (init->canPerformInPlaceInitialization() &&
@@ -351,16 +351,16 @@ static void copyOrInitValuesInto(Initialization *init,
     // of trivial types.
     implodeTuple = true;
   }
-  
+
   // If we can satisfy the tuple type by breaking up the aggregate
   // initialization, do so.
   if (!implodeTuple && init->canSplitIntoTupleElements()) {
     SmallVector<InitializationPtr, 4> subInitBuf;
     auto subInits = init->splitIntoTupleElements(SGF, loc, type, subInitBuf);
-    
+
     assert(subInits.size() == tupleType->getNumElements() &&
            "initialization does not match tuple?!");
-    
+
     for (unsigned i = 0, e = subInits.size(); i < e; ++i)
       copyOrInitValuesInto<KIND>(subInits[i].get(), values,
                                  tupleType.getElementType(i), loc, SGF);
@@ -368,7 +368,7 @@ static void copyOrInitValuesInto(Initialization *init,
     init->finishInitialization(SGF);
     return;
   }
-  
+
   // Otherwise, process this by turning the values corresponding to the tuple
   // into a single value (through an implosion) and then binding that value to
   // our initialization.
@@ -433,7 +433,7 @@ RValue::RValue(SILGenFunction *SGF, ArrayRef<ManagedValue> values, CanType type)
 
   assert(values.size() == expectedExplosionSize(type)
          && "creating rvalue with wrong number of pre-exploded elements");
-  
+
   if (values.size() == 1 && values[0].isInContext()) {
     values = ArrayRef<ManagedValue>();
     type = CanType();

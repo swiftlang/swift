@@ -60,7 +60,7 @@ enum class DeclAvailabilityFlag : uint8_t {
   /// If an error diagnostic would normally be emitted, demote the error to a
   /// warning. Used for ObjC key path components.
   ForObjCKeyPath = 1 << 3,
-  
+
   /// Do not diagnose potential decl unavailability if that unavailability
   /// would only occur at or below the deployment target.
   AllowPotentiallyUnavailableAtOrBelowDeploymentTarget = 1 << 4,

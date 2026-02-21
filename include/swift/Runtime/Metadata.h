@@ -237,8 +237,8 @@ swift_getSingletonMetadata(MetadataRequest request,
 /// \param candidate A prespecialized metadata record for a type which is not
 ///                  statically made to be canonical which will be canonicalized
 ///                  if no other canonical metadata exists for the type.
-/// \param cache A pointer to a cache which will be set to the canonical 
-///              metadata record for the type described by the candidate 
+/// \param cache A pointer to a cache which will be set to the canonical
+///              metadata record for the type described by the candidate
 ///              metadata record.  If the cache has already been populated, its
 ///              contents will be returned.
 /// \returns The canonical metadata for the specialized generic type described
@@ -921,7 +921,7 @@ inline int swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src) {
   return int(value);
 #endif
 }
-  
+
 /// Store an extra inhabitant of a heap object pointer to memory,
 /// in the style of a value witness.
 inline void swift_storeHeapObjectExtraInhabitant(HeapObject **dest, int index) {
@@ -953,7 +953,7 @@ inline constexpr unsigned swift_getHeapObjectExtraInhabitantCount() {
     ? unsigned(INT_MAX)
     : unsigned(LeastValidPointerValue);
 #endif
-}  
+}
 
 /// Calculate the numeric index of an extra inhabitant of a function
 /// pointer in memory.
@@ -964,7 +964,7 @@ inline int swift_getFunctionPointerExtraInhabitantIndex(void * const* src) {
   return (value < heap_object_abi::LeastValidPointerValue
             ? (int) value : -1);
 }
-  
+
 /// Store an extra inhabitant of a function pointer to memory, in the
 /// style of a value witness.
 inline void swift_storeFunctionPointerExtraInhabitant(void **dest, int index) {

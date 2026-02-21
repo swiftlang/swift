@@ -329,7 +329,7 @@ emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
   std::tie(maybeReturnValue, returnLoc) = emitEpilogBB(TopLevel);
 
   SILBasicBlock *ResultBB = nullptr;
-  
+
   if (!maybeReturnValue) {
     // Nothing to do.
   } else if (UsesCustomEpilog) {
@@ -348,13 +348,13 @@ emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
 
     B.createReturn(returnLoc, returnValue);
   }
-  
+
   emitRethrowEpilog(TopLevel);
   emitCoroutineUnwindEpilog(TopLevel);
-  
+
   if (ResultBB)
     B.setInsertionPoint(ResultBB);
-  
+
   return returnLoc;
 }
 

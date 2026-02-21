@@ -132,7 +132,7 @@ class OverloadChoice {
       TheFunctionRefInfo(functionRefInfo) {
     assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
            "Badly aligned decl");
-    
+
     DeclOrKind = value;
   }
 
@@ -239,7 +239,7 @@ public:
   Type getBaseType() const {
     return BaseAndDeclKind.getPointer();
   }
-  
+
   /// Determines the kind of overload choice this is.
   OverloadChoiceKind getKind() const {
     if (!DynamicMember.getPointer().empty()) {
