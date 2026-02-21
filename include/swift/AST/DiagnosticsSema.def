@@ -4953,6 +4953,11 @@ WARNING(use_of_void_pointer,none,
 // Ambiguities
 ERROR(ambiguous_decl_ref,none,
       "ambiguous use of %0", (DeclNameRef))
+NOTE(ambiguous_because_no_candidates_were_found,none,
+     "no candidates found for specified argument %0", (DeclNameRef))
+NOTE(ambiguous_no_candidates_match_argument_type,none,
+      "cannot convert result type %0 to expected argument type %1",
+      (Type, Type))
 ERROR(ambiguous_operator_ref,none,
       "ambiguous use of operator %0", (DeclNameRef))
 NOTE(ambiguous_because_of_trailing_closure,none,
