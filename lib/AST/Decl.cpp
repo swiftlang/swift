@@ -7056,6 +7056,20 @@ ArtificialMainKind Decl::getArtificialMainKind() const {
   llvm_unreachable("type has no @Main attr?!");
 }
 
+bool Decl::canSupportBorrowAccessors() const {
+  if (isa<StructDecl>(this)) {
+    return true;
+  }
+  if (auto *extension = dyn_cast<ExtensionDecl>(this)) {
+    auto *extendedNominal = extension->getExtendedNominal();
+    if (extendedNominal && isa<StructDecl>(extendedNominal)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 static bool isOverridingDecl(const ValueDecl *Derived,
                              const ValueDecl *Base) {
   while (Derived) {
