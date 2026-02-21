@@ -2612,6 +2612,54 @@ static bool diagnoseAmbiguity(
     }
   }
 
+  // If each ambiguous solution shares the same set of fixes, diagnose the
+  // individual fixes directly instead of producing a generic overload error.
+  {
+    llvm::MapVector<std::pair<FixKind, ConstraintLocator *>,
+                    SmallVector<std::pair<const Solution *,
+                                          const ConstraintFix *>, 4>>
+        fixesByKindAndLocator;
+    for (const auto &entry : aggregateFix) {
+      fixesByKindAndLocator[{entry.second->getKind(), entry.second->getLocator()}]
+          .push_back(entry);
+    }
+
+    bool diagnosedAllCommonFixes = false;
+    {
+      DiagnosticTransaction transaction(DE);
+
+      bool allDiagnosed = true;
+      size_t coveredFixes = 0;
+
+      for (const auto &entry : fixesByKindAndLocator) {
+        const auto &commonFixes = entry.second;
+
+        // Only diagnose groups that are present in every viable solution.
+        if (!llvm::all_of(solutions, [&](const Solution &solution) {
+              return llvm::any_of(commonFixes, [&](const auto &fix) {
+                return fix.first == &solution;
+              });
+            })) {
+          continue;
+        }
+
+        coveredFixes += commonFixes.size();
+        if (!commonFixes.front().second->diagnoseForAmbiguity(commonFixes)) {
+          allDiagnosed = false;
+          break;
+        }
+      }
+
+      diagnosedAllCommonFixes =
+          coveredFixes == aggregateFix.size() && allDiagnosed;
+      if (!diagnosedAllCommonFixes)
+        transaction.abort();
+    }
+
+    if (diagnosedAllCommonFixes)
+      return true;
+  }
+
   auto *decl = *localAmbiguity.begin();
   auto *commonCalleeLocator = ambiguity.locator;
 

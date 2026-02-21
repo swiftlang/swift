@@ -1519,6 +1519,15 @@ func testUnwrapFixIts(x: Int?) throws {
   let _: Int = try! .optionalThrowsMember ?? 0
 }
 
+// https://github.com/swiftlang/swift/issues/87218
+func issue87218() {
+  let dictionary = [String: [String]]()
+  let optionalValue: String? = nil
+  if let array = dictionary["foo"] {
+    array.append(optionalValue) // expected-error {{cannot use mutating member on immutable value: 'array' is a 'let' constant}} expected-error {{value of optional type 'String?' must be unwrapped to a value of type 'String'}} expected-note {{coalesce using '??' to provide a default when the optional value contains 'nil'}} expected-note {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  }
+}
+
 // https://github.com/apple/swift/issues/63746
 func issue63746() {
   let fn1 = {
