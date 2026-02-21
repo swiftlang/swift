@@ -207,26 +207,19 @@ fileprivate extension String {
     _ encoding: UInt,
     _ work: (UnsafeRawPointer, Int) -> R
   ) -> R {
-    if encoding == NSASCIIStringEncoding || encoding == NSUTF8StringEncoding {
-      return Array(self.utf8).withUnsafeBufferPointer { buffer in
-        return work(buffer.baseAddress!, count)
-      }
+    let bridged = self as NSString
+    return withExtendedLifetime(bridged) {
+      let byteCount = bridged.lengthOfBytes(using: encoding)
+      let ptr = bridged.cString(using: encoding)
+      return work(UnsafeRawPointer(ptr!), byteCount)
     }
-    if encoding == NSUTF16StringEncoding {
-      return Array(self.utf16).withUnsafeBufferPointer { utf16Buffer in
-        utf16Buffer.withMemoryRebound(to: UInt8.self) { buffer in
-          work(buffer.baseAddress!, count)
-        }
-      }
-    }
-    fatalError("Unsupported encoding")
   }
 }
 
 struct EqualityTestInput: CustomStringConvertible {
   let string: String
   let encoding: UInt
-  let bytes: UnsafeRawBufferPointer
+  let bytes: [UInt8]
   
   var description: String {
     let encodingName = switch encoding {
@@ -254,7 +247,6 @@ StringBridgeTests.test("Foundation Buffer Comparison SPI") {
   let utf16_4byte = "𝕳𝖊𝖑𝖑𝖔"                           // Supplementary plane (4-byte UTF-16 - surrogate pairs)
   
   let differentString1 = "World"
-  let differentString2 = "Different"
   let shorterString = "Hi"
     
   func testEquality(
@@ -277,12 +269,12 @@ StringBridgeTests.test("Foundation Buffer Comparison SPI") {
         let lhsInput = EqualityTestInput(
           string: lhs,
           encoding: lhsEncoding,
-          bytes: UnsafeRawBufferPointer(start: lhsPtr, count: lhsCount),
+          bytes: Array(UnsafeRawBufferPointer(start: lhsPtr, count: lhsCount)),
         )
         let rhsInput = EqualityTestInput(
           string: rhs,
           encoding: rhsEncoding,
-          bytes: UnsafeRawBufferPointer(start: rhsPtr, count: rhsCount),
+          bytes: Array(UnsafeRawBufferPointer(start: rhsPtr, count: rhsCount)),
         )
         return (equal, lhsInput, rhsInput)
       }
