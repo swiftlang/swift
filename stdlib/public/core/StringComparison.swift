@@ -529,9 +529,15 @@ fileprivate func isEqual(
     }
     for lhsIdx in lhs.byteOffsets {
       // Bounds checking handled by looping over `byteOffsets`
-      let l = unsafe lhs.unsafeLoadUnaligned(fromUncheckedByteOffset: lhsIdx, as: UInt8.self)
+      let l = unsafe lhs.unsafeLoadUnaligned(
+        fromUncheckedByteOffset: lhsIdx,
+        as: UInt8.self
+      )
       // Bounds checking handled by the count * 2 verification earlier
-      let r = unsafe UInt8(truncatingIfNeeded: rhs.unsafeLoadUnaligned(fromUncheckedByteOffset: lhsIdx, as: UInt16.self))
+      let r = unsafe UInt8(truncatingIfNeeded: rhs.unsafeLoadUnaligned(
+        fromUncheckedByteOffset: lhsIdx,
+        as: UInt16.self
+      ))
       if l != r {
         return false
       }
