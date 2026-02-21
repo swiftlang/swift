@@ -139,6 +139,28 @@ extension _AbstractStringStorage {
     return unsafe (start == nativeOther.start ||
       (memcmp(start, nativeOther.start, count) == 0)) ? 1 : 0
   }
+  
+  @inline(__always)
+  @_effects(readonly)
+  internal func _isEqualToBuffer(
+    ptr: UnsafeRawPointer,
+    count otherCount: Int,
+    encoding: UInt
+  ) -> Bool {
+    let ourEncoding = if isASCII {
+      _cocoaASCIIEncoding
+    } else {
+      _cocoaUTF8Encoding
+    }
+    return unsafe _swift_unicodeBuffersEqual_nonNormalizing(
+      bytes: start,
+      count: count,
+      encoding: ourEncoding,
+      bytes: ptr,
+      count: otherCount,
+      encoding: encoding
+    )
+  }
 
   @inline(__always)
   @_effects(readonly)
@@ -162,46 +184,18 @@ extension _AbstractStringStorage {
       return unsafe _nativeIsEqual(
         _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
     default:
-          // We're allowed to crash, but for compatibility reasons NSCFString allows
+      // We're allowed to crash, but for compatibility reasons NSCFString allows
       // non-strings here.
       if !_isNSString(other) {
         return 0
       }
-
-      // At this point we've proven that it is a non-Swift NSString
-      let otherUTF16Length = _stdlib_binary_CFStringGetLength(other)
       
-      if UTF16Length != otherUTF16Length {
-        return 0
-      }
-      
-      // CFString will only give us ASCII bytes here, but that's fine.
-      // We already handled non-ASCII UTF8 strings earlier since they're Swift.
-      if let asciiEqual = unsafe withCocoaASCIIPointer(other, work: { (ascii) -> Bool in
-        // otherUTF16Length is the same as the byte count here since it's ASCII
-        // self.count could still be utf8
-        if count != otherUTF16Length {
-          return false
-        }
-        return unsafe (start == ascii || (memcmp(start, ascii, otherUTF16Length) == 0))
-      }) {
-        return asciiEqual ? 1 : 0
-      }
-      
-      if let utf16Ptr = unsafe _stdlib_binary_CFStringGetCharactersPtr(other) {
-        let utf16Buffer = unsafe UnsafeBufferPointer(
-          start: utf16Ptr,
-          count: otherUTF16Length
-        )
-        return unsafe utf16.elementsEqual(utf16Buffer) ? 1 : 0
-      }
-
-      /*
-      The abstract implementation of -isEqualToString: falls back to -compare:
-      immediately, so when we run out of fast options to try, do the same.
-      We can likely be more clever here if need be
-      */
-      return _cocoaStringCompare(self, other) == 0 ? 1 : 0
+      return unsafe _NSStringIsEqualToBytes(
+        other,
+        bytes: start,
+        count: count,
+        encoding: isASCII ? _cocoaASCIIEncoding : _cocoaUTF8Encoding
+      )
     }
   }
 }
@@ -310,7 +304,21 @@ extension __StringStorage {
   final internal func isEqual(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
   }
-
+  
+  @objc(_isEqualToBytes:count:encoding:)
+  @_effects(readonly)
+  final internal func isEqual(
+    ptr: UnsafeRawPointer,
+    count: Int,
+    encoding: UInt
+  ) -> Int8 {
+    return unsafe _isEqualToBuffer(
+      ptr: ptr,
+      count: count,
+      encoding: encoding
+    ) ? 1 : 0
+  }
+  
   @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // While __StringStorage instances aren't immutable in general,
@@ -425,6 +433,20 @@ extension __SharedStringStorage {
   final internal func isEqual(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
   }
+  
+  @objc(_isEqualToBytes:count:encoding:)
+  @_effects(readonly)
+  final internal func isEqual(
+    ptr: UnsafeRawPointer,
+    count: Int,
+    encoding: UInt
+  ) -> Int8 {
+    return unsafe _isEqualToBuffer(
+      ptr: ptr,
+      count: count,
+      encoding: encoding
+    ) ? 1 : 0
+  }
 
   @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
@@ -433,6 +455,168 @@ extension __SharedStringStorage {
     // Therefore, it is safe to return self here; any outstanding Objective-C
     // reference will make the instance non-unique.
     return self
+  }
+}
+
+// See swift_stdlib_connectNSBaseClasses. This method is installed onto
+// NSString in Foundation via ObjC runtime shenanigans
+@_effects(releasenone)
+@c internal func _swift_NSStringIsEqualToBytesImpl(
+  _ ns: UnsafeRawPointer,
+  _ _cmd: UInt, //SEL
+  _ lhsPtr: UnsafeRawPointer,
+  _ lhsByteCount: Int,
+  _ lhsEncoding: UInt
+) -> Int8 {
+  let ns = unsafe unsafeBitCast(ns, to: _CocoaString.self)
+  defer { _fixLifetime(ns) }
+  
+  let rhsCount = _stdlib_binary_CFStringGetLength(ns)
+    
+  let tryASCIIRHS = { () -> Int8? in
+    return unsafe withCocoaASCIIPointer(ns) { (rhsPtr) -> Int8? in
+      return unsafe _swift_unicodeBuffersEqual_nonNormalizing(
+        bytes: lhsPtr,
+        count: lhsByteCount,
+        encoding: lhsEncoding,
+        bytes: rhsPtr,
+        count: rhsCount,
+        encoding: _cocoaASCIIEncoding
+      ) ? 1 : 0
+    }
+  }
+  
+  let tryUTF16RHS = { () -> Int8? in
+    if let rhsPtr = unsafe _stdlib_binary_CFStringGetCharactersPtr(ns) {
+      return unsafe _swift_unicodeBuffersEqual_nonNormalizing(
+        bytes: lhsPtr,
+        count: lhsByteCount,
+        encoding: lhsEncoding,
+        bytes: rhsPtr,
+        count: rhsCount,
+        encoding: _cocoaUTF16Encoding
+      ) ? 1 : 0
+    }
+    return nil
+  }
+  
+  //TODO: figure out how to de-duplicate these length checks with the ones in StringComparison.swift
+  switch lhsEncoding {
+  case _cocoaASCIIEncoding:
+    // One LHS byte per UTF16 code unit
+    if rhsCount != lhsByteCount {
+      return 0
+    }
+    if let result = tryASCIIRHS() {
+      return result
+    }
+    if let result = tryUTF16RHS() {
+      return result
+    }
+  case _cocoaUTF8Encoding:
+    // Best case size change for UTF8 -> UTF16 is 3 bytes -> 1 code unit
+    if rhsCount < lhsByteCount / 3 {
+      return 0
+    }
+    // Worst case size change for UTF8 -> UTF16 is 1 byte -> 1 code unit
+    if rhsCount > lhsByteCount * 2 {
+      return 0
+    }
+    if let result = tryASCIIRHS() {
+      return result
+    }
+    if let result = tryUTF16RHS() {
+      return result
+    }
+  case _cocoaUTF16Encoding:
+    // Two LHS bytes per UTF16 code unit
+    if rhsCount != lhsByteCount * 2 {
+      return 0
+    }
+    if let result = tryUTF16RHS() {
+      return result
+    }
+    if let result = tryASCIIRHS() {
+      return result
+    }
+  default:
+    fatalError("Unsupported encoding")
+  }
+    
+  var remainingLHSByteCount = lhsByteCount
+  var offset = 0
+  
+  enum ChunkResult {
+    case equal
+    case nonequal
+    case `continue`
+  }
+  
+  let tryCopyingChunk = { () -> ChunkResult in
+    /*
+     Larger chunk sizes mean we read more out of `rhs` even if the difference
+     is early, which can be a bit expensive if it has to transcode or doesn't
+     do bulk access (the latter is unusual but appears in our benchmark suite).
+     
+     Smaller chunk sizes mean more call overhead.
+     */
+    let chunkSize = Swift.min(64, remainingLHSByteCount)
+    return unsafe withUnsafeTemporaryAllocation(
+      of: UInt8.self,
+      capacity: chunkSize
+    ) { tmpBuffer in
+      let buffer = UnsafeMutableRawBufferPointer(tmpBuffer)
+      var remainingRange = 0 ..< 0
+      /*
+       Ask rhs to start transcoding from `offset` until it's either
+       run out of contents or filled `chunkSize` bytes of output buffer
+       */
+      guard let rhsChunkByteCount = unsafe _cocoaStringCopyBytes(
+        ns,
+        encoding: lhsEncoding,
+        into: buffer,
+        options: 0,
+        UTF16Range: offset ..< rhsCount, //the remaining tail of rhs
+        remainingRange: &remainingRange
+      ) else {
+        return .nonequal
+      }
+      /*
+       rhsChunkByteCount is now the number of bytes occupied by the next
+       N UTF16 code units from rhs, when transcoded into `lhsEncoding`
+       */
+      if rhsChunkByteCount > remainingLHSByteCount {
+        return .nonequal
+      }
+      if remainingRange.isEmpty && rhsChunkByteCount != remainingLHSByteCount {
+        //We've processed all of RHS. If we don't have enough bytes now we never will
+        return .nonequal
+      }
+      
+      remainingLHSByteCount &-= rhsChunkByteCount
+      offset = remainingRange.lowerBound
+      
+      let result = unsafe _swift_stdlib_memcmp(
+        lhsPtr + (lhsByteCount &- remainingLHSByteCount),
+        buffer.baseAddress.unsafelyUnwrapped,
+        rhsChunkByteCount
+      )
+      if result != 0 {
+        return .nonequal
+      }
+      return remainingLHSByteCount == 0 ? .equal : .continue
+    }
+  }
+  
+  while true {
+    switch tryCopyingChunk() {
+    case .equal:
+      return 1
+    case .nonequal:
+      return 0
+    default:
+      continue
+    }
   }
 }
 
