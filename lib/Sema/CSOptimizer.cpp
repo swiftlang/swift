@@ -26,6 +26,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1920,7 +1921,9 @@ ConstraintSystem::selectDisjunction() {
         applicableFn.get()->getFirstType()->getAs<FunctionType>();
     }
 
-    pruneDisjunction(disjunction, applicableFn.getPtrOrNull());
+    getRemainingDisjunction(disjunction)
+      .pruneDisjunctionIfNeeded(*this, applicableFn.getPtrOrNull());
+
     auto info = computeDisjunctionInfo(*this, disjunctions, index, favorings);
     favorings.try_emplace(disjunction, info);
 

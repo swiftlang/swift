@@ -145,8 +145,9 @@ CHANGE(RecordedKeyPath)
 CHANGE(RetiredConstraint)
 CHANGE(AddedBinding)
 CHANGE(RetractedBinding)
+CHANGE(PrunedDisjunction)
 
-LAST_CHANGE(RetractedBinding)
+LAST_CHANGE(PrunedDisjunction)
 
 #undef LOCATOR_CHANGE
 #undef EXPR_CHANGE

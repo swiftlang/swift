@@ -1876,31 +1876,33 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       assert(!argsWithLabels[argIdx].isAutoClosure() ||
              isSynthesizedArgument(argument));
 
-      // If parameter is a generic parameter, let's copy its
-      // conformance requirements (if any), to the argument
-      // be able to filter mismatching choices earlier.
-      if (auto *typeVar = paramTy->getAs<TypeVariableType>()) {
-        auto *locator = typeVar->getImpl().getLocator();
-        if (locator->isForGenericParameter()) {
-          auto &CG = cs.getConstraintGraph();
+      if (cs.getASTContext().TypeCheckerOpts.SolverEnableTransitiveConformance) {
+        // If parameter is a generic parameter, let's copy its
+        // conformance requirements (if any), to the argument
+        // be able to filter mismatching choices earlier.
+        if (auto *typeVar = paramTy->getAs<TypeVariableType>()) {
+          auto *locator = typeVar->getImpl().getLocator();
+          if (locator->isForGenericParameter()) {
+            auto &CG = cs.getConstraintGraph();
 
-          auto isTransferableConformance = [&typeVar](Constraint *constraint) {
-            if (constraint->getKind() != ConstraintKind::ConformsTo &&
-                constraint->getKind() != ConstraintKind::NonisolatedConformsTo)
-              return false;
+            auto isTransferableConformance = [&typeVar](Constraint *constraint) {
+              if (constraint->getKind() != ConstraintKind::ConformsTo &&
+                  constraint->getKind() != ConstraintKind::NonisolatedConformsTo)
+                return false;
 
-            auto requirementTy = constraint->getFirstType();
-            if (!requirementTy->isEqual(typeVar))
-              return false;
+              auto requirementTy = constraint->getFirstType();
+              if (!requirementTy->isEqual(typeVar))
+                return false;
 
-            return constraint->getSecondType()->is<ProtocolType>();
-          };
+              return constraint->getSecondType()->is<ProtocolType>();
+            };
 
-          for (auto *constraint : CG[typeVar].getConstraints()) {
-            if (isTransferableConformance(constraint))
-              cs.addConstraint(ConstraintKind::TransitivelyConformsTo, argTy,
-                               constraint->getSecondType(),
-                               constraint->getLocator());
+            for (auto *constraint : CG[typeVar].getConstraints()) {
+              if (isTransferableConformance(constraint))
+                cs.addConstraint(ConstraintKind::TransitivelyConformsTo, argTy,
+                                 constraint->getSecondType(),
+                                 constraint->getLocator());
+            }
           }
         }
       }
