@@ -1306,12 +1306,8 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
   setType(E, resultType);
 
   if (E->getStmtKind() == SingleValueStmtExpr::Kind::For) {
-    auto *rrcProtocol =
-        ctx.getProtocol(KnownProtocolKind::RangeReplaceableCollection);
     auto *sequenceProtocol = ctx.getProtocol(KnownProtocolKind::Sequence);
 
-    addConstraint(ConstraintKind::ConformsTo, resultType,
-                  rrcProtocol->getDeclaredInterfaceType(), loc);
     Type elementTypeVar = createTypeVariable(loc, /*options*/ 0);
     Type elementType = DependentMemberType::get(
         resultType, sequenceProtocol->getAssociatedType(ctx.Id_Element));

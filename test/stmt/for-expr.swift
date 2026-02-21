@@ -9,8 +9,16 @@ func f() -> String {
       x.uppercased()
     } else  {
       "*skip*"
-
     }
   }
 }
+
 print(f()) // CHECK: H*skip*L*skip*O
+
+// Not fully exercising this one, as it will fail at run time due to `OutputSpan` not having backing storage.
+// But at least we need this to type check successfully.
+func g() -> OutputSpan<Int> {
+  for (i, x) in "hello".enumerated() {
+    42
+  }
+}
