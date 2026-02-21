@@ -200,7 +200,7 @@ public:
   using RemoteAddressType = std::pair<uint64_t, uint8_t>;
 
   friend class NodeFactory;
-
+  
 private:
 
   struct NodeVector {
@@ -640,7 +640,7 @@ demangleTypeAsString(llvm::StringRef MangledName,
   return demangleTypeAsString(MangledName.data(),
                               MangledName.size(), Options);
 }
-
+  
 
 enum class OperatorKind {
   NotOperator,
@@ -798,7 +798,7 @@ public:
     Stream.append(Value.data(), Value.size());
     return *this;
   }
-
+  
   DemanglerPrinter &operator<<(char c) & {
     Stream.push_back(c);
     return *this;
@@ -817,14 +817,14 @@ public:
   DemanglerPrinter &operator<<(int n) & {
     return *this << (long long)n;
   }
-
+  
   template<typename T>
   DemanglerPrinter &&operator<<(T &&x) && {
     return std::move(*this << std::forward<T>(x));
   }
-
+  
   DemanglerPrinter &writeHex(unsigned long long n) &;
-
+ 
   std::string &&str() && { return std::move(Stream); }
 
   llvm::StringRef getStringRef() const { return Stream; }

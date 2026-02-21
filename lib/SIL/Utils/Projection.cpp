@@ -35,7 +35,7 @@ static_assert(std::is_standard_layout<Projection>::value,
 
 
 //===----------------------------------------------------------------------===//
-//                              Utility
+//                              Utility 
 //===----------------------------------------------------------------------===//
 
 /// Extract an integer index from a SILValue.
@@ -439,7 +439,7 @@ std::optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
 ///
 /// This means that the two objects have the same base but access different
 /// fields of the base object.
-bool
+bool 
 ProjectionPath::hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const{
   // First make sure that both of our base types are the same.
   if (BaseType != RHS.BaseType)
@@ -746,11 +746,11 @@ bool ProjectionPath::hasUncoveredNonTrivials(SILType B, const SILFunction &F,
   do {
     // Get the next level projections based on current projection's type.
     ProjectionPath PP = Worklist.pop_back_val();
-
+ 
     // If this path is part of the covered path, then continue.
     if (CPaths.find(PP) != CPaths.end())
       continue;
-
+      
     // Get the current type to process.
     SILType Ty = PP.getMostDerivedType(Mod, F.getTypeExpansionContext());
 
@@ -789,7 +789,7 @@ bool ProjectionPath::hasUncoveredNonTrivials(SILType B, const SILFunction &F,
   for (auto &X : Paths) {
     if (!X.getMostDerivedType(Mod, F.getTypeExpansionContext()).isTrivial(F))
       return true;
-  }
+  }   
   return false;
 }
 
@@ -1033,7 +1033,7 @@ void ProjectionTreeNode::createNextLevelChildrenForStruct(
     SILType NodeTy = Ty.getFieldType(VD, Mod, context);
     auto *Node = Tree.createChildForStruct(this, NodeTy, VD, ChildIndex++);
     LLVM_DEBUG(llvm::dbgs() << "        Creating child for: " <<NodeTy << "\n");
-    LLVM_DEBUG(llvm::dbgs() << "            Projection: "
+    LLVM_DEBUG(llvm::dbgs() << "            Projection: " 
                << Node->getProjection().value().getIndex() << "\n");
     ChildProjections.push_back(Node->getIndex());
     assert(getChildForProjection(Tree, Node->getProjection().value()) == Node &&
@@ -1249,7 +1249,7 @@ ProjectionTree::computeExplodedArgumentValueInner(SILBuilder &Builder,
   }
 
   // This is an aggregate node, construct its value from its children
-  // recursively.
+  // recursively. 
   //
   // NOTE: We do not expect to have too many levels of nesting, so
   // recursion should be fine.

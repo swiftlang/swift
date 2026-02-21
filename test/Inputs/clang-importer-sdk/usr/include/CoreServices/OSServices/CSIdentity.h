@@ -7,7 +7,7 @@
 
 typedef struct __CSIdentity* CSIdentityRef;
 
-extern CSIdentityRef
+extern CSIdentityRef 
 CSIdentityCreateCopy(
   CFAllocatorRef   allocator,
   CSIdentityRef    identity);

@@ -180,7 +180,7 @@ bool SILGlobalVariable::mustBeInitializedStatically() const {
   if (!section().empty())
     return true;
 
-  auto *decl = getDecl();
+  auto *decl = getDecl();  
   if (decl && isDefinition() && decl->getAttrs().hasAttribute<SILGenNameAttr>())
     return true;
 

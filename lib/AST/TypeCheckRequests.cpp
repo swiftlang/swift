@@ -644,7 +644,7 @@ void swift::simple_display(
 void swift::simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m) {
   static const char *names[] =
     {"is nonmutating", "is mutating", "doesn't exist"};
-
+  
   os << "getter " << names[m.Getter] << ", setter " << names[m.Setter];
 }
 
@@ -1035,7 +1035,7 @@ void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 }
 
 void EnumRawValuesRequest::noteCycleStep(DiagnosticEngine &diags) const {
-
+  
 }
 
 //----------------------------------------------------------------------------//

@@ -161,12 +161,12 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
 /// Given an \p instruction try to find the argument pack that is allocated
 /// to it as a best effort. If no appropriate value can be found, return
 /// an empty \c SILValue.
-///
+/// 
 /// While any instruction *could* be passed, this pattern matching was only written
 /// with the following patterns in mind, which start with alloc_stack and load.
-///
+/// 
 /// Given an escaping use of a pack:
-///
+/// 
 /// ```swift
 /// func foo<each T>(_ fn: repeat () -> each T) {
 ///   escapes {
@@ -174,15 +174,15 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
 ///   }
 /// }
 /// ```
-///
+/// 
 /// We start at
-///
+/// 
 /// ```
 /// %3 = alloc_stack $(repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>) // users: %20, %18, %14
 /// ```
-///
+/// 
 /// And need to navigate
-///
+/// 
 /// ```
 /// // %0 "fn"                                        // users: %13, %1
 /// bb0(%0 : $*Pack{repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>}):
@@ -194,9 +194,9 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
 ///   copy_addr %13 to [init] %14                     // id: %15
 /// // ...
 /// ```
-///
+/// 
 /// Taking a path like
-///
+/// 
 /// ```
 ///     %3 alloc_stack             [get users]
 /// -> %14 tuple_pack_element_addr [get users] (since tuple isn't an arg!)
@@ -204,13 +204,13 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
 /// -> %13 pack_element_get        [get pack arg]
 /// ->  %0 "fn"
 /// ```
-///
+/// 
 /// We can follow use to user, until we hit copy_addr and need to find the
 /// source of the copy. When we hit pack_element_get, the pack operand is the
 /// argument "fn" and we are done. Defer within an escaping function and pack
 /// iteration follows this pattern. The arg check on tuple_pack_element_addr exists
 /// for the next case, the use of a pack inside defer:
-///
+/// 
 /// ```swift
 /// func foo<each T>(_ fn: repeat () -> each T) {
 ///   defer {
@@ -221,15 +221,15 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
 ///   _ = 42
 /// }
 /// ```
-///
+/// 
 /// We start at
-///
+/// 
 /// ```
 /// %17 = alloc_stack $(repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>) // users: %34, %32, %28
 /// ```
-///
+/// 
 /// And need to navigate
-///
+/// 
 /// ```
 /// // %0 "fn"                                        // user: %11
 /// bb0(%0 : @closureCapture $*(repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>)):
@@ -247,9 +247,9 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
 ///   copy_addr %27 to [init] %28                     // id: %29
 /// // ...
 /// ```
-///
+/// 
 /// Taking a path like
-///
+/// 
 /// ```
 ///    %17 alloc_stack             [get users]
 /// -> %28 tuple_pack_element_addr [get users]      (since tuple isn't an arg!)
@@ -260,26 +260,26 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
 /// -> %11 tuple_pack_element_addr [get tuple arg]
 /// ->  %0 "fn"
 /// ```
-///
+/// 
 /// The same logic applies, until we hit pack_element_get, where defer introduces
 /// additional indirection. We need to find the allocation of the pack it is
 /// accessing, then find it's users to discover the addr instruction, which
 /// will have the argument "fn" as the tuple operand. We need to support this
 /// indirection. You can see that we hit two different pack instructions, and finish
 /// on a tuple_pack_element_addr instruction, not a pack_element_get instruction.
-///
+/// 
 /// One more case (that I'm aware of) exists, where an escaping capture is repeated:
-///
+/// 
 /// ```swift
 /// repeat escapes {
 ///   (each fn)()
 /// }
 /// ```
-///
+/// 
 /// ```
 /// %13 = load [copy] %12 : $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %14
 /// ```
-///
+/// 
 /// ```
 /// // %0 "fn"                                        // users: %12, %1
 /// bb0(%0 : $*Pack{repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>}):
@@ -287,15 +287,15 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
 ///   %12 = pack_element_get %9 of %0 as $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %13
 ///   %13 = load [copy] %12                           // user: %14
 /// ```
-///
+/// 
 /// With a nice and simple path:
-///
+/// 
 /// ```
 ///    %13 load [get src inst]
 /// -> %12 pack_element_get [get pack arg]
 /// -> %0 "fn"
 /// ```
-///
+/// 
 /// We follow the src of the load, like copy_addr, although load is single operand.
 static const SILValue tryGetPackFromIntermediaryInstruction(SILInstruction *instruction) {
   InstructionWorklist worklist(instruction);

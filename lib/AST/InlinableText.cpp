@@ -91,7 +91,7 @@ static void appendRange(
       // whitespace.
       CharSourceRange range = CharSourceRange(sourceMgr, commentLoc, endLoc);
       StringRef fullTokenText = sourceMgr.extractText(range);
-      unsigned leadingWhitespace = fullTokenText.size() -
+      unsigned leadingWhitespace = fullTokenText.size() - 
         fullTokenText.ltrim().size();
       if (leadingWhitespace > 0) {
         commentLoc = commentLoc.getAdvancedLoc(leadingWhitespace);

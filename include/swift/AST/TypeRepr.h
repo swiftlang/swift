@@ -142,7 +142,7 @@ public:
   /// don't emit another one upon further reanalysis.
   bool isWarnedAbout() const { return Bits.TypeRepr.Warned; }
   void setWarned() { Bits.TypeRepr.Warned = true; }
-
+  
   /// Get the representative location for pointing at this type.
   SourceLoc getLoc() const;
 
@@ -545,7 +545,7 @@ class FunctionTypeRepr : public TypeRepr {
 
 public:
   FunctionTypeRepr(GenericParamList *genericParams, TupleTypeRepr *argsTy,
-                   SourceLoc asyncLoc, SourceLoc throwsLoc,
+                   SourceLoc asyncLoc, SourceLoc throwsLoc, 
                    TypeRepr *thrownTy,
                    SourceLoc arrowLoc,
                    TypeRepr *retTy,
@@ -934,7 +934,7 @@ class TupleTypeRepr final : public TypeRepr,
   friend TrailingObjects;
 
   SourceRange Parens;
-
+  
   size_t numTrailingObjects(OverloadToken<TupleTypeReprElement>) const {
     return Bits.TupleTypeRepr.NumElements;
   }
@@ -1051,17 +1051,17 @@ public:
   bool isTypeReprAny() {
         return getTypes().size() == 0 ?  true : false;
   }
-
+  
   static CompositionTypeRepr *create(const ASTContext &C,
                                      ArrayRef<TypeRepr*> Protocols,
                                      SourceLoc FirstTypeLoc,
                                      SourceRange CompositionRange);
-
+  
   static CompositionTypeRepr *createEmptyComposition(ASTContext &C,
                                                      SourceLoc AnyLoc) {
     return CompositionTypeRepr::create(C, {}, AnyLoc, {AnyLoc, AnyLoc});
   }
-
+  
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Composition;
   }
@@ -1139,17 +1139,17 @@ private:
 class SpecifierTypeRepr : public TypeRepr {
   TypeRepr *Base;
   SourceLoc SpecifierLoc;
-
+  
 public:
   SpecifierTypeRepr(TypeReprKind Kind, TypeRepr *Base, SourceLoc Loc)
     : TypeRepr(Kind), Base(Base), SpecifierLoc(Loc) {
     // ensure the kind passed-in matches up with our TypeRepr classof.
     assert(SpecifierTypeRepr::classof(cast<TypeRepr>(this)));
   }
-
+  
   TypeRepr *getBase() const { return Base; }
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
-
+  
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
@@ -1159,7 +1159,7 @@ public:
            T->getKind() == TypeReprKind::Sending;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
-
+  
 private:
   SourceLoc getStartLocImpl() const { return SpecifierLoc; }
   SourceLoc getEndLocImpl() const { return Base->getEndLoc(); }
@@ -1183,12 +1183,12 @@ public:
                     SourceLoc ModifierLoc)
     : SpecifierTypeRepr(TypeReprKind::Ownership, Base, ModifierLoc),
       Specifier(Specifier) {}
-
+  
   ParamSpecifier getSpecifier() const { return Specifier; }
-
+  
   /// Return the \c ValueOwnership kind that corresponds to the specifier.
   ValueOwnership getValueOwnership() const;
-
+  
   /// Return the spelling of the ownership specifier as a string.
   StringRef getSpecifierSpelling() const;
 
@@ -1197,7 +1197,7 @@ public:
   }
   static bool classof(const OwnershipTypeRepr *T) { return true; }
 };
-
+  
 /// An 'isolated' type.
 /// \code
 ///   x : isolated Actor
@@ -1384,16 +1384,16 @@ class OpaqueReturnTypeRepr : public TypeRepr {
   /// In valid code this must resolve to a class, protocol, or composition type.
   TypeRepr *Constraint;
   SourceLoc OpaqueLoc;
-
+  
 public:
   OpaqueReturnTypeRepr(SourceLoc opaqueLoc, TypeRepr *constraint)
     : TypeRepr(TypeReprKind::OpaqueReturn), Constraint(constraint),
       OpaqueLoc(opaqueLoc)
   {}
-
+  
   TypeRepr *getConstraint() const { return Constraint; }
   SourceLoc getOpaqueLoc() const { return OpaqueLoc; }
-
+  
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::OpaqueReturn;
   }
@@ -1552,7 +1552,7 @@ class SILBoxTypeRepr final : public TypeRepr,
   size_t numTrailingObjects(OverloadToken<TypeRepr*>) const {
     return Bits.SILBoxTypeRepr.NumGenericArgs;
   }
-
+  
 public:
   using Field = SILBoxTypeReprField;
 
@@ -1574,19 +1574,19 @@ public:
     std::uninitialized_copy(GenericArgs.begin(), GenericArgs.end(),
                             getTrailingObjects<TypeRepr*>());
   }
-
+  
   static SILBoxTypeRepr *create(ASTContext &C,
                       GenericParamList *GenericParams,
                       SourceLoc LBraceLoc, ArrayRef<Field> Fields,
                       SourceLoc RBraceLoc,
                       SourceLoc ArgLAngleLoc, ArrayRef<TypeRepr *> GenericArgs,
                       SourceLoc ArgRAngleLoc);
-
+  
   void setGenericSignature(GenericSignature Sig) {
     assert(!GenericSig);
     GenericSig = Sig;
   }
-
+  
   ArrayRef<Field> getFields() const {
     return {getTrailingObjects<Field>(),
             static_cast<size_t>(Bits.SILBoxTypeRepr.NumFields)};
@@ -1595,7 +1595,7 @@ public:
     return {getTrailingObjects<TypeRepr*>(),
             static_cast<size_t>(Bits.SILBoxTypeRepr.NumGenericArgs)};
   }
-
+  
   GenericParamList *getGenericParams() const {
     return GenericParams;
   }
@@ -1612,7 +1612,7 @@ public:
     return T->getKind() == TypeReprKind::SILBox;
   }
   static bool classof(const SILBoxTypeRepr *T) { return true; }
-
+  
 private:
   SourceLoc getStartLocImpl() const;
   SourceLoc getEndLocImpl() const;

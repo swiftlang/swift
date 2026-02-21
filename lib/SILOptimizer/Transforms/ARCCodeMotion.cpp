@@ -28,8 +28,8 @@
 /// -------------------
 ///
 /// 1. Retains are blocked by MayDecrements. Its straightforward to prove that
-/// retain sinking is correct.
-///
+/// retain sinking is correct. 
+/// 
 /// If a retain is sunk from Region A to Region B, that means there is no
 /// blocking operation between where the retain was in Region A to where it is
 /// sunk to in Region B. Since we only sink retains (we do not move any other
@@ -64,7 +64,7 @@
 ///
 /// TODO: There are a lot of code duplications between retain and release code
 /// motion in the data flow part. Consider whether we can share them.
-/// Essentially, we can implement the release code motion by inverting the
+/// Essentially, we can implement the release code motion by inverting the 
 /// retain code motion, but this can also make the code less readable.
 ///
 //===----------------------------------------------------------------------===//
@@ -100,7 +100,7 @@ STATISTIC(NumReleasesHoisted, "Number of releases hoisted");
 llvm::cl::opt<bool> DisableARCCodeMotion("disable-arc-cm", llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
-//                             Block State
+//                             Block State 
 //===----------------------------------------------------------------------===//
 
 struct BlockState {
@@ -234,7 +234,7 @@ public:
   virtual void computeCodeMotionGenKillSet() = 0;
 
   /// Run the iterative data flow to converge.
-  virtual void convergeCodeMotionDataFlow() = 0;
+  virtual void convergeCodeMotionDataFlow() = 0; 
 
   /// Use the data flow results, come up with places to insert the new inst.
   virtual void computeCodeMotionInsertPoints() = 0;
@@ -285,7 +285,7 @@ bool CodeMotionContext::run() {
 }
 
 //===----------------------------------------------------------------------===//
-//                          Retain Code Motion
+//                          Retain Code Motion 
 //===----------------------------------------------------------------------===//
 
 class RetainBlockState : public BlockState {
@@ -306,7 +306,7 @@ public:
     // MultiIteration is true.
     BBSetOut.resize(size, MultiIteration);
     BBMaxSet.resize(size, !IsEntry && MultiIteration);
-
+  
     // Genset and Killset are initially empty.
     BBGenSet.resize(size, false);
     BBKillSet.resize(size, false);
@@ -485,7 +485,7 @@ void RetainCodeMotionContext::initializeCodeMotionBBMaxSet() {
 void RetainCodeMotionContext::computeCodeMotionGenKillSet() {
   for (SILBasicBlock *BB : PO->getReversePostOrder()) {
     BlockState &State = BlockStates[BB];
-    bool InterestBlock = false;
+    bool InterestBlock = false; 
     for (auto &I : *BB) {
       // Check whether this instruction blocks any RC root code motion.
       for (unsigned i = 0; i < RCRootVault.size(); ++i) {
@@ -573,7 +573,7 @@ bool RetainCodeMotionContext::processBBWithGenKillSet(SILBasicBlock *BB) {
   // Compute the BBSetIn at the beginning of the basic block.
   State.BBSetIn.reset(State.BBKillSet);
   State.BBSetIn |= State.BBGenSet;
-
+ 
   // If BBSetIn changes, then keep iterating until reached a fixed point.
   return State.updateBBSetOut(State.BBSetIn);
 }
@@ -581,7 +581,7 @@ bool RetainCodeMotionContext::processBBWithGenKillSet(SILBasicBlock *BB) {
 void RetainCodeMotionContext::convergeCodeMotionDataFlow() {
   // Process each basic block with the genset and killset. Every time the
   // BBSetOut of a basic block changes, the optimization is rerun on its
-  // successors.
+  // successors. 
   BasicBlockWorklist WorkList(BlockStates.getFunction());
   // Push into reverse post order so that we can pop from the back and get
   // post order.
@@ -654,7 +654,7 @@ void RetainCodeMotionContext::computeCodeMotionInsertPoints() {
 }
 
 //===----------------------------------------------------------------------===//
-//                          Release Code Motion
+//                          Release Code Motion 
 //===----------------------------------------------------------------------===//
 
 class ReleaseBlockState : public BlockState {
@@ -677,7 +677,7 @@ public:
     BBSetIn.resize(size, InitOptimistic);
     BBSetOut.resize(size, false);
     BBMaxSet.resize(size, InitOptimistic);
-
+  
     // Genset and Killset are initially empty.
     BBGenSet.resize(size, false);
     BBKillSet.resize(size, false);
@@ -810,7 +810,7 @@ void ReleaseCodeMotionContext::initializeCodeMotionDataFlow() {
   BasicBlockSet BlocksInitOptimistically(BlockStates.getFunction());
 
   llvm::SmallVector<SILBasicBlock *, 32> Worklist;
-
+  
   // Find all the RC roots in the function.
   for (auto &BB : *F) {
     for (auto &II : BB) {
@@ -1000,7 +1000,7 @@ bool ReleaseCodeMotionContext::processBBWithGenKillSet(SILBasicBlock *BB) {
   // Compute the BBSetIn at the beginning of the basic block.
   State.BBSetOut.reset(State.BBKillSet);
   State.BBSetOut |= State.BBGenSet;
-
+ 
   // If BBSetIn changes, then keep iterating until reached a fixed point.
   return State.updateBBSetIn(State.BBSetOut);
 }
@@ -1040,7 +1040,7 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
     // If there is a transition from 1 to 0, that means we have a partial
     // merge, which means the release can NOT be hoisted to the current block.
     // place it at the successors.
-    for (unsigned i = 0; i < RCRootVault.size(); ++i) {
+    for (unsigned i = 0; i < RCRootVault.size(); ++i) {  
       if (S.BBSetOut[i])
         continue;
       for (auto &Succ : BB->getSuccessors()) {
@@ -1109,7 +1109,7 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
       InsertPoints[RCRootVault[i]].push_back(&*BB->begin());
       S.BBSetOut.reset(i);
     }
-
+   
     // Lastly update the BBSetIn, only necessary when we are running a single
     // iteration dataflow.
     if (!MultiIteration) {
@@ -1245,8 +1245,8 @@ public:
             Conv,
             ConsumedArgToEpilogueReleaseMatcher::ExitKind::Return);
 
-      ReleaseCodeMotionContext RelCM(this, BPA, F, PO, AA, RCFI,
-                                     FreezeEpilogueReleases, ERM);
+      ReleaseCodeMotionContext RelCM(this, BPA, F, PO, AA, RCFI, 
+                                     FreezeEpilogueReleases, ERM); 
       // Run release hoisting.
       InstChanged |= RelCM.run();
     } else {

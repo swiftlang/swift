@@ -108,7 +108,7 @@ public:
   /// Translate a SILDebugScope into an llvm::DIDescriptor.
   llvm::DIScope *getOrCreateScope(const SILDebugScope *DS);
 
-
+  
   /// Emit debug info for an import declaration.
   ///
   /// The DWARF output for import decls is similar to that of a using

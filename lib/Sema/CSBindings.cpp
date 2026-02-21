@@ -1094,7 +1094,7 @@ void PotentialBindings::inferFromLiteral(Constraint *constraint) {
     if (literal.getProtocol() == protocol)
       return;
   }
-
+  
   Type defaultType;
   // `ExpressibleByNilLiteral` doesn't have a default type.
   if (!protocol->isSpecificProtocol(
@@ -2397,7 +2397,7 @@ void BindingSet::forEachLiteralRequirement(
     // Only uncovered defaultable literal protocols participate.
     if (!info.viableAsBinding())
       continue;
-
+    
     if (auto protocolKind = info.getProtocol()->getKnownProtocolKind())
       callback(*protocolKind);
   }
@@ -2487,7 +2487,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     out << "[attributes: ";
     interleave(attributes, out, ", ");
   }
-
+  
   auto literalKind = getLiteralForScore();
   if (literalKind != LiteralBindingKind::None) {
     if (!attributes.empty()) {
@@ -2594,5 +2594,5 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
         [&] { out << ", "; });
     out << "]";
   }
-
+  
 }

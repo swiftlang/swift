@@ -144,7 +144,7 @@ public:
   TypeDecl *createTypeDecl(NodePointer node);
 
   GenericTypeDecl *createTypeDecl(StringRef mangledName, bool &typeAlias);
-
+  
   GenericTypeDecl *createTypeDecl(NodePointer node,
                                   bool &typeAlias);
 
@@ -157,7 +157,7 @@ public:
   Type createTypeAliasType(GenericTypeDecl *decl, Type parent);
 
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args);
-
+  
   OpaqueTypeDecl *resolveOpaqueTypeDecl(NodePointer opaqueDescriptor);
 
   Type resolveOpaqueType(NodePointer opaqueDescriptor,

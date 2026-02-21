@@ -907,7 +907,7 @@ ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
     ResilienceExpansion contextExpansion) {
   auto namingDecl = opaque->getNamingDecl();
-
+  
   // Don't allow replacement if the naming decl is dynamically replaceable.
   if (namingDecl && namingDecl->isDynamic())
     return OpaqueSubstitutionKind::DontSubstitute;

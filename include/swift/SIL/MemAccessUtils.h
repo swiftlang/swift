@@ -31,9 +31,9 @@
 ///   %address = struct_element_addr %access : $*S, #.field
 ///   %value   = load [trivial] %address : $*Int64
 ///   end_access %access : $*S
-///
+/// 
 /// OR
-///
+/// 
 ///   %root    = alloc_box $S
 ///   %base    = project_box %root : ${ var S }
 ///   %access  = begin_access [read] [static] %base : $*S
@@ -650,7 +650,7 @@ public:
   SILValue getOwnershipReferenceAggregate() const {
     return findOwnershipReferenceAggregate(getReference());
   }
-
+  
   /// Return the storage root of the reference being accessed.
   ///
   /// Precondition: isReference() is true.
@@ -1112,9 +1112,9 @@ public:
     }
 
     int getEncoding() const { return indexEncoding; }
-
+    
     void print(raw_ostream &os) const;
-
+    
     void dump() const;
   };
 

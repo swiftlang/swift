@@ -16,7 +16,7 @@ __attribute__((swift_name("SomeClass.init(value:)")))
 IAMSomeClass * _Nonnull MakeIAMSomeClass(double x);
 
 __attribute__((swift_name("SomeClass.applyOptions(self:_:)")))
-void IAMSomeClassApplyOptions(IAMSomeClass * _Nonnull someClass,
+void IAMSomeClassApplyOptions(IAMSomeClass * _Nonnull someClass, 
                               IAMSomeClassOptions options);
 
 __attribute__((swift_name("SomeClass.doIt(self:)")))

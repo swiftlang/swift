@@ -38,11 +38,11 @@ namespace {
   struct DenseMapAPFloatKeyInfo {
     static inline APFloat getEmptyKey() { return APFloat(APFloat::Bogus(), 1); }
     static inline APFloat getTombstoneKey() { return APFloat(APFloat::Bogus(), 2); }
-
+    
     static unsigned getHashValue(const APFloat &Key) {
       return static_cast<unsigned>(hash_value(Key));
     }
-
+    
     static bool isEqual(const APFloat &LHS, const APFloat &RHS) {
       return LHS.bitwiseIsEqual(RHS);
     }
@@ -111,7 +111,7 @@ namespace {
     };
 
   #define PAIRCASE(XS, YS) case PairSwitch(XS, YS)
-
+    
     class Space final : public RelationalOperationsBase<Space> {
     private:
       SpaceKind Kind;
@@ -144,7 +144,7 @@ namespace {
             // Decomposed pattern spaces grow with the sum of the subspaces.
             acc += sp.computeSize(DC, cache);
           }
-
+          
           cache.erase(getType().getPointer());
           return acc;
         }
@@ -156,7 +156,7 @@ namespace {
                   && cache.count(sp.getType().getPointer())) {
               continue;
             }
-
+            
             // Constructor spaces grow with the product of their arguments.
             acc *= sp.computeSize(DC, cache);
           }
@@ -593,7 +593,7 @@ namespace {
           if (other.getSpaces().empty()) {
             return Space();
           }
-
+          
           SmallVector<Space, 4> constrSpaces;
           bool foundBad = false;
           auto i = this->getSpaces().begin();
@@ -619,7 +619,7 @@ namespace {
             if (!reducedSpaceOrNone)
               return std::nullopt;
             auto reducedSpace = *reducedSpaceOrNone;
-
+            
             // If one of the constructor parameters is empty it means
             // the whole constructor space is empty as well, so we can
             // safely skip it.
@@ -923,10 +923,10 @@ namespace {
     APIntMap<Expr *> IntLiteralCache;
     llvm::DenseMap<APFloat, Expr *, ::DenseMapAPFloatKeyInfo> FloatLiteralCache;
     llvm::DenseMap<StringRef, Expr *> StringLiteralCache;
-
+    
     SpaceEngine(ASTContext &C, const SwitchStmt *SS, const DeclContext *DC)
         : Context(C), Switch(SS), DC(DC) {}
-
+    
     bool checkRedundantLiteral(const Pattern *Pat, Expr *&PrevPattern) {
       if (Pat->getKind() != PatternKind::Expr) {
           return false;
@@ -1087,7 +1087,7 @@ namespace {
 
       diagnoseMissingCases(RequiresDefault::No, uncovered, unknownCase);
     }
-
+    
     enum class RequiresDefault {
       No,
       EmptySwitchBody,
@@ -1343,7 +1343,7 @@ namespace {
           flats.push_back(space);
           return;
         }
-
+        
         // To recursively recover a pattern matrix from a bunch of disjuncts:
         // 1) Unpack the arguments to the constructor under scrutiny.
         // 2) Traverse each argument in turn.
@@ -1400,7 +1400,7 @@ namespace {
               matrix[rowIdx].push_back(columnVect[colIdx]);
             }
           }
-
+          
           // Pattern matrices grow quasi-factorially in the size of the
           // input space.
           multiplier *= columnVect.size();

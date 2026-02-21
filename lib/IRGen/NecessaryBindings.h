@@ -50,7 +50,7 @@ public:
   NecessaryBindings() {}
   NecessaryBindings(SubstitutionMap subs, bool noEscape)
     : SubMap(subs), NoEscape(noEscape) {}
-
+  
   SubstitutionMap getSubstitutionMap() const {
     return SubMap;
   }

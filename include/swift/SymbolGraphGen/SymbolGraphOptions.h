@@ -38,11 +38,11 @@ struct SymbolGraphOptions {
   /// Emit members gotten through class inheritance or protocol default
   /// implementations with compound, "SYNTHESIZED" USRs.
   bool EmitSynthesizedMembers = false;
-
+  
   /// Whether to print informational messages when rendering
   /// a symbol graph.
   bool PrintMessages = false;
-
+  
   /// Whether to skip docs for symbols with compound, "SYNTHESIZED" USRs.
   bool SkipInheritedDocs = false;
 

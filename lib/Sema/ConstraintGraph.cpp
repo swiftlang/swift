@@ -459,7 +459,7 @@ void ConstraintGraph::mergeNodesPre(TypeVariableType *typeVar2) {
   }
 }
 
-void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
+void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
                                  TypeVariableType *typeVar2) {
   // Retrieve the node for the representative that we're merging into.
   ASSERT(CS.getRepresentative(typeVar1) == typeVar1);
@@ -610,7 +610,7 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherAllConstraints(
 }
 
 llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherNearbyConstraints(
-    TypeVariableType *typeVar,
+    TypeVariableType *typeVar, 
     llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
   llvm::TinyPtrVector<Constraint *> constraints;
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;

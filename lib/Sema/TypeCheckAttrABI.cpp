@@ -797,10 +797,10 @@ public:
   }
 
   /// Check two attribute lists against one another.
-  ///
+  /// 
   /// This pairs up attributes which are sufficiently similar (as determined by
   /// \c canCompareAttrs() ) and then checks them. Attributes which
-  /// have no counterpart are checked individually.
+  /// have no counterpart are checked individually. 
   bool checkAttrs(DeclAttributes api, DeclAttributes abi,
                   Decl *apiDecl, Decl *abiDecl) {
     bool didDiagnose = false;
@@ -837,7 +837,7 @@ public:
 
   /// Check a single attribute against its counterpart. If an attribute has no
   /// counterpart, the counterpart may be \c nullptr ; either \p abi or \p abi
-  /// may be \c nullptr , but never both.
+  /// may be \c nullptr , but never both. 
   bool checkAttr(DeclAttribute *api, DeclAttribute *abi,
                  Decl *apiDecl, Decl *abiDecl) {
     ASSERT(api || abi && "checkAttr() should have at least one attribute");

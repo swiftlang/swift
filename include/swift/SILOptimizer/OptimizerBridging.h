@@ -137,10 +137,10 @@ struct BridgedOptimizerUtilities {
 
 struct BridgedLoopTree {
   swift::SILLoopInfo * _Nonnull li;
-
+  
   BRIDGED_INLINE SwiftInt getTopLevelLoopCount() const;
   BRIDGED_INLINE BridgedLoop getLoop(SwiftInt index) const;
-
+  
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const;
 };
 
@@ -166,9 +166,9 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftMutableSpanDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLoopTree getLoopTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLoop getLoop() const;
-
+  
   // Array semantics call
-
+  
   static BRIDGED_INLINE ArrayCallKind getArraySemanticsCallKind(BridgedInstruction inst);
   BRIDGED_INLINE bool canHoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction toInst) const;
   BRIDGED_INLINE void hoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction beforeInst) const;

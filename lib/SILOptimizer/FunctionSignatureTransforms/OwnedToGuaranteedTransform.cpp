@@ -96,7 +96,7 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
         isIndirectArgumentMutated(A.Arg, /*ignoreDestroys=*/ true, /*defaultIsMutating=*/true)) {
       continue;
     }
-
+  
     // See if we can find a ref count equivalent strong_release or release_value
     // at the end of this function if our argument is an @owned parameter.
     // See if we can find a destroy_addr at the end of this function if our

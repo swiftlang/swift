@@ -29,7 +29,7 @@ __swift_uint8_t _swift_stdlib_getWordBreakProperty(__swift_uint32_t scalar) {
 
     // Shift the range count out of the value.
     auto lower = (entry << 11) >> 11;
-
+    
     // Shift the enum out first, then shift out the scalar value.
     auto upper = lower + (entry >> 21) - 1;
 

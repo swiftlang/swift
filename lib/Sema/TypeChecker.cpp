@@ -86,7 +86,7 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
 
   if (!isa<LiteralExpr>(expr))
     return nullptr;
-
+  
   if (isa<NilLiteralExpr>(expr))
     return TypeChecker::getProtocol(Context, expr->getLoc(),
                                     KnownProtocolKind::ExpressibleByNilLiteral);
@@ -253,7 +253,7 @@ BindExtensionsRequest::evaluate(Evaluator &evaluator, ModuleDecl *M) const {
   // If that fails, try again, but this time expand macros.
   excludeMacroExpansions = false;
   tryBindExtensions();
-
+  
   // Any remaining extensions are invalid. They will be diagnosed later by
   // typeCheckDecl().
   for (auto *ext : worklist)

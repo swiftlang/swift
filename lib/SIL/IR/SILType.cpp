@@ -143,7 +143,7 @@ SILType SILType::getUnsafeRawPointer(const ASTContext &ctx) {
 
 bool SILType::isTrivial(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
-
+  
   return F.getTypeProperties(contextType).isTrivial();
 }
 
@@ -176,7 +176,7 @@ bool SILType::isEmpty(const SILFunction &F) const {
   if (F.getTypeProperties(*this).isInfinite()) {
     return false;
   }
-
+  
   if (auto tupleTy = getAs<TupleType>()) {
     // A tuple is empty if it either has no elements or if all elements are
     // empty.
@@ -278,7 +278,7 @@ bool SILType::isPointerSizeAndAligned(SILModule &M,
   if (auto underlyingField = getSingletonAggregateFieldType(M, expansion)) {
     return underlyingField.isPointerSizeAndAligned(M, expansion);
   }
-
+  
   return false;
 }
 
@@ -287,7 +287,7 @@ static bool isSingleSwiftRefcounted(SILModule &M,
                                     ResilienceExpansion expansion,
                                     bool didUnwrapOptional) {
   auto &C = M.getASTContext();
-
+  
   // Unwrap one layer of optionality.
   // TODO: Or more generally, any fragile enum with a single payload and single
   // no-payload case.
@@ -302,15 +302,15 @@ static bool isSingleSwiftRefcounted(SILModule &M,
     return ::isSingleSwiftRefcounted(M, underlyingField, expansion,
                                      didUnwrapOptional);
   }
-
+  
   auto Ty = SILTy.getASTType();
-
+  
   // Easy cases: Builtin.NativeObject and boxes are always Swift-refcounted.
   if (Ty == C.TheNativeObjectType)
     return true;
   if (isa<SILBoxType>(Ty))
     return true;
-
+  
   // Is the type a Swift-refcounted class?
   // For a generic type, consider its superclass constraint, if any.
   auto ClassTy = Ty;
@@ -327,12 +327,12 @@ static bool isSingleSwiftRefcounted(SILModule &M,
     if (layout.containsSwiftProtocol) {
       return false;
     }
-
+    
     // The Error existential has its own special layout.
     if (layout.isErrorExistential()) {
       return false;
     }
-
+    
     // We can look at the superclass constraint, if any, to see if it's
     // Swift-refcounted.
     if (!layout.getSuperclass()) {
@@ -340,7 +340,7 @@ static bool isSingleSwiftRefcounted(SILModule &M,
     }
     ClassTy = layout.getSuperclass()->getCanonicalType();
   }
-
+  
   // TODO: Does the base class we found have fully native Swift ancestry,
   // so we can use Swift native refcounting on it?
   return false;
@@ -503,7 +503,7 @@ bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
 
 bool SILType::isAddressOnly(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
-
+    
   return F.getTypeLowering(contextType).isAddressOnly();
 }
 
@@ -589,7 +589,7 @@ SILType::getPreferredExistentialRepresentation(Type containedType) const {
   // Existential metatypes always use metatype representation.
   if (is<ExistentialMetatypeType>())
     return ExistentialRepresentation::Metatype;
-
+  
   // If the type isn't existential, then there is no representation.
   if (!isExistentialType())
     return ExistentialRepresentation::None;
@@ -610,7 +610,7 @@ SILType::getPreferredExistentialRepresentation(Type containedType) const {
   // class reference directly.
   if (layout.requiresClass())
     return ExistentialRepresentation::Class;
-
+  
   // Otherwise, we need to use a fixed-sized buffer.
   assert(!layout.isObjC());
   return ExistentialRepresentation::Opaque;
@@ -669,13 +669,13 @@ CanType swift::getSILBoxFieldLoweredType(TypeExpansionContext context,
                                          unsigned index) {
   auto fieldTy = SILType::getPrimitiveObjectType(
     type->getLayout()->getFields()[index].getLoweredType());
-
+  
   // Map the type into the new expansion context, which might substitute opaque
   // types.
   auto sig = type->getLayout()->getGenericSignature();
   fieldTy = TC.getTypeLowering(fieldTy, context, sig)
               .getLoweredType();
-
+  
   // Apply generic arguments if the layout is generic.
   if (auto subMap = type->getSubstitutions()) {
     fieldTy = fieldTy.subst(TC,
@@ -962,7 +962,7 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
   return Type(const_cast<TypeBase *>(this)).transformRec([&](TypeBase *t) -> std::optional<Type> {
     if (auto *f = t->getAs<SILFunctionType>()) {
       auto sft = f->getUnsubstitutedType(M);
-
+      
       // Also eliminate substituted function types in the arguments, yields,
       // and returns of the function type.
       bool didChange = false;
@@ -998,10 +998,10 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
         didChange |= error->getInterfaceType() != newErrorTy;
         newErrorResult = SILResultInfo(newErrorTy, error->getConvention());
       }
-
+      
       if (!didChange)
         return sft;
-
+      
       return SILFunctionType::get(sft->getInvocationGenericSignature(),
                                   sft->getExtInfo(), sft->getCoroutineKind(),
                                   sft->getCalleeConvention(),
@@ -1081,7 +1081,7 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
 
     // If there's only one stored property, we have the layout of its field.
     auto allFields = structDecl->getStoredProperties();
-
+    
     if (allFields.size() == 1) {
       auto fieldTy = getFieldType(
           allFields[0], M,
@@ -1105,7 +1105,7 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
     }
 
     auto allCases = enumDecl->getAllElements();
-
+    
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
         && (*theCase)->hasAssociatedValues()) {

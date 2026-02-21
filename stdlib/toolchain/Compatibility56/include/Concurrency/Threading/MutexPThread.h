@@ -105,7 +105,7 @@ struct MutexPlatformHelper {
     return OS_UNFAIR_LOCK_INIT;
 #else
     return PTHREAD_MUTEX_INITIALIZER;
-#endif
+#endif  
   }
 
   __attribute__((visibility("hidden")))

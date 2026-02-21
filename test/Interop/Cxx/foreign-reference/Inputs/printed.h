@@ -1,7 +1,7 @@
 struct ImmortalFRT {
 private:
   int priv = 1;
-
+  
 public:
   int publ = 2;
 } __attribute__((swift_attr("import_reference")))

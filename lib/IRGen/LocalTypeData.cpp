@@ -412,7 +412,7 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   if (DS && DS->getInlinedFunction() &&
       DS->getInlinedFunction()->isTransparent())
     return;
-
+  
   // Only for formal type metadata.
   if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata())
     return;

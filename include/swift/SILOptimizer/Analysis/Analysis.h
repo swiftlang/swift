@@ -99,7 +99,7 @@ public:
 
   /// Destructor.
   virtual ~SILAnalysis() {}
-
+  
   /// Can be used to retrieve other analysis passes from \p PM, which this
   /// analysis depends on.
   virtual void initialize(SILPassManager *pm) { }

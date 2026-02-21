@@ -67,7 +67,7 @@ class IVInfoPrinter : public SILModuleTransform {
           dumpIV(Info.getInductionVariableHeader(value), value);
         }
       }
-
+      
       if (FoundIV)
         llvm::errs() << "\n";
     }

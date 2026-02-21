@@ -1611,7 +1611,7 @@ void CodeCompletionCallbacksImpl::readyForTypeChecking(SourceFile *SrcFile) {
                                 : Ctx.SourceMgr.getIDEInspectionTargetLoc();
   switch (Kind) {
   case CompletionKind::PostfixExpr:
-  case CompletionKind::DotExpr:
+  case CompletionKind::DotExpr: 
     postfixCompletion(CompletionLoc, MaybeFuncBody);
     return;
   case CompletionKind::UnresolvedMember:

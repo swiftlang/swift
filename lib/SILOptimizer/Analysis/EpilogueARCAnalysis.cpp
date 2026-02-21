@@ -18,7 +18,7 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-//                          Epilogue ARC Utilities
+//                          Epilogue ARC Utilities 
 //===----------------------------------------------------------------------===//
 
 void EpilogueARCContext::initializeDataflow() {
@@ -125,7 +125,7 @@ bool EpilogueARCContext::computeEpilogueARC() {
       //
       // In case we've found ARC instructions in some and not all successors,
       // that means from this point to the end of the function, some paths will
-      // not have an epilogue ARC instruction, which means the data flow has
+      // not have an epilogue ARC instruction, which means the data flow has 
       // failed.
       auto Iter = B->succ_begin();
       // Since basic block B is in PO, its successors will be reachable and will

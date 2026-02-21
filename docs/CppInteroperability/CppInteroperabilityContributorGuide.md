@@ -24,7 +24,7 @@ forcing the user to make **any** changes to their code.
 Because of that promise that we're making to our users,
 we need to be very diligent when it comes to making
 changes to how Swift and C++ interop work, as they could
-potentially violate this promise. Thus it's recommended
+potentially violate this promise. Thus it's recommended 
 that you treat every
 change as source breaking, unless proven otherwise.
 

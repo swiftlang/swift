@@ -270,7 +270,7 @@ if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
   split_embedded_sources(
     OUT_LIST_EMBEDDED SWIFTLIB_EMBEDDED_VECTOR_GYB_SOURCES
     OUT_LIST_NORMAL SWIFTLIB_VECTOR_GYB_SOURCES
-
+    
     EMBEDDED SIMDIntegerConcreteOperations.swift.gyb
     EMBEDDED SIMDFloatConcreteOperations.swift.gyb
     EMBEDDED SIMDMaskConcreteOperations.swift.gyb
@@ -526,7 +526,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     list(GET list 0 arch)
     list(GET list 1 mod)
     list(GET list 2 triple)
-
+    
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")

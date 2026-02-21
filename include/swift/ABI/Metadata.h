@@ -209,7 +209,7 @@ static inline const T *asMetadata(const FullMetadata<T> *metadata) {
 // that isn't SFINAE-safe.
 namespace {
   template<typename T> struct _ResultOf;
-
+  
   template<typename R, typename...A>
   struct _ResultOf<R(*)(A...)> {
     using type = R;
@@ -279,7 +279,7 @@ public:
   MetadataKind getKind() const {
     return getEnumeratedMetadataKind(Kind);
   }
-
+  
   /// Set the metadata kind.
   void setKind(MetadataKind kind) {
     Kind = static_cast<StoredPointer>(kind);
@@ -300,7 +300,7 @@ public:
   bool isClassObject() const {
     return static_cast<MetadataKind>(getKind()) == MetadataKind::Class;
   }
-
+  
   /// Does the given metadata kind represent metadata for some kind of class?
   static bool isAnyKindOfClass(MetadataKind k) {
     switch (k) {
@@ -313,7 +313,7 @@ public:
       return false;
     }
   }
-
+  
   /// Is this metadata for an existential type?
   bool isAnyExistentialType() const {
     switch (getKind()) {
@@ -325,7 +325,7 @@ public:
       return false;
     }
   }
-
+  
   /// Is this either type metadata or a class object for any kind of class?
   bool isAnyClass() const {
     return isAnyKindOfClass(getKind());
@@ -366,7 +366,7 @@ public:
 
     return false;
   }
-
+  
   // Define forwarders for value witnesses. These invoke this metadata's value
   // witness table with itself as the 'self' parameter.
   #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
@@ -505,7 +505,7 @@ public:
 
 protected:
   friend struct TargetOpaqueMetadata<Runtime>;
-
+  
   /// Metadata should not be publicly copied or moved.
   constexpr TargetMetadata(const TargetMetadata &) = default;
   TargetMetadata &operator=(const TargetMetadata &) = default;
@@ -892,7 +892,7 @@ struct TargetAnyClassMetadataObjCInterop
   /// order to indicate that this is a Swift metatype and therefore
   /// that the type metadata header is present.
   StoredSize Data;
-
+  
   static constexpr StoredPointer offsetToData() {
     return offsetof(TargetAnyClassMetadataObjCInterop, Data);
   }
@@ -1167,7 +1167,7 @@ public:
 
     // Otherwise there should be nothing to do, since only the old "is
     // Swift" bit is used for backward-deployed runtimes.
-
+    
     assert(isTypeMetadata());
   }
 #endif
@@ -1599,9 +1599,9 @@ private:
   ) const {
     return hasThrownError() ? 1 : 0;
   }
-
+      
 public:
-  Parameter *getParameters() {
+  Parameter *getParameters() { 
     return this->template getTrailingObjects<Parameter>();
   }
 
@@ -1690,7 +1690,7 @@ public:
     assert(hasExtendedFlags());
     return this->template getTrailingObjects<ExtendedFunctionTypeFlags>();
   }
-
+      
   ExtendedFunctionTypeFlags getExtendedFlags() const {
     if (!hasExtendedFlags())
       return ExtendedFunctionTypeFlags();
@@ -1733,10 +1733,10 @@ using MetatypeMetadata = TargetMetatypeMetadata<InProcess>;
 template <typename Runtime>
 struct TargetFixedArrayTypeMetadata : public TargetMetadata<Runtime> {
   using StoredPointerDifference = typename Runtime::StoredPointerDifference;
-
+  
   StoredPointerDifference Count;
   ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> Element;
-
+  
   // Returns the number of elements for which storage is reserved.
   // A type that is instantiated with negative size cannot have values
   // instantiated, so is laid out with zero size like an uninhabited type.
@@ -1825,7 +1825,7 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
   }
 };
 using TupleTypeMetadata = TargetTupleTypeMetadata<InProcess>;
-
+  
 template <typename Runtime>
 constexpr inline auto
 TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements() -> StoredSize {
@@ -1990,7 +1990,7 @@ public:
   constexpr TargetExistentialTypeMetadata()
     : TargetMetadata<Runtime>(MetadataKind::Existential),
       Flags(ExistentialTypeFlags()), NumProtocols(0) {}
-
+  
   explicit constexpr TargetExistentialTypeMetadata(ExistentialTypeFlags Flags)
     : TargetMetadata<Runtime>(MetadataKind::Existential),
       Flags(Flags), NumProtocols(0) {}
@@ -2001,14 +2001,14 @@ public:
   /// True if it's valid to take ownership of the value in the existential
   /// container if we own the container.
   bool mayTakeValue(const OpaqueValue *container) const;
-
+  
   /// Clean up an existential container whose value is uninitialized.
   void deinitExistentialContainer(OpaqueValue *container) const;
-
+  
   /// Project the value pointer from an existential container of the type
   /// described by this metadata.
   const OpaqueValue *projectValue(const OpaqueValue *container) const;
-
+  
   OpaqueValue *projectValue(OpaqueValue *container) const {
     return const_cast<OpaqueValue *>(projectValue((const OpaqueValue*)container));
   }
@@ -2017,7 +2017,7 @@ public:
   /// by this metadata.
   const TargetMetadata<Runtime> *
   getDynamicType(const OpaqueValue *container) const;
-
+  
   /// Get a witness table from an existential container of the type described
   /// by this metadata.
   const TargetWitnessTable<Runtime> * getWitnessTable(
@@ -2371,7 +2371,7 @@ public:
     if (!hasGeneralizationSignature()) return 0;
     return getGenSigHeader()->getArgumentLayoutSizeInWords();
   }
-
+  
   bool isCopyable() const {
     for (auto &reqt : getRequirementSignature().getRequirements()) {
       if (reqt.getKind() != GenericRequirementKind::InvertedProtocols) {
@@ -2759,7 +2759,7 @@ public:
   TypeReferenceKind getTypeKind() const {
     return DirectNominalTypeDescriptor.getInt();
   }
-
+  
   const TargetContextDescriptor<Runtime> *
   getContextDescriptor() const {
     switch (getTypeKind()) {
@@ -2775,7 +2775,7 @@ public:
     case TypeReferenceKind::IndirectObjCClass:
       return nullptr;
     }
-
+    
     return nullptr;
   }
 };
@@ -2871,7 +2871,7 @@ public:
 private:
   /// The protocol being conformed to.
   TargetRelativeContextPointer<Runtime, TargetProtocolDescriptor> Protocol;
-
+  
   // Some description of the type that conforms to the protocol.
   TargetTypeReference<Runtime> TypeRef;
 
@@ -2965,7 +2965,7 @@ public:
   /// Get the canonical metadata for the type referenced by this record, or
   /// return null if the record references a generic or universal type.
   const TargetMetadata<Runtime> *getCanonicalTypeMetadata() const;
-
+  
   /// Get the witness table for the specified type, realizing it if
   /// necessary, or return null if the conformance does not apply to the
   /// type.
@@ -3094,7 +3094,7 @@ struct swift_ptrauth_struct_context_descriptor(ContextDescriptor)
     TargetContextDescriptor {
   /// Flags describing the context, including its kind and format version.
   ContextDescriptorFlags Flags;
-
+  
   /// The parent context, or null if this is a top-level context.
   TargetRelativeContextPointer<Runtime> Parent;
 
@@ -3227,7 +3227,7 @@ public:
   llvm::StringRef getMangledExtendedContext() const {
     return Demangle::makeSymbolicMangledNameStringRef(ExtendedContext.get());
   }
-
+  
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Extension;
   }
@@ -3448,12 +3448,12 @@ public:
   unsigned getNumUnderlyingTypeArguments() const {
     return this->Flags.getKindSpecificFlags();
   }
-
+  
   using TrailingGenericContextObjects::numTrailingObjects;
   size_t numTrailingObjects(OverloadToken<RelativeDirectPointer<const char>>) const {
     return getNumUnderlyingTypeArguments();
   }
-
+  
   const RelativeDirectPointer<const char> &
   getUnderlyingTypeArgumentMangledName(unsigned i) const {
     assert(i < getNumUnderlyingTypeArguments());
@@ -3463,7 +3463,7 @@ public:
 
   llvm::StringRef getUnderlyingTypeArgument(unsigned i) const {
     assert(i < getNumUnderlyingTypeArguments());
-    const char *ptr = getUnderlyingTypeArgumentMangledName(i);
+    const char *ptr = getUnderlyingTypeArgumentMangledName(i);    
     return Demangle::makeSymbolicMangledNameStringRef(ptr);
   }
 
@@ -3479,7 +3479,7 @@ public:
     return
       *this->template getTrailingObjects<InvertibleProtocolSet>();
   }
-
+  
   size_t numTrailingObjects(OverloadToken<InvertibleProtocolSet>) const {
     return this->hasInvertibleProtocols() ? 1 : 0;
   }
@@ -3769,7 +3769,7 @@ struct TargetTypeGenericContextDescriptorHeader {
 
   /// The base header.  Must always be the final member.
   TargetGenericContextDescriptorHeader<Runtime> Base;
-
+  
   operator const TargetGenericContextDescriptorHeader<Runtime> &() const {
     return Base;
   }
@@ -3789,7 +3789,7 @@ public:
   explicit MetadataAccessFunction(MetadataResponse (*Function)(...))
     : Function(Function)
   {}
-
+  
   explicit operator bool() const {
     return Function != nullptr;
   }
@@ -3798,7 +3798,7 @@ public:
   explicit operator void*() const {
     return reinterpret_cast<void *>(Function);
   }
-
+  
   /// Invoke with an array of arguments of dynamic size.
   MetadataResponse operator()(MetadataRequest request,
                               llvm::ArrayRef<const void *> args) const {
@@ -3815,7 +3815,7 @@ public:
       return applyMany(request, args.data());
     }
   }
-
+  
   /// Invoke with exactly 0 arguments.
   MetadataResponse operator()(MetadataRequest request) const {
     using Fn0 = SWIFT_CC(swift) MetadataResponse(MetadataRequest request);
@@ -3852,7 +3852,7 @@ public:
                                                  const void *arg2);
     return reinterpret_cast<Fn3*>(Function)(request, arg0, arg1, arg2);
   }
-
+  
   /// Invoke with more than 3 arguments.
   template<typename...Args>
   MetadataResponse operator()(MetadataRequest request,
@@ -4033,7 +4033,7 @@ public:
   /// convention for a given number of arguments.
   TargetCompactFunctionPointer<Runtime, MetadataResponse(...),
                               /*Nullable*/ true> AccessFunctionPtr;
-
+  
   /// A pointer to the field descriptor for the type, if any.
   TargetRelativeDirectPointer<Runtime,
                               const reflection::TargetFieldDescriptor<Runtime>,
@@ -4276,7 +4276,7 @@ class swift_ptrauth_struct_context_descriptor(ClassDescriptor)
                               TargetMethodDefaultOverrideTableHeader<Runtime>,
                               TargetMethodDefaultOverrideDescriptor<Runtime>> {
 private:
-  using TrailingGenericContextObjects =
+  using TrailingGenericContextObjects = 
     swift::TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
                                          TargetTypeGenericContextDescriptorHeader,
                                          TargetResilientSuperclass<Runtime>,
@@ -4316,9 +4316,9 @@ public:
     TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>, /*Nullable*/ false>;
   using MetadataListCount =
     TargetCanonicalSpecializedMetadatasListCount<Runtime>;
-  using MetadataListEntry =
+  using MetadataListEntry = 
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
-  using MetadataAccessor =
+  using MetadataAccessor = 
     TargetCompactFunctionPointer<Runtime, MetadataResponse(MetadataRequest), /*Nullable*/ false>;
   using MetadataAccessorListEntry =
       TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>;
@@ -4407,7 +4407,7 @@ private:
   template<typename T>
   using OverloadToken =
     typename TrailingGenericContextObjects::template OverloadToken<T>;
-
+  
   using TrailingGenericContextObjects::numTrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<ResilientSuperclass>) const {
@@ -4538,7 +4538,7 @@ public:
   bool hasResilientSuperclass() const {
     return this->getTypeContextDescriptorFlags().class_hasResilientSuperclass();
   }
-
+  
   const VTableDescriptorHeader *getVTableDescriptor() const {
     if (!hasVTable())
       return nullptr;
@@ -4814,7 +4814,7 @@ public:
   /// properties in its metadata, if any. 0 means there is no field offset
   /// vector.
   uint32_t FieldOffsetVectorOffset;
-
+  
   /// True if metadata records for this type have a field offset vector for
   /// its stored properties.
   bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
@@ -4922,7 +4922,7 @@ private:
                                         ForeignMetadataInitialization,
                                         SingletonMetadataInitialization,
                                         MetadataListCount,
-                                        MetadataListEntry,
+                                        MetadataListEntry, 
                                         MetadataCachingOnceToken,
                                         InvertibleProtocolSet,
                                         TargetSingletonMetadataPointer<Runtime>>;
@@ -4990,7 +4990,7 @@ public:
   size_t getPayloadSizeOffset() const {
     return ((NumPayloadCasesAndPayloadSizeOffset & 0xFF000000U) >> 24);
   }
-
+  
   bool hasPayloadSizeOffset() const {
     return getPayloadSizeOffset() != 0;
   }
@@ -5050,7 +5050,7 @@ public:
     return
       *this->template getTrailingObjects<InvertibleProtocolSet>();
   }
-
+               
   size_t numTrailingObjects(OverloadToken<InvertibleProtocolSet>) const {
     return this->hasInvertibleProtocols() ? 1 : 0;
   }
@@ -5094,7 +5094,7 @@ TargetContextDescriptor<Runtime>::getGenericContext() const {
   case ContextDescriptorKind::OpaqueType:
     return llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)
         ->getGenericContext();
-  default:
+  default:    
     // We don't know about this kind of descriptor.
     return nullptr;
   }
@@ -5161,7 +5161,7 @@ TargetTypeContextDescriptor<Runtime>::getFullGenericContextHeader() const {
 }
 
 template <typename Runtime>
-llvm::ArrayRef<GenericParamDescriptor>
+llvm::ArrayRef<GenericParamDescriptor> 
 TargetTypeContextDescriptor<Runtime>::getGenericParams() const {
   switch (this->getKind()) {
   case ContextDescriptorKind::Class:

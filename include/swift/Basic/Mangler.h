@@ -56,7 +56,7 @@ protected:
 
   /// Identifier substitutions.
   llvm::StringMap<unsigned> StringSubstitutions;
-
+  
   /// Index to use for the next added substitution.
   /// Note that this is not simply the sum of the size of the \c Substitutions
   /// and \c StringSubstitutions maps above, since in some circumstances the
@@ -160,7 +160,7 @@ protected:
   void addSubstitution(const void *ptr) {
     if (!UseSubstitutions)
       return;
-
+    
     auto value = NextSubstitutionIndex++;
     Substitutions[ptr] = value;
   }
@@ -173,7 +173,7 @@ protected:
   }
 
   bool tryMangleSubstitution(const void *ptr);
-
+  
   void mangleSubstitution(unsigned Index);
 
 #ifndef NDEBUG

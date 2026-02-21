@@ -593,7 +593,7 @@ namespace irgen {
     bool hasSubstitutions() const {
       return Info.Substitutions.hasAnySubstitutableParams();
     }
-
+    
     SubstitutionMap getSubstitutions() const { return Info.Substitutions; }
 
     const FunctionPointer &getFunctionPointer() const { return Fn; }

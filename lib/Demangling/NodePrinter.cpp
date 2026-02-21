@@ -2894,7 +2894,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::ImplErasedIsolation:
     Printer << "@isolated(any)";
-    return nullptr;
+    return nullptr;    
   case Node::Kind::ImplCoroutineKind:
     // Skip if text is empty.
     if (Node->getText().empty())
@@ -2989,7 +2989,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::ErrorType:
     Printer << "<ERROR TYPE>";
     return nullptr;
-
+      
   case Node::Kind::DependentPseudogenericSignature:
   case Node::Kind::DependentGenericSignature: {
     printGenericSignature(Node, depth);

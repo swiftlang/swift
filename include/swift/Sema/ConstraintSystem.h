@@ -721,7 +721,7 @@ struct Score {
   friend bool operator>=(const Score &x, const Score &y) {
     return !(x < y);
   }
-
+  
   /// Return ScoreKind descriptions for printing alongside non-zero ScoreKinds
   /// in debug output.
   static std::string getNameFor(ScoreKind kind) {
@@ -1129,7 +1129,7 @@ public:
 
   /// The set of type bindings.
   llvm::MapVector<TypeVariableType *, Type> typeBindings;
-
+  
   /// The set of overload choices along with their types.
   llvm::DenseMap<ConstraintLocator *, SelectedOverload> overloadChoices;
 
@@ -1572,17 +1572,17 @@ struct MemberLookupResult {
     /// This result indicates that we cannot begin to solve this, because the
     /// base expression is a type variable.
     Unsolved,
-
+    
     /// This result indicates that the member reference is erroneous, but was
     /// already diagnosed.  Don't emit another error.
     ErrorAlreadyDiagnosed,
-
+    
     /// This result indicates that the lookup produced candidate lists,
     /// potentially of viable results, potentially of error candidates, and
     /// potentially empty lists, indicating that there were no matches.
     HasResults
   } OverallResult;
-
+  
   /// This is a list of viable candidates that were matched.
   ///
   SmallVector<OverloadChoice, 4> ViableCandidates;
@@ -1657,11 +1657,11 @@ struct MemberLookupResult {
     OverallResult = ErrorAlreadyDiagnosed;
     return *this;
   }
-
+  
   void addViable(OverloadChoice candidate) {
     ViableCandidates.push_back(candidate);
   }
-
+  
   void addUnviable(OverloadChoice candidate, UnviableReason reason) {
     UnviableCandidates.push_back(candidate);
     UnviableReasons.push_back(reason);
@@ -2062,7 +2062,7 @@ private:
     ConstraintSystem &CS;
 
     FreeTypeVariableBinding AllowFreeTypeVariables;
-
+    
     /// Return current depth of solution stack for debug printing.
     unsigned int getCurrentIndent() const { return depth * 2; }
 
@@ -2350,7 +2350,7 @@ private:
   /// able to emit an error message, or false if none of the fixits worked out.
   bool applySolutionFixes(const Solution &solution);
 
-  /// If there is more than one viable solution, attempt
+  /// If there is more than one viable solution, attempt 
   /// to pick the best solution and remove all of the rest.
   ///
   /// \param solutions The set of solutions to filter.
@@ -2378,7 +2378,7 @@ private:
   SolverTrail *getTrail() const {
     return solverState ? &solverState->Trail : nullptr;
   }
-
+  
   /// Add a constraint from the subscript base to the root of the key
   /// path literal to the constraint system.
   void addKeyPathApplicationRootConstraint(Type root, ConstraintLocatorBuilder locator);
@@ -2528,7 +2528,7 @@ public:
       return std::get<1>(result->second);
     return nullptr;
   }
-
+  
   TypeVariableType *getKeyPathRootType(const KeyPathExpr *keyPath) const {
     auto result = getKeyPathRootTypeIfAvailable(keyPath);
     assert(result);
@@ -3068,7 +3068,7 @@ public:
   /// Try to salvage the constraint system by applying (speculative)
   /// fixes.
   SolutionResult salvage();
-
+  
   /// Mine the active and inactive constraints in the constraint
   /// system to generate a plausible diagnosis of why the system could not be
   /// solved.
@@ -4159,7 +4159,7 @@ public:
   TypeMatchResult matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
-
+  
   /// Subroutine of \c matchTypes()
   bool matchFunctionIsolations(FunctionType *func1, FunctionType *func2,
                                ConstraintKind kind, TypeMatchOptions flags,
@@ -4397,10 +4397,10 @@ private:
   ///
   /// \param flags A set of flags composed from the TMF_* constants, which
   /// indicates how the constraint should be simplified.
-  ///
+  /// 
   /// \param locator Locator describing where this construction
   /// occurred.
-  SolutionKind simplifyConstructionConstraint(Type valueType,
+  SolutionKind simplifyConstructionConstraint(Type valueType, 
                                               FunctionType *fnType,
                                               TypeMatchOptions flags,
                                               DeclContext *DC,

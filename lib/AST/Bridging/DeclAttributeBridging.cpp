@@ -509,7 +509,7 @@ BridgedWarnAttr_createParsed(BridgedASTContext cContext,
                              BridgedStringRef reason) {
   ASTContext &context = cContext.unbridged();
   auto diagGroupID = getDiagGroupIDByName(diagGroupName.str());
-
+  
   WarningGroupBehavior attrBehavior;
   switch (behavior) {
     case None:
@@ -523,7 +523,7 @@ BridgedWarnAttr_createParsed(BridgedASTContext cContext,
       attrBehavior = WarningGroupBehavior::Ignored;
       break;
   }
-
+  
   std::optional<StringRef> reasonText = std::nullopt;
   if (!reason.getIsEmpty())
     reasonText = context.AllocateCopy(reason.unbridged());

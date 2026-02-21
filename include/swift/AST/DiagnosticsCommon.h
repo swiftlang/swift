@@ -39,7 +39,7 @@ namespace swift {
     // DIAG/ERROR/WARNING/NOTE/REMARK/FIXIT macros.
     template<typename T>
     struct DiagWithArguments;
-
+    
     template<typename ...ArgTypes>
     struct DiagWithArguments<void(ArgTypes...)> {
       typedef Diag<ArgTypes...> type;

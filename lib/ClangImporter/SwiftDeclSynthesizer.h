@@ -313,7 +313,7 @@ public:
 
   FuncDecl *makeOperator(FuncDecl *operatorMethod,
                          clang::OverloadedOperatorKind opKind);
-
+  
   // Synthesize a C++ method that invokes the method from the base
   // class. This lets Clang take care of the cast from the derived class
   // to the base class during the invocation of the method.

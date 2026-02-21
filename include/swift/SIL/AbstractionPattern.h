@@ -266,29 +266,29 @@ class AbstractionPattern {
 
   class EncodedForeignInfo {
     unsigned Value;
-
+    
     enum Error_t {
       Error,
     };
-
+    
     enum Async_t {
       Async,
     };
-
+    
     enum {
       AsyncCompletionParameterIndexMask = 0xFFEu,
       AsyncCompletionParameterIndexShift = 1,
-
+      
       AsyncCompletionErrorParameterIndexMask = 0x1FF000u,
       AsyncCompletionErrorParameterIndexShift = 12,
-
+      
       AsyncCompletionErrorFlagParameterIndexMask = 0x3FE00000u,
       AsyncCompletionErrorFlagParameterIndexShift = 21,
-
+      
       AsyncCompletionErrorFlagParameterPolarityMask = 0x40000000u,
       AsyncCompletionErrorFlagParameterPolarityShift = 30,
     };
-
+    
   public:
     enum ForeignKind {
       IsNotForeign,
@@ -354,10 +354,10 @@ class AbstractionPattern {
     ForeignKind getKind() const {
       if (!hasValue())
         return IsNotForeign;
-
+      
       return ForeignKind((Value - 1 & 1) + 1);
     }
-
+    
     bool errorStripsResultOptionality() const {
       if (getKind() != IsError) return false;
       return (Value - 1) & 2;
@@ -372,7 +372,7 @@ class AbstractionPattern {
       assert(getKind() == IsError);
       return (Value - 1) >> 3;
     }
-
+    
     unsigned getAsyncCompletionHandlerParamIndex() const {
       assert(getKind() == IsAsync);
       return ((Value - 1) & AsyncCompletionParameterIndexMask)
@@ -412,10 +412,10 @@ class AbstractionPattern {
       switch (getKind()) {
       case IsNotForeign:
         llvm_unreachable("no foreign param");
-
+      
       case IsError:
         return getErrorParamIndex();
-
+          
       case IsAsync:
         return getAsyncCompletionHandlerParamIndex();
       }
@@ -527,7 +527,7 @@ class AbstractionPattern {
       return false;
     }
   }
-
+  
   void initSwiftType(SubstitutionMap subs,
                      CanGenericSignature signature,
                      CanType origType,
@@ -689,7 +689,7 @@ public:
     pattern.initClangType(subs, sig, origTupleType, clangBlockType,
                           Kind::ObjCCompletionHandlerArgumentsType);
     pattern.OtherData = foreignInfo.getOpaqueValue();
-
+    
     return pattern;
   }
 
@@ -788,7 +788,7 @@ public:
     assert(hasImportAsMemberStatus());
     return ImportAsMemberStatus(OtherData);
   }
-
+  
   /// Return an abstraction pattern for a value that is discarded after being
   /// evaluated.
   static AbstractionPattern getDiscard(SubstitutionMap subs,
@@ -798,7 +798,7 @@ public:
     pattern.initSwiftType(subs, signature, origType, Kind::Discard);
     return pattern;
   }
-
+  
   /// Return an abstraction pattern for the type of the given struct field or enum case
   /// substituted in `this` type.
   ///
@@ -807,7 +807,7 @@ public:
   AbstractionPattern
   unsafeGetSubstFieldType(ValueDecl *member, CanType origMemberType,
                           SubstitutionMap subMap) const;
-
+  
 private:
   /// Return an abstraction pattern for the curried type of an
   /// Objective-C method.
@@ -820,7 +820,7 @@ private:
                            Kind::CurriedObjCMethodType, errorInfo);
     return pattern;
   }
-
+  
   static AbstractionPattern
   getCurriedCFunctionAsMethod(CanType origType,
                               const clang::Type *clangType,
@@ -1211,7 +1211,7 @@ public:
     assert(hasStoredForeignInfo());
     return EncodedForeignInfo::fromOpaqueValue(OtherData);
   }
-
+  
   bool hasForeignErrorStrippingResultOptionality() const {
     switch (getKind()) {
     case Kind::Invalid:
@@ -1359,7 +1359,7 @@ public:
     case Kind::CXXFunctionalConstructorType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
-      llvm_unreachable("pattern is not a tuple");
+      llvm_unreachable("pattern is not a tuple");      
     case Kind::Tuple:
       return getNumTupleElements_Stored();
     case Kind::ObjCCompletionHandlerArgumentsType:
@@ -1592,7 +1592,7 @@ public:
   /// dependencies, or because it was explicitly marked as `@_addressable`
   /// in its declaration.
   bool isFunctionParamAddressable(unsigned index) const;
-
+  
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
 
   /// Given that the value being abstracted is a function type, and that
@@ -1665,7 +1665,7 @@ public:
   /// which will generally only work in specific situations.
   size_t getNumPackExpandedComponents() const;
 
-  /// If this pattern refers to a foreign ObjC method that was imported as
+  /// If this pattern refers to a foreign ObjC method that was imported as 
   /// async, return the bridged-back-to-ObjC completion handler type.
   CanType getObjCMethodAsyncCompletionHandlerForeignType(
       ForeignAsyncConvention convention,
@@ -1726,10 +1726,10 @@ public:
                               AbstractionPattern coroutineYieldOrigType,
                               CanType coroutineYieldSubstType,
                               bool &unimplementable) const;
-
+  
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(raw_ostream &OS) const;
-
+  
   bool operator==(const AbstractionPattern &other) const;
   bool operator!=(const AbstractionPattern &other) const {
     return !(*this == other);

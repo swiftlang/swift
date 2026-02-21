@@ -40,7 +40,7 @@ using namespace swift;
 /// version must be set to 0.
 struct OverrideSection {
   uintptr_t version;
-
+  
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
 #include "CompatibilityOverrideIncludePath.h"
@@ -78,7 +78,7 @@ static OverrideSection *getOverrideSectionPtr() {
     if (Size < sizeof(OverrideSection))
       OverrideSectionPtr = nullptr;
   }, nullptr);
-
+  
   return OverrideSectionPtr;
 }
 

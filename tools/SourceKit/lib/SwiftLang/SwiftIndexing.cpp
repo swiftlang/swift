@@ -333,7 +333,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     IdxConsumer.failed("no primary source file found");
     return;
   }
-
+  
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
   index::indexSourceFile(CI.getPrimarySourceFile(), IdxDataConsumer);
 }

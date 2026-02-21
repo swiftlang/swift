@@ -88,7 +88,7 @@ void COWOptsPass::run() {
 
   bool changed = false;
   for (SILBasicBlock &block : *F) {
-
+  
     for (SILInstruction &inst : block) {
       if (auto *beginCOW = dyn_cast<BeginCOWMutationInst>(&inst)) {
         if (optimizeBeginCOW(beginCOW))
@@ -179,7 +179,7 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
     BasicBlockSet handled(function);
     int numStoresFound = 0;
     int numLoadsFound = 0;
-
+  
     // This is a simple worklist-based backward dataflow analysis.
     // Start at the initial begin_cow_mutation and go backward.
     instWorkList.push_back(BCM);
@@ -227,7 +227,7 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
         inst = &*std::prev(inst->getIterator());
       }
     }
-
+    
     // Check if there is any (potential) load from a memory location where the
     // buffer is stored to.
     if (numStoresFound != 0) {
@@ -253,7 +253,7 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
   auto *IL = B.createIntegerLiteral(BCM->getLoc(),
                                     BCM->getUniquenessResult()->getType(), 1);
   BCM->getUniquenessResult()->replaceAllUsesWith(IL);
-
+  
   for (EndCOWMutationInst *ECM : endCOWMutationInsts) {
     // This is important for other optimizations: The code is now relying on
     // the buffer to be unique.

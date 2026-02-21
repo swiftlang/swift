@@ -35,7 +35,7 @@ struct SymbolicMangling {
   std::string String;
   std::vector<std::pair<Mangle::ASTMangler::SymbolicReferent, unsigned>>
     SymbolicReferences;
-
+  
   unsigned runtimeSizeInBytes() const {
     return String.size();
   }
@@ -212,7 +212,7 @@ public:
   std::string mangleNominalTypeDescriptorRecord(const NominalTypeDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Hn");
   }
-
+  
   std::string mangleOpaqueTypeDescriptorAccessor(const OpaqueTypeDecl *decl) {
     beginMangling();
     appendOpaqueDeclName(decl);
@@ -261,7 +261,7 @@ public:
   std::string mangleTypeMetadataCompletionFunction(const NominalTypeDecl *Decl){
     return mangleNominalTypeSymbol(Decl, "Mr");
   }
-
+  
   std::string mangleModuleDescriptor(const ModuleDecl *Decl) {
     beginMangling();
     BaseEntitySignature base(Decl);
@@ -269,7 +269,7 @@ public:
     appendOperator("MXM");
     return finalize();
   }
-
+  
   std::string mangleExtensionDescriptor(const ExtensionDecl *Decl) {
     beginMangling();
     BaseEntitySignature base(Decl);
@@ -277,7 +277,7 @@ public:
     appendOperator("MXE");
     return finalize();
   }
-
+  
   void appendAnonymousDescriptorName(PointerUnion<DeclContext*, VarDecl*> Name){
     if (auto DC = Name.dyn_cast<DeclContext *>()) {
       BaseEntitySignature nullBase(nullptr);
@@ -288,14 +288,14 @@ public:
     }
     llvm_unreachable("unknown kind");
   }
-
+  
   std::string mangleAnonymousDescriptorName(
                                     PointerUnion<DeclContext*, VarDecl*> Name) {
     beginMangling();
     appendAnonymousDescriptorName(Name);
     return finalize();
   }
-
+  
   std::string mangleAnonymousDescriptor(
                                     PointerUnion<DeclContext*, VarDecl*> Name) {
     beginMangling();
@@ -656,7 +656,7 @@ public:
   }
 
   std::string manglePartialApplyForwarder(StringRef FuncName);
-
+  
   std::string mangleTypeForForeignMetadataUniquing(Type type) {
     return mangleTypeWithoutPrefix(type);
   }

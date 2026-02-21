@@ -118,7 +118,7 @@ protected:
     /// Sometimes the location for diagnostics needs to be different than the
     /// one used to emit the line table for debugging.
     ASTNodeTy forDebugging;
-
+    
     ExtendedASTNodeLoc(ASTNodeTy primary, ASTNodeTy forDebugging) :
       primary(primary), forDebugging(forDebugging) {}
   };
@@ -130,15 +130,15 @@ private:
   enum StorageKind : uint8_t {
     /// For usages see the struct `FilenameAndLocation`.
     FilenameAndLocationKind,
-
+    
     /// The most common location kind: a pointer to the AST from which the
     /// source location can be retrieved.
     /// This is the "normal" case when compiling a swift file.
     ASTNodeKind,
-
+    
     /// Use for a few locations in pattern-code. See ExtendedASTNodeLoc.
     ExtendedASTNodeKind,
-
+    
     /// This is used when parsing a SIL file.
     /// Note: this is only used for functions/instruction for which there is no
     /// location specified in the SIL file.
@@ -180,7 +180,7 @@ private:
       assert(fields.storageKind == storageKind && "StorageKind overflow");
     }
     KindAndFlags(uint8_t packed) : packedKindAndFlags(packed) {}
-
+  
     uint8_t packedKindAndFlags;
     struct Fields {
       uint8_t kind: 3;
@@ -465,7 +465,7 @@ public:
   /// Returns the source location for debugging.
   /// See ExtendedASTNodeLoc.
   SourceLoc getSourceLocForDebugging() const;
-
+  
   SourceLoc getStartSourceLoc() const;
   SourceLoc getEndSourceLoc() const;
   SourceRange getSourceRange() const {
@@ -491,7 +491,7 @@ public:
   /// Compiler-generated locations may be applied to instructions without any
   /// clear correspondence to an AST node in an otherwise normal function.
   static FilenameAndLocation *getCompilerGeneratedLoc();
-
+  
   /// Pretty-print the value.
   void dump() const;
   void print(raw_ostream &OS, const SourceManager &SM) const;
@@ -717,7 +717,7 @@ public:
   CleanupLocation(Stmt *S) : SILLocation(ASTNodeTy(S), CleanupKind) {}
   CleanupLocation(Pattern *P) : SILLocation(ASTNodeTy(P), CleanupKind) {}
   CleanupLocation(Decl *D) : SILLocation(ASTNodeTy(D), CleanupKind) {}
-
+  
   /// Convert \p loc to a CleanupLocation.
   explicit CleanupLocation(SILLocation L) : SILLocation(L, CleanupKind) {}
 

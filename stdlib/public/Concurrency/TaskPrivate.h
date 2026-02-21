@@ -486,7 +486,7 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// use the task executor preference when we'd otherwise be running on
     /// the generic global pool.
     HasTaskExecutorPreference = 0x8000,
-
+    
     HasActiveTaskCancellationShield = 0x10000,
   };
 
@@ -539,8 +539,8 @@ public:
 
   /// Is the task currently cancelled?
   /// This does take into account cancellation shields, i.e. while a shield is active this function will always return 'false'.
-  bool isCancelled(bool ignoreShield = false) const {
-    return (Flags & IsCancelled) && (ignoreShield || !(Flags & HasActiveTaskCancellationShield));
+  bool isCancelled(bool ignoreShield = false) const { 
+    return (Flags & IsCancelled) && (ignoreShield || !(Flags & HasActiveTaskCancellationShield)); 
   }
   bool isCancelledIgnoringShield() const { return Flags & IsCancelled; }
   ActiveTaskStatus withCancelled() const {
@@ -549,8 +549,8 @@ public:
 #else
     return ActiveTaskStatus(Record, Flags | IsCancelled);
 #endif
-  }
-
+  }  
+  
   bool hasCancellationShield() const { return Flags & HasActiveTaskCancellationShield; }
   ActiveTaskStatus withCancellationShield() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -1329,13 +1329,13 @@ inline bool AsyncTask::cancellationShieldPush() {
 
     auto newStatus = oldStatus.withCancellationShield();
     assert(newStatus.hasCancellationShield());
-
+    
     if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /* success */ std::memory_order_relaxed,
               /* failure */ std::memory_order_relaxed)) {
       return true; // we did successfully install the shield
     }
-  }
+  } 
 }
 
 inline void AsyncTask::cancellationShieldPop() {
@@ -1347,13 +1347,13 @@ inline void AsyncTask::cancellationShieldPop() {
 
     auto newStatus = oldStatus.withoutCancellationShield();
     assert(!newStatus.hasCancellationShield());
-
+    
     if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /* success */ std::memory_order_relaxed,
               /* failure */ std::memory_order_relaxed)) {
       return;
     }
-  }
+  } 
 }
 
 } // end namespace swift

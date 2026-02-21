@@ -30,10 +30,10 @@ ParameterList::create(const ASTContext &C, SourceLoc LParenLoc,
                       ArrayRef<ParamDecl*> params, SourceLoc RParenLoc) {
   assert(LParenLoc.isValid() == RParenLoc.isValid() &&
          "Either both paren locs are valid or neither are");
-
+  
   auto byteSize = totalSizeToAlloc<ParamDecl *>(params.size());
   auto rawMem = C.Allocate(byteSize, alignof(ParameterList));
-
+  
   //  Placement initialize the ParameterList and the Parameter's.
   auto PL = ::new (rawMem) ParameterList(LParenLoc, params.size(), RParenLoc);
 
@@ -60,7 +60,7 @@ ParameterList *ParameterList::clone(const ASTContext &C,
   // If this list is empty, don't actually bother with a copy.
   if (size() == 0)
     return const_cast<ParameterList*>(this);
-
+  
   SmallVector<ParamDecl*, 8> params(begin(), end());
 
   // Remap the ParamDecls inside of the ParameterList.
@@ -96,7 +96,7 @@ ParameterList *ParameterList::clone(const ASTContext &C,
       decl->setName(C.getIdentifier(s));
     }
   }
-
+  
   return create(C, params);
 }
 
@@ -112,7 +112,7 @@ SourceRange ParameterList::getSourceRange() const {
   // If we have locations for the parens, then they define our range.
   if (LParenLoc.isValid())
     return { LParenLoc, RParenLoc };
-
+  
   // Otherwise, try the first and last parameter.
   if (size() != 0) {
     auto Start = get(0)->getStartLoc();

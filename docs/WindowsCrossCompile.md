@@ -24,7 +24,7 @@ The `ucrt.modulemap` located at
 needs to be copied into `${VCToolsInstallDir}/include` as `module.modulemap`
 
 ## 3. Configure the runtime to be built with the just built `clang`
-Ensure that we use the tools from the just built LLVM and `clang` tools to
+Ensure that we use the tools from the just built LLVM and `clang` tools to 
 build the Windows SDK. You will need to pass a few extra options to cmake via
 the `build-script` invocation to achieve this. You will need to expand out the
 path where `llvm-ar` and `llvm-ranlib` are built. These are needed to correctly

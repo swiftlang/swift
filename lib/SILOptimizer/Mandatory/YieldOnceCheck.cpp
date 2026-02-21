@@ -56,7 +56,7 @@ class YieldOnceCheck : public SILFunctionTransform {
 
   private:
     friend class BasicBlockData<BBState>;
-
+  
     // The following states are maintained for emitting diagnostics.
 
     /// For AfterYield and Conflict states, this field records the yield
@@ -68,7 +68,7 @@ class YieldOnceCheck : public SILFunctionTransform {
     /// in the Conflict.
     SILBasicBlock *yieldingPred = nullptr;
     SILBasicBlock *nonYieldingPred = nullptr;
-
+    
     bool visited = false;
 
     BBState() {}
@@ -109,7 +109,7 @@ class YieldOnceCheck : public SILFunctionTransform {
       assert(yieldState == Conflict);
       return nonYieldingPred;
     }
-
+    
     bool isVisited() const { return visited; }
   };
 

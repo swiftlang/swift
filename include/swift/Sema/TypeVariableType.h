@@ -130,10 +130,10 @@ public:
   constraints::ConstraintGraphNode *getGraphNode() const { return GraphNode; }
 
   /// Set the corresponding node in the constraint graph.
-  void setGraphNode(constraints::ConstraintGraphNode *newNode) {
-    GraphNode = newNode;
+  void setGraphNode(constraints::ConstraintGraphNode *newNode) { 
+    GraphNode = newNode; 
   }
-
+  
   /// Check whether this type variable either has a representative that
   /// is not itself or has a fixed type binding.
   bool hasRepresentativeOrFixed() const {

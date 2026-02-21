@@ -201,15 +201,15 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     else()
       list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_ATOMIC_SOURCES})
     endif()
-
+      
     add_swift_target_library_single(
       embedded-synchronization-${mod}
       swiftSynchronization
       ONLY_SWIFTMODULE
       IS_FRAGILE
-
+      
       ${SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES}
-
+      
       GYB_SOURCES
         ${SWIFT_SYNCHRONIZATION_GYB_SOURCES}
 

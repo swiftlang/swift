@@ -28,22 +28,22 @@ using ARCBBState = ARCSequenceDataflowEvaluator::ARCBBState;
 
 
 //===----------------------------------------------------------------------===//
-//                             Utilities
+//                             Utilities 
 //===----------------------------------------------------------------------===//
 
 /// Return true if this instruction is the epilogue release for the \p Arg.
 /// false otherwise.
 static bool isOwnedArgumentEpilogueRelease(SILInstruction *I, SILValue Arg,
                                            EpilogueARCFunctionInfo *EAFI) {
-  auto Releases =
+  auto Releases = 
     EAFI->computeEpilogueARCInstructions(
             EpilogueARCContext::EpilogueARCKind::Release, Arg);
-  return Releases.size() && Releases.count(I);
+  return Releases.size() && Releases.count(I); 
 }
 
 static bool isGuaranteedSafetyByEpilogueRelease(SILInstruction *I, SILValue Arg,
                                                 EpilogueARCFunctionInfo *EAFI) {
-  auto Releases =
+  auto Releases = 
     EAFI->computeEpilogueARCInstructions(
             EpilogueARCContext::EpilogueARCKind::Release, Arg);
   return Releases.size() && !Releases.count(I);

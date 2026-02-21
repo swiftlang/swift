@@ -474,7 +474,7 @@ void SILFunction::numberValues(llvm::DenseMap<const SILNode*, unsigned> &
   for (auto &BB : *this) {
     for (auto I = BB.args_begin(), E = BB.args_end(); I != E; ++I)
       ValueToNumberMap[*I] = idx++;
-
+    
     for (auto &I : BB) {
       auto results = I.getResults();
       if (results.empty()) {
@@ -718,7 +718,7 @@ SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
 
 void SILFunction::moveAllBlocksFromOtherFunction(SILFunction *F) {
   BlockList.splice(begin(), F->BlockList);
-
+  
   SILModule &mod = getModule();
   for (SILBasicBlock &block : *this) {
     for (SILInstruction &inst : block) {
@@ -976,13 +976,13 @@ bool SILFunction::hasName(const char *Name) const {
 
 /*
  Checks if this (callee) function body can be inlined into the caller
- by comparing their SerializedKind_t values.
-
+ by comparing their SerializedKind_t values. 
+ 
  If both callee and caller are not_serialized, the callee can be inlined
  into the caller during SIL inlining passes even if it (and the caller)
  might contain private symbols. If this callee is serialized_for_pkg, it
  can only be referenced by a serialized caller but not inlined into it.
-
+ 
  canInlineInto:                                 Caller
                             | not_serialized | serialized_for_pkg | serialized
         not_serialized      |      ok        |       no           |    no
@@ -1341,7 +1341,7 @@ void SILFunction::
 visitArgEffects(std::function<void(int, int, bool)> c) const {
   if (!getEffectInfoFunction)
     return;
-
+    
   int idx = 0;
   BridgedFunction bridgedFn = {const_cast<SILFunction *>(this)};
   while (true) {

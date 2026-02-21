@@ -54,7 +54,7 @@ unsigned PointerInfo::getExtraInhabitantCount(const IRGenModule &IGM) const {
     IGM.TargetInfo.LeastValidPointerValue >> NumReservedLowBits;
 
   if (Nullable) rawCount--;
-
+  
   // The runtime limits the count.
   return std::min(uint64_t(ValueWitnessFlags::MaxNumExtraInhabitants),
                   rawCount);
@@ -177,7 +177,7 @@ llvm::Value *PointerInfo::getExtraInhabitantIndex(IRGenFunction &IGF,
   auto phi = IGF.Builder.CreatePHI(IGF.IGM.Int32Ty, phiValues.size());
   for (auto &entry : phiValues) {
     phi->addIncoming(entry.second, entry.first);
-  }
+  }  
   return phi;
 }
 

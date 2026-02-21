@@ -195,7 +195,7 @@ void SILGenFunction::emitDistActorIdentityInit(ConstructorDecl *ctor,
   assert(ctor->isDesignatedInit());
 
   auto &C = ctor->getASTContext();
-
+  
   auto *dc = ctor->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
 
@@ -254,7 +254,7 @@ void InitializeDistActorIdentity::emit(SILGenFunction &SGF, CleanupLocation loc,
   // since there is no actorSystem.
   if (forUnwind == IsForUnwind)
     return;
-
+    
 
   // Save the current clean-up depth
   auto baseDepth = SGF.getCleanupsDepth();
@@ -529,7 +529,7 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
 void SILGenFunction::emitDistributedActorSystemResignIDCall(
     SILLocation loc, ClassDecl *actorDecl, ManagedValue actorSelf) {
   ASTContext &ctx = getASTContext();
-
+  
   FormalEvaluationScope scope(*this);
 
   // ==== locate: self.id

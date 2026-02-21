@@ -349,7 +349,7 @@ static bool usesFeatureAddressableParameters(Decl *d) {
   if (!fd) {
     return false;
   }
-
+  
   for (auto pd : *fd->getParameters()) {
     if (pd->isAddressable()) {
       return true;
@@ -362,7 +362,7 @@ static bool usesFeatureAddressableTypes(Decl *d) {
   if (d->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
     return true;
   }
-
+  
   return false;
 }
 
@@ -392,7 +392,7 @@ static bool usesFeatureABIAttributeSE0479(Decl *decl) {
   return getABIAttr(decl) != nullptr;
 }
 
-static bool usesFeatureIsolatedConformances(Decl *decl) {
+static bool usesFeatureIsolatedConformances(Decl *decl) { 
   // FIXME: Check conformances associated with this decl?
   return false;
 }

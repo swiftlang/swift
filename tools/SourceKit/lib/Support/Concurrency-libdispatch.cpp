@@ -31,12 +31,12 @@ void Semaphore::Impl::signal(Ty Obj) {
 }
 
 bool Semaphore::Impl::wait(Ty Obj) {
-  return dispatch_semaphore_wait(dispatch_semaphore_t(Obj),
+  return dispatch_semaphore_wait(dispatch_semaphore_t(Obj), 
                                  DISPATCH_TIME_FOREVER);
 }
 
 bool Semaphore::Impl::wait(Ty Obj, long milliseconds) {
-  dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW,
+  dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 
                                           milliseconds * NSEC_PER_MSEC);
   return dispatch_semaphore_wait(dispatch_semaphore_t(Obj), timeout);
 }
@@ -90,7 +90,7 @@ void *WorkQueue::Impl::create(Dequeuing DeqKind, Priority Prio,
 namespace {
 struct ExecuteOnLargeStackInfo {
   dispatch_block_t BlockToRun;
-
+  
   ~ExecuteOnLargeStackInfo() {
     Block_release(BlockToRun);
   }
@@ -128,7 +128,7 @@ toCFunction(void *Ctx, WorkQueue::DispatchFn Fn, bool isStackDeep) {
 #else
   ExecuteInfo->BlockToRun = Block_copy(^{ Fn(Ctx); });
 #endif
-
+  
   return std::make_pair(ExecuteInfo, executeOnLargeStackThread);
 }
 

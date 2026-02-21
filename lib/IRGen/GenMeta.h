@@ -38,7 +38,7 @@ namespace swift {
   class SILType;
   class VarDecl;
   enum class SpecialProtocol : uint8_t;
-
+  
 namespace irgen {
   class ConstantStructBuilder;
   class FieldTypeInfo;
@@ -184,7 +184,7 @@ namespace irgen {
   /// Given a metatype value, read its instance type.
   llvm::Value *emitMetatypeInstanceType(IRGenFunction &IGF,
                                         llvm::Value *metatypeMetadata);
-
+  
   /// Emit the field type accessor for a nominal type's metadata. This function
   /// lazily generates the metadata for the types of all of the nominal type's
   /// fields for reflection purposes.
@@ -206,7 +206,7 @@ namespace irgen {
       //   -1: vwt
       //    0: metadata flags (unused)
       EmbeddedWithExistentials = 1,
-
+      
       // Struct and enum metadata have one word of head-allocated data:
       // the value witness table.
       ValueType = 2,
@@ -214,7 +214,7 @@ namespace irgen {
       // Some builtin and well-known types don't have a layout string
       // for binary compatibility reasons.
       NoTypeLayoutString = 1,
-
+      
       // Other metadata objects have no head allocation.
       None = 0,
     };

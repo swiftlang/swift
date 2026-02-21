@@ -44,7 +44,7 @@ static StringRef getDeclKindStrRaw(const DeclKind Value)  {
   switch (Value) {
 #define DECL(X, PARENT) case DeclKind::X: return #X;
 #include "swift/AST/DeclNodes.def"
-  }
+  } 
   llvm_unreachable("Unhandled DeclKind in switch.");
 }
 

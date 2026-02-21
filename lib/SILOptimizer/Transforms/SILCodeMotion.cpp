@@ -44,7 +44,7 @@ llvm::cl::opt<bool> DisableSILRRCodeMotion("disable-sil-cm-rr-cm", llvm::cl::ini
 using namespace swift;
 
 namespace {
-
+  
 //===----------------------------------------------------------------------===//
 //                                  Utility
 //===----------------------------------------------------------------------===//

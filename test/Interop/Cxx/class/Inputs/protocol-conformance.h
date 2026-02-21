@@ -50,7 +50,7 @@ struct HasOperatorExclaim {
 
 struct HasOperatorEqualEqual {
   int value;
-
+  
   bool operator==(const HasOperatorEqualEqual &other) const {
     return value == other.value;
   }
@@ -69,7 +69,7 @@ struct HasOperatorPlusEqual {
 using HasOperatorPlusEqualInt = HasOperatorPlusEqual<int>;
 
 struct HasVirtualMethod {
-  virtual int return42() { return 42; }
+  virtual int return42() { return 42; } 
 };
 
 struct HasStaticOperatorCall {

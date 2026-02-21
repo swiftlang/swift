@@ -221,7 +221,7 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
 
     if (isForConditionalDirective && Tok.isAtStartOfLine())
       break;
-
+    
 parse_operator:
     switch (Tok.getKind()) {
     case tok::oper_binary_spaced:
@@ -240,7 +240,7 @@ parse_operator:
            (Context.LangOpts.hasFeature(Feature::ReferenceBindings) &&
             peekToken().isAny(tok::kw_inout))))
         goto done;
-
+      
       // Parse the operator.
       Expr *Operator = parseExprOperator();
       SequencedExprs.push_back(Operator);
@@ -249,11 +249,11 @@ parse_operator:
       Message = diag::expected_expr_after_operator;
       break;
     }
-
+    
     case tok::question_infix: {
       // Save the '?'.
       SourceLoc questionLoc = consumeToken();
-
+      
       // Parse the middle expression of the ternary.
       ParserResult<Expr> middle = parseExprSequence(
           diag::expected_expr_after_ternary_question, isExprBasic);
@@ -285,7 +285,7 @@ parse_operator:
       Message = diag::expected_expr_after_ternary_colon;
       break;
     }
-
+        
     case tok::equal: {
       // If we're parsing an expression as the body of a refutable var/let
       // pattern, then an assignment doesn't make sense.  In a "if let"
@@ -299,35 +299,35 @@ parse_operator:
       Message = diag::expected_expr_assignment;
       break;
     }
-
+        
     case tok::kw_is: {
       // Parse a type after the 'is' token instead of an expression.
       ParserResult<Expr> is = parseExprIs();
       if (is.isNull() || is.hasCodeCompletion())
         return is;
-
+      
       // Store the expr itself as a placeholder RHS. The real RHS is the
       // type parameter stored in the node itself.
       SequenceStatus |= is;
       SequencedExprs.push_back(is.get());
       SequencedExprs.push_back(is.get());
-
+      
       // We already parsed the right operand as part of the 'is' production.
       // Jump directly to parsing another operator.
       goto parse_operator;
     }
-
+        
     case tok::kw_as: {
       ParserResult<Expr> as = parseExprAs();
       if (as.isNull() || as.hasCodeCompletion())
         return as;
-
+        
       // Store the expr itself as a placeholder RHS. The real RHS is the
       // type parameter stored in the node itself.
       SequenceStatus |= as;
       SequencedExprs.push_back(as.get());
       SequencedExprs.push_back(as.get());
-
+      
       // We already parsed the right operand as part of the 'is' production.
       // Jump directly to parsing another operator.
       goto parse_operator;
@@ -352,7 +352,7 @@ parse_operator:
       SequencedExprs.push_back(arrow.get());
       break;
     }
-
+        
     default:
       // If the next token is not a binary operator, we're done.
       goto done;
@@ -592,7 +592,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       if (Tok.is(tok::kw_catch) && isa<ClosureExpr>(sub.get())) {
         diagnose(tryLoc, diag::docatch_not_trycatch)
           .fixItReplace(tryLoc, "do");
-
+        
         // Eat all of the catch clauses, so we don't trip over them in error
         // recovery.
         while (Tok.is(tok::kw_catch)) {
@@ -603,7 +603,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 
         return makeParserResult(new (Context) ErrorExpr(tryLoc));
       }
-
+        
       sub = makeParserResult(new (Context) TryExpr(tryLoc, sub.get()));
       break;
     }
@@ -1081,7 +1081,7 @@ StringRef Parser::copyAndStripUnderscores(StringRef orig) {
       }
     }
   }
-
+  
   return StringRef(start, p - start);
 }
 
@@ -1152,7 +1152,7 @@ bool Parser::isStartOfGetSetAccessor() {
 /// will emit a diagnostic with a fixit to add wrapping parens.
 static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
   assert(P.Tok.is(tok::l_brace) && "Couldn't be a trailing closure");
-
+  
   // If this is the start of a get/set accessor, then it isn't a trailing
   // closure.
   if (P.isStartOfGetSetAccessor())
@@ -1172,7 +1172,7 @@ static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
   //
   if (!isExprBasic)
     return true;
-
+  
   // If this is an expr-basic, then a trailing closure is not allowed.  However,
   // it is very common for someone to write something like:
   //
@@ -1674,12 +1674,12 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     // input.
     if (peekToken().isNot(tok::string_literal))
       goto UnknownCharacter;
-
+    
     diagnose(Tok.getLoc(), diag::string_literal_no_atsign)
       .fixItRemove(Tok.getLoc());
     consumeToken(tok::at_sign);
     LLVM_FALLTHROUGH;
-
+      
   case tok::string_literal:  // "foo"
     return parseExprStringLiteral();
 
@@ -1784,7 +1784,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::period_prefix: {     // .foo
     Tok.setKind(tok::period_prefix);
     SourceLoc DotLoc = consumeToken();
-
+    
     // Special case ".<integer_literal>" like ".4".  This isn't valid, but the
     // developer almost certainly meant to use "0.4".  Diagnose this, and
     // recover as if they wrote that.
@@ -1798,13 +1798,13 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       memcpy(Ptr+2, Tok.getText().data(), Tok.getLength());
       auto FltText = StringRef(Ptr, Tok.getLength()+2);
       FltText = copyAndStripUnderscores(FltText);
-
+      
       consumeToken(tok::integer_literal);
       return makeParserResult(new (Context)
                                   FloatLiteralExpr(FltText, DotLoc,
                                                    /*Implicit=*/false));
     }
-
+    
     DeclNameRef Name;
     DeclNameLoc NameLoc;
 
@@ -1829,7 +1829,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     return makeParserResult(new (Context) UnresolvedMemberExpr(
         DotLoc, NameLoc, Name, /*implicit=*/false));
   }
-
+      
   case tok::kw_super: // 'super'
     if (peekToken().is(tok::colon_colon))
       return parseExprIdentifier(/*allowKeyword=*/true);
@@ -2014,7 +2014,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                               CommentLength));
       break;
     }
-
+        
     case Lexer::StringSegment::Expr: {
       unsigned DelimiterLen = EntireTok.getCustomDelimiterLen();
       bool HasCustomDelimiter = DelimiterLen > 0;
@@ -2137,7 +2137,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     Stmts.push_back(InterpolationVar);
 
     // Collect all string segments.
-    Status = parseStringSegments(Segments, EntireTok, InterpolationVar,
+    Status = parseStringSegments(Segments, EntireTok, InterpolationVar, 
                                  Stmts, LiteralCapacity, InterpolationCount);
 
     auto Body = BraceStmt::create(Context, /*LBLoc=*/SourceLoc(), Stmts,
@@ -2506,7 +2506,7 @@ ParserResult<Expr> Parser::parseExprIdentifier(bool allowKeyword,
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
   bool hasGenericArgumentList = false;
-
+  
   ///   The generic-args case is ambiguous with an expression involving '<'
   ///   and '>' operators. The operator expression is favored unless a generic
   ///   argument list can be successfully parsed, and the closing bracket is
@@ -2519,10 +2519,10 @@ ParserResult<Expr> Parser::parseExprIdentifier(bool allowKeyword,
     status |= argStatus;
     if (argStatus.isErrorOrHasCompletion())
       diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
-
+    
     hasGenericArgumentList = true;
   }
-
+  
   if (IdentTok.isEditorPlaceholder()) {
     return makeParserResult(
         status, parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier()));
@@ -2605,11 +2605,11 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
 static void printTupleNames(const TypeRepr *typeRepr, llvm::raw_ostream &OS) {
   if (!typeRepr)
     return;
-
+  
   auto tupleRepr = dyn_cast<TupleTypeRepr>(typeRepr);
   if (!tupleRepr)
     return;
-
+  
   OS << "(";
   unsigned elementIndex = 0;
   llvm::SmallVector<TypeRepr *, 10> elementTypes;
@@ -2628,7 +2628,7 @@ static void printTupleNames(const TypeRepr *typeRepr, llvm::raw_ostream &OS) {
                  else
                    OS << name;
                }
-
+               
                ++elementIndex;
              },
              [&] { OS << ", "; });
@@ -2667,9 +2667,9 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         skipSingle();
     }
   };
-
+  
   bool sawTopLevelArrowInLookahead = false;
-
+  
   // If we have a leading token that may be part of the closure signature, do a
   // speculative parse to validate it and look for 'in'.
   if (Tok.isAny(
@@ -2739,7 +2739,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         sawTopLevelArrowInLookahead = true;
         if (!canParseType())
           return makeParserSuccess();
-
+        
         consumeEffectsSpecifiers();
       }
     }
@@ -2904,7 +2904,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     }
     bracketRange = SourceRange(lBracketLoc, rBracketLoc);
   }
-
+  
   bool invalid = false;
   if (Tok.isNot(tok::kw_in)) {
     if (Tok.is(tok::l_paren)) {
@@ -3151,7 +3151,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
     SmallVector<ParamDecl*, 4> elements;
     for (auto anonVar : anonVars)
       elements.push_back(anonVar);
-
+    
     params = ParameterList::create(Context, leftBrace, elements, leftBrace);
 
     // Pop out of the anonymous closure variables scope.
@@ -3410,7 +3410,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                                    SmallVectorImpl<ExprListElt> &elts,
                                    SourceLoc &rightLoc) {
   StructureMarkerRAII ParsingExprList(*this, Tok);
-
+  
   leftLoc = consumeToken(leftTok);
   return parseList(rightTok, leftLoc, rightLoc, /*AllowSepAfterLast=*/true,
                    rightTok == tok::r_paren ? diag::expected_rparen_expr_list

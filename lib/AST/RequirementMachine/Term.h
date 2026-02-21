@@ -174,7 +174,7 @@ public:
 
   std::reverse_iterator<Symbol *> rbegin() { return Symbols.rbegin(); }
   std::reverse_iterator<Symbol *> rend() { return Symbols.rend(); }
-
+  
   Symbol front() const {
     return Symbols.front();
   }

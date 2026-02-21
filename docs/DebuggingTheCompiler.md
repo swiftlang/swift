@@ -186,7 +186,7 @@ Type Variables:
 Inactive Constraints:
   $T0 literal conforms to ExpressibleByIntegerLiteral @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
 
-  (Potential Binding(s):
+  (Potential Binding(s): 
     ($T0 [attributes: [literal: integer]] [potential bindings: (default type of literal) Int])
   (attempting type variable $T0 := Int
     (considering: $T0 literal conforms to ExpressibleByIntegerLiteral @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
@@ -196,10 +196,10 @@ Inactive Constraints:
       (outcome: simplified)
     )
     (Changes:
-      (Newly Bound:
+      (Newly Bound: 
         > $T0 := Int
       )
-      (Removed Constraint:
+      (Removed Constraint: 
         > $T0 literal conforms to ExpressibleByIntegerLiteral @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
       )
     )
@@ -235,12 +235,12 @@ the request evaluator. The error looks as follows:
 ```
 <unknown>:0: error: circular reference
 file.swift:18:22: note: through reference here
-16 |
+16 | 
 17 | extension MyType {
 18 |   public static func test() -> MyType { ... }
    |                      `- note: through reference here
 19 | }
-20 |
+20 | 
 ```
 
 To determine the actual circular request that is occuring, one can pass in the
@@ -877,7 +877,7 @@ format expected by the compiler crashes and undefined behavior may result.
 
 ## Diagnosing LSAN Failures in the Compiler
 
-### Create Ubuntu Container
+### Create Ubuntu Container 
 
 1. Use an x86 machine. The following instructions currently don’t work on arm64. It might be easy to adjust them or not, I have not tried
 2. Clone (or pull) swift-docker: https://github.com/swiftlang/swift-docker
@@ -918,7 +918,7 @@ SUMMARY: LeakSanitizer: 120 byte(s) leaked in 3 allocation(s).
 4. Find the loaded offset of swift-frontend by running `image list`
 For example, this might output
 ```
-[  0] 0AEA10C1 0x0000555555554000 /home/build-user/build/buildbot_incremental_lsan/swift-linux-x86_64/bin/swift-frontend
+[  0] 0AEA10C1 0x0000555555554000 /home/build-user/build/buildbot_incremental_lsan/swift-linux-x86_64/bin/swift-frontend 
 [  1] D52BB67A-BBBB-E429-6E87-FC16144CA7CE-55276DD6 0x00007ffff7ffb000 [vdso] (0x00007ffff7ffb000)
 [  2] 9EA8014C-F020-21A2-9E57-AA3E0512E9BB-6E30541D 0x00007ffff7dd3000 /lib/x86_64-linux-gnu/ld-2.27.so
 ```
@@ -1042,14 +1042,14 @@ two drivers are expected to be very similar.
 
 ## Building the compiler without the standalone driver
 One can build the compiler that does not rely on the standalone driver and
-instead uses the legacy, built-in driver using the `build-script` option:
+instead uses the legacy, built-in driver using the `build-script` option: 
 `--skip-early-swift-driver`.
 
 ## Invoking the compiler without forwarding to the standalone driver
 The Swift compiler can currently be invoked in an execution mode that will use
 the legacy C++-based compiler driver using one of the following two options:
 - Passing `-disallow-use-new-driver` argument to the `swiftc` invocation
-- Setting the `SWIFT_USE_OLD_DRIVER` environment variable
+- Setting the `SWIFT_USE_OLD_DRIVER` environment variable 
 
 ## Reproducing the Compiler Driver build steps
 A "[dry-run](#build-dry-run)" invocation of the `build-script` can be used to
@@ -1066,7 +1066,7 @@ Building the standard library for: swift-test-stdlib-macosx-x86_64
 One of the first steps is an invocation of the driver's
 `build-script-helper.py` script which specifies that the driver us to be built
 (`build`) using the host toolchain (`--toolchain`) to a specified location
-(`--build-path`).
+(`--build-path`). 
 
 ## Installing the Compiler Driver
 In order to create a Swift compiler installation (`--install-swift`), the
@@ -1227,12 +1227,12 @@ this tool with the relevant error code on a windows machine, I got back the foll
 
 ```
 # for hex 0xc0000135 / decimal -1073741515
-  STATUS_DLL_NOT_FOUND                                           ntstatus.h
+  STATUS_DLL_NOT_FOUND                                           ntstatus.h   
 # The code execution cannot proceed because %hs was not
 # found. Reinstalling the program may fix this problem.
 # as an HRESULT: Severity: FAILURE (1), FACILITY_NULL (0x0), Code 0x135
 # for hex 0x135 / decimal 309
-  ERROR_NOTIFICATION_GUID_ALREADY_DEFINED                        winerror.h
+  ERROR_NOTIFICATION_GUID_ALREADY_DEFINED                        winerror.h   
 # The specified file already has a notification GUID
 # associated with it.
 ```

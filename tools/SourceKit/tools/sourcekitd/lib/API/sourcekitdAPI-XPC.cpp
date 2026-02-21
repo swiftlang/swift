@@ -631,7 +631,7 @@ sourcekitd_response_error_get_kind(sourcekitd_response_t obj) {
         return SOURCEKITD_ERROR_REQUEST_CANCELLED;
     }
   }
-
+  
   llvm::report_fatal_error("sourcekitd error did not resolve to a known kind");
 }
 
@@ -645,7 +645,7 @@ sourcekitd_response_error_get_description(sourcekitd_response_t obj) {
     if (Dat.isError())
       return Dat.getErrorDescription();
   }
-
+  
   llvm::report_fatal_error("invalid sourcekitd error object");
 }
 
@@ -672,7 +672,7 @@ sourcekitd_response_get_value(sourcekitd_response_t resp) {
 
 static sourcekitd_variant_type_t XPCVar_get_type(sourcekitd_variant_t var) {
   xpc_object_t obj = XPC_OBJ(var);
-
+  
   xpc_type_t type = xpc_get_type(obj);
   if (type == XPC_TYPE_DICTIONARY)
     return SOURCEKITD_VARIANT_TYPE_DICTIONARY;

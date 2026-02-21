@@ -137,7 +137,7 @@ class CapturedType {
 
 public:
   CapturedType(Type type, SourceLoc loc) : type(type), loc(loc) { }
-
+  
   Type getType() const { return type; }
   SourceLoc getLoc() const { return loc; }
 };

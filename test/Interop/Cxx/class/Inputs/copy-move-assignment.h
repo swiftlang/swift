@@ -8,7 +8,7 @@ struct InstanceBalanceCounter {
     static inline int getCounterValue() {
         return theCounterValue();
     }
-
+    
     __attribute__((optnone))
     InstanceBalanceCounter() {
         ++theCounterValue();

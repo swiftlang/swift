@@ -2,7 +2,7 @@ Lexicon
 =======
 
 This file defines several terms used by the Swift compiler and standard library
-source code, tests, and commit messages. See also the
+source code, tests, and commit messages. See also the 
 [LLVM lexicon](http://llvm.org/docs/Lexicon.html).
 
 Glossary
@@ -150,7 +150,7 @@ opposed to a type that's useful for temporary/internal purposes but which you
 wouldn't normally use in an external interface, like `ArraySlice`. Having broad
 agreement about the currency type you use for a particular kind of data (e.g.
 using `Array` to pass around sequential collections) generally makes the whole
-ecosystem better by reducing artificial barriers to passing data from one system
+ecosystem better by reducing artificial barriers to passing data from one system 
 to another, and it gives algorithm writers an obvious target to ensure they
 optimize for. That's where the analogy to currency comes from: agreeing on a
 currency type improves the flow of information in a program in some of the same
@@ -193,7 +193,7 @@ protocol that the base type conforms to.
 
 The feature that no uninitialized variables, constants, or properties will
 be read by a program, or the analysis pass that operates on [SIL](#sil) to
-guarantee this. This was
+guarantee this. This was 
 [discussed on Apple's Swift blog](https://developer.apple.com/swift/blog/?id=28).
 
 ## DNM
@@ -307,7 +307,7 @@ is platform-dependent. Loaders update GOT relocations either on
 startup or on symbol access.
 
 Additionally, IRGen makes heavy usage of "GOT" as in "GOT-equivalent variable"
-to describe the way it forms references to global objects that may or may not be external references.
+to describe the way it forms references to global objects that may or may not be external references. 
 
 ## iff
 
@@ -396,8 +396,8 @@ considered [canonical](#canonical-SIL).
 ## metatype
 
 The type of a value representing a type. Greg Parker has a good
-explanation of
-[Objective-C's "metaclasses"](http://sealiesoftware.com/blog/archive/2009/04/14/objc_explain_Classes_and_metaclasses.html);
+explanation of 
+[Objective-C's "metaclasses"](http://sealiesoftware.com/blog/archive/2009/04/14/objc_explain_Classes_and_metaclasses.html); 
 because Swift has types
 that are *not* classes, a more general term is used.
 
@@ -554,7 +554,7 @@ GCC.
 
 ## Radar
 
-[Apple's bug-tracking system](https://bugreport.apple.com), or an issue reported
+[Apple's bug-tracking system](https://bugreport.apple.com), or an issue reported 
 on that system.
 
 ## raw SIL

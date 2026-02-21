@@ -294,11 +294,11 @@ SWIFT_CLASS("_TtC8comments15ParamAndReturns")
 /// Ddd.
 - (void)f1:(NSInteger)first;
 /// Aaa.  f2.
-/// \param first
+/// \param first 
 ///
 /// \param second Aaa.
 ///
-/// \param third
+/// \param third 
 /// Bbb.
 ///
 - (void)f2:(NSInteger)first second:(double)second third:(float)third;

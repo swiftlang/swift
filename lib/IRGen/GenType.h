@@ -55,7 +55,7 @@ namespace swift {
   class UnownedStorageType;
   class WeakStorageType;
   enum IsTake_t : bool;
-
+  
 namespace irgen {
   class Alignment;
   class GenericContextScope;
@@ -64,7 +64,7 @@ namespace irgen {
   class FixedTypeInfo;
   class LoadableTypeInfo;
   class TypeInfo;
-
+  
 /// The helper class for generating types.
 class TypeConverter {
 public:
@@ -103,7 +103,7 @@ private:
 
   llvm::DenseMap<ProtocolDecl*, std::unique_ptr<const ProtocolInfo>> Protocols;
   const TypeInfo *FirstType;
-
+  
   const LoadableTypeInfo *NativeObjectTI = nullptr;
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
@@ -126,7 +126,7 @@ private:
   };
 
   const TypeInfo *DynamicTupleTI[2] = {nullptr, nullptr};
-
+  
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     OpaqueStorageTypes;
 
@@ -234,7 +234,7 @@ public:
   /// Retrieve the generic signature for the current generic context, or null if no
   /// generic environment is active.
   CanGenericSignature getCurGenericContext() { return CurGenericSignature; }
-
+  
   /// Retrieve the generic environment for the current generic context.
   ///
   /// Fails if there is no generic context.
@@ -261,7 +261,7 @@ private:
 
   ArchetypeType *getExemplarArchetype(ArchetypeType *t);
   CanType getExemplarType(CanType t);
-
+  
   class Types_t {
     llvm::DenseMap<TypeBase *, const TypeInfo *> IndependentCache[NumLoweringModes];
     llvm::DenseMap<TypeBase *, const TypeInfo *> DependentCache[NumLoweringModes];
@@ -291,11 +291,11 @@ public:
   {
     TC.setGenericContext(newSig);
   }
-
+  
   GenericContextScope(IRGenModule &IGM, CanGenericSignature sig)
     : GenericContextScope(IGM.Types, sig)
   {}
-
+  
   ~GenericContextScope() {
     assert(TC.CurGenericSignature == newSig);
     TC.setGenericContext(oldSig);
@@ -344,16 +344,16 @@ private:
 
 public:
   IRGenTypeVerifierFunction(IRGenModule &IGM, llvm::Function *f);
-
+  
   void emit(ArrayRef<CanType> typesToVerify);
-
+  
   /// Call a runtime function that verifies that the two LLVM values are
   /// equivalent, logging a detailed error if they differ.
   void verifyValues(llvm::Value *typeMetadata,
                     llvm::Value *runtimeValue,
                     llvm::Value *compilerValue,
                     const llvm::Twine &description);
-
+  
   /// Call a runtime function that verifies that the contents of the two
   /// memory buffers are equivalent, logging a detailed error if they differ.
   void verifyBuffers(llvm::Value *typeMetadata,
@@ -401,7 +401,7 @@ TypeLayoutEntry *buildTypeLayoutEntryForFields(IRGenModule &IGM, SILType T,
 bool tryEmitDestroyUsingDeinit(IRGenFunction &IGF,
                                Address address,
                                SILType T);
-
+                               
 /// Emit a call to the deinit for T to destroy the value in the given explosion,
 /// if a deinit is available.
 ///

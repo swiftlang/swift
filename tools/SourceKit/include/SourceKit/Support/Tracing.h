@@ -46,7 +46,7 @@ typedef std::vector<std::pair<std::string, std::string>> StringPairs;
 struct SwiftInvocation {
   SwiftArguments Args;
 };
-
+  
 class TraceConsumer {
 public:
   virtual ~TraceConsumer() = default;

@@ -7,8 +7,8 @@ While it's a virtual machine, there are considerations to be taken into account 
 available yet, specifically:
   1. `wasm64` variant is not specified yet, only the 32-bit `wasm32` variant is supported in WebAssembly
   hosts such as browsers.
-  2. While a preview of multi-threading and atomics is available in some browsers and stand-alone
-  WebAssembly hosts, [the corresponding proposal](https://github.com/WebAssembly/threads/) haven't
+  2. While a preview of multi-threading and atomics is available in some browsers and stand-alone 
+  WebAssembly hosts, [the corresponding proposal](https://github.com/WebAssembly/threads/) haven't 
   formally reached the implementation phase yet.
     The multi-threading feature is available in `wasm32-unknown-wasip1-threads` target, but it's not
     in `wasm32-unknown-wasi` target.

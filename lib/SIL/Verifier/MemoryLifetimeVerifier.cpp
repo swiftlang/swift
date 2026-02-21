@@ -157,7 +157,7 @@ public:
 bool MemoryLifetimeVerifier::isValueTrivialAt(int locIdx,
                                              SILInstruction *atInst) {
   SILBasicBlock *startBlock = atInst->getParent();
-
+  
   // Start at atInst an walk up the control flow.
   BasicBlockWorklist worklist(startBlock);
   while (SILBasicBlock *block = worklist.pop()) {
@@ -322,7 +322,7 @@ bool MemoryLifetimeVerifier::applyMayRead(Operand *argOp, SILValue addr) {
   // Conservatively assume that a partial_apply does _not_ read an argument.
   if (isa<PartialApplyInst>(argOp->getUser()))
     return false;
-
+  
   FullApplySite as(argOp->getUser());
   CalleeList callees;
   if (calleeCache) {
@@ -944,7 +944,7 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
                          SILInstruction *applyInst) {
   if (argumentConvention != SILArgumentConvention::Indirect_In_Guaranteed)
     requireNoStoreBorrowLocation(argumentOp.get(), applyInst);
-
+  
   switch (argumentConvention) {
     case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:

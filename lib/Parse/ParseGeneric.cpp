@@ -178,7 +178,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
         .isErrorOrHasCompletion()) {
     Invalid = true;
   }
-
+  
   // Parse the closing '>'.
   SourceLoc RAngleLoc;
   if (startsWithGreater(Tok)) {

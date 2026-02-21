@@ -91,7 +91,7 @@ protected:
 public:
   // This is useful for metaprogramming.
   static bool isLoadable() { return true; }
-
+  
   /// Return the number of elements in an explosion of this type.
   virtual unsigned getExplosionSize() const = 0;
 
@@ -129,7 +129,7 @@ public:
   /// as if by copy-initialization.
   virtual void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
                     Explosion &targetExplosion, Atomicity atomicity) const = 0;
-
+  
   /// Release reference counts or other resources owned by the explosion.
   virtual void consume(IRGenFunction &IGF, Explosion &explosion,
                        Atomicity atomicity,
@@ -138,14 +138,14 @@ public:
   /// Fix the lifetime of the source explosion by creating opaque calls to
   /// swift_fixLifetime for all reference types in the explosion.
   virtual void fixLifetime(IRGenFunction &IGF, Explosion &explosion) const = 0;
-
+  
   /// Pack the source explosion into an enum payload.
   virtual void packIntoEnumPayload(IRGenModule &IGM,
                                    IRBuilder &builder,
                                    EnumPayload &payload,
                                    Explosion &sourceExplosion,
                                    unsigned offset) const = 0;
-
+  
   /// Unpack an enum payload containing a valid value of the type into the
   /// destination explosion.
   virtual void unpackFromEnumPayload(IRGenFunction &IGF,

@@ -749,7 +749,7 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
   // The hack operated on "favored" types and only declaration references,
   // applications, and (dynamic) subscripts had them if they managed to
   // get an overload choice selected during constraint generation.
-  //
+  // 
   // It's sometimes possible to infer a type of a literal, an operator
   // chain, and a member, so it should be allowed as well.
   if (!(isExpr<DeclRefExpr>(argument) || isExpr<ApplyExpr>(argument) ||

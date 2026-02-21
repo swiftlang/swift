@@ -105,7 +105,7 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
       // Check extra inhabitants.
       if (xiCount > 0) {
         // Verify that the extra inhabitant representations are consistent.
-
+        
         // TODO: Update for EnumPayload implementation changes.
         auto xiBuf = createAlloca(fixedTI->getStorageType(),
                                       fixedTI->getFixedAlignment(),
@@ -132,12 +132,12 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
                                    llvm::ConstantInt::get(IGM.Int8Ty, 0x5A),
                                    fixedTI->getFixedSize().getValue(),
                                    llvm::MaybeAlign(fixedTI->getFixedAlignment().getValue()));
-
+          
           // Ask the runtime to store an extra inhabitant.
           auto tag = llvm::ConstantInt::get(IGM.Int32Ty, i+1);
           emitStoreEnumTagSinglePayloadCall(*this, layoutType, tag,
                                             numCases, xiOpaque);
-
+          
           // Compare the stored extra inhabitant against the fixed extra
           // inhabitant pattern.
           auto fixedXIValue
@@ -146,7 +146,7 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
             EnumPayload::fromBitPattern(IGM, fixedXIValue,
                                         xiSchema);
           fixedXIPayload.store(*this, fixedXIBuf);
-
+          
           auto runtimeXIPayload = EnumPayload::load(*this, xiBuf, xiSchema);
           runtimeXIPayload.emitApplyAndMask(*this, xiMask);
           runtimeXIPayload.store(*this, xiBuf);
@@ -156,10 +156,10 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
             llvm::raw_svector_ostream os(numberBuf);
             os << i;
           }
-
+          
           verifyBuffers(metadata, xiBuf, fixedXIBuf, fixedTI->getFixedSize(),
                  llvm::Twine("stored extra inhabitant ") + numberBuf.str());
-
+          
           // Now ask the runtime to identify the fixed extra inhabitant value.
           // Mask in junk to make sure the runtime correctly ignores it.
           // TODO: Randomize the filler.
@@ -170,7 +170,7 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
           auto maskedXIPayload = EnumPayload::fromBitPattern(IGM,
             fixedXIValue, xiSchema);
           maskedXIPayload.store(*this, fixedXIBuf);
-
+          
           auto runtimeTag =
             emitGetEnumTagSinglePayloadCall(*this, layoutType, numCases,
                                             fixedXIOpaque);
@@ -208,10 +208,10 @@ IRGenTypeVerifierFunction::verifyValues(llvm::Value *typeMetadata,
     bufs = {runtimeBuf, staticBuf};
     VerifierArgBufs[runtimeVal->getType()] = bufs;
   }
-
+  
   Builder.CreateStore(runtimeVal, bufs.runtimeBuf);
   Builder.CreateStore(staticVal, bufs.staticBuf);
-
+  
   auto runtimePtr = Builder.CreateBitCast(bufs.runtimeBuf.getAddress(),
                                               IGM.Int8PtrTy);
   auto staticPtr = Builder.CreateBitCast(bufs.staticBuf.getAddress(),
@@ -220,7 +220,7 @@ IRGenTypeVerifierFunction::verifyValues(llvm::Value *typeMetadata,
                 IGM.DataLayout.getTypeStoreSize(runtimeVal->getType()));
   auto msg
     = IGM.getAddrOfGlobalString(description.str());
-
+  
   Builder.CreateCall(
       VerifierFn, {typeMetadata, runtimePtr, staticPtr, count, msg});
 }
@@ -246,7 +246,7 @@ IRGenTypeVerifierFunction::verifyBuffers(llvm::Value *typeMetadata,
 
 void IRGenModule::emitTypeVerifier() {
   // Look up the types to verify.
-
+  
   SmallVector<CanType, 4> TypesToVerify;
   for (auto name : IRGen.Opts.VerifyTypeLayoutNames) {
     // Look up the name in the module.
@@ -259,7 +259,7 @@ void IRGenModule::emitTypeVerifier() {
                              name);
       continue;
     }
-
+    
     TypeDecl *typeDecl = nullptr;
     for (auto decl : lookup) {
       if (auto td = dyn_cast<TypeDecl>(decl)) {
@@ -276,7 +276,7 @@ void IRGenModule::emitTypeVerifier() {
       Context.Diags.diagnose(SourceLoc(), diag::type_to_verify_not_found, name);
       continue;
     }
-
+    
     {
       auto type = typeDecl->getDeclaredInterfaceType();
       if (type->hasTypeParameter()) {
@@ -284,7 +284,7 @@ void IRGenModule::emitTypeVerifier() {
                                name);
         continue;
       }
-
+      
       TypesToVerify.push_back(type->getCanonicalType());
     }
   next:;
@@ -298,11 +298,11 @@ void IRGenModule::emitTypeVerifier() {
 
   if (!EntryPoint)
     return;
-
+  
   llvm::Function *EntryFunction = Module.getFunction(EntryPoint->getName());
   if (!EntryFunction)
     return;
-
+  
   // Create a new function to contain our logic.
   auto fnTy = llvm::FunctionType::get(VoidTy, /*varArg*/ false);
   auto VerifierFunction = llvm::Function::Create(fnTy,
@@ -310,7 +310,7 @@ void IRGenModule::emitTypeVerifier() {
                                              "type_verifier",
                                              getModule());
   VerifierFunction->setAttributes(constructInitialAttributes());
-
+  
   // Insert a call into the entry function.
   {
     llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();

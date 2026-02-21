@@ -15,7 +15,7 @@
 
 int main() {
     using namespace Functions;
-
+    
     assert(transparentPrimitiveFunc(12) == 144);
 
     return 0;

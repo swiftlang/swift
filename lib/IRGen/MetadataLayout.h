@@ -173,7 +173,7 @@ public:
       Offset,
       DirectImpl,
     };
-
+    
   private:
     Kind TheKind;
     union {
@@ -187,7 +187,7 @@ public:
       : TheKind(Kind::DirectImpl), TheImpl(impl) {}
 
     Kind getKind() const { return TheKind; }
-
+    
     Offset getOffset() const {
       assert(getKind() == Kind::Offset);
       return TheOffset;
@@ -432,7 +432,7 @@ llvm::Value *emitClassFieldOffset(IRGenFunction &IGF,
                                   VarDecl *field,
                                   llvm::Value *metadata);
 
-/// Given a class metadata pointer, emit the address of its superclass field.
+/// Given a class metadata pointer, emit the address of its superclass field.  
 Address emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
                                                   llvm::Value *metadata);
 

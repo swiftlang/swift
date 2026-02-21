@@ -52,14 +52,14 @@ public:
                                ArrayRef<ParamDecl*> params) {
     return create(C, SourceLoc(), params, SourceLoc());
   }
-
+ 
   /// Create an empty parameter list.
   static ParameterList *createEmpty(const ASTContext &C,
                                     SourceLoc LParenLoc = SourceLoc(),
                                     SourceLoc RParenLoc = SourceLoc()) {
     return create(C, LParenLoc, {}, RParenLoc);
   }
-
+  
   /// Create a parameter list for a single parameter lacking location info.
   static ParameterList *createWithoutLoc(ParamDecl *decl) {
     return create(decl->getASTContext(), decl);
@@ -75,7 +75,7 @@ public:
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
-
+  
   typedef MutableArrayRef<ParamDecl*>::iterator iterator;
   typedef ArrayRef<ParamDecl*>::iterator const_iterator;
   iterator begin() { return getArray().begin(); }
@@ -96,11 +96,11 @@ public:
   size_t size() const {
     return numParameters;
   }
-
+  
   const ParamDecl *get(unsigned i) const {
     return getArray()[i];
   }
-
+  
   ParamDecl *&get(unsigned i) {
     return getArray()[i];
   }
@@ -145,7 +145,7 @@ public:
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
-
+  
   //  void print(raw_ostream &OS) const;
 };
 

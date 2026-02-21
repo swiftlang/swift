@@ -241,7 +241,7 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
                                    (isBT ? 0 : IsNonBitwiseTakable));
   }
-
+  
   /// True if values of this type can be passed by value when borrowed.
   /// If this bit is true, then borrows of the value are independent of the
   /// value's address, so a value can be passed in registers or memcpy'd
@@ -262,14 +262,14 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseBorrowable) |
                                    (isBB ? 0 : IsNonBitwiseBorrowable));
   }
-
+  
   /// True if values of this type can be copied.
   bool isCopyable() const { return !(Data & IsNonCopyable); }
   constexpr TargetValueWitnessFlags withCopyable(bool isCopyable) const {
     return TargetValueWitnessFlags((Data & ~IsNonCopyable) |
                                    (isCopyable ? 0 : IsNonCopyable));
   }
-
+  
   /// True if values of this type are addressable-for-dependencies, meaning
   /// that values of this type should be passed indirectly to functions that
   /// produce lifetime-dependent values that could possibly contain pointers
@@ -825,7 +825,7 @@ public:
                                  ? IsConformanceOfProtocolMask
                                  : 0));
   }
-
+  
   ConformanceFlags withHasGlobalActorIsolation(
                                            bool hasGlobalActorIsolation) const {
     return ConformanceFlags((Value & ~HasGlobalActorIsolation)
@@ -1344,7 +1344,7 @@ public:
         (Data & ~InvertedProtocolMask) |
         (inverted.rawBits() << InvertedProtocolshift));
   }
-
+  
   bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
 
   bool isIsolatedAny() const {
@@ -1640,7 +1640,7 @@ enum class RawLayoutFlags : uintptr_t {
 
   /// Whether or not this raw layout type was declared 'movesAsLike'.
   MovesAsLike = 0x2,
-
+  
   /// Whether this raw layout type is bitwise borrowable.
   ///
   /// No raw layout types are yet, but should we change our mind about that in the future,

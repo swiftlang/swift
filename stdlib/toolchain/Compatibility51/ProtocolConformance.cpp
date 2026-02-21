@@ -77,13 +77,13 @@ const Metadata *_swiftoverride_class_getSuperclass(
     if (classHasSuperclass(classType))
       return getObjCClassMetadata(classType->Superclass);
   }
-
+  
   if (const ForeignClassMetadata *foreignClassType
       = dyn_cast<ForeignClassMetadata>(theClass)) {
     if (const Metadata *superclass = foreignClassType->Superclass)
       return superclass;
   }
-
+  
   return nullptr;
 }
 
@@ -107,7 +107,7 @@ StringRef getTypeContextIdentity(const TypeContextDescriptor *type) {
   if (!type->getTypeContextDescriptorFlags().hasImportInfo()) {
     return component;
   }
-
+  
   // The identity starts with the user-facing name.
   const char *startOfIdentity = component.begin();
   const char *endOfIdentity = component.end();
@@ -135,7 +135,7 @@ StringRef getTypeContextIdentity(const TypeContextDescriptor *type) {
       endOfIdentity = component.end();
     }
   }
-
+  
   return StringRef(startOfIdentity, endOfIdentity - startOfIdentity);
 }
 
@@ -152,14 +152,14 @@ static bool override_equalContexts(const ContextDescriptor *a,
 
   // If either descriptor is known to be unique, we're done.
   if (a->isUnique() || b->isUnique()) return false;
-
+  
   // Do the kinds match?
   if (a->getKind() != b->getKind()) return false;
-
+  
   // Do the parents match?
   if (!override_equalContexts(a->Parent.get(), b->Parent.get()))
     return false;
-
+  
   // Compare kind-specific details.
   switch (auto kind = a->getKind()) {
   case ContextDescriptorKind::Module: {
@@ -168,12 +168,12 @@ static bool override_equalContexts(const ContextDescriptor *a,
     auto moduleB = cast<ModuleContextDescriptor>(b);
     return strcmp(moduleA->Name.get(), moduleB->Name.get()) == 0;
   }
-
+  
   case ContextDescriptorKind::Extension:
   case ContextDescriptorKind::Anonymous:
     // These context kinds are always unique.
     return false;
-
+  
   default:
     // Types in the same context with the same name are equivalent.
     if (kind >= ContextDescriptorKind::Type_First
@@ -182,7 +182,7 @@ static bool override_equalContexts(const ContextDescriptor *a,
       auto typeB = cast<TypeContextDescriptor>(b);
       return getTypeContextIdentity(typeA) == getTypeContextIdentity(typeB);
     }
-
+    
     // Otherwise, this runtime doesn't know anything about this context kind.
     // Conservatively return false.
     return false;
@@ -201,7 +201,7 @@ override_getCanonicalTypeMetadata(const ProtocolConformanceDescriptor *conf) {
     if (auto cls = *conf->getIndirectObjCClass())
       return getObjCClassMetadata(cls);
     return nullptr;
-
+      
   case TypeReferenceKind::DirectObjCClassName:
     if (auto cls = reinterpret_cast<const ClassMetadata *>(
                              objc_lookUpClass(conf->getDirectObjCClassName())))
@@ -390,7 +390,7 @@ override_getCanonicalTypeMetadata(const ProtocolConformanceDescriptor *conf) {
       assert(isSuccessful());
       return Description.load(std::memory_order_acquire);
     }
-
+    
     /// Get the generation in which this lookup failed.
     size_t getFailureGeneration() const {
       assert(!isSuccessful());
@@ -408,7 +408,7 @@ using mach_header_platform = mach_header;
 struct ConformanceState {
   ConcurrentMap<ConformanceCacheEntry> Cache;
   ConcurrentReadableArray<ConformanceSection> SectionsToScan;
-
+  
   ConformanceState();
 
   void cacheSuccess(const void *type, const ProtocolDescriptor *proto,
@@ -453,7 +453,7 @@ static void addImageCallback(const mach_header *mh) {
   getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
                  SEG_TEXT, "__swift5_proto",
                  &conformancesSize);
-
+  
   if (!conformances)
     return;
 
@@ -467,7 +467,7 @@ static void addImageCallback(const mach_header *mh) {
   auto recordsEnd
     = reinterpret_cast<const ProtocolConformanceRecord*>
                                           (conformanceBytes + conformancesSize);
-
+  
   // Conformance cache should always be sufficiently initialized by this point.
   Conformances.unsafeGetAlreadyInitialized()
     .SectionsToScan
@@ -632,7 +632,7 @@ swift::swift51override_conformsToSwiftProtocol(const Metadata * const type,
 
   // Prepare to scan conformance records.
   auto snapshot = C.SectionsToScan.snapshot();
-
+  
   // Scan only sections that were not scanned yet.
   // If we found an out-of-date negative cache entry,
   // we need not to re-scan the sections that it covers.
@@ -668,7 +668,7 @@ swift::swift51override_conformsToSwiftProtocol(const Metadata * const type,
       }
     }
   }
-
+  
   // Conformance scan is complete.
 
   // Search the cache once more, and this time update the cache if necessary.

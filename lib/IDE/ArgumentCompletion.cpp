@@ -206,7 +206,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
        ExpectedCallType->hasUnboundGenericType())) {
     ExpectedCallType = Type();
   }
-
+  
   auto *CallLocator = CS.getConstraintLocator(ParentCall);
   auto *CalleeLocator = S.getCalleeLocator(CallLocator);
 

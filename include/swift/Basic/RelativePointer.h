@@ -237,7 +237,7 @@ private:
   static_assert(std::is_integral<Offset>::value &&
                 std::is_signed<Offset>::value,
                 "offset type should be signed integer");
-
+  
   /// The relative offset of the pointer's memory from the `this` pointer.
   /// If the low bit is clear, this is a direct reference; otherwise, it is
   /// an indirect reference.
@@ -265,12 +265,12 @@ public:
       assert(absolute != nullptr &&
              "constructing non-nullable relative pointer from null");
   }
-
+  
   RelativeIndirectablePointer &operator=(ValueTy *absolute) & {
     if (!Nullable)
       assert(absolute != nullptr &&
              "constructing non-nullable relative pointer from null");
-
+      
     RelativeOffsetPlusIndirect = Nullable && absolute == nullptr
       ? 0
       : detail::measureRelativeOffset<Offset>(absolute, this);
@@ -281,11 +281,11 @@ public:
     static_assert(alignof(ValueTy) >= 2 && alignof(Offset) >= 2,
                   "alignment of value and offset must be at least 2 to "
                   "make room for indirectable flag");
-
+  
     // Check for null.
     if (Nullable && RelativeOffsetPlusIndirect == 0)
       return nullptr;
-
+    
     Offset offsetPlusIndirect = RelativeOffsetPlusIndirect;
     uintptr_t address = detail::applyRelativeOffset(this,
                                                     offsetPlusIndirect & ~1);
@@ -303,7 +303,7 @@ public:
   bool isNull() const & {
     return RelativeOffsetPlusIndirect == 0;
   }
-
+  
   operator const ValueTy* () const & {
     return get();
   }
@@ -431,7 +431,7 @@ public:
   : RelativeOffset (0) {
     static_assert(Nullable, "can't construct non-nullable pointer from null");
   }
-
+  
   RelativeDirectPointerImpl &operator=(PointerTy absolute) & {
     if (!Nullable)
       assert(absolute != nullptr &&
@@ -446,7 +446,7 @@ public:
     // Check for null.
     if (Nullable && RelativeOffset == 0)
       return nullptr;
-
+    
     // The value is addressed relative to `this`.
     uintptr_t absolute = detail::applyRelativeOffset(this, RelativeOffset);
     return reinterpret_cast<PointerTy>(absolute);
@@ -499,7 +499,7 @@ class RelativeDirectPointer<T, Nullable, Offset,
 public:
   using super::get;
   using super::super;
-
+  
   RelativeDirectPointer &operator=(T *absolute) & {
     super::operator=(absolute);
     return *this;
@@ -612,7 +612,7 @@ public:
   IntTy getInt() const & {
     return IntTy(RelativeOffsetPlusInt & getMask());
   }
-
+  
   Offset getOpaqueValue() const & {
     return RelativeOffsetPlusInt;
   }

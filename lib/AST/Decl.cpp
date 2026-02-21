@@ -877,7 +877,7 @@ void Decl::setInvalid() {
   llvm_unreachable("Unknown decl kind");
 }
 
-void Decl::setDeclContext(DeclContext *DC) {
+void Decl::setDeclContext(DeclContext *DC) { 
   Context = DC;
   // If this Decl is also a DeclContext, we need to update its parent too.
   if (auto *thisDC = dyn_cast<DeclContext>(this))
@@ -966,7 +966,7 @@ DiagnosticEngine &Decl::getDiags() const {
 // Helper functions to verify statically whether source-location
 // functions have been overridden.
 typedef const char (&TwoChars)[2];
-template<typename Class>
+template<typename Class> 
 inline char checkSourceLocType(SourceLoc (Class::*)() const);
 inline TwoChars checkSourceLocType(SourceLoc (Decl::*)() const);
 
@@ -974,7 +974,7 @@ template<typename Class>
 inline char checkSourceLocType(SourceLoc (Class::*)(bool) const);
 inline TwoChars checkSourceLocType(SourceLoc (Decl::*)(bool) const);
 
-template<typename Class>
+template<typename Class> 
 inline char checkSourceRangeType(SourceRange (Class::*)() const);
 inline TwoChars checkSourceRangeType(SourceRange (Decl::*)() const);
 
@@ -1153,7 +1153,7 @@ StringRef Decl::getAlternateModuleName() const {
       }
     }
   }
-
+  
   for (auto *DC = getDeclContext(); DC; DC = DC->getParent()) {
     if (auto decl = DC->getAsDecl()) {
       if (decl == this)
@@ -1268,7 +1268,7 @@ ExplicitSafety Decl::getExplicitSafety() const {
         ClangDeclExplicitSafety({clangDecl, isa<ClassDecl>(this)}),
         ExplicitSafety::Unspecified);
   }
-
+  
   // Inference: Check the enclosing context, unless this is a type.
   if (!isa<TypeDecl>(this)) {
     if (auto enclosingDC = getDeclContext()) {
@@ -1622,7 +1622,7 @@ GenericParamList *GenericContext::getParsedGenericParams() const {
 bool GenericContext::hasComputedGenericSignature() const {
   return GenericSigAndBit.getInt();
 }
-
+      
 bool GenericContext::isComputingGenericSignature() const {
   return getASTContext().evaluator.hasActiveRequest(
                  GenericSignatureRequest{const_cast<GenericContext*>(this)});
@@ -1749,7 +1749,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
     return ImportKind::Enum;
   case DeclKind::Struct:
     return ImportKind::Struct;
-
+      
   case DeclKind::OpaqueType:
     return ImportKind::Type;
 
@@ -2077,7 +2077,7 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
 
 void ExtensionDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
                                          uint64_t contextData) {
-  assert(!Bits.ExtensionDecl.HasLazyConformances &&
+  assert(!Bits.ExtensionDecl.HasLazyConformances && 
          "Already have lazy conformances");
   Bits.ExtensionDecl.HasLazyConformances = true;
 
@@ -2226,7 +2226,7 @@ AccessLevel ExtensionDecl::getMaxAccessLevel() const {
     DefaultAndMaxAccessLevelRequest{const_cast<ExtensionDecl *>(this)},
     {AccessLevel::Private, AccessLevel::Private}).second;
 }
-
+      
 Type ExtensionDecl::getExtendedType() const {
   ASTContext &ctx = getASTContext();
   if (auto type = evaluateOrDefault(ctx.evaluator,
@@ -2499,21 +2499,21 @@ VarDecl *PatternBindingInitializer::getInitializedLazyVar() const {
 
 unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) const {
   assert(VD && "Cannot find a null VarDecl");
-
+  
   auto List = getPatternList();
   if (List.size() == 1) {
     assert(List[0].getPattern()->containsVarDecl(VD) &&
            "Single entry PatternBindingDecl is set up wrong");
     return 0;
   }
-
+  
   unsigned Result = 0;
   for (auto entry : List) {
     if (entry.getPattern()->containsVarDecl(VD))
       return Result;
     ++Result;
   }
-
+  
   assert(0 && "PatternBindingDecl doesn't bind the specified VarDecl!");
   return ~0U;
 }
@@ -3553,7 +3553,7 @@ bool AbstractStorageDecl::requiresOpaqueYieldingBorrowCoroutine() const {
       isExported(this) != ExportedLevel::None) {
     return true;
   }
-
+  
   // If a borrow accessor is present, we don't need a read coroutine.
   if (getParsedAccessor(AccessorKind::Borrow)) {
     return false;
@@ -3803,7 +3803,7 @@ bool AbstractStorageDecl::isSetterMutating() const {
     IsSetterMutatingRequest{const_cast<AbstractStorageDecl *>(this)}, {});
 }
 
-StorageMutability
+StorageMutability 
 AbstractStorageDecl::mutability(const DeclContext *useDC,
                                 std::optional<const DeclRefExpr *> base ) const {
   if (auto vd = dyn_cast<VarDecl>(this))
@@ -4065,7 +4065,7 @@ bool swift::conflicting(const OverloadSignature& sig1,
   // Note that we intentionally ignore the HasOpaqueReturnType bit here.
   // For declarations that can't be overloaded by type, we want them to be
   // considered conflicting independent of their type.
-
+  
   return sig1.Name == sig2.Name;
 }
 
@@ -4139,7 +4139,7 @@ bool swift::conflicting(ASTContext &ctx,
   // Otherwise, the declarations conflict if the overload types are the same.
   if (sig1.HasOpaqueReturnType != sig2.HasOpaqueReturnType)
     return false;
-
+  
   if (sig1Type != sig2Type)
     return false;
 
@@ -4234,7 +4234,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
         type = objectType;
       }
     }
-
+    
     // Functions and subscripts cannot overload differing only in opaque return
     // types. Replace the opaque type with `Any`.
     if (type->is<OpaqueTypeArchetypeType>()) {
@@ -4422,7 +4422,7 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
 
   auto *dc = getDeclContext();
   auto &ctx = dc->getASTContext();
-
+  
   if (returnRepr && returnRepr->hasOpaque()) {
     return returnRepr;
   } else if (returnRepr && ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
@@ -4909,7 +4909,7 @@ getVarAtSimilarStructuralPosition(VarDecl *otherVar) {
 
   // Find the entry index and sibling index for `otherVar` within its PBD.
   auto entryIndex = otherPBD->getPatternEntryIndexForVarDecl(otherVar);
-
+  
   SmallVector<VarDecl *, 16> otherSiblings;
   otherPBD->getPattern(entryIndex)->collectVariables(otherSiblings);
   size_t siblingIndex =
@@ -5879,7 +5879,7 @@ DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {
   if (!isa<StructDecl>(this) && !isa<EnumDecl>(this)) {
     return nullptr;
   }
-
+  
   auto found = lookupDirect(DeclBaseName::createDestructor());
   if (found.size() != 1) {
     return nullptr;
@@ -6015,7 +6015,7 @@ void NominalTypeDecl::prepareExtensions() {
   if (getLocalContext() != nullptr) {
     return;
   }
-
+  
   auto &context = Decl::getASTContext();
 
   // If our list of extensions is out of date, update it now.
@@ -6034,7 +6034,7 @@ ExtensionRange NominalTypeDecl::getExtensions() {
 void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   assert(!extension->NextExtension.getInt() && "Already added extension");
   extension->NextExtension.setInt(true);
-
+  
   // First extension; set both first and last.
   if (!FirstExtension) {
     FirstExtension = extension;
@@ -6187,7 +6187,7 @@ Type TypeAliasDecl::getUnderlyingType() const {
     return type;
   return ErrorType::get(ctx);
 }
-
+      
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
   // lldb creates global typealiases containing archetypes
   // sometimes...
@@ -6590,7 +6590,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   // FIXME: rdar://56844567
   if (Bits.NominalTypeDecl.IsComputingSemanticMembers)
     return;
-
+    
   Bits.NominalTypeDecl.IsComputingSemanticMembers = true;
   SWIFT_DEFER { Bits.NominalTypeDecl.IsComputingSemanticMembers = false; };
 
@@ -6903,7 +6903,7 @@ AncestryOptions ClassDecl::checkAncestry() const {
                            ClassAncestryFlagsRequest{const_cast<ClassDecl *>(this)},
                            AncestryFlags()));
 }
-
+        
 AncestryFlags
 ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator,
                                     ClassDecl *value) const {
@@ -6950,7 +6950,7 @@ ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator,
 
   return AncestryFlags(result.toRaw());
 }
-
+      
 void swift::simple_display(llvm::raw_ostream &out, AncestryFlags value) {
   AncestryOptions opts(value);
   out << "{ ";
@@ -6960,11 +6960,11 @@ void swift::simple_display(llvm::raw_ostream &out, AncestryFlags value) {
     if (wantsSeparator) {
       out << ", ";
     }
-
+      
     if (!wantsSeparator) {
       wantsSeparator = true;
     }
-
+      
     out << name;
     if (val) {
       out << " = true";
@@ -7301,7 +7301,7 @@ bool EnumDecl::isEffectivelyExhaustive(ModuleDecl *M,
          "these should match up");
   return !isResilient(M, expansion);
 }
-
+      
 void EnumDecl::setHasFixedRawValues() {
   SemanticFlags |= OptionSet<EnumDecl::SemanticInfoFlags>{EnumDecl::HasFixedRawValues};
 }
@@ -7647,7 +7647,7 @@ void ProtocolDecl::computeKnownProtocolKind() const {
       !module->getName().is("Foundation") &&
       !module->getName().is("_Differentiation") &&
       !module->getName().is("_Concurrency") &&
-      !module->getName().is("Distributed") &&
+      !module->getName().is("Distributed") && 
       !module->getName().is("Cxx")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
@@ -8077,7 +8077,7 @@ AbstractStorageDecl::getObjCSetterSelector(Identifier preferredName) const {
                           { ctx.Id_setObject, ctx.Id_forKeyedSubscript });
     }
   }
-
+  
 
   // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
   // property name capitalized and preceded by 'set'.
@@ -8690,7 +8690,7 @@ void ParamDecl::setSpecifier(Specifier specifier) {
   case ParamSpecifier::LegacyOwned:
     introducer = VarDecl::Introducer::Let;
     break;
-
+  
   // `inout` and `consuming` parameters are locally mutable.
   case ParamSpecifier::InOut:
   case ParamSpecifier::Consuming:
@@ -8698,7 +8698,7 @@ void ParamDecl::setSpecifier(Specifier specifier) {
     introducer = VarDecl::Introducer::Var;
     break;
   }
-
+  
   setIntroducer(introducer);
   Bits.ParamDecl.OwnershipSpecifier = static_cast<unsigned>(specifier) + 1;
   assert(getCachedSpecifier() == specifier
@@ -8842,7 +8842,7 @@ bool VarDecl::allAttachedPropertyWrappersHaveWrappedValueInit() const {
     if (!getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit)
       return false;
   }
-
+  
   return true;
 }
 
@@ -8938,14 +8938,14 @@ VarDecl *VarDecl::getPropertyWrapperWrappedValueVar() const {
 bool VarDecl::hasStorageOrWrapsStorage() const {
   if (hasStorage())
     return true;
-
+  
   if (getAttrs().hasAttribute<LazyAttr>())
     return true;
-
+  
   auto *backing = getPropertyWrapperBackingProperty();
   if (backing && backing->hasStorage())
     return true;
-
+  
   return false;
 }
 
@@ -9415,7 +9415,7 @@ SourceRange ParamDecl::getSourceRange() const {
     if (endLoc.isValid())
       return SourceRange(startLoc, endLoc);
   }
-
+  
   // If the typeloc has a valid location, use it to end the range.
   if (auto typeRepr = getTypeRepr()) {
     auto endLoc = typeRepr->getEndLoc();
@@ -9918,7 +9918,7 @@ static bool isIntegralType(Type type) {
 
 void SubscriptDecl::setIndices(ParameterList *p) {
   Indices = p;
-
+  
   if (Indices)
     Indices->setDeclContextOfParamDecls(this);
 }
@@ -11096,7 +11096,7 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
   assert(getNamingDecl() && "not an opaque return type");
   if (!OpaqueReturnTypeIdentifier.empty())
     return OpaqueReturnTypeIdentifier;
-
+  
   SmallString<64> mangleBuf;
   {
     llvm::raw_svector_ostream os(mangleBuf);
@@ -11636,7 +11636,7 @@ std::optional<Type> FuncDecl::getCachedResultInterfaceType() const {
 bool FuncDecl::isUnaryOperator() const {
   if (!isOperator())
     return false;
-
+  
   auto *params = getParameters();
   return params->size() == 1 && !params->get(0)->isVariadic();
 }
@@ -11644,7 +11644,7 @@ bool FuncDecl::isUnaryOperator() const {
 bool FuncDecl::isBinaryOperator() const {
   if (!isOperator())
     return false;
-
+  
   auto *params = getParameters();
   return params->size() == 2 &&
     !params->get(0)->isVariadic() &&
@@ -11717,7 +11717,7 @@ ConstructorDecl *ConstructorDecl::createImported(
       ctx, sizeof(ConstructorDecl), true);
   auto ctor = ::new (declPtr)
       ConstructorDecl(name, constructorLoc,
-                      failable, failabilityLoc,
+                      failable, failabilityLoc, 
                       async, asyncLoc,
                       throws, throwsLoc, TypeLoc::withoutLoc(thrownType),
                       bodyParams, genericParams, parent);
@@ -12128,7 +12128,7 @@ bool FuncDecl::isPotentialIBActionTarget() const {
 
 void FuncDecl::setHasTopLevelLocalContextCaptures(bool hasCaptures) {
   assert(!hasCaptures || isa<SourceFile>(getDeclContext()));
-
+  
   Bits.FuncDecl.HasTopLevelLocalContextCaptures = hasCaptures;
 }
 
@@ -12727,7 +12727,7 @@ static MacroRoles freestandingMacroRoles =
 #define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)
 #include "swift/Basic/MacroRoles.def"
    );
-static MacroRoles attachedMacroRoles =
+static MacroRoles attachedMacroRoles = 
   (MacroRoles()
 #define ATTACHED_MACRO_ROLE(Name, Description, MangledChar) | MacroRole::Name
 #define FREESTANDING_MACRO_ROLE(Name, Description)

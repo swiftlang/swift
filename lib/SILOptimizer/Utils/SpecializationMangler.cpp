@@ -203,10 +203,10 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(SILInstruction *const
   case SILInstructionKind::KeyPathInst: {
     // Mangle a keypath instruction by creating a MD5 hash of the printed
     // instruction. Everything else would be too complicated.
-
+  
     auto *kp = cast<KeyPathInst>(constInst);
     KeyPathPattern *pattern = kp->getPattern();
-
+    
     MD5Stream md5Stream;
     SILPrintContext printCtxt(md5Stream);
     for (auto &component : pattern->getComponents()) {

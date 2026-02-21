@@ -38,23 +38,23 @@
 // module. This is wrong if the layout of `Impl` is exposed to other
 // modules. A struct's memory may be initialized by any module with
 // access to the struct's layout.
-//
+// 
 // In fact, this assumption is wrong even if the struct, and it's let
 // property cannot be accessed externally by name. In this next example,
 // external modules cannot access `Impl` or `Impl.hidden` by name, but
 // can still access the memory because the layout is exposed via a public type
 // that contains it.
-//
+// 
 // ```
 // internal struct Impl<T> {
 //   let hidden: T
-//
+// 
 //   init(t: T) { self.hidden = t }
 // }
-//
+// 
 // public struct Wrapper<T> {
 //   var impl: Impl<T>
-//
+//   
 //   public var property: T {
 //     get {
 //       return impl.hidden
@@ -62,22 +62,22 @@
 //   }
 // }
 // ```
-//
+// 
 // As long as `Wrapper`s layout is exposed to other modules, the contents of
 // `Wrapper`, `Impl`, and `hidden' can all be initialized in another
 // module. This following code is legal if Wrapper's home module is *not*
 // built with library evolution (or if Wrapper is declared `@frozen`).
-//
+// 
 // func inExternalModule(buffer: UnsafeRawPointer) -> Wrapper<Int64> {
 //   return buffer.load(as: Wrapper<Int64>.self)
 // }
-//
+// 
 // If library evolution is enabled and a `public` struct is not declared
 // `@frozen` then external modules cannot assume its layout, and therefore
 // cannot initialize the struct memory. In that case, it is possible to optimize
 // `X.hidden` and `Impl.hidden` as if the properties are only initialized inside
 // their home module.
-//
+// 
 // The right way to view a type's memory visibility is to consider whether
 // external modules have access to the layout of the type. If not, then the
 // property can still be optimized As long as a struct is never enclosed in a
@@ -87,7 +87,7 @@
 // constant initialization, or is simply copied from another value. If an
 // escaping unsafe pointer to any enclosing type is created, then the
 // optimization is not valid.
-//
+// 
 // When viewed this way, the fact that a property is declared 'let' is mostly
 // irrelevant to this optimization--it can be expanded to handle non-'let'
 // properties. The more salient feature is whether the property has a public

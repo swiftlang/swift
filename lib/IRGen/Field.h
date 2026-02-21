@@ -30,7 +30,7 @@ class IRGenModule;
 /// which determines a number of things in the ABI, including the length
 /// of the field vector in the type metadata.
 ///
-/// Generally this is the length of the stored properties, but
+/// Generally this is the length of the stored properties, but 
 /// root default actors have an implicit field for their default-actor
 /// storage, and there may also be missing members.
 ///

@@ -16,7 +16,7 @@
   Task.isCancelled // true
   withTaskCancellationShield {
     Task.isCancelled // false
-    cleanup()
+    cleanup() 
   }
   ```
 
@@ -55,27 +55,27 @@
 * [SE-0491][]:
   You can now use a module selector to specify which module Swift should look inside to find a named declaration. A
   module selector is written before the name it qualifies and consists of the module name and two colons (`::`):
-
+  
   ```swift
   // This type conforms to the `View` protocol from `SwiftUI`, even if other
   // modules have also declared a type named `View`:
   struct MyView: SwiftUI::View { ... }
   ```
-
+  
   A module selector can also be applied to the name of a member; this is helpful if extensions in other modules have
   added an ambiguous overload:
-
+  
   ```swift
   // Calls the `data(using:)` method added by `Foundation`, even if other
   // modules have added identical overloads of `data(using:)`.
   let data = "a little bit of text".Foundation::data(using: .utf8)
   ```
-
+  
   When a module selector is used, Swift skips past any enclosing scopes and starts its search at the top level of the
   module; this means that certain declarations, such as local variables and generic parameter types, cannot be found
   with a module selector. Constraints in `where` clauses also cannot use a module selector to refer to an associated
   type.
-
+  
   Module selectors are primarily intended to be used when working around unavoidable conflicts, such as when two
   modules you don't control both use the same name. API designs which force clients to use a module selector are not
   recommended; it is usually better to rename a declaration instead. (19481048)
@@ -87,12 +87,12 @@
 
 * Concurrency-related APIs like `Task` and string-processing-related APIs like `Regex` can now be qualified by the name
   `Swift`, just like other standard library APIs:
-
+  
   ```swift
   Swift.Task { ... }
   func match(_ regex: Swift.Regex<(Substring)>) { ... }
   ```
-
+  
   The old `_Concurrency` and `_StringProcessing` names are still supported for backwards compatibility, and Embedded
   Swift projects must still explicitly `import _Concurrency` to access concurrency APIs.
 
@@ -100,26 +100,26 @@
 
 * [SE-0472][]:
   Introduced new `Task.immediate` and `taskGroup.addImmediateTask` APIs, which allow a task to run "immediately" in the
-  calling context if its isolation is compatible with the enclosing one. This can be used to create tasks which execute
+  calling context if its isolation is compatible with the enclosing one. This can be used to create tasks which execute 
   without additional scheduling overhead, and allow for finer-grained control over where a task begins running.
 
   The canonical example for using this new API is using an unstructured immediate task like this:
-
+  
   ```swift
   func synchronous() { // synchronous function
   // executor / thread: "T1"
   let task: Task<Void, Never> = Task.immediate {
   // executor / thread: "T1"
   guard keepRunning() else { return } // synchronous call (1)
-
+  
       // executor / thread: "T1"
       await noSuspension() // potential suspension point #1 // (2)
-
+      
       // executor / thread: "T1"
       await suspend() // potential suspension point #2 // (3), suspend, (5)
       // executor / thread: "other"
   }
-
+  
   // (4) continue execution
   // executor / thread: "T1"
   }
@@ -128,11 +128,11 @@
 * [SE-0471][]:
   Actor and global actor annotated types may now declare a synchronous `isolated deinit`, which allows such deinitializer
   to access actor isolated state while deinitializing the actor. This enables actor deinitializers to safely access
-  and shut down or close resources during an actors deinitialization, without explicitly resorting to unstructured
+  and shut down or close resources during an actors deinitialization, without explicitly resorting to unstructured 
   concurrency tasks.
 
   ```swift
-  class NonSendableAhmed {
+  class NonSendableAhmed { 
     var state: Int = 0
   }
 
@@ -151,7 +151,7 @@
       // to cross between otherMaria and self.
       self.friend = otherMaria.friend
     }
-
+    
     isolated deinit {
       // Used to be a potential data race. Now, deinit is also
       // isolated on the MainActor, so this code is perfectly
@@ -159,7 +159,7 @@
       friend.state += 1
     }
   }
-
+    
   func example() async {
     let m1 = await Maria()
     let m2 = await Maria(sharingFriendOf: m1)
@@ -168,7 +168,7 @@
   ```
 
 * [SE-0469][]:
-  Swift concurrency tasks (both unstructured and structured, via the TaskGroup `addTask` APIs) may now be given
+  Swift concurrency tasks (both unstructured and structured, via the TaskGroup `addTask` APIs) may now be given 
   human-readable names, which can be used to support debugging and identifying tasks.
 
   ```swift
@@ -178,7 +178,7 @@
   ```
 
 * [SE-0462][]:
-  Task priority escalation may now be explicitly caused to a `Task`, as well as reacted to using the new task priority escalation handlers:
+  Task priority escalation may now be explicitly caused to a `Task`, as well as reacted to using the new task priority escalation handlers:      
 
   ```swift
   // priority: low
@@ -193,9 +193,9 @@
   Nonisolated asynchronous functions may now execute on the calling actor, when the upcoming feature `NonisolatedNonsendingByDefault`
   is enabled, or when explicitly opted-into using the `nonisolated(nonsending)` keywords. This allows for fine grained control
   over where nonisolated asynchronous functions execute, and allows for the default behavior of their execution to be changed
-  from always executing on the global concurrent pool, to the calling actor, which can yield noticeable performance improvements
-  thanks to less executor hopping when nonisolated and isolated code is invoked in sequence.
-
+  from always executing on the global concurrent pool, to the calling actor, which can yield noticeable performance improvements 
+  thanks to less executor hopping when nonisolated and isolated code is invoked in sequence. 
+  
   This also allows for safely using asynchronous functions on non-sendable types from actors, like so:
 
   ```swift
@@ -297,7 +297,7 @@
   Introduced an opt-in mode for strict checking of memory safety, which can be
   enabled with the compiler flag `-strict-memory-safety`. In this mode,
   the Swift compiler will produce warnings for uses of memory-unsafe constructs
-  and APIs. For example,
+  and APIs. For example, 
 
   ```swift
   func evilMalloc(size: Int) -> Int {
@@ -327,7 +327,7 @@
   These warnings can be escalated back to errors with `-Werror ExistentialAny`.
 
 * Previous versions of Swift would incorrectly allow Objective-C `-init...`
-  methods with custom Swift names to be imported as initializers, but with base
+  methods with custom Swift names to be imported as initializers, but with base 
   names other than `init`. The compiler now diagnoses these attributes and
   infers a name for the initializer as though they are not present.
 
@@ -358,14 +358,14 @@
   When the upcoming feature `MemberImportVisibility` is enabled, Swift will
   require that a module be directly imported in a source file when resolving
   member declarations from that module:
-
+  
   ```swift
   let recipe = "2 slices of bread, 1.5 tbs peanut butter".parse()
   // error: instance method 'parse()' is inaccessible due to missing import of
   //        defining module 'RecipeKit'
   // note:  add import of module 'RecipeKit'
   ```
-
+  
   This new behavior prevents ambiguities from arising when a transitively
   imported module declares a member that conflicts with a member of a directly
   imported module.
@@ -392,21 +392,21 @@
   Previously the child task type would have to be specified explicitly when creating the task group:
 
   ```swift
-  await withTaskGroup(of: Int.self) { group in
+  await withTaskGroup(of: Int.self) { group in 
     group.addTask { 12 }
 
     return await group.next()
-  }
+  } 
   ```
 
   Now the type is inferred based on the first use of the task group within the task group's body:
 
   ```swift
-  await withTaskGroup { group in
+  await withTaskGroup { group in 
     group.addTask { 12 }
 
     return await group.next()
-  }
+  } 
   ```
 
 
@@ -431,18 +431,18 @@
   compiler flag.
 
 * [SE-0428][]:
-  Distributed actors now have the ability to support complete split server /
+  Distributed actors now have the ability to support complete split server / 
   client systems, thanks to the new `@Resolvable` macro and runtime changes.
 
-  It is now possible to share an "API module" between a client and server
-  application, declare a resolvable distributed actor protocol with the expected
-  API contract and perform calls on it, without knowing the specific type the
-  server is implementing those actors as.
+  It is now possible to share an "API module" between a client and server 
+  application, declare a resolvable distributed actor protocol with the expected 
+  API contract and perform calls on it, without knowing the specific type the 
+  server is implementing those actors as. 
 
   Declaring such protocol looks like this:
 
 ```swift
-import Distributed
+import Distributed 
 
 @Resolvable
 protocol Greeter where ActorSystem: DistributedActorSystem<any Codable> {
@@ -462,26 +462,26 @@ And the module structure to support such applications looks like this:
                  │       │ }                                      │       │
                  │       └────────────────────────────────────────┘       │
                  │                                                        │
-                 ▼                                                        ▼
+                 ▼                                                        ▼   
 ┌────────────────────────────────────────────────┐      ┌──────────────────────────────────────────────┐
 │             Client Module                      │      │               Server Module                  │
 │================================================│      │==============================================│
 │ let g = try $Greeter.resolve(...) /*new*/      │      │ distributed actor EnglishGreeter: Greeter {  │
 │ try await greeter.hello(name: ...)             │      │   distributed func greet(name: String) {     │
 └────────────────────────────────────────────────┘      │     "Greeting in english, for \(name)!"      │
-/* Client cannot know about EnglishGreeter type */      │   }                                          │
+/* Client cannot know about EnglishGreeter type */      │   }                                          │      
                                                         │ }                                            │
                                                         └──────────────────────────────────────────────┘
 ```
 
 * [SE-0424][]:
   Serial executor gains a new customization point `checkIsolation()`, which can be
-  implemented by custom executor implementations in order to provide a last resort
+  implemented by custom executor implementations in order to provide a last resort  
   check before the isolation asserting APIs such as `Actor.assumeIsolated` or
   `assertIsolated` fail and crash.
 
   This specifically enables Dispatch to implement more sophisticated isolation
-  checking, and now even an actor which is "on a queue which is targeting
+  checking, and now even an actor which is "on a queue which is targeting 
   another specific queue" can be properly detected using these APIs.
 
 * Closures can now appear in pack expansion expressions, which allows you to
@@ -629,7 +629,7 @@ And the module structure to support such applications looks like this:
     case salad
     case sandwich
   }
-
+  
   func isSoup(_ lunch: borrowing Lunch) -> Bool {
     switch lunch {
       case .soup: true
@@ -665,13 +665,13 @@ And the module structure to support such applications looks like this:
   disconnected at the function boundary and thus possesses the capability of
   being safely sent across an isolation domain or merged into an actor-isolated
   region in the function's body or the function's caller respectively. Example:
-
+  
   ```swift
   func parameterWithoutSending(_ x: NonSendableType) async {
     // Error! Cannot send a task-isolated value to the main actor!
     await transferToMainActor(x)
   }
-
+  
   func parameterWithSending(_ x: sending NonSendableType) async {
     // Ok since `x` is `sending` and thus disconnected.
     await transferToMainActor(x)
@@ -689,12 +689,12 @@ And the module structure to support such applications looks like this:
   isolation boundary cannot result in races because the value (and any other
   value that might reference it) is not used in the caller after the point of
   sending allowing code like the following to compile:
-
+  
   ```swift
   actor MyActor {
       init(_ x: NonSendableType) { ... }
   }
-
+  
   func useValue() {
     let x = NonSendableType()
     let a = await MyActor(x) // Error without Region-Based Isolation!
@@ -702,7 +702,7 @@ And the module structure to support such applications looks like this:
   ```
 
 * [SE-0427][]:
-  You can now suppress `Copyable` on protocols, generic parameters,
+  You can now suppress `Copyable` on protocols, generic parameters, 
   and existentials:
 
   ```swift
@@ -731,32 +731,32 @@ And the module structure to support such applications looks like this:
 
   By writing `~Copyable` on a generic type, you're suppressing a default
   `Copyable` constraint that would otherwise appear on that type. This permits
-  noncopyable types, which have no `Copyable` conformance, to conform to such
+  noncopyable types, which have no `Copyable` conformance, to conform to such 
   protocols and be substituted for those generic types. Full functionality of this
   feature requires the newer Swift 6 runtime.
 
-* Since its introduction in Swift 5.1 the @TaskLocal property wrapper was used to
+* Since its introduction in Swift 5.1 the @TaskLocal property wrapper was used to   
   create and access task-local value bindings. Property wrappers introduce mutable storage,
   which was now properly flagged as potential source of concurrency unsafety.
-
+ 
   In order for Swift 6 language mode to not flag task-locals as potentially thread-unsafe,
-  task locals are now implemented using a macro. The macro has the same general semantics
-  and usage patterns, however there are two source-break situations which the Swift 6
+  task locals are now implemented using a macro. The macro has the same general semantics 
+  and usage patterns, however there are two source-break situations which the Swift 6 
   task locals cannot handle:
 
   Using an implicit default `nil` value for task local initialization, when combined with a type alias:
   ```swift
   // allowed in Swift 5.x, not allowed in Swift 6.x
-
-  typealias MyValue = Optional<Int>
-
+  
+  typealias MyValue = Optional<Int> 
+  
   @TaskLocal
   static var number: MyValue // Swift 6: error, please specify default value explicitly
-
+  
   // Solution 1: Specify the default value
   @TaskLocal
   static var number: MyValue = nil
-
+  
   // Solution 2: Avoid the type-alias
   @TaskLocal
   static var number: Optional<Int>
@@ -827,7 +827,7 @@ And the module structure to support such applications looks like this:
     }
   }
 
-  evaluateFirst(1, 2, 3)
+  evaluateFirst(1, 2, 3) 
   // 'doSomething' will be called only on the first element of the pack.
   ```
 
@@ -860,7 +860,7 @@ And the module structure to support such applications looks like this:
   ```
 
   Instead, it will be expanded at where the function is called:
-
+  
   ```swift
   print(currentFile())
   // Prints "main.swift"
@@ -884,7 +884,7 @@ And the module structure to support such applications looks like this:
 
   ```swift
   nonisolated func doSomething() async { ... }
-
+  
   await withTaskExecutorPreference(preferredExecutor) {
     doSomething()
   ```
@@ -957,12 +957,12 @@ And the module structure to support such applications looks like this:
   \_SwiftConcurrencyShims used to declare the `exit` function, even though it
   might not be available. The declaration has been removed, and must be imported
   from the appropriate C library module (e.g. Darwin or SwiftGlibc)
-
+  
 * [SE-0270][]:
 
   The Standard Library now provides APIs for performing collection operations
   over noncontiguous elements. For example:
-
+  
   ```swift
   var numbers = Array(1...15)
 
@@ -978,7 +978,7 @@ And the module structure to support such applications looks like this:
   // numbers == [2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15]
   // numbers[rangeOfEvens] == [2, 4, 6, 8, 10, 12, 14]
   ```
-
+  
   The standard library now provides a new `indices(where:)` function which creates
   a `RangeSet` - a new type representing a set of discontiguous indices. `RangeSet`
   is generic over its index type and can be used to execute operations over
@@ -1081,7 +1081,7 @@ concurrency checking.
   import Dispatch
 
   // 'MutableData' is not 'Sendable'
-  class MutableData { ... }
+  class MutableData { ... } 
 
   final class MyModel: Sendable {
     private let queue = DispatchQueue(...)
@@ -1169,10 +1169,10 @@ concurrency checking.
     module: "ConcurrencyHelperMacros",
     type: "AddCompletionHandlerMacro"
   )
-
+  
   @AddCompletionHandler
   func fetchAvatar(from url: URL) throws -> Image { ... }
-
+  
   // expands to...
   func fetchAvatar(from url: URL, completionHandler: @escaping (Result<Image, Error>) -> Void) {
     Task.detached {
@@ -1191,7 +1191,7 @@ concurrency checking.
   ```swift
   import PackageDescription
   import CompilerPluginSupport
-
+  
   let package = Package(
       name: "ConcurrencyHelpers",
       dependencies: [
@@ -1270,7 +1270,7 @@ concurrency checking.
 * Marking stored properties as unavailable with `@available` has been banned,
   closing an unintentional soundness hole that had allowed arbitrary
   unavailable code to run and unavailable type metadata to be used at runtime:
-
+  
   ```swift
   @available(*, unavailable)
   struct Unavailable {
@@ -1286,7 +1286,7 @@ concurrency checking.
 
   _ = S() // prints "Unavailable.init()"
   ```
-
+  
   Marking `deinit` as unavailable has also been banned for similar reasons.
 
 * [SE-0366][]:
@@ -1335,17 +1335,17 @@ concurrency checking.
 * [SE-0376][]:
 
   The `@backDeployed(before:)` attribute may now be used to extend the availability of a function to OS releases prior to the introduction of that function as ABI.
-
+  
   For example, suppose that `struct Temperature` was introduced in a macOS SDK framework in macOS 12. Later in macOS 13 the framework authors decided to add a `degreesFahrenheit` property as a convenience:
-
+  
   ```swift
   @available(macOS 12, *)
   public struct Temperature {
     public var degreesCelsius: Double
-
+    
     // ...
   }
-
+  
   extension Temperature {
     @available(macOS 12, *)
     @backDeployed(before: macOS 13)
@@ -1354,9 +1354,9 @@ concurrency checking.
     }
   }
   ```
-
+  
   Adding the `@backDeployed` attribute to `degreesFahrenheit` enables the framework author to make this new declaration available to apps with a minimum deployment target of macOS 12, even though the ABI entry point for `degreesFahrenheit` is only present in macOS 13 and up.
-
+  
   When a function with `@backDeployed` is called, the compiler wraps the invocation of the function in a thunk. The thunk checks whether the library entry point for the declaration is available at runtime, and invokes it if it is. Otherwise, a copy of the function that was emitted into the client is called instead.
 
 * [#56139][]:
@@ -1372,7 +1372,7 @@ concurrency checking.
       // ...
     }
   }
-  ```
+  ``` 
 * [SE-0370][]:
 
   The API of `UnsafeMutableRawPointer`, `UnsafeMutableBufferPointer`, `UnsafeMutableRawBufferPointer` were improved, adding previously missing initialization (and deinitialization) methods, including more performant initialization from `Collection` types.
@@ -1386,7 +1386,7 @@ concurrency checking.
   ```
 
 * [SE-0365][]:
-
+ 
   Implicit `self` is now permitted for `weak self` captures, after `self` is unwrapped.
 
   For example, the usage of implicit `self` below is permitted:
@@ -1415,7 +1415,7 @@ concurrency checking.
       ["foo", "bar", "baaz"].map { [weak self] string in
         double(string) // implicitly refers to `self!.double(string)`
       }
-    }
+    } 
 
     func double(_ string: String) -> String {
       string + string
@@ -1460,7 +1460,7 @@ concurrency checking.
 
       print("before = \(self.rows)") // ✅ this access to 'rows' is OK
       world.publishDatabase(self)    // ✅ passing 'self' is OK in Swift 5.7+
-      print("after = \(self.rows)")  // ❌ this access to 'rows' is illegal.
+      print("after = \(self.rows)")  // ❌ this access to 'rows' is illegal. 
 
       Task { [weak self] in          // ✅ capturing 'self' is OK in Swift 5.7+
         while let db = self { await db.prune() }
@@ -1544,7 +1544,7 @@ concurrency checking.
 
   In Swift 6, `/` will also be supported as a delimiter for `Regex` literals.
   You can enable this mode in Swift 5.7 with the `-enable-bare-slash-regex`
-  flag. Doing so will cause some existing expressions that use `/` as an
+  flag. Doing so will cause some existing expressions that use `/` as an 
   operator to no longer compile; you can add parentheses or line breaks as a
   workaround.
 
@@ -1553,7 +1553,7 @@ concurrency checking.
 
 * [SE-0329][]:
 
-  New types representing time and clocks were introduced. This includes a protocol `Clock` defining clocks which allow for defining a concept of now and a way to wake up after a given instant. Additionally a new protocol `InstantProtocol` for defining instants in time was added. Furthermore a new protocol `DurationProtocol` was added to define an elapsed duration between two given `InstantProtocol` types. Most commonly the `Clock` types for general use are the `SuspendingClock` and `ContinuousClock` which represent the most fundamental clocks for the system. The `SuspendingClock` type does not progress while the machine is suspended whereas the `ContinuousClock` progresses no matter the state of the machine.
+  New types representing time and clocks were introduced. This includes a protocol `Clock` defining clocks which allow for defining a concept of now and a way to wake up after a given instant. Additionally a new protocol `InstantProtocol` for defining instants in time was added. Furthermore a new protocol `DurationProtocol` was added to define an elapsed duration between two given `InstantProtocol` types. Most commonly the `Clock` types for general use are the `SuspendingClock` and `ContinuousClock` which represent the most fundamental clocks for the system. The `SuspendingClock` type does not progress while the machine is suspended whereas the `ContinuousClock` progresses no matter the state of the machine. 
 
   ```swift
   func delayedHello() async throws {
@@ -1582,14 +1582,14 @@ concurrency checking.
 
   ```swift
   protocol Surface {...}
-
+  
   protocol Solid {
     associatedtype SurfaceType: Surface
     func boundary() -> SurfaceType
   }
-
+  
   let solid: any Solid = ...
-
+  
   // Type of 'boundary' is 'any Surface'
   let boundary = solid.boundary()
   ```
@@ -1682,7 +1682,7 @@ concurrency checking.
   let didUpdateObjectWithTag: (Delegate) -> ((Int) -> Void)? = Delegate.didUpdateObject
   ```
 
-  > **Warning**
+  > **Warning**  
   > Due to the type change, selectors for aforementioned method references that require writing out their type explicitly for disambiguation will no longer compile. To fix this, simply adjust the written type, or resort to a `#if swift(<5.7)` directive when compatibility with older compiler versions is warranted. For example:
   >
   > ```swift
@@ -1743,7 +1743,7 @@ concurrency checking.
   - Comparisons between pointers have been simplified by being more permissive.
   Since pointers are representations of memory locations within a single pool of
   underlying memory, Swift now allows comparing pointers without requiring type
-  conversions with the `==`, `!=`, `<`,`<=`,`>`, and `>=` operators.
+  conversions with the `==`, `!=`, `<`,`<=`,`>`, and `>=` operators. 
 
 * [SE-0333][]:
 
@@ -1829,20 +1829,20 @@ concurrency checking.
 
   It is now possible to unwrap optional variables with a shorthand syntax that
   shadows the existing declaration. For example, the following:
-
+  
   ```swift
   let foo: String? = "hello world"
-
+  
   if let foo {
     print(foo) // prints "hello world"
   }
   ```
-
+  
   is equivalent to:
-
+  
   ```swift
   let foo: String? = "hello world"
-
+  
   if let foo = foo {
     print(foo) // prints "hello world"
   }
@@ -1880,26 +1880,26 @@ concurrency checking.
 
   It is now possible to declare `distributed actor` and `distributed func`s inside of them.
 
-  Distributed actors provide stronger isolation guarantees than "local" actors, and enable additional checks to be made on return types and parameters of distributed methods, e.g. checking if they conform to `Codable`. Distributed methods can be called on "remote" references of distributed actors, turning those invocations into remote procedure calls, by means of pluggable and user extensible distributed actor system implementations.
-
+  Distributed actors provide stronger isolation guarantees than "local" actors, and enable additional checks to be made on return types and parameters of distributed methods, e.g. checking if they conform to `Codable`. Distributed methods can be called on "remote" references of distributed actors, turning those invocations into remote procedure calls, by means of pluggable and user extensible distributed actor system implementations. 
+  
   Swift does not provide any specific distributed actor system by itself, however, packages in the ecosystem fulfill the role of providing those implementations.
-
+  
   ```swift
-  distributed actor Greeter {
+  distributed actor Greeter { 
     var greetingsSent = 0
-
+    
     distributed func greet(name: String) -> String {
       greetingsSent += 1
       return "Hello, \(name)!"
     }
   }
-
+  
   func talkTo(greeter: Greeter) async throws {
     // isolation of distributed actors is stronger, it is impossible to refer to
     // any stored properties of distributed actors from outside of them:
     greeter.greetingsSent // distributed actor-isolated property 'name' can not be accessed from a non-isolated context
-
-    // remote calls are implicitly throwing and async,
+    
+    // remote calls are implicitly throwing and async, 
     // to account for the potential networking involved:
     let greeting = try await greeter.greet(name: "Alice")
     print(greeting) // Hello, Alice!
@@ -1914,23 +1914,23 @@ concurrency checking.
   protocol P {
     associatedtype A : Q where Self == Self.A.B
   }
-
+  
   protocol Q {
     associatedtype B
-
+  
     static func getB() -> B
   }
-
+  
   class C : P {
     typealias A = D
   }
-
+  
   class D : Q {
     typealias B = C
-
+  
     static func getB() -> C { return C() }
   }
-
+  
   extension P {
     static func getAB() -> Self {
       // This is well-typed, because `Self.A.getB()` returns
@@ -1938,9 +1938,9 @@ concurrency checking.
       return Self.A.getB()
     }
   }
-
+  
   class SubC : C {}
-
+  
   // P.getAB() declares a return type of `Self`, so it should
   // return `SubC`, but it actually returns a `C`.
   print(SubC.getAB())
@@ -2036,7 +2036,7 @@ concurrency checking.
   ```swift
   @MainActor
   func partyGenerator() -> [PartyMember] { fatalError("todo") }
-
+  
   class Party {
     @MainActor var members: [PartyMember] = partyGenerator()
     //                                      ^~~~~~~~~~~~~~~~
@@ -2044,9 +2044,9 @@ concurrency checking.
     //          appear in default-value expression of property 'members'
   }
   ```
-
+  
   Previously, the isolation granted by the type checker matched the isolation of
-  the property itself, but at runtime that is not guaranteed. In Swift 6,
+  the property itself, but at runtime that is not guaranteed. In Swift 6, 
   such default-value expressions will become an error if they require isolation.
 
 * Actor isolation checking now understands that `defer` bodies share the isolation of their enclosing function.
@@ -2238,7 +2238,7 @@ concurrency checking.
   directs the compiler to fill in that portion of the type according to the usual
   type inference rules. Type placeholders are spelled as an underscore ("`_`") in
   a type name. For instance:
-
+  
   ```swift
   // This is OK--the compiler can infer the key type as `Int`.
   let dict: [_: String] = [0: "zero", 1: "one", 2: "two"]
@@ -2252,7 +2252,7 @@ concurrency checking.
   if #unavailable(iOS 15.0) {
       // Old functionality
   } else {
-      // iOS 15 functionality
+      // iOS 15 functionality 
   }
   ```
 
@@ -2343,13 +2343,13 @@ concurrency checking.
   Task local values can be defined using the new `@TaskLocal` property wrapper.
   Such values are carried implicitly by the task in which the binding was made,
   as well as any child-tasks, and unstructured task created from the tasks context.
-
+  
   ```swift
-  struct TraceID {
+  struct TraceID { 
     @TaskLocal
-    static var current: TraceID?
+    static var current: TraceID? 
   }
-
+  
   func printTraceID() {
     if let traceID = TraceID.current {
       print("\(traceID)")
@@ -2357,16 +2357,16 @@ concurrency checking.
       print("nil")
     }
   }
-
-  func run() async {
+  
+  func run() async { 
     printTraceID()    // prints: nil
-    TraceID.$current.withValue("1234-5678") {
+    TraceID.$current.withValue("1234-5678") { 
       printTraceID()  // prints: 1234-5678
       inner()         // prints: 1234-5678
     }
     printTraceID()    // prints: nil
   }
-
+  
   func inner() {
     // if called from a context in which the task-local value
     // was bound, it will print it (or 'nil' otherwise)
@@ -2459,7 +2459,7 @@ concurrency checking.
   to reference its metatype, so correct syntax would be to use `obj[MyValue.self]`.
 
 * [SE-0310][]:
-
+  
   Read-only computed properties and subscripts can now define their `get` accessor to be `async` and/or `throws`, by writing one or both of those keywords between the `get` and `{`.  Thus, these members can now make asynchronous calls or throw errors in the process of producing a value:
   ```swift
   class BankAccount: FinancialAccount {
@@ -2491,10 +2491,10 @@ concurrency checking.
     func meetsTransactionLimit(_ limit: Amount) async -> Bool {
       return try! await self.lastTransaction.amount < limit
       //                    ^~~~~~~~~~~~~~~~ this access is async & throws
-    }
+    }                
   }
 
-
+    
   func hadWithdrawalOn(_ day: Date, from acct: BankAccount) async -> Bool {
     return await !acct[day].allSatisfy { $0.amount >= Amount.zero }
     //            ^~~~~~~~~ this access is async
@@ -2803,34 +2803,34 @@ concurrency checking.
 * [SE-0287][]:
 
   Implicit member expressions now support chains of member accesses, making the following valid:
-
+  
   ```swift
   let milky: UIColor = .white.withAlphaComponent(0.5)
   let milky2: UIColor = .init(named: "white")!.withAlphaComponent(0.5)
   let milkyChance: UIColor? = .init(named: "white")?.withAlphaComponent(0.5)
   ```
-
+  
   As is the case with the existing implicit member expression syntax, the resulting type of the chain must be the same as the (implicit) base, so it is not well-formed to write:
-
+  
   ```swift
   let cgMilky: CGColor = .white.withAlphaComponent(0.5).cgColor
   ```
-
+  
   (Unless, of course, appropriate `white` and `withAlphaComponent` members were defined on `CGColor`.)
-
+  
   Members of a "chain" can be properties, method calls, subscript accesses, force unwraps, or optional chaining question marks. Furthermore, the type of each member along the chain is permitted to differ (again, as long as the base of the chain matches the resulting type) meaning the following successfully typechecks:
-
+  
   ```swift
   struct Foo {
     static var foo = Foo()
     static var bar = Bar()
-
+    
     var anotherFoo: Foo { Foo() }
     func getFoo() -> Foo { Foo() }
     var optionalFoo: Foo? { Foo() }
     subscript() -> Foo { Foo() }
   }
-
+  
   struct Bar {
     var anotherFoo = Foo()
   }
@@ -2845,7 +2845,7 @@ concurrency checking.
 * [SE-0279][] & [SE-0286][]:
 
   Trailing closure syntax has been extended to allow additional labeled closures to follow the initial unlabeled closure:
-
+  
   ```swift
   // Single trailing closure argument
   UIView.animate(withDuration: 0.3) {
@@ -2858,17 +2858,17 @@ concurrency checking.
     self.view.removeFromSuperview()
   }
   ```
-
+  
   Additionally, trailing closure arguments now match the appropriate parameter according to a forward-scan rule (as opposed to the previous backward-scan rule):
-
+  
   ```swift
   func takesClosures(first: () -> Void, second: (Int) -> Void = { _ in }) {}
-
+  
   takesClosures {
     print("First")
   }
   ```
-
+  
   In the above example, the trailing closure argument matches parameter `first`, whereas pre-Swift-5.3 it would have matched `second`. In order to ease the transition to this new rule, cases in which the forward-scan and backward-scan match a single trailing closure to different parameters, the backward-scan result is preferred and a warning is emitted. This is expected to be upgraded to an error in the next major version of Swift.
 
 * [#49631][]:
@@ -2885,7 +2885,7 @@ concurrency checking.
   ```
 
   Note that the initial value of the property will be forced and made available as the `oldValue` for the `didSet` observer, if the property hasn't been accessed yet.
-
+  
   ```swift
   class C {
     lazy var property: Int = 0 {
@@ -2940,16 +2940,16 @@ concurrency checking.
   ```
 
 * [SE-0268][]:
-
+  
   A `didSet` observer which does not refer to the `oldValue` in its body or does not explicitly request it by placing it in the parameter list (i.e. `didSet(oldValue)`) will no longer trigger a call to the property getter to fetch the `oldValue`.
-
+  
   ```swift
   class C {
     var value: Int = 0 {
       didSet { print("didSet called!") }
     }
   }
-
+  
   let c = C()
   // This does not trigger a call to the getter for 'value'
   // because the 'didSet' observer on 'value' does not
@@ -2957,7 +2957,7 @@ concurrency checking.
   // the 'oldValue' does not need to be fetched.
   c.value = 1
   ```
-
+  
 * [SE-0276][]:
 
   Catch clauses in a `do`-`catch` statement can now include multiple patterns in a comma-separated list. The body of a `catch` clause will be executed if a thrown error matches any of its patterns.
@@ -2972,15 +2972,15 @@ concurrency checking.
   ```
 
 * [SE-0280][]:
-
+  
   Enum cases can now satisfy static protocol requirements. A static get-only property of type `Self` can be witnessed by an enum case with no associated values and a static function with arguments and returning `Self` can be witnessed by an enum case with associated values.
-
+  
   ```swift
   protocol P {
     static var foo: Self { get }
     static func bar(value: Int) -> Self
   }
-
+  
   enum E: P {
     case foo // matches 'static var foo'
     case bar(value: Int) // matches 'static func bar(value:)'
@@ -2988,7 +2988,7 @@ concurrency checking.
   ```
 
 * [SE-0267][]:
-
+  
   Non-generic members that support a generic parameter list, including nested type declarations, are now allowed to carry a contextual `where` clause against outer generic parameters. Previously, such declarations could only be expressed by placing the member inside a dedicated constrained extension.
 
   ```swift
@@ -2997,15 +2997,15 @@ concurrency checking.
   }
   ```
   Since contextual `where` clauses are effectively visibility constraints, overrides adopting this feature must be at least as visible as the overridden method. In practice, this implies any instance of `Derived` that can access `Base.foo` must also be able to access `Derived.foo`.
-
+  
   ```swift
   class Base<T> {
     func foo() where T == Int { ... }
   }
-
+  
   class Derived<U>: Base<U> {
     // OK, <U where U: Equatable> has broader visibility than <T where T == Int>
-    override func foo() where U: Equatable { ... }
+    override func foo() where U: Equatable { ... } 
   }
 
 * [#42697][]:
@@ -3023,14 +3023,14 @@ concurrency checking.
   ```
 
 * [SE-0266][]:
-
+  
   Enumerations with no associated values, or only `Comparable` associated values, can opt-in to synthesized `Comparable` conformance by declaring conformance to the `Comparable` protocol. The synthesized implementation orders the cases first by case-declaration order, and then by lexicographic order of the associated values (if any).
-
+  
   ```swift
   enum Foo: Comparable {
     case a(Int), b(Int), c
   }
-
+  
   // .a(0) < .a(1) < .b(0) < .b(1) < .c
   ```
 
@@ -3039,10 +3039,10 @@ concurrency checking.
   When an escaping closure explicitly captures `self` in its capture list, the
   use of implicit `self` is enabled within that closure. This means that the
   following code is now valid:
-
+  
   ```swift
   func doStuff(_ stuff: @escaping () -> Void) {}
-
+  
   class C {
     var x = 0
 
@@ -3053,7 +3053,7 @@ concurrency checking.
     }
   }
   ```
-
+  
   This proposal also introduces new diagnostics for inserting `self` into the
   closure's capture list in addition to the existing 'use `self.` explicitly'
   fix-it.
@@ -3066,7 +3066,7 @@ concurrency checking.
 
   When chaining calls to `filter(_:)` on a lazy sequence or collection, the
   filtering predicates will now be called in the same order as eager filters.
-
+  
   ```swift
   let evens = (1...10).lazy
       .filter { $0.isMultiple(of: 2) }
@@ -3074,14 +3074,14 @@ concurrency checking.
   _ = evens.count
   // Prints 2, 4, 6, 8, and 10 on separate lines
   ```
-
+  
   Previously, the predicates were called in reverse order.
-
+  
 * [apple/swift-corelibs-foundation#4326][]:
 
   The compiler will now emit a warning when attempting to pass a temporary
   pointer argument produced from an array, string, or inout argument to a
-  parameter which is known to escape it. This includes the various initializers
+  parameter which is known to escape it. This includes the various initializers 
   for the `UnsafePointer`/`UnsafeBufferPointer` family of types, as well as
   memberwise initializers.
 
@@ -3093,13 +3093,13 @@ concurrency checking.
   func foo() {
     var i: Int8 = 0
     let ptr = UnsafePointer(&i)
-    // warning: initialization of 'UnsafePointer<Int8>' results in a
+    // warning: initialization of 'UnsafePointer<Int8>' results in a 
     // dangling pointer
-
-    let s1 = S(ptr: [1, 2, 3])
+    
+    let s1 = S(ptr: [1, 2, 3]) 
     // warning: passing '[Int8]' to parameter, but argument 'ptr' should be a
     // pointer that outlives the call to 'init(ptr:)'
-
+    
     let s2 = S(ptr: "hello")
     // warning: passing 'String' to parameter, but argument 'ptr' should be a
     // pointer that outlives the call to 'init(ptr:)'
@@ -3129,30 +3129,30 @@ concurrency checking.
 
   The compiler will now correctly strip argument labels from function references
   used with the `as` operator in a function call. As a result, the `as` operator
-  can now be used to disambiguate a call to a function with argument labels.
-
+  can now be used to disambiguate a call to a function with argument labels. 
+  
   ```swift
   func foo(x: Int) {}
   func foo(x: UInt) {}
-
+  
   (foo as (Int) -> Void)(5)  // Calls foo(x: Int)
   (foo as (UInt) -> Void)(5) // Calls foo(x: UInt)
   ```
-
+  
   Previously this was only possible for functions without argument labels.
-
+  
   This change also means that a generic type alias can no longer be used to
   preserve the argument labels of a function reference through the `as`
   operator. The following is now rejected:
-
+  
   ```swift
   typealias Magic<T> = T
   func foo(x: Int) {}
   (foo as Magic)(x: 5) // error: Extraneous argument label 'x:' in call
   ```
-
+  
   The function value must instead be called without argument labels:
-
+  
   ```swift
   (foo as Magic)(5)
   ```
@@ -3202,21 +3202,21 @@ concurrency checking.
   * `mutating func callAsFunction` is supported.
   * `func callAsFunction` works with `throws` and `rethrows`.
   * `func callAsFunction` works with trailing closures.
-
+  
 * [SE-0249][]:
 
-  A `\Root.value` key path expression is now allowed wherever a `(Root) -> Value`
-  function is allowed. Such an expression is implicitly converted to a key path
+  A `\Root.value` key path expression is now allowed wherever a `(Root) -> Value` 
+  function is allowed. Such an expression is implicitly converted to a key path 
   application of `{ $0[keyPath: \Root.value] }`.
-
+  
   For example:
-
+  
   ```swift
   struct User {
     let email: String
     let isAdmin: Bool
   }
-
+  
   users.map(\.email) // this is equivalent to: users.map { $0[keyPath: \User.email] }
   ```
 
@@ -3227,11 +3227,11 @@ concurrency checking.
 
   ```swift
   protocol P {}
-
+  
   class Base {
     func foo<T>(arg: T) {}
   }
-
+  
   class Derived: Base {
     override func foo<T: P>(arg: T) {}
   }
@@ -3270,7 +3270,7 @@ concurrency checking.
   let f: Foo = .bar(x: 0, x: 1)
   ```
 
-  will now be diagnosed as an error.
+  will now be diagnosed as an error. 
 
   Note: You can still use duplicate argument labels when declaring functions and
   subscripts, as long as the internal parameter names are different. For example:
@@ -3333,7 +3333,7 @@ concurrency checking.
   While most code should not be affected, there are edge cases where
   the Swift 5.0 compiler would accept code violating these restrictions.
   This could result in runtime crashes or silent data corruption.
-
+  
   An example of invalid code which was incorrectly accepted by the Swift 5.0
   compiler is an `@escaping` closure calling a local function which
   references an `inout` parameter from an outer scope:
@@ -3400,7 +3400,7 @@ concurrency checking.
   It is now possible to use `Self` to refer to the innermost nominal
   type inside struct, enum and class declarations. For example, the
   two method declarations inside this struct are equivalent:
-
+  
   ```swift
   struct Box<Value> {
     func transform1() -> Self { return self }
@@ -3500,20 +3500,20 @@ concurrency checking.
 * [SE-0235][]:
 
   The standard library now contains a `Result` type for manually propagating errors.
-
+  
   ```swift
   enum Result<Success, Failure: Error> {
       case success(Success)
       case failure(Failure)
   }
   ```
-
-  This type serves a complementary role to that of throwing functions and initializers.
-  Use `Result` in situations where automatic error propagation or `try`-`catch`
-  blocks are undesirable, such as in asynchronous code or when accumulating the
+  
+  This type serves a complementary role to that of throwing functions and initializers. 
+  Use `Result` in situations where automatic error propagation or `try`-`catch` 
+  blocks are undesirable, such as in asynchronous code or when accumulating the 
   results of successive error-producing operations.
-
-* `Error` now conforms to itself. This allows for the use of `Error` itself as
+  
+* `Error` now conforms to itself. This allows for the use of `Error` itself as 
   the argument for a generic parameter constrained to `Error`.
 
 * Swift 3 mode has been removed. Supported values for the `-swift-version`
@@ -3528,7 +3528,7 @@ concurrency checking.
   removed; any code making use of this protocol will need to be updated
   for the new design. An `#if compiler` block can be used to conditionalize
   code between 4.2 and 5.0, for example:
-
+  
   ```swift
   #if compiler(<5.0)
   extension MyType : _ExpressibleByStringInterpolation { ... }
@@ -3657,13 +3657,13 @@ concurrency checking.
   In Swift 5 mode, attempting to declare a static property with the same name as a
   nested type is now always correctly rejected. Previously, it was possible to
   perform such a redeclaration in an extension of a generic type.
-
+  
   For example:
   ```swift
   struct Foo<T> {}
   extension Foo {
     struct i {}
-
+    
     // compiler error: Invalid redeclaration of 'i'
     // (prior to Swift 5, this did not produce an error)
     static var i: Int { return 0 }
@@ -3673,10 +3673,10 @@ concurrency checking.
 * [#46831][]:
 
   In Swift 5 mode, when casting an optional value to a generic placeholder type,
-  the compiler will be more conservative with the unwrapping of the value. The
+  the compiler will be more conservative with the unwrapping of the value. The 
   result of such a cast now more closely matches the result you would get in a
   non-generic context.
-
+  
   For example:
   ```swift
   func forceCast<U>(_ value: Any?, to type: U.Type) -> U {
@@ -3684,11 +3684,11 @@ concurrency checking.
   }
 
   let value: Any? = 42
-  print(forceCast(value, to: Any.self))
+  print(forceCast(value, to: Any.self)) 
   // prints: Optional(42)
   // (prior to Swift 5, this would print: 42)
-
-  print(value as! Any)
+  
+  print(value as! Any)                  
   // prints: Optional(42)
   ```
 
@@ -3766,16 +3766,16 @@ concurrency checking.
   The standard library now provides a unified set of randomization functionality.
   Integer types, floating point types, and Bool all introduce a new static
   method that creates a random value.
-
+  
   ```swift
   let diceRoll = Int.random(in: 1 ... 6)
   let randomUnit = Double.random(in: 0 ..< 1)
   let randomBool = Bool.random()
   ```
-
+  
   There are also additions to select a random element from a collection or
   shuffle its contents.
-
+  
   ```swift
   let greetings = ["hey", "hello", "hi", "hola"]
   let randomGreeting = greetings.randomElement()! // This returns an Optional
@@ -3788,14 +3788,14 @@ concurrency checking.
   thread-safe random number generator on each platform. All the randomization
   functions have a `using:` parameter that take a `RandomNumberGenerator` that
   users can pass in their own random number generator.
-
+  
   ```swift
   struct MersenneTwister: RandomNumberGenerator {
     func next() -> UInt64 {
       // implementation
     }
   }
-
+  
   var mt = MersenneTwister()
   let diceRoll = Int.random(in: 1 ... 6, using: &mt)
   ```
@@ -3875,18 +3875,18 @@ concurrency checking.
 
     The standard library now uses a high-quality, randomly seeded, universal
     hash function, represented by the new public `Hasher` struct.
-
+  
     “Random seeding” varies the result of `hashValue` on each execution of a
     Swift program, improving the reliability of the standard library's hashed
     collections such as `Set` and `Dictionary`. In particular, random seeding
     enables better protection against (accidental or deliberate) hash-flooding
     attacks.
-
+    
     This change fulfills a long-standing prophecy in Hashable's documentation:
 
     > Hash values are not guaranteed to be equal across different executions of
     > your program. Do not save hash values to use during a future execution.
-
+    
     As a consequence of random seeding, the elements in `Set` and `Dictionary`
     values may have a different order on each execution. This may expose some
     bugs in existing code that accidentally relies on repeatable ordering.
@@ -3897,17 +3897,17 @@ concurrency checking.
     provides better hashing. To implement `hash(into:)`, simply feed the exact
     same components of your type that you compare in `Equatable`'s `==`
     implementation to the supplied `Hasher`:
-
+    
     ```swift
     struct Foo: Hashable {
       var a: String?
       var b: [Int]
       var c: [String: Int]
-
+      
       static func ==(lhs: Foo, rhs: Foo) -> Bool {
         return lhs.a == rhs.a && lhs.b == rhs.b && lhs.c == rhs.c
       }
-
+      
       func hash(into hasher: inout Hasher) {
         hasher.combine(a)
         hasher.combine(b)
@@ -3915,17 +3915,17 @@ concurrency checking.
       }
     }
     ```
-
+    
     Automatic synthesis for `Hashable` ([SE-0185]) has been updated to generate
     `hash(into:)` implementations. For example, the `==` and `hash(into:)`
     implementations above are equivalent to the ones synthesized by the
     compiler, and can be removed without changing the meaning of the code.
-
+    
     Synthesis has also been extended to support deriving `hashValue` from
     `hash(into:)`, and vice versa. Therefore, code that only implements
     `hashValue` continues to work in Swift 4.2. This new compiler functionality
     works for all types that can implement `Hashable`, including classes.
-
+    
     Note that these changes don't affect Foundation's hashing interface. Classes
     that subclass `NSObject` should override the `hash` property, like before.
 
@@ -3937,7 +3937,7 @@ concurrency checking.
     value of `1`. The Swift runtime looks at this variable during process
     startup and, if it is defined, replaces the random seed with a constant
     value.
-
+  
 * [#42728][]
 
   The behavior of `.description` and `.debugDescription` for floating-point
@@ -3974,7 +3974,7 @@ concurrency checking.
   available for types that include stored properties of these types.
 
 * [SE-0196][]
-
+  
   Custom compile-time warnings or error messages can be emitted using the
   `#warning(_:)` and `#error(_:)` directives.
 
@@ -4013,8 +4013,8 @@ concurrency checking.
 
   Compile-time testing for the existence and importability of modules is now
   implemented as a build configuration test.  The `canImport` test allows
-  the development of features that require a possibly-failing import
-  declaration across multiple platforms.
+  the development of features that require a possibly-failing import 
+  declaration across multiple platforms.  
 
   ```swift
   #if canImport(UIKit)
@@ -4052,11 +4052,11 @@ concurrency checking.
   conditional conformances, available only when their type parameters
   conform to `Encodable` or `Decodable`, respectively.
 
-* [SE-0188][]
-
-  Index types for most standard library collections now conform to `Hashable`.
+* [SE-0188][] 
+  
+  Index types for most standard library collections now conform to `Hashable`. 
   These indices can now be used in key-path subscripts and hashed collections:
-
+  
   ```swift
   let s = "Hashable"
   let p = \String.[s.startIndex]

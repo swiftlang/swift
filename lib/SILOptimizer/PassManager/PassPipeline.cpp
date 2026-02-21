@@ -512,7 +512,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addCOWArrayOpts();
     P.addDCE();
     P.addSwiftArrayPropertyOpt();
-
+    
     // This string optimization can catch additional opportunities, which are
     // exposed once optimized String interpolations (from the high-level string
     // optimization) are cleaned up. But before the mid-level inliner inlines
@@ -707,7 +707,7 @@ static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
   addFunctionPasses(P, OptimizationLevelKind::HighLevel);
 
   addHighLevelLoopOptPasses(P);
-
+  
   P.addStringOptimization();
   P.addComputeEscapeEffects();
   P.addComputeSideEffects();
@@ -970,7 +970,7 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
     addPerfDebugSerializationPipeline(P);
     return P;
   }
-
+  
   // Passes which run once before all other optimizations run. Those passes are
   // _not_ intended to run later again.
   addPrepareOptimizationsPipeline(P);

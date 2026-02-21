@@ -53,7 +53,7 @@ public:
 
   bool VisitMemberExpr(clang::MemberExpr *ME) {
     if (isa<clang::FunctionDecl>(ME->getMemberDecl()) ||
-        isa<clang::VarDecl>(ME->getMemberDecl()) ||
+        isa<clang::VarDecl>(ME->getMemberDecl()) || 
         isa<clang::FieldDecl>(ME->getMemberDecl())) {
       callback(ME->getMemberDecl());
     }

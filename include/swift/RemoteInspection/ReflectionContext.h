@@ -1597,7 +1597,7 @@ public:
       return llvm::createStringError(TC.takeLastError());
     return *TI;
   }
-
+  
   /// Given a typeref, attempt to calculate the unaligned start of this
   /// instance's fields. For example, for a type without a superclass, the start
   /// of the instance fields would after the word for the isa pointer and the

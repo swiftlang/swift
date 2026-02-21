@@ -439,7 +439,7 @@ public:
     swift::writeEscaped(Str, OS);
     OS << '\"';
   }
-
+  
   void visitUID(StringRef UID) {
     OSColor(OS, UIDColor) << UID;
   }
@@ -493,7 +493,7 @@ void
 sourcekitd_request_dictionary_set_stringbuf(sourcekitd_object_t dict,
                                             sourcekitd_uid_t key,
                                             const char *buf, size_t length) {
-  static_cast<SKDObject *>(dict)->set(key,
+  static_cast<SKDObject *>(dict)->set(key, 
                                       new SKDString(std::string(buf, length)));
 }
 
@@ -609,7 +609,7 @@ sourcekitd_request_array_set_value(sourcekitd_object_t array, size_t index,
 void
 sourcekitd_request_array_set_string(sourcekitd_object_t array, size_t index,
                                     const char *string) {
-  static_cast<SKDObject *>(array)->set(index,
+  static_cast<SKDObject *>(array)->set(index, 
                                        new SKDString(std::string(string)));
 }
 
@@ -740,7 +740,7 @@ void ResponseBuilder::Dictionary::set(UIdent Key, const char *Str) {
 }
 
 void ResponseBuilder::Dictionary::set(UIdent Key, StringRef Str) {
-  static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key),
+  static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), 
                                       new SKDString(std::string(Str)));
 }
 
@@ -793,7 +793,7 @@ ResponseBuilder::Dictionary::setDictionary(UIdent Key) {
 
 void ResponseBuilder::Dictionary::setCustomBuffer(
       SourceKit::UIdent Key, std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
-  static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key),
+  static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), 
                                       new SKDCustomData(std::move(MemBuf)));
 }
 
@@ -913,13 +913,13 @@ RequestDict::getOptionalInt64(SourceKit::UIdent Key) const {
 
 sourcekitd_response_t
 sourcekitd::createErrorRequestInvalid(StringRef Description) {
-  return retained(new SKDError(SOURCEKITD_ERROR_REQUEST_INVALID,
+  return retained(new SKDError(SOURCEKITD_ERROR_REQUEST_INVALID, 
                                Description));
 }
 
 sourcekitd_response_t
 sourcekitd::createErrorRequestFailed(StringRef Description) {
-  return retained(new SKDError(SOURCEKITD_ERROR_REQUEST_FAILED,
+  return retained(new SKDError(SOURCEKITD_ERROR_REQUEST_FAILED, 
                                Description));
 }
 
@@ -931,7 +931,7 @@ sourcekitd::createErrorRequestInterrupted(StringRef Description) {
 
 sourcekitd_response_t
 sourcekitd::createErrorRequestCancelled() {
-  return retained(new SKDError(SOURCEKITD_ERROR_REQUEST_CANCELLED,
+  return retained(new SKDError(SOURCEKITD_ERROR_REQUEST_CANCELLED, 
                                StringRef("")));
 }
 
@@ -952,7 +952,7 @@ static bool SKDVar_array_apply(
     sourcekitd_variant_t array,
     sourcekitd_variant_array_applier_f_t applier,
     void *context) {
-  return dyn_cast<SKDArray>(SKD_OBJ(array))->apply([&](size_t Index,
+  return dyn_cast<SKDArray>(SKD_OBJ(array))->apply([&](size_t Index, 
                                                        SKDObjectRef Object){
     return applier(Index, variantFromSKDObject(Object), context);
   });
@@ -980,7 +980,7 @@ SKDVar_array_get_string(sourcekitd_variant_t array, size_t index) {
   return SKD_OBJ(array)->get(index)->getCString();
 }
 
-static sourcekitd_uid_t SKDVar_array_get_uid(sourcekitd_variant_t array,
+static sourcekitd_uid_t SKDVar_array_get_uid(sourcekitd_variant_t array, 
                                              size_t index) {
   return SKD_OBJ(array)->get(index)->getUID();
 }
@@ -1002,7 +1002,7 @@ static bool SKDVar_dictionary_apply(
     sourcekitd_variant_t dict,
     sourcekitd_variant_dictionary_applier_f_t applier,
     void *context) {
-  return dyn_cast<SKDDictionary>(SKD_OBJ(dict))->apply([&](sourcekitd_uid_t Key,
+  return dyn_cast<SKDDictionary>(SKD_OBJ(dict))->apply([&](sourcekitd_uid_t Key, 
                                                            SKDObjectRef Object){
     return applier(Key, variantFromSKDObject(Object), context);
   });

@@ -151,7 +151,7 @@ SourceRange Stmt::getSourceRange() const {
   case StmtKind::ID: return getSourceRangeImpl(cast<ID##Stmt>(this));
 #include "swift/AST/StmtNodes.def"
   }
-
+  
   llvm_unreachable("statement type not handled!");
 }
 
@@ -516,7 +516,7 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
   for (auto &elt : e)
     if (auto pat = elt.getPatternOrNull())
       pat->markOwnedByStatement(this);
-
+  
   Cond = e;
 }
 

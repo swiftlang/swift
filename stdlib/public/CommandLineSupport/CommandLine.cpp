@@ -53,27 +53,27 @@ void _swift_stdlib_overrideUnsafeArgvArgc(char **argv, int argc) {
 
 namespace swift {
   /// A platform-specific implementation of @c _swift_stdlib_getUnsafeArgvArgc.
-  ///
+  /// 
   /// This function should return @c argc and @c argv cheaply (ideally in
   /// constant time and without needing to allocate.) If it cannot do so,
   /// it should return @c nullptr, at which point the caller can call
   /// @c enumerateUnsafeArgv() in order to reconstruct @c argv locally.
-  ///
+  /// 
   /// The result of this function is @em not owned by the caller and should
   /// persist for the lifetime of the process.
   static char **getUnsafeArgvArgc(int *outArgLen);
 
   /// A platform-specific function that enumerates the contents of @c argv
   /// one argument at a time.
-  ///
+  /// 
   /// @a body is a function that takes two arguments:
-  ///
+  /// 
   /// - The first argument is the value of @c argc if it can be readily
   ///   computed, or @c -1 otherwise.
   /// - The second argument is the element of @c argv being enumerated. The
   ///   caller makes a copy of this string. The implementation should not
   ///   enumerate the trailing @c nullptr required by the C standard.
-  ///
+  /// 
   /// Callers should call @c getUnsafeArgvArgc() before calling this function
   /// in case a fast path is available. If that function is implemented on this
   /// platform, then this function does not need to be implemented.
@@ -122,9 +122,9 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 
       // Reallocate (or initially allocate) the argv buffer. Overallocate by
       // one element to allow for a trailing nullptr.
-      //
+      // 
       // NOTE: It is intentional that we do not simply use std::vector here.
-      // STL collections may call operator new() which can be overridden by
+      // STL collections may call operator new() which can be overridden by 
       // client code and that client code could call back into Swift.
       size_t argvSize = sizeof(char *) * (maxArgc + 1);
       argv = reinterpret_cast<char **>(realloc(argv, argvSize));

@@ -196,7 +196,7 @@ ImportCache::getImportSet(ASTContext &ctx,
   // getImportedModulesForLookup().
   if (ImportSet *result = ImportSets.FindNodeOrInsertPos(ID, InsertPos))
     return *result;
-
+  
   size_t bytes = ImportSet::totalSizeToAlloc<ImportedModule>(
                             topLevelImports.size() + transitiveImports.size() +
                             transitiveSwiftOnlyImports.size());

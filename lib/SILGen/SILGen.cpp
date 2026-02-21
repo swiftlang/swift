@@ -1516,7 +1516,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
     auto &out = llvm::errs();
     AFD->dump(out);
   }
-
+  
   // Emit default arguments and property wrapper initializers.
   emitArgumentGenerators(AFD, AFD->getParameters());
 
@@ -1778,7 +1778,7 @@ void SILGenModule::emitDeallocatorImpl(SILDeclRef constant, SILFunction *f) {
 
 void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   emitAbstractFuncDecl(dd);
-
+  
   // Emit the ivar destroyer, if needed.
   if (requiresIVarDestroyer(cd)) {
     SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer);
@@ -2158,7 +2158,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   // TODO: Key path code emission doesn't handle opaque values properly yet.
   if (!SILModuleConventions(M).useLoweredAddresses())
     return;
-
+  
   auto descriptorContext = decl->getPropertyDescriptorGenericSignature();
   if (!descriptorContext)
     return;
@@ -2169,7 +2169,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   if (decl->getDeclContext()->isTypeContext()) {
     baseTy = decl->getDeclContext()->getSelfInterfaceType()
                  ->getReducedType(*descriptorContext);
-
+    
     if (decl->isStatic()) {
       baseTy = MetatypeType::get(baseTy);
     }
@@ -2182,12 +2182,12 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   auto genericEnv = descriptorContext->getGenericEnvironment();
   unsigned baseOperand = 0;
   bool needsGenericContext = true;
-
+  
   if (canStorageUseTrivialDescriptor(*this, decl)) {
     (void)SILProperty::create(M, /*serializedKind*/ 0, decl, std::nullopt);
     return;
   }
-
+  
   SubstitutionMap subs;
   if (genericEnv) {
     // The substitutions are used when invoking the underlying accessors, so
@@ -2199,7 +2199,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
                                     ->getGenericSignatureOfContext(),
       genericEnv->getForwardingSubstitutionMap());
   }
-
+  
   auto component = emitKeyPathComponentForDecl(SILLocation(decl),
                                                genericEnv,
                                                ResilienceExpansion::Maximal,
@@ -2208,7 +2208,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
                                                baseTy->getCanonicalType(),
                                                M.getSwiftModule(),
                                                /*property descriptor*/ true);
-
+  
   (void)SILProperty::create(M, /*serializedKind*/ 0, decl, component);
 }
 

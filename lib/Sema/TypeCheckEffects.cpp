@@ -76,7 +76,7 @@ PolymorphicEffectRequirementsRequest::evaluate(Evaluator &evaluator,
 
   SmallVector<AbstractFunctionDecl *, 2> requirements;
   SmallVector<std::pair<Type, ProtocolDecl *>, 2> conformances;
-
+  
   // check if immediate members of protocol are 'throws'
   for (auto member : proto->getMembers()) {
     auto fnDecl = dyn_cast<AbstractFunctionDecl>(member);
@@ -97,7 +97,7 @@ PolymorphicEffectRequirementsRequest::evaluate(Evaluator &evaluator,
 
     conformances.emplace_back(requirement.getFirstType(), protoDecl);
   }
-
+  
   return PolymorphicEffectRequirementList(ctx.AllocateCopy(requirements),
                                           ctx.AllocateCopy(conformances));
 }
@@ -177,8 +177,8 @@ PolymorphicEffectKindRequest::evaluate(Evaluator &evaluator,
   return PolymorphicEffectKind::Invalid;
 }
 
-static bool classifyWitness(ModuleDecl *module,
-                            ProtocolConformance *conformance,
+static bool classifyWitness(ModuleDecl *module, 
+                            ProtocolConformance *conformance, 
                             AbstractFunctionDecl *req,
                             EffectKind kind) {
   auto declRef = conformance->getWitnessDeclRef(req);
@@ -280,7 +280,7 @@ bool ConformanceHasEffectRequest::evaluate(
     }
 
     for (auto pair : list.getConformances()) {
-      auto assocConf =
+      auto assocConf = 
           current->getAssociatedConformance(
               pair.first, pair.second);
       if (!assocConf.isConcrete())
@@ -1007,9 +1007,9 @@ class Classification {
   void print(raw_ostream &out) const {
     out << "{ IsInvalid = " << IsInvalid
         << ", ThrowKind = ";
-
+    
     simple_display(out, ThrowKind);
-
+         
     out << ", ThrowReason = ";
     if (!ThrowReason)
       out << "nil";
@@ -1070,7 +1070,7 @@ public:
     result.UnsafeUses.clear();
     return result;
   }
-
+  
   /// Return a classification that only retains the throwing parts of the
   /// given classification.
   Classification onlyThrowing(std::optional<PotentialEffectReason>
@@ -1502,7 +1502,7 @@ public:
   /// Mark an argument as safe if it is of a form where a @safe declaration
   /// covers it.
   static void markArgumentSafe(
-      Expr *arg,
+      Expr *arg, 
       llvm::DenseSet<const Expr *> &assumedSafeArguments
   ) {
     auto argValue = arg->findOriginalValue();
@@ -1522,7 +1522,7 @@ public:
   /// Mark any of the local variable references within the given argument
   /// list as safe, so we don't diagnose unsafe uses of them.
   static void markArgumentsSafe(
-      ArgumentList *argumentList,
+      ArgumentList *argumentList, 
       llvm::DenseSet<const Expr *> &assumedSafeArguments
   ) {
     if (!argumentList)
@@ -1536,7 +1536,7 @@ public:
   }
 
   Classification classifyLookup(
-      LookupExpr *E,
+      LookupExpr *E, 
       llvm::DenseSet<const Expr *> *assumedSafeArguments
   ) {
     auto member = E->getMember();
@@ -2006,7 +2006,7 @@ public:
 
     // If there is an 'await', the for-each loop is always async.
     Classification result;
-
+    
     // For-each loops with effects are always async.
     if (stmt->getAwaitLoc().isValid()) {
      result.merge(
@@ -2286,7 +2286,7 @@ private:
     ShouldRecurse_t checkObjCSelector(ObjCSelectorExpr *E) {
       return ShouldNotRecurse;
     }
-
+        
     ConditionalEffectKind checkExhaustiveDoBody(DoCatchStmt *S) {
       // All errors thrown by the do body are caught, but any errors thrown
       // by the catch bodies are bounded by the throwing kind of the do body.
@@ -2563,7 +2563,7 @@ private:
 
     void visitExprPre(Expr *expr) { return; }
   };
-
+  
   Classification
   classifyFunctionBodyImpl(AnyFunctionRef key, BraceStmt *body, bool allowNone,
                            EffectKind kind, PotentialEffectReason reason) {
@@ -3870,7 +3870,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
       preserveDiagnoseErrorOnTryFlag();
     }
-
+    
     void preserveCoverageFromTryOperand() {
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::asyncAwaitFlags(), Self.Flags);
@@ -4596,7 +4596,7 @@ private:
     S->getSequence()->walk(*this);
     if (S->getWhere())
       S->getWhere()->walk(*this);
-
+      
     S->getBody()->walk(*this);
 
     if (auto *desugared = S->getDesugaredStmt()) {

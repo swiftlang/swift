@@ -173,7 +173,7 @@ SDKNodeDeclOperator::SDKNodeDeclOperator(SDKNodeInitInfo Info):
 SDKNodeDeclTypeAlias::SDKNodeDeclTypeAlias(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclTypeAlias) {}
 
-SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info):
+SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info): 
   SDKNodeDecl(Info, SDKNodeKind::DeclVar), IsLet(Info.IsLet),
   HasStorage(Info.HasStorage) {}
 
@@ -664,7 +664,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   SDKNode *Result = nullptr;
 
   for (auto &Pair : *Node) {
-    auto keyString = GetScalarString(Pair.getKey());
+    auto keyString = GetScalarString(Pair.getKey()); 
     if (auto keyKind = parseKeyKind(keyString)) {
       switch(*keyKind) {
       case KeyKind::KK_kind:

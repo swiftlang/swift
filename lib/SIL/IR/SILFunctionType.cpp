@@ -115,19 +115,19 @@ CanSILFunctionType SILFunctionType::getUnsubstitutedType(SILModule &M) const {
     return SILType::getPrimitiveObjectType(type)
              .subst(M, subs).getASTType();
   };
-
+  
   for (auto param : getParameters()) {
     params.push_back(param.map(substComponentType));
   }
-
+  
   for (auto yield : getYields()) {
     yields.push_back(yield.map(substComponentType));
   }
-
+  
   for (auto result : getResults()) {
     results.push_back(result.map(substComponentType));
   }
-
+  
   if (auto error = getOptionalErrorResult()) {
     errorResult = error->map(substComponentType);
   }
@@ -292,7 +292,7 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
       resultIndices.push_back(resultAndIndex.index());
 
   auto numSemanticResults = getNumResults();
-
+  
   // Check semantic results (`inout`) parameters.
   for (auto resultParamAndIndex : enumerate(getAutoDiffSemanticResultsParameters()))
     // Currently, an `inout` parameter can either be:
@@ -993,7 +993,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
                                 origTypeOfAbstraction, TC);
     break;
   }
-
+  
   // Compute the derivative function parameters.
   SmallVector<SILParameterInfo, 4> newParameters;
   newParameters.reserve(constrainedOriginalFnTy->getNumParameters());
@@ -1168,7 +1168,7 @@ uint16_t SILFunctionType::getCoroutineYieldTypesDiscriminator(SILModule &M) {
   llvm::raw_svector_ostream out(buffer);
   auto genericSig = getInvocationGenericSignature();
   auto *genericEnv =  genericSig.getCanonicalSignature().getGenericEnvironment();
-
+  
   out << [&]() -> StringRef {
     switch (getCoroutineKind()) {
     case SILCoroutineKind::YieldMany: return "yield_many:";
@@ -1968,7 +1968,7 @@ private:
     // of the sequence.  visit() will add foreign parameters that are
     // positioned after any parameters it adds.
     maybeAddForeignParameters();
-
+    
     // Parameters may lower differently when they have scoped dependencies.
     SmallBitVector paramsWithScopedDependencies(params.size(), false);
     for (auto &depInfo : extInfoBuilder.getLifetimeDependencies()) {
@@ -1976,7 +1976,7 @@ private:
         paramsWithScopedDependencies |= scopeIndices->getBitVector();
       }
     }
-
+    
     // Process all the non-self parameters.
     origType.forEachFunctionParam(params.drop_back(hasSelf ? 1 : 0),
                                   /*ignore final orig param*/ hasSelf,
@@ -2005,7 +2005,7 @@ private:
                          packTy, origFlags.getValueOwnership(), origFlags);
         return;
       }
-
+      
       // If the parameter is not a pack expansion, just pull off the
       // next parameter and destructure it in parallel with the abstraction
       // pattern for the type.
@@ -2066,7 +2066,7 @@ private:
     ForeignSelf = std::nullopt;
 
     assert(ParameterMap.size() == Inputs.size());
-
+    
     // Any parameters not yet marked addressable shouldn't be.
     assert(AddressableLoweredParameters.size() <= ParameterMap.size());
     assert(ConditionallyAddressableLoweredParameters.size() <= ParameterMap.size());
@@ -2111,7 +2111,7 @@ private:
     // abstraction.
     if (origFlags.isAddressable()) {
       origType = AbstractionPattern::getOpaque();
-
+      
       // Remember that this lowered parameter is unconditionally addressable in
       // the addressable parameters vector.
       AddressableLoweredParameters.resize(ParameterMap.size() + 1, false);
@@ -2140,7 +2140,7 @@ private:
     }
 
     unsigned origParamIndex = NextOrigParamIndex++;
-
+    
     auto &substTLConv = TC.getTypeLowering(origType, substType,
                                        TypeExpansionContext::minimal());
     auto &substTL = TC.getTypeLowering(origType, substType, expansion);
@@ -2244,7 +2244,7 @@ private:
       // Continue to see, just in case there are more parameters to add.
     }
   }
-
+  
   bool maybeAddForeignAsyncParameter() {
     if (!Foreign.async ||
         NextOrigParamIndex != Foreign.async->completionHandlerParamIndex())
@@ -2615,7 +2615,7 @@ static void destructureYieldsForReadAccessor(TypeConverter &TC,
       return ParameterConvention::Direct_Unowned;
     return ParameterConvention::Direct_Guaranteed;
   }();
-
+  
   yields.push_back(SILYieldInfo(tl.getLoweredType().getASTType(),
                                 convention));
 }
@@ -2772,7 +2772,7 @@ static CanSILFunctionType getSILFunctionType(
   SILCoroutineKind coroutineKind = SILCoroutineKind::None;
   AbstractionPattern coroutineOrigYieldType = AbstractionPattern::getInvalid();
   CanType coroutineSubstYieldType;
-
+  
   if (auto accessor = getAsCoroutineAccessor(constant)) {
     auto origAccessor = cast<AccessorDecl>(origConstant->getDecl());
     auto &ctx = origAccessor->getASTContext();
@@ -2831,7 +2831,7 @@ static CanSILFunctionType getSILFunctionType(
     // protocols.
     if (genericSig)
       return false;
-
+    
     // We only currently use substituted function types for function values,
     // which will have standard thin or thick representation. (Per the previous
     // comment, it would be useful to do so for generic methods on classes and
@@ -2840,9 +2840,9 @@ static CanSILFunctionType getSILFunctionType(
     return (rep == SILFunctionTypeRepresentation::Thick ||
             rep == SILFunctionTypeRepresentation::Thin);
   }();
-
+  
   SubstitutionMap substFunctionTypeSubs;
-
+  
   if (shouldBuildSubstFunctionType) {
     // Generalize the generic signature in the abstraction pattern, so that
     // abstraction patterns with the same general shape produce equivalent
@@ -2949,7 +2949,7 @@ static CanSILFunctionType getSILFunctionType(
                                   TC.getCaptureTypeExpansionContext(*constant),
                                   inputs, extInfoBuilder);
   }
-
+  
   // Form the lowered lifetime dependency records using the parameter mapping
   // we formed above.
   SmallVector<LifetimeDependenceInfo, 8> loweredLifetimes;
@@ -2967,9 +2967,9 @@ static CanSILFunctionType getSILFunctionType(
         if (!formal) {
           return nullptr;
         }
-
+        
         SmallBitVector loweredIndices;
-        loweredIndices.resize(parameterMap.size());
+        loweredIndices.resize(parameterMap.size());      
         for (unsigned j = 0; j < parameterMap.size(); ++j) {
           int formalIndex = parameterMap[j];
           if (formalIndex < 0) {
@@ -2977,19 +2977,19 @@ static CanSILFunctionType getSILFunctionType(
           }
           loweredIndices[j] = formal->contains(formalIndex);
         }
-
+        
         if (!loweredIndices.any()) {
           return nullptr;
         }
-
+        
         return IndexSubset::get(TC.Context, loweredIndices);
       };
-
+      
       IndexSubset *inheritIndicesSet
         = lowerIndexSet(formalDeps.getInheritIndices());
       IndexSubset *scopeIndicesSet
         = lowerIndexSet(formalDeps.getScopeIndices());
-
+      
       // If the original formal parameter dependencies were lowered away
       // entirely (such as if they were of `()` type), then there is effectively
       // no dependency, leaving behind an immortal value.
@@ -2999,14 +2999,14 @@ static CanSILFunctionType getSILFunctionType(
             /*hasImmortalSpecifier*/ true,
             /*fromAnnotation*/ formalDeps.isFromAnnotation());
       }
-
+      
       SmallBitVector addressableDeps = scopeIndicesSet
         ? scopeIndicesSet->getBitVector() & addressableParams
         : SmallBitVector(1, false);
       IndexSubset *addressableSet = addressableDeps.any()
         ? IndexSubset::get(TC.Context, addressableDeps)
         : nullptr;
-
+        
       SmallBitVector condAddressableDeps = scopeIndicesSet
         ? scopeIndicesSet->getBitVector() & conditionallyAddressableParams
         : SmallBitVector(1, false);
@@ -3025,20 +3025,20 @@ static CanSILFunctionType getSILFunctionType(
     if (parameterMap[i] < 0) {
       continue;
     }
-
+    
     // If the lowered type is escapable, then any lifetime dependencies
     // targeting it have no effect.
     if (inputs[i].getInterfaceType()->isEscapable(loweredSig)) {
       continue;
     }
-
+    
     auto formalParamDeps = getLifetimeDependenceFor(
                                        extInfoBuilder.getLifetimeDependencies(),
                                        parameterMap[i]);
     if (!formalParamDeps) {
       continue;
     }
-
+    
     loweredLifetimes.emplace_back(lowerLifetimeDependence(*formalParamDeps, i));
   }
   // Lower the return value dependencies.
@@ -3058,13 +3058,13 @@ static CanSILFunctionType getSILFunctionType(
       // The result is `()` or some other unit type, which is always escapable.
       resultIsEscapable = true;
     }
-
+    
     if (!resultIsEscapable) {
       loweredLifetimes.emplace_back(lowerLifetimeDependence(*formalReturnDeps,
                                                           parameterMap.size()));
     }
   }
-
+  
   auto calleeConvention = ParameterConvention::Direct_Unowned;
   if (extInfoBuilder.hasContext())
     calleeConvention = conventions.getCallee();
@@ -3239,7 +3239,7 @@ struct DeallocatorConventions : Conventions {
   ParameterConvention getPackParameter(unsigned index) const override {
     llvm_unreachable("Deallocators do not have pack parameters");
   }
-
+	
   ResultConvention getResult(const TypeLowering &tl) const override {
     // TODO: Put an unreachable here?
     return ResultConvention::Owned;
@@ -3355,7 +3355,7 @@ struct DefaultInitializerConventions : DefaultConventions {
   getDirectSelfParameter(const AbstractionPattern &type) const override {
     return ParameterConvention::Direct_Owned;
   }
-
+  
   ParameterConvention
   getIndirectSelfParameter(const AbstractionPattern &type) const override {
     return ParameterConvention::Indirect_In;
@@ -4340,7 +4340,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::Func: {
     if (!c.hasDecl())
       return ObjCSelectorFamily::None;
-
+      
     auto *FD = cast<FuncDecl>(c.getDecl());
     if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
       switch (accessor->getAccessorKind()) {
@@ -4757,7 +4757,7 @@ getLoweredResultIndices(const SILFunctionType *functionType,
       resultIndices.push_back(resultAndIndex.index());
 
   auto numResults = functionType->getNumResults();
-
+  
   // Collect semantic result parameters.
   unsigned semResultParamIdx = 0;
   for (auto resultParamAndIndex
@@ -4771,7 +4771,7 @@ getLoweredResultIndices(const SILFunctionType *functionType,
       resultIndices.push_back(numResults + semResultParamIdx);
     semResultParamIdx += 1;
   }
-
+  
   numResults += semResultParamIdx;
 
   return IndexSubset::get(functionType->getASTContext(),
@@ -5064,7 +5064,7 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
     basePattern,
     bridgedTypes.Uncurried,
     fnTy};
-
+  
   auto inserted = ConstantOverrideTypes.insert({{derived, base}, result});
   assert(inserted.second);
   (void)inserted;

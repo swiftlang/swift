@@ -80,7 +80,7 @@ void Edge::serialize(llvm::json::OStream &OS) const {
         });
       }
     }
-
+    
     const ValueDecl *InheritingDecl = Source.getInheritedDecl();
 
     // If our source symbol is a inheriting decl, write in information about
@@ -89,10 +89,10 @@ void Edge::serialize(llvm::json::OStream &OS) const {
       Symbol inheritedSym(Graph, InheritingDecl, nullptr);
       SmallString<256> USR, Display;
       llvm::raw_svector_ostream DisplayOS(Display);
-
+      
       inheritedSym.getUSR(USR);
       inheritedSym.printPath(DisplayOS);
-
+      
       OS.attributeObject("sourceOrigin", [&](){
         OS.attribute("identifier", USR.str());
         OS.attribute("displayName", Display.str());

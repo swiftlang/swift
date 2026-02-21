@@ -440,7 +440,7 @@ namespace {
       // If we're referring to an invalid declaration, fail.
       if (!decl)
         return nullptr;
-
+      
       if (decl->isInvalid())
         return nullptr;
 
@@ -1216,13 +1216,13 @@ namespace {
                                    TVO_CanBindToLValue |
                                    TVO_CanBindToNoEscape);
     }
-
+    
     Type visitMemberRefExpr(MemberRefExpr *expr) {
       return addMemberRefConstraints(
           expr, expr->getBase(), expr->getMember().getDecl(),
           /*FIXME:*/ FunctionRefInfo::doubleBaseNameApply());
     }
-
+    
     Type visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
       llvm_unreachable("Already typechecked");
     }
@@ -1236,7 +1236,7 @@ namespace {
       assert(result != UnresolvedBaseTypes.end());
       return result->second;
     }
-
+    
     virtual Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
       auto baseLocator = CS.getConstraintLocator(
                             expr,
@@ -1427,7 +1427,7 @@ namespace {
           expr->getLAngleLoc(), expr->getUnresolvedParams());
       return baseTy;
     }
-
+    
     Type visitSequenceExpr(SequenceExpr *expr) {
       // If a SequenceExpr survived until CSGen, then there was an upstream
       // error that was already reported.
@@ -1579,7 +1579,7 @@ namespace {
       return addSubscriptConstraints(expr, CS.getType(base), decl,
                                      expr->getArgs());
     }
-
+    
     Type visitArrayExpr(ArrayExpr *expr) {
       auto &ctx = CS.getASTContext();
 
@@ -1699,7 +1699,7 @@ namespace {
       CS.addConstraint(ConstraintKind::LiteralConformsTo, arrayTy,
                        arrayProto->getDeclaredInterfaceType(),
                        locator);
-
+      
       // Its subexpression should be convertible to a tuple (T.Element...).
       Type arrayElementTy = DependentMemberType::get(arrayTy, elementAssocTy);
 
@@ -1754,7 +1754,7 @@ namespace {
         Type contextualDictionaryValueType;
         std::tie(contextualDictionaryKeyType,
                  contextualDictionaryValueType) = *dictionaryKeyValue;
-
+        
         // Form an explicit tuple type from the contextual type's key and value types.
         TupleTypeElt tupleElts[2] = { TupleTypeElt(contextualDictionaryKeyType),
                                       TupleTypeElt(contextualDictionaryValueType) };
@@ -1800,7 +1800,7 @@ namespace {
       // been merged.
       llvm::DenseSet<Expr *> mergedElements;
 
-      // If no contextual type is present, Merge equivalence classes of key
+      // If no contextual type is present, Merge equivalence classes of key 
       // and value types as necessary.
       if (!CS.getContextualType(expr, /*forConstraint=*/false)) {
         for (auto element1 : expr->getElements()) {
@@ -1839,7 +1839,7 @@ namespace {
 
               if (elemExpr1->getKind() == elemExpr2->getKind() &&
                 isMergeableValueKind(elemExpr1)) {
-                mergedValue = mergeRepresentativeEquivalenceClasses(CS,
+                mergedValue = mergeRepresentativeEquivalenceClasses(CS, 
                                 valueTyvar1, valueTyvar2);
               }
 
@@ -1848,7 +1848,7 @@ namespace {
             }
           }
         }
-      }
+      }      
 
       // Introduce conversions from each element to the element type of the
       // dictionary. (If the equivalence class of an element has already been
@@ -3018,7 +3018,7 @@ namespace {
 
       // Add a checked cast constraint.
       auto fromType = CS.getType(expr->getSubExpr());
-
+      
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType,
                        CS.getConstraintLocator(expr));
 
@@ -3069,7 +3069,7 @@ namespace {
                        CS.getConstraintLocator(expr));
       return TupleType::getEmpty(CS.getASTContext());
     }
-
+    
     Type visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
       // Encountering an UnresolvedPatternExpr here means we have an invalid
       // ExprPattern with a Pattern node like 'let x' nested in it. Record a
@@ -3107,14 +3107,14 @@ namespace {
                                             TVO_PrefersSubtypeBinding |
                                             TVO_CanBindToLValue |
                                             TVO_CanBindToNoEscape);
-
+      
       // The result is the object type of the optional subexpression.
       CS.addConstraint(ConstraintKind::OptionalObject,
                        CS.getType(expr->getSubExpr()), objectTy,
                        locator);
       return objectTy;
     }
-
+    
     Type visitOptionalEvaluationExpr(OptionalEvaluationExpr *expr) {
       // The operand must be coercible to T? for some type T.  We'd
       // like this to be the smallest possible nesting level of
@@ -3179,7 +3179,7 @@ namespace {
                                          locator);
       return projectedTy;
     }
-
+    
     Type visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
       return CS.getASTContext().getBoolType();
     }
@@ -3219,7 +3219,7 @@ namespace {
         return nullptr;
       }
 
-
+      
       // Make sure we can reference ObjectiveC.Selector.
       // FIXME: Fix-It to add the import?
       auto type = CS.getASTContext().getSelectorType();
@@ -3234,15 +3234,15 @@ namespace {
     Type visitKeyPathExpr(KeyPathExpr *E) {
       if (E->isObjC())
         return CS.getType(E->getObjCStringLiteralExpr());
-
+      
       auto kpDecl = CS.getASTContext().getKeyPathDecl();
-
+      
       if (!kpDecl) {
         auto &de = CS.getASTContext().Diags;
         de.diagnose(E->getLoc(), diag::expr_keypath_no_keypath_type);
         return ErrorType::get(CS.getASTContext());
       }
-
+      
       // For native key paths, traverse the key path components to set up
       // appropriate type relationships at each level.
       auto rootLocator =
@@ -3351,7 +3351,7 @@ namespace {
           llvm_unreachable("not implemented");
           break;
         }
-
+                
         case KeyPathExpr::Component::Kind::OptionalChain: {
           didOptionalChain = true;
 
@@ -3377,7 +3377,7 @@ namespace {
           base = optionalObjTy;
           break;
         }
-
+        
         case KeyPathExpr::Component::Kind::OptionalWrap: {
           // This should only appear in resolved ASTs, but we may need to
           // re-type-check the constraints during failure diagnosis.
@@ -3476,7 +3476,7 @@ namespace {
               isa<AbstractClosureExpr>(varDC) ||
               varDC->isChildContextOf(CS.DC)) &&
              "TapExpr var should be in the same DeclContext we're checking it in!");
-
+      
       auto locator = CS.getConstraintLocator(expr);
       auto tv = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
 

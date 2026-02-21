@@ -328,7 +328,7 @@ void DifferentiableActivityInfo::setUsefulAndPropagateToOperands(
 
     llvm::report_fatal_error("do not know how to handle this incoming bb argument");
   }
-
+  
   auto *inst = value->getDefiningInstruction();
   if (!inst)
     return;

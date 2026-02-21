@@ -756,7 +756,7 @@ ModuleDependenciesCache::findSwiftDependency(StringRef moduleName) const {
 
 const ModuleDependencyInfo &ModuleDependenciesCache::findKnownDependency(
     const ModuleDependencyID &moduleID) const {
-
+  
   auto dep = findDependency(moduleID);
   assert(dep && "dependency unknown");
   return **dep;

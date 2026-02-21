@@ -70,7 +70,7 @@ namespace swift {
 
     /// Return the location of the start of the statement.
     SourceLoc getStartLoc() const;
-
+  
     /// Return the location of the end of the statement.
     SourceLoc getEndLoc() const;
 

@@ -54,7 +54,7 @@ private:
   /// releasing this value one is affecting.
   RCIdentityFunctionInfo *RCIA;
 
-  /// An analysis to get the epilogue ARC instructions.
+  /// An analysis to get the epilogue ARC instructions. 
   EpilogueARCFunctionInfo *EAFI;
 
   /// The map from dataflow terminating decrements -> increment dataflow state.

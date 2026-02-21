@@ -27,7 +27,7 @@ class Expr;
 struct SILDeclRef;
 class SILLocation;
 class SILModule;
-
+  
 namespace Lowering {
 class ManagedValue;
 class SGFContext;

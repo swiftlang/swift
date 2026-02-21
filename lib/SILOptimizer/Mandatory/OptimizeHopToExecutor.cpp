@@ -49,7 +49,7 @@ private:
   struct BlockState {
     enum {
       NotSet = -2,
-
+      
       // Used in the forward dataflow in removeRedundantHopToExecutors.
       Unknown = -1,
 
@@ -66,14 +66,14 @@ private:
 
     /// The value at the entry (i.e. the first instruction) of the block.
     int entry = NotSet;
-
+    
     /// The value of the block itself. It's NotSet if the block has no
     /// significant instructions for the dataflow.
     int intra = NotSet;
 
     /// The value at the exit (i.e. after the terminator) of the block.
     int exit = NotSet;
-
+    
     /// Merge two values at a control-flow merge point.
     static int merge(int lhs, int rhs) {
       if (lhs == NotSet || lhs == rhs)
@@ -429,7 +429,7 @@ bool OptimizeHopToExecutor::run() {
 
   bool changed = removeRedundantHopToExecutors(actors);
   changed |= removeDeadHopToExecutors();
-
+ 
   return changed;
 }
 

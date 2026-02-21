@@ -227,7 +227,7 @@ public:
   void addUnknown(uintptr_t kind) {
     path.push_back({ PathPiece::Kind::Unknown, kind });
   }
-
+  
   void addOpaqueReturnType(Identifier name) {
     path.push_back({ PathPiece::Kind::OpaqueReturnType, name });
   }

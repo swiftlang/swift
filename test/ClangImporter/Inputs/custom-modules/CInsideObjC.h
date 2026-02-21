@@ -6,7 +6,7 @@ struct AlreadyDeclaredStruct {
 };
 
 #if defined(CLASS)
-@interface Wrapper : Base
+@interface Wrapper : Base 
 #elif defined(CATEGORY)
 @interface Wrapper : Base
 @end

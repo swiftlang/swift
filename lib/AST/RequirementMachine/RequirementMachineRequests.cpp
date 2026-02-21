@@ -873,7 +873,7 @@ InferredGenericSignatureRequest::evaluate(
   InverseRequirement::expandDefaults(ctx, paramTypes, requirements, defaults, expandedGPs);
   applyInverses(ctx, expandedGPs, inverses, requirements,
                 defaults, errors);
-
+  
   // Any remaining implicit defaults in a conditional inverse requirement
   // extension must be made explicit.
   if (forExtension) {
@@ -895,12 +895,12 @@ InferredGenericSignatureRequest::evaluate(
           if (req.req.getCanonical() == def.req.getCanonical()) {
             goto next;
           }
-
+          
           // Disregard requirements on other parameters.
           if (!req.req.getFirstType()->isEqual(def.req.getFirstType())) {
             continue;
           }
-
+          
           // Or it can be implied by a requirement on something that's inherently
           // copyable.
           if (req.req.getKind() == RequirementKind::Superclass) {
@@ -934,7 +934,7 @@ InferredGenericSignatureRequest::evaluate(
       defaults.clear();
     }
   }
-
+  
   requirements.append(defaults);
 
   auto &rewriteCtx = ctx.getRewriteContext();

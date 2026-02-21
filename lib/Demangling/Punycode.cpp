@@ -60,7 +60,7 @@ static int adapt(int delta, int numpoints, bool firsttime) {
     delta = delta / damp;
   else
     delta = delta / 2;
-
+  
   delta += delta / numpoints;
   int k = 0;
   while (delta > ((base - tmin) * tmax) / 2) {
@@ -97,7 +97,7 @@ bool Punycode::decodePunycode(StringRef InputPunycode,
     InputPunycode =
         InputPunycode.slice(lastDelimiter + 1, InputPunycode.size());
   }
-
+  
   while (!InputPunycode.empty()) {
     int oldi = i;
     int w = 1;
@@ -111,7 +111,7 @@ bool Punycode::decodePunycode(StringRef InputPunycode,
       int digit = digit_index(codePoint);
       if (digit < 0)
         return false;
-
+      
       // Fail if i + (digit * w) would overflow
       if (digit > (std::numeric_limits<int>::max() - i) / w)
         return false;
@@ -139,7 +139,7 @@ bool Punycode::decodePunycode(StringRef InputPunycode,
     OutCodePoints.insert(OutCodePoints.begin() + i, n);
     ++i;
   }
-
+  
   return true;
 }
 
@@ -170,7 +170,7 @@ bool Punycode::encodePunycode(const std::vector<uint32_t> &InputCodePoints,
   // ...followed by a delimiter if b > 0
   if (b > 0)
     OutPunycode.push_back(delimiter);
-
+  
   while (h < InputCodePoints.size()) {
     // let m = the minimum code point >= n in the input
     uint32_t m = 0x10FFFF;
@@ -195,7 +195,7 @@ bool Punycode::encodePunycode(const std::vector<uint32_t> &InputCodePoints,
           int t = k <= bias ? tmin
                 : k >= bias + tmax ? tmax
                 : k - bias;
-
+          
           if (q < t) break;
           OutPunycode.push_back(digit_value(t + ((q - t) % (base - t))));
           q = (q - t) / (base - t);

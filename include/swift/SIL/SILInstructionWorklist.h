@@ -24,7 +24,7 @@
 ///
 /// Additionally, SILInstructionWorklist provides conveniences for simple
 /// instruction modifications and ensuring that the appropriate instructions
-/// will be visited accordingly.  For example, if provides a method for
+/// will be visited accordingly.  For example, if provides a method for 
 /// replacing an operation which has already been removed with a new instruction
 /// determined by a SILInstructionVisitor.
 ///

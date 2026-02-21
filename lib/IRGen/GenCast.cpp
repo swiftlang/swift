@@ -177,7 +177,7 @@ getDynamicCastArguments(IRGenFunction &IGF,
     argsBuf[n-2] = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
     argsBuf[n-1] = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
     return argsBuf;
-
+      
   case CheckedCastMode::Conditional:
     return llvm::ArrayRef(argsBuf, n - 3);
     break;
@@ -393,7 +393,7 @@ emitExistentialScalarCastFn(IRGenModule &IGM, unsigned numProtocols,
       break;
     }
   }
-
+  
   // Build the function type.
   llvm::SmallVector<llvm::Type *, 4> argTys;
   llvm::SmallVector<llvm::Type *, 4> returnTys;
@@ -406,7 +406,7 @@ emitExistentialScalarCastFn(IRGenModule &IGM, unsigned numProtocols,
     argTys.push_back(IGM.ProtocolDescriptorPtrTy);
     returnTys.push_back(IGM.WitnessTablePtrTy);
   }
-
+  
   llvm::Type *returnTy = llvm::StructType::get(IGM.getLLVMContext(), returnTys);
 
   auto fn = IGM.getOrCreateHelperFunction(
@@ -492,7 +492,7 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
   // if the metatype is for a class.
   if (!IGF.IGM.ObjCInterop)
     return nullptr;
-
+  
   switch (type->getRepresentation()) {
   case MetatypeRepresentation::ObjC:
     // Metatypes that can be represented as ObjC trivially cast to AnyObject.
@@ -504,7 +504,7 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
     assert(!type.getInstanceType()->mayHaveSuperclass()
            && "classes should not have thin metatypes (yet)");
     return nullptr;
-
+    
   case MetatypeRepresentation::Thick: {
     auto instanceTy = type.getInstanceType();
     // Is the type obviously a class?
@@ -514,7 +514,7 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
                                                               instanceTy);
       return IGF.Builder.CreateBitCast(heapMetadata, IGF.IGM.ObjCPtrTy);
     }
-
+    
     // If it's not a class, we can't handle it here
     if (!isa<ArchetypeType>(instanceTy) && !isa<ExistentialMetatypeType>(type)) {
       return nullptr;
@@ -590,7 +590,7 @@ void irgen::emitScalarExistentialDowncast(
     if (protoDecl->isObjC())
       objcProtos.push_back(emitReferenceToObjCProtocol(IGF, protoDecl));
   }
-
+  
   llvm::Type *resultType;
   if (metatypeKind) {
     switch (*metatypeKind) {
@@ -685,7 +685,7 @@ void irgen::emitScalarExistentialDowncast(
     if (objcObject)
       objcObject = IGF.Builder.CreateBitCast(objcObject,
                                              IGF.IGM.UnknownRefCountedPtrTy);
-
+    
     // Pick the cast function based on the cast mode and on whether we're
     // casting a Swift metatype or ObjC object.
     FunctionPointer castFn;
@@ -706,7 +706,7 @@ void irgen::emitScalarExistentialDowncast(
       break;
     }
     llvm::Value *objcCastObject = objcObject ? objcObject : value;
-
+    
     Address protoRefsBuf = IGF.createAlloca(
                                         llvm::ArrayType::get(IGF.IGM.Int8PtrTy,
                                                              objcProtos.size()),
@@ -854,11 +854,11 @@ void irgen::emitScalarExistentialDowncast(
     condition.reset();
     IGF.Builder.CreateBr(contBB);
     IGF.Builder.emitBlock(contBB);
-
+    
     // Return null on the failure path.
     Explosion successEx = std::move(ex);
     ex.reset();
-
+    
     while (!successEx.empty()) {
       auto successVal = successEx.claimNext();
       auto failureVal = llvm::Constant::getNullValue(successVal->getType());
@@ -1153,12 +1153,12 @@ llvm::Value *irgen::emitFastClassCastIfPossible(
     destMetadata = response.getMetadata();
   }
   llvm::Value *lhs = IGF.Builder.CreateBitCast(destMetadata, IGF.IGM.Int8PtrTy);
-
+    
   // Load the isa pointer.
   llvm::Value *objMetadata = emitHeapMetadataRefForHeapObject(IGF, instance,
       sourceFormalType, /*suppress cast*/ true);
   llvm::Value *rhs = IGF.Builder.CreateBitCast(objMetadata, IGF.IGM.Int8PtrTy);
-
+  
   // return isa_ptr == metadata_ptr ? instance : nullptr
   llvm::Value *isNotEqual = IGF.Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE,
                                               lhs, rhs);

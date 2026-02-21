@@ -301,7 +301,7 @@ public:
   constexpr static bool isDependencySink = detail::isDependencySink(Caching);
 
   using OutputType = Output;
-
+  
   explicit SimpleRequest(const Inputs& ...inputs)
     : storage(inputs...) { }
 

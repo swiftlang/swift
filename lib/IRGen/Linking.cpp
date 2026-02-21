@@ -288,7 +288,7 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
 
   case Kind::ModuleDescriptor:
     return mangler.mangleModuleDescriptor(cast<ModuleDecl>(getDecl()));
-
+  
   case Kind::ExtensionDescriptor:
     return mangler.mangleExtensionDescriptor(getExtension());
 
@@ -370,7 +370,7 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
       return mangler.mangleBaseWitnessTableAccessFunction(
                   getProtocolConformance(), assocConf.second);
     }
-
+    
     return mangler.mangleAssociatedTypeWitnessTableAccessFunction(
                 getProtocolConformance(), assocConf.first, assocConf.second);
   }
@@ -711,7 +711,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     // Everything else is only referenced inside its module.
     return SILLinkage::Private;
   }
-
+      
   case Kind::TypeMetadataDemanglingCacheVariable:
     return SILLinkage::Shared;
 
@@ -732,7 +732,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
         return SILLinkage::Shared;
 
-      // Prespecialization of the same generic metadata may be requested
+      // Prespecialization of the same generic metadata may be requested 
       // multiple times within the same module, so it needs to be uniqued.
       if (nominal->isGenericContext())
         return SILLinkage::Shared;
@@ -1163,11 +1163,11 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
       return IGM.TypeMetadataStructTy;
     }
     llvm_unreachable("invalid metadata address");
-
+    
   case Kind::TypeMetadataPattern:
     // TODO: Use a real type?
     return IGM.Int8Ty;
-
+    
   case Kind::ClassMetadataBaseOffset:
     return IGM.ClassMetadataBaseOffsetTy;
 
@@ -1544,7 +1544,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::DistributedAccessor:
     return getDecl()->isWeakImported(module);
-
+      
   case Kind::PropertyDescriptor:
     // Static properties may have nil property descriptors if declared in
     // modules compiled with older compilers and should be weak linked.
@@ -1687,14 +1687,14 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::DynamicallyReplaceableFunctionKey:
     return getSILFunction()->getDeclContext();
-
+  
   case Kind::SILGlobalVariable:
   case Kind::ReadOnlyGlobalObject:
     if (auto decl = getSILGlobalVariable()->getDecl())
       return decl->getDeclContext();
 
     return nullptr;
-
+    
   case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
   case Kind::ProtocolConformanceDescriptorRecord:
@@ -1714,7 +1714,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
     auto nom = ty->getAnyNominal();
     if (nom)
       return nom->getDeclContext();
-
+    
     return nullptr;
   }
 

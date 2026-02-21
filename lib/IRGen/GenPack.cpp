@@ -1195,7 +1195,7 @@ void irgen::deallocatePack(IRGenFunction &IGF, StackAddress addr, CanSILPackType
   if (packType->containsPackExpansionType()) {
     IGF.emitDeallocateDynamicAlloca(addr);
     return;
-  }
+  } 
 
   auto elementSize = getPackElementSize(IGF.IGM, packType);
   auto elementCount = packType->getNumElements();

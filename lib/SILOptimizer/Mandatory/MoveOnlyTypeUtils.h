@@ -230,7 +230,7 @@ public:
       return Kind::NonfrozenUsableFromInlineType;
     else if (payload.isa<ConsumeDuringDeinit>())
       return Kind::ConsumeDuringDeinit;
-
+    
     llvm_unreachable("unhandled tag");
   }
 

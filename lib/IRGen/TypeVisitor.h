@@ -55,8 +55,8 @@ class ReferenceTypeVisitor : public CanTypeVisitor<ImplClass, RetTy, Args...> {
   // Archetype
   // Function
 };
-
+  
 } // end namespace irgen
 } // end namespace swift
-
+  
 #endif

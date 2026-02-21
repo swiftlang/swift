@@ -691,11 +691,11 @@ public:
   bool canHandle(SILInstruction *Inst);
 
 private:
-
+  
   /// True if CSE is done on high-level SIL, i.e. semantic calls are not inlined
   /// yet. In this case some semantic calls can be CSEd.
   bool RunsOnHighLevelSil;
-
+  
   // NodeScope - almost a POD, but needs to call the constructors for the
   // scoped hash tables so that a new scope gets pushed on. These are RAII so
   // that the scope gets popped when the NodeScope is destroyed.
@@ -813,7 +813,7 @@ bool CSE::processLazyPropertyGetters(SILFunction &F) {
     SILInliner::inlineFullApply(ai, SILInliner::InlineKind::PerformanceInline,
                                 FuncBuilder, deleter);
     deleter.cleanupDeadInstructions();
-
+    
     // ...and fold the switch_enum in the first block to the Optional.some case.
     // The Optional.none branch becomes dead.
     auto *sei = cast<SwitchEnumInst>(callBlock->getTerminator());
@@ -1134,7 +1134,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
   if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
     if (!AI->mayReadOrWriteMemory())
       return true;
-
+    
     if (RunsOnHighLevelSil) {
       ArraySemanticsCall SemCall(AI);
       switch (SemCall.getKind()) {
@@ -1165,15 +1165,15 @@ bool CSE::canHandle(SILInstruction *Inst) {
     auto MB = BCA->getMemoryBehavior(FullApplySite(AI), /*observeRetains*/false);
     if (MB == MemoryBehavior::None)
       return true;
-
+    
     if (isLazyPropertyGetter(AI))
       return true;
-
+      
     if (SILFunction *callee = AI->getReferencedFunctionOrNull()) {
       if (callee->isGlobalInit())
         return true;
     }
-
+    
     return false;
   }
   if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
@@ -1475,13 +1475,13 @@ static bool CSEExistentialCalls(SILFunction *Func, DominanceInfo *DA) {
 
 namespace {
 class SILCSE : public SILFunctionTransform {
-
+  
   /// True if CSE is done on high-level SIL, i.e. semantic calls are not inlined
   /// yet. In this case some semantic calls can be CSEd.
   /// We only CSE semantic calls on high-level SIL because we can be sure that
   /// e.g. an Array as SILValue is really immutable (including its content).
   bool RunsOnHighLevelSil;
-
+  
   void run() override {
     LLVM_DEBUG(llvm::dbgs() << "***** CSE on function: "
                             << getFunction()->getName() << " *****\n");

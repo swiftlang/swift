@@ -334,7 +334,7 @@ bool jobMatchesFilter(LinkKind jobKind, BackDeployLibFilter filter) {
   switch (filter) {
   case BackDeployLibFilter::executable:
     return jobKind == LinkKind::Executable;
-
+    
   case BackDeployLibFilter::all:
     return true;
   }
@@ -380,7 +380,7 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
     runtimeCompatibilityVersion
                    = getSwiftRuntimeCompatibilityVersionForTarget(getTriple());
   }
-
+  
   if (runtimeCompatibilityVersion) {
     auto addBackDeployLib = [&](llvm::VersionTuple version,
                                 BackDeployLibFilter filter,
@@ -391,11 +391,11 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
 
       if (!jobMatchesFilter(job.getKind(), filter))
         return;
-
+      
       SmallString<128> BackDeployLib;
       BackDeployLib.append(SharedResourceDirPath);
       llvm::sys::path::append(BackDeployLib, "lib" + libraryName + ".a");
-
+      
       if (llvm::sys::fs::exists(BackDeployLib)) {
         if (forceLoad)
           Arguments.push_back("-force_load");
@@ -409,7 +409,7 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
           LibraryName, ForceLoad);
     #include "swift/Frontend/BackDeploymentLibs.def"
   }
-
+    
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
   SmallVector<std::string, 4> RuntimeLibPaths;
@@ -997,7 +997,7 @@ static void validateTargetVariant(const toolchains::Darwin &TC,
   }
 }
 
-void
+void 
 toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
                                       const llvm::opt::ArgList &args,
                                       StringRef defaultTarget) const {

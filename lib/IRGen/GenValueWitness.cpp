@@ -847,7 +847,7 @@ ValueWitnessFlags getValueWitnessFlags(IRGenModule &IGM,
     bool isAddressableForDependencies =
         IGM.getTypeProperties(concreteType, TypeExpansionContext::minimal())
           .isAddressableForDependencies();
-
+          
     flags = flags.withAlignment(fixedTI->getFixedAlignment().getValue())
                 .withPOD(fixedTI->isTriviallyDestroyable(ResilienceExpansion::Maximal))
                 .withCopyable(fixedTI->isCopyable(ResilienceExpansion::Maximal))
@@ -1001,7 +1001,7 @@ valueWitnessRequiresCopyability(ValueWitness index) {
   case ValueWitness::InitializeWithCopy:
   case ValueWitness::AssignWithCopy:
     return true;
-
+  
   case ValueWitness::Destroy:
   case ValueWitness::InitializeWithTake:
   case ValueWitness::AssignWithTake:
@@ -1438,18 +1438,18 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
       if (!enumDecl->isObjC() && !type->isUninhabited())
         return {};
   }
-
+ 
   auto &C = IGM.Context;
 
   type = getFormalTypeInPrimaryContext(type);
-
+  
   auto &ti = IGM.getTypeInfoForUnlowered(AbstractionPattern::getOpaque(), type);
 
   // We only have known value witness tables for copyable types currently.
   if (!ti.isCopyable(ResilienceExpansion::Maximal)) {
     return {};
   }
-
+  
   // We only have witnesses for fixed type info.
   auto *fixedTI = dyn_cast<FixedTypeInfo>(&ti);
   if (!fixedTI)
@@ -1713,7 +1713,7 @@ bool TypeInfo::canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
   if (isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
     return true;
   }
-
+  
   // By default, assume that extra inhabitants must be branched out on.
   return false;
 }
@@ -1727,7 +1727,7 @@ Address TypeInfo::indexArray(IRGenFunction &IGF, Address base,
 
   llvm::Value *destValue = nullptr;
   Size stride(1);
-
+  
   // TODO: Arrays currently lower-bound the stride to 1.
   if (!fixedTI || fixedTI->getFixedStride() != fixedTI->getFixedSize()) {
     llvm::Value *byteAddr = IGF.Builder.CreateBitCast(base.getAddress(),

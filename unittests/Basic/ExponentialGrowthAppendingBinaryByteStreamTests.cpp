@@ -157,7 +157,7 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteInteger) {
   EXPECT_EQ(AfterFirstInsertRef, Stream.data());
   EXPECT_EQ(6u, Stream.getLength());
 
-  uint32_t ToInsert = 'w' |
+  uint32_t ToInsert = 'w' | 
                       'o' << 8 |
                       'r' << 16 |
                       'l' << 24;

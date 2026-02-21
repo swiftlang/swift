@@ -40,7 +40,7 @@ int main() {
   puts("Hello Embedded Swift!\n");
   puts("-- printing works\n");
   int res = recur(10, 1);
-  if (res == 11)
+  if (res == 11) 
     puts("-- stack works\n");
   else
     puts("???\n");

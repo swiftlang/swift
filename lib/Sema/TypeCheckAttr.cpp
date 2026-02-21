@@ -499,7 +499,7 @@ public:
   void visitSendableAttr(SendableAttr *attr);
 
   void visitMacroRoleAttr(MacroRoleAttr *attr);
-
+  
   void visitRawLayoutAttr(RawLayoutAttr *attr);
 
   void visitNonEscapableAttr(NonEscapableAttr *attr);
@@ -617,7 +617,7 @@ void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::transparent_in_protocols_not_supported);
   // Class declarations cannot be transparent.
   if (isa<ClassDecl>(dc)) {
-
+    
     // @transparent is always ok on implicitly generated accessors: they can
     // be dispatched (even in classes) when the references are within the
     // class themselves.
@@ -670,7 +670,7 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
         // It's still OK to specify the ownership convention of methods in
         // classes.
         break;
-
+        
       case SelfAccessKind::Mutating:
       case SelfAccessKind::NonMutating:
         diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes,
@@ -1676,7 +1676,7 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
                    numParameters != 1,
                    func->hasThrows())
               .limitBehavior(behavior));
-
+        
         correctNameUsingNewAttr(
             ObjCAttr::createUnnamed(Ctx, attr->AtLoc, attr->Range.Start));
       }
@@ -2470,7 +2470,7 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // builtins or proper language features breaks the compiler in various hard
   // to predict ways. Warn when code attempts to do so; hopefully we can
   // promote this to an error after a while.
-
+  
 #define FUNCTION(_, Module, Name, ...) \
   if (symbol == #Name) { return false; } \
   if (symbol == "_" #Name) { return false; } \
@@ -2676,7 +2676,7 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
       diagnose(attr->getLocation(), diag::extern_c_maybe_invalid_name, cName)
           .fixItInsert(attr->getRParenLoc(), (", \"" + cName + "\"").str());
     }
-
+    
     // Diagnose reserved symbol names.
     // The standard library can't use normal C interop so needs extern(c)
     // for access to C standard library and ObjC/Swift runtime functions.
@@ -2764,12 +2764,12 @@ void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
              diag::no_objc_tagged_pointer_not_class_protocol);
     attr->setInvalid();
   }
-
+  
   if (!proto->requiresClass()
       && !proto->getAttrs().hasAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(),
              diag::no_objc_tagged_pointer_not_class_protocol);
-    attr->setInvalid();
+    attr->setInvalid();    
   }
 }
 
@@ -2870,7 +2870,7 @@ void AttributeChecker::visitConstValAttr(ConstValAttr *attr) {
 
 void AttributeChecker::visitConstInitializedAttr(ConstInitializedAttr *attr) {
   auto *VD = cast<VarDecl>(D);
-
+  
   if (D->getDeclContext()->isLocalContext()) {
     diagnose(attr->getLocation(), diag::attr_only_at_non_local_scope, attr);
   } else
@@ -6941,7 +6941,7 @@ typecheckDifferentiableAttrforDecl(AbstractFunctionDecl *original,
     originalFnRemappedTy =
         derivativeGenEnv->mapTypeIntoEnvironment(originalFnRemappedTy)
             ->castTo<AnyFunctionType>();
-
+  
   auto *resultIndices =
     autodiff::getFunctionSemanticResultIndices(originalFnRemappedTy,
                                                resolvedDiffParamIndices);
@@ -8517,11 +8517,11 @@ void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
                           attr, "struct");
     return;
   }
-
+  
   if (sd->canBeCopyable()) {
     diagnoseAndRemoveAttr(attr, diag::attr_rawlayout_cannot_be_copyable);
   }
-
+  
   if (!sd->getStoredProperties().empty()) {
     diagnoseAndRemoveAttr(attr, diag::attr_rawlayout_cannot_have_stored_properties);
   }
@@ -8548,7 +8548,7 @@ void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
   } else {
     llvm_unreachable("new unhandled rawLayout attribute form?");
   }
-
+  
   // If the type also specifies an `@_alignment`, that's an error.
   // Maybe this is interesting to support to have a layout like another
   // type but with different alignment in the future.
@@ -8556,7 +8556,7 @@ void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::attr_rawlayout_cannot_have_alignment_attr);
     return;
   }
-
+  
   // The storage is not directly referenceable by stored properties.
   sd->setHasUnreferenceableStorage(true);
 }
@@ -8616,7 +8616,7 @@ void AttributeChecker::visitAddressableSelfAttr(AddressableSelfAttr *attr) {
   if (!Ctx.LangOpts.hasFeature(Feature::AddressableParameters)) {
     Ctx.Diags.diagnose(attr->getLocation(), diag::addressable_not_enabled);
   }
-
+  
   if (!D->getDeclContext()->isTypeContext()) {
     Ctx.Diags.diagnose(attr->getLocation(), diag::addressableSelf_not_on_method);
   }
@@ -8628,7 +8628,7 @@ AttributeChecker::visitAddressableForDependenciesAttr(
   if (!Ctx.LangOpts.hasFeature(Feature::AddressableTypes)) {
     Ctx.Diags.diagnose(attr->getLocation(), diag::addressable_types_not_enabled);
   }
-
+  
   if (isa<ClassDecl>(D)) {
     Ctx.Diags.diagnose(attr->getLocation(), diag::class_cannot_be_addressable_for_dependencies);
   }

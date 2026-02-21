@@ -345,12 +345,12 @@ void ArrayInfo::classifyUsesOfArray(SILValue arrayValue, bool isInInitSection) {
     ArraySemanticsCall arrayOp(user);
     if (arrayOp.doesNotChangeArray())
       continue;
-
+    
     if (arrayOp.getKind() == ArrayCallKind::kArrayFinalizeIntrinsic) {
       classifyUsesOfArray((ApplyInst *)arrayOp, /*isInInitSection*/ false);
       continue;
     }
-
+    
     mayBeWritten = true;
   }
 }

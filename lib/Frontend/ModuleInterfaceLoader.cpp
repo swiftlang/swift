@@ -2018,7 +2018,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   if (clangImporterOpts.LoadVersionIndependentAPINotes) {
     GenericArgs.push_back("-version-independent-apinotes");
     genericSubInvocation.getClangImporterOptions().LoadVersionIndependentAPINotes = true;
-  }
+  }  
 
   // Inherit the C++ interoperability mode.
   if (langOpts.EnableCXXInterop) {
@@ -2897,7 +2897,7 @@ void setOutputPath(ResultTy &resolvedOutputPath, const StringRef &moduleName,
                   llvm::sys::path::end(interfacePath.str()),
                   llvm::sys::path::begin(path), llvm::sys::path::end(path));
   };
-
+ 
   // Dependency-scanner-specific module output path handling
   if ((CI.getFrontendOptions().RequestedAction ==
        FrontendOptions::ActionType::ScanDependencies)) {

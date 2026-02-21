@@ -1748,7 +1748,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
     auto nextSF = dyn_cast<SourceFile>(File);
     if (!nextSF)
       continue;
-
+    
     // There must be an output filename for each source file.
     // We ignore additional output filenames.
     if (OutputIter == outputFilenames.end()) {
@@ -1849,7 +1849,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
     // Verify type layout if we were asked to.
     if (!Opts.VerifyTypeLayoutNames.empty())
       PrimaryGM->emitTypeVerifier();
-
+    
     std::for_each(Opts.LinkLibraries.begin(), Opts.LinkLibraries.end(),
                   [&](LinkLibrary linkLib) {
                     PrimaryGM->addLinkLibrary(linkLib);

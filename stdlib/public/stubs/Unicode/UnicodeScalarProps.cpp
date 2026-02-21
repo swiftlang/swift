@@ -439,48 +439,48 @@ __swift_uint8_t _swift_stdlib_getScript(__swift_uint32_t scalar) {
   auto lowerBoundIndex = 0;
   auto endIndex = SCRIPTS_COUNT;
   auto upperBoundIndex = endIndex - 1;
-
+  
   while (upperBoundIndex >= lowerBoundIndex) {
     auto index = lowerBoundIndex + (upperBoundIndex - lowerBoundIndex) / 2;
-
+    
     auto entry = _swift_stdlib_scripts[index];
-
+    
     // Shift the enum value out of the scalar.
     auto lowerBoundScalar = (entry << 11) >> 11;
-
+    
     __swift_uint32_t upperBoundScalar = 0;
-
+    
     // If we're not at the end of the array, the range count is simply the
     // distance to the next element.
     if (index != endIndex - 1) {
       auto nextEntry = _swift_stdlib_scripts[index + 1];
-
+      
       auto nextLower = (nextEntry << 11) >> 11;
-
+      
       upperBoundScalar = nextLower - 1;
     } else {
       // Otherwise, the range count is the distance to 0x10FFFF
       upperBoundScalar = 0x10FFFF;
     }
-
+    
     // Shift the scalar out and get the enum value.
     auto script = entry >> 21;
-
+    
     if (scalar >= lowerBoundScalar && scalar <= upperBoundScalar) {
       return script;
     }
-
+    
     if (scalar > upperBoundScalar) {
       lowerBoundIndex = index + 1;
       continue;
     }
-
+    
     if (scalar < lowerBoundScalar) {
       upperBoundIndex = index - 1;
       continue;
     }
   }
-
+  
   // If we make it out of this loop, then it means the scalar was not found at
   // all in the array. This should never happen because the array represents all
   // scalars from 0x0 to 0x10FFFF, but if somehow this branch gets reached,
@@ -498,16 +498,16 @@ const __swift_uint8_t *_swift_stdlib_getScriptExtensions(__swift_uint32_t scalar
   auto dataIdx = _swift_stdlib_getScalarBitArrayIdx(scalar,
                                                 _swift_stdlib_script_extensions,
                                          _swift_stdlib_script_extensions_ranks);
-
+  
   // If we don't have an index into the data indices, then this scalar has no
   // script extensions
   if (dataIdx == INTPTR_MAX) {
     return 0;
   }
-
+  
   auto scalarDataIdx = _swift_stdlib_script_extensions_data_indices[dataIdx];
   *count = scalarDataIdx >> 11;
-
+  
   return _swift_stdlib_script_extensions_data + (scalarDataIdx & 0x7FF);
 #endif
 }
@@ -522,34 +522,34 @@ void _swift_stdlib_getCaseMapping(__swift_uint32_t scalar,
                                         _swift_stdlib_case_keys,
                                         _swift_stdlib_case_ranks,
                                         _swift_stdlib_case_sizes);
-
+  
   auto caseValue = _swift_stdlib_case[mphIdx];
   __swift_uint32_t hashedScalar = (caseValue << 43) >> 43;
-
+  
   // If our scalar is not the original one we hashed, then this scalar has no
   // case mapping. It maps to itself.
   if (scalar != hashedScalar) {
     buffer[0] = scalar;
     return;
   }
-
+  
   // If the top bit is NOT set, then this scalar simply maps to another scalar.
   // We have stored the distance to said scalar in this value.
   if ((caseValue & ((__swift_uint64_t)(0x1) << 63)) == 0) {
     auto distance = (__swift_int32_t)((caseValue << 1) >> 22);
     auto mappedScalar = (__swift_uint32_t)((__swift_int32_t)(scalar) - distance);
-
+    
     buffer[0] = mappedScalar;
     return;
   }
-
+  
   // Our top bit WAS set which means this scalar maps to multiple scalars.
   // Lookup our mapping in the full mph.
   auto fullMphIdx = _swift_stdlib_getMphIdx(scalar, CASE_FULL_FOLD_LEVEL_COUNT,
                                             _swift_stdlib_case_full_keys,
                                             _swift_stdlib_case_full_ranks,
                                             _swift_stdlib_case_full_sizes);
-
+  
   auto fullCaseValue = _swift_stdlib_case_full[fullMphIdx];
 
   // Count is either 2 or 3.

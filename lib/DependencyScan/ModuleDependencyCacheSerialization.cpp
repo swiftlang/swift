@@ -203,10 +203,10 @@ bool ModuleDependenciesCacheDeserializer::readSerializationTime(llvm::sys::TimeP
 
   if (*recordID != TIME_NODE)
     return true;
-
+  
   TimeLayout::readRecord(Scratch);
   std::string serializedTimeStamp = BlobData.str();
-
+  
   SerializationTimeStamp =
     llvm::sys::TimePoint<>(llvm::sys::TimePoint<>::duration(std::stoll(serializedTimeStamp)));
   return SerializationTimeStamp == llvm::sys::TimePoint<>();
@@ -848,7 +848,7 @@ bool ModuleDependenciesCacheDeserializer::readInterModuleDependenciesCache(
 
   if (readMetadata(cache.scannerContextHash))
     return true;
-
+  
   if (readSerializationTime(serializedCacheTimeStamp))
     return true;
 
@@ -1868,7 +1868,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
         addIdentifier(md.second.LibraryPath);
         addIdentifier(md.second.ExecutablePath);
       }
-
+      
       for (const auto &ii : dependencyInfo->getModuleImports()) {
         addIdentifier(ii.importIdentifier);
         for (const auto &il : ii.importLocations)

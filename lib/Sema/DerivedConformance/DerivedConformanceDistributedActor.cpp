@@ -258,7 +258,7 @@ static FuncDecl* createLocalFunc_doInvokeOnReturn(
       DeclName(C, doInvokeLocalFuncIdent, doInvokeParamsList),
       sloc,
       /*async=*/true,
-      /*throws=*/true,
+      /*throws=*/true, 
       /*ThrownType=*/Type(),
       doInvokeGenericParamList, doInvokeParamsList,
       /*returnType=*/C.TheEmptyTupleType, parentFunc);

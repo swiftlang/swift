@@ -176,14 +176,14 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 #  #endif
 #
 # and use CMake to detect the OS, such as via
-#
+#  
 #  if(EXISTS "/etc/os-release")
 #    file(READ "/etc/os-release" OS_RELEASE)
 #     if(OS_RELEASE MATCHES "Amazon Linux 2")
 #       ...
 #
-# and use
-#
+# and use 
+#   
 #    target_compile_definitions(SwiftRuntimeTests PRIVATE __SKIP_RDAR123__)
 #
 # to add the preprocessor definition.

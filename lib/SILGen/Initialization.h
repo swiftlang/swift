@@ -100,7 +100,7 @@ public:
   virtual bool isInPlaceInitializationOfGlobal() const {
     llvm_unreachable("didn't implement isInPlaceInitializationOfGlobal");
   }
-
+  
   /// Begin an in-place initialization, given that
   /// canPerformInPlaceInitialization() returned true.
   virtual SILValue
@@ -148,7 +148,7 @@ public:
     llvm_unreachable("Must implement if canPerformInPlacePackInitialization"
                      "returns true");
   }
-
+  
   /// Return true if we can get the addresses of elements with the
   /// 'splitIntoTupleElements' method.  Subclasses can override this to
   /// enable this behavior.
@@ -215,7 +215,7 @@ protected:
 private:
   Initialization(const Initialization &) = delete;
   Initialization(Initialization &&) = delete;
-
+  
   virtual void _anchor();
 };
 
@@ -225,7 +225,7 @@ class SingleBufferInitialization : virtual public Initialization {
   llvm::TinyPtrVector<CleanupHandle::AsPointer> SplitCleanups;
 public:
   SingleBufferInitialization() {}
-
+  
   bool canPerformInPlaceInitialization() const override {
     return true;
   }
@@ -235,11 +235,11 @@ public:
                                               SILLocation loc) override = 0;
 
   bool isInPlaceInitializationOfGlobal() const override = 0;
-
+  
   bool canSplitIntoTupleElements() const override {
     return true;
   }
-
+  
   MutableArrayRef<InitializationPtr>
   splitIntoTupleElements(SILGenFunction &SGF, SILLocation loc, CanType type,
                          SmallVectorImpl<InitializationPtr> &buf) override;
@@ -252,7 +252,7 @@ public:
 
   /// Overriders must call this.
   void finishInitialization(SILGenFunction &SGF) override;
-
+  
   /// Emit the exploded element into a buffer at the specified address.
   static void copyOrInitValueIntoSingleBuffer(SILGenFunction &SGF,
                                               SILLocation loc,
@@ -271,10 +271,10 @@ public:
 class KnownAddressInitialization : public SingleBufferInitialization {
   /// The physical address of the global.
   SILValue address;
-
+  
 public:
   KnownAddressInitialization(SILValue address) : address(address) {}
-
+  
   SILValue getAddress() const {
     return address;
   }
@@ -371,7 +371,7 @@ public:
   bool canSplitIntoTupleElements() const override {
     return true;
   }
-
+    
   MutableArrayRef<InitializationPtr>
   splitIntoTupleElements(SILGenFunction &SGF, SILLocation loc, CanType type,
                          SmallVectorImpl<InitializationPtr> &buf) override {
@@ -507,7 +507,7 @@ public:
   bool canSplitIntoTupleElements() const override {
     return true;
   }
-
+  
   MutableArrayRef<InitializationPtr>
   splitIntoTupleElements(SILGenFunction &SGF, SILLocation loc,
                          CanType type,

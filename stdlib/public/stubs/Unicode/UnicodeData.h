@@ -41,4 +41,4 @@ __swift_intptr_t _swift_stdlib_getScalarBitArrayIdx(__swift_uint32_t scalar,
 } // extern "C"
 #endif
 
-#endif // SWIFT_STDLIB_SHIMS_UNICODEDATA_H
+#endif // SWIFT_STDLIB_SHIMS_UNICODEDATA_H   

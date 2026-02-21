@@ -111,7 +111,7 @@ namespace {
     Address projectMetadataRef(IRGenFunction &IGF, Address addr) {
       return IGF.Builder.CreateStructGEP(addr, 1, getFixedBufferSize(IGF.IGM));
     }
-
+    
     /// Give the offset of the metadata field of an existential object.
     Size getMetadataRefOffset(IRGenModule &IGM) {
       return getFixedBufferSize(IGM);
@@ -1020,7 +1020,7 @@ public:
     call->setDoesNotThrow();
     return;
   }
-
+               
   // Opaque existentials have extra inhabitants and spare bits in their type
   // metadata pointer, matching those of a standalone thick metatype (which
   // in turn match those of a heap object).
@@ -1064,7 +1064,7 @@ class ClassExistentialTypeInfo final
     : public ScalarExistentialTypeInfoBase<ClassExistentialTypeInfo,
                                            ReferenceTypeInfo> {
   ReferenceCounting Refcounting;
-
+ 
   friend ExistentialTypeInfoBase;
   ClassExistentialTypeInfo(ArrayRef<const ProtocolDecl *> protocols,
                            llvm::Type *ty,
@@ -1164,7 +1164,7 @@ public:
     if (refcounting) *refcounting = Refcounting;
     return getNumStoredProtocols() == 0;
   }
-
+  
   bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
                                            unsigned index) const override {
     return index == 0;
@@ -1489,12 +1489,12 @@ public:
     // Error uses its own RC entry points.
     return Refcounting;
   }
-
+  
   ArrayRef<const ProtocolDecl *> getStoredProtocols() const {
     return ErrorProto;
   }
 };
-
+  
 } // end anonymous namespace
 
 static const TypeInfo *
@@ -1521,7 +1521,7 @@ llvm::Type *TypeConverter::getExistentialType(unsigned numWitnessTables) {
   llvm::StructType *&type = OpaqueExistentialTypes[numWitnessTables];
   if (type)
     return type;
-
+  
   SmallVector<llvm::Type*, 5> fields;
 
   fields.push_back(IGM.getFixedBufferTy());
@@ -1656,7 +1656,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   Alignment align = opaque.getAlignment(IGM);
   Size size = opaque.getSize(IGM);
   IsCopyable_t copyable = T->isNoncopyable() ? IsNotCopyable : IsCopyable;
-
+  
   // There are spare bits in the metadata pointer and witness table pointers
   // consistent with a native object reference.
   // NB: There are spare bits we could theoretically use in the type metadata
@@ -1818,7 +1818,7 @@ ContainedAddress irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
   // TODO: Non-ErrorType boxed existentials.
   assert(baseTy.canUseExistentialRepresentation(
            ExistentialRepresentation::Boxed, Type()));
-
+  
   // Get the reference to the existential box.
   llvm::Value *box = base.claimNext();
   // Allocate scratch space to invoke the runtime.
@@ -1855,7 +1855,7 @@ Address irgen::emitOpenExistentialBox(IRGenFunction &IGF,
   auto witnessAddr = IGF.Builder.CreateStructGEP(out, 2,
                                                  2 * IGF.IGM.getPointerSize());
   auto witness = IGF.Builder.CreateLoad(witnessAddr);
-
+  
   bindArchetype(IGF, openedArchetype, metadata, MetadataState::Complete,
                 witness);
   return box.getAddress();
@@ -1880,7 +1880,7 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   assert(proto == conformances[0].getProtocol());
   auto witness = emitWitnessTableRef(IGF, formalSrcType, &srcMetadata,
                                      conformances[0]);
-
+  
   // Call the runtime to allocate the box.
   // TODO: When there's a store or copy_addr immediately into the box, peephole
   // it into the initializer parameter to allocError.
@@ -1938,7 +1938,7 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
       return;
     }
   }
-
+  
   assert(outType.isClassExistentialType() &&
          "creating a non-class existential type");
 

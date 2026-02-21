@@ -873,7 +873,7 @@ broken down into smaller ones.
 ##### Overload Choices
 
 Whenever the solver creates a new overload set, that overload set is
-associated with a particular locator.
+associated with a particular locator. 
 
 When the solver selects a particular overload an the overload set,
 it records the selected overload based on the locator of the overload
@@ -1001,8 +1001,8 @@ use this same arena.
 
 ## Diagnostics
 
-Swift 5.2 introduced a new diagnostic framework, which is described
-in detail in this
+Swift 5.2 introduced a new diagnostic framework, which is described 
+in detail in this 
 [blog post](https://swift.org/blog/new-diagnostic-arch-overview/).
 
 ## Footnotes

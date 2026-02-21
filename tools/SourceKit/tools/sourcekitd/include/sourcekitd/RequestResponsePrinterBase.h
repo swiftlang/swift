@@ -37,7 +37,7 @@ class RequestResponsePrinterBase {
 public:
   typedef std::vector<std::pair<SourceKit::UIdent, VisitedType>> DictMap;
 
-  RequestResponsePrinterBase(llvm::raw_ostream &OS, unsigned Indent = 0,
+  RequestResponsePrinterBase(llvm::raw_ostream &OS, unsigned Indent = 0, 
                              bool PrintAsJSON = false)
     : OS(OS), Indent(Indent), PrintAsJSON(PrintAsJSON) { }
 

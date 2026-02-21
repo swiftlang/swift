@@ -1093,7 +1093,7 @@ static Type applyGenericArguments(Type type,
 
     return ParameterizedProtocolType::get(ctx, protoType, argTys);
   }
-
+  
   // Builtins have special handling.
   if (auto bug = type->getAs<BuiltinUnboundGenericType>()) {
     // We don't have any variadic builtins yet, but we do have value arguments.
@@ -1111,13 +1111,13 @@ static Type applyGenericArguments(Type type,
 
       args.push_back(substTy);
     }
-
+    
     // Try to form a substitution map.
     auto subs = SubstitutionMap::get(bug->getGenericSignature(), args,
                                      LookUpConformanceInModule());
-
+                                     
     auto bound = bug->getBound(subs);
-
+    
     if (bound->hasError()) {
       diags.diagnose(loc, diag::invalid_generic_builtin_type, type);
       return ErrorType::get(ctx);
@@ -1609,7 +1609,7 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
 
       return I->second;
     }
-
+    
     // type-casting operators such as 'is' and 'as'.
     if (resolution.getOptions().is(TypeResolverContext::ExplicitCastExpr)) {
       auto lookupResult = TypeChecker::lookupUnqualified(
@@ -1655,7 +1655,7 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
     ModuleSelectorCorrection correction(
       TypeChecker::lookupMemberType(dc, parentType, anyModuleName,
                                     repr->getLoc(), lookupOptions));
-
+    
     if (correction.diagnose(ctx, repr->getNameLoc(), repr->getNameRef())) {
       // FIXME: Can we recover by assuming the first/best result is correct?
       return ErrorType::get(ctx);
@@ -2355,9 +2355,9 @@ namespace {
       repr->setInvalid();
       return diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
-
+    
     bool diagnoseDisallowedExistential(TypeRepr *repr);
-
+    
     bool diagnoseInvalidPlaceHolder(OpaqueReturnTypeRepr *repr);
 
     Type resolveGlobalActor(SourceLoc loc, TypeResolutionOptions options,
@@ -2991,10 +2991,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     // evaluation of an `OpaqueResultTypeRequest`.
     auto opaqueRepr = cast<OpaqueReturnTypeRepr>(repr);
     auto *DC = getDeclContext();
-
+    
     bool isInExistential = diagnoseDisallowedExistential(opaqueRepr);
     bool hasInvalidPlaceholder = diagnoseInvalidPlaceHolder(opaqueRepr);
-
+    
     if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
       if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr)){
         return !isInExistential ? getOpaqueArchetypeIdentity(opaqueDecl, *ordinal)
@@ -3632,7 +3632,7 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     else
       ty = resolveASTFunctionType(fnRepr, options, &attrs);
 
-  // Boxes
+  // Boxes 
   } else if (auto boxRepr = dyn_cast<SILBoxTypeRepr>(repr)) {
     ty = resolveSILBoxType(boxRepr, options, &attrs);
 
@@ -3812,7 +3812,7 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
       ty = ErrorType::get(getASTContext());
     }
   }
-
+  
   if (getASTContext().LangOpts.hasFeature(Feature::AddressableParameters)) {
     if (auto addressableAttr = claim<AddressableTypeAttr>(attrs)) {
       if (options.is(TypeResolverContext::VariadicFunctionInput) &&
@@ -4082,7 +4082,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
         else
           noDerivative = true;
       }
-
+      
       if (ATR->has(TypeAttrKind::Addressable)) {
         addressable = true;
       }
@@ -4447,7 +4447,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   case FunctionTypeRepresentation::Thin:
     // Native conventions.
     break;
-
+    
   case FunctionTypeRepresentation::Block:
   case FunctionTypeRepresentation::CFunctionPointer:
     // C conventions. Reject incompatible parameter attributes.
@@ -4694,7 +4694,7 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
 
   // Substitute out parsed context types into interface types.
   auto genericSig = repr->getGenericSignature().getCanonicalSignature();
-
+  
   // Resolve the generic arguments.
   // Start by building a TypeSubstitutionMap.
   SubstitutionMap subMap;
@@ -4707,7 +4707,7 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
       diagnose(repr->getLoc(), diag::sil_box_arg_mismatch);
       return ErrorType::get(getASTContext());
     }
-
+  
     for (unsigned i : indices(params)) {
       auto argTy = resolveType(repr->getGenericArguments()[i], options);
       genericArgMap.insert({params[i], argTy->getCanonicalType()});
@@ -6251,7 +6251,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
         !elements[0].getType()->is<PackExpansionType>())
       return elements[0].getType();
   }
-
+  
   if (moveOnlyElementIndex.has_value()) {
     auto noncopyableTy = elements[*moveOnlyElementIndex].getType();
     auto loc = repr->getElementType(*moveOnlyElementIndex)->getLoc();
@@ -6711,7 +6711,7 @@ class ExistentialTypeSyntaxChecker : public ASTWalker {
 
   unsigned exprCount = 0;
   llvm::SmallVector<TypeRepr *, 4> reprStack;
-
+    
 public:
   ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements)
       : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) {}

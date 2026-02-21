@@ -349,22 +349,22 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         // Don't need to dynamically calculate this offset.
         Offsets.push_back(nullptr);
         break;
-
+      
       case ElementLayout::Kind::NonFixed:
         // Start calculating non-fixed offsets from the end of the first fixed
         // field.
         if (!offset) {
           offset = calcInitOffset(IGF, i, layout);
         }
-
+        
         // Round up to alignment to get the offset.
         auto alignMask = elt.getType().getAlignmentMask(IGF, eltTy);
         auto notAlignMask = IGF.Builder.CreateNot(alignMask);
         offset = IGF.Builder.CreateAdd(offset, alignMask);
         offset = IGF.Builder.CreateAnd(offset, notAlignMask);
-
+        
         Offsets.push_back(offset);
-
+        
         // Advance by the field's size to start the next field.
         offset = IGF.Builder.CreateAdd(offset,
                                        elt.getType().getSize(IGF, eltTy));
@@ -1289,7 +1289,7 @@ void IRGenFunction::emitNativeSetDeallocating(llvm::Value *value) {
 llvm::Constant *IRGenModule::getFixLifetimeFn() {
   if (FixLifetimeFn)
     return FixLifetimeFn;
-
+  
   // Generate a private stub function for the LLVM ARC optimizer to recognize.
   auto fixLifetimeTy = llvm::FunctionType::get(VoidTy, RefCountedPtrTy,
                                                /*isVarArg*/ false);
@@ -1307,7 +1307,7 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
   // Give the function an empty body.
   auto entry = llvm::BasicBlock::Create(getLLVMContext(), "", fixLifetime);
   llvm::ReturnInst::Create(getLLVMContext(), entry);
-
+  
   FixLifetimeFn = fixLifetime;
   return fixLifetime;
 }
@@ -1315,7 +1315,7 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
 FunctionPointer IRGenModule::getFixedClassInitializationFn() {
   if (FixedClassInitializationFn)
     return *FixedClassInitializationFn;
-
+  
   // If ObjC interop is disabled, we don't need to do fixed class
   // initialization.
   FunctionPointer fn;
@@ -1671,16 +1671,16 @@ class FixedBoxTypeInfo final : public FixedBoxTypeInfoBase {
     return getSILBoxFieldType(IGM.getMaximalTypeExpansionContext(),
                               T, IGM.getSILModule().Types, 0);
   }
-
+  
   static HeapLayout getHeapLayout(IRGenModule &IGM, SILBoxType *T) {
     SmallVector<SILType> fieldTypes;
     fieldTypes.push_back(getFieldType(IGM, T));
-
+    
     auto bindings = NecessaryBindings::forFixedBox(IGM, T);
     unsigned bindingsIndex = 0;
     SmallVector<const TypeInfo *, 4> fields;
     fields.push_back(&IGM.getTypeInfo(fieldTypes[0]));
-
+    
     if (!bindings.empty()) {
       bindingsIndex = 1;
       auto bindingsSize = bindings.getBufferSize(IGM);
@@ -1689,7 +1689,7 @@ class FixedBoxTypeInfo final : public FixedBoxTypeInfoBase {
       fieldTypes.push_back(SILType());
       fields.push_back(&bindingsTI);
     }
-
+    
     return HeapLayout(IGM, LayoutStrategy::Optimal,
                       fieldTypes, fields,
                       /* type to fill */ nullptr,
@@ -1800,7 +1800,7 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // Produce a tailored box metadata for the type.
   assert(T->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-
+  
   return new FixedBoxTypeInfo(IGM, T);
 }
 
@@ -1997,7 +1997,7 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
       metadata->setName(llvm::Twine(object->getName()) + ".metadata");
     return metadata;
   }
-
+      
   case IsaEncoding::ObjC: {
     // Feed the object pointer to object_getClass.
     llvm::Value *objcClass = emitLoadOfObjCHeapMetadataRef(IGF, object);
@@ -2055,10 +2055,10 @@ static llvm::Value *emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
     return emitLoadOfHeapMetadataRef(IGF, object, IsaEncoding::Pointer,
                                      /*suppressCast*/ false);
   }
-
+  
   object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
   llvm::CallInst *metadata;
-
+  
   switch (repr) {
   case MetatypeRepresentation::ObjC:
     metadata = IGF.Builder.CreateCall(
@@ -2073,7 +2073,7 @@ static llvm::Value *emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
   case MetatypeRepresentation::Thin:
     llvm_unreachable("class metadata can't be thin");
   }
-
+  
   metadata->setDoesNotThrow();
   metadata->setOnlyReadsMemory();
   return metadata;
@@ -2116,7 +2116,7 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
         && hasKnownSwiftMetadata(IGF.IGM, objectType.getASTType()))
       return emitLoadOfHeapMetadataRef(IGF, object, isaEncoding,
                                        /*suppressCast*/ false);
-
+   
     // Ask the Swift runtime to find the dynamic type. This will look through
     // dynamic subclasses of Swift classes, and use the -class message for
     // ObjC classes.
@@ -2139,7 +2139,7 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
     // For ObjC or mixed classes, we need to use object_getClass.
     return IsaEncoding::ObjC;
   }
-
+  
   // Existentials use the encoding of the enclosed dynamic type.
   if (type->isAnyExistentialType()) {
     return getIsaEncodingForType(

@@ -56,7 +56,7 @@ Clang also has a kind of diagnostic called a "remark", which represents informat
   - `expected '{' after 'defer'`.
   - `type 'S' does not conform to protocol 'Sequence'`.
 
-- When referring to attributes by name, use *either* `attribute 'foo'` or
+- When referring to attributes by name, use *either* `attribute 'foo'` or 
   `'@foo'`, rather than `attribute '@foo'`.
 
 - Match the tone and phrasing of other diagnostics. Some common phrases:
@@ -67,7 +67,7 @@ Clang also has a kind of diagnostic called a "remark", which represents informat
   - "...to silence this warning"
   - "...here" (for a purely locational note)
 
-- If possible, it is best to include the name of the type or function that has the error, e.g. "non-actor type 'Nope' cannot ..." is better than "non-actor type cannot ...". It helps developers relate the error message to the specific type the error is about, even if the error would highlight the appropriate line / function in other ways.
+- If possible, it is best to include the name of the type or function that has the error, e.g. "non-actor type 'Nope' cannot ..." is better than "non-actor type cannot ...". It helps developers relate the error message to the specific type the error is about, even if the error would highlight the appropriate line / function in other ways. 
 
 [book]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language
 
@@ -156,7 +156,7 @@ If you run into any issues or have questions while following the steps above, fe
 
 - `%%` - Emits a literal percent sign.
 
-The following subsections describe format specifiers that are specific to
+The following subsections describe format specifiers that are specific to 
 diagnostic arguments of a given type.
 
 #### `Decl`
@@ -174,14 +174,14 @@ diagnostic arguments of a given type.
 - `%kind0` - Replaced with `attribute 'foo'`, whereas `%0` is replaced with
   `'@foo'`.
 
-Note: If your diagnostic could apply to accessors, be careful how you format the declaration's name; accessors have an empty name, so you need to display their accessor kind and the name of their storage decl instead. Inserting the name with a `Decl *` parameter will handle these complications automatically; if you want to use `DeclName` or `Identifier` instead, you'll probably need a separate version of the diagnostic for accessors.
+Note: If your diagnostic could apply to accessors, be careful how you format the declaration's name; accessors have an empty name, so you need to display their accessor kind and the name of their storage decl instead. Inserting the name with a `Decl *` parameter will handle these complications automatically; if you want to use `DeclName` or `Identifier` instead, you'll probably need a separate version of the diagnostic for accessors. 
 
 ### Diagnostic Verifier ###
 
 (This section is specific to the Swift compiler's diagnostic engine.)
 
 If the `-verify` frontend flag is used, the Swift compiler will check emitted diagnostics against specially formatted comments in the source. This feature is used extensively throughout the test suite to ensure diagnostics are emitted with the correct message and source location.
-
+  
 `-verify` parses all ordinary source files passed as inputs to the compiler to look for expectation comments. If you'd like to check for diagnostics in additional files, like swiftinterfaces or even Objective-C headers, specify them with `-verify-additional-file <filename>`. By default, `-verify` considers any diagnostic at `<unknown>:0` (that is, any diagnostic emitted with an invalid source location) to be unexpected; you can disable this by passing `-verify-ignore-unknown`.
 
 An expected diagnostic is denoted by a comment which begins with `expected-error`, `expected-warning`, `expected-note`, or `expected-remark`. (You can use `-verify-additional-prefix <string>` to add expectations with additional prefixes, e.g. `-verify-additional-prefix foo-` will pick up both `expected-error` and `expected-foo-error`.) It is followed by:
@@ -193,11 +193,11 @@ An expected diagnostic is denoted by a comment which begins with `expected-error
 - (Required) The expected error message. The message should be enclosed in double curly braces and should not include the `error:`/`warning:`/`note:`/`remark:` prefix. For example, `// expected-error {{invalid redeclaration of 'y'}}` would match an error with that message on the same line. The expected message does not need to match the emitted message verbatim. As long as the expected message is a substring of the original message, they will match.
 
 - (Optional) Expected fix-its. These are each enclosed in double curly braces and appear after the expected message. An expected fix-it consists of a column range followed by the text it's expected to be replaced with. For example, `let r : Int i = j // expected-error{{consecutive statements}} {{12-12=;}}` will match a fix-it attached to the consecutive statements error which inserts a semicolon at column 12, just after the 't' in 'Int'.
-
+  
   * Insertions are represented by identical start and end locations: `{{3-3=@objc }}`. Deletions are represented by empty replacement text: `{{3-9=}}`.
-
+  
   * Line offsets are also permitted; for instance, `{{-1:12-+1:42=}}` would specify a fix-it that deleted everything between column 12 on the previous line and column 42 on the next line. (If the sign is omitted, it specifies an absolute line number, not an offset.)
-
+  
   * By default, the verifier ignores any fix-its that are *not* expected; the special `{{none}}` specifier tells it to verify that the diagnostic it's attached to has *only* the fix-its specified and no others.
 
   * If two (or more) expected fix-its are juxtaposed with nothing (or whitespace) between them, then both must be present for the verifier to match. If two (or more) expected fix-its have `||` between them, then one of them must be present for the verifier to match. `||` binds more tightly than juxtaposition: `{{1-1=a}} {{2-2=b}} || {{2-2=c}} {{3-3=d}} {{none}}` will only match if there is either a set of three fix-its that insert `a`, `b`, and `d`, or a set of three fix-its that insert `a`, `c`, and `d`. (Without the `{{none}}`, it would also permit all four fix-its, but only because one of the four would be unmatched and ignored.)

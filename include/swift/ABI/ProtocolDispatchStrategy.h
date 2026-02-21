@@ -30,7 +30,7 @@ enum class ProtocolDispatchStrategy: uint8_t {
   ///
   /// This must be 0 for ABI compatibility with Objective-C protocol_t records.
   ObjC = 0,
-
+  
   /// Uses Swift protocol witness table dispatch.
   ///
   /// To invoke methods of this protocol, a pointer to a protocol witness table

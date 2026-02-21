@@ -837,7 +837,7 @@ bool ClosureArgDataflowState::process(
   // these when we clone the closure.
   if (performConsumingDataflow(initBlocks, consumingBlocks)) {
     LLVM_DEBUG(llvm::dbgs() << "found single consuming use!\n");
-
+    
     // Before we do anything, make sure our argument has at least one single
     // debug_value user. If we have many we can't handle it since something in
     // SILGen is emitting weird code. Our tests will ensure that SILGen does not

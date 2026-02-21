@@ -31,7 +31,7 @@ static __swift_uint32_t hash(__swift_uint32_t scalar, __swift_uint32_t level,
   hash ^= scramble(scalar);
   hash = (hash << 13) | (hash >> 19);
   hash = hash * 5 + 0xE6546B64;
-
+  
   hash ^= scramble(level);
   hash = (hash << 13) | (hash >> 19);
   hash = hash * 5 + 0xE6546B64;

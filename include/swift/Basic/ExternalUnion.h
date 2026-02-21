@@ -515,7 +515,7 @@ public:
     is_nothrow_copy_assignable =
       Member::is_nothrow_copy_assignable &&
       Others::is_nothrow_copy_assignable,
-    is_move_assignable =
+    is_move_assignable = 
       Member::is_move_assignable &&
       Others::is_move_assignable,
     is_nothrow_move_assignable =

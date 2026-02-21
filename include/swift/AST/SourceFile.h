@@ -179,7 +179,7 @@ private:
    /// The set of parsed decls with opaque return types that have not yet
    /// been validated.
    llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
-
+  
   /// The set of validated opaque return type decls in the source file.
   llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
   llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;

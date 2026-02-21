@@ -114,7 +114,7 @@ namespace swift {
   /// The input triple should already be "normalized" in the sense that
   /// llvm::Triple::normalize() would not affect it.
   llvm::Triple getTargetSpecificModuleTriple(const llvm::Triple &triple);
-
+  
   /// Computes the target triple without version information.
   llvm::Triple getUnversionedTriple(const llvm::Triple &triple);
 

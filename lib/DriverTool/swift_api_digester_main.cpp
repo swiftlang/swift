@@ -1108,7 +1108,7 @@ class InterfaceTypeChangeDetector {
          Node->getChildrenCount() != Counter->getChildrenCount())) {
       Node->annotate(NodeAnnotation::TypeRewritten);
       Node->annotate(NodeAnnotation::TypeRewrittenLeft, Node->getPrintedName());
-      Node->annotate(NodeAnnotation::TypeRewrittenRight,
+      Node->annotate(NodeAnnotation::TypeRewrittenRight, 
                      Counter->getPrintedName());
       return true;
     }

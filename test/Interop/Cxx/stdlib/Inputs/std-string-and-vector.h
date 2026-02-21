@@ -27,8 +27,8 @@ protected:
   std::vector<std::string> protVec;
 
 public:
-  S() : privStr("private"), privVec({"private", "vector"}),
-        pubStr("public"), pubVec({"a", "public", "vector"}),
+  S() : privStr("private"), privVec({"private", "vector"}), 
+        pubStr("public"), pubVec({"a", "public", "vector"}), 
         protStr("protected"), protVec({"protected", "vector"}) {}
 
   std::vector<std::string> getPrivVec() const { return privVec; }

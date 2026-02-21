@@ -60,7 +60,7 @@ public:
   using AllocatorBase<MetadataAllocator>::Deallocate;
 
   void PrintStats() const {}
-
+  
   MetadataAllocator withTag(uint16_t Tag) {
     MetadataAllocator Allocator = *this;
     Allocator.Tag = Tag;
@@ -265,7 +265,7 @@ public:
     auto result = Storage.getOrInsert(key, worker, args...);
     auto entry = result.first;
 
-    // If we are not inserting the entry, we need to potentially block on
+    // If we are not inserting the entry, we need to potentially block on 
     // currently satisfies our conditions.
     if (!result.second) {
       auto status =
@@ -404,7 +404,7 @@ public:
 
     // Publish the value, which unpublishes the queue.
     worker.finishAndUnpublishQueue([&] {
-      Value.store(value, std::memory_order_release);
+      Value.store(value, std::memory_order_release);      
     });
 
     return origValue;
@@ -1351,7 +1351,7 @@ private:
     // We're done with this worker thread; replace the wait queue
     // with the dependency record.  We still want to do these stores
     // under the lock, though.
-    worker.finishAndUnpublishQueue([&] {
+    worker.finishAndUnpublishQueue([&] { 
       auto newInfo = PrivateMetadataTrackingInfo(newState, suspended);
       assert(newInfo.hasAllocatedMetadata());
 

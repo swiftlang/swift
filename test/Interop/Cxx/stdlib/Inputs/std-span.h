@@ -74,7 +74,7 @@ struct DependsOnSelf {
 inline struct SpanBox getStructSpanBox() { return {iarray, iarray, sarray, sarray}; }
 
 struct CaptureByReference {
-    void set(const std::vector<int>& x [[clang::lifetime_capture_by(this)]]) {
+    void set(const std::vector<int>& x [[clang::lifetime_capture_by(this)]]) { 
         this->x = ConstSpanOfInt(x.data(), x.size());
     };
     ConstSpanOfInt x;

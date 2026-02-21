@@ -288,9 +288,9 @@ public:
   using difference_type =
       typename std::iterator_traits<Iterator>::difference_type;
 
-  /// Construct a new transforming iterator for the given iterator
+  /// Construct a new transforming iterator for the given iterator 
   /// and operation.
-  TransformIterator(Iterator current, Operation op)
+  TransformIterator(Iterator current, Operation op) 
     : Current(current), Op(op) { }
 
   reference operator*() const {
@@ -329,7 +329,7 @@ public:
 
 /// Create a new transform iterator.
 template<typename Iterator, typename Operation>
-inline TransformIterator<Iterator, Operation>
+inline TransformIterator<Iterator, Operation> 
 makeTransformIterator(Iterator current, Operation op) {
   return TransformIterator<Iterator, Operation>(current, op);
 }
@@ -364,15 +364,15 @@ public:
     return Op(Rng[index]);
   }
 
-  typename std::iterator_traits<iterator>::value_type front() const {
+  typename std::iterator_traits<iterator>::value_type front() const { 
     assert(!empty() && "Front of empty range");
-    return *begin();
+    return *begin(); 
   }
 };
 
 /// Create a new transform range.
 template<typename Range, typename Operation>
-inline TransformRange<Range, Operation>
+inline TransformRange<Range, Operation> 
 makeTransformRange(Range range, Operation op) {
   return TransformRange<Range, Operation>(range, op);
 }
@@ -421,7 +421,7 @@ public:
 
   /// Construct a new optional transform iterator for the given
   /// iterator range and operation.
-  OptionalTransformIterator(Iterator current, Iterator end,
+  OptionalTransformIterator(Iterator current, Iterator end, 
                             OptionalTransform op)
     : Current(current), End(end), Op(op)
   {
@@ -433,10 +433,10 @@ public:
   /// and operation, where the iterator range has already been
   /// "primed" by ensuring that it is empty or the current iterator
   /// points to something that matches the operation.
-  OptionalTransformIterator(Iterator current, Iterator end,
+  OptionalTransformIterator(Iterator current, Iterator end, 
                             OptionalTransform op, PrimedT)
-    : Current(current), End(end), Op(op)
-  {
+    : Current(current), End(end), Op(op) 
+  { 
     // Assert that the iterators have already been primed.
     assert((Current == End || Op(*Current)) && "Not primed!");
   }
@@ -459,7 +459,7 @@ public:
     return old;
   }
 
-  friend bool operator==(OptionalTransformIterator lhs,
+  friend bool operator==(OptionalTransformIterator lhs, 
                          OptionalTransformIterator rhs) {
     return lhs.Current == rhs.Current;
   }
@@ -471,8 +471,8 @@ public:
 
 /// Create a new filter iterator.
 template<typename Iterator, typename OptionalTransform>
-inline OptionalTransformIterator<Iterator, OptionalTransform>
-makeOptionalTransformIterator(Iterator current, Iterator end,
+inline OptionalTransformIterator<Iterator, OptionalTransform> 
+makeOptionalTransformIterator(Iterator current, Iterator end, 
                               OptionalTransform op) {
   return OptionalTransformIterator<Iterator, OptionalTransform>(current, end,
                                                                 op);
@@ -490,32 +490,32 @@ public:
   using iterator = OptionalTransformIterator<Iterator, OptionalTransform>;
 
   OptionalTransformRange(Range range, OptionalTransform op)
-    : First(range.begin()), Last(range.end()), Op(op)
-  {
+    : First(range.begin()), Last(range.end()), Op(op) 
+  { 
     // Prime the sequence.
     while (First != Last && !Op(*First))
       ++First;
   }
 
-  iterator begin() const {
-    return iterator(First, Last, Op, iterator::Primed);
+  iterator begin() const { 
+    return iterator(First, Last, Op, iterator::Primed); 
   }
 
-  iterator end() const {
-    return iterator(Last, Last, Op, iterator::Primed);
+  iterator end() const { 
+    return iterator(Last, Last, Op, iterator::Primed); 
   }
 
   bool empty() const { return First == Last; }
 
-  typename std::iterator_traits<iterator>::value_type front() const {
+  typename std::iterator_traits<iterator>::value_type front() const { 
     assert(!empty() && "Front of empty range");
-    return *begin();
+    return *begin(); 
   }
 };
 
 /// Create a new filter range.
 template<typename Range, typename OptionalTransform>
-inline OptionalTransformRange<Range, OptionalTransform>
+inline OptionalTransformRange<Range, OptionalTransform> 
 makeOptionalTransformRange(Range range, OptionalTransform op) {
   return OptionalTransformRange<Range, OptionalTransform>(range, op);
 }
@@ -555,16 +555,16 @@ makeDowncastFilterIterator(Iterator current, Iterator end) {
 }
 
 template<typename Subclass, typename Range>
-class DowncastFilterRange
+class DowncastFilterRange 
   : public OptionalTransformRange<Range, DowncastAsOptional<Subclass>> {
 
   using Inherited = OptionalTransformRange<Range, DowncastAsOptional<Subclass>>;
 
 public:
-  DowncastFilterRange(Range range)
+  DowncastFilterRange(Range range) 
     : Inherited(range, DowncastAsOptional<Subclass>()) { }
 };
-
+              
 template<typename Subclass, typename Range>
 DowncastFilterRange<Subclass, Range>
 makeDowncastFilterRange(Range range) {
@@ -695,7 +695,7 @@ public:
     return !(left == right);
   }
 };
-
+  
 /// Cast a pointer to \c U  to a pointer to a supertype \c T.
 /// Example:  Wobulator *w = up_cast<Wobulator>(coloredWobulator)
 /// Useful with ?: where each arm is a different subtype.

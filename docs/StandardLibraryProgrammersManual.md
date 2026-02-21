@@ -19,7 +19,7 @@ Some of this code is very subtle, and its presentation matters greatly. Effort s
 #### Line Breaking
 
 The stdlib currently has a hard line length limit of 80 characters. This allows code to be easily read in environments that don't gracefully handle long lines, including (especially!) code reviews on GitHub.
-
+   
 We use two spaces as the unit of indentation. We don't use tabs.
 
 To break long lines, please closely follow the indentation conventions you see in the existing codebase. (FIXME: Describe in detail.)
@@ -35,7 +35,7 @@ The rationale for this is that line breaks tend to put strong visual emphasis on
 }
 
 // BAD (arg2 is easily missed)
-@inlinable
+@inlinable 
 public func foobar<Result>(
   _ arg1: Result, arg2: Int,             // ☹️
   _ arg3: (Result, Element) throws -> Result
@@ -44,8 +44,8 @@ public func foobar<Result>(
 // GOOD
 @inlinable
 public func foobar<Result>(
-  _ arg1: Result,
-  arg2: Int,
+  _ arg1: Result, 
+  arg2: Int, 
   _ arg3: (Result, Element) throws -> Result
 ) rethrows -> Result {
   ...
@@ -66,7 +66,7 @@ internal func _preconditionFailure(
 // Also OK
 internal func _preconditionFailure(
   _ message: StaticString = StaticString(),
-  file: StaticString = #file,
+  file: StaticString = #file, 
   line: UInt = #line
 ) -> Never {
   ...
@@ -107,8 +107,8 @@ internal func _parseIntegerDigits<Result: FixedWidthInteger>(
 // ALSO GOOD:
 @_alwaysEmitIntoClient
 internal func _parseIntegerDigits<Result: FixedWidthInteger>(
-  ascii codeUnits: UnsafeBufferPointer<UInt8>,
-  radix: Int,
+  ascii codeUnits: UnsafeBufferPointer<UInt8>, 
+  radix: Int, 
   isNegative: Bool
 ) -> Result? {
   ...
@@ -162,7 +162,7 @@ Please keep all stored properties together in a single uninterrupted list, follo
 
 We also have some recommendations for defining other members. These aren't strict rules, as the best way to present definitions varies; but it usually makes sense to break up the implementation into easily digestible, logical chunks.
 
-- In general, it is a good idea to keep the main `struct`/`class` definition as short as possible: preferably it should consist of the type's stored properties and a handful of critical initializers, and nothing else.
+- In general, it is a good idea to keep the main `struct`/`class` definition as short as possible: preferably it should consist of the type's stored properties and a handful of critical initializers, and nothing else. 
 
 - Everything else should go in standalone extensions, arranged by logical theme. For example, it's often nice to define protocol conformances in dedicated extensions. If it makes sense, feel free to add a comment to title these sectioning extensions.
 
@@ -170,40 +170,40 @@ We also have some recommendations for defining other members. These aren't stric
 
 - In some cases, it can also work well to declare the most essential protocol conformances directly on the type definition; feel free to do so if it helps understanding. (You can still implement requirements in separate extensions in this case, or you can do it within the main declaration.)
 
-- It's okay for the core type declaration to forward reference large nested types or static members that are defined in subsequent extensions. It's often a good idea to define these in an extension immediately following the type declaration, but this is not a strict rule.
+- It's okay for the core type declaration to forward reference large nested types or static members that are defined in subsequent extensions. It's often a good idea to define these in an extension immediately following the type declaration, but this is not a strict rule. 
 
-Extensions are a nice way to break up the implementation into easily digestible chunks, but they aren't the only way. The goal is to make things easy to understand -- if a type is small enough, it may be best to list every member directly in the `struct`/`class` definition, while for huge types it often makes more sense to break them up into a handful of separate source files instead.
+Extensions are a nice way to break up the implementation into easily digestible chunks, but they aren't the only way. The goal is to make things easy to understand -- if a type is small enough, it may be best to list every member directly in the `struct`/`class` definition, while for huge types it often makes more sense to break them up into a handful of separate source files instead. 
 
 ```swift
 // BAD (a jumbled mess)
 struct Foo: RandomAccessCollection, Hashable {
   var count: Int { ... }
-
+  
   struct Iterator: IteratorProtocol { /* hundreds of lines */ }
-
+ 
   class _Storage { /* even more lines */ }
-
+  
   static func _createStorage(_ foo: Int, _ bar: Double) -> _Storage { ... }
-
+  
   func hash(into hasher: inout Hasher) { ... }
-
+  
   func makeIterator() -> Iterator { ... }
-
+  
   /* more stuff */
-
-  init(foo: Int, bar: Double) {
-    _storage = Self._createStorage(foo, bar)
+  
+  init(foo: Int, bar: Double) { 
+    _storage = Self._createStorage(foo, bar) 
   }
 
   static func ==(left: Self, right: Self) -> Bool { ... }
-
+  
   var _storage: _Storage
 }
 
 // GOOD
 struct Foo {
   var _storage: _Storage
-
+  
   init(foo: Int, bar: Double) { ... }
 }
 
@@ -220,10 +220,10 @@ extension Foo: Equatable {
 extension Foo: Hashable {
   func hash(into hasher: inout Hasher) { ... }
 }
-
+ 
 extension Foo: Sequence {
   struct Iterator: IteratorProtocol { /* hundreds of lines */ }
-
+  
   func makeIterator() -> Iterator { ... }
   ...
 }
@@ -246,7 +246,7 @@ All new public API additions to the core Standard Library must go through the [S
 
 All public APIs should come with documentation comments describing their purpose and behavior. It is highly recommended to use big-oh notation to document any guaranteed performance characteristics. (CPU and/or memory use, number of accesses to some underlying collection, etc.)
 
-Note that implementation details are generally outside the scope of the Swift Evolution -- the stdlib is free to change its internal algorithms, internal APIs and data structures etc. from release to release, as long as the documented API (and ABI) remains intact.
+Note that implementation details are generally outside the scope of the Swift Evolution -- the stdlib is free to change its internal algorithms, internal APIs and data structures etc. from release to release, as long as the documented API (and ABI) remains intact. 
 
 For example, since `hashValue` was always documented to allow changing its return value across different executions of the same program, we were able to switch to randomly seeded hashing in Swift 4.2 without going through the Swift Evolution process. However, the introduction of `hash(into:)` required a formal proposal. (Note though that highly visible behavioral changes like this are much more difficult to implement now that they were in the early days -- in theory we can still do ABI-preserving changes, but [Hyrum's Law](https://www.hyrumslaw.com) makes it increasingly more difficult to change any observable behavior. For example, in some cases we may need to add runtime version checks for the Swift SDK on which the main executable was compiled, to prevent breaking binaries compiled with previous releases.)
 
@@ -260,10 +260,10 @@ Anything under `stdlib/private` can be added/removed/changed with the simple app
 
 ### The Leading Underscore Rule
 
-All APIs that aren't part of the stdlib's official public API must include at least one underscored component in their fully qualified names. This includes symbols that are technically declared `public` but that aren't considered part of the public stdlib API, as well as `@usableFromInline internal`, plain `internal` and `[file]private` types and members.
+All APIs that aren't part of the stdlib's official public API must include at least one underscored component in their fully qualified names. This includes symbols that are technically declared `public` but that aren't considered part of the public stdlib API, as well as `@usableFromInline internal`, plain `internal` and `[file]private` types and members. 
 
 The underscored component need not be the last. For example, `Swift.Dictionary._worble()` is a good name for an internal helper method, but so is `Swift._NativeDictionary.worble()` -- the `_NativeDictionary` type already has the underscore.
-
+    
 Initializers don't have a handy base name on which we can put the underscore; instead, we put the underscore on the first argument label, adding one if necessary: e.g., `init(_ value: Int)` may become `init(_value: Int)`. If the initializer doesn't have any parameters, then we add a dummy parameter of type Void with an underscored label: for example, `UnsafeBufferPointer.init(_empty: ())`.
 
 This rule ensures we don't accidentally clutter the public namespace with `@usableFromInline` things (which could prevent us from choosing the best names for newly public API later), and it also makes it easy to see at a glance if a piece of stdlib code uses any non-public entities.
@@ -283,9 +283,9 @@ extension String {
   // 😊👍
   public func blanch() { ... }
   public func roast() { ... }
-}
+}    
 ```
-
+    
 This makes it trivial to identify the access level of every definition without having to scan the context it appears in.
 
 For historical reasons, the existing codebase generally uses `internal` as the catch-all non-public access level. However, it is okay to use `private`/`fileprivate` when appropriate.
@@ -294,7 +294,7 @@ For historical reasons, the existing codebase generally uses `internal` as the c
 
 Every entry point in the standard library that has an ABI impact must be applied an `@available` attribute that describes the earliest ABI-stable OS releases that it can be deployed on. (Currently this only applies to macOS, iOS, watchOS and tvOS, since Swift isn't ABI stable on other platforms yet.)
 
-Just like access control modifiers, we prefer to put `@available` attributes on each individual access point, rather than just the extension in which they are defined.
+Just like access control modifiers, we prefer to put `@available` attributes on each individual access point, rather than just the extension in which they are defined. 
 
 ```swift
 // 😢👎
@@ -332,9 +332,9 @@ extension String {
 
 (Mistakes in the OS version number list are very easy to miss during review, but can have major ABI consequences.)
 
-This is especially important for newly introduced APIs, where the corresponding OS releases may not even be known yet.
+This is especially important for newly introduced APIs, where the corresponding OS releases may not even be known yet. 
 
-Features under development that haven't shipped yet must be marked as available in the placeholder OS version `9999`. This special version is always considered available in custom builds of the Swift toolchain (including development snapshots), but not in any ABI-stable production release.
+Features under development that haven't shipped yet must be marked as available in the placeholder OS version `9999`. This special version is always considered available in custom builds of the Swift toolchain (including development snapshots), but not in any ABI-stable production release. 
 
 Never explicitly spell out such placeholder availability -- instead, use the `SwiftStdlib` macro corresponding to the Swift version we're currently working on:
 

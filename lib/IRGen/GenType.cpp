@@ -155,7 +155,7 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF, Address destAddr,
                                        bool zeroizeIfSensitive) const {
   assert(isBitwiseTakable(ResilienceExpansion::Maximal)
         && "non-bitwise-takable type must override default initializeWithTake");
-
+  
   // Prefer loads and stores if we won't make a million of them.
   // Maybe this should also require the scalars to have a fixed offset.
   ExplosionSchema schema = getSchema();
@@ -247,7 +247,7 @@ llvm::Value *FixedTypeInfo::getIsAddressableForDependencies(IRGenFunction &IGF, 
 
   bool isAFD = T.isAddressableForDeps(IGF.IGM.getSILModule(),
                                       TypeExpansionContext::minimal());
-
+  
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty, isAFD);
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
@@ -308,10 +308,10 @@ FixedTypeInfo::getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
   // Factor the index into the part that goes in the occupied bits and the
   // part that goes in the spare bits.
   unsigned occupiedIndex, spareIndex = 0;
-
+  
   unsigned spareBitCount = SpareBits.count();
   unsigned occupiedBitCount = SpareBits.size() - spareBitCount;
-
+  
   if (occupiedBitCount >= 31) {
     occupiedIndex = index;
     // The spare bit value is biased by one because all zero spare bits
@@ -334,14 +334,14 @@ llvm::Value *
 FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
                                                Address src) const {
   assert(!SpareBits.none() && "no spare bits");
-
+  
   auto &C = IGF.IGM.getLLVMContext();
-
+  
   // Load the value.
   auto payloadTy = llvm::IntegerType::get(C, getFixedSize().getValueInBits());
   src = IGF.Builder.CreateElementBitCast(src, payloadTy);
   auto val = IGF.Builder.CreateLoad(src);
-
+  
   // If the spare bits are all zero, then we have a valid value and not an
   // extra inhabitant.
   auto spareBitsMask
@@ -349,7 +349,7 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
   auto valSpareBits = IGF.Builder.CreateAnd(val, spareBitsMask);
   auto isValid = IGF.Builder.CreateICmpEQ(valSpareBits,
                                           llvm::ConstantInt::get(payloadTy, 0));
-
+  
   auto *origBB = IGF.Builder.GetInsertBlock();
   auto *endBB = llvm::BasicBlock::Create(C);
   auto *spareBB = llvm::BasicBlock::Create(C);
@@ -357,12 +357,12 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
 
   IGF.Builder.emitBlock(spareBB);
   ConditionalDominanceScope condition(IGF);
-
+  
   // Gather the occupied bits.
   auto OccupiedBits = SpareBits;
   OccupiedBits.flipAll();
   llvm::Value *idx = emitGatherBits(IGF, OccupiedBits.asAPInt(), val, 0, 31);
-
+  
   // See if spare bits fit into the 31 bits of the index.
   unsigned numSpareBits = SpareBits.count();
   unsigned numOccupiedBits = getFixedSize().getValueInBits() - numSpareBits;
@@ -378,15 +378,15 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
     idx = IGF.Builder.CreateOr(idx, spareIdx);
   }
   idx = IGF.Builder.CreateZExt(idx, IGF.IGM.Int32Ty);
-
+  
   IGF.Builder.CreateBr(endBB);
   IGF.Builder.emitBlock(endBB);
-
+  
   // If we had a valid value, return -1. Otherwise, return the index.
   auto phi = IGF.Builder.CreatePHI(IGF.IGM.Int32Ty, 2);
   phi->addIncoming(llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1), origBB);
   phi->addIncoming(idx, spareBB);
-
+  
   return phi;
 }
 
@@ -927,7 +927,7 @@ FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
                                             llvm::Value *index,
                                             Address dest) const {
   assert(!SpareBits.none() && "no spare bits");
-
+  
   auto &C = IGF.IGM.getLLVMContext();
 
   auto payloadTy = llvm::IntegerType::get(C, getFixedSize().getValueInBits());
@@ -936,11 +936,11 @@ FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
   unsigned occupiedBitCount = SpareBits.size() - spareBitCount;
   llvm::Value *occupiedIndex;
   llvm::Value *spareIndex;
-
+  
   // The spare bit value is biased by one because all zero spare bits
   // represents a valid value of the type.
   auto spareBitBias = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1U);
-
+  
   // Factor the spare and occupied bit values from the index.
   if (occupiedBitCount >= 31) {
     occupiedIndex = index;
@@ -950,22 +950,22 @@ FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
     occupiedBitMask = occupiedBitMask.zext(32);
     auto occupiedBitMaskValue = llvm::ConstantInt::get(C, occupiedBitMask);
     occupiedIndex = IGF.Builder.CreateAnd(index, occupiedBitMaskValue);
-
+    
     auto occupiedBitCountValue
       = llvm::ConstantInt::get(IGF.IGM.Int32Ty, occupiedBitCount);
     spareIndex = IGF.Builder.CreateLShr(index, occupiedBitCountValue);
     spareIndex = IGF.Builder.CreateAdd(spareIndex, spareBitBias);
   }
-
+  
   // Scatter the occupied bits.
   auto OccupiedBits = ~SpareBits.asAPInt();
   llvm::Value *occupied = emitScatterBits(IGF.IGM, IGF.Builder, OccupiedBits,
                                           occupiedIndex, 0);
-
+  
   // Scatter the spare bits.
   llvm::Value *spare = emitScatterBits(IGF.IGM, IGF.Builder, SpareBits.asAPInt(),
                                        spareIndex, 0);
-
+  
   // Combine the values and store to the destination.
   llvm::Value *inhabitant = IGF.Builder.CreateOr(occupied, spare);
 
@@ -1152,7 +1152,7 @@ namespace {
                        IsABIAccessible),
         ScalarTypes(std::move(scalarTypes))
     {}
-
+    
     llvm::ArrayType *getStorageType() const {
       return cast<llvm::ArrayType>(ScalarTypeInfo::getStorageType());
     }
@@ -1171,12 +1171,12 @@ namespace {
     unsigned getExplosionSize() const override {
       return ScalarTypes.size();
     }
-
+    
     void loadAsCopy(IRGenFunction &IGF, Address addr,
                     Explosion &explosion) const override {
       loadAsTake(IGF, addr, explosion);
     }
-
+    
     void loadAsTake(IRGenFunction &IGF, Address addr,
                     Explosion &explosion) const override {
       auto index = ScalarTypes.size();
@@ -1213,7 +1213,7 @@ namespace {
         }
       }
     }
-
+    
     void reexplode(Explosion &sourceExplosion,
                    Explosion &targetExplosion) const override {
       for (auto scalarTy : ScalarTypes) {
@@ -1221,7 +1221,7 @@ namespace {
         targetExplosion.add(sourceExplosion.claimNext());
       }
     }
-
+    
     void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
               Explosion &targetExplosion, Atomicity atomicity) const override {
       reexplode(sourceExplosion, targetExplosion);
@@ -1234,7 +1234,7 @@ namespace {
         (void)explosion.claimNext();
       }
     }
-
+    
     void fixLifetime(IRGenFunction &IGF, Explosion &explosion) const override {
       for (auto scalarTy: ScalarTypes) {
         (void)scalarTy;
@@ -1246,7 +1246,7 @@ namespace {
                  bool isOutlined) const override {
       /* nop */
     }
-
+    
     void getSchema(ExplosionSchema &schema) const override {
       for (auto scalarTy: ScalarTypes) {
         schema.add(ExplosionSchema::Element::forScalar(scalarTy));
@@ -1258,7 +1258,7 @@ namespace {
       lowering.addOpaqueData(offset.asCharUnits(),
                              (offset + getFixedSize()).asCharUnits());
     }
-
+    
     void packIntoEnumPayload(IRGenModule &IGM,
                              IRBuilder &builder,
                              EnumPayload &payload,
@@ -1269,7 +1269,7 @@ namespace {
         offset += scalarTy->getIntegerBitWidth();
       }
     }
-
+    
     void unpackFromEnumPayload(IRGenFunction &IGF,
                                const EnumPayload &payload,
                                Explosion &target,
@@ -1988,7 +1988,7 @@ const TypeInfo &IRGenModule::getTypeInfoForLowered(CanType T) {
   return Types.getCompleteTypeInfo(T);
 }
 
-///
+/// 
 const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
   return *getTypeEntry(T);
 }
@@ -2073,12 +2073,12 @@ const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
                   IGM.getSILModule(),
                   SILType::getPrimitiveAddressType(contextTy)).getASTType();
   }
-
+  
   // Fold archetypes to unique exemplars. Any archetype with the same
   // constraints is equivalent for type lowering purposes.
   CanType exemplarTy = getExemplarType(contextTy);
   assert(!exemplarTy->hasTypeParameter());
-
+  
   // See whether we lowered a type equivalent to this one.
   if (exemplarTy != canonicalTy) {
     auto &Cache = Types.getCacheFor(/*isDependent*/ false, LoweringMode);
@@ -2106,7 +2106,7 @@ const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
                                                LoweringMode);
     insertEntry(IndependentCache[exemplarTy.getPointer()]);
   }
-
+  
   // If the type info hasn't been added to the list of types, do so.
   if (!convertedTI->NextConverted) {
     convertedTI->NextConverted = FirstType;
@@ -2163,7 +2163,7 @@ TypeConverter::getOpaqueStorageTypeInfo(Size size, Alignment align) {
                     size,
                     SpareBitVector::getConstant(size.getValueInBits(), false),
                     align);
-
+  
   type->NextConverted = FirstType;
   FirstType = type;
 
@@ -2334,7 +2334,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinUnboundGeneric:
     llvm_unreachable("not a real type");
-
+    
   case TypeKind::BuiltinFixedArray: {
     return convertBuiltinFixedArrayType(cast<BuiltinFixedArrayType>(ty));
   }
@@ -2881,7 +2881,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
 
     // If there's only one stored property, we have the layout of its field.
     auto allFields = structDecl->getStoredProperties();
-
+    
     if (allFields.size() == 1) {
       auto fieldTy = t.getFieldType(
           allFields[0], IGM.getSILModule(),
@@ -2904,7 +2904,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
       return SILType();
 
     auto allCases = enumDecl->getAllElements();
-
+    
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
         && (*theCase)->hasAssociatedValues()) {
@@ -2966,13 +2966,13 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
          && "deinit should have only one parameter");
 
   auto substitutions = ty->getContextSubstitutionMap();
-
+                                                     
   CalleeInfo info(deinitTy,
                   deinitTy->substGenericArgs(IGF.getSILModule(),
                                      substitutions,
                                      IGF.IGM.getMaximalTypeExpansionContext()),
                   substitutions);
-
+                  
   bool isIndirect;
   Address indirectArg;
   Explosion directArg;
@@ -2988,7 +2988,7 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
   default:
     llvm_unreachable("move-only deinit should only have consuming parameter convention");
   }
-
+                  
   // If the deinit's convention has a special `self` parameter, then the
   // (pointer to) the value being destroyed is that parameter.
   llvm::Value *self = nullptr;
@@ -2998,7 +2998,7 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
            && "direct param (if any) should be a single pointer if "
               "it's the swiftself param");
   }
-
+   
   GenericContextScope scope(IGF.IGM,
                         nominal->getGenericSignature().getCanonicalSignature());
 

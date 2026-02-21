@@ -57,14 +57,14 @@ public:
 
   /// The target's object format type.
   llvm::Triple::ObjectFormatType OutputObjectFormat;
-
+  
   /// The spare bit mask for pointers. Bits set in this mask are unused by
   /// pointers of any alignment.
   SpareBitVector PointerSpareBits;
 
   /// The spare bit mask for (ordinary C) thin function pointers.
   SpareBitVector FunctionPointerSpareBits;
-
+  
   /// The reserved bit mask for Objective-C pointers. Pointer values with
   /// bits from this mask set are reserved by the ObjC runtime and cannot be
   /// used for Swift value layout when a reference type may reference ObjC
@@ -78,7 +78,7 @@ public:
 
   /// The alignment of heap objects.  By default, assume pointer alignment.
   Alignment HeapObjectAlignment;
-
+  
   /// The least integer value that can theoretically form a valid pointer.
   /// By default, assume that there's an entire page free.
   ///
@@ -98,14 +98,14 @@ public:
 
   /// Inline assembly to mark a call to objc_retainAutoreleasedReturnValue.
   llvm::StringRef ObjCRetainAutoreleasedReturnValueMarker;
-
+  
   /// Some architectures have specialized objc_msgSend variants.
   bool ObjCUseStret = true;
   bool ObjCUseFPRet = false;
   bool ObjCUseFP2Ret = false;
   bool ObjCUseISAMask = false;
   bool ObjCHasOpaqueISAs = false;
-
+  
   /// The value stored in a Builtin.once predicate to indicate that an
   /// initialization has already happened, if known.
   std::optional<int64_t> OnceDonePredicateValue = std::nullopt;

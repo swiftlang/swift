@@ -1279,7 +1279,7 @@ void DiagnosticVerifier::verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &
     // again. We do have to do this after checking fix-its, though, because
     // the diagnostic owns its fix-its.
     CapturedDiagnostics.erase(FoundDiagnosticIter);
-
+    
     // We found the diagnostic, so remove it... unless we allow an arbitrary
     // number of diagnostics, in which case we want to reprocess this.
     if (expected.mayAppear)
@@ -1441,7 +1441,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
   // Diagnose expected diagnostics that didn't appear.
   verifyRemaining(ExpectedDiagnostics, InputFile.data());
-
+  
   // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
   bool HadUnexpectedDiag = false;
   auto CapturedDiagIter = CapturedDiagnostics.begin();

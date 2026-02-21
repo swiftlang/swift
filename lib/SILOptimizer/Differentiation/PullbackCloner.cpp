@@ -1371,7 +1371,7 @@ public:
                            SILType::getEmptyTupleType(getASTContext()));
     builder.emitDestroyValueOperation(loc, applyInfo.pullback);
   }
-
+  
   /// Handle `struct` instruction.
   ///   Original: y = struct (x0, x1, x2, ...)
   ///    Adjoint: adj[x0] += struct_extract adj[y], #x0

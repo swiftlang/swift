@@ -212,15 +212,15 @@ bool RedundantPhiEliminationPass::valuesAreEqual(SILValue val1, SILValue val2) {
 
   SmallVector<std::pair<SILValue, SILValue>, 8> workList;
   llvm::SmallSet<std::pair<SILValue, SILValue>, 16> handled;
-
+  
   workList.push_back({val1, val2});
   handled.insert({val1, val2});
 
   while (!workList.empty()) {
-
+  
     if (handled.size() > maxNumberOfChecks)
       return false;
-
+  
     auto valuePair = workList.pop_back_val();
     SILValue val1 = valuePair.first;
     SILValue val2 = valuePair.second;
@@ -228,7 +228,7 @@ bool RedundantPhiEliminationPass::valuesAreEqual(SILValue val1, SILValue val2) {
     // The trivial case.
     if (val1 == val2)
       continue;
-
+ 
     if (val1->getKind() != val2->getKind())
       return false;
 
@@ -263,7 +263,7 @@ bool RedundantPhiEliminationPass::valuesAreEqual(SILValue val1, SILValue val2) {
       }
       continue;
     }
-
+    
     if (auto *inst1 = dyn_cast<SingleValueInstruction>(val1)) {
       // Bail if the instructions have any side effects.
       if (inst1->getMemoryBehavior() != MemoryBehavior::None)
@@ -287,7 +287,7 @@ bool RedundantPhiEliminationPass::valuesAreEqual(SILValue val1, SILValue val2) {
       }
       continue;
     }
-
+    
     return false;
   }
 
@@ -346,9 +346,9 @@ void PhiExpansionPass::run() {
     for (auto argAndIdx : enumerate(block.getArguments())) {
       if (!argAndIdx.value()->isPhi())
         continue;
-
+      
       unsigned idx = argAndIdx.index();
-
+      
       // Try multiple times on the same argument to handle nested structs.
       while (optimizeArg(cast<SILPhiArgument>(block.getArgument(idx)))) {
         changed = true;
@@ -379,7 +379,7 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
       SILInstruction *user = use->getUser();
       if (isa<DebugValueInst>(user))
         continue;
-
+      
       if (auto *extr = dyn_cast<StructExtractInst>(user)) {
         if (field && extr->getField() != field)
           return false;
@@ -438,7 +438,7 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
       // Branches are handled below by handling incoming phi operands.
       assert(isa<BranchInst>(user) || isa<CondBranchInst>(user));
     }
-
+  
     for (DebugValueInst *dvi : debugValueUsers) {
       // Recreate the debug_value with a fragment.
       SILBuilder B(dvi, dvi->getDebugScope());

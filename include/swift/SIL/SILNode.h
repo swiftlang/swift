@@ -64,7 +64,7 @@ public:
   SILNodePointer(const SingleValueInstruction *svi);
   SILNodePointer(const NonSingleValueInstruction *nsvi);
   SILNodePointer(SILValue value);
-
+  
   const SILNode *get() const { return node; }
   const SILNode *operator->() const { return node; }
   operator const SILNode *() const { return node; }
@@ -274,7 +274,7 @@ protected:
       enforcement : NumSILAccessEnforcementBits,
       noNestedConflict : 1,
       fromBuiltin : 1);
-
+    
     SHARED_FIELD(EndUnpairedAccessInst, uint8_t
       enforcement : NumSILAccessEnforcementBits,
       aborting : 1,
@@ -428,7 +428,7 @@ public:
 
   /// Return the parent module of this value.
   SILModule *getModule() const;
-
+  
   /// Pretty-print the node.  If the node is an instruction, the output
   /// will be valid SIL assembly; otherwise, it will be an arbitrary
   /// format suitable for debugging.
@@ -448,7 +448,7 @@ public:
   // never use static_cast to downcast a SILNode.
   SILInstruction *castToInstruction();
   const SILInstruction *castToInstruction() const;
-
+  
   // Called when transferring basic blocks from one function to another.
   void resetBitfields() {
     lastInitializedBitfieldID = 0;

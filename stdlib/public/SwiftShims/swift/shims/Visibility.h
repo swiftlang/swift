@@ -223,7 +223,7 @@
 // TODO: use this in shims headers in overlays.
 #if defined(__cplusplus)
 #define SWIFT_EXPORT_FROM(LIBRARY) extern "C" SWIFT_EXPORT_FROM_ATTRIBUTE(LIBRARY)
-#define SWIFT_EXTERN_C extern "C"
+#define SWIFT_EXTERN_C extern "C" 
 #else
 #define SWIFT_EXPORT_FROM(LIBRARY) SWIFT_EXPORT_FROM_ATTRIBUTE(LIBRARY)
 #define SWIFT_EXTERN_C

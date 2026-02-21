@@ -275,7 +275,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
 
   template<class A, class B, class C>
   friend struct ::llvm::CastInfo;
-
+  
   // See swift/AST/Decl.h
   static DeclContext *castDeclToDeclContext(const Decl *D);
 
@@ -403,7 +403,7 @@ public:
   /// - Generic types return a bound generic type using archetypes.
   /// - Non-type contexts return a null type.
   Type getDeclaredTypeInContext() const;
-
+  
   /// Gets the type being declared by this context.
   ///
   /// - Generic types return a bound generic type using interface types.
@@ -745,7 +745,7 @@ public:
   SWIFT_DEBUG_DUMPER(dumpContext());
   unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
                         bool onlyAPartialLine = false) const;
-
+  
   // Some Decls are DeclContexts, but not all. See swift/AST/Decl.h
   static bool classof(const Decl *D);
 };
@@ -755,7 +755,7 @@ public:
 class DeclIterator {
   Decl *Current;
 
-public:
+public: 
   typedef std::forward_iterator_tag iterator_category;
   typedef Decl *value_type;
   typedef Decl *reference;
@@ -776,7 +776,7 @@ public:
   }
 
   friend bool operator==(DeclIterator lhs, DeclIterator rhs) {
-    return lhs.Current == rhs.Current;
+    return lhs.Current == rhs.Current; 
   }
 
   friend bool operator!=(DeclIterator lhs, DeclIterator rhs) {
@@ -789,7 +789,7 @@ public:
 using DeclRange = iterator_range<DeclIterator>;
 
 /// The kind of an \c IterableDeclContext.
-enum class IterableDeclContextKind : uint8_t {
+enum class IterableDeclContextKind : uint8_t {  
   NominalTypeDecl = 0,
   ExtensionDecl,
 };

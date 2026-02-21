@@ -475,7 +475,7 @@ enum class SelfAccessKind : uint8_t {
   Borrowing,
 };
 using SelfAccessKindField = BCFixed<3>;
-
+  
 /// Translates an operator decl fixity to a Serialization fixity, whose values
 /// are guaranteed to be stable.
 static inline OperatorKind getStableFixity(OperatorFixity fixity) {
@@ -2220,7 +2220,7 @@ namespace decls_block {
     BCFixed<1>,        // restrict to protocol extension
     BCFixed<1>         // imported from Clang?
   >;
-
+  
   using XRefOpaqueReturnTypePathPieceLayout = BCRecordLayout<
     XREF_OPAQUE_RETURN_TYPE_PATH_PIECE,
     IdentifierIDField // mangled name of defining decl
@@ -2303,7 +2303,7 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCVBR<8>    // alignment
   >;
-
+  
   using RawLayoutDeclAttrLayout = BCRecordLayout<
     RawLayout_DECL_ATTR,
     BCFixed<1>, // implicit
@@ -2313,7 +2313,7 @@ namespace decls_block {
     BCVBR<8>, // alignment
     BCFixed<1> // movesAsLike
   >;
-
+  
   using SwiftNativeObjCRuntimeBaseDeclAttrLayout = BCRecordLayout<
     SwiftNativeObjCRuntimeBase_DECL_ATTR,
     BCFixed<1>, // implicit flag

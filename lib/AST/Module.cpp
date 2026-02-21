@@ -1331,7 +1331,7 @@ void ModuleDecl::populateObjCNameLookupCache() {
       // have compound names, but not allowed to have @objc attributes. Thus we
       // are sure to not hit asserts getting the simple name.
       //
-      // Similarly, init, dealloc and subscript (the special names) can't be top
+      // Similarly, init, dealloc and subscript (the special names) can't be top 
       // level decls, so we won't hit asserts getting the base identifier out of the
       // value decl.
       const Identifier &declObjCName =
@@ -2260,7 +2260,7 @@ Fingerprint ModuleDecl::getFingerprint() const {
     // changes, so use the one without type members.
     FPs.emplace_back(bsfi.getInterfaceHashExcludingTypeMembers());
   });
-
+  
   // Sort the fingerprints lexicographically so we have a stable hash despite
   // an unstable ordering of files across rebuilds.
   // FIXME: If we used a commutative hash combine (say, if we could take an
@@ -4174,7 +4174,7 @@ bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) con
   // aren't any).
   if (!mod->hasName() || mod->getFiles().empty())
     return false;
-
+  
   StringRef modulePath;
   auto fileUnit = mod->getFiles().front();
   if (auto *LF = dyn_cast_or_null<LoadedFile>(fileUnit)) {

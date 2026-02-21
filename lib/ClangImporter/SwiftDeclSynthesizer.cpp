@@ -217,7 +217,7 @@ bool SwiftDeclSynthesizer::isCGFloat(Type type) {
   if (found == ImporterImpl.RawTypes.end()) {
     return false;
   }
-
+  
   Type importTy = found->second;
   return importTy->isCGFloat();
 }
@@ -229,7 +229,7 @@ bool SwiftDeclSynthesizer::isObjCBool(Type type) {
   if (found == ImporterImpl.RawTypes.end()) {
     return false;
   }
-
+  
   Type importTy = found->second;
   return importTy->isObjCBool();
 }
@@ -2523,7 +2523,7 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
 
   auto topLevelStaticFuncDecl = FuncDecl::createImplicit(
       ctx, StaticSpellingKind::None, opDeclName, SourceLoc(),
-      /*Async*/ false, /*Throws*/ false, /*ThrownType=*/Type(),
+      /*Async*/ false, /*Throws*/ false, /*ThrownType=*/Type(), 
       genericParamList, ParameterList::create(ctx, newParams),
       operatorMethod->getResultInterfaceType(), parentCtx);
 
@@ -2556,14 +2556,14 @@ FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
       clangDC, clangDC, clangMethodDecl, ForwardingMethodKind::Virtual,
       ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
       /*forceConstQualifier*/ false);
-
+  
   // If the override has a swift_name different from the base
   // method, we ignore the swift_name attribute and instead use the base method's name.
   // In this case, swiftName holds the correct derived method name obtained through NameImporter
   if (clangMethodDecl->size_overridden_methods() > 0) {
     if (auto oldSwiftNameAttr = newMethod->getAttr<clang::SwiftNameAttr>()) {
       auto oldSwiftName = oldSwiftNameAttr->getName();
-
+      
       if (swiftName != oldSwiftName) {
         ImporterImpl.diagnose(HeaderLoc(oldSwiftNameAttr->getLoc()),
                               diag::swift_name_attr_ignored,
@@ -3042,7 +3042,7 @@ ConstructorDecl *SwiftDeclSynthesizer::makeClosureConstructor(NominalTypeDecl *d
   PrettyStackTraceDecl trace("creating a closure constructor", decl);
   assert(decl);
   ASTContext &ctx = decl->getASTContext();
-
+  
   auto callAsFunctionOverloads = decl->lookupDirect(ctx.Id_callAsFunction);
   if (callAsFunctionOverloads.size() != 1)
     return nullptr;
@@ -3511,7 +3511,7 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
   // for a destroy operation.
   ASTContext &ctx = ImporterImpl.SwiftContext;
   auto valueSemanticsKind = evaluateOrDefault(
-      ctx.evaluator,
+      ctx.evaluator, 
       CxxValueSemantics({clangType->getTypeForDecl(), &ImporterImpl}), {});
 
   if (valueSemanticsKind == CxxValueSemanticsKind::Unknown)

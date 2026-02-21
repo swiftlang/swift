@@ -43,11 +43,11 @@ namespace {
       bool isAsContext() const {
         return AsContext;
       }
-
+      
       void setAnonymousContextDiscriminator(StringRef discriminator) {
         AnonymousContextDiscriminator = discriminator.str();
       }
-
+      
       std::string takeAnonymousContextDiscriminator() {
         auto r = std::move(AnonymousContextDiscriminator);
         AnonymousContextDiscriminator.clear();
@@ -1399,7 +1399,7 @@ Remangler::mangleNamedEntity(Node *node, char basicKind, StringRef entityKind,
   if (basicKind != '\0') Buffer << basicKind;
   RETURN_IF_ERROR(mangleEntityContext(node->begin()[0], ctx, depth + 1));
   Buffer << entityKind;
-
+  
   auto privateDiscriminator = ctx.takeAnonymousContextDiscriminator();
   if (!privateDiscriminator.empty() &&
       swift::Mangle::isDigit(privateDiscriminator[0]))
@@ -1407,7 +1407,7 @@ Remangler::mangleNamedEntity(Node *node, char basicKind, StringRef entityKind,
   if (!artificialPrivateDiscriminator.empty())
     privateDiscriminator.append(artificialPrivateDiscriminator.data(),
                                 artificialPrivateDiscriminator.size());
-
+  
   // Include the artificial private discriminator if one was given.
   auto name = node->getChild(1);
   if (!privateDiscriminator.empty()
@@ -1554,7 +1554,7 @@ ManglingError Remangler::mangleType(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1);
 }
 
-template <size_t N>
+template <size_t N> 
 static bool stripPrefix(StringRef &string, const char (&data)[N]) {
   constexpr size_t prefixLength = N - 1;
   if (!string.starts_with(StringRef(data, prefixLength)))

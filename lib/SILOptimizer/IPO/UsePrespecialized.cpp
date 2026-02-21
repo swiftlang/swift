@@ -113,7 +113,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
                                                            IsNotSerialized);
     std::string ClonedName = NewGenericMangler.mangleReabstracted(Subs,
        ReInfo.needAlternativeMangling());
-
+      
     SILFunction *NewF = nullptr;
     // If we already have this specialization, reuse it.
     auto PrevF = M.lookUpFunction(ClonedName);

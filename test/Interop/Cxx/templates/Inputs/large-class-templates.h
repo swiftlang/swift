@@ -14,7 +14,7 @@ template<class E, int>
 struct SliceExpr {
   using type = typename E::type;
   E expr;
-
+  
   typename E::type* test() { return nullptr; }
 };
 
@@ -27,7 +27,7 @@ template<class E>
 struct ValExpr {
   using type = typename E::type;
   E expr;
-
+  
   ValExpr<SliceExpr<E, 1>> test1() { return {SliceExpr<E, 1>{expr}}; }
   ValExpr<SliceExpr<E, 2>> test2() { return {SliceExpr<E, 2>{expr}}; }
   ValExpr<SliceExpr<E, 3>> test3() { return {SliceExpr<E, 3>{expr}}; }

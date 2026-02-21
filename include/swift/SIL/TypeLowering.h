@@ -160,17 +160,17 @@ public:
   bool isFixedABI() const {
     return Properties.isFixedABI();
   }
-
+  
   /// Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
   bool isTrivial() const {
     return Properties.isTrivial();
   }
-
+  
   bool isOrContainsRawPointer() const {
     return Properties.isOrContainsRawPointer();
   }
-
+  
   /// Returns true if the type is a scalar reference-counted reference, which
   /// can be retained and released.
   bool isReferenceCounted() const {
@@ -464,7 +464,7 @@ struct SILConstantInfo {
       FormalPattern(formalPattern),
       LoweredType(loweredType),
       SILFnType(silFnTy) {}
-
+  
   SILType getSILType() const {
     return SILType::getPrimitiveObjectType(SILFnType);
   }
@@ -580,7 +580,7 @@ class TypeConverter {
     bool isCacheable() const {
       return IsCacheable;
     }
-
+    
     TypeKey getKeyForMinimalExpansion() const {
       return {OrigType, SubstType, TypeExpansionContext::minimal(),
               IsCacheable};
@@ -625,7 +625,7 @@ class TypeConverter {
   struct OverrideKey {
     SILDeclRef derived;
     SILDeclRef base;
-
+    
     friend bool operator==(const OverrideKey &lhs,
                            const OverrideKey &rhs) {
       return lhs.derived == rhs.derived
@@ -636,7 +636,7 @@ class TypeConverter {
       return !(lhs == rhs);
     }
   };
-
+  
   friend struct llvm::DenseMapInfo<OverrideKey>;
 
   /// Find a cached TypeLowering by TypeKey, or return null if one doesn't
@@ -656,7 +656,7 @@ class TypeConverter {
 
   /// Stack of types currently being lowered as part of an aggregate.
   llvm::SetVector<CanType> AggregateFieldsBeingLowered;
-
+  
   /// Mapping for types independent on contextual generic parameters.
   llvm::DenseMap<CachingTypeKey, const TypeLowering *> LoweredTypes;
 
@@ -684,7 +684,7 @@ class TypeConverter {
   bool isCacheableLowering(const TypeLowering *tl);
 
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
-
+  
   // Types converted during foreign bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule, BridgedType)                        \
   std::optional<CanType> BridgedType##Ty;
@@ -712,7 +712,7 @@ public:
   CanGenericSignature getCurGenericSignature() const {
     return CurGenericSignature;
   }
-
+  
   // RAII type used when lowering nominal aggregate types (structs and enums)
   // to catch self-recursion. Although Sema tries to catch direct circularity
   // in value type definitions, it can't catch circularity that arises from
@@ -721,16 +721,16 @@ public:
   // after passes that perform generic specialization.
   class LowerAggregateTypeRAII {
     TypeConverter &TC;
-
+    
   public:
     // True if the aggregate about to be lowered is already being lowered,
     // indicating a circularity.
     const bool IsInfinite;
-
+    
     LowerAggregateTypeRAII(TypeConverter &TC, CanType aggregate)
       : TC(TC), IsInfinite(!TC.AggregateFieldsBeingLowered.insert(aggregate))
     {}
-
+    
     ~LowerAggregateTypeRAII() {
       if (!IsInfinite) {
         TC.AggregateFieldsBeingLowered.pop_back();
@@ -796,10 +796,10 @@ public:
     // Native protocols use the witness calling convention.
     return SILFunctionTypeRepresentation::WitnessMethod;
   }
-
+  
   /// Get the calling convention used to call a declaration.
   SILFunctionTypeRepresentation getDeclRefRepresentation(SILDeclRef c);
-
+  
   /// Get the method dispatch strategy for a protocol.
   static ProtocolDispatchStrategy getProtocolDispatchStrategy(ProtocolDecl *P);
 
@@ -813,7 +813,7 @@ public:
 
     return swift::protocolRequiresWitnessTable(getProtocolDispatchStrategy(P));
   }
-
+  
   /// True if a type is passed indirectly at +0 when used as the "self"
   /// parameter of its own methods.
   ///
@@ -824,11 +824,11 @@ public:
     return !T->hasReferenceSemantics()
         && (T->isExistentialType() || T->is<ArchetypeType>());
   }
-
+  
   static bool isIndirectPlusZeroSelfParameter(SILType T) {
     return isIndirectPlusZeroSelfParameter(T.getASTType());
   }
-
+  
   /// Lowers a context-independent Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
   ///
@@ -952,7 +952,7 @@ public:
                                              SILDeclRef constant) {
     return getConstantInfo(context, constant).SILFnType;
   }
-
+  
   /// Returns the SILParameterInfo for the given declaration's `self` parameter.
   /// `constant` must refer to a method.
   SILParameterInfo getConstantSelfParameter(TypeExpansionContext context,
@@ -1060,13 +1060,13 @@ public:
     // would fall into the `NeedsThunk` case, because a thunk would be needed
     // to change the representation of the function argument.)
     CompatibleRepresentation,
-
+    
     // No convention differences, but there may still be a representation
     // difference between values of the compared function types, such as a
     // different ptrauth discriminator. The conversion can be performed by a
     // `convert_function` instruction.
     CompatibleCallingConvention,
-
+    
     // Representation difference requires thin-to-thick conversion with a
     // `thin_to_thick_function` conversion.
     CompatibleRepresentation_ThinToThick,
@@ -1074,11 +1074,11 @@ public:
     // a thin-to-thick conversion, so a `convert_function` followed by a
     // `thin_to_thick_function` sequence is necessary to convert.
     CompatibleCallingConvention_ThinToThick,
-
+    
     // Non-trivial difference requires thunk.
     NeedsThunk
   };
-
+  
   /// Test if type1 is ABI compatible with type2, and can be converted
   /// with a trivial bitcast.
   ///

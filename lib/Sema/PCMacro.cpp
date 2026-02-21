@@ -317,7 +317,7 @@ public:
     }
     return DCS;
   }
-
+  
   DeferStmt *transformDeferStmt(DeferStmt *DS) {
     if (auto *FD = DS->getTempDecl()) {
       // Temporarily unmark the DeferStmt's FuncDecl as implicit so it is

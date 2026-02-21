@@ -80,7 +80,7 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   std::unordered_map<NominalTypeDecl *,
                      std::array<LastProcessedEntry, NumConformanceStages>>
   LastProcessed;
-
+  
   struct ConformanceEntry;
 
   /// Describes the "source" of a conformance, indicating where the
@@ -487,7 +487,7 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   /// \param superclassExt If non-null, the superclass extension from
   /// which conformances will be inherited. If null, the conformances
   /// on the superclass declaration itself will be inherited.
-  void inheritConformances(ClassDecl *classDecl,
+  void inheritConformances(ClassDecl *classDecl, 
                            ClassDecl *superclassDecl,
                            ExtensionDecl *superclassExt);
 
@@ -521,9 +521,9 @@ public:
   /// \param conformances Will be populated with the set of protocol
   /// conformances found for this protocol and nominal type.
   ///
-  /// \returns true if any conformances were found.
+  /// \returns true if any conformances were found. 
   bool lookupConformance(NominalTypeDecl *nominal,
-                         ProtocolDecl *protocol,
+                         ProtocolDecl *protocol, 
                          SmallVectorImpl<ProtocolConformance *> &conformances);
 
   /// Look for all of the conformances within the given declaration context.

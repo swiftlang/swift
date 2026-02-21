@@ -106,7 +106,7 @@ struct SwiftError : SwiftErrorHeader {
     return const_cast<OpaqueValue *>(getIndirectValue(
                                   const_cast<const SwiftError * const *>(ptr)));
   }
-
+  
   /// Get a pointer to the value, which is tail-allocated after
   /// the fixed header.
   const OpaqueValue *getValue() const {
@@ -114,7 +114,7 @@ struct SwiftError : SwiftErrorHeader {
     // value. We can't provide an address for that; getIndirectValue must be
     // used if we haven't established this as an NSError yet..
     assert(!isPureNSError());
-
+  
     auto baseAddr = reinterpret_cast<uintptr_t>(this + 1);
     // Round up to the value's alignment.
     unsigned alignMask = type->getValueWitnesses()->getAlignmentMask();
@@ -125,7 +125,7 @@ struct SwiftError : SwiftErrorHeader {
     return const_cast<OpaqueValue*>(
              const_cast<const SwiftError *>(this)->getValue());
   }
-
+  
 #if SWIFT_OBJC_INTEROP
   // True if the object is really an NSError or CFError instance.
   // The type and errorConformance fields don't exist in an NSError.
@@ -133,7 +133,7 @@ struct SwiftError : SwiftErrorHeader {
 #else
   bool isPureNSError() const { return false; }
 #endif
-
+  
 #if SWIFT_OBJC_INTEROP
   /// Get the type of the contained value.
   const Metadata *getType() const;

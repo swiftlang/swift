@@ -427,8 +427,8 @@ bool SILDeclRef::shouldBeEmittedForDebugger() const {
 
   if (getLinkage(ForDefinition) == SILLinkage::Shared)
     return false;
-
-  if (auto decl = getDecl())
+  
+  if (auto decl = getDecl()) 
     if (!decl->isImplicit())
       return true;
 
@@ -490,7 +490,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     if (fn->hasForcedStaticDispatch())
       return Limit::OnDemand;
   }
-
+  
   if (isa<DestructorDecl>(d)) {
     // The destructor of a class implemented with @_objcImplementation is only
     // ever called by its ObjC thunk, so it should not be public.

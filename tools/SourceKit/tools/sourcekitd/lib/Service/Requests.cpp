@@ -1546,7 +1546,7 @@ getIndexStoreOpts(const RequestDict &Req, ResponseReceiver Rec) {
   if (auto IncludeLocals = Req.getOptionalInt64(KeyIncludeLocals)) {
     Opts.IncludeLocals = IncludeLocals.value() > 0;
   }
-
+  
   if (auto Compress = Req.getOptionalInt64(KeyCompress)) {
     Opts.Compress = Compress.value() > 0;
   }
@@ -2080,7 +2080,7 @@ handleRequestSemanticTokens(const RequestDict &Req,
 ///     key.macro_roles: [<macro role UID>...]
 ///   }
 ///
-/// Sends the results as a 'CategorizedEdits'.
+/// Sends the results as a 'CategorizedEdits'. 
 /// Note that, unlike refactoring, each edit doesn't have 'key.buffer_name'.
 /// FIXME: Support nested expansion.
 static void handleRequestSyntacticMacroExpansion(

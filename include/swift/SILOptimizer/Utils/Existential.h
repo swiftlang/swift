@@ -49,7 +49,7 @@ struct OpenedArchetypeInfo {
     assert(!OpenedArchetype || (OpenedArchetypeValue && ExistentialValue));
     return OpenedArchetype;
   }
-
+  
   void dump() const;
 };
 
@@ -107,7 +107,7 @@ struct ConcreteExistentialInfo {
     CanType selfTy = P->getSelfInterfaceType()->getCanonicalType();
     return ExistentialSubs.lookupConformance(selfTy, P);
   }
-
+  
   void dump() const;
 
 private:
@@ -138,7 +138,7 @@ struct ConcreteOpenedExistentialInfo {
     assert(CEI->isValid());
     return true;
   }
-
+  
   void dump() const;
 };
 

@@ -78,7 +78,7 @@ class RValue {
   std::vector<ManagedValue> values;
   CanType type;
   unsigned elementsToBeAdded;
-
+  
   /// Flag value used to mark an rvalue as invalid.
   ///
   /// The reasons why this can be true is:
@@ -95,11 +95,11 @@ class RValue {
   bool isInSpecialState() const {
     return elementsToBeAdded >= InContext;
   }
-
+  
   // Don't copy.
   RValue(const RValue &) = delete;
   RValue &operator=(const RValue &) = delete;
-
+  
   void makeUsed() {
     elementsToBeAdded = Used;
     values = {};
@@ -132,7 +132,7 @@ class RValue {
 
 public:
   RValue() : elementsToBeAdded(Null) {}
-
+  
   RValue(RValue &&rv) : values(std::move(rv.values)),
                         type(rv.type),
                         elementsToBeAdded(rv.elementsToBeAdded) {
@@ -143,7 +143,7 @@ public:
 
   RValue &operator=(RValue &&rv) {
     assert((isNull() || isUsed()) && "reassigning an valid rvalue?!");
-
+    
     assert((rv.isComplete() || rv.isInSpecialState())
            && "moving rvalue that wasn't complete?!");
     values = std::move(rv.values);
@@ -152,7 +152,7 @@ public:
     rv.elementsToBeAdded = Used;
     return *this;
   }
-
+  
   /// Create an RValue from a single value. If the value is of tuple type, it
   /// will be exploded.
   ///
@@ -178,13 +178,13 @@ public:
 
   static unsigned getRValueSize(CanType substType);
   static unsigned getRValueSize(AbstractionPattern origType, CanType substType);
-
+  
   /// Create an RValue to which values will be subsequently added using
   /// addElement(), with the level of tuple expansion in the input specified
   /// by the abstraction pattern. The RValue will not be complete until all
   /// the elements have been added.
   explicit RValue(AbstractionPattern pattern, CanType type);
-
+  
   /// Create an RValue to which values will be subsequently added using
   /// addElement(). The RValue will not be complete until all the elements have
   /// been added.
@@ -204,21 +204,21 @@ public:
 
   /// True if the rvalue was null-initialized.
   bool isNull() const & { return elementsToBeAdded == Null; }
-
+  
   /// True if this rvalue has been used.
   bool isUsed() const & { return elementsToBeAdded == Used; }
 
   /// True if this rvalue was emitted into context.
   bool isInContext() const & { return elementsToBeAdded == InContext; }
-
+  
   /// Add an element to the rvalue. The rvalue must not yet be complete.
   void addElement(RValue &&element) &;
-
+  
   /// Add a ManagedValue element to the rvalue, exploding tuples if necessary.
   /// The rvalue must not yet be complete.
   void addElement(SILGenFunction &SGF, ManagedValue element,
                   CanType formalType, SILLocation l) &;
-
+  
   /// Forward an rvalue into a single value, imploding tuples if necessary.
   SILValue forwardAsSingleValue(SILGenFunction &SGF, SILLocation l) &&;
 
@@ -230,7 +230,7 @@ public:
 
   /// Get the rvalue as a single value, imploding tuples if necessary.
   ManagedValue getAsSingleValue(SILGenFunction &SGF, SILLocation l) &&;
-
+  
   /// Get the rvalue as a single unmanaged value, imploding tuples if necessary.
   /// The values must not require any cleanups.
   SILValue getUnmanagedSingleValue(SILGenFunction &SGF, SILLocation l) const &;
@@ -292,26 +292,26 @@ public:
 
   /// Assign this r-value into the destination.
   void assignInto(SILGenFunction &SGF, SILLocation loc, SILValue destAddr) &&;
-
+  
   /// Forward the exploded SILValues into a SmallVector.
   void forwardAll(SILGenFunction &SGF,
                   SmallVectorImpl<SILValue> &values) &&;
 
   ManagedValue materialize(SILGenFunction &SGF, SILLocation loc) &&;
-
+  
   /// Take the ManagedValues from this RValue into a SmallVector.
   void getAll(SmallVectorImpl<ManagedValue> &values) &&;
-
+  
   /// Store the unmanaged SILValues into a SmallVector. The values must not
   /// require any cleanups.
   void getAllUnmanaged(SmallVectorImpl<SILValue> &values) const &;
-
+  
   /// Extract a single tuple element from the rvalue.
   RValue extractElement(unsigned element) &&;
-
+  
   /// Extract the tuple elements from the rvalue.
   void extractElements(SmallVectorImpl<RValue> &elements) &&;
-
+  
   CanType getType() const & { return type; }
 
   /// Return the lowered type associated with the given CanType's type lowering.
@@ -327,7 +327,7 @@ public:
   /// be returned. Otherwise, an object will be returned. So this is a
   /// convenient way to determine if an RValue needs an address.
   SILType getLoweredImplodedTupleType(SILGenFunction &SGF) const &;
-
+  
   /// Emit an equivalent value with independent ownership.
   RValue copy(SILGenFunction &SGF, SILLocation loc) const &;
 

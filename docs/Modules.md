@@ -82,8 +82,8 @@ when optimizing a user's program, usually by inlining the module code
 into a caller. In some cases[^1], the compiler may even use a module's
 function implementations to produce more effective diagnostics.
 
-Modules can also contain autolinking[^autolinking] information, which
-the compiler passes on to the linker. This can be used to specify which
+Modules can also contain autolinking[^autolinking] information, which 
+the compiler passes on to the linker. This can be used to specify which 
 library implements the declarations in the module.
 
 ### Modules can "re-export" other modules
@@ -100,7 +100,7 @@ declarations in the re-exported modules.
 @exported import AmericanCheckers
 ```
 
-As an example, the "Cocoa" framework[^framework] on macOS exists only
+As an example, the "Cocoa" framework[^framework] on macOS exists only 
 to re-export three other frameworks: AppKit, Foundation, and CoreData.
 
 Just as certain declarations can be selectively imported from a module,
@@ -283,7 +283,7 @@ declarations.
 
 ### Import Search Paths
 
-> *FIXME:*  Write this section. Can source files be self-contained modules?
+> *FIXME:*  Write this section. Can source files be self-contained modules? 
 How does `-i` mode work? Can the "wrong" module be found when looking for a
 dependency (i.e. can I substitute my own Foundation and expect AppKit to
 work)? How are modules stored on disk? How do hierarchical module names
@@ -292,7 +292,7 @@ work?
 ## Interoperability with Objective-C via Clang
 
 The compiler has the ability to interoperate with C and Objective-C by
-importing Clang modules[^clang-module]. This feature of the Clang compiler
+importing Clang modules[^clang-module]. This feature of the Clang compiler 
 was developed to provide a "semantic import" extension to the C family of
 languages. The Swift compiler uses this to expose declarations from C and
 Objective-C as if they used native Swift types.
@@ -305,7 +305,7 @@ Objective-C AppKit framework.
 
 Clang also has a concept of "submodules", which are essentially
 hierarchically-named modules. Unlike Swift's [submodules](#submodules),
-Clang submodules are visible from outside the module. It is conventional
+Clang submodules are visible from outside the module. It is conventional 
 for a top-level Clang module to re-export all of its submodules, but
 sometimes certain submodules are specified to require an explicit import:
 
@@ -374,7 +374,7 @@ to explicitly specify them at link time.
 of headers. See [Clang's Modules](http://clang.llvm.org/docs/Modules.html) documentation for more
 information.
 
-[^framework]: A mechanism for library distribution on OS X. Traditionally
+[^framework]: A mechanism for library distribution on OS X. Traditionally 
 frameworks contain header files describing the library's API, a binary file containing
 the implementation, and a directory containing any resources the
 library may need. Frameworks are also used on iOS, but as of iOS 7 custom frameworks

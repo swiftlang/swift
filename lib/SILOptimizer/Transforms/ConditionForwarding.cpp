@@ -121,7 +121,7 @@ private:
     if (Changed) {
       updateAllGuaranteedPhis(getPassManager(), F);
       invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
-      removeUnreachableBlocks(*F);
+      removeUnreachableBlocks(*F);
       if (F->needBreakInfiniteLoops())
         breakInfiniteLoops(getPassManager(), F);
       if (F->needCompleteLifetimes())

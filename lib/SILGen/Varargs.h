@@ -73,7 +73,7 @@ VarargsInfo emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
 /// Successfully end a varargs emission sequence.
 ManagedValue emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
                             VarargsInfo &&varargs,
-                             unsigned numElements);
+                             unsigned numElements); 
 
 } // end namespace Lowering
 } // end namespace swift

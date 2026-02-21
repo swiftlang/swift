@@ -216,7 +216,7 @@ public:
 struct ReadWriteRvalueGetterParam {
 private:
   int values[5] = {1, 2, 3, 4, 5};
-
+  
 public:
   const int &operator[](int &&x) const { return values[x]; }
   int &operator[](int x) { return values[x]; }

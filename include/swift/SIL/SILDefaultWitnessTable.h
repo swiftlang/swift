@@ -45,7 +45,7 @@ public:
   /// A default witness table entry describing the default witness for a
   /// requirement.
   using Entry = SILWitnessTable::Entry;
-
+ 
 private:
   /// The module which contains the SILDefaultWitnessTable.
   SILModule &Mod;
@@ -131,14 +131,14 @@ public:
 
   /// Verify that the default witness table is well-formed.
   void verify(const SILModule &M) const;
-
+  
   /// Print the default witness table.
   void print(llvm::raw_ostream &OS, bool Verbose = false) const;
 
   /// Dump the default witness table to stderr.
   void dump() const;
 };
-
+  
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//
@@ -146,7 +146,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 namespace llvm {
-
+  
 template <>
 struct ilist_traits<::swift::SILDefaultWitnessTable> :
 public ilist_node_traits<::swift::SILDefaultWitnessTable> {
@@ -154,7 +154,7 @@ public ilist_node_traits<::swift::SILDefaultWitnessTable> {
 
 public:
   static void deleteNode(SILDefaultWitnessTable *WT) { WT->~SILDefaultWitnessTable(); }
-
+  
 private:
   void createNode(const SILDefaultWitnessTable &);
 };

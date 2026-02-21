@@ -66,7 +66,7 @@ class SILDebugInfoGenerator : public SILModuleTransform {
     LineCountStream(llvm::raw_ostream &Underlying) :
       llvm::raw_ostream(/* unbuffered = */ true),
       Underlying(Underlying) { }
-
+    
     ~LineCountStream() override {
       flush();
     }

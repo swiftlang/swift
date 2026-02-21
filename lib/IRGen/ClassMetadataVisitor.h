@@ -56,7 +56,7 @@ protected:
 
   /// The most-derived class.
   ClassDecl *const Target;
-
+        
   /// SILVTable entry for the class.
   const SILVTable *VTable;
 
@@ -153,7 +153,7 @@ public:
   /// Notes the existence of a formally virtual method that has been elided from the
   /// reified vtable because it has no overrides.
   void noteNonoverriddenMethod(SILDeclRef method) {}
-
+        
 private:
   /// Add fields associated with the given class and its bases.
   void addClassMembers(ClassDecl *theClass,
@@ -253,8 +253,8 @@ private:
       asImpl().noteNonoverriddenMethod(declRef);
     }
   }
-
-
+  
+        
   void addFieldEntries(Field field) {
     switch (field.getKind()) {
     case Field::Var:

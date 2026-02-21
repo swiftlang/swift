@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file contains the declaration of the MetadataSectionsRange and
-/// MetadataSections struct, which represent, respectively,  information about
+/// This file contains the declaration of the MetadataSectionsRange and 
+/// MetadataSections struct, which represent, respectively,  information about  
 /// an image's section, and an image's metadata information (which is composed
 /// of multiple section information).
 ///
@@ -29,7 +29,7 @@
 #include "SwiftStdint.h"
 
 #ifdef __cplusplus
-namespace swift {
+namespace swift { 
 extern "C" {
 #endif
 

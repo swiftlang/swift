@@ -39,7 +39,7 @@ namespace Lowering {
 }
 
 } // end namespace swift
-
+  
 namespace swift {
 
 /// Find an opened archetype represented by this type.
@@ -114,7 +114,7 @@ private:
            "constructing SILType with type that should have been "
            "eliminated by SIL lowering");
   }
-
+  
   SILType(ValueType value) : value(value) {
   }
 
@@ -257,7 +257,7 @@ public:
   EnumDecl *getEnumOrBoundGenericEnum() const {
     return getASTType().getEnumOrBoundGenericEnum();
   }
-
+  
   /// Returns true if this type is an enum or contains an enum.
   bool isOrHasEnum() const {
     return getASTType().findIf([](Type ty) {
@@ -427,7 +427,7 @@ public:
   bool isAnyClassReferenceType() const {
     return getASTType().isAnyClassReferenceType();
   }
-
+  
   /// Returns true if the referenced type is guaranteed to have a
   /// single-retainable-pointer representation.
   /// This does not include C++ imported `SWIFT_SHARED_REFERENCE` classes.
@@ -490,19 +490,19 @@ public:
   /// existential type.
   ExistentialRepresentation
   getPreferredExistentialRepresentation(Type containedType = Type()) const;
-
+  
   /// Returns true if the existential type can use operations for the given
   /// existential representation when working with values of the given type,
   /// or when working with an unknown type if containedType is null.
   bool
   canUseExistentialRepresentation(ExistentialRepresentation repr,
                                   Type containedType = Type()) const;
-
+  
   /// True if the type contains a type parameter.
   bool hasTypeParameter() const {
     return getASTType()->hasTypeParameter();
   }
-
+  
   /// True if the type is bridgeable to an ObjC object pointer type.
   bool isBridgeableObjectType() const {
     return getASTType()->isBridgeableObjectType();
@@ -550,7 +550,7 @@ public:
     // Handle whatever AST types are known to hold functions. Namely tuples.
     return ty->isNoEscape();
   }
-
+  
   bool isThickFunction() const {
     if (auto *fTy = getASTType()->getAs<SILFunctionType>()) {
       return fTy->getRepresentation() == SILFunctionType::Representation::Thick;
@@ -577,7 +577,7 @@ public:
   bool hasOpaqueArchetype() const {
     return getASTType()->hasOpaqueArchetype();
   }
-
+  
   /// Returns the ASTContext for the referenced Swift type.
   ASTContext &getASTContext() const {
     return getASTType()->getASTContext();
@@ -924,7 +924,7 @@ public:
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(*this);
   }
-
+  
   /// If a type is visibly a singleton aggregate (a tuple with one element, a
   /// struct with one field, or an enum with a single payload case), return the
   /// type of its field, which it is guaranteed to have identical layout to.
@@ -1024,7 +1024,7 @@ public:
   //
   // Accessors for types used in SIL instructions:
   //
-
+  
   /// Get the NativeObject type as a SILType.
   static SILType getNativeObjectType(const ASTContext &C);
   /// Get the BridgeObject type as a SILType.
@@ -1091,7 +1091,7 @@ public:
   void *getOpaqueValue() const {
     return value.getOpaqueValue();
   }
-
+  
   bool operator==(SILType rhs) const {
     return value.getOpaqueValue() == rhs.value.getOpaqueValue();
   }

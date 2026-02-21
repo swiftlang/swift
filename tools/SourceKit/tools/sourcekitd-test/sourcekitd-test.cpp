@@ -727,7 +727,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::ProtocolVersion:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestProtocolVersion);
     break;
-
+  
   case SourceKitRequest::CompilerVersion:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCompilerVersion);
     break;
@@ -980,7 +980,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestRelatedIdents);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     break;
-
+      
   case SourceKitRequest::ActiveRegions:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestActiveRegions);
     break;

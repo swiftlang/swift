@@ -81,13 +81,13 @@ static void emitCompareBuiltin(IRGenFunction &IGF, Explosion &result,
                                Explosion &args, llvm::CmpInst::Predicate pred) {
   llvm::Value *lhs = args.claimNext();
   llvm::Value *rhs = args.claimNext();
-
+  
   llvm::Value *v;
   if (lhs->getType()->isFPOrFPVectorTy())
     v = IGF.Builder.CreateFCmp(pred, lhs, rhs);
   else
     v = IGF.Builder.CreateICmp(pred, lhs, rhs);
-
+  
   result.add(v);
 }
 
@@ -99,7 +99,7 @@ static void emitTypeTraitBuiltin(IRGenFunction &IGF,
   assert(substitutions.getReplacementTypes().size() == 1
          && "type trait should have gotten single type parameter");
   args.claimNext();
-
+  
   // Lower away the trait to a tristate 0 = no, 1 = yes, 2 = maybe.
   unsigned result;
   switch ((substitutions.getReplacementTypes()[0].getPointer()->*trait)()) {
@@ -512,11 +512,11 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
   case BuiltinValueKind::id:                                          \
     return emitCompareBuiltin(IGF, out, args, llvm::CmpInst::id);
-
+  
 #define BUILTIN_TYPE_TRAIT_OPERATION(id, name) \
   case BuiltinValueKind::id:                                          \
     return emitTypeTraitBuiltin(IGF, out, args, substitutions, &TypeBase::name);
-
+  
 #define BUILTIN(ID, Name, Attrs)  // Ignore the rest.
 #include "swift/AST/Builtins.def"
 
@@ -549,7 +549,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto errorBuffer = IGF.getCalleeErrorResultSlot(
         SILType::getPrimitiveObjectType(errorTy), false);
     IGF.Builder.CreateStore(error, errorBuffer);
-
+    
     auto context = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
 
     llvm::CallInst *call = IGF.Builder.CreateCall(fn,
@@ -568,7 +568,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
     return out.add(call);
   }
-
+  
   case BuiltinValueKind::FNeg: {
     llvm::Value *v = IGF.Builder.CreateFNeg(args.claimNext());
     return out.add(v);
@@ -619,7 +619,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   case BuiltinValueKind::Freeze: {
     return out.add(IGF.Builder.CreateFreeze(args.claimNext()));
   }
-
+  
   case BuiltinValueKind::AllocRaw: {
     auto size = args.claimNext();
     auto align = args.claimNext();
@@ -650,13 +650,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto ordering = decodeLLVMAtomicOrdering(BuiltinName.substr(0, underscore));
     assert(ordering != llvm::AtomicOrdering::NotAtomic);
     BuiltinName = BuiltinName.substr(underscore);
-
+    
     // Accept singlethread if present.
     bool isSingleThread = BuiltinName.starts_with("_singlethread");
     if (isSingleThread)
       BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
     assert(BuiltinName.empty() && "Mismatch with sema");
-
+    
     IGF.Builder.CreateFence(ordering, isSingleThread
                                           ? llvm::SyncScope::SingleThread
                                           : llvm::SyncScope::System);
@@ -734,7 +734,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
     return;
   }
-
+  
   case BuiltinValueKind::AtomicRMW: {
     using namespace llvm;
 
@@ -744,7 +744,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     BuiltinName = BuiltinName.drop_front(strlen("atomicrmw_"));
     auto underscore = BuiltinName.find('_');
     StringRef SubOp = BuiltinName.substr(0, underscore);
-
+    
     AtomicRMWInst::BinOp SubOpcode = StringSwitch<AtomicRMWInst::BinOp>(SubOp)
       .Case("xchg", AtomicRMWInst::Xchg)
       .Case("add",  AtomicRMWInst::Add)
@@ -758,22 +758,22 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       .Case("umax", AtomicRMWInst::UMax)
       .Case("umin", AtomicRMWInst::UMin);
     BuiltinName = BuiltinName.drop_front(underscore+1);
-
+    
     // Decode the ordering argument, which is required.
     underscore = BuiltinName.find('_');
     auto ordering = decodeLLVMAtomicOrdering(BuiltinName.substr(0, underscore));
     assert(ordering != llvm::AtomicOrdering::NotAtomic);
     BuiltinName = BuiltinName.substr(underscore);
-
+    
     // Accept volatile and singlethread if present.
     bool isVolatile = BuiltinName.starts_with("_volatile");
     if (isVolatile) BuiltinName = BuiltinName.drop_front(strlen("_volatile"));
-
+    
     bool isSingleThread = BuiltinName.starts_with("_singlethread");
     if (isSingleThread)
       BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
     assert(BuiltinName.empty() && "Mismatch with sema");
-
+    
     auto pointer = args.claimNext();
     auto val = args.claimNext();
 
@@ -880,17 +880,17 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     out.add(IGF.Builder.CreateInsertElement(vector, newValue, index));
     return;
   }
-
+  
   case BuiltinValueKind::Select: {
     using namespace llvm;
-
+    
     auto pred = args.claimNext();
     auto ifTrue = args.claimNext();
     auto ifFalse = args.claimNext();
     out.add(IGF.Builder.CreateSelect(pred, ifTrue, ifFalse));
     return;
   }
-
+  
   case BuiltinValueKind::ShuffleVector: {
     using namespace llvm;
 
@@ -900,13 +900,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     out.add(IGF.Builder.CreateShuffleVector(dict0, dict1, index));
     return;
   }
-
+  
   case BuiltinValueKind::Interleave: {
     using namespace llvm;
-
+    
     auto src0 = args.claimNext();
     auto src1 = args.claimNext();
-
+    
     int n = Builtin.Types[0]->getAs<BuiltinVectorType>()->getNumElements();
     SmallVector<int> shuffleLo(n);
     SmallVector<int> shuffleHi(n);
@@ -916,19 +916,19 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       shuffleLo[2*i+1] = n + i;
       shuffleHi[2*i+1] = 3*n/2 + i;
     }
-
+    
     out.add(IGF.Builder.CreateShuffleVector(src0, src1, shuffleLo));
     out.add(IGF.Builder.CreateShuffleVector(src0, src1, shuffleHi));
     return;
   }
-
-
+  
+  
   case BuiltinValueKind::Deinterleave: {
     using namespace llvm;
-
+    
     auto src0 = args.claimNext();
     auto src1 = args.claimNext();
-
+    
     int n = Builtin.Types[0]->getAs<BuiltinVectorType>()->getNumElements();
     SmallVector<int> shuffleEven(n);
     SmallVector<int> shuffleOdd(n);
@@ -936,7 +936,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       shuffleEven[i] = 2*i;
       shuffleOdd[i]  = 2*i + 1;
     }
-
+    
     out.add(IGF.Builder.CreateShuffleVector(src0, src1, shuffleEven));
     out.add(IGF.Builder.CreateShuffleVector(src0, src1, shuffleOdd));
     return;
@@ -1055,10 +1055,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     } else {
       Context = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
     }
-
+    
     // If we know the platform runtime's "done" value, emit the check inline.
     llvm::BasicBlock *doneBB = nullptr;
-
+    
     llvm::BasicBlock *beforeBB = IGF.Builder.GetInsertBlock();
 
     if (auto ExpectedPred = IGF.IGM.TargetInfo.OnceDonePredicateValue) {
@@ -1069,21 +1069,21 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       auto PredIsDone = IGF.Builder.CreateICmpEQ(PredValue, ExpectedPredValue);
       PredIsDone = IGF.Builder.CreateExpect(PredIsDone,
                                      llvm::ConstantInt::get(IGF.IGM.Int1Ty, 1));
-
+      
       auto notDoneBB = IGF.createBasicBlock("once_not_done");
       doneBB = IGF.createBasicBlock("once_done");
-
+      
       IGF.Builder.CreateCondBr(PredIsDone, doneBB, notDoneBB);
-
+      
       IGF.Builder.SetInsertPoint(&IGF.CurFn->back());
       IGF.Builder.emitBlock(notDoneBB);
     }
-
+    
     // Emit the runtime "once" call.
     auto call = IGF.Builder.CreateCall(IGF.IGM.getOnceFunctionPointer(),
                                        {PredPtr, FnCode, Context});
     call->setCallingConv(IGF.IGM.DefaultCC);
-
+    
     // If we emitted the "done" check inline, join the branches.
     if (auto ExpectedPred = IGF.IGM.TargetInfo.OnceDonePredicateValue) {
       IGF.Builder.CreateBr(doneBB);
@@ -1098,7 +1098,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
       IGF.Builder.CreateAssumption(PredIsDone);
     }
-
+    
     // No return value.
     return;
   }
@@ -1126,7 +1126,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       args.claimNext();
     llvm::Value *ptr = args.claimNext();
     llvm::Value *count = args.claimNext();
-
+    
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
 
@@ -1306,7 +1306,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     src = IGF.Builder.CreateBitCast(src, IGM.PtrTy);
     Address destArray = valueTy.second.getAddressForPointer(dest);
     Address srcArray = valueTy.second.getAddressForPointer(src);
-
+    
     switch (Builtin.ID) {
     case BuiltinValueKind::CopyArray:
       valueTy.second.initializeArrayWithCopy(IGF, destArray, srcArray, count,
@@ -1342,16 +1342,16 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       break;
     default:
       llvm_unreachable("out of sync with if condition");
-    }
+    }    
     return;
   }
-
+  
   case BuiltinValueKind::CondUnreachable: {
     // conditionallyUnreachable is a no-op by itself. Since it's noreturn, there
     // should be a true unreachable terminator right after.
     return;
   }
-
+  
   case BuiltinValueKind::ZeroInitializer: {
     if (args.size() > 0) {
       auto valueType = argTypes[0];
@@ -1447,10 +1447,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   case BuiltinValueKind::TypePtrAuthDiscriminator: {
     (void)args.claimAll();
     Type valueTy = substitutions.getReplacementTypes()[0];
-
+    
     // The type should lower statically to a SILFunctionType.
     auto loweredTy = IGF.IGM.getLoweredType(valueTy).castTo<SILFunctionType>();
-
+    
     out.add(PointerAuthEntity(loweredTy).getTypeDiscriminator(IGF.IGM));
     return;
   }

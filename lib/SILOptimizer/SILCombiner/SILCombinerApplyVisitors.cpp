@@ -210,10 +210,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   };
 
   unsigned OpI = 0;
-
+  
   auto newRetI = newOpRetTypes.begin();
   auto oldRetI = oldOpRetTypes.begin();
-
+  
   auto getCurrentOperand = [&OpI, &AI]() -> Operand & {
     return AI.getInstruction()
         ->getAllOperands()[OpI + ApplyInst::getArgumentOperandNumber()];
@@ -247,7 +247,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   auto newResultTy = ConvertCalleeTy
     ->getDirectFormalResultsType(AI.getModule(),
                                  AI.getFunction()->getTypeExpansionContext());
-
+  
   // Create the new apply inst.
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     // If the results need to change, create a new landing block to do that
@@ -257,10 +257,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       normalBB = AI.getFunction()->createBasicBlockBefore(TAI->getNormalBB());
       Builder.setInsertionPoint(normalBB);
       SmallVector<SILValue, 4> branchArgs;
-
+      
       auto oldOpResultTypes = substConventions.getDirectSILResultTypes(context);
       auto newOpResultTypes = convertConventions.getDirectSILResultTypes(context);
-
+      
       auto oldRetI = oldOpResultTypes.begin();
       auto newRetI = newOpResultTypes.begin();
       auto origArgs = TAI->getNormalBB()->getArguments();
@@ -272,7 +272,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
           Builder.createUncheckedForwardingCast(AI.getLoc(), arg, *oldRetI);
         branchArgs.push_back(converted);
       }
-
+      
       Builder.createBranch(AI.getLoc(), TAI->getNormalBB(), branchArgs);
     }
 
@@ -303,12 +303,12 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   ApplyInst *NAI = Builder.createApply(AI.getLoc(), funcOper, SubstitutionMap(),
                                        Args, Options);
   SILInstruction *result = NAI;
-
+  
   if (oldResultTy != newResultTy) {
     result =
       Builder.createUncheckedForwardingCast(AI.getLoc(), NAI, oldResultTy);
   }
-
+  
   Builder.setInsertionPoint(AI->getNextInstruction());
   for (auto *borrow : Borrows) {
     Builder.createEndBorrow(AI.getLoc(), borrow);
@@ -346,16 +346,16 @@ bool swift::tryOptimizeKeypathApplication(ApplyInst *AI,
   } else {
     return false;
   }
-
+  
   auto projector = KeyPathProjector::create(keyPath, rootAddr,
                                             AI->getLoc(), Builder);
   if (!projector)
     return false;
-
+  
   KeyPathProjector::AccessType accessType;
   if (isSet) accessType = KeyPathProjector::AccessType::Set;
   else accessType = KeyPathProjector::AccessType::Get;
-
+  
   projector->project(accessType, [&](SILValue projectedAddr) {
     if (isSet) {
       Builder.createCopyAddr(AI->getLoc(), valueAddr, projectedAddr,
@@ -365,7 +365,7 @@ bool swift::tryOptimizeKeypathApplication(ApplyInst *AI,
                              IsNotTake, IsInitialization);
     }
   });
-
+  
   ++NumOptimizedKeypaths;
   return true;
 }
@@ -411,7 +411,7 @@ bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
       pattern->getRootType().subst(patternSubs)->getCanonicalType());
 
   SILType parentTy = rootTy;
-
+  
   // First check if _storedInlineOffset would return an offset or nil. Basically
   // only stored struct and tuple elements produce an offset. Everything else
   // (e.g. computed properties, class properties) result in nil.
@@ -512,15 +512,15 @@ bool swift::tryOptimizeKeypathKVCString(ApplyInst *AI,
   if (!calleeFn->getAttrs()
         .hasSemanticsAttr(semantics::KEYPATH_KVC_KEY_PATH_STRING))
     return false;
-
+  
   // Method should return `String?`
   auto &C = calleeFn->getASTContext();
   auto objTy = AI->getType().getOptionalObjectType();
   if (!objTy || !objTy.getASTType()->isString())
     return false;
-
+  
   auto objcString = kp->getPattern()->getObjCString();
-
+  
   SILValue literalValue;
   if (objcString.empty()) {
     // Replace with a nil String value.
@@ -550,12 +550,12 @@ bool swift::tryOptimizeKeypathKVCString(ApplyInst *AI,
       CanMetatypeType::get(objTy.getASTType(), MetatypeRepresentation::Thin);
     auto self = Builder.createMetatype(AI->getLoc(),
                                      SILType::getPrimitiveObjectType(metaTy));
-
+    
     auto initFnRef = Builder.createFunctionRef(AI->getLoc(), initFn);
     auto string = Builder.createApply(AI->getLoc(),
                                       initFnRef, {},
                                       {stringValue, stringLen, isAscii, self});
-
+    
     literalValue = Builder.createEnum(AI->getLoc(), string,
                                       C.getOptionalSomeDecl(), AI->getType());
   }
@@ -569,12 +569,12 @@ bool swift::tryOptimizeKeypath(ApplyInst *AI, SILBuilder Builder) {
   if (SILFunction *callee = AI->getReferencedFunctionOrNull()) {
     return tryOptimizeKeypathApplication(AI, callee, Builder);
   }
-
+  
   // Try optimize keypath method calls.
   auto *methodInst = dyn_cast<ClassMethodInst>(AI->getCallee());
   if (!methodInst)
     return false;
-
+  
   if (AI->getNumArguments() != 1) {
     return false;
   }
@@ -590,7 +590,7 @@ bool swift::tryOptimizeKeypath(ApplyInst *AI, SILBuilder Builder) {
   KeyPathInst *kp = KeyPathProjector::getLiteralKeyPath(AI->getArgument(0));
   if (!kp || !kp->hasPattern())
     return false;
-
+  
   if (tryOptimizeKeypathOffsetOf(AI, calleeFn, kp, Builder))
     return true;
 
@@ -643,20 +643,20 @@ bool SILCombiner::tryOptimizeInoutKeypath(BeginApplyInst *AI) {
   EndApplyInst *endApply = dyn_cast<EndApplyInst>(AIUse->getUser());
   if (!endApply)
     return false;
-
+  
   auto projector = KeyPathProjector::create(keyPath, rootAddr,
                                             AI->getLoc(), Builder);
   if (!projector)
     return false;
-
+    
   KeyPathProjector::AccessType accessType;
   if (isModify) accessType = KeyPathProjector::AccessType::Modify;
   else accessType = KeyPathProjector::AccessType::Get;
-
+  
   projector->project(accessType, [&](SILValue projectedAddr) {
     // Replace the projected address.
     valueAddr->replaceAllUsesWith(projectedAddr);
-
+    
     // Skip to the end of the key path application before cleaning up.
     Builder.setInsertionPoint(endApply);
   });

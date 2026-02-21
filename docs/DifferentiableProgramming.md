@@ -1581,7 +1581,7 @@ func foo<T: Differentiable & AdditiveArithmetic>(_ x: T, _ y: T, _ z: T) -> T
 func _<T: Differentiable & AdditiveArithmetic>(_ v: T) -> (x: T, y: T, z: T)
     where T == T.TangentVector { ... }
 
-// Transpose with respect to original parameter `x`, making `foo(_:_:_:)`
+// Transpose with respect to original parameter `x`, making `foo(_:_:_:)` 
 // linear with respect to `x`.
 @transpose(of: foo, wrt: 0)
 func _<T: Differentiable & AdditiveArithmetic>(y: T, z: T, v: T) -> T
@@ -1613,13 +1613,13 @@ extension MyType {
     @transpose(of: foo)
     static func _<T: Differentiable & AdditiveArithmetic>(_ v: T) -> (x: T, y: T, z: T)
         where T == T.TangentVector { ... }
-
-    // Transpose with respect to original parameter `x`, making `foo(_:_:_:)`
+    
+    // Transpose with respect to original parameter `x`, making `foo(_:_:_:)` 
     // linear with respect to `x`.
     @transpose(of: foo, wrt: 0)
     static func _<T: Differentiable & AdditiveArithmetic>(y: T, z: T, v: T) -> T
         where T == T.TangentVector { ... }
-
+    
     // Transpose with respect to original parameters `x` and `z`, making
     // `foo(_:_:_:)` linear with respect to `x` and `z`.
     @transpose(of: foo, wrt: (0, 2))
@@ -1637,7 +1637,7 @@ respect to each parameter). Here's how they are made differentiable in the
 standard library.
 
 ```swift
-extension FloatingPoint
+extension FloatingPoint 
     where Self: Differentiable & AdditiveArithmetic, Self == TangentVector
 {
     @transpose(of: +)
@@ -1701,25 +1701,25 @@ extension MyType {
     @transpose(of: foo)
     func _<T: Differentiable & AdditiveArithmetic>(_ v: T) -> (x: T, y: T, z: T)
         where T == T.TangentVector { ... }
-
-    // Transpose with respect to original parameter `x`, making `foo(_:_:_:)`
+    
+    // Transpose with respect to original parameter `x`, making `foo(_:_:_:)` 
     // linear with respect to `x`.
     @transpose(of: foo, wrt: 0)
     func _<T: Differentiable & AdditiveArithmetic>(y: T, z: T, v: T) -> T
         where T == T.TangentVector { ... }
-
+    
     // Transpose with respect to original parameters `x` and `z`, making
     // `foo(_:_:_:)` linear with respect to `x` and `z`.
     @transpose(of: foo, wrt: (0, 2))
     func _<T: Differentiable & AdditiveArithmetic>(y: T, v: T) -> (x: T, z: T)
         where T == T.TangentVector { ... }
-
+    
     // Transpose with respect to original parameters `self`, making `foo(_:_:_:)`
     // linear with respect to `self`.
     @transpose(of: foo, wrt: self)
     static func _<T: Differentiable & AdditiveArithmetic>(x: T, y: T, z: T, v: T) -> MyType
         where T == T.TangentVector { ... }
-
+    
     // Transpose with respect to original parameters `self`, `x` and `z`, making
     // `foo(_:_:_:)` linear with respect to `self`, `x` and `z`.
     @transpose(of: foo, wrt: (self, 0, 2))
@@ -1936,7 +1936,7 @@ func foo<T: Differentiable>(_ x: T, _ y: T, _ z: T) -> T { ... }
 // Derivative with respect to all parameters.
 @derivative(of: foo)
 func _<T: Differentiable>(_ x: T, _ y: T, _ z: T) -> (
-    value: T,
+    value: T, 
     differential: @differentiable(linear) (T.TangentVector, T.TangentVector, T.TangentVector) -> T.TangentVector
 ) {
     ...
@@ -1945,7 +1945,7 @@ func _<T: Differentiable>(_ x: T, _ y: T, _ z: T) -> (
 // Derivative with respect to `x`.
 @derivative(of: foo, wrt: x)
 func _<T: Differentiable>(_ x: T, _ y: T, _ z: T) -> (
-    value: T,
+    value: T, 
     differential: @differentiable(linear) (T.TangentVector) -> T.TangentVector
 ) {
     ...
@@ -1954,7 +1954,7 @@ func _<T: Differentiable>(_ x: T, _ y: T, _ z: T) -> (
 // Derivative with respect to `x` and `z`.
 @derivative(of: foo, wrt: (x, z))
 func _<T: Differentiable>(_ x: T, _ y: T, _ z: T) -> (
-    value: T,
+    value: T, 
     differential: @differentiable(linear) (T.TangentVector, T.TangentVector) -> T.TangentVector
 ) {
     ...
@@ -1976,7 +1976,7 @@ import func Glibc.sinf
 
 @derivative(of: sinf)
 public func _(_ x: Float) -> (
-    value: Float,
+    value: Float, 
     differential: @differentiable(linear) (Float) -> Float
 ) {
     (value: sinf(x), differential: { v in cosf(x) * v })
@@ -2002,7 +2002,7 @@ func foo<T, U, V>(_ x: T, _ y: U, _ z: V) -> W { ... }
 func foo<T: Differentiable, U, V: Differentiable>(
     _ x: T, _ y: U, _ z: V
 ) -> (
-    value: W,
+    value: W, 
     differential: (T.TangentVector, V.TangentVector) -> W.TangentVector
 ) {
     ...
@@ -2177,7 +2177,7 @@ let dfdx_A = derivative(at: 3, of: foo)
 // File B.swift:
 @derivative(of: foo)
 fileprivate func _(_ x: Float) -> (
-    value: Float,
+    value: Float, 
     differential: @differentiable(linear) (Float) -> Float
 ) {
     (value: foo(x), differential: { _ in 42 })

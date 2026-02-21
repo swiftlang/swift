@@ -260,7 +260,7 @@ void SelectEnforcement::analyzeUsesOfBox(SingleValueInstruction *source) {
       analyzeProjection(projection);
       continue;
     }
-
+      
     // Ignore certain other uses that do not capture the value.
     if (isa<StrongRetainInst>(user) || isa<StrongReleaseInst>(user) ||
         isa<DestroyValueInst>(user) || isa<DeallocBoxInst>(user) ||
@@ -743,7 +743,7 @@ SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
       // passed as inout. @in/@in_guaranteed may be captured @inout_aliasable.
       // (This is fairly horrible, but presumably Sema/SILGen made sure a copy
       // wasn't needed?)
-      //
+      //  
       // FIXME: When we have borrowed arguments, a "read" needs to be enforced
       // on the caller side.
       return SourceAccess::getStaticAccess();

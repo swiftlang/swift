@@ -83,7 +83,7 @@ void PrettyStackTraceSILFunction::print(llvm::raw_ostream &out) const {
   printFunctionInfo(out);
 }
 
-void PrettyStackTraceSILFunction::printFunctionInfo(llvm::raw_ostream &out) const {
+void PrettyStackTraceSILFunction::printFunctionInfo(llvm::raw_ostream &out) const {  
   out << "\"";
   func->printName(out);
   out << "\".\n";

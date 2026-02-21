@@ -527,7 +527,7 @@ public:
     case ValueKind::DereferenceBorrowInst:
       return Kind::DereferenceBorrow;
     }
-
+       
   }
 
   BorrowedValueKind(Kind newValue) : value(newValue) {}

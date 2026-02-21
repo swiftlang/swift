@@ -90,20 +90,20 @@ public:
   explicit operator bool() const {
     return LocalBuffer != nullptr;
   }
-
+  
   const T *operator->() const {
     assert(LocalBuffer);
     return LocalBuffer;
   }
-
+  
   bool operator==(RemoteRef<T> other) const {
     return Address == other.Address;
   }
-
+  
   bool operator!=(RemoteRef<T> other) const {
     return !operator==(other);
   }
-
+  
   /// Project a reference for a field. The field must be projected from the same
   /// LocalBuffer pointer as this RemoteRef.
   template<typename U>
@@ -111,7 +111,7 @@ public:
     auto offset = (intptr_t)&field - (intptr_t)LocalBuffer;
     return RemoteRef<U>((Address + (int64_t)offset), &field);
   }
-
+  
   /// Resolve the remote address of a relative offset stored at the remote address.
   RemoteAddress resolveRelativeAddressData() const {
     int32_t offset;
@@ -245,38 +245,38 @@ private:
       return IsResolved ? Payloads::template indexOf<ContextDescriptorRef>()
                         : Payloads::template indexOf<std::string>();
     }
-
+    
     ExternalUnion<bool, Payloads, getPayloadIndex> Payload;
-
+    
   public:
     explicit ParentContextDescriptorRef(StringRef Symbol)
       : IsResolved(false)
     {
       Payload.template emplace<std::string>(IsResolved, Symbol);
     }
-
+    
     explicit ParentContextDescriptorRef(ContextDescriptorRef Resolved)
       : IsResolved(true)
     {
       Payload.template emplace<ContextDescriptorRef>(IsResolved, Resolved);
     }
-
+    
     ParentContextDescriptorRef()
       : ParentContextDescriptorRef(ContextDescriptorRef())
     {}
-
+    
     ParentContextDescriptorRef(const ParentContextDescriptorRef &o)
       : IsResolved(o.IsResolved)
     {
       Payload.copyConstruct(IsResolved, o.Payload);
     }
-
+    
     ParentContextDescriptorRef(ParentContextDescriptorRef &&o)
       : IsResolved(o.IsResolved)
     {
       Payload.moveConstruct(IsResolved, std::move(o.Payload));
     }
-
+    
     ~ParentContextDescriptorRef() {
       Payload.destruct(IsResolved);
     }
@@ -293,11 +293,11 @@ private:
     }
 
     bool isResolved() const { return IsResolved; }
-
+    
     StringRef getSymbol() const {
       return Payload.template get<std::string>(IsResolved);
     }
-
+    
     ContextDescriptorRef getResolved() const {
       return Payload.template get<ContextDescriptorRef>(IsResolved);
     }
@@ -556,7 +556,7 @@ public:
 
       return nullptr;
     };
-
+    
     auto mangledNameStr =
       Demangle::makeSymbolicMangledNameStringRef(mangledName.getLocalBuffer());
 
@@ -1589,7 +1589,7 @@ public:
     if (demangledSymbol->getKind() == Demangle::Node::Kind::Global) {
       demangledSymbol = demangledSymbol->getChild(0);
     }
-
+    
     switch (demangledSymbol->getKind()) {
     // Pointers to nominal type or protocol descriptors would demangle to
     // the type they represent.
@@ -1607,7 +1607,7 @@ public:
     default:
       return nullptr;
     }
-
+  
     return demangledSymbol;
   }
 
@@ -1648,7 +1648,7 @@ public:
     } else {
       top = demangling;
     }
-
+    
     return top;
   }
 
@@ -1671,14 +1671,14 @@ public:
       return nullptr;
     if (context->getKind() != ContextDescriptorKind::OpaqueType)
       return nullptr;
-
+    
     auto opaqueType =
       reinterpret_cast<const TargetOpaqueTypeDescriptor<Runtime> *>(
                                                       context.getLocalBuffer());
 
     if (ordinal >= opaqueType->getNumUnderlyingTypeArguments())
       return nullptr;
-
+    
     auto nameAddr = resolveRelativeField(context,
                      opaqueType->getUnderlyingTypeArgumentMangledName(ordinal));
 
@@ -2088,12 +2088,12 @@ protected:
     auto fieldRef = base.getField(field);
     int32_t offset;
     memcpy(&offset, fieldRef.getLocalBuffer(), sizeof(int32_t));
-
+    
     if (offset == 0)
       return std::optional<RemoteAbsolutePointer>(nullptr);
     bool indirect = offset & 1;
     offset &= ~1u;
-
+    
     using SignedPointer = typename std::make_signed<StoredPointer>::type;
 
     // Low bit set in the offset indicates that the offset leads to the absolute
@@ -2274,7 +2274,7 @@ protected:
           stripSignedPointer(descriptorAddressSigned);
       return descriptorAddress;
     }
-
+        
     case MetadataKind::ForeignClass: {
       auto foreignMeta = cast<TargetForeignClassMetadata<Runtime>>(metadata);
       StoredSignedPointer descriptorAddressSigned = foreignMeta->getDescriptionAsSignedPointer();
@@ -2453,7 +2453,7 @@ private:
     }
     return newNode;
   }
-
+  
   /// Read a mangled name at the given remote address and return the
   /// demangle tree.
   Demangle::NodePointer readMangledName(RemoteAddress address,
@@ -2541,7 +2541,7 @@ private:
         || !*parentContextRef
         || !parentContextRef->isResolved())
       return nullptr;
-
+    
     auto parentContextLocalRef = parentContextRef->getResolved();
 
     auto context = contextRef.getLocalBuffer();
@@ -2673,7 +2673,7 @@ private:
     if (descriptor.isResolved()) {
       return buildContextDescriptorMangling(descriptor.getResolved(), dem, recursion_limit);
     }
-
+    
     // Try to demangle the symbol name to figure out what context it would
     // point to.
     return buildContextDescriptorManglingForSymbol(descriptor.getSymbol(), dem);
@@ -2686,7 +2686,7 @@ private:
       return nullptr;
     }
 
-    // Check if the Reader can provide a symbol for this descriptor, and if it
+    // Check if the Reader can provide a symbol for this descriptor, and if it 
     // can, use that instead.
     if (auto remoteAbsolutePointer =
             Reader->resolvePointerAsSymbol(descriptor.getRemoteAddress())) {
@@ -2939,7 +2939,7 @@ private:
       anonNode->addChild(name, dem);
       if (parentDemangling)
         anonNode->addChild(parentDemangling, dem);
-
+      
       return anonNode;
     }
 
@@ -2963,7 +2963,7 @@ private:
       // contexts; just create the node directly here and return.
       return dem.createNode(nodeKind, std::move(moduleName));
     }
-
+        
     case ContextDescriptorKind::OpaqueType: {
       // The opaque type may have a named anonymous context for us to map
       // back to its defining decl.
@@ -2991,7 +2991,7 @@ private:
         return nullptr;
       }
     }
-
+    
     default:
       // Not a kind of context we know about.
       return nullptr;
@@ -3147,10 +3147,10 @@ private:
     auto generics = descriptor->getGenericContext();
     if (!generics)
       return {};
-
+    
     auto numGenericArgs =
       generics->getGenericContextHeader().getNumArguments();
-
+    
     auto offsetToGenericArgs = readGenericArgsOffset(metadata, descriptor);
     if (!offsetToGenericArgs)
       return {};
@@ -3187,7 +3187,7 @@ private:
           return {};
         }
         break;
-
+        
       case GenericParamKind::TypePack:
         // assert(false && "Packs not supported here yet");
         return {};
@@ -3264,7 +3264,7 @@ private:
 
     if (!nominal)
       return BuiltType();
-
+    
     TypeCache[{getAddress(metadata), skipArtificialSubclasses}] = nominal;
 
     // If we've skipped an artificial subclass, remove the

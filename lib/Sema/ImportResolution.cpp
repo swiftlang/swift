@@ -119,7 +119,7 @@ struct UnboundImport {
   NullablePtr<ModuleDecl> getTopLevelModule(ModuleDecl *M, SourceFile &SF);
 
   /// Diagnose any errors concerning the \c @_exported, \c @_implementationOnly,
-  /// \c \@testable, or \c @_private attributes, including a
+  /// \c \@testable, or \c @_private attributes, including a 
   /// non-implementation-only import of a fragile library from a resilient one.
   void validateOptions(NullablePtr<ModuleDecl> topLevelModule, SourceFile &SF);
 

@@ -469,7 +469,7 @@ static bool canConvertArg(CanSILFunctionType substType, unsigned paramIdx,
       && substType->getSelfParameterIndex() == paramIdx) {
     return false;
   }
-
+  
   // Addressable parameters cannot be dropped because the address may
   // escape. They also can't be promoted to direct convention, so there
   // is no danger in preserving them.
@@ -589,7 +589,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   }
 
   // Check if the substitution contains any generic types that are too deep.
-  // If this is the case, bail to avoid the explosion in the number of
+  // If this is the case, bail to avoid the explosion in the number of 
   // generated specializations.
   for (auto Replacement : ParamSubs.getReplacementTypes()) {
     if (isTypeTooComplex(Replacement)) {
@@ -899,7 +899,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     case ParameterConvention::Pack_Owned:
     case ParameterConvention::Pack_Guaranteed:
       break;
-
+      
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed: {
@@ -929,14 +929,14 @@ getReturnTypeCategory(const SILResultInfo &RI,
 
   if (!TL.isLoadable())
     return NotLoadable;
-
+    
   if (RI.getReturnValueType(getModule(), SubstitutedType, typeExpansion)
         ->isVoid())
     return NotLoadable;
 
   if (!shouldExpand(getModule(), ResultTy))
     return NotLoadable;
-
+  
   return TL.isTrivial() ? LoadableAndTrivial : Loadable;
 }
 
@@ -950,7 +950,7 @@ getParamTypeCategory(const SILParameterInfo &PI,
 
   if (!TL.isLoadable())
     return NotLoadable;
-
+    
   return TL.isTrivial() ? LoadableAndTrivial : Loadable;
 }
 
@@ -3458,7 +3458,7 @@ void swift::trySpecializeApplyOfGeneric(
     // same as its SerializedKind.
     SpecializedF->setSerializedKind(F->getSerializedKind());
     assert(SpecializedF->canBeInlinedIntoCaller(F->getSerializedKind()));
-
+    
     // ... including all referenced shared functions.
     FuncBuilder.getModule().linkFunction(SpecializedF.getFunction(),
                                          SILModule::LinkingMode::LinkAll);

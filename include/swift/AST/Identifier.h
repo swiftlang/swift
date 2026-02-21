@@ -195,7 +195,7 @@ public:
     static const char OpChars[] = "/=-+*%<>!&|^~.?";
     if (C < 0x80)
       return memchr(OpChars, C, sizeof(OpChars) - 1) != 0;
-
+    
     // Unicode math, symbol, arrow, dingbat, and line/box drawing chars.
     return (C >= 0x00A1 && C <= 0x00A7)
         || C == 0x00A9 || C == 0x00AB || C == 0x00AC || C == 0x00AE
@@ -208,7 +208,7 @@ public:
         || (C >= 0x2E00 && C <= 0x2E7F) || (C >= 0x3001 && C <= 0x3003)
         || (C >= 0x3008 && C <= 0x3030);
   }
-
+  
   /// isOperatorContinuationCodePoint - Return true if the specified code point
   /// is a valid operator code point.
   static bool isOperatorContinuationCodePoint(uint32_t C) {
@@ -229,7 +229,7 @@ public:
   bool hasDollarPrefix() const {
     return str().starts_with("$") && !(getLength() == 1);
   }
-
+  
   bool hasUnderscoredNaming() const {
     return str().starts_with("_");
   }
@@ -254,7 +254,7 @@ public:
   bool operator!=(Identifier RHS) const { return !(*this==RHS); }
 
   bool operator<(Identifier RHS) const { return Pointer < RHS.Pointer; }
-
+  
   static Identifier getEmptyKey() {
     uintptr_t Val = static_cast<uintptr_t>(-1);
     Val <<= NumLowBitsAvailable;
@@ -303,7 +303,7 @@ namespace llvm {
       return LHS == RHS;
     }
   };
-
+  
   // An Identifier is "pointer like".
   template<typename T> struct PointerLikeTypeTraits;
   template<>
@@ -317,7 +317,7 @@ namespace llvm {
     }
     enum { NumLowBitsAvailable = swift::Identifier::NumLowBitsAvailable };
   };
-
+  
 } // end namespace llvm
 
 #endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
@@ -334,7 +334,7 @@ public:
     Constructor,
     Destructor
   };
-
+  
 private:
   /// In a special DeclName representing a subscript, this opaque pointer
   /// is used as the data of the base name identifier.
@@ -516,7 +516,7 @@ class DeclName {
 
     explicit CompoundDeclName(DeclBaseName BaseName, size_t NumArgs)
         : BaseName(BaseName), NumArgs(NumArgs) { }
-
+    
     ArrayRef<Identifier> getArgumentNames() const {
       return getTrailingObjects(NumArgs);
     }
@@ -599,7 +599,7 @@ public:
       return true;
     return !cast<DeclBaseName>(BaseNameOrCompound).empty();
   }
-
+  
   /// True if this is a simple one-component name.
   bool isSimpleName() const { return isa<DeclBaseName>(BaseNameOrCompound); }
 
@@ -607,13 +607,13 @@ public:
   bool isCompoundName() const {
     return !isSimpleName();
   }
-
+  
   /// True if this name is a simple one-component name identical to the
   /// given identifier.
   bool isSimpleName(DeclBaseName name) const {
     return isSimpleName() && getBaseName() == name;
   }
-
+  
   /// True if this name is a simple one-component name equal to the
   /// given string.
   bool isSimpleName(StringRef name) const {
@@ -627,7 +627,7 @@ public:
   /// True if this name is a compound name equal to the given normal
   /// base name and argument names.
   bool isCompoundName(StringRef base, ArrayRef<StringRef> args) const;
-
+  
   /// True if this name is an operator.
   bool isOperator() const {
     return getBaseName().isOperator();

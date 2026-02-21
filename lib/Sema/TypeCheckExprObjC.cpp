@@ -50,7 +50,7 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
     ResolvingSet,
     ResolvingDictionary,
   } state = Beginning;
-
+  
   /// Determine whether we are currently resolving a property.
   auto isResolvingProperty = [&] {
     switch (state) {
@@ -154,7 +154,7 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
     state = ResolvingProperty;
     currentType = newType;
   };
-
+  
   // Local function to perform name lookup for the current index.
   auto performLookup = [&](DeclNameRef componentName,
                            SourceLoc componentNameLoc,
@@ -192,10 +192,10 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
 
   bool isInvalid = false;
   SmallVector<KeyPathExpr::Component, 4> resolvedComponents;
-
+  
   for (auto &component : expr->getComponents()) {
     auto componentNameLoc = component.getLoc();
-
+    
     // ObjC keypaths only support named segments.
     // TODO: Perhaps we can map subscript components to dictionary keys.
     switch (auto kind = component.getKind()) {
@@ -222,7 +222,7 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
     case KeyPathExpr::Component::Kind::DictionaryKey:
       llvm_unreachable("already resolved!");
     }
-
+    
     auto componentName = component.getUnresolvedDeclName();
     if (!componentName.isSimpleName()) {
       diags.diagnose(componentNameLoc,

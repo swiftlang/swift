@@ -68,7 +68,7 @@ public:
 
   /// Suppress all warnings
   bool SuppressWarnings = false;
-
+  
   /// Suppress all notes
   bool SuppressNotes = false;
 

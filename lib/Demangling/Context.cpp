@@ -76,7 +76,7 @@ std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
                                           const DemangleOptions &Options) {
   NodePointer root = demangleTypeAsNode(MangledName);
   if (!root) return MangledName.str();
-
+  
   std::string demangling = nodeToString(root, Options);
   if (demangling.empty())
     return MangledName.str();

@@ -71,7 +71,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
       // Non-InlineArray arrays are not allowed
       return std::make_pair(expr, IllegalConstError::TypeNotSupported);
     }
-
+    
     // Coerce expressions to UInt8 are allowed (to support @DebugDescription)
     if (const CoerceExpr *coerceExpr = dyn_cast<CoerceExpr>(expr)) {
       auto coerceType = coerceExpr->getType();

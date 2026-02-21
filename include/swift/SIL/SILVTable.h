@@ -82,16 +82,16 @@ public:
 
   SILFunction *getImplementation() const { return ImplAndKind.getPointer(); }
   void setImplementation(SILFunction *f);
-
+  
   void print(llvm::raw_ostream &os) const;
-
+  
   bool operator==(const SILVTableEntry &e) const {
     return Method == e.Method
       && getImplementation() == e.getImplementation()
       && getKind() == e.getKind()
       && isNonOverridden() == e.isNonOverridden();
   }
-
+  
   bool operator!=(const SILVTableEntry &e) const {
     return !(*this == e);
   }
@@ -181,7 +181,7 @@ public:
   MutableArrayRef<Entry> getMutableEntries() {
     return getTrailingObjects(NumEntries);
   }
-
+                          
   void updateVTableCache(const Entry &entry);
 
   /// Look up the implementation function for the given method.

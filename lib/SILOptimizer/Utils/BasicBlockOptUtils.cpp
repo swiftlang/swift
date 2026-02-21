@@ -56,7 +56,7 @@ ReachingReturnBlocks::ReachingReturnBlocks(SILFunction *function)
     if (isa<ReturnInst>(block.getTerminator()))
       worklist.push(&block);
   }
-
+  
   while (SILBasicBlock *block = worklist.pop()) {
     for (SILBasicBlock *pred : block->getPredecessorBlocks()) {
       worklist.pushIfNotVisited(pred);

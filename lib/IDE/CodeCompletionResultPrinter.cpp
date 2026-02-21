@@ -89,7 +89,7 @@ void swift::ide::printCodeCompletionResultDescription(
         skipToEndOfCurrentNestedGroup(I, E);
         continue;
       }
-
+      
       if (C.hasText()) {
         TextSize += C.getText().size();
         OS << C.getText();

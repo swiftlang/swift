@@ -34,7 +34,7 @@ class FieldRecordFlags {
   enum : int_type {
     // Is this an indirect enum case?
     IsIndirectCase = 0x1,
-
+    
     // Is this a mutable `var` property?
     IsVar = 0x2,
 

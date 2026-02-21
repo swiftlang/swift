@@ -23,12 +23,12 @@ must work around by defining additional public symbols not intended for
 direct consumption by users. For example:
 
 ```swift
-// Workaround.
-public protocol _Pointer {
-  // ...
+// Workaround. 
+public protocol _Pointer { 
+  // ... 
 }
 
-// Symbol intended for use outside stdlib.
+// Symbol intended for use outside stdlib. 
 public struct UnsafeRawPointer: _Pointer {
   // ...
 }
@@ -56,7 +56,7 @@ To document the reason for marking symbols public, we use comments:
 
 # `internal`
 
-In Swift, `internal` is an implied default everywhere — except within `public`
+In Swift, `internal` is an implied default everywhere — except within `public` 
 extensions and protocols. Therefore, `internal` should be used explicitly
 everywhere in the stdlib to avoid confusion.
 

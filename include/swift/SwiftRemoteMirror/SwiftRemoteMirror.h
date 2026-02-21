@@ -293,10 +293,10 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
 
 /// Like swift_reflection_projectExistential, with 2 differences:
 ///
-/// - When dealing with an error existential, this version will dereference
+/// - When dealing with an error existential, this version will dereference 
 ///   the ExistentialAddress before proceeding.
 /// - After setting OutInstanceTypeRef and OutStartOfInstanceData this version
-///   may dereference and set OutStartOfInstanceData if OutInstanceTypeRef is a
+///   may dereference and set OutStartOfInstanceData if OutInstanceTypeRef is a 
 ///   class TypeRef.
 SWIFT_REMOTE_MIRROR_LINKAGE
 int swift_reflection_projectExistentialAndUnwrapClass(

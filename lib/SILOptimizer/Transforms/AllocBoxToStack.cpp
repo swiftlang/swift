@@ -541,7 +541,7 @@ static void replaceAllNonDebugUsesWith(SILValue value,
     if (op->getUser()->isDebugInstruction()) {
       continue;
     }
-
+    
     // Rewrite all other uses.
     op->set(with);
   }

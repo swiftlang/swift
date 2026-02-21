@@ -163,7 +163,7 @@ public:
     Explosion discard;
     reexplode(explosion, discard);
     (void)discard.claimAll();
-  }
+  }  
 
   void destroy(IRGenFunction &IGF, Address address, SILType T,
                bool isOutlined) const override {
@@ -186,7 +186,7 @@ public:
                            unsigned offset) const override {
     ReferentTI.packIntoEnumPayload(IGM, builder, payload, source, offset);
   }
-
+  
   void unpackFromEnumPayload(IRGenFunction &IGF,
                              const EnumPayload &payload,
                              Explosion &target,
@@ -223,7 +223,7 @@ public:
   APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
     return ReferentTI.getFixedExtraInhabitantMask(IGM);
   }
-
+  
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
                                         bool useStructLayouts) const override {
     return ReferentTI.buildTypeLayoutEntry(IGM, T, useStructLayouts);
@@ -312,7 +312,7 @@ public:
     auto isValueRep = getIsValueRepresentation(IGF, referentTy, referentTI);
     auto isValueRepBB = IGF.createBasicBlock("is_value_representation");
     auto isAddrRepBB = IGF.createBasicBlock("is_address_representation");
-
+    
     auto doneBB = IGF.createBasicBlock("done");
 
     IGF.Builder.CreateCondBr(isValueRep, isValueRepBB, isAddrRepBB);
@@ -333,7 +333,7 @@ public:
 
     IGF.Builder.CreateBr(doneBB);
 
-    // In pointer representation, we take on RawPointer's extra inhabitant.
+    // In pointer representation, we take on RawPointer's extra inhabitant. 
     IGF.Builder.emitBlock(isAddrRepBB);
 
     auto pointerTy = SILType::getPrimitiveObjectType(IGF.IGM.Context.TheRawPointerType);
@@ -369,7 +369,7 @@ public:
     auto isValueRep = getIsValueRepresentation(IGF, referentTy, referentTI);
     auto isValueRepBB = IGF.createBasicBlock("is_value_representation");
     auto isAddrRepBB = IGF.createBasicBlock("is_address_representation");
-
+    
     auto doneBB = IGF.createBasicBlock("done");
 
     IGF.Builder.CreateCondBr(isValueRep, isValueRepBB, isAddrRepBB);
@@ -383,7 +383,7 @@ public:
 
     IGF.Builder.CreateBr(doneBB);
 
-    // In pointer representation, we take on RawPointer's extra inhabitant.
+    // In pointer representation, we take on RawPointer's extra inhabitant. 
     IGF.Builder.emitBlock(isAddrRepBB);
 
     auto pointerTy = SILType::getPrimitiveObjectType(IGF.IGM.Context.TheRawPointerType);
@@ -403,13 +403,13 @@ TypeConverter::convertBuiltinBorrowType(BuiltinBorrowType *T) {
   // SIL type.
   auto referentTy = SILType::getPrimitiveObjectType(T->getReferentType());
   auto &referentTI = IGM.getTypeInfo(referentTy);
-
+  
   // If the referent doesn't have fixed layout here, then the borrow layout
   // is also dependent.
   auto *fixedReferent = dyn_cast<FixedTypeInfo>(&referentTI);
   if (!fixedReferent) {
     return new BorrowNonFixedTypeInfo(IGM);
-  }
+  } 
 
   // TODO: If the referent type's layout is dependent on a type defined in a
   // library-evolution-enabled module whose interface has been compiled with a
@@ -484,7 +484,7 @@ void irgen::emitInitBorrowAtAddress(IRGenFunction &IGF,
     // The borrow is a pointer to the referent.
     IGF.Builder.CreateStore(srcReferent.getAddress(), destBorrow);
     return;
-
+    
   case BorrowTypeInfoSubclassKind::BorrowNonFixed:
     // The borrow representation is dependent on the referent type.
     // Ask the runtime 'swift_initBorrow' to handle it.
@@ -526,7 +526,7 @@ Address irgen::emitDereferenceBorrowToAddress(IRGenFunction &IGF,
     SILType::getPrimitiveObjectType(builtinBorrowTy->getReferentType()));
 
   auto addr = borrow.claimNext();
-
+  
   return Address(addr, referentTL.getStorageType(),
                  referentTL.getBestKnownAlignment());
 }
@@ -554,11 +554,11 @@ Address irgen::emitDereferenceBorrowAtAddress(IRGenFunction &IGF,
     auto addr = IGF.Builder.CreateLoad(borrow.getAddress(),
                                        IGF.IGM.PtrTy,
                                        IGF.IGM.getPointerAlignment());
-
+    
     return Address(addr, referentTL.getStorageType(),
                    referentTL.getBestKnownAlignment());
   }
-
+    
   case BorrowTypeInfoSubclassKind::BorrowNonFixed: {
     // The borrow representation is dependent on the referent type.
     // Ask the runtime 'swift_dereferenceBorrow' to handle it.

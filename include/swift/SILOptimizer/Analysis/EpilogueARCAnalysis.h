@@ -77,7 +77,7 @@ private:
   std::vector<EpilogueARCBlockState> IndexToStateMap;
 
   /// The epilogue retains or releases.
-  llvm::SmallSetVector<SILInstruction *, 1> EpilogueARCInsts;
+  llvm::SmallSetVector<SILInstruction *, 1> EpilogueARCInsts; 
 
   /// The exit blocks of the function.
   llvm::SmallPtrSet<SILBasicBlock *, 2> ExitBlocks;
@@ -93,9 +93,9 @@ private:
   }
 
   /// Return true if this is a function exiting block this epilogue ARC
-  /// matcher is interested in.
+  /// matcher is interested in. 
   bool isInterestedFunctionExitingBlock(SILBasicBlock *BB) {
-    if (EpilogueARCKind::Release == Kind)
+    if (EpilogueARCKind::Release == Kind)  
       return BB->getTerminator()->isFunctionExiting();
 
     return BB->getTerminator()->isFunctionExiting() &&
@@ -148,7 +148,7 @@ public:
     return computeEpilogueARC();
   }
 
-  /// Reset the epilogue arc instructions.
+  /// Reset the epilogue arc instructions. 
   llvm::SmallSetVector<SILInstruction *, 1> getEpilogueARCInsts() {
     return EpilogueARCInsts;
   }
@@ -171,7 +171,7 @@ public:
 
   /// This instruction prevents looking further for epilogue retains on the
   /// current path.
-  bool mayBlockEpilogueRetain(SILInstruction *II, SILValue Ptr) {
+  bool mayBlockEpilogueRetain(SILInstruction *II, SILValue Ptr) { 
     // reference decrementing instruction prevents any retain to be identified as
     // epilogue retains.
     auto *function = II->getFunction();
@@ -183,18 +183,18 @@ public:
      if (AI->getCalleeFunction() == function)
        return true;
     return false;
-  }
+  } 
 
   /// This instruction prevents looking further for epilogue releases on the
   /// current path.
-  bool mayBlockEpilogueRelease(SILInstruction *II, SILValue Ptr) {
+  bool mayBlockEpilogueRelease(SILInstruction *II, SILValue Ptr) { 
     // Check whether this instruction read reference count, i.e. uniqueness
     // check. Moving release past that may result in additional COW.
     return II->mayReleaseOrReadRefCount();
-  }
+  } 
 
   /// Does this instruction block the interested ARC instruction ?
-  bool mayBlockEpilogueARC(SILInstruction *II, SILValue Ptr) {
+  bool mayBlockEpilogueARC(SILInstruction *II, SILValue Ptr) { 
     if (Kind == EpilogueARCKind::Retain)
       return mayBlockEpilogueRetain(II, Ptr);
     return mayBlockEpilogueRelease(II, Ptr);
@@ -274,7 +274,7 @@ class EpilogueARCAnalysis : public FunctionAnalysisBase<EpilogueARCFunctionInfo>
   PostOrderAnalysis *PO = nullptr;
   /// Current RC Identity analysis we are using.
   RCIdentityAnalysis *RC = nullptr;
-
+  
 public:
   EpilogueARCAnalysis(SILModule *)
       : FunctionAnalysisBase<EpilogueARCFunctionInfo>(
@@ -288,7 +288,7 @@ public:
   }
 
   virtual void initialize(SILPassManager *PM) override;
-
+  
   virtual std::unique_ptr<EpilogueARCFunctionInfo>
   newFunctionAnalysis(SILFunction *F) override;
 

@@ -70,12 +70,12 @@ public:
   IndirectOpenedSelfCleanup()
     : box()
   {}
-
+  
   void setBox(SILValue b) {
     assert(!box && "buffer already set?!");
     box = b;
   }
-
+  
   void emit(SILGenFunction &SGF, CleanupLocation loc, ForUnwind_t forUnwind)
   override {
     assert(box && "buffer never emitted before activating cleanup?!");
@@ -88,7 +88,7 @@ public:
     }
     SGF.B.createDeallocBox(loc, theBox);
   }
-
+  
   void dump(SILGenFunction &SGF) const override {
     llvm::errs() << "IndirectOpenedSelfCleanup\n";
     if (box)
@@ -154,12 +154,12 @@ public:
                                                          CleanupState::Dormant);
     handle = SGF.Cleanups.getCleanupsDepth();
   }
-
+  
   void
   gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
                             SmallVectorImpl<SILValue> &outList) const override {
     assert(!resultBox && "already created temporary?!");
-
+    
     // We allocate the buffer as a box because the scope nesting won't clean
     // this up with good stack discipline relative to any stack allocations that
     // occur during argument emission. Escape analysis during mandatory passes
@@ -200,7 +200,7 @@ public:
                 ArrayRef<ManagedValue> &directResults,
                 SILValue bridgedForeignError) override {
     assert(resultBox && "never emitted temporary?!");
-
+    
     // Lower the unabstracted result type.
     auto &substTL = SGF.getTypeLowering(substType);
 
@@ -715,7 +715,7 @@ public:
                                           calleeTypeInfo.substResultType);
     resumeBuf = SGF.emitTemporaryAllocation(loc, opaqueResumeType);
   }
-
+  
   void
   gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
                             SmallVectorImpl<SILValue> &outList) const override {
@@ -980,12 +980,12 @@ public:
       SGF.B.emitBlock(awaitBB);
     }
     SGF.B.createAwaitAsyncContinuation(loc, continuation, resumeBlock, errorBlock);
-
+    
     // Propagate an error if we have one.
     if (errorBlock) {
       SGF.B.emitBlock(errorBlock);
       breadcrumb.emit(SGF, loc);
-
+      
       Scope errorScope(SGF, loc);
 
       auto errorTy = ctx.getErrorExistentialType();
@@ -994,10 +994,10 @@ public:
 
       SGF.emitThrow(loc, errorVal, true);
     }
-
+    
     SGF.B.emitBlock(resumeBlock);
     breadcrumb.emit(SGF, loc);
-
+    
     // The incoming value is the maximally-abstracted result type of the
     // continuation. Move it out of the resume buffer and reabstract it if
     // necessary.
@@ -1217,7 +1217,7 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
                                                 CanType substType,
                                                 SILResultInfo result) {
   auto calleeTy = calleeTypeInfo.substFnType;
-
+  
   // If the result is indirect, and we have an address to emit into, and
   // there are no abstraction differences, then just do it.
   if (init && init->canPerformInPlaceInitialization() &&
@@ -1235,7 +1235,7 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
   //   - store it to the destination
   // We could break this down into different ResultPlan implementations,
   // but it's easier not to.
-
+  
   // If the result type involves an indirectly-returned opened existential,
   // then we need to evaluate the arguments first in order to have access to
   // the opened Self type. A special result plan defers allocating the stack

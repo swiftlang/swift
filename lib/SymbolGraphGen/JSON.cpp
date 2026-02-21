@@ -113,7 +113,7 @@ void swift::symbolgraphgen::serialize(const Requirement &Req,
     OS.attribute("kind", Kind);
     OS.attribute("lhs", Req.getFirstType()->getString());
     OS.attribute("rhs", Req.getSecondType()->getString());
-
+    
     // If the RHS type has a USR we can link to, add it to the output
     if (auto *TyDecl = Req.getSecondType()->getAnyNominal()) {
       SmallString<256> USR;

@@ -469,7 +469,7 @@ public:
     DeadToLiveEdge = 2,
     LiveOut = 3,
   };
-
+  
   static bool isDead(IsLive liveness) {
     return liveness == Dead || liveness == DeadToLiveEdge;
   }
@@ -1337,14 +1337,14 @@ public:
     auto defBlock = getDefinedInBlock(node);
     defBlocks.insert(defBlock, span);
     initializeDefBlock(defBlock, span);
-
+    
     if (defBlock != node->getParentBlock()) {
       // If the block the value becomes defined in is different from the
       // defining instruction, then the def notionally occurs "on the edge"
       // between the instruction (which must be a terminator) and the defined-in
       // successor block. Mark the original block as a dead-to-live edge.
       auto ti = cast<TermInst>(node);
-
+      
       assert(std::find(ti->getSuccessorBlocks().begin(),
                        ti->getSuccessorBlocks().end(),
                        defBlock) != ti->getSuccessorBlocks().end()

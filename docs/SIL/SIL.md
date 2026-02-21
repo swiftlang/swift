@@ -56,7 +56,7 @@ architecture:
 
 Ownership SSA - or OSSA - is an augmented version of SSA that enforces
 ownership invariants for SSA values in SIL functions. OSSA allows to verify
-ownership.
+ownership. 
 
 By using these ownership invariants, SIL in OSSA form can be validated
 statically as not containing use after free errors or leaked memory. This
@@ -121,7 +121,7 @@ Each formal type has a corresponding lowered type. However, most lowered types
 are identical to their original formal type, for example all nominal types,
 like classes, structs or enums (except `Optional`). Only a few kind of types
 are lowered to a different lowered type. The most prominent example is function
-types: a lowered function type adds information about the calling convention and
+types: a lowered function type adds information about the calling convention and 
 it lowers tuple arguments to individual arguments.
 
 For example, the formal type of
@@ -274,7 +274,7 @@ arg-or-return ::= '%r' ('.' projection-path)?
 defined-effect ::= '!'    // the effect is defined in the source code and not
                           // derived by the optimizer
 
-projection-path ::= path-component ('.' path-component)*
+projection-path ::= path-component ('.' path-component)* 
 path-component ::= 's' [0-9]+        // struct field
 path-component ::= 'c' [0-9]+        // class field
 path-component ::= 'ct'              // class tail element
@@ -323,7 +323,7 @@ Reference](Instructions.md).
 ## Basic Block Arguments
 
 A block argument is a [value](#values-and-operands) and can have an ownership
-kind specified before its type annotation.
+kind specified before its type annotation.  
 There are three kind of arguments:
 
 - Function arguments: Per definition, the arguments of the first basic block in
@@ -427,7 +427,7 @@ sil-operand ::= sil-value ':' sil-type
 ```
 
 Values are used in instruction operands. Unlike LLVM IR, SIL instructions that
-take value operands *only* accept value operands.
+take value operands *only* accept value operands. 
 References to literal constants, functions, global variables, or other entities
 are introduced as the results of dedicated instructions such as
 `integer_literal`, `function_ref`, and `global_addr`.
@@ -485,7 +485,7 @@ kind associated.
 
 The ownership kind of a value is statically determined:
 
-- Basic block arguments have their ownership explicitly specified:
+- Basic block arguments have their ownership explicitly specified: 
 
 ```
     bb1(%0 : @owned $String, %1 : @guaranteed $String, %2 : $Int):
@@ -499,7 +499,7 @@ The ownership kind of a value is statically determined:
 
 - Forwarding instructions: some instructions work with both, owned and
   guaranteed ownership, and "forward" the ownership from their operand(s) to
-  their result(s), for example cast instructions.
+  their result(s), for example cast instructions.  
   If a forwarding instruction has multiple operands (like `struct` or `tuple`),
   the ownership of all operand values must be consistent. The operands values
   cannot have both guaranteed and owned ownership. However, it's possible to
@@ -592,7 +592,7 @@ Lifetimes have following properties:
       %1 = begin_borrow                          -+
       ...                                         |
       // forwarding instruction                   | lifetime = borrow scope
-      %2 = struct $S (%1)  // forwarded use =     |
+      %2 = struct $S (%1)  // forwarded use =     |   
       ...                  //   interior use      |
       end_borrow %1                              -+
 ```
@@ -675,7 +675,7 @@ result - the non-escaping closure.
   %4 = convert_function %3 to $SomeFuncType    |
   destroy_value %4                            -+ %1 and %2 must be alive until here
 ```
-
+ 
 #### `mark_dependence`
 
 A [`mark_dependence [nonescaping]`](Instructions.md#mark_dependence) defines a
@@ -776,7 +776,7 @@ non-trivial phi arguments:
   forwarded guaranteed values. The phi argument does _not_ produce a new
   lifetime. Instead the argument can be viewed as interior use of another
   enclosing borrow scope. Such guaranteed phi-arguments are called "forwarded
-  guaranteed phis".
+  guaranteed phis".  
   Like reborrow arguments, the argument's enclosing values (= its borrow
   introducers) must be specified with a
   [`borrowed-from`](Instructions.md#borrowed-from) instruction.
@@ -1055,7 +1055,7 @@ information.
 
 Some SIL instructions need to reference Swift declarations directly.
 These references are introduced with the `#` sigil followed by the fully
-qualified name of the Swift declaration.
+qualified name of the Swift declaration. 
 
 ```
 sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?

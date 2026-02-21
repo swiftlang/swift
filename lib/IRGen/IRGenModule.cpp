@@ -228,7 +228,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   auto &opts = irgen.Opts;
 
   EnableValueNames = opts.shouldProvideValueNames();
-
+  
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   PtrTy = llvm::PointerType::getUnqual(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
@@ -324,7 +324,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int32Ty,                // flags
     RelativeAddressTy,      // default implementation
   });
-
+  
   // A tuple type metadata record has a couple extra fields.
   auto tupleElementTy = createStructType(*this, "swift.tuple_element_type", {
     TypeMetadataPtrTy,      // Metadata *Type;

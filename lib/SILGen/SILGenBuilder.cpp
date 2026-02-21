@@ -109,7 +109,7 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
   SILValue fnValue = fn.getValue();
   SILValue result =
       createConvertEscapeToNoEscape(loc, fnValue, resultTy, false);
-
+  
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
@@ -769,7 +769,7 @@ ManagedValue SILGenBuilder::createUncheckedForwardingCast(SILLocation loc,
                                                           SILType type) {
   CleanupCloner cloner(*this, value);
   SILValue cast = createUncheckedForwardingCast(loc, value.getValue(), type);
-
+  
   // Currently createUncheckedBitCast only produces these
   // instructions. We assert here to make sure if this changes, this code is
   // updated.
@@ -1074,12 +1074,12 @@ public:
   EndAccessCleanup(SILValue beginAccess)
     : beginAccess(beginAccess)
   {}
-
+  
   void emit(SILGenFunction &SGF, CleanupLocation loc, ForUnwind_t forUnwind)
   override {
     SGF.B.createEndAccess(loc, beginAccess, /*aborted*/ false);
   }
-
+  
   void dump(SILGenFunction &SGF) const override {
     llvm::errs() << "EndAccessCleanup\n";
     if (beginAccess) {

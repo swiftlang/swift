@@ -34,7 +34,7 @@ using namespace swift;
 // SILBasicBlock Implementation
 //===----------------------------------------------------------------------===//
 
-SwiftMetatype SILBasicBlock::registeredMetatype;
+SwiftMetatype SILBasicBlock::registeredMetatype;    
 
 SILBasicBlock::SILBasicBlock() :
   SwiftObjectHeader(registeredMetatype), Parent(nullptr) {}
@@ -50,7 +50,7 @@ SILBasicBlock::~SILBasicBlock() {
            "a static initializer block must be cleared before the destructor");
     return;
   }
-
+    
   dropAllReferences();
   eraseAllInstructions(getModule());
 }
@@ -344,7 +344,7 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
         op.resetBitfields();
       }
       II.asSILNode()->resetBitfields();
-
+    
       II.setDebugScope(ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
       // Special handling for SILDebugVariable.
       // Fetch incomplete var info to avoid calling setDebugVarScope on

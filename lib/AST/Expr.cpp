@@ -134,7 +134,7 @@ SourceRange Expr::getSourceRange() const {
   case ExprKind::ID: return getSourceRangeImpl(cast<ID##Expr>(this));
 #include "swift/AST/ExprNodes.def"
   }
-
+  
   llvm_unreachable("expression type not handled!");
 }
 
@@ -491,7 +491,7 @@ forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
 
     ChildWalker(llvm::function_ref<Expr *(Expr *)> callback, Expr *ThisNode)
       : callback(callback), ThisNode(ThisNode) {}
-
+    
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // When looking at the current node, of course we want to enter it.  We
       // also don't want to enumerate it.
@@ -507,7 +507,7 @@ forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
       // further.
       return Action::SkipNode(E);
     }
-
+    
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       return Action::SkipNode(S);
     }
@@ -522,7 +522,7 @@ forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
       return Action::SkipNode();
     }
   };
-
+  
   this->walk(ChildWalker(callback, this));
 }
 
@@ -1247,7 +1247,7 @@ ObjectLiteralExpr::create(ASTContext &ctx, SourceLoc poundLoc, LiteralKind kind,
 StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
   switch (getLiteralKind()) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return #Name;
-#include "swift/AST/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"    
   }
   llvm_unreachable("unspecified literal");
 }
@@ -1256,7 +1256,7 @@ StringRef ObjectLiteralExpr::
 getLiteralKindPlainName(ObjectLiteralExpr::LiteralKind kind) {
   switch (kind) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return Desc;
-#include "swift/AST/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"    
   }
   llvm_unreachable("unspecified literal");
 }
@@ -1274,14 +1274,14 @@ MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
                              bool Implicit, AccessSemantics semantics)
   : LookupExpr(ExprKind::MemberRef, base, member, Implicit),
     DotLoc(dotLoc), NameLoc(nameLoc) {
-
+   
   Bits.MemberRefExpr.Semantics = (unsigned) semantics;
 }
 
 Type OverloadSetRefExpr::getBaseType() const {
   if (isa<OverloadedDeclRefExpr>(this))
     return Type();
-
+  
   llvm_unreachable("Unhandled overloaded set reference expression");
 }
 
@@ -1485,7 +1485,7 @@ SourceRange TupleExpr::getSourceRange() const {
 
 TupleExpr::TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
                      ArrayRef<Expr *> SubExprs,
-                     ArrayRef<Identifier> ElementNames,
+                     ArrayRef<Identifier> ElementNames, 
                      ArrayRef<SourceLoc> ElementNameLocs,
                      bool Implicit, Type Ty)
   : Expr(ExprKind::Tuple, Implicit, Ty),
@@ -1493,11 +1493,11 @@ TupleExpr::TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
   Bits.TupleExpr.HasElementNames = !ElementNames.empty();
   Bits.TupleExpr.HasElementNameLocations = !ElementNameLocs.empty();
   Bits.TupleExpr.NumElements = SubExprs.size();
-
+  
   assert(LParenLoc.isValid() == RParenLoc.isValid() &&
          "Mismatched parenthesis location information validity");
   assert(ElementNames.empty() || ElementNames.size() == SubExprs.size());
-  assert(ElementNameLocs.empty() ||
+  assert(ElementNameLocs.empty() || 
          ElementNames.size() == ElementNameLocs.size());
 
   // Copy elements.
@@ -1545,7 +1545,7 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
                              ElementNameLocs, Implicit, Ty);
 }
 
-TupleExpr *TupleExpr::createEmpty(ASTContext &ctx, SourceLoc LParenLoc,
+TupleExpr *TupleExpr::createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
                                   SourceLoc RParenLoc, bool Implicit) {
   return create(ctx, LParenLoc, {}, {}, {}, RParenLoc, Implicit,
                 TupleType::getEmpty(ctx));
@@ -1932,7 +1932,7 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
       candidate = covariantExpr->getSubExpr();
       continue;
     }
-
+    
     // Look through inject into optional expressions
     if (auto injectIntoOptionalExpr
         = dyn_cast<InjectIntoOptionalExpr>(candidate)) {
@@ -2085,7 +2085,7 @@ bool AbstractClosureExpr::isBodyThrowing() const {
 
     return false;
   }
-
+  
   return getType()->castTo<FunctionType>()->getExtInfo().isThrowing();
 }
 
@@ -2191,7 +2191,7 @@ bool ClosureExpr::hasEmptyBody() const {
 Type ClosureExpr::getExplicitThrownType() const {
   if (getThrowsLoc().isInvalid())
     return Type();
-
+  
   ASTContext &ctx = getASTContext();
   auto mutableThis = const_cast<ClosureExpr *>(this);
   ExplicitCaughtTypeRequest request{&ctx, mutableThis};
@@ -2530,7 +2530,7 @@ KeyPathExpr::setComponents(ASTContext &C,
       ::new ((void*)&Components[i]) Component{};
     }
   }
-
+  
   for (unsigned i : indices(newComponents)) {
     Components[i] = newComponents[i];
   }
@@ -2803,7 +2803,7 @@ ArrayRef<Expr *> SingleValueStmtExpr::getResultExprs(
   return scratch;
 }
 
-void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx,
+void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx, 
     llvm::function_ref<void(bool, CallExpr *)> callback) {
   auto appendingExpr = getAppendingExpr();
   for (auto stmt : appendingExpr->getBody()->getElements()) {

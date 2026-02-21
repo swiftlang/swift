@@ -35,7 +35,7 @@ enum class InvertibleProtocolKind : uint8_t {
 /// InvertibleProtocolKind.
 class InvertibleProtocolSet {
   using StorageType = uint16_t;
-
+  
   /// The stored bits.
   StorageType bits;
 
@@ -43,7 +43,7 @@ class InvertibleProtocolSet {
   static StorageType getMask(InvertibleProtocolKind kind) {
     return 1 << static_cast<uint8_t>(kind);
   }
-
+  
 public:
   explicit constexpr InvertibleProtocolSet(StorageType bits) : bits(bits) {}
   constexpr InvertibleProtocolSet() : bits(0) {}
@@ -109,9 +109,9 @@ public:
   /// another kind of invertible protocol. The Swift runtime will need to
   /// step lightly around protocol sets with unknown protocols.
   bool hasUnknownProtocols() const {
-    return !(*this - allKnown()).empty();
+    return !(*this - allKnown()).empty();    
   }
-
+  
   class iterator {
     /// The bits remaining in the set, which will be 0 when we have hit the
     /// end.

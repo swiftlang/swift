@@ -23,7 +23,7 @@ typedef void (^dispatch_block_t)(void);
 dispatch_queue_t dispatch_get_current_queue(void);
 void dispatch_async(dispatch_queue_t q, dispatch_block_t) __attribute__((nonnull));
 
-void dispatch_sync(dispatch_queue_t q,
+void dispatch_sync(dispatch_queue_t q, 
                    __attribute__((noescape)) dispatch_block_t) __attribute__((nonnull));
 
 void dispatch_retain(dispatch_object_t object) __attribute__((nonnull));

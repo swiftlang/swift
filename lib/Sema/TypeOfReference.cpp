@@ -1216,7 +1216,7 @@ ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
   // Determine the type of the value, opening up that type if necessary.
   bool wantInterfaceType = !varDecl->getDeclContext()->isLocalContext();
   Type valueType =
-      getUnopenedTypeOfReference(varDecl, Type(), useDC,
+      getUnopenedTypeOfReference(varDecl, Type(), useDC, 
                                  getConstraintLocator(locator),
                                  wantInterfaceType);
 

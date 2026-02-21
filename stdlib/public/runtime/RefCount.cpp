@@ -172,7 +172,7 @@ void RefCounts<SideTableRefCountBits>::incrementUnownedSlow(uint32_t n) {
   // Overflow from side table to a new side table?!
   swift_abortUnownedRetainOverflow();
 }
-
+  
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_immortalize(void *obj) {
   auto heapObj = reinterpret_cast<HeapObject *>(obj);

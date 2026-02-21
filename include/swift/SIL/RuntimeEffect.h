@@ -19,7 +19,7 @@ namespace swift {
 enum class RuntimeEffect : unsigned {
   /// The runtime function has no observable effect.
   NoEffect            = 0,
-
+  
   /// The runtime function can lock.
   Locking             = 0x01,
 
@@ -28,10 +28,10 @@ enum class RuntimeEffect : unsigned {
 
   /// The runtime function can deallocate memory (implies Locking).
   Deallocating        = 0x04,
-
+  
   /// The runtime function performs ARC operations (implies Locking).
   RefCounting         = 0x08,
-
+  
   /// The runtime function performs metadata operations (which implies Locking
   /// and Allocating).
   /// TODO: distinguish between metadata runtime functions which only lock and
@@ -51,19 +51,19 @@ enum class RuntimeEffect : unsigned {
 
   /// The runtime function calls ObjectiveC methods.
   ObjectiveC          = 0x40,
-
+  
   /// Witness methods, boxing, unboxing, initializing, etc.
   Existential         = 0x80,
 
   /// Class-bound only existential
   ExistentialClassBound = 0x200,
-
+  
   /// Not modelled currently.
   Concurrency         = 0x0,
 
   /// Not modelled currently.
   AutoDiff            = 0x0,
-
+  
   Releasing = RefCounting | Deallocating,
 };
 

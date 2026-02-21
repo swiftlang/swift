@@ -82,7 +82,7 @@ public:
     if (asImpl().hasTrailingFlags())
       asImpl().addTrailingFlags();
   }
-
+  
   // Note the start of the field offset vector.
   void noteStartOfFieldOffsets() {}
 

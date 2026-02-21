@@ -2611,7 +2611,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     auto SplitMap = StringRef(A).split('=');
     Opts.DeserializedPathRecoverer.addMapping(SplitMap.first, SplitMap.second);
   }
-
+  
   for (const Arg *A : Args.filtered(OPT_scanner_prefix_map_paths)) {
     Opts.ScannerPrefixMapper.push_back({A->getValue(0), A->getValue(1)});
   }
@@ -3618,7 +3618,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_debug_module_path))
     Opts.DebugModulePath = A->getValue();
-
+  
   for (auto A : Args.getAllArgValues(options::OPT_file_prefix_map)) {
     auto SplitMap = StringRef(A).split('=');
     Opts.FilePrefixMap.addMapping(SplitMap.first, SplitMap.second);

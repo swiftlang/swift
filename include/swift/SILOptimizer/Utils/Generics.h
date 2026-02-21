@@ -164,7 +164,7 @@ class ReabstractionInfo {
     Loadable,
     LoadableAndTrivial
   };
-
+  
   // Create a new substituted type with the updated signature.
   CanSILFunctionType createSubstitutedType(SILFunction *OrigF,
                                            SubstitutionMap SubstMap,
@@ -173,7 +173,7 @@ class ReabstractionInfo {
 public:
   void createSubstitutedAndSpecializedTypes();
 private:
-
+  
   TypeCategory getReturnTypeCategory(const SILResultInfo &RI,
                                      const SILFunctionConventions &substConv,
                                      TypeExpansionContext typeExpansion);

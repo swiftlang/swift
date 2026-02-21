@@ -344,7 +344,7 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
         SourceLoc(), SourceLoc(), name, SourceLoc(),
         /*genericparams*/ nullptr, dc);
     aliasDecl->setUnderlyingType(type);
-
+    
     aliasDecl->setImplicit();
     aliasDecl->setSynthesized();
 
@@ -2737,7 +2737,7 @@ deriveTypeWitness(const NormalProtocolConformance *Conformance,
   auto *protocol = cast<ProtocolDecl>(AssocType->getDeclContext());
 
   auto knownKind = protocol->getKnownProtocolKind();
-
+  
   if (!knownKind)
     return std::make_pair(nullptr, nullptr);
 

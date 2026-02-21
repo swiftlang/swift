@@ -70,7 +70,7 @@ struct InProcess;
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
 
-// swift::crash() halts with a crash log message,
+// swift::crash() halts with a crash log message, 
 // but otherwise tries not to disturb register state.
 
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN
@@ -117,8 +117,8 @@ swift_dynamicCastFailure(const Metadata *sourceType,
 // with a description of a failed cast's types.
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN
 void
-swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
-                         const void *targetType, const char *targetName,
+swift_dynamicCastFailure(const void *sourceType, const char *sourceName, 
+                         const void *targetType, const char *targetName, 
                          const char *message = nullptr);
 
 SWIFT_RUNTIME_EXPORT

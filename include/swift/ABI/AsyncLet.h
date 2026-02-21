@@ -43,20 +43,20 @@ public:
   /// Returns the child task that is associated with this async let.
   /// The tasks completion is used to fulfil the value represented by this async let.
   AsyncTask *getTask() const;
-
+  
   // The compiler preallocates a large fixed space for the `async let`, with the
   // intent that most of it be used for the child task context. The next two
   // methods return the address and size of that space.
-
+  
   /// Return a pointer to the unused space within the async let block.
   void *getPreallocatedSpace();
-
+  
   /// Return the size of the unused space within the async let block.
   static size_t getSizeOfPreallocatedSpace();
-
+  
   /// Was the task allocated out of the parent's allocator?
   bool didAllocateFromParentTask();
-
+  
   /// Flag that the task was allocated from the parent's allocator.
   void setDidAllocateFromParentTask(bool value = true);
 };

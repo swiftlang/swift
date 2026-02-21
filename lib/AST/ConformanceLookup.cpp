@@ -521,7 +521,7 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
                                       BuiltinConformanceKind::Synthesized));
         }
       }
-
+    
       // All other builtin types are Sendable, SendableMetatype, Copyable, and
       // Escapable.
       return ProtocolConformanceRef(

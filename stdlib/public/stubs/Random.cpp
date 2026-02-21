@@ -98,22 +98,22 @@ void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
 #if defined(__NR_getrandom)
     static const bool getrandom_available =
       !(syscall(__NR_getrandom, nullptr, 0, 0) == -1 && errno == ENOSYS);
-
+  
     if (getrandom_available) {
       actual_nbytes = WHILE_EINTR(syscall(__NR_getrandom, buf, nbytes, 0));
     }
 #elif __has_include(<sys/random.h>) && (defined(__CYGWIN__) || defined(__Fuchsia__) || defined(__wasi__))
     __swift_size_t getentropy_nbytes = std::min(nbytes, __swift_size_t{256});
-
+    
     if (0 == getentropy(buf, getentropy_nbytes)) {
       actual_nbytes = getentropy_nbytes;
     }
 #endif
 
     if (actual_nbytes == -1) {
-      static const int fd =
+      static const int fd = 
         WHILE_EINTR(open("/dev/urandom", O_RDONLY | O_CLOEXEC, 0));
-
+        
       if (fd != -1) {
         // ###FIXME: Why is this locked?  None of the others are.
         static LazyMutex mutex;
@@ -122,11 +122,11 @@ void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
         });
       }
     }
-
+    
     if (actual_nbytes == -1) {
       fatalError(0, "Fatal error: %d in '%s'\n", errno, __func__);
     }
-
+    
     buf = static_cast<uint8_t *>(buf) + actual_nbytes;
     nbytes -= actual_nbytes;
   }

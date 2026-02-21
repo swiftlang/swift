@@ -14,7 +14,7 @@
 /// If no memory access markers exist, then the pass does nothing. Otherwise, it
 /// unconditionally eliminates all non-dynamic markers (plus any dynamic markers
 /// if dynamic exclusivity checking is disabled).
-///
+/// 
 /// This is an always-on pass for temporary bootstrapping. It allows running
 /// test cases through the pipeline and exercising SIL verification before all
 /// passes support access markers.

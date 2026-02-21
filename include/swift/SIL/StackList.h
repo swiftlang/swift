@@ -28,11 +28,11 @@ template <typename Element> class StackList {
   /// The capacity of a single slab.
   static constexpr size_t slabCapacity =
       FixedSizeSlab::capacity / sizeof(Element);
-
+  
   static_assert(slabCapacity > 0, "Element type to large for StackList");
   static_assert(alignof(FixedSizeSlab) >= alignof(Element),
                 "Element alignment to large for StackList");
-
+  
   /// Backlink to the module which manages the slab allocation.
   SILModule &module;
 
@@ -41,7 +41,7 @@ template <typename Element> class StackList {
   /// Invariant: there is always free space in the last slab to store at least
   /// one element.
   SILModule::SlabList slabs;
-
+  
   /// The index of the next free element in endSlab.
   ///
   /// Invariant: endIndex < slabCapacity
@@ -58,7 +58,7 @@ template <typename Element> class StackList {
       endIndex = 0;
     }
   }
-
+  
 
 public:
   /// The Stack's iterator.
@@ -69,7 +69,7 @@ public:
 
     iterator(const FixedSizeSlab *slab, unsigned index)
       : slab(slab), index(index) {}
-
+      
   public:
     const Element &operator*() const {
       assert(index < slabCapacity);
@@ -86,7 +86,7 @@ public:
       }
       return *this;
     }
-
+    
     iterator operator++(int unused) {
       iterator copy = *this;
       ++*this;
@@ -115,7 +115,7 @@ public:
 
   iterator begin() const { return iterator(&*slabs.begin(), 0); }
   iterator end() const { return iterator(lastSlab(), endIndex); }
-
+  
   bool empty() const {
     return begin() == end();
   }
@@ -141,7 +141,7 @@ public:
       return std::move(slab->dataFor<Element>()[--endIndex]);
 
     assert(!empty());
-
+  
     slabs.remove(*slab);
     module.freeSlab(slab);
     assert(!slabs.empty());

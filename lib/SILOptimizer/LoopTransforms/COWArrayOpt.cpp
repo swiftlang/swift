@@ -648,7 +648,7 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
 
   if (UseInst->isDebugInstruction())
     return true;
-
+  
   // If this is an instruction which is a safe array element use if and only if
   // all of its users are safe array element uses, recursively check its uses
   // and return false if any of them are not transitive escape array element
@@ -742,7 +742,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
           SameTy = Sem.getSelf()->getType().getASTType();
           continue;
         }
-
+        
         if (Sem.getSelf()->getType().getASTType() != SameTy) {
           LLVM_DEBUG(llvm::dbgs() << "    (NO) mismatching array types\n");
           return ReturnWithCleanup(false);
@@ -1034,13 +1034,13 @@ bool COWArrayOpt::run() {
   // is only mapped to a call once the analysis has determined that no
   // make_mutable calls are required within the loop body for that array.
   llvm::SmallDenseMap<SILValue, ApplyInst*> ArrayMakeMutableMap;
-
+  
   llvm::SmallVector<ArraySemanticsCall, 8> makeMutableCalls;
-
+  
   for (auto *BB : Loop->getBlocks()) {
     if (ColdBlocks.isCold(BB))
       continue;
-
+      
     // Instructions are getting moved around. To not mess with iterator
     // invalidation, first collect all calls, and then do the transformation.
     for (SILInstruction &I : *BB) {

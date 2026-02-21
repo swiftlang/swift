@@ -67,7 +67,7 @@ Both CMake and the Swift package manager can be configured to invoke Swift with 
 
 ### Experimental C++ Language Support
 
-This status table describes which of the following C++ language features can be used in Swift:
+This status table describes which of the following C++ language features can be used in Swift: 
 
 | **C++ Language Feature**                    | **Implemented Experimental Support For Using It In Swift**    |
 |---------------------------------------------|---------------------------------------------------------------|
@@ -126,7 +126,7 @@ This status table describes which of the following C++ standard library features
 
 ## Swift to C++ Interoperability Status
 
-This section of the document describes which Swift language and standard library features can be imported and used from C++.
+This section of the document describes which Swift language and standard library features can be imported and used from C++. 
 
 ### Importing Swift
 

@@ -813,7 +813,7 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
                   << "\n";
       } else {
         MangledName = "<failed to mangle name>";
-        std::cout
+        std::cout 
           << "Failed to get mangled name: Node " << Mangling.error().node
           << " error " << Mangling.error().code << ":"
           << Mangling.error().line << "\n";

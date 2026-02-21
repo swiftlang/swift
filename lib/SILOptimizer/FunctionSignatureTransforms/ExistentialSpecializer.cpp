@@ -244,7 +244,7 @@ bool ExistentialSpecializer::canSpecializeCalleeFunction(FullApplySite &Apply) {
     return false;
 
   /// Ignore error returning functions.
-  if (Callee->getLoweredFunctionType()->hasErrorResult())
+  if (Callee->getLoweredFunctionType()->hasErrorResult()) 
     return false;
 
   /// Do not optimize heuristic_always_inlinable functions.

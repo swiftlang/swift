@@ -945,7 +945,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // currently handle).
   if (BI->getArgs().empty() && !isa<SwitchEnumAddrInst>(destTerminator))
     return false;
-
+      
   // We don't have a great cost model at the SIL level, so we don't want to
   // blissly duplicate tons of code with a goal of improved performance (we'll
   // leave that to LLVM).  However, doing limited code duplication can lead to
@@ -1284,7 +1284,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
         return Simplified;
       }
     }
-
+    
     // If there are any BB arguments in the destination, replace them with the
     // branch operands, since they must dominate the dest block.
     for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
@@ -1382,12 +1382,12 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
 static SILValue skipInvert(SILValue Cond, bool &Inverted,
                            bool onlyAcceptSingleUse) {
   while (auto *BI = dyn_cast<BuiltinInst>(Cond)) {
-
+    
     if (onlyAcceptSingleUse && !BI->hasOneUse())
       return SILValue();
-
+    
     OperandValueArrayRef Args = BI->getArguments();
-
+    
     if (BI->getBuiltinInfo().ID == BuiltinValueKind::Xor) {
       // Check if it's a boolean inversion of the condition.
       if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[1])) {
@@ -1445,7 +1445,7 @@ static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
   CondFailInst *CondFail = getFirstCondFail(condfailBB);
   if (!CondFail)
     return nullptr;
-
+  
   // The simple case: check if it is a "cond_fail 1".
   auto *IL = dyn_cast<IntegerLiteralInst>(CondFail->getOperand());
   if (IL && IL->getValue() != 0)
@@ -1670,7 +1670,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
           std::next(Iter) == AllElts.end() &&
           *Iter == SEI->getCase(0).first) {
         EnumElementDecl *SecondElt = *Iter;
-
+        
         SILValue FirstValue;
         // SelectEnum must be exhaustive, so the second case must be handled
         // either by a case or the default.
@@ -1681,8 +1681,8 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
         } else {
           FirstValue = SEI->getDefaultResult();
         }
-
-
+        
+        
         std::pair<EnumElementDecl*, SILValue> SwappedCases[2] = {
           {FirstElt, SEI->getCase(0).second},
           {SecondElt, FirstValue},
@@ -1695,7 +1695,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
                             SEI->getType(),
                             SILValue(),
                             SwappedCases);
-
+        
         // We only change the condition to be NewEITI instead of all uses since
         // EITI may have other uses besides this one that need to be updated.
         BI->setCondition(NewSEI);
@@ -1732,7 +1732,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     SILBuilderWithScope Builder(BI);
     createCondFail(FalseCFI, CFCondition, FalseCFI->getMessage(), true, Builder);
     SILBuilderWithScope(BI).createBranch(BI->getLoc(), TrueSide, TrueArgs);
-
+    
     BI->eraseFromParent();
     addToWorklist(ThisBB);
     simplifyAfterDroppingPredecessor(FalseSide);
@@ -2491,7 +2491,7 @@ static SILValue getActualCallee(SILValue Callee) {
     }
     break;
   }
-
+  
   return Callee;
 }
 
@@ -2513,14 +2513,14 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
   auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeOperand);
   if (!CFI)
     return false;
-
+  
   // Check if it is a conversion of a non-throwing function into
   // a throwing function. If this is the case, replace by a
   // simple apply.
   auto OrigFnTy = CFI->getOperand()->getType().getAs<SILFunctionType>();
   if (!OrigFnTy || OrigFnTy->hasErrorResult())
     return false;
-
+  
   auto TargetFnTy = CFI->getType().getAs<SILFunctionType>();
   if (!TargetFnTy || !TargetFnTy->hasErrorResult())
     return false;
@@ -2528,12 +2528,12 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
   // Look through the conversions and find the real callee.
   Callee = getActualCallee(CFI->getOperand());
   CalleeType = Callee->getType();
-
+  
   // If it a call of a throwing callee, bail.
   auto CalleeFnTy = CalleeType.getAs<SILFunctionType>();
   if (!CalleeFnTy || CalleeFnTy->hasErrorResult())
     return false;
-
+  
   return true;
 }
 
@@ -2735,7 +2735,7 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
   CondFailInst *CFI = getFirstCondFail(BB);
   if (!CFI)
     return false;
-
+  
   // Find the underlying condition value of the cond_fail.
   // We only accept single uses. This is not a correctness check, but we only
   // want to the optimization if the condition gets dead after moving the
@@ -2744,15 +2744,15 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
   SILValue cond = skipInvert(CFI->getOperand(), inverted, true);
   if (!cond)
     return false;
-
+  
   // Check if the condition is a single-used argument in the current block.
   auto *condArg = dyn_cast<SILArgument>(cond);
   if (!condArg || !condArg->hasOneUse())
     return false;
-
+  
   if (condArg->getParent() != BB)
     return false;
-
+  
   // Check if some of the predecessor blocks provide a constant for the
   // cond_fail condition. So that the optimization has a positive effect.
   bool somePredsAreConst = false;
@@ -3853,7 +3853,7 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
   SmallVector<SILValue, 4> Incoming;
   if (!A->getIncomingPhiValues(Incoming) || Incoming.empty())
     return;
-
+  
   SILValue V;
   for (size_t Idx = 0; Idx < Incoming.size(); ++Idx) {
     if (Incoming[Idx] == A) {
@@ -3867,7 +3867,7 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
       return;
     }
   }
-
+  
   if (!V) {
     return;
   }
@@ -3921,7 +3921,7 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
     // succeeds, argument A will have no uses afterwards.
     if (DT)
       tryToReplaceArgWithIncomingValue(BB, i, DT);
-
+    
     // Try to simplify the argument
     if (!A->use_empty()) {
       if (simplifyArgument(BB, i))
@@ -4068,7 +4068,7 @@ public:
 class SimplifyBBArgs : public SILFunctionTransform {
 public:
   SimplifyBBArgs() {}
-
+  
   /// The entry point to the transformation.
   void run() override {
     if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll, false)
@@ -4076,7 +4076,7 @@ public:
       invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
   }
-
+  
 };
 
 // Used to test splitBBArguments with sil-opt

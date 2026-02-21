@@ -643,7 +643,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     return OwnedAddress(fieldTI.getUndefAddress(), base);
   }
-
+  
   auto &baseClassTI = IGF.getTypeInfo(baseType).as<ClassTypeInfo>();
   ClassDecl *baseClass = baseClassTI.getClass();
 
@@ -663,13 +663,13 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                     fieldTI.getStorageType());
     return OwnedAddress(memberAddr, base);
   }
-
+    
   case FieldAccess::NonConstantDirect: {
     Address offsetA = IGF.IGM.getAddrOfFieldOffset(field, NotForDefinition);
     auto offset = IGF.Builder.CreateLoad(offsetA, "offset");
     return emitAddressAtOffset(IGF, baseType, base, offset, field);
   }
-
+    
   case FieldAccess::ConstantIndirect: {
     auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
     auto offset = emitClassFieldOffset(IGF, baseClass, field, metadata);
@@ -901,7 +901,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
   return IGF.Builder.CreateBitCast(val, IGF.IGM.PtrTy);
 }
 
-llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
+llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF, 
                                                llvm::Value *metadata,
                                                SILType selfType,
                                                bool objc,
@@ -1413,7 +1413,7 @@ namespace {
       auto metaclass = cast<llvm::GlobalVariable>(uncastMetaclass);
       metaclass->setInitializer(init);
     }
-
+    
   private:
     void buildCategoryName(SmallVectorImpl<char> &s) {
       llvm::raw_svector_ostream os(s);
@@ -1427,7 +1427,7 @@ namespace {
       ModuleDecl *TheModule = TheExtension->getParentModule();
 
       os << TheModule->getName();
-
+      
       unsigned categoryCount = CategoryCounts[{getClass(), TheModule}]++;
       if (categoryCount > 0)
         os << categoryCount;
@@ -1496,7 +1496,7 @@ namespace {
       return buildGlobalVariable(fields, "_CATEGORY_", /*const*/ true,
                                  internalLinkage);
     }
-
+    
     llvm::Constant *emitProtocol() {
       ConstantInitBuilder builder(IGM);
       auto fields = builder.beginStruct();
@@ -1504,7 +1504,7 @@ namespace {
       auto weakLinkage = llvm::GlobalVariable::WeakAnyLinkage;
 
       assert(isBuildingProtocol() && "not emitting a protocol");
-
+      
       // struct protocol_t {
       //   Class super;
       fields.addNullPointer(IGM.Int8PtrTy);
@@ -1539,9 +1539,9 @@ namespace {
         .withClassConstraint(ProtocolClassConstraint::Class)
         .withDispatchStrategy(ProtocolDispatchStrategy::ObjC)
         .withSpecialProtocol(getSpecialProtocolID(getProtocol()));
-
+      
       fields.addInt32(flags.getIntValue());
-
+      
       //   const char ** extendedMethodTypes;
       fields.add(buildOptExtendedMethodTypes());
       //   const char *demangledName;
@@ -1648,15 +1648,15 @@ namespace {
 
       // };
     }
-
+    
     llvm::Constant *emitROData(ForMetaClass_t forMeta,
                                HasUpdateCallback_t hasUpdater) {
       ConstantInitBuilder builder(IGM);
       auto fields = builder.beginStruct();
       emitRODataFields(fields, forMeta, hasUpdater);
-
+      
       auto dataSuffix = forMeta ? "_METACLASS_DATA_" : "_DATA_";
-
+      
       // The rodata is constant if the object layout is known entirely
       // statically. Otherwise, the ObjC runtime may slide the InstanceSize
       // based on changing base class layout.
@@ -1729,7 +1729,7 @@ namespace {
         Name = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
         return Name;
       }
-
+      
       llvm::SmallString<64> buffer;
       Name = IGM.getAddrOfGlobalString(getClass()->getObjCRuntimeName(buffer),
                                        CStringSectionType::ObjCClassName);
@@ -1747,7 +1747,7 @@ namespace {
     void visitFuncDecl(FuncDecl *method) {
       if (!isBuildingProtocol() &&
           !requiresObjCMethodDescriptor(method)) return;
-
+      
       // getters and setters funcdecls will be handled by their parent
       // var/subscript.
       if (isa<AccessorDecl>(method)) return;
@@ -1785,7 +1785,7 @@ namespace {
     }
 
     /// Destructors need to be collected into the instance methods
-    /// list
+    /// list 
     void visitDestructorDecl(DestructorDecl *destructor) {
       auto classDecl = cast<ClassDecl>(destructor->getDeclContext()->getImplementedObjCContext());
       if (Lowering::usesObjCAllocator(classDecl) &&
@@ -1876,10 +1876,10 @@ namespace {
         return forClass;
       if (isBuildingProtocol())
         return forProtocol;
-
+      
       llvm_unreachable("not a class, category, or protocol?!");
     }
-
+    
 
     enum class MethodListKind : uint8_t {
       ClassMethods,
@@ -1979,7 +1979,7 @@ namespace {
       assert(protocol->isObjC());
       return IGM.getAddrOfObjCProtocolRecord(protocol, NotForDefinition);
     }
-
+    
     /// struct protocol_list_t {
     ///   uintptr_t count;
     ///   protocol_ref_t[count];
@@ -2169,7 +2169,7 @@ namespace {
           methods.push_back(setter);
       }
     }
-
+    
     /// Build the property attribute string for a property decl.
     void buildPropertyAttributes(VarDecl *prop, SmallVectorImpl<char> &out) {
       llvm::raw_svector_ostream outs(out);
@@ -2179,24 +2179,24 @@ namespace {
 
       // Emit the type encoding for the property.
       outs << 'T';
-
+      
       std::string typeEnc;
       getObjCEncodingForPropertyType(IGM, prop, typeEnc);
       outs << typeEnc;
-
+      
       // Emit other attributes.
 
       // All Swift properties are (nonatomic).
       outs << ",N";
-
+      
       // @NSManaged properties are @dynamic.
       if (prop->getAttrs().hasAttribute<NSManagedAttr>())
         outs << ",D";
-
+      
       auto isObject = propDC->mapTypeIntoEnvironment(propTy)
           ->hasRetainablePointerRepresentation();
       auto hasObjectEncoding = typeEnc[0] == '@';
-
+      
       // Determine the assignment semantics.
       // Get-only properties are (readonly).
       if (!prop->isSettable(propDC))
@@ -2216,7 +2216,7 @@ namespace {
       // the default (assign).
       else
         (void)0;
-
+      
       // If the property is an instance property and has storage, and meanwhile
       // its type is trivially representable in ObjC, emit the ivar name last.
       bool isTriviallyRepresentable =
@@ -2233,7 +2233,7 @@ namespace {
     void buildProperty(ConstantArrayBuilder &properties, VarDecl *prop) {
       llvm::SmallString<16> propertyAttributes;
       buildPropertyAttributes(prop, propertyAttributes);
-
+      
       auto fields = properties.beginStruct();
       fields.add(
           IGM.getAddrOfGlobalString(prop->getObjCPropertyName().str(),
@@ -2369,7 +2369,7 @@ namespace {
                         llvm::GlobalValue::LinkageTypes linkage) {
       llvm::SmallString<64> nameBuffer;
       auto var =
-        fields.finishAndCreateGlobal(Twine(nameBase)
+        fields.finishAndCreateGlobal(Twine(nameBase) 
                                       + getEntityName(nameBuffer)
                                       + (TheExtension
                                            ? Twine("_$_") + CategoryName.str()
@@ -2427,22 +2427,22 @@ namespace {
       if (auto setter = subscript->getOpaqueAccessor(AccessorKind::Set))
         methods.push_back(setter);
     }
-
+    
     SWIFT_DEBUG_DUMP {
       dump(llvm::errs());
       llvm::errs() << "\n";
     }
-
+    
     void dump(llvm::raw_ostream &os) const {
       os << "(class_data_builder";
-
+      
       if (isBuildingClass())
         os << " for_class";
       if (isBuildingCategory())
         os << " for_category";
       if (isBuildingProtocol())
         os << " for_protocol";
-
+      
       if (auto cd = getClass()) {
         os << " class=";
         cd->dumpRef(os);
@@ -2464,15 +2464,15 @@ namespace {
       if (auto name = getCustomCategoryName()) {
         os << " custom_category_name=" << *name;
       }
-
+      
       if (HasNonTrivialConstructor)
         os << " has_non_trivial_constructor";
       if (HasNonTrivialDestructor)
         os << " has_non_trivial_destructor";
-
+      
       if (!CategoryName.empty())
         os << " category_name=" << CategoryName;
-
+      
       os << "\n  (ivars";
       for (auto field : Ivars) {
         os << "\n    (";
@@ -2494,12 +2494,12 @@ namespace {
         os << ")";
       }
       os << ")";
-
+      
       auto printMethodList =
           [&](StringRef label,
               const SmallVectorImpl<MethodDescriptor> &methods) {
         if (methods.empty()) return;
-
+        
         os << "\n  (" << label;
         for (auto method : methods) {
           os << "\n    (";
@@ -2508,12 +2508,12 @@ namespace {
               os << "method ";
               method.getMethod()->dumpRef(os);
               break;
-
+              
             case MethodDescriptor::Kind::IVarInitializer:
               os << "ivar_initializer";
               method.getImpl()->printAsOperand(os);
               break;
-
+              
             case MethodDescriptor::Kind::IVarDestroyer:
               os << "ivar_destroyer";
               method.getImpl()->printAsOperand(os);
@@ -2523,12 +2523,12 @@ namespace {
         }
         os << ")";
       };
-
+      
       printMethodList("instance_methods", InstanceMethods);
       printMethodList("class_methods", ClassMethods);
       printMethodList("opt_instance_methods", OptInstanceMethods);
       printMethodList("opt_class_methods", OptClassMethods);
-
+      
       os << "\n  (protocols";
       for (auto pd : Protocols) {
         os << "\n    (protocol ";
@@ -2536,11 +2536,11 @@ namespace {
         os << ")";
       }
       os << ")";
-
+      
       auto printPropertyList = [&](StringRef label,
                                    const SmallVectorImpl<VarDecl *> &props) {
         if (props.empty()) return;
-
+        
         os << "\n  (" << label;
         for (auto prop : props) {
           os << "\n    (property ";
@@ -2549,10 +2549,10 @@ namespace {
         }
         os << ")";
       };
-
+      
       printPropertyList("instance_properties", InstanceProperties);
       printPropertyList("class_properties", ClassProperties);
-
+      
       os << ")";
     }
   };
@@ -2770,12 +2770,12 @@ llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
   ClassDecl *cls = ext->getSelfClassDecl();
   assert(cls && "generating category metadata for a non-class extension");
-
+  
   PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", ext);
   ClassDataBuilder builder(IGM, cls, ext);
   return builder.emitCategory();
 }
-
+  
 /// Emit the metadata for an ObjC protocol.
 llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
                                             ProtocolDecl *proto) {
@@ -2807,9 +2807,9 @@ const TypeInfo *
 TypeConverter::convertClassType(CanType type, ClassDecl *D) {
   llvm::StructType *ST = IGM.createNominalType(type);
   ReferenceCounting refcount = type->getReferenceCounting();
-
+  
   SpareBitVector spareBits;
-
+  
   // Classes known to be implemented in Swift can be assumed not to have tagged
   // pointer representations, so we can use spare bits for enum layout with
   // them. We can't make that assumption about imported ObjC types.
@@ -2842,7 +2842,7 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
                               /*isNameImplicit=*/true));
   SwiftRootClass->setImplicit();
   SwiftRootClass->setAccess(AccessLevel::Open);
-
+  
   SwiftRootClasses.insert({name, SwiftRootClass});
   return SwiftRootClass;
 }
@@ -2851,7 +2851,7 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
 ClassDecl *
 IRGenModule::getObjCRuntimeBaseForSwiftRootClass(ClassDecl *theClass) {
   assert(!theClass->hasSuperclass() && "must pass a root class");
-
+  
   Identifier name;
   // If the class declares its own ObjC runtime base, use it.
   if (auto baseAttr = theClass->getAttrs()
@@ -2885,7 +2885,7 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
   // SwiftObject (or maybe eventually something else like it),
   // which will be visible in the Objective-C type system.
   if (C->hasClangNode()) return C;
-
+  
   // FIXME: If the root class specifies its own runtime ObjC base class,
   // assume that base class ultimately inherits NSObject.
   if (C->getAttrs().hasAttribute<SwiftNativeObjCRuntimeBaseAttr>())
@@ -2962,11 +2962,11 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
   // If we have resiliently-sized fields, we might be able to use the
   // update pattern.
   if (resilientLayout.doesMetadataRequireUpdate()) {
-
+      
     // FixedOrUpdate strategy does not work in JIT mode
     if (IRGen.Opts.UseJIT)
       return ClassMetadataStrategy::Singleton;
-
+      
     // The update pattern only benefits us on platforms with an Objective-C
     // runtime, otherwise just use the singleton pattern.
     if (!Context.LangOpts.EnableObjCInterop)

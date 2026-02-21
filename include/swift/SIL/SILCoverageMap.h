@@ -91,7 +91,7 @@ public:
 
 private:
   /// The parent source file containing the coverage map.
-  ///
+  /// 
   /// NOTE: `ParentSourceFile->getFilename()` is not necessarily equivalent to
   /// `Filename`. `Filename` could be a .swift file, and `ParentSourceFile`
   /// could be a parsed .sil file. As such, this should only be used for

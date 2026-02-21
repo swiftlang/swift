@@ -81,7 +81,7 @@ struct CodablePerfTester<Enc: GenericEncoder, Dec: GenericDecoder>  {
   var encoder: Enc
   var decoder: Dec
   var data: Data! = nil
-
+  
   init(encoder e: Enc, decoder d: Dec) {
     encoder = e
     decoder = d
@@ -91,11 +91,11 @@ struct CodablePerfTester<Enc: GenericEncoder, Dec: GenericDecoder>  {
     let _ = try! decoder.decode(Array<Jabberwocky>.self,
                                        from: data)
   }
-
+  
   func encode() {
     let _ = try! encoder.encode(poems)
   }
-
+  
   func decode() {
     let _ = try! decoder.decode(Array<Jabberwocky>.self, from: data)
   }

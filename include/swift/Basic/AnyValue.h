@@ -34,15 +34,15 @@ namespace llvm {
   bool operator==(const TinyPtrVector<T> &lhs, const TinyPtrVector<T> &rhs) {
     if (lhs.size() != rhs.size())
       return false;
-
+    
     for (unsigned i = 0, n = lhs.size(); i != n; ++i) {
       if (lhs[i] != rhs[i])
         return false;
     }
-
+    
     return true;
   }
-
+  
   template<typename T>
   bool operator!=(const TinyPtrVector<T> &lhs, const TinyPtrVector<T> &rhs) {
     return !(lhs == rhs);

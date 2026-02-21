@@ -4,7 +4,7 @@
 template <class T>
 struct HasStaticOutOfLineMember {
   static int values[];
-
+  
   static int getFirstValue() {
     return values[0];
   }

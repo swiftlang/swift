@@ -149,7 +149,7 @@ void WordIterator::computeNextPosition() const {
       ++endOfNext;
 
     // If the next word is a plural suffix, add it on.
-    if (i == n ||
+    if (i == n || 
         (isPluralSuffix(String.slice(i, endOfNext)) &&
          String.slice(i-1, endOfNext) != "Is"))
       NextPosition = endOfNext;
@@ -305,7 +305,7 @@ StringRef camel_case::toLowercaseWord(StringRef string,
   return StringRef(scratch.data(), scratch.size());
 }
 
-StringRef camel_case::toSentencecase(StringRef string,
+StringRef camel_case::toSentencecase(StringRef string, 
                                      SmallVectorImpl<char> &scratch) {
   if (string.empty())
     return string;
@@ -318,7 +318,7 @@ StringRef camel_case::toSentencecase(StringRef string,
   scratch.clear();
   scratch.push_back(clang::toUppercase(string[0]));
   scratch.append(string.begin() + 1, string.end());
-  return StringRef(scratch.data(), scratch.size());
+  return StringRef(scratch.data(), scratch.size());  
 }
 
 StringRef camel_case::dropPrefix(StringRef string) {

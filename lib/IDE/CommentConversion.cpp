@@ -394,7 +394,7 @@ visitDocComment(const DocComment *DC, TypeOrExtensionDecl SynthesizedTarget) {
     appendWithXMLEscaping(OS, DeclSS);
     OS << "</Declaration>";
   }
-
+  
   OS << "<CommentParts>";
   visitCommentParts(DC->getParts());
   OS << "</CommentParts>";

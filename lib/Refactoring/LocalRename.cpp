@@ -228,7 +228,7 @@ private:
     if (!loc) {
       return IndexDataConsumer::Continue;
     }
-
+    
     // Inside capture lists like `{ [test] in }`, 'test' refers to both the
     // newly declared, captured variable and the referenced variable it is
     // initialized from. Make sure to only rename it once.

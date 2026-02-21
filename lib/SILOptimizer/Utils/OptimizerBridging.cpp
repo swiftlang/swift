@@ -462,11 +462,11 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       original->getInlineStrategy(), original->getEffectsKind(),
       original, original->getDebugScope());
-
+  
   if (!original->hasOwnership()) {
     specializedApplySiteCallee->setOwnershipEliminated();
   }
-
+  
   for (auto &Attr : original->getSemanticsAttrs())
     specializedApplySiteCallee->addSemanticsAttr(Attr);
 

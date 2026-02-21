@@ -152,7 +152,7 @@ public:
     case Kind::LValue: return true;
     case Kind::Expr: return asKnownExpr()->isSemanticallyInOutExpr();
     }
-    llvm_unreachable("bad kind");
+    llvm_unreachable("bad kind");    
   }
 
   SILLocation getLocation() const & {

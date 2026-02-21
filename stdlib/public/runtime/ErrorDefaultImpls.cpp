@@ -28,7 +28,7 @@ intptr_t _swift_stdlib_getDefaultErrorCode(OpaqueValue *error,
   intptr_t result;
 
   switch (T->getKind()) {
-    case MetadataKind::Enum:
+    case MetadataKind::Enum: 
       result = T->vw_getEnumTag(error);
       break;
 

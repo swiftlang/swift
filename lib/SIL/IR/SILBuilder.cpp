@@ -93,7 +93,7 @@ SILType SILBuilder::getPartialApplyResultType(
       result = SILResultInfo(result.getReturnValueType(M, FTI, context),
                              ResultConvention::Owned);
   }
-
+  
   // Do we still need the substitutions in the result?
   bool needsSubstFunctionType = false;
   for (auto param : newParams) {
@@ -175,7 +175,7 @@ SILBuilder::createUncheckedReinterpretCast(SILLocation Loc, SILValue Op,
       }
     }
   }
-
+  
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.
   return insert(UncheckedBitwiseCastInst::create(
@@ -209,7 +209,7 @@ SILBuilder::createUncheckedForwardingCast(SILLocation Loc, SILValue Op,
       }
     }
   }
-
+  
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.
   return createUncheckedValueCast(Loc, Op, Ty);

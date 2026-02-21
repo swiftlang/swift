@@ -726,7 +726,7 @@ public:
   virtual bool isTargetLookup() const { return false; }
 #endif
 };
-
+  
 /// Just used to print
 /// Used to gather lookup results
 class ASTScopeDeclGatherer : public AbstractASTScopeDeclConsumer {

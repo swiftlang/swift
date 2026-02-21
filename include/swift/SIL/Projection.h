@@ -508,9 +508,9 @@ private:
 public:
   /// Create an empty path which serves as a stack. Use push_back() to populate
   /// the stack with members.
-  ProjectionPath(SILType Base)
+  ProjectionPath(SILType Base) 
      : BaseType(Base), MostDerivedType(SILType()), Path() {}
-  ProjectionPath(SILType Base, SILType End)
+  ProjectionPath(SILType Base, SILType End) 
      : BaseType(Base), MostDerivedType(End), Path() {}
   ~ProjectionPath() = default;
 
@@ -520,7 +520,7 @@ public:
     BaseType = Other.BaseType;
     MostDerivedType = Other.MostDerivedType;
     Path = Other.Path;
-  }
+  } 
 
   ProjectionPath &operator=(const ProjectionPath &O) {
     BaseType = O.BaseType;
@@ -873,10 +873,10 @@ public:
   /// Create a root SILValue iout of the given leaf node values by walking on
   /// the projection tree.
   SILValue computeExplodedArgumentValue(SILBuilder &Builder,
-                                        SILLocation Loc,
+                                        SILLocation Loc, 
                                         llvm::SmallVector<SILValue, 8> &LVs);
   SILValue computeExplodedArgumentValueInner(SILBuilder &Builder,
-                                             SILLocation Loc,
+                                             SILLocation Loc, 
                                              ProjectionTreeNode *Node,
                                              LeafValueMapTy &LeafValues);
 

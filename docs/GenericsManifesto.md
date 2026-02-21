@@ -90,22 +90,22 @@ var d2: Dictionary<String, Int> = d1 // okay: d1 and d2 have the same type, Dict
 
 ### Generic associatedtypes
 
-Associatedtypes could be allowed to carry generic parameters.
+Associatedtypes could be allowed to carry generic parameters. 
 
 ```Swift
     protocol Wrapper {
       associatedtype Wrapped<T>
-
+      
       static func wrap<T>(_ t: T) -> Wrapped<T>
     }
 ```
 
-Generic associatedtypes would support all constraints supported by the language including where clauses.  As with non-generic associatedtypes conforming types would be required to provide a nested type or typealias matching the name of the associatedtype.  However, in this case the nested type or typealias would be generic.
+Generic associatedtypes would support all constraints supported by the language including where clauses.  As with non-generic associatedtypes conforming types would be required to provide a nested type or typealias matching the name of the associatedtype.  However, in this case the nested type or typealias would be generic.  
 
 ```Swift
     enum OptionalWrapper {
       typealias Wrapped<T> = Optional<T>
-
+      
       static func wrap<T>(_ t: T) -> Optional<T>
     }
 ```

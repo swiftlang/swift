@@ -4,16 +4,16 @@ It is possible by means of providing some special command-line
 options to ask the Swift compiler to produce different statistics about
 the optimizer counters. Optimizer counters are most typically counters
 representing different aspects of a SIL representation for a Swift module
-being compiled, e.g. the number of SIL basic blocks or instructions.
+being compiled, e.g. the number of SIL basic blocks or instructions. 
 These counters may also reveal some details about transformations
 and optimizations performed on SIL, e.g. the duration of an optimization
 or how much memory was consumed by the compiler. Therefore having the
 information about the changes of optimizer counters over time allows for
 analysis of changes to the SIL representation during the compilation.
-
+ 
 This document describes how you collect and analyze the counters produced by
 the optimizer of the Swift compiler. This analysis is useful if you need to get
-a detailed insight into the optimizer passes, their effect on the SIL code,
+a detailed insight into the optimizer passes, their effect on the SIL code, 
 compile times, compiler's memory consumption, etc. For example, you can find
 out which optimization passes or phases of optimization produce most new SIL
 instructions or delete most SIL functions.
@@ -48,7 +48,7 @@ instructions or delete most SIL functions.
       - [Which stage added/removed most instructions (in term of deltas)?](#which-stage-addedremoved-most-instructions-in-term-of-deltas)
 <!-- /TOC -->
 
-## Which optimizer counters are available for recording
+## Which optimizer counters are available for recording 
 
 The following statistics can be recorded:
 
@@ -116,7 +116,7 @@ used by a given SILFunction or a SILModule. For example, you can count how many
 interested in collecting the stats only for some specific SIL instructions, you
 can use a comma-separated list of instructions as a value of the option,
 e.g. `-Xllvm -sil-stats-only-instructions=alloc_ref,alloc_stack`. If you need to
-collect stats about all kinds of SIL instructions, you can use this syntax:
+collect stats about all kinds of SIL instructions, you can use this syntax: 
 `-Xllvm -sil-stats-only-instructions=all`.
 
 ### Debug variable level counters
@@ -166,7 +166,7 @@ By default, all the collected statistics are written to the
 standard error.
 
 But it is possible to write into a custom file by specifying the following
-command-line option:
+command-line option: 
 
   `-Xllvm -sil-stats-output-file=your_file_name`
 
@@ -181,7 +181,7 @@ For counter value updates, the CSV line looks like this:
     NewCounterValue, Duration, Symbol`
 
 And for counter stats it looks like this:
-  * `Kind, CounterName, StageName, TransformName,
+  * `Kind, CounterName, StageName, TransformName,   
      TransformPassNumber, CounterValue, Duration, Symbol`
 
  where the names used above have the following meaning:
@@ -190,7 +190,7 @@ And for counter stats it looks like this:
   * `function` and
     `module` correspond directly to the module-level and function-level counters
   * `function_history` corresponds to the verbose mode of function
-    counters collection, when changes to the SILFunction counters are logged
+    counters collection, when changes to the SILFunction counters are logged 
     unconditionally, without any on-line filtering.
 * `CounterName` is typically one of `block`, `inst`, `function`, `memory`,
    `lostvars`, or `inst_instruction_name` if you collect counters for specific
@@ -199,8 +199,8 @@ And for counter stats it looks like this:
 * `StageName` is the name of the current optimizer pipeline stage
 * `TransformName` is the name of the current optimizer transformation/pass
 * `Duration` is the duration of the transformation
-* `TransformPassNumber` is the optimizer pass number. It is useful if you
-   want to reproduce the result later using
+* `TransformPassNumber` is the optimizer pass number. It is useful if you 
+   want to reproduce the result later using 
    `-Xllvm -sil-opt-pass-count -Xllvm TransformPassNumber`
 
 ## Extract Lost Variables per Pass
@@ -214,7 +214,7 @@ to make graphs.
 ## Storing the produced statistics into a database
 
 To store the set of produced counters into a database, you can use the
-following command:
+following command: 
 
 `utils/optimizer_counters_to_sql.py  csv_file_with_counters your_database.db`
 
@@ -281,7 +281,7 @@ group by C.Stage, C.Transform;
 #### Which pass created/removed most instructions?
 
 ```sql
-# Sort by biggest changes
+# Sort by biggest changes 
 select C.Transform, sum(C.Delta)
 from Counters C where C.counter = 'inst' and C.kind = 'module'
 group by C.Transform
@@ -290,7 +290,7 @@ order by abs(sum(C.Delta));
 
 #### Which pass at which stage created/removed most instructions?
 ```sql
-# Sort by biggest changes
+# Sort by biggest changes 
 select C.Stage, C.Transform, sum(C.Delta)
 from Counters C where C.counter = 'inst' and C.kind = 'module'
 group by C.Stage, C.Transform
@@ -304,13 +304,13 @@ select C.Stage, min(C.Old), max(C.Old), Symbol
 from Counters C where C.counter = 'inst' and C.kind = 'function_history'
 group by C.Symbol, C.Stage
 having min(C.Old) <> max(C.Old)
-order by abs(max(C.Old)-min(C.Old));
+order by abs(max(C.Old)-min(C.Old)); 
 ```
 
 #### Get the number of instructions at the beginning and at the end of the optimization pipeline for each function
 ```sql
 select MinOld.Id, MinOld.Old, MaxOld.Id, MaxOld.Old, MinOld.Symbol
-from
+from 
 (
   select C.Id, C.Old, C.Symbol
   from Counters C where C.counter = 'inst' and C.kind = 'function_history'
@@ -329,7 +329,7 @@ where MinOld.Symbol == MaxOld.Symbol;
 #### Show functions which have the biggest size at the end of the optimization pipeline
 ```sql
 select MinOld.Id, MinOld.Old, MaxOld.Id, MaxOld.Old, MinOld.Symbol
-from
+from 
 (
   select C.Id, C.Old, C.Symbol
   from Counters C
@@ -354,7 +354,7 @@ select sum(Duration), Stage
 from Counters C
 where C.counter = 'inst' and C.kind = 'module'
 group by Stage
-order by sum(C.Duration);
+order by sum(C.Duration); 
 ```
 
 #### Which stage added/removed most instructions (in term of deltas)?

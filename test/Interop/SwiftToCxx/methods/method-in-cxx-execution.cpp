@@ -70,7 +70,7 @@ int main() {
     auto largeStruct = ClassWithMethods::staticFinalClassMethod(9075);
 // CHECK-NEXT: ClassWithMethods.staticFinalClassMethod;
     largeStruct.dump();
-// CHECK-NEXT: 1, -1, -9075, -2, 9075, -456
+// CHECK-NEXT: 1, -1, -9075, -2, 9075, -456 
   }
 
   {

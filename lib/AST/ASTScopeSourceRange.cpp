@@ -54,7 +54,7 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
     if (auto *PBD = dyn_cast<PatternBindingDecl>(d))
       if (PBD->isDebuggerBinding())
         return;
-
+  
   auto &sourceMgr = ctx.SourceMgr;
 
   auto range = getCharSourceRangeOfScope(sourceMgr);

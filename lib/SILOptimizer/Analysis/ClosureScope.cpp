@@ -131,7 +131,7 @@ protected:
     }
     return EdgeRange(it.edgeIter(), next);
   }
-
+  
   EdgeRange getFunctionToClosureEdges(SILFunction *scopeFunc) {
     return getEdgeRange(scopeFunc, functionToClosures);
   }

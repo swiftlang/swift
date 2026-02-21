@@ -21,7 +21,7 @@
 class NodeBuilder {
   using NodePointer = swift::Demangle::NodePointer;
   using Kind = swift::Demangle::Node::Kind;
-
+  
   swift::Demangle::Demangler &m_dem;
 
 public:

@@ -75,7 +75,7 @@ class ValueLifetimeAnalysis {
 
   /// The set of blocks where the value is live.
   llvm::SmallVector<SILBasicBlock *, 16> liveBlocks;
-
+  
   /// True for blocks which are in liveBlocks.
   BasicBlockFlag inLiveBlocks;
 
@@ -170,11 +170,11 @@ public:
     /// Don't split critical edges if the frontier instructions are located on
     /// a critical edges. Instead fail.
     DontModifyCFG,
-
+    
     /// Split critical edges if the frontier instructions are located on
     /// a critical edges.
     AllowToModifyCFG,
-
+    
     /// Require that all users must commonly post-dominate the definition. In
     /// other words: All paths from the definition to the function exit must
     /// contain at least one use. Fail if this is not the case.

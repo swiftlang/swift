@@ -376,7 +376,7 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *urci) {
   if (!SILType::canRefCast(srcTy.getObjectType(), destTy.getObjectType(),
                            urci->getModule()))
     return nullptr;
-
+ 
   SILLocation loc = urci->getLoc();
   Builder.setCurrentDebugScope(urci->getDebugScope());
   SILValue load = Builder.emitLoadValueOperation(loc, urci->getSrc(),
@@ -824,7 +824,7 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
         [&](NormalDifferentiableFunctionTypeComponent extractee) {
           if (!DFI->hasExtractee(extractee))
             return SILValue();
-
+        
           auto operand = DFI->getExtractee(extractee);
           auto fnType = operand->getType().castTo<SILFunctionType>();
           auto noEscapeFnType =
@@ -833,7 +833,7 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
           return Builder.createConvertEscapeToNoEscape(
             operand.getLoc(), operand, noEscapeType, Cvt->isLifetimeGuaranteed())->getResult(0);
         };
-
+    
       SILValue originalNoEscape =
         createConvertEscapeToNoEscape(NormalDifferentiableFunctionTypeComponent::Original);
       SILValue convertedJVP = createConvertEscapeToNoEscape(
@@ -854,7 +854,7 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
       return newDFI;
     }
   }
-
+  
   return nullptr;
 }
 
@@ -1010,7 +1010,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
       [&](NormalDifferentiableFunctionTypeComponent extractee) {
         if (!DFI->hasExtractee(extractee))
           return SILValue();
-
+        
         auto operand = DFI->getExtractee(extractee);
         auto convertInstType =
             cfi->getType().castTo<SILFunctionType>();

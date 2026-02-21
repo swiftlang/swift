@@ -321,7 +321,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
 
   bool didDiagnoseUnreachableElements = false;
   for (auto &ESD : S->getElements()) {
-
+    
     if (auto D = ESD.dyn_cast<Decl*>()) {
       // Hoisted declarations are emitted at the top level by emitSourceFile().
       if (D->isHoisted())
@@ -337,7 +337,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
         continue;
       }
     }
-
+    
     // If we ever reach an unreachable point, stop emitting statements and issue
     // an unreachable code diagnostic.
     if (!SGF.B.hasValidInsertionPoint()) {
@@ -386,11 +386,11 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
         if (!isa<PatternBindingDecl>(D))
           continue;
       }
-
+      
       if (didDiagnoseUnreachableElements)
         continue;
       didDiagnoseUnreachableElements = true;
-
+      
       if (StmtType != UnknownStmtType) {
         diagnose(getASTContext(), ESD.getStartLoc(),
                  diag::unreachable_code_after_stmt, StmtType);
@@ -851,7 +851,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                     Expr *ret) {
   SmallVector<SILValue, 4> directResults;
   auto retTy = ret->getType()->getCanonicalType();
-
+  
   AbstractionPattern origRetTy = TypeContext
     ? TypeContext->OrigType.getFunctionResultType()
     : AbstractionPattern(retTy);
@@ -888,10 +888,10 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     // SILValue return.
     FullExpr scope(Cleanups, CleanupLocation(ret));
     FormalEvaluationScope writeback(*this);
-
+    
     // Does the return context require reabstraction?
     RValue RV;
-
+    
     auto loweredRetTy = getLoweredType(retTy);
     auto loweredResultTy = getLoweredType(origRetTy, retTy);
     if (loweredResultTy != loweredRetTy) {
@@ -901,7 +901,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     } else {
       RV = emitRValue(ret);
     }
-
+    
     std::move(RV)
       .ensurePlusOne(*this, CleanupLocation(ret))
       .forwardAll(*this, directResults);
@@ -1068,7 +1068,7 @@ namespace {
       auto TheCleanup = SGF.Cleanups.getTopCleanup();
 
       SGF.emitIgnoredExpr(call);
-
+      
       if (SGF.B.hasValidInsertionPoint())
         SGF.Cleanups.setCleanupState(TheCleanup, CleanupState::Dead);
     }
@@ -1100,7 +1100,7 @@ void StmtEmitter::visitDeferStmt(DeferStmt *S) {
 
 void StmtEmitter::visitIfStmt(IfStmt *S) {
   Scope condBufferScope(SGF.Cleanups, S);
-
+  
   // Create a continuation block.
   JumpDest contDest = createJumpDest(S->getThenStmt());
   auto contBB = contDest.getBlock();
@@ -1134,7 +1134,7 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
     // In the success path, emit the 'then' part if the if.
     SGF.emitProfilerIncrement(S->getThenStmt());
     SGF.emitStmt(S->getThenStmt());
-
+  
     // Finish the "true part" by cleaning up any temporaries and jumping to the
     // continuation block.
     if (SGF.B.hasValidInsertionPoint()) {
@@ -1143,7 +1143,7 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
       SGF.Cleanups.emitBranchAndCleanups(contDest, L);
     }
   }
-
+  
   // If there is 'else' logic, then emit it.
   if (S->getElseStmt()) {
     SGF.B.emitBlock(falseDest.getBlock());
@@ -1200,7 +1200,7 @@ void StmtEmitter::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
   JumpDest loopDest = createJumpDest(S->getBody());
   SGF.B.emitBlock(loopDest.getBlock(), S);
-
+  
   // Create a break target (at this level in the cleanup stack) in case it is
   // needed.
   JumpDest breakDest = createJumpDest(S->getBody());
@@ -1208,7 +1208,7 @@ void StmtEmitter::visitWhileStmt(WhileStmt *S) {
   // Set the destinations for any 'break' and 'continue' statements inside the
   // body.
   SGF.BreakContinueDestStack.push_back({S, breakDest, loopDest});
-
+  
   // Evaluate the condition, the body, and a branch back to LoopBB when the
   // condition is true.  On failure, jump to BreakBB.
   {
@@ -1220,12 +1220,12 @@ void StmtEmitter::visitWhileStmt(WhileStmt *S) {
     auto NumTrueTaken = SGF.loadProfilerCount(S->getBody());
     auto NumFalseTaken = SGF.loadProfilerCount(S);
     SGF.emitStmtCondition(S->getCond(), breakDest, S, NumTrueTaken, NumFalseTaken);
-
+    
     // In the success path, emit the body of the while.
     if (!S->getParentForEach())
       SGF.emitProfilerIncrement(S->getBody());
     SGF.emitStmt(S->getBody());
-
+    
     // Finish the "true part" by cleaning up any temporaries and jumping to the
     // continuation block.
     if (SGF.B.hasValidInsertionPoint()) {
@@ -1366,7 +1366,7 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
   // Create a new basic block and jump into it.
   SILBasicBlock *loopBB = createBasicBlock();
   SGF.B.emitBlock(loopBB, S);
-
+  
   // Set the destinations for 'break' and 'continue'
   JumpDest endDest = createJumpDest(S->getBody());
   JumpDest condDest = createJumpDest(S->getBody());
@@ -1393,12 +1393,12 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
     if (SGF.B.hasValidInsertionPoint()) {
       SGF.B.createBranch(S->getCond(), loopBB);
     }
-
+    
     Cond.exitTrue(SGF);
     // Complete the conditional execution.
     Cond.complete(SGF);
   }
-
+  
   emitOrDeleteBlock(SGF, endDest, S);
   SGF.BreakContinueDestStack.pop_back();
 }
@@ -1667,7 +1667,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
   SILBasicBlock &throwBB = *ThrowDest.getBlock();
   SILType destErrorType =  indirectErrorAddr
       ? indirectErrorAddr->getType().getObjectType()
-      : !throwBB.getArguments().empty()
+      : !throwBB.getArguments().empty() 
         ? throwBB.getArguments()[0]->getType().getObjectType()
         : exnType;
 
@@ -1705,7 +1705,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
       B.createCopyAddr(loc, exn, indirectErrorAddr,
                        IsTake, IsInitialization);
     }
-
+    
     // If the error is represented as a value, then we should forward it into
     // the indirect error return slot. We have to wait to do that until after
     // we pop cleanups, though, since the value may have a borrow active in
@@ -1728,7 +1728,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
 
   // Emit clean-ups needed prior to entering throw block.
   Cleanups.emitCleanupsBeforeBranch(ThrowDest, IsForUnwind);
-
+  
   if (indirectErrorAddr && !exn->getType().isAddress()) {
     // Forward the error value into the return slot now. This has to happen
     // after emitting cleanups because the active scope may be borrowing the
@@ -1737,6 +1737,6 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     emitSemanticStore(loc, exn, indirectErrorAddr,
                       getTypeLowering(destErrorType), IsInitialization);
   }
-
+  
   getBuilder().createBranch(loc, ThrowDest.getBlock(), args);
 }

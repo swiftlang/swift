@@ -25,18 +25,18 @@ namespace swift {
 namespace symbolgraphgen {
 
 struct SymbolGraph;
-
+  
 /// The kind of relationship, tagging an edge in the graph.
 struct RelationshipKind {
   StringRef Name;
-
+  
   RelationshipKind(llvm::StringRef Name) : Name(Name) {}
-
+  
   /**
    A symbol A is a member of another symbol B.
-
+   
    For example, a method or field of a class would be a member of that class.
-
+   
    The implied inverse of this relationship is a symbol B is the owner
    of a member symbol A.
    */
@@ -46,10 +46,10 @@ struct RelationshipKind {
 
   /**
    A symbol A conforms to an interface/protocol symbol B.
-
+   
    For example, a class `C` that conforms to protocol `P` in Swift would use
    this relationship.
-
+   
    The implied inverse of this relationship is a symbol B that has
    a conformer A.
    */
@@ -58,10 +58,10 @@ struct RelationshipKind {
   }
   /**
    A symbol A inherits from another symbol B.
-
+   
    For example, a derived class inherits from a base class, or a protocol
    that refines another protocol would use this relationship.
-
+   
    The implied inverse of this relationship is a symbol B is a base
    of another symbol A.
    */
@@ -70,7 +70,7 @@ struct RelationshipKind {
   }
   /**
    A symbol A serves as a default implementation of an interface requirement B.
-
+   
    The implied inverse of this relationship is an interface requirement B
    has a default implementation of A.
    */
@@ -79,7 +79,7 @@ struct RelationshipKind {
   }
   /**
    A symbol A overrides another symbol B, such as through inheritance.
-
+   
    The implied inverse of this relationship is a symbol A is the base
    of symbol B.
    */
@@ -88,7 +88,7 @@ struct RelationshipKind {
   }
   /**
    A symbol A is a requirement of interface B.
-
+   
    The implied inverse of this relationship is an interface B
    has a requirement of A.
    */
@@ -97,7 +97,7 @@ struct RelationshipKind {
   }
   /**
    A symbol A is an optional requirement of interface B.
-
+   
    The implied inverse of this relationship is an interface B
    has an optional requirement of A.
    */
@@ -136,18 +136,18 @@ struct Edge {
 
   /// The precise identifier of the source symbol node.
   Symbol Source;
-
+  
   /// The precise identifier of the target symbol node.
   Symbol Target;
 
   /// If this is a conformsTo relationship, the extension that defined
   /// the conformance.
   const ExtensionDecl *ConformanceExtension;
-
+  
   void serialize(llvm::json::OStream &OS) const;
 };
-
-} // end namespace symbolgraphgen
+  
+} // end namespace symbolgraphgen 
 } // end namespace swift
 
 namespace llvm {

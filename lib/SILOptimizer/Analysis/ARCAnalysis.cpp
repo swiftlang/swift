@@ -495,7 +495,7 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
   // guaranteed, attempt to prove that the passed in parameter cannot alias
   // Ptr. If we fail, return true.
   auto Params = FType->getParameters();
-  for (unsigned i : indices(Params)) {
+  for (unsigned i : indices(Params)) {    
     if (!Params[i].isGuaranteedInCaller())
       continue;
     SILValue Op = FAS.getArgumentsWithoutIndirectResults()[i];
@@ -561,9 +561,9 @@ findMatchingRetainsInBasicBlock(SILBasicBlock *BB, SILValue V) {
   for (auto II = BB->rbegin(), IE = BB->rend(); II != IE; ++II) {
     // Handle self-recursion.
     if (auto *AI = dyn_cast<ApplyInst>(&*II))
-      if (AI->getCalleeFunction() == BB->getParent())
+      if (AI->getCalleeFunction() == BB->getParent()) 
         return std::make_pair(FindRetainKind::Recursion, AI);
-
+    
     // If we do not have a retain_value or strong_retain...
     if (!isa<RetainValueInst>(*II) && !isa<StrongRetainInst>(*II)) {
       // we can ignore it if it can not decrement the reference count of the
@@ -593,7 +593,7 @@ findMatchingRetainsInBasicBlock(SILBasicBlock *BB, SILValue V) {
 
   // Did not find retain in this block.
   return std::make_pair(FindRetainKind::None, nullptr);
-}
+} 
 
 void
 ConsumedResultToEpilogueRetainMatcher::
@@ -647,7 +647,7 @@ findMatchingRetains(SILBasicBlock *BB) {
     RetainKindValue Kind = findMatchingRetainsInBasicBlock(R.first, R.second);
 
     // We've found a retain on this path.
-    if (Kind.first == FindRetainKind::Found) {
+    if (Kind.first == FindRetainKind::Found) { 
       EpilogueRetainInsts.push_back(Kind.second);
       continue;
     }
@@ -663,7 +663,7 @@ findMatchingRetains(SILBasicBlock *BB) {
       EpilogueRetainInsts.push_back(Kind.second);
       continue;
     }
-
+  
     // Did not find a retain in this block, try to go to its predecessors.
     if (Kind.first == FindRetainKind::None) {
       // We can not find a retain in a block with no predecessors.
@@ -690,7 +690,7 @@ findMatchingRetains(SILBasicBlock *BB) {
           WorkList.push_back(std::make_pair(X, SA->getIncomingPhiValue(X)));
         } else
           WorkList.push_back(std::make_pair(X, R.second));
-
+   
         HandledBBs.insert(X);
       }
     }
@@ -751,7 +751,7 @@ bool ConsumedArgToEpilogueReleaseMatcher::isRedundantRelease(
 
   for (auto &R : Insts) {
     SILValue ROp = R->getOperand(0);
-    auto PROp = ProjectionPath::getProjectionPath(Base, ROp);
+    auto PROp = ProjectionPath::getProjectionPath(Base, ROp); 
     if (!PROp.has_value())
       return true;
     // If Op is a part of ROp or Rop is a part of Op. then we have seen
@@ -774,7 +774,7 @@ bool ConsumedArgToEpilogueReleaseMatcher::releaseArgument(
     if (!PP)
       return false;
     Paths.insert(PP.value());
-  }
+  } 
 
   // Is there an uncovered non-trivial type.
   return !ProjectionPath::hasUncoveredNonTrivials(Arg->getType(), *F, Paths);
@@ -876,7 +876,7 @@ void ConsumedArgToEpilogueReleaseMatcher::collectMatchingReleases(
   // associated with each arguments.
   //
   // The ConsumedArgToEpilogueReleaseMatcher finds the final releases
-  // in the following way.
+  // in the following way. 
   //
   // 1. If an instruction, which is not releaseinst nor releasevalue, that
   // could decrement reference count is found. bail out.
@@ -902,7 +902,7 @@ void ConsumedArgToEpilogueReleaseMatcher::collectMatchingReleases(
         break;
 
       // We do not know what this instruction is, do a simple check to make sure
-      // that it does not decrement the reference count of any of its operand.
+      // that it does not decrement the reference count of any of its operand. 
       //
       // TODO: we could make the logic here more complicated to handle each type
       // of instructions in a more precise manner.

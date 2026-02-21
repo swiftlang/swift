@@ -74,7 +74,7 @@ public:
   }
 
   /// Traverse ProtocolConformanceMapCache recursively to determine sole
-  /// conforming concrete type.
+  /// conforming concrete type. 
   NominalTypeDecl *findSoleConformingType(ProtocolDecl *Protocol);
 
   // Wrapper function to findSoleConformingType that checks for additional

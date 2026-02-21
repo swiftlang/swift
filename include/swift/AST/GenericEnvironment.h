@@ -47,11 +47,11 @@ template <class> class CanTypeWrapper;
 /// the mapping of interface types to archetypes.
 class QueryInterfaceTypeSubstitutions {
   const GenericEnvironment *self;
-
+  
 public:
   QueryInterfaceTypeSubstitutions(const GenericEnvironment *self)
   : self(self) { }
-
+  
   Type operator()(SubstitutableType *type) const;
 };
 
@@ -270,8 +270,8 @@ public:
 
   /// Only allow placement new.
   void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
-    return Mem;
+    assert(Mem); 
+    return Mem; 
   }
 
   /// For an opaque or pack element archetype environment, apply the
@@ -354,7 +354,7 @@ struct OpenedElementContext {
   createForContextualExpansion(ASTContext &ctx,
                    CanTypeWrapper<PackExpansionType> expansionType);
 };
-
+  
 } // end namespace swift
 
 #endif // SWIFT_AST_GENERIC_ENVIRONMENT_H

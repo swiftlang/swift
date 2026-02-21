@@ -109,13 +109,13 @@ class ConstantTracker {
     // callee without inlining it.
     bool isFromCaller;
   };
-
+  
   // Links between loaded and stored values.
   // The key is a load instruction, the value is the corresponding store
   // instruction which stores the loaded value. Both, key and value can also
   // be copy_addr instructions.
   llvm::DenseMap<SILInstruction *, SILInstruction *> links;
-
+  
   // The current stored values at memory addresses.
   // The key is the base address of the memory (after skipping address
   // projections). The value are store (or copy_addr) instructions, which
@@ -123,27 +123,27 @@ class ConstantTracker {
   // This is only an estimation, because e.g. it does not consider potential
   // aliasing.
   llvm::DenseMap<SILValue, SILInstruction *> memoryContent;
-
+  
   // Cache for evaluated constants.
   llvm::SmallDenseMap<BuiltinInst *, IntConst> constCache;
 
   // The caller/callee function which is tracked.
   SILFunction *F;
-
+  
   // The constant tracker of the caller function (null if this is the
   // tracker of the callee).
   ConstantTracker *callerTracker;
-
+  
   // The apply instruction in the caller (null if this is the tracker of the
   // callee).
   FullApplySite AI;
-
+  
   // Walks through address projections and (optionally) collects them.
   // Returns the base address, i.e. the first address which is not a
   // projection.
   SILValue scanProjections(SILValue addr,
                            SmallVectorImpl<Projection> *Result = nullptr);
-
+  
   // Get the stored value for a load. The loadInst can be either a real load
   // or a copy_addr.
   SILValue getStoredValue(SILInstruction *loadInst,
@@ -159,7 +159,7 @@ class ConstantTracker {
     }
     return SILValue();
   }
-
+  
   SILInstruction *getMemoryContent(SILValue addr) {
     // The memory content can be stored in this ConstantTracker or in the
     // caller's ConstantTracker.
@@ -170,26 +170,26 @@ class ConstantTracker {
       return callerTracker->getMemoryContent(addr);
     return nullptr;
   }
-
+  
   // Gets the estimated definition of a value.
   SILInstruction *getDef(SILValue val, ProjectionPath &projStack);
 
   // Gets the estimated integer constant result of a builtin.
   IntConst getBuiltinConst(BuiltinInst *BI, int depth);
-
+  
 public:
-
+  
   // Constructor for the caller function.
   ConstantTracker(SILFunction *function) :
     F(function), callerTracker(nullptr), AI()
   { }
-
+  
   // Constructor for the callee function.
   ConstantTracker(SILFunction *function, ConstantTracker *caller,
                   FullApplySite callerApply) :
      F(function), callerTracker(caller), AI(callerApply)
   { }
-
+  
   void beginBlock() {
     // Currently we don't do any sophisticated dataflow analysis, so we keep
     // the memoryContent alive only for a single block.
@@ -198,13 +198,13 @@ public:
 
   // Must be called for each instruction visited in dominance order.
   void trackInst(SILInstruction *inst);
-
+  
   // Gets the estimated definition of a value.
   SILInstruction *getDef(SILValue val) {
     ProjectionPath projStack(val->getType());
     return getDef(val, projStack);
   }
-
+  
   // Gets the estimated definition of a value if it is in the caller.
   SILInstruction *getDefInCaller(SILValue val) {
     SILInstruction *def = getDef(val);

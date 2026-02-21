@@ -234,7 +234,7 @@ static bool canonicalizeLoadBorrows(SILFunction *F) {
       }
     }
   }
-
+  
   return changed;
 }
 

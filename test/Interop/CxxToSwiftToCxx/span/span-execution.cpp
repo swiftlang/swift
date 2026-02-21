@@ -67,7 +67,7 @@ public func mapSpan(_ sp: Span) {
 }
 
 public func receiveArr(_ arr: inout [Int32]) -> Span {
-  arr.withUnsafeMutableBufferPointer { ubpointer in
+  arr.withUnsafeMutableBufferPointer { ubpointer in 
     return Span(ubpointer);
   }
 }
@@ -84,7 +84,7 @@ public func receiveSpanAlias(_ sp1: SpanConstUInt8, _ sp2: SpanConstUInt8) {
 
 
 int main() {
-  using namespace swift;
+  using namespace swift;  
   {
     Span emptySpan = UseSpan::createEmptySpan();
     assert(emptySpan.empty());
@@ -105,7 +105,7 @@ int main() {
     UseSpan::printSpanOfString(strSp);
   }
   // CHECK-NEXT: {, a, abc}
-  {
+  { 
     int arr[] = {4, 5, 6};
     Span sp = {arr};
     UseSpan::printSpan(UseSpan::passthroughSpan(sp));
@@ -119,7 +119,7 @@ int main() {
     Span sp = {arr};
     UseSpan::mapSpan(sp);
   }
-  // CHECK-NEXT: [7, 8, 9]
+  // CHECK-NEXT: [7, 8, 9] 
   {
     Array<int> arr = Array<int>::init();
     arr.append(2);

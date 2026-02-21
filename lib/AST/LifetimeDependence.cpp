@@ -142,7 +142,7 @@ filterEscapableLifetimeDependencies(GenericSignature sig,
         continue;
       }
     }
-
+    
     // Otherwise, keep the dependency.
     outputs.push_back(depInfo);
   }
@@ -170,7 +170,7 @@ std::string LifetimeDependenceInfo::getString() const {
   std::string lifetimeDependenceString = "@lifetime(";
   auto addressable = getAddressableIndices();
   auto condAddressable = getConditionallyAddressableIndices();
-
+  
   bool isFirstSpecifier = true;
   auto getSourceString = [&](IndexSubset *bitvector, StringRef kind) {
     std::string result;
@@ -899,7 +899,7 @@ protected:
     }
     return "a function";
   }
-
+  
   // Ensure that dependencies exist for any return value or inout parameter that
   // needs one. Always runs before the checker completes if no other diagnostics
   // were issued.
@@ -932,7 +932,7 @@ protected:
                          {StringRef(diagnosticQualifier())});
     }
   }
-
+  
   void diagnoseMissingInoutDependencies(DiagID diagID) {
     unsigned paramIndex = 0;
     for (auto &paramInfo : parameterInfos) {

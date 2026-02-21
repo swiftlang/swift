@@ -19,11 +19,11 @@
 //             |                    start here:
 //             |                    - InferredGenericSignatureRequest
 //             |                    - RequirementSignatureRequest
-//             v
+//             v                    
 // +-------------------------+            -------------------
 // | Requirement realization | --------> / Sema diagnostics /
 // +-------------------------+           -------------------
-//             |
+//             |       
 //             |       -------------------------------------
 //             |      / Function parameter/result TypeRepr /
 //             |      -------------------------------------

@@ -37,7 +37,7 @@ protected:
   TypeWalker() = default;
   TypeWalker(const TypeWalker &) = default;
   virtual ~TypeWalker() = default;
-
+  
   virtual void anchor();
 };
 

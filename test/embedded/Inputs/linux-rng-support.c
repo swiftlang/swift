@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <stdint.h>
 
-#ifdef __linux__
+#ifdef __linux__ 
 
 ssize_t getrandom(void *buf, size_t len, unsigned int flags);
 
@@ -19,7 +19,7 @@ void arc4random_buf(void *buf, size_t nbytes) {
     if (actual_nbytes == -1) {
       abort();
     }
-
+    
     buf = (uint8_t *)(buf) + actual_nbytes;
     nbytes -= actual_nbytes;
   }

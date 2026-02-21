@@ -126,7 +126,7 @@ enum class ImportTypeKind {
 
   /// Import the declared type of a variable.
   Variable,
-
+  
   /// Import the declared type of an audited variable.
   ///
   /// This is exactly like ImportTypeKind::Variable, except it
@@ -135,7 +135,7 @@ enum class ImportTypeKind {
 
   /// Import the declared type of a struct or union field.
   RecordField,
-
+  
   /// Import the result type of a function.
   ///
   /// This provides special treatment for 'void', among other things, and
@@ -432,7 +432,7 @@ struct ImportDiagnosticHasher {
 };
 
 /// Implementation of the Clang importer.
-class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
+class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
   : public LazyMemberLoader,
     public LazyConformanceLoader
 {
@@ -917,7 +917,7 @@ private:
   /// When set, ClangImporter is disabled, and all requests go to the
   /// DWARFImporter delegate.
   bool DisableSourceImport;
-
+  
   /// File dependency tracker, if installed.
   DependencyTracker *SwiftDependencyTracker = nullptr;
 
@@ -935,7 +935,7 @@ private:
   /// Load a module using the clang::CompilerInstance.
   ModuleDecl *loadModuleClang(SourceLoc importLoc,
                               ImportPath::Module path);
-
+  
   /// "Load" a module from debug info. Because debug info types are read on
   /// demand, this doesn't really do any work.
   ModuleDecl *loadModuleDWARF(SourceLoc importLoc,
@@ -982,7 +982,7 @@ public:
   clang::Preprocessor &getClangPreprocessor() const {
     return Instance->getPreprocessor();
   }
-
+  
   clang::CodeGenOptions &getCodeGenOpts() const {
     return Instance->getCodeGenOpts();
   }
@@ -1736,7 +1736,7 @@ public:
 
   void finishNormalConformance(NormalProtocolConformance *conformance,
                                uint64_t unused) override;
-
+  
   /// Returns the default definition type for \p ATD.
   Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                  uint64_t contextData) override {

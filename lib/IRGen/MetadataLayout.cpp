@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file includes code for laying out type metadata.
-//
+// 
 //  It also implements certain low-level access routines for type metadata.
 //  These routines are generally declared in one of two different places:
 //
@@ -392,7 +392,7 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       }
       super::addReifiedVTableEntry(fn);
     }
-
+    
     void noteNonoverriddenMethod(SILDeclRef fn) {
       if (fn.getDecl()->getDeclContext() == Target) {
         auto impl = VTable->getEntry(IGM.getSILModule(), fn);
@@ -733,7 +733,7 @@ StructMetadataLayout::getFieldOffsetVectorOffset() const {
   return Offset(FieldOffsetVector.getStaticOffset());
 }
 
-Offset
+Offset 
 StructMetadataLayout::getTrailingFlagsOffset() const {
   assert(TrailingFlagsOffset.isStatic());
   return Offset(TrailingFlagsOffset.getStaticOffset());

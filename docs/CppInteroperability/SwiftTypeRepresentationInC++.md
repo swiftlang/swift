@@ -94,7 +94,7 @@ Class type is mapped to a C++ class that has a pointer to the underlying Swift i
 class BaseClass {
 private:
   void *_opaquePointer; // Swift class instance pointer is stored here.
-};
+}; 
 class Vehicle: public BaseClass {
 public:
 }

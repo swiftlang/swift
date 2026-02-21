@@ -792,7 +792,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
   case DeclContextKind::ExtensionDecl:    Kind = "ExtensionDecl"; break;
   case DeclContextKind::TopLevelCodeDecl: Kind = "TopLevelCodeDecl"; break;
   case DeclContextKind::SerializedTopLevelCodeDecl:
-    Kind = "SerializedTopLevelCodeDecl";
+    Kind = "SerializedTopLevelCodeDecl"; 
     break;
   case DeclContextKind::Initializer:      Kind = "Initializer"; break;
   case DeclContextKind::AbstractFunctionDecl:

@@ -1059,11 +1059,11 @@ public:
   //===--------------------------------------------------------------------===//
   // Helper Functions.
   //===--------------------------------------------------------------------===//
-
+  
   bool isInDefer() const {
     return isDefer(DC);
   }
-
+  
   template<typename StmtTy>
   bool typeCheckStmt(StmtTy *&S) {
     FrontendStatsTracer StatsTracer(getASTContext().Stats,
@@ -1085,7 +1085,7 @@ public:
   }
 
   void typeCheckASTNode(ASTNode &node);
-
+  
   //===--------------------------------------------------------------------===//
   // Visit Methods.
   //===--------------------------------------------------------------------===//
@@ -1408,7 +1408,7 @@ public:
         case SelfAccessKind::LegacyConsuming:
         case SelfAccessKind::Consuming:
           break;
-
+          
         case SelfAccessKind::Borrowing:
         case SelfAccessKind::NonMutating:
         case SelfAccessKind::Mutating:
@@ -1430,7 +1430,7 @@ public:
     PA->setCondition(C);
     return PA;
   }
-
+    
   Stmt *visitDeferStmt(DeferStmt *DS) {
     TypeChecker::typeCheckDecl(DS->getTempDecl());
 
@@ -1440,7 +1440,7 @@ public:
 
     return DS;
   }
-
+  
   Stmt *visitIfStmt(IfStmt *IS) {
     typeCheckConditionForStatement(IS, DC);
 
@@ -1458,7 +1458,7 @@ public:
 
     return IS;
   }
-
+  
   Stmt *visitGuardStmt(GuardStmt *GS) {
     typeCheckConditionForStatement(GS, DC);
 
@@ -1477,7 +1477,7 @@ public:
     DS->setBody(S);
     return DS;
   }
-
+  
   Stmt *visitWhileStmt(WhileStmt *WS) {
     typeCheckConditionForStatement(WS, DC);
 
@@ -1487,7 +1487,7 @@ public:
     Stmt *S = WS->getBody();
     typeCheckStmt(S);
     WS->setBody(S);
-
+    
     return WS;
   }
   Stmt *visitRepeatWhileStmt(RepeatWhileStmt *RWS) {
@@ -1503,7 +1503,7 @@ public:
     RWS->setCond(E);
     return RWS;
   }
-
+  
   Stmt *visitForEachStmt(ForEachStmt *S) {
     // If we're performing IDE inspection, we also want to skip the where
     // clause if we're leaving the body unchecked.
@@ -1925,7 +1925,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
   auto valueE = E;
   while (1) {
     valueE = valueE->getValueProvidingExpr();
-
+    
     if (auto *OEE = dyn_cast<OpenExistentialExpr>(valueE))
       valueE = OEE->getSubExpr();
     else if (auto *CRCE = dyn_cast<CovariantReturnConversionExpr>(valueE))
@@ -2029,7 +2029,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
   // `Void`, (potentially wrapped in optionals) then it is safe to ignore.
   if (isDiscardableType(valueE->getType()))
     return;
-
+  
   // Complain about '#selector'.
   if (auto *ObjCSE = dyn_cast<ObjCSelectorExpr>(valueE)) {
     DE.diagnose(ObjCSE->getLoc(), diag::expression_unused_selector_result)
@@ -2043,7 +2043,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       .highlight(E->getSourceRange());
     return;
   }
-
+    
   // Always complain about 'try?'.
   if (auto *OTE = dyn_cast<OptionalTryExpr>(valueE)) {
     DE.diagnose(OTE->getTryLoc(), diag::expression_unused_optional_try)
@@ -2087,7 +2087,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     else if (auto dynMemberRef = dyn_cast<DynamicMemberRefExpr>(fn))
       callee = dyn_cast<AbstractFunctionDecl>(
                  dynMemberRef->getMember().getDecl());
-
+    
     // If the callee explicitly allows its result to be ignored, then don't
     // complain.
     if (callee && callee->getAttrs().getAttribute<DiscardableResultAttr>())
@@ -2102,13 +2102,13 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         .highlight(call->getArgs()->getSourceRange());
       return;
     }
-
+    
     SourceRange SR1 = call->getArgs()->getSourceRange(), SR2;
     if (auto *BO = dyn_cast<BinaryExpr>(call)) {
       SR1 = BO->getLHS()->getSourceRange();
       SR2 = BO->getRHS()->getSourceRange();
     }
-
+    
     // Otherwise, produce a generic diagnostic.
     if (callee) {
       auto &ctx = callee->getASTContext();
@@ -2127,7 +2127,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       auto diagID = diag::expression_unused_result_call;
       if (callee->getName().isOperator())
         diagID = diag::expression_unused_result_operator;
-
+      
       DE.diagnose(fn->getLoc(), diagID, callee)
         .highlight(SR1).highlight(SR2);
     } else
@@ -2277,7 +2277,7 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
       r, ctor, /*contextualInfo=*/{}, TypeCheckExprFlags::IsDiscarded);
   if (!resultTy)
     return nullptr;
-
+  
   return r;
 }
 
@@ -2291,7 +2291,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
                         apply->getSemanticFn());
   if (!otherCtorRef)
     return false;
-
+  
   auto ctor = otherCtorRef->getDecl();
   if (!ctor->isDesignatedInit()) {
     if (!implicitlyGenerated) {
@@ -2344,7 +2344,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
       fromCtor->diagnose(diag::availability_unavailable_implicit_init,
                          ctor, superclassDecl->getName());
     }
-
+    
     // Only allowed to synthesize a throwing super.init() call if the init being
     // checked is also throwing.
     if (ctor->hasThrows()) {
@@ -2354,7 +2354,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
         return true; // considered an error
       }
     }
-
+    
     // Not allowed to implicitly generate a super.init() call if the init
     // is async; that would hide the 'await' from the programmer.
     if (ctor->hasAsync()) {

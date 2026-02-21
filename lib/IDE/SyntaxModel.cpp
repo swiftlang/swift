@@ -598,7 +598,7 @@ ASTWalker::PreWalkResult<Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::ObjectLiteralExpression;
     SN.Range = charSourceRangeFromSourceRange(SM, ObjectE->getSourceRange());
-    SourceLoc NRStart = ObjectE->getSourceLoc().getAdvancedLoc(1);
+    SourceLoc NRStart = ObjectE->getSourceLoc().getAdvancedLoc(1);    
     SourceLoc NREnd =
       NRStart.getAdvancedLoc(ObjectE->getLiteralKindRawName().size());
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
@@ -1439,7 +1439,7 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
   if (!passNode(Node))
     return false;
 
-  return searchForURL(AfterMarker);
+  return searchForURL(AfterMarker);  
 }
 
 bool ModelASTWalker::findUrlStartingLoc(StringRef Text,

@@ -79,7 +79,7 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
   SILBasicBlock *ThisParent = getContainingBlock();
   SILBasicBlock *l2Block = L2.getContainingBlock();
   if (ThisParent == l2Block) return;
-
+  
   bool differentFunctions = (ThisParent->getFunction() != l2Block->getFunction());
 
   // Update the parent fields in the instructions.
@@ -177,7 +177,7 @@ void SILInstruction::dropNonOperandReferences() {
   if (auto *KPI = dyn_cast<KeyPathInst>(this)) {
     if (!KPI->hasPattern())
       return;
-
+    
     KPI->dropReferencedPattern();
     return;
   }
@@ -411,7 +411,7 @@ namespace {
       }
       return true;
     }
-
+    
     bool visitDestroyValueInst(const DestroyValueInst *RHS) {
       auto *left = cast<DestroyValueInst>(LHS);
       return left->poisonRefs() == RHS->poisonRefs();
@@ -814,7 +814,7 @@ namespace {
     bool visitBridgeObjectToWordInst(BridgeObjectToWordInst *X) {
       return true;
     }
-
+      
     bool visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
       return true;
     }
@@ -1096,13 +1096,13 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }
-
+  
   if (auto *mdi = dyn_cast<MarkDependenceInst>(this)) {
     if (mdi->getBase()->getType().isAddress())
       return MemoryBehavior::MayRead;
     return MemoryBehavior::None;
   }
-
+  
   // TODO: An UncheckedTakeEnumDataAddr instruction has no memory behavior if
   // it is nondestructive. Setting this currently causes LICM to miscompile
   // because access paths do not account for enum projections.
@@ -1409,7 +1409,7 @@ bool SILInstruction::mayRequirePackMetadata(SILFunction const &F) const {
     return false;
   }
   case SILInstructionKind::ClassMethodInst:
-  case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::DebugValueInst: 
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::DestroyValueInst:
   // Unary instructions.
@@ -1873,7 +1873,7 @@ bool SILInstruction::maySuspend() const {
   // hop_to_executor also may cause a suspension
   if (isa<HopToExecutorInst>(this))
     return true;
-
+  
   // Fully applying an async function may suspend the caller.
   if (auto applySite = FullApplySite::isa(const_cast<SILInstruction*>(this))) {
     return applySite.getOrigCalleeType()->isAsync();
@@ -1885,7 +1885,7 @@ bool SILInstruction::maySuspend() const {
         return true;
     }
   }
-
+  
   return false;
 }
 
@@ -2140,7 +2140,7 @@ UncheckedTakeEnumDataAddrInst::isDestructive(EnumDecl *forEnum, SILModule &M) {
                              TypeExpansionContext::minimal())) {
     return false;
   }
-
+  
   // We only overlap spare bits with valid payload values when an enum has
   // multiple payloads.
   bool sawPayloadCase = false;
@@ -2155,7 +2155,7 @@ UncheckedTakeEnumDataAddrInst::isDestructive(EnumDecl *forEnum, SILModule &M) {
       }
     }
   }
-
+  
   return false;
 }
 

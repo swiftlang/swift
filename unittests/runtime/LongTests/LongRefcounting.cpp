@@ -35,7 +35,7 @@ struct TestObject : HeapObject {
   // *Addr = Value during deinit
   size_t *Addr;
   size_t Value;
-
+  
   // Check lifecycle state DEINITING during deinit
   bool CheckLifecycle;
 
@@ -43,7 +43,7 @@ struct TestObject : HeapObject {
   // On entry to deinit: must point to object
   // On exit from deinit: is destroyed
   WeakReference *WeakRef;
-
+  
   // Callback invoked during the object's deinit.
   std::function<void()> DeinitCallback;
 
@@ -73,7 +73,7 @@ static SWIFT_CC(swift) void deinitTestObject(SWIFT_CONTEXT HeapObject *_object) 
     swift_unownedRetain(object);
     swift_unownedRelease(object);
     swift_unownedRelease(object);
-
+    
     if (object->WeakRef) {
       // WRC load is nil
       // WRC increment is nil
@@ -343,7 +343,7 @@ TEST(LongRefcountingTest, nonatomic_unowned_retain_overflow_DeathTest) {
 
 static HeapObjectSideTableEntry *weakRetainALot(TestObject *object, uint64_t count) {
   if (count == 0) return nullptr;
-
+  
   auto side = object->refCounts.formWeakReference();
   for (uint64_t i = 1; i < count; i++) {
     side = side->incrementWeak();
@@ -378,7 +378,7 @@ TEST(LongRefcountingTest, weak_retain_max) {
   EXPECT_EQ(object->refCounts.getWeakCount(), 1u);
   auto side = weakRetainALot(object, maxWRC - 1);
   EXPECT_EQ(side->getWeakCount(), maxWRC);
-
+  
   EXPECT_EQ(0u, deinited);
   EXPECT_ALLOCATED(object);
   EXPECT_ALLOCATED(side);
@@ -425,7 +425,7 @@ TEST(LongRefcountingTest, nonatomic_weak_retain_max) {
   EXPECT_EQ(object->refCounts.getWeakCount(), 1u);
   auto side = weakRetainALot(object, maxWRC - 1);
   EXPECT_EQ(side->getWeakCount(), maxWRC);
-
+  
   EXPECT_EQ(0u, deinited);
   EXPECT_ALLOCATED(object);
   EXPECT_ALLOCATED(side);
@@ -452,7 +452,7 @@ namespace swift {
 
 class WeakReference {
   uintptr_t value;
-
+  
  public:
   void *getSideTable() {
     return (void*)(value & ~3ULL);
@@ -462,10 +462,10 @@ class WeakReference {
 } // namespace swift
 
 // Lifecycle paths. One test each.
-//
+// 
 // LIVE -> DEINITING                      -> DEAD, no side table
 // LIVE -> DEINITING -> DEINITED          -> DEAD, no side table
-//
+// 
 // LIVE -> DEINITING                      -> DEAD, with side table
 // LIVE -> DEINITING -> DEINITED          -> DEAD, with side table
 // LIVE -> DEINITING             -> FREED -> DEAD, with side table
@@ -481,16 +481,16 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_no_side_DeathTest) {
   object->CheckLifecycle = true;
 
   // Object is LIVE
-
+  
   EXPECT_ALLOCATED(object);
   // RC tested elsewhere
-
+  
   // URC load OK
   // URC increment OK
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);
+  swift_unownedRetain(object);   swift_unownedCheck(object);  
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
@@ -505,7 +505,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_no_side_DeathTest) {
   // WRC == 1
 
   swift_release(object);  // DEINITING is in here
-
+  
   // Object is DEAD
   // RC == 0
   // URC == 0
@@ -524,16 +524,16 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_no_side_DeathTest) {
   object->CheckLifecycle = true;
 
   // Object is LIVE
-
+  
   EXPECT_ALLOCATED(object);
   // RC tested elsewhere
-
+  
   // URC load OK
   // URC increment OK
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);
+  swift_unownedRetain(object);   swift_unownedCheck(object);  
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
 
@@ -546,7 +546,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_no_side_DeathTest) {
   // WRC == 1
 
   swift_release(object);  // DEINITING is in here
-
+  
   // Object is DEINITED
   // RC == 0
   // URC == 2
@@ -572,7 +572,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_no_side_DeathTest) {
   // WRC == 1
 
   swift_unownedRelease(object);
-
+  
   // Object is DEAD
   // RC == 0
   // URC == 0
@@ -591,16 +591,16 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_with_side_DeathTest) {
   object->CheckLifecycle = true;
 
   // Object is LIVE
-
+  
   EXPECT_ALLOCATED(object);
   // RC tested elsewhere
-
+  
   // URC load OK
   // URC increment OK
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);
+  swift_unownedRetain(object);   swift_unownedCheck(object);  
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   // Remaining releases are performed after the side table is allocated.
@@ -611,7 +611,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_with_side_DeathTest) {
 
   WeakReference w;
   swift_weakInit(&w, object);
-
+  
   // Object is LIVE with side table
 
   void *side = w.getSideTable();
@@ -621,7 +621,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_with_side_DeathTest) {
   swift_weakInit(&w_deinit, object);
   object->WeakRef = &w_deinit;
   // destroyed during deinit
-
+  
   // RC increment ok
   // RC decrement ok
   swift_retain(object);
@@ -630,13 +630,13 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_with_side_DeathTest) {
   swift_release(object);
   swift_release(object);
   swift_release(object);
-
+  
   // URC load OK
   // URC increment OK
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);
+  swift_unownedRetain(object);   swift_unownedCheck(object);  
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
@@ -658,13 +658,13 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_with_side_DeathTest) {
   weakValue = swift_weakTakeStrong(&w);
   EXPECT_EQ(weakValue, object);
   swift_release(weakValue);
-
+  
   // RC == 1
   // URC == 1
   // WRC == 1
 
   swift_release(object);  // DEINITING is in here
-
+  
   // Object is DEAD
   // RC == 0
   // URC == 0
@@ -684,16 +684,16 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_with_side_DeathTest)
   object->CheckLifecycle = true;
 
   // Object is LIVE
-
+  
   EXPECT_ALLOCATED(object);
   // RC tested elsewhere
-
+  
   // URC load OK
   // URC increment OK
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);
+  swift_unownedRetain(object);   swift_unownedCheck(object);  
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   // Remaining releases are performed during DEINITED.
@@ -704,7 +704,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_with_side_DeathTest)
 
   WeakReference w;
   swift_weakInit(&w, object);
-
+  
   // Object is LIVE with side table
 
   void *side = w.getSideTable();
@@ -723,13 +723,13 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_with_side_DeathTest)
   swift_release(object);
   swift_release(object);
   swift_release(object);
-
+  
   // URC load OK
   // URC increment OK
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);
+  swift_unownedRetain(object);   swift_unownedCheck(object);  
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
@@ -748,7 +748,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_with_side_DeathTest)
   weakValue = swift_weakTakeStrong(&w);
   EXPECT_EQ(weakValue, object);
   swift_release(weakValue);
-
+  
   // RC == 1
   // URC == 3
   // WRC == 1
@@ -759,7 +759,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_with_side_DeathTest)
   // RC == 0
   // URC == 2
   // WRC == 1
-
+  
   EXPECT_EQ(1u, deinited);
   EXPECT_ALLOCATED(object);
   EXPECT_ALLOCATED(side);
@@ -776,7 +776,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_with_side_DeathTest)
   swift_unownedRelease(object);
   EXPECT_ALLOCATED(object);
   EXPECT_ALLOCATED(side);
-
+  
   // RC == 0
   // URC == 1
   // WRC == 1
@@ -802,16 +802,16 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_freed_with_side_DeathTest) {
   object->CheckLifecycle = true;
 
   // Object is LIVE
-
+  
   EXPECT_ALLOCATED(object);
   // RC tested elsewhere
-
+  
   // URC load OK
   // URC increment OK
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);
+  swift_unownedRetain(object);   swift_unownedCheck(object);  
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
@@ -825,7 +825,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_freed_with_side_DeathTest) {
   swift_weakInit(&w, object);
 
   // Object is LIVE with side table
-
+  
   void *side = w.getSideTable();
   EXPECT_ALLOCATED(side);
 
@@ -842,13 +842,13 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_freed_with_side_DeathTest) {
   swift_release(object);
   swift_release(object);
   swift_release(object);
-
+  
   // URC load OK
   // URC increment OK
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);
+  swift_unownedRetain(object);   swift_unownedCheck(object);  
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
@@ -867,7 +867,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_freed_with_side_DeathTest) {
   weakValue = swift_weakLoadStrong(&w);
   EXPECT_EQ(weakValue, object);
   swift_release(weakValue);
-
+  
   // RC == 1
   // URC == 1
   // WRC == 3
@@ -878,7 +878,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_freed_with_side_DeathTest) {
   // RC == 0
   // URC == 0
   // WRC == 2
-
+  
   EXPECT_EQ(1u, deinited);
   EXPECT_UNALLOCATED(object);
   EXPECT_ALLOCATED(side);
@@ -893,7 +893,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_freed_with_side_DeathTest) {
 
   weakValue = swift_weakTakeStrong(&w2);
   EXPECT_EQ(0, weakValue);
-
+  
   // RC == 0
   // URC == 0
   // WRC == 1
@@ -919,20 +919,20 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_freed_with_side_Deat
   object->CheckLifecycle = true;
 
   // Object is LIVE
-
+  
   EXPECT_ALLOCATED(object);
   // RC tested elsewhere
-
+  
   // URC load OK
   // URC increment OK
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);
+  swift_unownedRetain(object);   swift_unownedCheck(object);  
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   // Remaining releases are performed during DEINITED.
-
+  
   // WRC load can't happen
   // WRC increment adds side table
   // WRC decrement can't happen
@@ -944,11 +944,11 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_freed_with_side_Deat
 
   void *side = w.getSideTable();
   EXPECT_ALLOCATED(side);
-
+  
   WeakReference w_deinit;
   swift_weakInit(&w_deinit, object);
   object->WeakRef = &w_deinit;
-  // destroyed during deinit
+  // destroyed during deinit  
 
   // RC increment ok
   // RC decrement ok
@@ -958,13 +958,13 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_freed_with_side_Deat
   swift_release(object);
   swift_release(object);
   swift_release(object);
-
+  
   // URC load OK
   // URC increment OK
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);
+  swift_unownedRetain(object);   swift_unownedCheck(object);  
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
@@ -983,7 +983,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_freed_with_side_Deat
   weakValue = swift_weakLoadStrong(&w);
   EXPECT_EQ(weakValue, object);
   swift_release(weakValue);
-
+  
   // RC == 1
   // URC == 3
   // WRC == 3
@@ -1027,7 +1027,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_freed_with_side_Deat
   // RC == 0
   // URC == 0
   // WRC == 1
-
+  
   EXPECT_EQ(1u, deinited);
   EXPECT_UNALLOCATED(object);
   EXPECT_ALLOCATED(side);
@@ -1039,7 +1039,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_freed_with_side_Deat
   // WRC load is nil
   // WRC increment can't happen
   // WRC decrement OK
-
+  
   // RC == 0
   // URC == 0
   // WRC == 1

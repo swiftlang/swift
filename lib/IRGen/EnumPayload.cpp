@@ -28,7 +28,7 @@ using namespace irgen;
 static llvm::Value *forcePayloadValue(EnumPayload::LazyValue &value) {
   if (auto v = value.dyn_cast<llvm::Value *>())
     return v;
-
+  
   auto null = llvm::Constant::getNullValue(value.dyn_cast<llvm::Type*>());
   value = null;
   return null;
@@ -37,7 +37,7 @@ static llvm::Value *forcePayloadValue(EnumPayload::LazyValue &value) {
 static llvm::Type *getPayloadType(EnumPayload::LazyValue value) {
   if (auto t = value.dyn_cast<llvm::Type *>())
     return t;
-
+  
   return value.dyn_cast<llvm::Value *>()->getType();
 }
 
@@ -161,7 +161,7 @@ llvm::Value *EnumPayload::extractValue(IRGenFunction &IGF, llvm::Type *type,
 EnumPayload EnumPayload::fromExplosion(IRGenModule &IGM,
                                        Explosion &in, EnumPayloadSchema schema){
   EnumPayload result;
-
+  
   schema.forEachType(IGM, [&](llvm::Type *type) {
     auto next = in.claimNext();
     if (next->getType() == type) {
@@ -181,7 +181,7 @@ EnumPayload EnumPayload::fromExplosion(IRGenModule &IGM,
       }
     }
   });
-
+  
   return result;
 }
 
@@ -226,12 +226,12 @@ static llvm::Type *getPayloadStorageType(IRGenModule &IGM,
     payload.StorageType = getPayloadType(payload.PayloadValues.front());
     return payload.StorageType;
   }
-
+  
   SmallVector<llvm::Type *, 2> elementTypes;
   for (auto value : payload.PayloadValues) {
     elementTypes.push_back(getPayloadType(value));
   }
-
+  
   payload.StorageType = llvm::StructType::get(IGM.getLLVMContext(),
                                               elementTypes);
   return payload.StorageType;
@@ -242,7 +242,7 @@ EnumPayload EnumPayload::load(IRGenFunction &IGF, Address address,
   EnumPayload result = EnumPayload::zero(IGF.IGM, schema);
   if (result.PayloadValues.empty())
     return result;
-
+  
   auto storageTy = getPayloadStorageType(IGF.IGM, result);
   address = IGF.Builder.CreateElementBitCast(address, storageTy);
 
@@ -258,7 +258,7 @@ EnumPayload EnumPayload::load(IRGenFunction &IGF, Address address,
       offset += Size(IGF.IGM.DataLayout.getTypeAllocSize(loadedValue->getType()));
     }
   }
-
+  
   return result;
 }
 
@@ -296,7 +296,7 @@ void EnumPayload::emitSwitch(IRGenFunction &IGF,
       IGF.Builder.CreateBr(cases[0].second);
       return;
     }
-
+  
     auto *cmp = emitCompare(IGF, mask, cases[0].first);
     IGF.Builder.CreateCondBr(cmp, cases[0].second, dflt.getPointer());
     return;
@@ -361,7 +361,7 @@ EnumPayload::emitCompare(IRGenFunction &IGF,
     // If this piece is zero, it doesn't affect the comparison.
     if (maskPiece == 0)
       continue;
-
+    
     // Apply the mask and test.
     bool isMasked = !maskPiece.isAllOnes();
     auto intTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), size);
@@ -371,12 +371,12 @@ EnumPayload::emitCompare(IRGenFunction &IGF,
         || (!isa<llvm::IntegerType>(v->getType())
             && !isa<llvm::PointerType>(v->getType())))
       v = IGF.Builder.CreateBitOrPointerCast(v, intTy);
-
+    
     if (isMasked) {
       auto maskConstant = llvm::ConstantInt::get(intTy, maskPiece);
       v = IGF.Builder.CreateAnd(v, maskConstant);
     }
-
+    
     llvm::Value *valueConstant = llvm::ConstantInt::get(intTy, valuePiece);
     valueConstant = IGF.Builder.CreateBitOrPointerCast(valueConstant,
                                                        v->getType());
@@ -386,7 +386,7 @@ EnumPayload::emitCompare(IRGenFunction &IGF,
     else
       condition = IGF.Builder.CreateAnd(condition, cmp);
   }
-
+  
   // We should have handled the cases where there are no significant conditions
   // in the early exit.
   assert(condition && "no significant condition?!");
@@ -408,7 +408,7 @@ EnumPayload::emitApplyAndMask(IRGenFunction &IGF, const APInt &mask) {
 
     // Read a chunk of the mask.
     auto maskPiece = maskReader.read(size);
-
+    
     // If this piece is all ones, it has no effect.
     if (maskPiece.isAllOnes())
       continue;
@@ -423,7 +423,7 @@ EnumPayload::emitApplyAndMask(IRGenFunction &IGF, const APInt &mask) {
       pv = payloadTy;
       continue;
     }
-
+    
     // Otherwise, apply the mask to the existing value.
     auto v = cast<llvm::Value *>(pv);
     auto payloadIntTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), size);
@@ -455,10 +455,10 @@ EnumPayload::emitApplyOrMask(IRGenModule &IGM,
     // If this piece is zero, it has no effect.
     if (maskPiece == 0)
       continue;
-
+    
     auto payloadIntTy = llvm::IntegerType::get(IGM.getLLVMContext(), size);
     auto maskConstant = llvm::ConstantInt::get(payloadIntTy, maskPiece);
-
+    
     // If the payload value is vacant, or the mask is all ones,
     // we can adopt the mask value directly.
     if (isa<llvm::Type *>(pv) || maskPiece.isAllOnes()) {

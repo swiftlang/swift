@@ -58,25 +58,25 @@ class StringOptimization {
   struct StringInfo {
     /// The string
     StringRef str;
-
+    
     /// Negative means: not constant
     int reservedCapacity = 0;
-
+    
     StringInfo(StringRef str, int reservedCapacity = 0) :
       str(str), reservedCapacity(reservedCapacity) { }
-
+    
     bool isConstant() const { return reservedCapacity >= 0; }
     bool isEmpty() const { return isConstant() && str.empty(); }
-
+    
     static StringInfo unknown() { return StringInfo(StringRef(), -1); }
   };
 
   /// The stdlib's String type.
   SILType stringType;
-
+  
   /// The String initializer which takes an UTF8 string literal as argument.
   SILFunction *makeUTF8Func = nullptr;
-
+  
   /// Caches the analysis result for an alloc_stack or an inout function
   /// argument, whether it is an "identifiable" object.
   /// See mayWriteToIdentifyableObject().
@@ -88,7 +88,7 @@ public:
 private:
 
   bool optimizeBlock(SILBasicBlock &block);
-
+  
   bool optimizeStringAppend(ApplyInst *appendCall,
                             llvm::DenseMap<SILValue, SILValue> &storedStrings);
   bool optimizeStringConcat(ApplyInst *concatCall);
@@ -118,7 +118,7 @@ bool StringOptimization::run(SILFunction *F) {
                  stringDecl->getDeclaredInterfaceType()->getCanonicalType());
 
   bool changed = false;
-
+  
   for (SILBasicBlock &block : *F) {
     changed |= optimizeBlock(block);
   }
@@ -128,11 +128,11 @@ bool StringOptimization::run(SILFunction *F) {
 /// Run the optimization on a basic block.
 bool StringOptimization::optimizeBlock(SILBasicBlock &block) {
   bool changed = false;
-
+  
   /// Maps identifiable objects (alloc_stack, inout parameters) to string values
   /// which are stored in those objects.
   llvm::DenseMap<SILValue, SILValue> storedStrings;
-
+  
   for (auto iter = block.begin(); iter != block.end();) {
     SILInstruction *inst = &*iter++;
 
@@ -177,13 +177,13 @@ bool StringOptimization::optimizeStringAppend(ApplyInst *appendCall,
                             llvm::DenseMap<SILValue, SILValue> &storedStrings) {
   SILValue rhs = appendCall->getArgument(0);
   StringInfo rhsString = getStringInfo(rhs);
-
+  
   // Remove lhs.append(rhs) if rhs is empty.
   if (rhsString.isEmpty()) {
     appendCall->eraseFromParent();
     return true;
   }
-
+  
   SILValue lhsAddr = appendCall->getArgument(1);
   StringInfo lhsString = getStringInfo(storedStrings[lhsAddr]);
 
@@ -203,7 +203,7 @@ bool StringOptimization::optimizeStringAppend(ApplyInst *appendCall,
     storedStrings[lhsAddr] = rhs;
     return true;
   }
-
+  
   // Replace lhs.append(rhs) with "lhs = lhs + rhs" if both lhs and rhs are
   // constant.
   if (lhsString.isConstant() && rhsString.isConstant()) {
@@ -215,7 +215,7 @@ bool StringOptimization::optimizeStringAppend(ApplyInst *appendCall,
       return true;
     }
   }
-
+  
   return false;
 }
 
@@ -224,7 +224,7 @@ bool StringOptimization::optimizeStringConcat(ApplyInst *concatCall) {
   SILValue lhs = concatCall->getArgument(0);
   SILValue rhs = concatCall->getArgument(1);
   StringInfo rhsString = getStringInfo(rhs);
-
+  
   // Replace lhs + "" with lhs
   if (rhsString.isEmpty()) {
     lhs = copyValue(lhs, concatCall);
@@ -232,7 +232,7 @@ bool StringOptimization::optimizeStringConcat(ApplyInst *concatCall) {
     concatCall->eraseFromParent();
     return true;
   }
-
+  
   // Replace "" + rhs with rhs
   StringInfo lhsString = getStringInfo(lhs);
   if (lhsString.isEmpty()) {
@@ -252,7 +252,7 @@ bool StringOptimization::optimizeStringConcat(ApplyInst *concatCall) {
       return true;
     }
   }
-
+  
   return false;
 }
 
@@ -302,7 +302,7 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
   Type ty = metatype->getInstanceType();
   if (ty->hasArchetype() || ty->hasDynamicSelfType())
     return false;
-
+  
   // Usually the "qualified" parameter of _typeName() is a constant boolean.
   std::optional<int> isQualifiedOpt =
       getIntConstant(typeNameCall->getArgument(1));
@@ -390,7 +390,7 @@ ApplyInst *StringOptimization::isSemanticCall(SILInstruction *inst,
   auto *apply = dyn_cast<ApplyInst>(inst);
   if (!apply || apply->getNumArguments() != numArgs)
     return nullptr;
-
+    
   SILFunction *callee = apply->getReferencedFunctionOrNull();
   if (callee && callee->hasSemanticsAttr(attr))
     return apply;
@@ -490,7 +490,7 @@ static std::pair<SILValue, VarDecl *> skipStructExtract(SILValue value) {
   auto *apply = dyn_cast<ApplyInst>(value);
   if (!apply)
     return {value, nullptr};
-
+  
   SILFunction *callee = apply->getReferencedFunctionOrNull();
   if (!callee || !callee->isDefinition())
     return {value, nullptr};
@@ -504,7 +504,7 @@ static std::pair<SILValue, VarDecl *> skipStructExtract(SILValue value) {
   auto *sei = dyn_cast<StructExtractInst>(ret->getOperand());
   if (!sei)
     return {value, nullptr};
-
+  
   auto *arg = dyn_cast<SILFunctionArgument>(sei->getOperand());
   if (!arg)
     return {value, nullptr};
@@ -517,7 +517,7 @@ static std::pair<SILValue, VarDecl *> skipStructExtract(SILValue value) {
 StringOptimization::StringInfo StringOptimization::getStringInfo(SILValue value) {
   if (!value)
     return StringInfo::unknown();
-
+  
   // Look through struct_extract(struct(value)).
   // This specifically targets calls to
   //    String(stringInterpolation: DefaultStringInterpolation)
@@ -539,12 +539,12 @@ StringOptimization::StringInfo StringOptimization::getStringInfo(SILValue value)
   SILFunction *callee = apply->getReferencedFunctionOrNull();
   if (!callee)
     return StringInfo::unknown();
-
+    
   if (callee->hasSemanticsAttr(semantics::STRING_INIT_EMPTY)) {
     // An empty string initializer.
     return StringInfo("");
   }
-
+    
   if (callee->hasSemanticsAttr(semantics::STRING_INIT_EMPTY_WITH_CAPACITY)) {
     // An empty string initializer with initial capacity.
     int reservedCapacity = std::numeric_limits<int>::max();
@@ -554,7 +554,7 @@ StringOptimization::StringInfo StringOptimization::getStringInfo(SILValue value)
     }
     return StringInfo("", reservedCapacity);
   }
-
+    
   if (callee->hasSemanticsAttr(semantics::STRING_MAKE_UTF8)) {
     // A string literal initializer.
     SILValue stringVal = apply->getArgument(0);
@@ -648,9 +648,9 @@ StringOptimization::getStringFromStaticLet(SILValue value) {
   auto *store = dyn_cast<StoreInst>(gUse->getUser());
   if (!store || store->getDest() != gAddr)
     return StringInfo::unknown();
-
+    
   SILValue initVal = store->getSrc();
-
+  
   // This check is probably not needed, but let's be on the safe side:
   // it prevents an infinite recursion if the initializer of the global is
   // itself a load of another global, and so on.
@@ -716,7 +716,7 @@ ApplyInst *StringOptimization::createStringInit(StringRef str,
     ConstructorDecl *makeUTF8Decl = ctxt.getMakeUTF8StringDecl();
     if (!makeUTF8Decl)
       return nullptr;
-
+    
     auto Mangled = SILDeclRef(makeUTF8Decl, SILDeclRef::Kind::Allocator).mangle();
     makeUTF8Func = module.loadFunction(Mangled, SILModule::LinkingMode::LinkAll);
     if (!makeUTF8Func)

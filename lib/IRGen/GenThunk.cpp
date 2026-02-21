@@ -768,17 +768,17 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
   // Check for lookups of nonoverridden methods first.
   class LookUpNonoverriddenMethods
     : public ClassMetadataScanner<LookUpNonoverriddenMethods> {
-
+  
     IRGenFunction &IGF;
     llvm::Value *methodArg;
-
+      
   public:
     LookUpNonoverriddenMethods(IRGenFunction &IGF,
                                ClassDecl *classDecl,
                                llvm::Value *methodArg)
       : ClassMetadataScanner(IGF.IGM, classDecl), IGF(IGF),
         methodArg(methodArg) {}
-
+      
     void noteNonoverriddenMethod(SILDeclRef method) {
       // The method lookup function would be used only for `super.` calls
       // from other modules, so we only need to look at public-visibility
@@ -786,16 +786,16 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
       if (!hasPublicVisibility(method.getLinkage(NotForDefinition))) {
         return;
       }
-
+      
       auto methodDesc = IGM.getAddrOfMethodDescriptor(method, NotForDefinition);
-
+      
       auto isMethod = IGF.Builder.CreateICmpEQ(methodArg, methodDesc);
-
+      
       auto falseBB = IGF.createBasicBlock("");
       auto trueBB = IGF.createBasicBlock("");
 
       IGF.Builder.CreateCondBr(isMethod, trueBB, falseBB);
-
+      
       IGF.Builder.emitBlock(trueBB);
       // Since this method is nonoverridden, we can produce a static result.
       auto entry = VTable->getEntry(IGM.getSILModule(), method);
@@ -813,23 +813,23 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
                   : IGM.getOptions().PointerAuth.SwiftClassMethods) {
         auto discriminator =
           PointerAuthInfo::getOtherDiscriminator(IGM, schema, method);
-
+        
         impl = emitPointerAuthSign(IGF, impl,
                             PointerAuthInfo(schema.getKey(), discriminator));
       }
       impl = IGF.Builder.CreateBitCast(impl, IGM.Int8PtrTy);
       IGF.Builder.CreateRet(impl);
-
+      
       IGF.Builder.emitBlock(falseBB);
       // Continue emission on the false branch.
     }
-
+      
     void noteResilientSuperclass() {}
     void noteStartOfImmediateMembers(ClassDecl *clazz) {}
   };
-
+  
   LookUpNonoverriddenMethods(IGF, classDecl, method).layout();
-
+  
   // Use the runtime to look up vtable entries.
   auto *result = IGF.Builder.CreateCall(getLookUpClassMethodFunctionPointer(),
                                         {metadata, method, description});

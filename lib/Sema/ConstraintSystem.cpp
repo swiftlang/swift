@@ -4708,7 +4708,7 @@ void SyntacticElementTargetKey::dump(raw_ostream &OS) const {
   case Kind::tombstone:
     OS << "<tombstone>\n";
     return;
-
+    
   case Kind::stmtCondElement:
     // TODO: Implement a proper dump function for StmtConditionElement
     OS << "statement condition element\n";

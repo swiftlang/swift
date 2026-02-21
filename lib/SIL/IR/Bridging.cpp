@@ -201,12 +201,12 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
                                           MetatypeRepresentation::ObjC);
     }
   }
-
+  
   // Existentials consisting of only marker protocols can bridge to
   // `AnyObject` (`id` in ObjC).
   if (t->isMarkerExistential())
     return Context.getAnyObjectType();
-
+  
   if (auto funTy = t->getAs<FunctionType>()) {
     switch (funTy->getExtInfo().getSILRepresentation()) {
     case SILFunctionType::Representation::Block:

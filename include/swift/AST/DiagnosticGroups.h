@@ -77,7 +77,7 @@ struct DiagGroupInfo {
                   opts == DiagnosticGroupOptions::DefaultIgnoreWarnings) {}
 
   void traverseDepthFirst(
-      llvm::function_ref<void(const DiagGroupInfo &)> func) const;
+      llvm::function_ref<void(const DiagGroupInfo &)> func) const;  
 };
 
 extern const std::array<DiagGroupInfo, DiagGroupsCount> diagnosticGroupsInfo;

@@ -252,7 +252,7 @@ bool ValueLifetimeAnalysis::computeFrontier(FrontierImpl &frontier, Mode mode,
   auto visitBoundaryEdge = [&](SILBasicBlock *predBB, SILBasicBlock *succBB) {
     if (deBlocks && deBlocks->isDeadEnd(succBB))
       return;
-
+    
     if (mode == UsersMustPostDomDef) {
       foundInvalidLastUser = true;
       return;

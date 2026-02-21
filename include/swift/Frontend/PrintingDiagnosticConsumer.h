@@ -42,7 +42,7 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   /// swift-syntax rendering
   DiagnosticBridge DiagBridge;
 #endif
-
+ 
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs());
   ~PrintingDiagnosticConsumer();
@@ -85,7 +85,7 @@ private:
   void queueBuffer(SourceManager &sourceMgr, unsigned bufferID);
   void printDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
 };
-
+  
 }
 
 #endif

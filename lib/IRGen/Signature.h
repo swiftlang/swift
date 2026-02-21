@@ -33,7 +33,7 @@ namespace llvm {
 namespace clang {
   class CXXConstructorDecl;
   namespace CodeGen {
-    class CGFunctionInfo;
+    class CGFunctionInfo;    
   }
 }
 

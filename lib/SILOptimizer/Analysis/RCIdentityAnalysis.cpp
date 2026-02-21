@@ -342,7 +342,7 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
              && "Should have been handled in stripRCIdentityPreservingInsts");
 #endif
       return SILValue();
-
+    
   }
 
   // Ok, we have multiple predecessors. See if all of them are the same

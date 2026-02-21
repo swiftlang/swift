@@ -35,10 +35,10 @@ struct SILBasicBlock {
   SILBasicBlock(SILFunction *function): function(function) {}
 
   SILFunction *getFunction() const { return function; }
-
+  
   unsigned getCustomBits() const { return customBits; }
   void setCustomBits(unsigned value) { customBits = value; }
-
+  
 };
 
 }

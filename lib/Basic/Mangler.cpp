@@ -37,7 +37,7 @@ static int numLargeSubsts = 0;
 
 struct OpStatEntry {
   OpStatEntry() : num(0), size(0) { }
-
+  
   int num;
   int size;
 };

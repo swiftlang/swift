@@ -404,7 +404,7 @@ SILBasicBlock *SILDeserializer::getBBForDefinition(SILFunction *Fn,
   // If the block has never been named yet, just create it.
   if (BB == nullptr) {
     if (Prev) {
-      BB = Fn->createBasicBlockAfter(Prev);
+      BB = Fn->createBasicBlockAfter(Prev);      
     } else {
       BB = Fn->createBasicBlock();
     }
@@ -725,12 +725,12 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   case SILStage::Raw:
   case SILStage::Canonical:
     break;
-
+    
   case SILStage::Lowered:
     llvm_unreachable("cannot deserialize into a module that has entered "
                      "Lowered stage");
   }
-
+  
   if (FID == 0)
     return nullptr;
   assert(FID <= Funcs.size() && "invalid SILFunction ID");
@@ -1051,7 +1051,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     if (!maybeKind)
       return maybeKind.takeError();
     unsigned kind = maybeKind.get();
-
+    
     if (kind == SIL_ARG_EFFECTS_ATTR) {
       IdentifierID effectID;
       unsigned isDerived;
@@ -1380,7 +1380,7 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
                                       unsigned &nextValue) {
   auto kind =
     (KeyPathComponentKindEncoding)ListOfValues[nextValue++];
-
+  
   if (kind == KeyPathComponentKindEncoding::Trivial)
     return std::nullopt;
 
@@ -1417,7 +1417,7 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
     externalDecl =
       cast_or_null<AbstractStorageDecl>(MF->getDecl(externalDeclID));
     externalSubs = MF->getSubstitutionMap(ListOfValues[nextValue++]);
-
+    
     SmallVector<KeyPathPatternComponent::Index, 4> indicesBuf;
     auto numIndexes = ListOfValues[nextValue++];
     indicesBuf.reserve(numIndexes);
@@ -1433,7 +1433,7 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
                                   loweredCategory),
         conformance});
     }
-
+    
     indices = MF->getContext().AllocateCopy(indicesBuf);
     if (!indices.empty()) {
       auto indicesEqualsName = MF->getIdentifierText(ListOfValues[nextValue++]);
@@ -1484,7 +1484,7 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   case KeyPathComponentKindEncoding::Trivial:
     llvm_unreachable("handled above");
   }
-
+  
   llvm_unreachable("invalid key path component kind encoding");
 }
 
@@ -1613,7 +1613,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     case SIL_BEGIN_APPLY:
       RawOpCode = (unsigned)SILInstructionKind::BeginApplyInst;
       break;
-
+        
     default:
       llvm_unreachable("unexpected apply inst kind");
     }
@@ -1850,14 +1850,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createMetatype(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
     break;
-
+      
   case SILInstructionKind::GetAsyncContinuationInst:
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     ResultInst = Builder.createGetAsyncContinuation(
         Loc, MF->getType(TyID)->getCanonicalType(),
         /*throws*/ Attr != 0);
     break;
-
+  
   case SILInstructionKind::GetAsyncContinuationAddrInst:
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND
            && "Layout should be OneTypeOneOperand.");
@@ -2121,7 +2121,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
 
   }
-
+  
   case SILInstructionKind::RefToBridgeObjectInst: {
     auto RefTy =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
@@ -3411,7 +3411,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     if (ListOfValues.size() >= 3) {
       errorBB = getBBForReference(Fn, ListOfValues[2]);
     }
-
+    
     ResultInst = Builder.createAwaitAsyncContinuation(Loc, Cont, resultBB, errorBB);
     break;
   }
@@ -3850,13 +3850,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     if (numGenericParams != 0) {
       MF->deserializeGenericRequirements(ListOfValues, nextValue, requirements);
     }
-
+    
     SmallVector<KeyPathPatternComponent, 4> components;
     components.reserve(numComponents);
     while (numComponents-- > 0) {
       components.push_back(*readKeyPathComponent(ListOfValues, nextValue));
     }
-
+    
     CanGenericSignature sig = CanGenericSignature();
     if (!genericParams.empty() || !requirements.empty())
       sig = GenericSignature::get(genericParams, requirements)
@@ -3867,9 +3867,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                        valueTy->getCanonicalType(),
                                        components,
                                        objcString);
-
+    
     SmallVector<SILValue, 4> operands;
-
+    
     operands.reserve(numOperands);
     while (numOperands-- > 0) {
       auto opValue = ListOfValues[nextValue++];
@@ -4331,10 +4331,10 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
   kind = maybeKind.get();
 
   SILBuilder Builder(v);
-
+  
   llvm::DenseMap<uint32_t, ValueBase*> SavedLocalValues;
   serialization::ValueID SavedLastValueID = 1;
-
+  
   SavedLocalValues.swap(LocalValues);
   std::swap(SavedLastValueID, LastValueID);
 
@@ -4626,7 +4626,7 @@ void SILDeserializer::getAllMoveOnlyDeinits() {
 
 SILProperty *SILDeserializer::readProperty(DeclID PId) {
   auto &propOrOffset = Properties[PId-1];
-
+  
   if (propOrOffset.isFullyDeserialized())
     return propOrOffset.get();
 
@@ -4661,7 +4661,7 @@ SILProperty *SILDeserializer::readProperty(DeclID PId) {
   auto decl = cast<AbstractStorageDecl>(MF->getDecl(StorageID));
   unsigned ComponentValueIndex = 0;
   auto component = readKeyPathComponent(ComponentValues, ComponentValueIndex);
-
+  
   auto prop = SILProperty::create(SILMod, Serialized, decl, component);
   propOrOffset.set(prop, /*fully deserialized*/ true);
   return prop;
@@ -4853,7 +4853,7 @@ llvm::Expected<SILWitnessTable *>
     if (Callback)
       Callback->didDeserialize(MF->getAssociatedModule(), wT);
   }
-
+  
   // We may see multiple shared-linkage definitions of the same witness table
   // for the same conformance.
   if (wT->isDefinition() && hasSharedVisibility(*Linkage)

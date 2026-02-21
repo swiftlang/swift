@@ -602,7 +602,7 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
       extraDataPattern->OffsetInWords + extraDataPattern->SizeInWords;
   }
 
-  auto bytes = (char*)
+  auto bytes = (char*) 
     MetadataAllocator(GenericClassMetadataTag)
       .Allocate(allocationBounds.getTotalSizeInBytes(), alignof(void*));
 
@@ -1621,16 +1621,16 @@ public:
       return hash_value(key.Count, key.Element);
     }
   };
-
+  
   static const char *getName() { return "FixedArrayCache"; }
-
+  
   ValueType getValue() {
     return &Data;
   }
   void setValue(ValueType value) {
     assert(value == &Data);
   }
-
+  
   FixedArrayCacheEntry(const Key &key, MetadataWaitQueue::Worker &worker,
                    MetadataRequest request);
 
@@ -1695,14 +1695,14 @@ swift::swift_getFixedArrayTypeMetadata(MetadataRequest request,
     return MetadataResponse{&METADATA_SYM(EMPTY_TUPLE_MANGLING),
                             MetadataState::Complete};
   }
-
+  
   // If the element type has no tail padding, then its metadata is good enough
   // to hold space for the vector.
   if (count == 1
       && element->getValueWitnesses()->size == element->getValueWitnesses()->stride) {
     return MetadataResponse{element, MetadataState::Complete};
   }
-
+  
   auto &cache = FixedArrayTypes.get();
   FixedArrayCacheEntry::Key key{count, element};
   return cache.getOrInsert(key, request).second;
@@ -1747,10 +1747,10 @@ vector_destroy(OpaqueValue *dest, const Metadata *metatype) {
   if (metatype->getValueWitnesses()->isPOD()) {
     return;
   }
-
+  
   auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
   auto destBytes = (char*)dest;
-
+  
   for (unsigned i = 0, end = vectorType->getRealizedCount(),
                 stride = vectorType->Element->vw_stride();
        i < end;
@@ -1769,11 +1769,11 @@ vector_elementwise_transfer(OpaqueValue *dest, OpaqueValue *src,
     memcpy(dest, src, metatype->vw_size());
     return dest;
   }
-
+  
   auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
   auto destBytes = (char*)dest;
   auto srcBytes = (char*)src;
-
+  
   for (unsigned i = 0, end = vectorType->getRealizedCount(),
                 stride = vectorType->Element->vw_stride();
        i < end;
@@ -1828,7 +1828,7 @@ static OpaqueValue *vector_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
       generic_projectBuffer<true>(src, metatype),
       metatype);
   }
-
+  
   auto *srcReference = *reinterpret_cast<HeapObject**>(src);
   *reinterpret_cast<HeapObject**>(dest) = srcReference;
   swift_retain(srcReference);
@@ -1873,13 +1873,13 @@ FixedArrayCacheEntry::tryInitialize(Metadata *metadata,
   auto eltRequest = MetadataRequest(MetadataState::LayoutComplete,
                                     /*nonblocking*/ true);
   auto eltResponse = swift_checkMetadataState(eltRequest, element);
-
+  
   // If the element is not layout-complete, we have to suspend.
   if (!isAtLeast(eltResponse.State, MetadataState::LayoutComplete)) {
     return {PrivateMetadataState::Abstract,
             MetadataDependency(element, MetadataState::LayoutComplete)};
   }
-
+  
   // We can derive the array's layout from the element's.
   intptr_t count = Data.Count;
   // We should have checked for empty and uninhabited cases before getting this
@@ -1898,7 +1898,7 @@ FixedArrayCacheEntry::tryInitialize(Metadata *metadata,
                                                eltWitnesses->getAlignment()));
   // We get extra inhabitants from the first element.
   Witnesses.extraInhabitantCount = eltWitnesses->extraInhabitantCount;
-
+  
   // Copy in the value witnesses.
   // TODO: Specialize witnesses for POD etc.?
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
@@ -1911,14 +1911,14 @@ FixedArrayCacheEntry::tryInitialize(Metadata *metadata,
   if (eltResponse.State == MetadataState::Complete) {
     return {PrivateMetadataState::Complete, MetadataDependency()};
   }
-
+  
   // If it isn't at least non-transitively complete, wait for it to be.
   if (!isAtLeast(eltResponse.State, MetadataState::NonTransitiveComplete)) {
     return {PrivateMetadataState::NonTransitiveComplete,
             MetadataDependency(element,
                                MetadataState::NonTransitiveComplete) };
   }
-
+  
   // Otherwise, do a full completeness check.
   return checkTransitiveCompleteness();
 }
@@ -1957,16 +1957,16 @@ public:
       return hash_value(key.Referent);
     }
   };
-
+  
   static const char *getName() { return "BorrowCache"; }
-
+  
   ValueType getValue() {
     return &Data;
   }
   void setValue(ValueType value) {
     assert(value == &Data);
   }
-
+  
   BorrowCacheEntry(const Key &key, MetadataWaitQueue::Worker &worker,
                    MetadataRequest request);
 
@@ -2079,7 +2079,7 @@ static OpaqueValue *borrow_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
       generic_projectBuffer<true>(src, metatype),
       metatype);
   }
-
+  
   auto *srcReference = *reinterpret_cast<HeapObject**>(src);
   *reinterpret_cast<HeapObject**>(dest) = srcReference;
   swift_retain(srcReference);
@@ -2177,7 +2177,7 @@ BorrowCacheEntry::tryInitialize(Metadata *metadata,
                     .withBitwiseBorrowable(true)
                     .withCopyable(true)
                     .withInlineStorage(isInline);
-
+  
   // Copy in the value witnesses.
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
@@ -2510,7 +2510,7 @@ template <bool IsPOD, bool IsInline>
 static unsigned tuple_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
                                               unsigned numEmptyCases,
                                               const Metadata *self) {
-
+  
   auto *witnesses = generic_getValueWitnesses(self);
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
@@ -2680,7 +2680,7 @@ void swift::swift_getTupleTypeLayout(TypeLayout *result,
       numExtraInhabitants = std::max(numExtraInhabitants,
                                      elt->getNumExtraInhabitants());
     });
-
+  
   if (numExtraInhabitants > 0) {
     *result = TypeLayout(result->size,
                          result->stride,
@@ -2952,14 +2952,14 @@ bool swift::equalContexts(const ContextDescriptor *a,
 
   // If either descriptor is known to be unique, we're done.
   if (a->isUnique() || b->isUnique()) return false;
-
+  
   // Do the kinds match?
   if (a->getKind() != b->getKind()) return false;
-
+  
   // Do the parents match?
   if (!equalContexts(a->Parent.get(), b->Parent.get()))
     return false;
-
+  
   // Compare kind-specific details.
   switch (auto kind = a->getKind()) {
   case ContextDescriptorKind::Module: {
@@ -2968,12 +2968,12 @@ bool swift::equalContexts(const ContextDescriptor *a,
     auto moduleB = cast<ModuleContextDescriptor>(b);
     return strcmp(moduleA->Name.get(), moduleB->Name.get()) == 0;
   }
-
+  
   case ContextDescriptorKind::Extension:
   case ContextDescriptorKind::Anonymous:
     // These context kinds are always unique.
     return false;
-
+  
   default:
     // Types in the same context with the same name are equivalent.
     if (kind >= ContextDescriptorKind::Type_First
@@ -2982,7 +2982,7 @@ bool swift::equalContexts(const ContextDescriptor *a,
       auto typeB = cast<TypeContextDescriptor>(b);
       return TypeContextIdentity(typeA) == TypeContextIdentity(typeB);
     }
-
+    
     // Otherwise, this runtime doesn't know anything about this context kind.
     // Conservatively return false.
     return false;
@@ -3010,10 +3010,10 @@ bool swift::swift_compareTypeContextDescriptors(
 
   // If either descriptor is known to be unique, we're done.
   if (a->isUnique() || b->isUnique()) return false;
-
+  
   // Do the kinds match?
   if (a->getKind() != b->getKind()) return false;
-
+  
   // Do the parents match?
   if (!equalContexts(a->Parent.get(), b->Parent.get()))
     return false;
@@ -3032,7 +3032,7 @@ bool swift::swift_compareTypeContextDescriptors(
 namespace {
   template<typename T>
   struct pointer_function_cast_impl;
-
+  
   template<typename OutRet, typename...OutArgs>
   struct pointer_function_cast_impl<OutRet * (*)(OutArgs *...)> {
     template<typename InRet, typename...InArgs>
@@ -3135,7 +3135,7 @@ void swift::installCommonValueWitnesses(const TypeLayout &layout,
       // getEnumTagSinglePayload and storeEnumTagSinglePayload are not
       // interestingly optimizable based on POD-ness.
       return;
-
+      
     case sizeWithAlignmentMask(1, 0, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi8_);
       break;
@@ -3164,10 +3164,10 @@ void swift::installCommonValueWitnesses(const TypeLayout &layout,
     vwtable->LOWER_ID = commonVWT->LOWER_ID;
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
 #include "swift/ABI/ValueWitness.def"
-
+    
     return;
   }
-
+  
   if (flags.isBitwiseTakable()) {
     // Use POD value witnesses for operations that do an initializeWithTake.
     vwtable->initializeWithTake = _swift_pod_copy;
@@ -3566,7 +3566,7 @@ void swift::swift_initRawStructMetadata2(StructMetadata *structType,
     vwtable->flags = vwtable->flags
                 .withBitwiseTakable(likeTypeLayout->flags.isBitwiseTakable());
   }
-
+  
   vwtable->flags = vwtable->flags
     .withBitwiseBorrowable(isRawLayoutBitwiseBorrowable(rawLayoutFlags));
 
@@ -5005,7 +5005,7 @@ public:
   struct Key {
     unsigned numWitnessTables : 31;
     unsigned copyable : 1;
-
+    
     bool operator==(struct Key k) {
       return k.numWitnessTables == numWitnessTables
         && k.copyable == copyable;
@@ -5020,7 +5020,7 @@ public:
     return (Data.size - sizeof(OpaqueExistentialContainer))
               / sizeof(const WitnessTable *);
   }
-
+  
   bool isCopyable() const {
     return Data.flags.isCopyable();
   }
@@ -5252,12 +5252,12 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
     // Without ObjC interop, Error is native-refcounted.
     return &VALUE_WITNESS_SYM(Bo);
 #endif
-
+      
   // Other existentials use standard representation.
   case SpecialProtocol::None:
     break;
   }
-
+  
   switch (classConstraint) {
   case ProtocolClassConstraint::Class:
     return getClassExistentialValueWitnesses(superclassConstraint,
@@ -5323,13 +5323,13 @@ const {
   case ExistentialTypeRepresentation::Class:
     // Nothing to clean up after taking the class reference.
     break;
-
+  
   case ExistentialTypeRepresentation::Opaque: {
     auto *opaque = reinterpret_cast<OpaqueExistentialContainer *>(container);
     opaque->deinit();
     break;
   }
-
+  
   case ExistentialTypeRepresentation::Error:
     // TODO: If we were able to claim the value from a uniquely-owned
     // existential box, we would want to deallocError here.
@@ -5398,7 +5398,7 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
   // The layout of the container depends on whether it's class-constrained
   // or a special protocol.
   const WitnessTable * const *witnessTables;
-
+  
   switch (getRepresentation()) {
   case ExistentialTypeRepresentation::Class: {
     auto classContainer =
@@ -5474,7 +5474,7 @@ swift::swift_getExistentialTypeMetadata(
   // We entrust that the compiler emitting the call to
   // swift_getExistentialTypeMetadata always sorts the `protocols` array using
   // a globally stable ordering that's consistent across modules.
-
+  
   // Ensure that the "class constraint" bit is set whenever we have a
   // superclass or a one of the protocols is class-bound.
 #ifndef NDEBUG
@@ -6136,12 +6136,12 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
     }
     fprintf(stderr, "\n");
   };
-
+  
   if (memcmp(runtimeValue, staticValue, size) != 0) {
     auto typeName = nameForMetadata(type);
     fprintf(stderr, "*** Type verification of %s %s failed ***\n",
             typeName.c_str(), description);
-
+    
     fprintf(stderr, "  runtime value:  ");
     presentValue(runtimeValue);
     fprintf(stderr, "  compiler value: ");
@@ -6156,7 +6156,7 @@ StringRef swift::getStringForMetadataKind(MetadataKind kind) {
     case MetadataKind::NAME: \
       return #NAME;
 #include "swift/ABI/MetadataKind.def"
-
+      
   default:
     return "<unknown>";
   }
@@ -6698,7 +6698,7 @@ getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
   // Check whether the table has already been instantiated.
   auto tablePtr = reinterpret_cast<std::atomic<WitnessTable*> *>(
                      conformance->getGenericWitnessTable()->PrivateData.get());
-
+  
   auto existingTable = tablePtr->load(SWIFT_MEMORY_ORDER_CONSUME);
   if (existingTable) {
     return existingTable;
@@ -6709,10 +6709,10 @@ getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
   TaggedMetadataAllocator<SingletonGenericWitnessTableCacheTag> allocator;
   auto buffer = (void **)allocator.Allocate(tableSize, alignof(void*));
   memset(buffer, 0, tableSize);
-
+  
   // Instantiate the table.
   auto table = instantiateWitnessTable(type, conformance, nullptr, buffer);
-
+  
   // See whether we can claim to be the one true table.
   WitnessTable *orig = nullptr;
   if (!tablePtr->compare_exchange_strong(orig, table, std::memory_order_release,
@@ -6722,7 +6722,7 @@ getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
     allocator.Deallocate(buffer);
     return orig;
   }
-
+  
   return table;
 }
 
@@ -6750,7 +6750,7 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
   if (!genericTable || doesNotRequireInstantiation(conformance, genericTable)) {
     return uniqueForeignWitnessTableRef(conformance->getWitnessTablePattern());
   }
-
+  
   // If the conformance is not dependent on generic arguments in the conforming
   // type, then there is only one instantiation possible, so we can try to
   // allocate only the table without the concurrent map structure.
@@ -6759,7 +6759,7 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
   // as of the Swift 5.3 ABI. However, we can check whether the conforming
   // type is generic; a nongeneric type's conformance can never be dependent (at
   // least, not today). However, a generic type conformance may also be
-  // nondependent if it
+  // nondependent if it 
   auto typeDescription = conformance->getTypeDescriptor();
   if (typeDescription && !typeDescription->isGeneric() &&
       genericTable->PrivateData != nullptr) {
@@ -7134,7 +7134,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
                               ptrauth_blend_discriminator(witnessAddr,
                                                           extraDiscriminator));
 #endif
-
+  
   // If the low bit of the witness is clear, it's already a metadata pointer.
   if (SWIFT_LIKELY((reinterpret_cast<uintptr_t>(witness) &
                     ProtocolRequirementFlags::AssociatedTypeMangledNameBit) ==
@@ -7898,7 +7898,7 @@ PrivateMetadataState inferStateForMetadata(Metadata *metadata) {
 /// dependencies actually hold, and we can keep going.
 MetadataDependency checkTransitiveCompleteness(const Metadata *initialType) {
   llvm::SmallVector<const Metadata *, 8> worklist;
-
+  
   // An efficient hash-set implementation in the spirit of llvm's SmallPtrSet:
   // The first 8 elements are stored in an inline-allocated array to avoid
   // malloc calls in the common case. Lookup is still reasonable fast because

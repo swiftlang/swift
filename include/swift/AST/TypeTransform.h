@@ -336,7 +336,7 @@ case TypeKind::Id:
       if (!changed) {
         return t;
       }
-
+      
       // Lifetime dependencies get eliminated if their target type was
       // substituted with an escapable type.
       auto extInfo = fnTy->getExtInfo();
@@ -919,7 +919,7 @@ case TypeKind::Id:
         return GenericFunctionType::get(
             genericSig, substParams, resultTy, extInfo);
       }
-
+      
       if (isUnchanged) {
         return t;
       }
