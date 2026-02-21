@@ -377,7 +377,7 @@ extension _StringGutsSlice {
 fileprivate extension RawSpan {
   @inline(__always)
   func decodeUTF8(ofWidth width: Int, at index: Int) -> UInt32? {
-    guard index < self.byteOffsets.upperBound &- width else {
+    guard index <= self.byteOffsets.upperBound &- width else {
       return nil
     }
     var l1 = unsafe UInt32(self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 0, as: UInt8.self))
@@ -391,14 +391,14 @@ fileprivate extension RawSpan {
     case 3:
       let l2 = unsafe UInt32(self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 1, as: UInt8.self))
       let l3 = unsafe UInt32(self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 2, as: UInt8.self))
-      l1 =  (l1 & 0b00011111) << 12
+      l1 =  (l1 & 0b00001111) << 12
       l1 |= (l2 & 0b00111111) << 6
       l1 |= (l3 & 0b00111111)
     default:
       let l2 = unsafe UInt32(self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 1, as: UInt8.self))
       let l3 = unsafe UInt32(self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 2, as: UInt8.self))
       let l4 = unsafe UInt32(self.unsafeLoadUnaligned(fromUncheckedByteOffset: index &+ 3, as: UInt8.self))
-      l1 =  (l1 & 0b00011111) << 18
+      l1 =  (l1 & 0b00000111) << 18
       l1 |= (l2 & 0b00111111) << 12
       l1 |= (l3 & 0b00111111) << 6
       l1 |= (l4 & 0b00111111)
@@ -409,7 +409,7 @@ fileprivate extension RawSpan {
   @inline(__always)
   func decodeUTF16(ofWidth width: Int, at index: Int) -> UInt32? {
     _debugPrecondition(width == 2 || width == 4)
-    guard index < self.byteOffsets.upperBound &- width else {
+    guard index <= self.byteOffsets.upperBound &- width else {
       return nil
     }
     let r1 = unsafe self.unsafeLoadUnaligned(fromUncheckedByteOffset: index, as: UInt16.self)
@@ -470,7 +470,7 @@ fileprivate func isEqual(
     while true {
       guard let firstUTF8Byte = lhs.decodeUTF8(ofWidth: 1, at: lhsIdx) else {
         // If we've consumed everything in both buffers without finding an inequality, we're equal
-        return lhsIdx &+ 1 == lhs.byteOffsets.upperBound && rhsIdx &+ 1 == rhs.byteOffsets.upperBound
+        return lhsIdx == lhs.byteOffsets.upperBound && rhsIdx == rhs.byteOffsets.upperBound
       }
       let utf8Width: Int
       let utf16Width: Int
@@ -535,7 +535,7 @@ fileprivate func isEqual(
       )
       // Bounds checking handled by the count * 2 verification earlier
       let r = unsafe UInt8(truncatingIfNeeded: rhs.unsafeLoadUnaligned(
-        fromUncheckedByteOffset: lhsIdx,
+        fromUncheckedByteOffset: lhsIdx &* 2,
         as: UInt16.self
       ))
       if l != r {
