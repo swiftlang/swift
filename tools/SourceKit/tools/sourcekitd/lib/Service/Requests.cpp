@@ -36,6 +36,7 @@
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IDE/SignatureHelpFormatter.h"
 
 #include "llvm/ADT/ArrayRef.h"
@@ -1081,6 +1082,38 @@ static void handleRequestEditorOpenSwiftTypeInterface(
       return Rec(createErrorRequestInvalid("missing 'key.usr'"));
     return editorOpenSwiftTypeInterface(*Usr, Args, Rec);
   }
+}
+
+static void handleRequestPolyglotAST(
+    const RequestDict &Req, SourceKitCancellationToken CancellationToken,
+    ResponseReceiver Rec) {
+  using namespace swift;
+  handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
+    std::optional<VFSOptions> vfsOptions = getVFSOptions(Req);
+    auto PrimaryFilePath = getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
+      return;
+
+    SmallVector<const char *, 8> Args;
+    if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
+      return;
+
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Lang.getPolyglotAST(*PrimaryFilePath, Args, std::move(vfsOptions),
+                        CancellationToken,
+                        [Rec](const RequestResult<std::string> &Result) {
+                          if (Result.isCancelled())
+                            return Rec(createErrorRequestCancelled());
+                          if (Result.isError())
+                            return Rec(createErrorRequestFailed(Result.getError()));
+
+                          ResponseBuilder RespBuilder;
+                          auto Elem = RespBuilder.getDictionary();
+                          Elem.set(KeyFilePath, Result.value());
+                          return Rec(RespBuilder.createResponse());
+                        });
+    return;
+  });
 }
 
 static void handleRequestEditorExtractTextFromComment(
@@ -2291,6 +2324,8 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   HANDLE_REQUEST(RequestSemanticTokens, handleRequestSemanticTokens)
   HANDLE_REQUEST(RequestSyntacticMacroExpansion,
                  handleRequestSyntacticMacroExpansion)
+  HANDLE_REQUEST(RequestPolyglotAST,
+                 handleRequestPolyglotAST)
 
   {
     SmallString<64> ErrBuf;

@@ -1138,6 +1138,52 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
       CancellableResult<CompletionLikeOperationParams>::success(Params));
 }
 
+void SwiftLangSupport::getPolyglotAST(
+    StringRef PrimaryFilePath, ArrayRef<const char *> Args,
+    std::optional<VFSOptions> VfsOptions,
+    SourceKitCancellationToken CancellationToken,
+    std::function<void(const RequestResult<std::string> &)> Receiver) {
+  std::string FileSystemError;
+  auto FileSystem = getFileSystem(VfsOptions, PrimaryFilePath, FileSystemError);
+  if (!FileSystem) {
+    Receiver(RequestResult<std::string>::fromError(FileSystemError));
+    return;
+  }
+
+  // Display diagnostics to stderr.
+  CompilerInstance CI;
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+
+  std::string Error;
+  CompilerInvocation Invocation;
+  if (getASTManager()->initCompilerInvocation(
+        Invocation, Args,
+        FrontendOptions::ActionType::Typecheck, CI.getDiags(),
+        {}, Error)) {
+    Receiver(RequestResult<std::string>::fromError(Error));
+    return;
+  }
+
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    Receiver(RequestResult<std::string>::fromError(InstanceSetupError));
+    return;
+  }
+
+  auto &Ctx = CI.getASTContext();
+  auto &Importer = static_cast<ClangImporter &>(*Ctx.getClangModuleLoader());
+  Importer.importBridgingHeader(PrimaryFilePath,
+                                CI.getMainModule(),
+                                /*diagLoc=*/{},
+                                /*trackParsedSymbols=*/true);
+
+  std::string buffer;
+  llvm::raw_string_ostream OS(buffer);
+  Importer.printPolyglotAST(PrimaryFilePath, OS);
+  Receiver(RequestResult<std::string>::fromResult(buffer));
+}
+
 CloseClangModuleFiles::~CloseClangModuleFiles() {
   clang::Preprocessor &PP = loader.getClangPreprocessor();
   clang::ModuleMap &ModMap = PP.getHeaderSearchInfo().getModuleMap();

@@ -653,6 +653,13 @@ public:
                  std::function<void(const RequestResult<DiagnosticsResult> &)>
                      Receiver) override;
 
+  void
+  getPolyglotAST(StringRef PrimaryFilePath, ArrayRef<const char *> Args,
+                 std::optional<VFSOptions> VfsOptions,
+                 SourceKitCancellationToken CancellationToken,
+                 std::function<void(const RequestResult<std::string> &)>
+                     Receiver) override;
+
   void getSemanticTokens(
       StringRef PrimaryFilePath, StringRef InputBufferName,
       ArrayRef<const char *> Args, std::optional<VFSOptions> VfsOptions,
