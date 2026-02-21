@@ -454,6 +454,8 @@ public:
 
   llvm::SmallVector<Constraint *, 2> Defaults;
 
+  llvm::SmallDenseSet<ProtocolDecl *, 4> Protocols;
+
   /// The set of transitive protocol requirements inferred through
   /// subtype/conversion/equivalence relations with other type variables.
   std::optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;

@@ -62,17 +62,26 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
   for (const auto &binding : info.Bindings)
     addBinding(binding);
 
-  for (const auto &literal : info.Literals)
+  for (const auto &literal : info.Literals) {
     Literals.push_back(literal);
+    if (literal.IsDirectRequirement)
+      Protocols.insert(literal.getProtocol());
+  }
 
   for (auto *constraint : info.Defaults) {
-    // Do these in a separate pass.
     if (isDirectRequirement(CS, TypeVar, constraint))
       addDefault(constraint);
   }
 
   for (auto &entry : info.AdjacentVars)
     AdjacentVars.insert(entry.first);
+
+  for (auto *constraint : Info.Protocols) {
+    if (auto *protoTy = constraint->getSecondType()->getAs<ProtocolType>()) {
+      auto *protoDecl = protoTy->getDecl();
+      Protocols.insert(protoDecl);
+    }
+  }
 
   ASSERT(!IsDirty);
 }
