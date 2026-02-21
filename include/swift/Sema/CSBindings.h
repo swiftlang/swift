@@ -744,6 +744,9 @@ private:
   /// adjacent conformance constraints.
   void reduceBinding(PotentialBinding &binding);
 
+  std::optional<bool> subsumeBinding(PotentialBinding &binding,
+                                     const PotentialBinding &existing);
+
   void addDefault(Constraint *constraint);
 
   StringRef getLiteralBindingKind(LiteralBindingKind K) const {
