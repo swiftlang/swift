@@ -15,4 +15,4 @@
 public func foo(_ callback: (_ myInternalParam: Int) -> Void) {}
 
 // SWIFT_INTERFACE: import Swift
-// SWIFT_INTERFACE: public func foo(_ callback: (_ myInternalParam: Swift.Int) -> Swift.Void)
+// SWIFT_INTERFACE: public func foo(_ callback: (_ myInternalParam: Swift::Int) -> Swift::Void)

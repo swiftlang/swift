@@ -4,6 +4,9 @@
 
 // UNSUPPORTED: OS=linux-gnu
 
+// rdar://170773776
+// XFAIL: OS=freebsd
+
 let a: [Double] = []
 _ = a.map { $0 - 1.0 }
      .map { $0 * $0 }

@@ -1275,6 +1275,8 @@ NOTE(borrow_accessor_not_a_projection_note, none,
 ERROR(invalid_multiple_return_borrow_accessor, none,
       "multiple return statements in borrow accessors are not yet supported",
       ())
-
+ERROR(unsupported_borrow_abstraction, none,
+      "cannot witness borrow requirement for result type %0",
+      (Type))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

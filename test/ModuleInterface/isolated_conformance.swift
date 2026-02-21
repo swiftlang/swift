@@ -9,7 +9,7 @@ public protocol MyProtocol {
 @MainActor
 public class MyClass { }
 
-// CHECK: extension isolated_conformance.MyClass : @{{.*}}MainActor isolated_conformance.MyProtocol {
+// CHECK: extension isolated_conformance::MyClass : @{{.*}}MainActor isolated_conformance::MyProtocol {
 extension MyClass: @MainActor MyProtocol {
   @MainActor public func f() { }
 }

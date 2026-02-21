@@ -18,12 +18,12 @@
 
 // COMMON: public struct HasStoredProperties {
 public struct HasStoredProperties {
-  // COMMON: public var computedGetter: Swift.Int {
+  // COMMON: public var computedGetter: Swift::Int {
   // COMMON-NEXT: get
   // COMMON-NEXT: }
   public var computedGetter: Int { return 3 }
 
-  // COMMON: public var computedGetSet: Swift.Int {
+  // COMMON: public var computedGetSet: Swift::Int {
   // COMMON-NEXT: get
   // COMMON-NEXT: set
   // COMMON-NEXT: }
@@ -32,14 +32,14 @@ public struct HasStoredProperties {
     set {}
   }
 
-  // COMMON: public let simpleStoredImmutable: Swift.Int{{$}}
+  // COMMON: public let simpleStoredImmutable: Swift::Int{{$}}
   public let simpleStoredImmutable: Int
 
-  // COMMON: public var simpleStoredMutable: Swift.Int{{$}}
+  // COMMON: public var simpleStoredMutable: Swift::Int{{$}}
   public var simpleStoredMutable: Int
 
-  // CHECK: @_hasStorage public var storedWithObservers: Swift.Bool {
-  // RESILIENT:   {{^}}  public var storedWithObservers: Swift.Bool {
+  // CHECK: @_hasStorage public var storedWithObservers: Swift::Bool {
+  // RESILIENT:   {{^}}  public var storedWithObservers: Swift::Bool {
   // CHECK-NEXT:  {{^}}    @_transparent get
   // RESILIENT-NEXT: {{^}} get
   // COMMON-NEXT: {{^}}    set
@@ -48,18 +48,18 @@ public struct HasStoredProperties {
     willSet {}
   }
 
-  // CHECK: @_hasStorage public var storedPrivateSet: Swift.Int {
-  // RESILIENT:   {{^}}  public var storedPrivateSet: Swift.Int {
+  // CHECK: @_hasStorage public var storedPrivateSet: Swift::Int {
+  // RESILIENT:   {{^}}  public var storedPrivateSet: Swift::Int {
   // COMMON-NEXT: {{^}}    get
   // COMMON-NEXT: {{^}}  }
   public private(set) var storedPrivateSet: Int
 
-  // CHECK: private var privateVar: Swift.Bool
-  // RESILIENT-NOT: private var privateVar: Swift.Bool
+  // CHECK: private var privateVar: Swift::Bool
+  // RESILIENT-NOT: private var privateVar: Swift::Bool
   private var privateVar: Bool
 
-  // CHECK: @_hasStorage @_hasInitialValue public var storedWithObserversInitialValue: Swift.Int {
-  // RESILIENT:   {{^}}  public var storedWithObserversInitialValue: Swift.Int {
+  // CHECK: @_hasStorage @_hasInitialValue public var storedWithObserversInitialValue: Swift::Int {
+  // RESILIENT:   {{^}}  public var storedWithObserversInitialValue: Swift::Int {
   // COMMON-NEXT: {{^}}    get
   // COMMON-NEXT: {{^}}    set
   // COMMON-NEXT: {{^}}  }
@@ -82,19 +82,19 @@ public struct HasStoredProperties {
 // COMMON: @frozen public struct BagOfVariables {
 @frozen
 public struct BagOfVariables {
-  // COMMON: private let hidden: Swift.Int = 0
+  // COMMON: private let hidden: Swift::Int = 0
   private let hidden: Int = 0
 
-  // COMMON: public let a: Swift.Int = 0
+  // COMMON: public let a: Swift::Int = 0
   public let a: Int = 0
 
-  // COMMON: public let (x, y): (Swift.Int, Swift.Int) = (0, 0)
+  // COMMON: public let (x, y): (Swift::Int, Swift::Int) = (0, 0)
   public let (x, y) = (0, 0)
 
-  // COMMON: public var b: Swift.Bool = false
+  // COMMON: public var b: Swift::Bool = false
   public var b: Bool = false
 
-  // COMMON: public var c: Swift.Int = 0
+  // COMMON: public var c: Swift::Int = 0
   public var c: Int = 0
 
   // COMMON: public init()
@@ -106,10 +106,10 @@ public struct BagOfVariables {
 // COMMON: @frozen public struct HasStoredPropertiesFixedLayout {
 @frozen
 public struct HasStoredPropertiesFixedLayout {
-  // COMMON: public var simpleStoredMutable: StoredProperties.BagOfVariables
+  // COMMON: public var simpleStoredMutable: StoredProperties::BagOfVariables
   public var simpleStoredMutable: BagOfVariables
 
-  // COMMON:      {{^}} @_hasStorage public var storedWithObservers: StoredProperties.BagOfVariables {
+  // COMMON:      {{^}} @_hasStorage public var storedWithObservers: StoredProperties::BagOfVariables {
   // COMMON-NEXT: {{^}}    get
   // COMMON-NEXT: {{^}}    set
   // COMMON-NEXT: {{^}} }

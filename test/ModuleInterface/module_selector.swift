@@ -17,7 +17,7 @@
 // Test default behavior
 // RUN: %empty-directory(%t/default)
 // RUN: %target-swift-emit-module-interface(%t/default/TestCase.swiftinterface) %s %clang-importer-sdk -F %clang-importer-sdk-path/frameworks -I %S/Inputs/module_selector -target %target-stable-abi-triple -module-name TestCase 2>%t/default/stderr.txt
-// RUN: %FileCheck --input-file %t/default/TestCase.swiftinterface %s --check-prefixes CHECK,CHECK-DISABLED,CHECK-NOT-ALIAS
+// RUN: %FileCheck --input-file %t/default/TestCase.swiftinterface %s --check-prefixes CHECK,CHECK-ENABLED,CHECK-NOT-ALIAS
 // RUN: %FileCheck --input-file %t/default/stderr.txt %s --allow-empty --check-prefix DIAG-PRESERVE-NOT-OVERRIDDEN
 // RUN: %target-swift-typecheck-module-from-interface(%t/default/TestCase.swiftinterface) %clang-importer-sdk -F %clang-importer-sdk-path/frameworks -I %S/Inputs/module_selector -target %target-stable-abi-triple -module-name TestCase
 
@@ -251,12 +251,6 @@ public struct ProtoSet<T: Proto> {
   public let singleText: T.Text
 }
 
-// DIAG-PRESERVE-OVERRIDDEN: warning: ignoring -module-interface-preserve-types-as-written (overridden by -enable-module-selectors-in-module-interface)
-// DIAG-PRESERVE-NOT-OVERRIDDEN-NOT: warning: ignoring -module-interface-preserve-types-as-written (overridden by -enable-module-selectors-in-module-interface)
-
-// DIAG-ALIAS-OVERRIDDEN: warning: ignoring -alias-module-names-in-module-interface (overridden by -enable-module-selectors-in-module-interface)
-// DIAG-ALIAS-NOT-OVERRIDDEN-NOT: warning: ignoring -alias-module-names-in-module-interface (overridden by -enable-module-selectors-in-module-interface)
-
 // rdar://169720990 -- complicated protocol hierarchy with typealias in protocol
 
 // CHECK-LABEL: class TypeAliasNestClass
@@ -287,3 +281,9 @@ public protocol AssociatedType2Protocol {
 public protocol AssociatedType3Protocol {
   associatedtype AssociatedType4
 }
+
+// DIAG-PRESERVE-OVERRIDDEN: warning: ignoring '-module-interface-preserve-types-as-written'; this option has been obsoleted by module selectors (add '-disable-module-selectors-in-module-interface' to restore original behavior)
+// DIAG-PRESERVE-NOT-OVERRIDDEN-NOT: warning: ignoring '-module-interface-preserve-types-as-written'; this option has been obsoleted by module selectors (add '-disable-module-selectors-in-module-interface' to restore original behavior)
+
+// DIAG-ALIAS-OVERRIDDEN: warning: ignoring '-alias-module-names-in-module-interface'; this option has been obsoleted by module selectors (add '-disable-module-selectors-in-module-interface' to restore original behavior)
+// DIAG-ALIAS-NOT-OVERRIDDEN-NOT: warning: ignoring '-alias-module-names-in-module-interface'; this option has been obsoleted by module selectors (add '-disable-module-selectors-in-module-interface' to restore original behavior)

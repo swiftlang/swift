@@ -12,5 +12,5 @@ public enum A {
 }
 
 // CHECK-LABEL: public enum A {
-// CHECK-NEXT:    case function((@escaping () -> Swift.Void) -> Swift.Void)
+// CHECK-NEXT:    case function((@escaping () -> Swift::Void) -> Swift::Void)
 // CHECK-NEXT:  }

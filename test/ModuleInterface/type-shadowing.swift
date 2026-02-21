@@ -23,4 +23,4 @@ extension Bakery.Cake {
 }
 #endif
 
-// CHECK: extension Bakery.Cake
+// CHECK: extension Bakery::Cake

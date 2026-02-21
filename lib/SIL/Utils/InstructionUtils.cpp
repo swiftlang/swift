@@ -50,23 +50,18 @@ SILValue swift::lookThroughOwnershipInsts(SILValue v) {
 }
 
 SILValue swift::lookThroughMoveOnlyCheckerPattern(SILValue value) {
-  auto *bbi = dyn_cast<BeginBorrowInst>(value);
-  if (!bbi) {
-    return value;
+  while (true) {
+    switch (value->getKind()) {
+    default:
+      return value;
+    case ValueKind::MoveValueInst:
+    case ValueKind::CopyValueInst:
+    case ValueKind::BeginBorrowInst:
+    case ValueKind::MarkUnresolvedNonCopyableValueInst:
+    case ValueKind::CopyableToMoveOnlyWrapperValueInst:
+      value = cast<SingleValueInstruction>(value)->getOperand(0);
+    }
   }
-  auto *muncvi = dyn_cast<MarkUnresolvedNonCopyableValueInst>(bbi->getOperand());
-  if (!muncvi) {
-    return value;
-  }
-  auto *cvi = dyn_cast<CopyValueInst>(muncvi->getOperand());
-  if (!cvi) {
-    return value;
-  }
-  auto result = cvi->getOperand();
-  if (auto *cmwi = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(result)) {
-    return cmwi->getOperand();
-  }
-  return result;
 }
 
 bool swift::visitNonOwnershipUses(SILValue value,

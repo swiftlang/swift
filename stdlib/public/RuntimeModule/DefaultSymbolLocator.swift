@@ -112,7 +112,7 @@ public class DefaultSymbolLocator: SymbolLocator {
     }
 
     // We must be able to load the original image (as an ELF image)
-    guard let imagePath = image.path,
+    guard let imagePath = find(image: image),
           let result = loadElfImage(path: imagePath, uuid: image.uuid) else {
       return nil
     }
@@ -276,7 +276,7 @@ public class DefaultSymbolLocator: SymbolLocator {
 
     // See if we can load the image
     let peImage: PeCoffImage?
-    if let path = image.path {
+    if let path = find(image: image) {
       peImage = loadPeCoffImage(path: path, uuid: uuid, age: age)
     } else {
       peImage = nil
@@ -385,6 +385,45 @@ public class DefaultSymbolLocator: SymbolLocator {
       if let source = findSymbolsForPeCoff(image: image) {
         return source
       }
+    }
+
+    return nil
+  }
+
+  public func find(image: any Image) -> String? {
+    let elfCache = ElfImageCache.threadLocal
+    let peCache = PeImageCache.threadLocal
+
+    guard let imagePath = image.path else {
+      return nil
+    }
+
+    if let result = elfCache.lookup(path: imagePath) {
+      switch result {
+        case let .elf32Image(elfImage):
+          if elfImage.uuid != image.uuid {
+            return nil
+          }
+
+        case let .elf64Image(elfImage):
+          if elfImage.uuid != image.uuid {
+            return nil
+          }
+      }
+
+      return imagePath
+    }
+
+    if let peImage = peCache.lookup(path: imagePath) {
+      if let codeview = peImage.codeview,
+         let uuid = image.uuid,
+         let age = image.age,
+         codeview.uuid != uuid
+           || codeview.age != age {
+        return nil
+      }
+
+      return imagePath
     }
 
     return nil

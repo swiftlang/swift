@@ -37,13 +37,13 @@ import c2cxx
 
 // Exposes a (fully-qualified) c2cxx decl in its module interface.
 public func shimId(_ n: c2cxx_number) -> c2cxx_number { return n }
-// CHECK: public func shimId(_ n: c2cxx.c2cxx_number) -> c2cxx.c2cxx_number
+// CHECK: public func shimId(_ n: c2cxx::c2cxx_number) -> c2cxx::c2cxx_number
 //                                ^^^^^`- refers to the module
 
 // @inlinable functions have their bodies splatted in the module interface file;
 // those verbatim bodies may contain unqualified names.
 @inlinable public func shimIdInline(_ n: c2cxx_number) -> c2cxx_number {
-// CHECK:  public func shimIdInline(_ n: c2cxx.c2cxx_number) -> c2cxx.c2cxx_number
+// CHECK:  public func shimIdInline(_ n: c2cxx::c2cxx_number) -> c2cxx::c2cxx_number
 //                                       ^^^^^`- refers to the module
           let m: c2cxx_number = n
 // CHECK: let m: c2cxx_number = n

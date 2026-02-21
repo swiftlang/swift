@@ -11,12 +11,12 @@
 var _i: Int = 0
 
 // CHECK:      #if compiler(>=5.3) && $CoroutineAccessors
-// CHECK-NEXT: public var i: Swift.Int {
+// CHECK-NEXT: public var i: Swift::Int {
 // CHECK-NEXT:   read
 // CHECK-NEXT:   modify
 // CHECK-NEXT: }
 // CHECK-NEXT: #else
-// CHECK-NEXT: public var i: Swift.Int {
+// CHECK-NEXT: public var i: Swift::Int {
 // CHECK-NEXT:   _read
 // CHECK-NEXT:   _modify
 // CHECK-NEXT: }

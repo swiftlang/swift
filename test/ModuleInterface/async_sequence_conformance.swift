@@ -12,7 +12,7 @@ public struct SequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK-NEXT: public typealias Element = Base.Element
 
   // CHECK: @available(
-  // CHECK: @_implements(_Concurrency.AsyncIteratorProtocol, Failure)
+  // CHECK: @_implements(_Concurrency::AsyncIteratorProtocol, Failure)
   // CHECK-SAME: public typealias __AsyncIteratorProtocol_Failure = Base.Failure
   public typealias Element = Base.Element
 
@@ -24,7 +24,7 @@ public struct SequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   public func makeAsyncIterator() -> AsyncIterator { AsyncIterator() }
 
   // CHECK: @available(
-  // CHECK: @_implements(_Concurrency.AsyncSequence, Failure)
+  // CHECK: @_implements(_Concurrency::AsyncSequence, Failure)
   // CHECK-SAME: public typealias __AsyncSequence_Failure = Base.Failure
 }
 
@@ -38,7 +38,7 @@ public struct OtherSequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK-LABEL: public struct AsyncIterator
   // CHECK: @available{{.*}}macOS 10.15
   // CHECK: @available(
-  // CHECK: @_implements(_Concurrency.AsyncIteratorProtocol, Failure)
+  // CHECK: @_implements(_Concurrency::AsyncIteratorProtocol, Failure)
   // CHECK-SAME: public typealias __AsyncIteratorProtocol_Failure = Base.Failure
   public typealias Element = Base.Element
 
@@ -61,9 +61,9 @@ public struct MineOwnIterator<Element>: AsyncSequence, AsyncIteratorProtocol {
   public mutating func next() async -> Element? { nil }
   public func makeAsyncIterator() -> Self { self }
 
-  // CHECK:      @_implements(_Concurrency.AsyncIteratorProtocol, Failure)
-  // CHECK-SAME: public typealias __AsyncIteratorProtocol_Failure = Swift.Never
+  // CHECK:      @_implements(_Concurrency::AsyncIteratorProtocol, Failure)
+  // CHECK-SAME: public typealias __AsyncIteratorProtocol_Failure = Swift::Never
 
-  // CHECK:      @_implements(_Concurrency.AsyncSequence, Failure)
-  // CHECK-SAME: public typealias __AsyncSequence_Failure = Swift.Never
+  // CHECK:      @_implements(_Concurrency::AsyncSequence, Failure)
+  // CHECK-SAME: public typealias __AsyncSequence_Failure = Swift::Never
 }

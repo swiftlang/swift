@@ -14,14 +14,14 @@ public protocol Circle {
   func fill() -> Color
 }
 
-// CHECK-LABEL: public protocol Ball : Library.Circle {
-// CHECK:         associatedtype Color = Swift.Int
+// CHECK-LABEL: public protocol Ball : Library::Circle {
+// CHECK:         associatedtype Color = Swift::Int
 public protocol Ball: Circle {
   associatedtype Color = Int
   func roll()
 }
 
-// CHECK-LABEL: extension Library.Ball : @reparented Library.Circle where Self.Color == Swift.Int {
+// CHECK-LABEL: extension Library::Ball : @reparented Library::Circle where Self.Color == Swift::Int {
 // CHECK:         public func fill() -> Self.Color
 // CHECK-NOT:     typealias
 extension Ball: @reparented Circle where Color == Int {
