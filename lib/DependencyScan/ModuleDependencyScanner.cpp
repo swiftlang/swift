@@ -1820,6 +1820,24 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
   discoverCrossImportOverlayFiles(DependencyCache, ScanASTContext, newOverlays,
                                   overlayFiles);
 
+  auto mainModuleID = ModuleDependencyID{DependencyCache.getMainModuleName().str(),
+                                         ModuleDependencyKind::SwiftSource};
+
+  // Update the command-line on the main module to disable implicit
+  // cross-import overlay search.
+  auto mainModuleInfo = DependencyCache.findKnownDependency(mainModuleID);
+  std::vector<std::string> cmdCopy = mainModuleInfo.getCommandline();
+  cmdCopy.push_back("-disable-cross-import-overlay-search");
+  for (auto &entry : overlayFiles) {
+    mainModuleInfo.addAuxiliaryFile(entry.second);
+    cmdCopy.push_back("-swift-module-cross-import");
+    cmdCopy.push_back(entry.first);
+    auto overlayPath = remapPath(entry.second);
+    cmdCopy.push_back(overlayPath);
+  }
+  mainModuleInfo.updateCommandLine(cmdCopy);
+  DependencyCache.updateDependency(mainModuleID, mainModuleInfo);
+
   // No new cross-import overlays are found, return.
   if (newOverlays.empty())
     return;
@@ -1830,8 +1848,6 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
       "_" + DependencyCache.getMainModuleName().str() + "-CrossImportOverlays";
   auto queryModuleID = ModuleDependencyID{batchCrossImportQueryModuleName,
                                         ModuleDependencyKind::SwiftSource};
-  auto mainModuleID = ModuleDependencyID{DependencyCache.getMainModuleName().str(),
-                                         ModuleDependencyKind::SwiftSource};
   auto queryModuleInfo = ModuleDependencyInfo::forSwiftSourceModule();
   llvm::for_each(
       newOverlays, [&](Identifier modName) {
@@ -1856,21 +1872,6 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
   // Update main module's dependencies to include these new overlays.
   DependencyCache.setCrossImportOverlayDependencies(
       mainModuleID, DependencyCache.getAllDependencies(queryModuleID));
-
-  // Update the command-line on the main module to disable implicit
-  // cross-import overlay search.
-  auto mainModuleInfo = DependencyCache.findKnownDependency(mainModuleID);
-  std::vector<std::string> cmdCopy = mainModuleInfo.getCommandline();
-  cmdCopy.push_back("-disable-cross-import-overlay-search");
-  for (auto &entry : overlayFiles) {
-    mainModuleInfo.addAuxiliaryFile(entry.second);
-    cmdCopy.push_back("-swift-module-cross-import");
-    cmdCopy.push_back(entry.first);
-    auto overlayPath = remapPath(entry.second);
-    cmdCopy.push_back(overlayPath);
-  }
-  mainModuleInfo.updateCommandLine(cmdCopy);
-  DependencyCache.updateDependency(mainModuleID, mainModuleInfo);
 
   // Report any discovered modules to the clients, which include all overlays
   // and their dependencies.

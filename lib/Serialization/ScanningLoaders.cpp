@@ -174,6 +174,7 @@ SwiftModuleScanner::scanInterfaceFile(Identifier moduleID,
         // Add explicit Swift dependency compilation flags
         Args.push_back("-explicit-interface-module-build");
         Args.push_back("-disable-implicit-swift-modules");
+        Args.push_back("-disable-cross-import-overlay-search");
 
         // Handle clang arguments. For caching build, all arguments are passed
         // with `-direct-clang-cc1-module-build`.
