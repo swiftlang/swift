@@ -24,6 +24,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SIL/OperandDatastructures.h"
 
 using namespace swift;
 
@@ -543,30 +544,6 @@ static bool diagnoseNonSendableFromDeinit(RefElementAddrInst *inst) {
       dc);
 }
 
-class OperandWorklist {
-  SmallVector<Operand *, 32> worklist;
-  SmallPtrSet<Operand *, 16> visited;
-
-public:
-  Operand *pop() {
-    if (worklist.empty())
-      return nullptr;
-    return worklist.pop_back_val();
-  }
-
-  void pushIfNotVisited(Operand *op) {
-    if (visited.insert(op).second) {
-      worklist.push_back(op);
-    }
-  }
-
-  void pushUsesOfValueIfNotVisited(SILValue value) {
-    for (Operand *use : value->getUses()) {
-      pushIfNotVisited(use);
-    }
-  }
-};
-
 /// Analyzes a function for uses of `self` and records the kinds of isolation
 /// required.
 /// \param selfParam the parameter of \c getFunction() that should be
@@ -577,10 +554,10 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
   ModuleDecl *module = getFunction()->getModule().getSwiftModule();
 
   // Use a worklist to track the uses left to be searched.
-  OperandWorklist worklist;
+  OperandWorklist worklist(getFunction());
 
   // Seed with direct users of `self`
-  worklist.pushUsesOfValueIfNotVisited(selfParam);
+  worklist.pushResultOperandsIfNotVisited(selfParam);
 
   while (Operand *operand = worklist.pop()) {
     // A type-dependent use of `self` is an instruction that contains the
@@ -711,13 +688,13 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
       case SILInstructionKind::BeginBorrowInst:
       case SILInstructionKind::EndInitLetRefInst: {
         auto *svi = cast<SingleValueInstruction>(user);
-        worklist.pushUsesOfValueIfNotVisited(svi);
+        worklist.pushResultOperandsIfNotVisited(svi);
         break;
       }
 
       case SILInstructionKind::BranchInst: {
         auto *arg = cast<BranchInst>(user)->getArgForOperand(operand);
-        worklist.pushUsesOfValueIfNotVisited(arg);
+        worklist.pushResultOperandsIfNotVisited(arg);
         break;
       }
 
