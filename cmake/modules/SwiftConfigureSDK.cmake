@@ -493,6 +493,10 @@ macro(configure_sdk_unix name architectures)
     endif()
   endforeach()
 
+  if("${prefix}" STREQUAL "ANDROID")
+    swift_android_copy_clang_headers()
+  endif()
+
   # Add this to the list of known SDKs.
   list(APPEND SWIFT_CONFIGURED_SDKS "${prefix}")
 

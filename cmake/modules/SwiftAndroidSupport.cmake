@@ -34,3 +34,72 @@ function(swift_android_cxx_libraries_for_arch arch libraries_var_name)
 
   set(${libraries_var_name} ${link_libraries} PARENT_SCOPE)
 endfunction()
+
+
+function(swift_android_copy_clang_headers)
+  if("${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+    return()
+  endif()
+
+
+  if(EXISTS "${SWIFT_ANDROID_NDK_PATH}/source.properties")
+    file(READ "${SWIFT_ANDROID_NDK_PATH}/source.properties" NDK_VERSION)
+    if(NOT NDK_VERSION MATCHES "Pkg\\.Revision = ([0-9\\.]+)")
+      message(WARNING "Could not find NDK version in source.properties, skipping header copy")
+      return()
+    endif()
+
+    if("${CMAKE_MATCH_1}" VERSION_GREATER_EQUAL "26")
+      file(GLOB ANDROID_CLANG_RESOURCE_DIR "${SWIFT_ANDROID_NDK_PATH}/toolchains/llvm/prebuilt/*/lib/clang/*")
+    else()
+      file(GLOB ANDROID_CLANG_RESOURCE_DIR "${SWIFT_ANDROID_NDK_PATH}/toolchains/llvm/prebuilt/*/lib64/clang/*")
+    endif()
+
+    if(NOT ANDROID_CLANG_RESOURCE_DIR)
+      message(WARNING "Could not find Android NDK clang resource directory, skipping header copy")
+      return()
+    endif()
+
+    list(GET ANDROID_CLANG_RESOURCE_DIR 0 ANDROID_CLANG_RESOURCE_DIR)
+    set(ANDROID_CLANG_INCLUDE_DIR "${ANDROID_CLANG_RESOURCE_DIR}/include")
+
+
+    if(SWIFT_EXEC)
+      get_filename_component(SWIFT_BIN_DIR "${SWIFT_EXEC}" DIRECTORY)
+      get_filename_component(SWIFT_TOOLCHAIN_DIR "${SWIFT_BIN_DIR}" DIRECTORY)
+      file(GLOB HOST_CLANG_RESOURCE_DIR "${SWIFT_TOOLCHAIN_DIR}/lib/clang/*")
+    endif()
+
+    if(NOT HOST_CLANG_RESOURCE_DIR)
+      if(CMAKE_C_COMPILER)
+        get_filename_component(HOST_CLANG_BIN_DIR "${CMAKE_C_COMPILER}" DIRECTORY)
+        get_filename_component(HOST_CLANG_TOOLCHAIN_DIR "${HOST_CLANG_BIN_DIR}" DIRECTORY)
+        file(GLOB HOST_CLANG_RESOURCE_DIR "${HOST_CLANG_TOOLCHAIN_DIR}/lib/clang/*")
+      endif()
+    endif()
+
+    if(NOT HOST_CLANG_RESOURCE_DIR)
+      message(WARNING "Could not find host clang resource directory, skipping header copy")
+      return()
+    endif()
+
+    list(GET HOST_CLANG_RESOURCE_DIR 0 HOST_CLANG_RESOURCE_DIR)
+    set(HOST_CLANG_INCLUDE_DIR "${HOST_CLANG_RESOURCE_DIR}/include")
+
+    # Copy the missing headers if they exist in host and don't exist in NDK
+    set(HEADERS_TO_COPY "lifetimebound.h" "ptrcheck.h")
+    foreach(HEADER ${HEADERS_TO_COPY})
+      set(SOURCE_HEADER "${HOST_CLANG_INCLUDE_DIR}/${HEADER}")
+      set(DEST_HEADER "${ANDROID_CLANG_INCLUDE_DIR}/${HEADER}")
+
+      if(EXISTS "${SOURCE_HEADER}" AND NOT EXISTS "${DEST_HEADER}")
+        message(STATUS "Copying ${HEADER} to Android NDK: ${DEST_HEADER}")
+        file(COPY "${SOURCE_HEADER}" DESTINATION "${ANDROID_CLANG_INCLUDE_DIR}")
+      elseif(NOT EXISTS "${SOURCE_HEADER}")
+        message(WARNING "Host Clang header not found: ${SOURCE_HEADER}")
+      endif()
+    endforeach()
+  else()
+    message(WARNING "Android NDK source.properties not found at ${SWIFT_ANDROID_NDK_PATH}/source.properties")
+  endif()
+endfunction()
