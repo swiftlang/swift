@@ -3083,7 +3083,8 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
     return false;
   }
 
-  return isTypeInferredByTypealias(typealias, nominal);
+  if (isTypeInferredByTypealias(typealias, nominal))
+    return true;
 
   // If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->hasGenericParamList())
