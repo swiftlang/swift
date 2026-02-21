@@ -74,6 +74,9 @@ enum class ConversionBehavior : unsigned {
   /// Function types and metatypes.
   Structural,
 
+  /// Tuples.
+  Tuple,
+
   /// InOut types have Pointer types as supertypes.
   InOut,
 
@@ -120,7 +123,9 @@ enum ConflictFlag : unsigned {
   Set = 1 << 7,
   Optional = 1 << 8,
   Double = 1 << 9,
-  Conformance = 1 << 10
+  Conformance = 1 << 10,
+  TupleArity = 1 << 11,
+  TupleElement = 1 << 11
 };
 using ConflictReason = OptionSet<ConflictFlag>;
 

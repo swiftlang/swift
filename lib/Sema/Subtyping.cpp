@@ -22,6 +22,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/TypeVariableType.h"
 
 #define DEBUG_TYPE "Subtyping"
 #include "llvm/Support/Debug.h"
@@ -80,6 +81,7 @@ bool ConstraintSystem::isConformanceTransitiveForSupertype(
   case ConversionBehavior::Set:
   case ConversionBehavior::Optional:
   case ConversionBehavior::AnyHashable:
+  case ConversionBehavior::Tuple:
     break;
 
   case ConversionBehavior::String:
@@ -179,6 +181,10 @@ bool ConstraintSystem::isConformanceTransitiveForSubtype(
   case ConversionBehavior::Dictionary:
   case ConversionBehavior::Set:
     // All subtypes of these have the same nominal type.
+    return true;
+
+  case ConversionBehavior::Tuple:
+    // All subtypes of a tuple remain a tuple.
     return true;
 
   case ConversionBehavior::Class:
@@ -325,6 +331,21 @@ swift::constraints::getConversionBehavior(Type type) {
   if (type->isVoid())
     return ConversionBehavior::None;
 
+  // Only tuples with a known length are supported for now.
+  if (type->is<TupleType>()) {
+    if (type->hasParameterPack())
+      return ConversionBehavior::Unknown;
+
+    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+    type->getTypeVariables(referencedTypeVars);
+    for (auto *typeVar : referencedTypeVars) {
+      if (typeVar->getImpl().isPackExpansion())
+        return ConversionBehavior::Unknown;
+    }
+
+    return ConversionBehavior::Tuple;
+  }
+
   return ConversionBehavior::Unknown;
 }
 
@@ -351,6 +372,7 @@ bool swift::constraints::hasProperSubtypes(Type type) {
   case ConversionBehavior::Pointer:
   case ConversionBehavior::Optional:
   case ConversionBehavior::Structural:
+  case ConversionBehavior::Tuple:
   case ConversionBehavior::Unknown:
     return true;
   }
@@ -388,6 +410,7 @@ bool swift::constraints::hasProperSupertypes(Type type) {
   case ConversionBehavior::Pointer:
   case ConversionBehavior::Optional:
   case ConversionBehavior::Structural:
+  case ConversionBehavior::Tuple:
   case ConversionBehavior::Unknown:
     return true;
   }
@@ -530,6 +553,23 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
 
       break;
     }
+    case ConversionBehavior::Tuple: {
+      auto *lhsTuple = lhs->castTo<TupleType>();
+      auto *rhsTuple = rhs->castTo<TupleType>();
+
+      if (lhsTuple->getNumElements() != rhsTuple->getNumElements())
+        return ConflictFlag::TupleArity;
+
+      for (unsigned i : indices(lhsTuple->getElements())) {
+        auto lhsElt = lhsTuple->getElementType(i);
+        auto rhsElt = rhsTuple->getElementType(i);
+        auto result = canPossiblyConvertTo(cs, lhsElt, rhsElt, sig);
+        if (result)
+          return result | ConflictFlag::TupleElement;
+      }
+
+      break;
+    }
     case ConversionBehavior::Unknown:
       break;
     }
@@ -609,6 +649,7 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     case ConversionBehavior::Dictionary:
     case ConversionBehavior::Set:
     case ConversionBehavior::Structural:
+    case ConversionBehavior::Tuple:
       return ConflictFlag::Category;
 
     case ConversionBehavior::Unknown:
@@ -676,4 +717,8 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " structural";
   if (reason.contains(ConflictFlag::Conformance))
     out << " conformance";
+  if (reason.contains(ConflictFlag::TupleArity))
+    out << " tuple_arity";
+  if (reason.contains(ConflictFlag::TupleElement))
+    out << " tuple_element";
 }
