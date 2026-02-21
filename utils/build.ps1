@@ -223,6 +223,7 @@ param
   [switch] $IncludeNoAsserts = $false,
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
+  [switch] $BuildLlvmDylib = $false,
 
   [switch] $Summary,
   [switch] $TraceExpand
@@ -2197,7 +2198,29 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     $SwiftFlags += @("-use-ld=lld");
   }
 
-  return $TestDefines + $DebugDefines + @{
+  $DylibDefines = if ($BuildLlvmDylib) {
+    @{
+      LLVM_BUILD_LLVM_DYLIB = "YES";
+      LLVM_BUILD_LLVM_DYLIB_VIS = "YES";
+      LLVM_BUILD_LLVM_C_DYLIB = "YES";
+      LLVM_DYLIB_EXPORT_INLINES = "YES";
+      LLVM_LINK_LLVM_DYLIB = "YES";
+      LLVM_TOOL_LLVM_SHLIB_BUILD = "YES";
+      CLANG_LINK_CLANG_DYLIB = "NO";
+    }
+  } else {
+    @{
+      LLVM_BUILD_LLVM_DYLIB = "NO";
+      LLVM_BUILD_LLVM_DYLIB_VIS = "NO";
+      LLVM_BUILD_LLVM_C_DYLIB = "NO";
+      LLVM_DYLIB_EXPORT_INLINES = "NO";
+      LLVM_LINK_LLVM_DYLIB = "NO";
+      LLVM_TOOL_LLVM_SHLIB_BUILD = "NO";
+      CLANG_LINK_CLANG_DYLIB = "NO";
+    }
+  }
+
+  return $TestDefines + $DebugDefines + $DylibDefines + @{
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
     CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
