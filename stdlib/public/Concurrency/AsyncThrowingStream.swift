@@ -227,7 +227,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// finish, the stream enters a terminal state and doesn't produce any additional
     /// elements.
     public func finish(throwing error: __owned Failure? = nil) {
-      storage.finish(throwing: error)
+      storage.terminate(reason: .finished(error))
     }
 
     /// A callback to invoke when canceling iteration of an asynchronous
@@ -474,7 +474,7 @@ extension AsyncThrowingStream.Continuation {
     case .success(let val):
       return storage.yield(val)
     case .failure(let err):
-      storage.finish(throwing: err)
+      storage.terminate(reason: .finished(err))
       return .terminated
     }
   }
