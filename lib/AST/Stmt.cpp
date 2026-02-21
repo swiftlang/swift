@@ -275,12 +275,19 @@ ASTNode BraceStmt::findAsyncNode() {
     }
 
     PreWalkAction walkToDeclPre(Decl *decl) override {
-      // Do not walk into function or type declarations.
+      // Do not walk into function or type declarations (except for defer
+      // bodies).
       if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
         if (patternBinding->isAsyncLet())
           AsyncNode = patternBinding;
 
         return Action::Continue();
+      }
+
+      if (auto *fnDecl = dyn_cast<FuncDecl>(decl)) {
+        if (fnDecl->isDeferBody()) {
+          return Action::Continue();
+        }
       }
 
       return Action::SkipNode();
@@ -402,6 +409,15 @@ SourceLoc DeferStmt::getEndLoc() const {
 /// Dig the original user's body of the defer out for AST fidelity.
 BraceStmt *DeferStmt::getBodyAsWritten() const {
   return tempDecl->getBody();
+}
+
+void DeferStmt::makeAsync(ASTContext &ctx) {
+  tempDecl->setHasAsync(true);
+  setCallExpr(AwaitExpr::createImplicit(ctx, SourceLoc(), getCallExpr()));
+  auto *attr = new (ctx) NonisolatedAttr(SourceLoc(), SourceRange(),
+                                         NonIsolatedModifier::NonSending,
+                                         /*implicit*/ true);
+  tempDecl->getAttrs().add(attr);
 }
 
 bool LabeledStmt::isPossibleContinueTarget() const {

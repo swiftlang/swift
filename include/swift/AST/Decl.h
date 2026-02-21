@@ -7992,6 +7992,8 @@ public:
   /// type of the function will be `async` as well.
   bool hasAsync() const { return Bits.AbstractFunctionDecl.Async; }
 
+  void setHasAsync(bool async) { Bits.AbstractFunctionDecl.Async = async; }
+
   /// Determine whether the given function is concurrent.
   ///
   /// A function is concurrent if it has the @Sendable attribute.

@@ -5611,6 +5611,12 @@ ERROR(tryless_throwing_call_in_nonexhaustive_catch,none,
       "the enclosing catch is not exhaustive", (StringRef))
 ERROR(throw_in_nonexhaustive_catch,none,
       "error is not handled because the enclosing catch is not exhaustive", ())
+ERROR(throw_in_defer_body,none,
+      "errors cannot be thrown out of a defer body", ())
+ERROR(throwing_op_in_defer_body,none,
+      "%0 can throw, but errors cannot be thrown out of a defer body", (StringRef))
+ERROR(async_defer_in_non_async_context,none,
+      "'async' defer must appear within an 'async' context", ())
 
 #define EFFECTS_CONTEXT_KIND \
   "%select{<<ERROR>>|" \
