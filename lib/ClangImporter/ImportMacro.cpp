@@ -443,13 +443,16 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                         Ctx.TheEmptyTupleType, ASTExtInfo{});
 
   /* Storage */
-  swift::VarDecl *V =
-      new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
-                        SourceLoc(), alias, DC);
+  auto *V = new (Ctx) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
+                              /*nameLoc=*/SourceLoc(), alias, DC);
+
   V->setAccess(swift::AccessLevel::Public);
   V->setInterfaceType(Ty.getType());
+
   V->addAttribute(new (Ctx) TransparentAttr(/*Implicit*/ true));
   V->addAttribute(new (Ctx) InlineAttr(InlineKind::AlwaysUnderscored));
+  V->addAttribute(new (Ctx) PreconcurrencyAttr(/*IsImplicit=*/true));
+  V->setSynthesized();
 
   /* Accessor */
   swift::AccessorDecl *G = nullptr;
@@ -495,10 +498,7 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                AbstractFunctionDecl::BodyKind::TypeChecked);
   }
 
-  /* Bind */
-  V->setImplInfo(S ? StorageImplInfo::getMutableComputed()
-                   : StorageImplInfo::getImmutableComputed());
-  V->setAccessors(SourceLoc(), S ? ArrayRef{G,S} : ArrayRef{G}, SourceLoc());
+  clang.makeComputed(V, G, S);
 
   return V;
 }
