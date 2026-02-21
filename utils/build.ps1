@@ -39,8 +39,7 @@ The pinned bootstrap Swift toolchain used to build the Swift components with.
 The SHA256 for the pinned toolchain.
 
 .PARAMETER EnableCaching
-Enable build caching using sccache to speed up rebuilds. Requires sccache to be
-configured via environment variables. Recommended for repeated builds.
+Enable build caching using LLVM CAS to speed up rebuilds.
 
 .PARAMETER IncludeSBoM
 Include Software Bill of Materials generation using syft. Used for compliance
@@ -148,6 +147,7 @@ param
   [System.IO.FileInfo] $SourceCache = "S:\SourceCache",
   [System.IO.FileInfo] $BinaryCache = "S:\b",
   [System.IO.FileInfo] $ImageRoot = "S:",
+  [System.IO.FileInfo] $Cache = "S:\CAS",
   [string] $Stage = "",
 
   # (Pinned) Bootstrap Toolchain
@@ -158,12 +158,6 @@ param
 
   # Build Caching
   [switch] $EnableCaching,
-  [ValidatePattern('^\d+(\.\d+)*$')]
-  [string] $SCCacheVersion = "0.10.0",
-
-  # Build with CAS
-  [switch] $EnableCAS = $false,
-  [string] $CASPath = "$ImageRoot\cas",
 
   # SBoM Support
   [switch] $IncludeSBoM = $false,
@@ -276,13 +270,13 @@ if ($UseHostToolchain -is [string]) {
 
 $DefaultPinned = @{
   AMD64 = @{
-    PinnedBuild = "https://download.swift.org/development/windows10/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a-windows10.exe";
-    PinnedSHA256 = "E16E5289691D9FBD01075054A066D5BB9BF6DE061970758DD9E8863606763C09";
+    PinnedBuild = "https://download.swift.org/development/windows10/swift-DEVELOPMENT-SNAPSHOT-2026-02-06-a/swift-DEVELOPMENT-SNAPSHOT-2026-02-06-a-windows10.exe";
+    PinnedSHA256 = "696E7353BDF5BEB37E1B8810A5C6218F431F337870644E0307B004E2CE774BDA";
     PinnedVersion = "0.0.0";
   };
   ARM64 = @{
-    PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a-windows10-arm64.exe"
-    PinnedSHA256 = "39C9013F2CC3FE5186D3F10E30023BED4456F971CFAA0E900779A5F55A9651F1";
+    PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2026-02-06-a/swift-DEVELOPMENT-SNAPSHOT-2026-02-06-a-windows10-arm64.exe"
+    PinnedSHA256 = "";
     PinnedVersion = "0.0.0";
   };
 }
@@ -488,34 +482,6 @@ $KnownNDKs = @{
   }
 }
 
-$KnownSCCache = @{
-  "0.9.1" = @{
-    AMD64 = @{
-      URL = "https://github.com/mozilla/sccache/releases/download/v0.9.1/sccache-v0.9.1-x86_64-pc-windows-msvc.zip"
-      SHA256 = "9C862BCAEF62804F2124DFC2605A0204F4FE0C5FA337BA4264E9BCAE9D2BA487"
-      Path = [IO.Path]::Combine("$BinaryCache\sccache-0.9.1\sccache-v0.9.1-x86_64-pc-windows-msvc", "sccache.exe");
-    }
-    ARM64 = @{
-      URL = "https://github.com/mozilla/sccache/releases/download/v0.9.1/sccache-v0.9.1-aarch64-pc-windows-msvc.tar.gz"
-      SHA256 = "99BD024919430DE3C741658ADC60334305A61C0A109F7A334C030F0BB56007A6"
-      Path = [IO.Path]::Combine("$BinaryCache\sccache-0.9.1\sccache-v0.9.1-aarch64-pc-windows-msvc", "sccache.exe")
-    }
-  }
-
-  "0.10.0" = @{
-    AMD64 = @{
-      URL = "https://github.com/mozilla/sccache/releases/download/v0.10.0/sccache-v0.10.0-x86_64-pc-windows-msvc.zip"
-      SHA256 = "6D8823B5C13E0DBA776D88C537229256ECB2F01A1D775B507FD141CB55D30578"
-      Path = [IO.Path]::Combine("$BinaryCache\sccache-0.10.0\sccache-v0.10.0-x86_64-pc-windows-msvc", "sccache.exe")
-    }
-    ARM64 = @{
-      URL = "https://github.com/mozilla/sccache/releases/download/v0.10.0/sccache-v0.10.0-aarch64-pc-windows-msvc.tar.gz"
-      SHA256 = "5FD6CD6DD474E91C37510719BF27CFE1826F929E40DD383C22A7B96DA9A5458D"
-      Path = [IO.Path]::Combine("$BinaryCache\sccache-0.10.0\sccache-v0.10.0-aarch64-pc-windows-msvc", "sccache.exe")
-    }
-  }
-}
-
 $KnownSyft = @{
   "1.29.1" = @{
     AMD64 = @{
@@ -589,7 +555,7 @@ $PinnedToolchain = [IO.Path]::GetFileNameWithoutExtension($PinnedBuild)
 # Use a shorter name in paths to avoid going over the path length limit.
 $ToolchainVersionIdentifier = $PinnedToolchain -replace 'swift-(.+?)-windows10.*', '$1'
 
-if ($EnableCAS -and ($UseHostToolchain -or ($PinnedVersion -ne "0.0.0"))) {
+if ($EnableCaching -and ($UseHostToolchain -or ($PinnedVersion -ne "0.0.0"))) {
   throw "CAS currently requires using a main-branch pinned toolchain."
 }
 
@@ -721,11 +687,6 @@ function Flatten-TimingEntry {
 function Write-Summary {
   Write-Host "Summary:" -ForegroundColor Cyan
 
-  if ($EnableCaching) {
-    Write-Host "SCCache:" -ForegroundColor Green
-    Invoke-Program (Get-SCCache).Path --show-stats
-  }
-
   $TotalTime = [TimeSpan]::Zero
   foreach ($Entry in $TimingData) {
     if (-not $Entry.Parent) {
@@ -766,10 +727,6 @@ function Get-FlexExecutable {
 
 function Get-BisonExecutable {
   return Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_bison.exe"
-}
-
-function Get-SCCache {
-  return $KnownSCCache[$SCCacheVersion][$BuildArchName]
 }
 
 function Get-PythonPath([Hashtable] $Platform) {
@@ -1313,20 +1270,6 @@ function Get-Dependencies {
 
     if ($SkipBuild) { return }
 
-    if ($EnableCaching) {
-      $SCCache = Get-SCCache
-      $FileExtension = if ($SCCache.URL -match '\.(?:tar\.\w+|zip)$') { $Matches[0] } else {
-          throw "Invalid sccache URL"
-      }
-      DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion$FileExtension" $SCCache.SHA256
-      if ($FileExtension -eq ".tar.gz") {
-        Expand-TapeArchive "sccache-$SCCacheVersion$FileExtension" $BinaryCache "sccache-$SCCacheVersion"
-      } else {
-        Expand-ZipFile "sccache-$SCCacheVersion$FileExtension" $BinaryCache "sccache-$SCCacheVersion"
-      }
-      Write-Success "sccache $SCCacheVersion"
-    }
-
     DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
 
     if ($Test -contains "lldb" -or $Test -contains "lldb-swift") {
@@ -1587,14 +1530,6 @@ function Build-CMakeProject {
             @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline")
           }
 
-          if ($EnableCAS -and $UsePinnedCompilers.Contains("C")) {
-            $CFLAGS += if ($UseGNUDriver) {
-              @("-fdepscan=inline", "-fdepscan-include-tree", "-Xclang", "-fcas-path", "-Xclang", $CASPath)
-            } else {
-              @("/clang:-fdepscan=inline", "/clang:-fdepscan-include-tree", "-Xclang", "-fcas-path", "-Xclang", $CASPath)
-            }
-          }
-
           if ($DebugInfo) {
             if ($UsePinnedCompilers.Contains("C") -or $UseBuiltCompilers.Contains("C")) {
               if ($CDebugFormat -eq "dwarf") {
@@ -1633,14 +1568,6 @@ function Build-CMakeProject {
           } else {
             # clang-cl does not support the /Zc:preprocessor flag.
             @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:__cplusplus")
-          }
-
-          if ($EnableCAS -and $UsePinnedCompilers.Contains("CXX")) {
-            $CXXFLAGS += if ($UseGNUDriver) {
-              @("-fdepscan=inline", "-fdepscan-include-tree", "-Xclang", "-fcas-path", "-Xclang", $CASPath)
-            } else {
-              @("/clang:-fdepscan=inline", "/clang:-fdepscan-include-tree", "-Xclang", "-fcas-path", "-Xclang", $CASPath)
-            }
           }
 
           if ($DebugInfo) {
@@ -1832,12 +1759,14 @@ function Build-CMakeProject {
     }
 
     if ($EnableCaching) {
+      $env:LLVM_CACHE_CAS_PATH = "$Cache"
+
       if ($UseC) {
-        Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_LAUNCHER $(Get-SCCache).Path
+        Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_LAUNCHER $(Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "clang-cache")
       }
 
       if ($UseCXX) {
-        Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_LAUNCHER $(Get-SCCache).Path
+        Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_LAUNCHER $(Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "clang-cache")
       }
     }
 
@@ -4221,10 +4150,6 @@ if ($Clean) {
 }
 
 if (-not $SkipBuild) {
-  if ($EnableCaching) {
-    Invoke-Program (Get-SCCache).Path --zero-stats
-  }
-
   Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
 
   Invoke-BuildStep Build-CMark $BuildPlatform
