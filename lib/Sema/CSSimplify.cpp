@@ -7170,6 +7170,39 @@ static bool isDependentMemberTypeWithBaseThatContainsUnresolvedPackExpansions(
   });
 }
 
+ConstraintSystem::ImpliedResultConversionKind
+ConstraintSystem::getImpliedResultConversionKind(ConstraintLocator *locator) {
+  if (locator->isLastElement<LocatorPathElt::ClosureBody>() ||
+      locator->isForContextualType(CTP_ReturnStmt) ||
+      locator->isForContextualType(CTP_ClosureResult) ||
+      locator->isForSingleValueStmtBranch()) {
+    // Implied results can occur for closure bodies, returns, and if/switch
+    // expression branches.
+    //
+    // We only allow the Void conversion for implied results in a closure
+    // context. In the more general case, we only allow the Never conversion.
+    // For explicit branches, no conversions are allowed, unless this is for
+    // a single expression body closure, in which case we still allow the
+    // Never conversion.
+    if (auto *E = getAsExpr(simplifyLocatorToAnchor(locator))) {
+      if (auto kind = isImpliedResult(E)) {
+        switch (*kind) {
+        case ImpliedResultKind::Regular:
+          return ImpliedResultConversionKind::FromNever;
+        case ImpliedResultKind::ForClosure:
+          return ImpliedResultConversionKind::ToVoid;
+        }
+      } else if (locator->isLastElement<LocatorPathElt::ClosureBody>()) {
+        // Even if explicit, we always allow uninhabited types in single
+        // expression closures.
+        return ImpliedResultConversionKind::FromNever;
+      }
+    }
+  }
+
+  return ImpliedResultConversionKind::None;
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
@@ -8378,40 +8411,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (auto elt = locator.last()) {
     if (kind >= ConstraintKind::Subtype &&
         (type1->isUninhabited() || type2->isVoid())) {
-      // Implied results can occur for closure bodies, returns, and if/switch
-      // expression branches.
-      //
-      // We only allow the Void conversion for implied results in a closure
-      // context. In the more general case, we only allow the Never conversion.
-      // For explicit branches, no conversions are allowed, unless this is for
-      // a single expression body closure, in which case we still allow the
-      // Never conversion.
       auto *loc = getConstraintLocator(locator);
-      if (elt->is<LocatorPathElt::ClosureBody>() || 
-          loc->isForContextualType(CTP_ReturnStmt) ||
-          loc->isForContextualType(CTP_ClosureResult) ||
-          loc->isForSingleValueStmtBranch()) {
-        bool allowConversion = false;
-        if (auto *E = getAsExpr(simplifyLocatorToAnchor(loc))) {
-          if (auto kind = isImpliedResult(E)) {
-            switch (*kind) {
-            case ImpliedResultKind::Regular:
-              allowConversion = type1->isUninhabited();
-              break;
-            case ImpliedResultKind::ForClosure:
-              allowConversion = true;
-              break;
-            }
-          } else if (elt->is<LocatorPathElt::ClosureBody>()) {
-            // Even if explicit, we always allow uninhabited types in single
-            // expression closures.
-            allowConversion = type1->isUninhabited();
-          }
-        }
-        if (allowConversion) {
-          increaseScore(SK_FunctionConversion, locator);
-          return getTypeMatchSuccess();
-        }
+      bool allowConversion = false;
+      switch (getImpliedResultConversionKind(loc)) {
+      case ImpliedResultConversionKind::None:
+        break;
+      case ImpliedResultConversionKind::FromNever:
+        allowConversion = type1->isUninhabited();
+        break;
+      case ImpliedResultConversionKind::ToVoid:
+        allowConversion = true;
+        break;
+      }
+
+      if (allowConversion) {
+        increaseScore(SK_FunctionConversion, locator);
+        return getTypeMatchSuccess();
       }
     }
   }
@@ -8998,8 +9013,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   /// Record the given conformance as the result, adding any conditional
   /// requirements if necessary.
   auto recordConformance = [&](ProtocolConformanceRef conformance) {
-    if (isConformanceUnavailable(conformance, loc))
-      increaseScore(SK_Unavailable, locator);
+    if (isConformanceUnavailable(conformance, loc)) {
+      if (conformance.getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+        increaseScore(SK_MissingSynthesizableConformance, locator);
+      } else {
+        increaseScore(SK_Unavailable, locator);
+      }
+    }
 
     unsigned numMissing = 0;
     conformance.forEachMissingConformance([&numMissing](auto *missing) {

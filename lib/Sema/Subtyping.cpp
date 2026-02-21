@@ -322,6 +322,9 @@ swift::constraints::getConversionBehavior(Type type) {
   if (type->is<LValueType>())
     return ConversionBehavior::LValue;
 
+  if (type->isVoid())
+    return ConversionBehavior::None;
+
   return ConversionBehavior::Unknown;
 }
 

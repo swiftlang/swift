@@ -450,6 +450,12 @@ def solver_enable_transitive_conformance : Flag<["-"], "solver-enable-transitive
 def solver_disable_transitive_conformance : Flag<["-"], "solver-disable-transitive-conformance">,
   HelpText<"Disable transitive conformance constraint optimization">;
 
+def solver_enable_binding_optimizations : Flag<["-"], "solver-enable-binding-optimizations">,
+  HelpText<"Enable experimental optimizations to speed up type variable binding">;
+
+def solver_disable_binding_optimizations : Flag<["-"], "solver-disable-binding-optimizations">,
+  HelpText<"Disable experimental optimizations to speed up type variable binding">;
+
 def disable_named_lazy_import_as_member_loading :
   Flag<["-"], "disable-named-lazy-import-as-member-loading">,
   HelpText<"Import all of a type's import-as-member globals together, as Swift "
