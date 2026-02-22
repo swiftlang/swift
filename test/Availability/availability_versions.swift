@@ -17,6 +17,9 @@ func globalFuncAvailableOn51() -> Int { return 10 }
 @available(OSX, introduced: 52)
 func globalFuncAvailableOn52() -> Int { return 11 }
 
+@available(OSX, introduced: 42)
+func globalFuncAvailableOn42() -> Int { return 12 }
+
 // Top level should reflect the minimum deployment target.
 let ignored1: Int = globalFuncAvailableOn10_9()
 
@@ -1491,6 +1494,27 @@ public func fixitForReferenceInGlobalFunctionWithDeclModifier() {
       // expected-error@-1 {{'functionAvailableOn51()' is only available in macOS 51 or newer}}
       // expected-note@-2 {{add 'if #available' version check}} {{3-26=if #available(macOS 51, *) {\n      functionAvailableOn51()\n  } else {\n      // Fallback on earlier versions\n  }}}
       
+}
+
+@available(macOS 12, *) func fixitForUpdatingExistingAvailabilitySimple() {
+      // expected-note@-1 {{update '@available' attribute on enclosing global function}} {{18-20=42}}
+  globalFuncAvailableOn42()
+      // expected-error@-1 {{'globalFuncAvailableOn42()' is only available in macOS 42 or newer}}
+      // expected-note@-2 {{add 'if #available' version check}}
+}
+
+@available(macOS 12, iOS 20, *) func fixitForUpdatingExistingAvailabilityMultiPlatform() {
+      // expected-note@-1 {{update '@available' attribute on enclosing global function}} {{18-20=42}}
+  globalFuncAvailableOn42()
+      // expected-error@-1 {{'globalFuncAvailableOn42()' is only available in macOS 42 or newer}}
+      // expected-note@-2 {{add 'if #available' version check}}
+}
+
+@available(macOS, introduced: 12, obsoleted: 9999) func fixitForUpdatingExistingAvailabilityLongForm() {
+      // expected-note@-1 {{update '@available' attribute on enclosing global function}} {{31-33=42}}
+  globalFuncAvailableOn42()
+      // expected-error@-1 {{'globalFuncAvailableOn42()' is only available in macOS 42 or newer}}
+      // expected-note@-2 {{add 'if #available' version check}}
 }
 
 func fixitForReferenceInGlobalFunctionWithAttribute() -> Never {
