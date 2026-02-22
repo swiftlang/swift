@@ -1,3 +1,6 @@
+/// New swift-driver canonicalize path
+// UNSUPPORTED: OS=windows-msvc && legacy_swift_driver
+
 // Check that the sdk and resource dirs end up in the debug info if we pass the
 // frontend flag. This tests the general functionality; we test the macosx
 // specific toolchain logic in compiler-flags-macosx.swift.

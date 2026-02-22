@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/json.exe
+// RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/json.exe -v
 // RUN: %target-codesign %t/json.exe
 // RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash.json %target-run %t/json.exe 2>&1
 // RUN: %validate-json %t/crash.json | %FileCheck %s --check-prefixes CHECK,UNSANITIZED,DEMANGLED,IMAGES,OMITTEDIMAGES,SYMBOLICATED,CAPTUREDMEM
