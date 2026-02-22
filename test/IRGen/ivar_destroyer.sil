@@ -10,7 +10,7 @@
 // CHECK-SAME:    ptr null,
 // CHECK-SAME:    ptr {{@"\$sBoWV"|null}},
 // CHECK-SAME:    i64 ptrtoint (ptr @"$s14ivar_destroyer17NonTrivialDerivedCMm" to i64),
-// CHECK-DIRECT-SAME:    ptr getelementptr inbounds (<{ {{.*}} }>, ptr @"$s14ivar_destroyer11TrivialBaseCMf", i32 0, i32 3),
+// CHECK-DIRECT-SAME:    ptr getelementptr inbounds (<{ {{.*}} }>, ptr @"$s14ivar_destroyer11TrivialBaseCMf", i32 0, i32 4),
 // CHECK-INDIRECT-SAME:  ptr null,
 // CHECK-SAME:    ptr @_objc_empty_cache,
 // CHECK-SAME:    ptr null,
@@ -20,8 +20,8 @@
 // CHECK-SAME:    i32 24,
 // CHECK-SAME:    i16 7,
 // CHECK-SAME:    i16 0,
-// CHECK-SAME:    i32 120,
-// CHECK-SAME:    i32 24,
+// CHECK-SAME:    i32 128,
+// CHECK-SAME:    i32 32,
 // CHECK-SAME:    ptr @"$s14ivar_destroyer17NonTrivialDerivedCMn"
 // CHECK-SAME:    ptr @"$s14ivar_destroyer17NonTrivialDerivedCfE",
 // CHECK-SAME:    ptr @alloc_NonTrivialDerived

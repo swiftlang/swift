@@ -46,7 +46,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret void
     // CHECK: }
@@ -63,7 +63,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret i64 undef
     // CHECK: }
@@ -81,7 +81,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64 } undef
     // CHECK: }
@@ -99,7 +99,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64, i64 } undef
     // CHECK: }
@@ -117,7 +117,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64, i64, i64 } undef
     // CHECK: }
@@ -140,7 +140,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %3, align 8
     // CHECK:   ret void
     // CHECK: }
@@ -166,7 +166,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi7OneWordVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret i64 {{%.*}}
     // CHECK: }
@@ -184,7 +184,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi7OneWordVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret i64 {{%.*}}
     // CHECK: }
@@ -203,7 +203,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi7OneWordVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64 } {{%.*}}
     // CHECK: }
@@ -222,7 +222,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi7OneWordVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64, i64 } {{%.*}}
     // CHECK: }
@@ -241,7 +241,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi7OneWordVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64, i64, i64 } {{%.*}}
     // CHECK: }
@@ -266,7 +266,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi7OneWordVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %3, align 8
     // CHECK:   ret void
     // CHECK: }
@@ -292,7 +292,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64 } @"$s16typed_throws_abi8TwoWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi8TwoWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64 } {{%.*}}
     // CHECK: }
@@ -310,7 +310,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64 } @"$s16typed_throws_abi8TwoWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi8TwoWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64 } {{%.*}}
     // CHECK: }
@@ -329,7 +329,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64 } @"$s16typed_throws_abi8TwoWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi8TwoWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64 } {{%.*}}
     // CHECK: }
@@ -348,7 +348,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64 } @"$s16typed_throws_abi8TwoWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi8TwoWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64, i64 } {{%.*}}
     // CHECK: }
@@ -367,7 +367,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64 } @"$s16typed_throws_abi8TwoWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi8TwoWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64, i64, i64 } {{%.*}}
     // CHECK: }
@@ -392,7 +392,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64 } @"$s16typed_throws_abi8TwoWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi8TwoWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %3, align 8
     // CHECK:   ret void
     // CHECK: }
@@ -418,7 +418,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi10ThreeWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi10ThreeWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64, i64 } {{%.*}}
     // CHECK: }
@@ -436,7 +436,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi10ThreeWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi10ThreeWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64, i64 } {{%.*}}
     // CHECK: }
@@ -455,7 +455,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi10ThreeWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi10ThreeWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64, i64 } {{%.*}}
     // CHECK: }
@@ -474,7 +474,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi10ThreeWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi10ThreeWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64, i64 } {{%.*}}
     // CHECK: }
@@ -493,7 +493,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi10ThreeWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi10ThreeWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64, i64, i64 } {{%.*}}
     // CHECK: }
@@ -518,7 +518,7 @@ struct Impl: P {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi10ThreeWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi10ThreeWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %3, align 8
     // CHECK:   ret void
     // CHECK: }
@@ -1507,7 +1507,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1526,7 +1526,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 undef, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1546,7 +1546,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 undef, i64 undef, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1566,7 +1566,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 undef, i64 undef, i64 undef, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1586,7 +1586,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 undef, i64 undef, i64 undef, i64 undef, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1611,7 +1611,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1639,7 +1639,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi7OneWordVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}} ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1659,7 +1659,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi7OneWordVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}} ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1680,7 +1680,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi7OneWordVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1701,7 +1701,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi7OneWordVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1722,7 +1722,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi7OneWordVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1748,7 +1748,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi7OneWordVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi7OneWordVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1776,7 +1776,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64 } @"$s16typed_throws_abi8TwoWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi8TwoWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}} ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1796,7 +1796,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64 } @"$s16typed_throws_abi8TwoWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi8TwoWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}} ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1817,7 +1817,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64 } @"$s16typed_throws_abi8TwoWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi8TwoWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}} ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1838,7 +1838,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64 } @"$s16typed_throws_abi8TwoWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi8TwoWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}} ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1859,7 +1859,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64 } @"$s16typed_throws_abi8TwoWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi8TwoWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}} ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1885,7 +1885,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64 } @"$s16typed_throws_abi8TwoWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi8TwoWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32 }>, ptr @"$s16typed_throws_abi8TwoWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1913,7 +1913,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi10ThreeWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi10ThreeWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1933,7 +1933,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi10ThreeWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi10ThreeWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1954,7 +1954,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi10ThreeWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi10ThreeWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1975,7 +1975,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi10ThreeWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi10ThreeWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -1996,7 +1996,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi10ThreeWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi10ThreeWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, i64 {{%.*}}, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
@@ -2022,7 +2022,7 @@ struct ImplAsync: PAsync {
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi10ThreeWordsVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi10ThreeWordsVACs5ErrorAAWl"()
-    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
+    // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias [[ERROR]], ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr, i32, i32, i32, [4 x i8] }>, ptr @"$s16typed_throws_abi10ThreeWordsVMf", i32 0, i32 3), ptr [[ERROR_WITNESS]])
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }

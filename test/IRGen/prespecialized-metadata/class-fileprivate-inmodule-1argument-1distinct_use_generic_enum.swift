@@ -11,6 +11,7 @@
 //   CHECK-apple-SAME: global 
 // CHECK-unknown-SAME: constant 
 //         CHECK-SAME: <{
+//         CHECK-SAME:   i64,
 //         CHECK-SAME:   ptr,
 //         CHECK-SAME:   ptr,
 //                   :   [[INT]],
@@ -32,6 +33,7 @@
 //         CHECK-SAME:   [[INT]],
 //         CHECK-SAME:   ptr
 //         CHECK-SAME: }> <{
+//         CHECK-SAME:   i64
 //         CHECK-SAME:   $s4main5Value[[UNIQUE_ID_1]]CfD
 //         CHECK-SAME:   $sBoWV
 //   CHECK-apple-SAME:   $s4main5Value[[UNIQUE_ID_1]]CyAA6EitherACLLOySiGGMM
@@ -51,9 +53,9 @@
 //         CHECK-SAME:   i32 {{(25|13)}},
 //         CHECK-SAME:   i16 {{(7|3)}},
 //         CHECK-SAME:   i16 0,
-//   CHECK-apple-SAME:   i32 {{(128|76)}},
-// CHECK-unknown-SAME:   i32 104,
-//         CHECK-SAME:   i32 {{(24|12)}},
+//   CHECK-apple-SAME:   i32 {{(136|84)}},
+// CHECK-unknown-SAME:   i32 112,
+//         CHECK-SAME:   i32 {{(32|20)}},
 //                   :   ptr bitcast (
 //                   :     <{
 //                   :       i32,
@@ -87,7 +89,7 @@
 //         CHECK-SAME:     %swift.full_type,
 //         CHECK-SAME:     $s4main6Either[[UNIQUE_ID_1]]OySiGMf
 //         CHECK-SAME:     i32 0,
-//         CHECK-SAME:     i32 2
+//         CHECK-SAME:     i32 3
 //         CHECK-SAME:   ),
 //         CHECK-SAME:   [[INT]] {{(16|8)}},
 //         CHECK-SAME:   $s4main5Value[[UNIQUE_ID_1]]C5firstADyxGx_tcfC

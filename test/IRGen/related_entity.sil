@@ -16,32 +16,32 @@ bb0:
   %take = function_ref @take_metatype : $@convention(thin) <T> (@thick T.Type) -> ()
 
 // CHECK:         @"$sSo18NestedTypedefErroraMn" = linkonce_odr hidden constant
-// CHECK-SAME:    <i32 0x0006_0012>
+// CHECK-SAME:    <i32 0x0026_0012>
 // CHECK-SAME:    @"$sSoMXM"
 // CHECK-SAME:    ptr @.str.28.Code_NNestedTypedefError_St_.nul12.nul32.nul35
 
 // CHECK:         @"$sSC14NestedTagErrorLeVMn" = linkonce_odr hidden constant
-// CHECK-SAME:    <i32 0x0006_0011>
+// CHECK-SAME:    <i32 0x0026_0011>
 // CHECK-SAME:    @"$sSCMXM"
 // CHECK-SAME:    ptr @.str.28.TagError_NNestedTagError_Re_.nul16.nul32.nul35
 
 // CHECK:         @"$sSo13TypedefError2aMn" = linkonce_odr hidden constant
-// CHECK-SAME:    <i32 0x0006_0012>
+// CHECK-SAME:    <i32 0x0026_0012>
 // CHECK-SAME:    @"$sSoMXM"
 // CHECK-SAME:    ptr @.str.23.Code_NTypedefError2_St_.nul12.nul27.nul30
 
 // CHECK:         @"$sSC13TypedefError1LEVMn" = linkonce_odr hidden constant
-// CHECK-SAME:    <i32 0x0006_0011>
+// CHECK-SAME:    <i32 0x0026_0011>
 // CHECK-SAME:    @"$sSCMXM"
 // CHECK-SAME:    ptr @.str.17.TypedefError1_RE_.nul21.nul24
 
 // CHECK:         @"$sSo9TagError2VMn" = linkonce_odr hidden constant
-// CHECK-SAME:    <i32 0x0006_0012>
+// CHECK-SAME:    <i32 0x0026_0012>
 // CHECK-SAME:    @"$sSoMXM"
 // CHECK-SAME:    ptr @.str.16.Code_NTagError2_.nul12.nul23
 
 // CHECK:         @"$sSC9TagError1LeVMn" = linkonce_odr hidden constant
-// CHECK-SAME:    <i32 0x0006_0011>
+// CHECK-SAME:    <i32 0x0026_0011>
 // CHECK-SAME:    @"$sSCMXM"
 // CHECK-SAME:    ptr @.str.13.TagError1_Re_.nul17.nul20
 

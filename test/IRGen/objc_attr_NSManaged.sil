@@ -21,7 +21,7 @@ sil_vtable X {}
 // CHECK: @_PROPERTIES__TtC19objc_attr_NSManaged10SwiftGizmo = internal constant { {{.*}}i32, i32, [1 x { ptr, ptr }] } { i32 16, i32 1, [1 x { ptr, ptr }] [{ ptr, ptr } { ptr @.str.1.x,
 
 // The getter/setter should not show up in the Swift metadata.
-// CHECK: @"$s19objc_attr_NSManaged10SwiftGizmoCMf" = internal global <{ {{.*}} }> <{ ptr{{.*}}, ptr {{.*}}@"$s19objc_attr_NSManaged10SwiftGizmoCfD{{(\.ptrauth)?}}"{{.*}}, ptr{{.*}} @"$sBOWV{{(.ptrauth)?(.)?[0-9]?}}"{{.*}}, {{.*}} @"OBJC_METACLASS_$__TtC19objc_attr_NSManaged10SwiftGizmo{{(.ptrauth)?}}"{{.*}}, ptr{{.*}} @"OBJC_CLASS_$_Gizmo{{(.ptrauth)?}}"{{.*}}, ptr @_objc_empty_cache, ptr null,{{.*}}@_DATA__TtC19objc_attr_NSManaged10SwiftGizmo{{.*}}{{(i64 )?(1|2)?}}{{.*}}, i32 {{1|0}}, i32 0, i32 8, i16 7, i16 0, i32 104, i32 24, ptr @"$s19objc_attr_NSManaged10SwiftGizmoCMn{{(\.ptrauth)?}}"{{.*}}, ptr null }>
+// CHECK: @"$s19objc_attr_NSManaged10SwiftGizmoCMf" = internal global <{ {{.*}} }> <{ i64 0, ptr{{.*}}, ptr {{.*}}@"$s19objc_attr_NSManaged10SwiftGizmoCfD{{(\.ptrauth)?}}"{{.*}}, ptr{{.*}} @"$sBOWV{{(.ptrauth)?(.)?[0-9]?}}"{{.*}}, {{.*}} @"OBJC_METACLASS_$__TtC19objc_attr_NSManaged10SwiftGizmo{{(.ptrauth)?}}"{{.*}}, ptr{{.*}} @"OBJC_CLASS_$_Gizmo{{(.ptrauth)?}}"{{.*}}, ptr @_objc_empty_cache, ptr null,{{.*}}@_DATA__TtC19objc_attr_NSManaged10SwiftGizmo{{.*}}{{(i64 )?(1|2)?}}{{.*}}, i32 {{1|0}}, i32 0, i32 8, i16 7, i16 0, i32 112, i32 32, ptr @"$s19objc_attr_NSManaged10SwiftGizmoCMn{{(\.ptrauth)?}}"{{.*}}, ptr null }>
 
 @objc class SwiftGizmo : Gizmo {
   @objc @NSManaged var x: X

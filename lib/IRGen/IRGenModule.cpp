@@ -342,13 +342,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A full type metadata record is basically just an adjustment to the
   // address point of a type metadata.  Resilience may cause
   // additional data to be laid out prior to this address point.
-  static_assert(MetadataAdjustmentIndex::ValueType == 2,
+  static_assert(MetadataAdjustmentIndex::ValueType == 3,
                 "Adjustment index must be synchronized with this layout");
-  FullTypeMetadataStructTy = createStructType(*this, "swift.full_type", {
-    Int8PtrTy,
-    WitnessTablePtrTy,
-    TypeMetadataStructTy
-  });
+  FullTypeMetadataStructTy = createStructType(
+      *this, "swift.full_type",
+      {Int64Ty, Int8PtrTy, WitnessTablePtrTy, TypeMetadataStructTy});
 
   FullForeignTypeMetadataStructTy = createStructType(*this, "swift.full_foreign_type", {
     WitnessTablePtrTy,
@@ -370,26 +368,23 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A full heap metadata is basically just an additional small prefix
   // on a full metadata, used for metadata corresponding to heap
   // allocations.
-  static_assert(MetadataAdjustmentIndex::Class == 3,
+  static_assert(MetadataAdjustmentIndex::Class == 4,
                 "Adjustment index must be synchronized with this layout");
-  FullHeapMetadataStructTy =
-                  createStructType(*this, "swift.full_heapmetadata", {
-    Int8PtrTy,
-    PtrTy,
-    WitnessTablePtrTy,
-    TypeMetadataStructTy
-  });
+  FullHeapMetadataStructTy = createStructType(
+      *this, "swift.full_heapmetadata",
+      {Int64Ty, Int8PtrTy, PtrTy, WitnessTablePtrTy, TypeMetadataStructTy});
 
   // A full box metadata is non-type heap metadata for a heap allocation of a
   // single value. The box tracks the offset to the value inside the box.
-  FullBoxMetadataStructTy =
-                  createStructType(*this, "swift.full_boxmetadata", {
-    PtrTy,
-    WitnessTablePtrTy,
-    TypeMetadataStructTy,
-    Int32Ty,
-    CaptureDescriptorPtrTy,
-  });
+  FullBoxMetadataStructTy = createStructType(*this, "swift.full_boxmetadata",
+                                             {
+                                                 Int64Ty,
+                                                 PtrTy,
+                                                 WitnessTablePtrTy,
+                                                 TypeMetadataStructTy,
+                                                 Int32Ty,
+                                                 CaptureDescriptorPtrTy,
+                                             });
 
   // This must match struct HeapObject in the runtime.
   llvm::Type *refCountedElts[] = {TypeMetadataPtrTy, IntPtrTy};
@@ -2391,6 +2386,18 @@ bool IRGenModule::isConcurrencyAvailable() {
   auto &ctx = getSwiftModule()->getASTContext();
   auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
   return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
+}
+
+bool IRGenModule::isTypedAllocationAvailable() {
+  if (!Triple.isOSDarwin() || Triple.isBridgeOS()) {
+    // Typed allocation is not available on non-apple platforms
+    // and bridgeOS
+    return false;
+  }
+  auto &ctx = getSwiftModule()->getASTContext();
+  auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
+  return deploymentAvailability.isContainedIn(
+      ctx.getTypedAllocationAvailability());
 }
 
 /// Pretend the other files that drivers/build systems expect exist by

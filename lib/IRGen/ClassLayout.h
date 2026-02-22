@@ -221,6 +221,9 @@ public:
   bool hasObjCImplementation() const {
     return Options.contains(ClassMetadataFlags::ClassHasObjCImplementation);
   }
+
+  std::optional<uint64_t>
+  computeTypedMallocTypeDescriptor(IRGenModule &IGM, SILType selfType) const;
 };
 
 } // end namespace irgen

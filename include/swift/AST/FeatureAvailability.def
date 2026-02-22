@@ -89,6 +89,8 @@ FEATURE(ClearSensitive,                                 FUTURE)
 FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
 // TODO: CoroutineAccessors: Change to correct version number.
 FEATURE(CoroutineAccessors,                             FUTURE)
+// TODO: TypedAllocation: Change to correct version number.
+FEATURE(TypedAllocation,                                FUTURE)
 
 #undef FEATURE
 #undef FUTURE

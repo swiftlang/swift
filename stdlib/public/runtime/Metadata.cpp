@@ -5698,7 +5698,9 @@ public:
   };
 
   ExtendedExistentialTypeCacheEntry(Key key)
-      : Data{ TargetTypeMetadataHeader<InProcess>({getOrCreateTypeLayout(key)}, {getOrCreateVWT(key)}), key.Shape} {
+      : Data{TargetTypeMetadataHeader<InProcess>(
+                 {0}, {getOrCreateTypeLayout(key)}, {getOrCreateVWT(key)}),
+             key.Shape} {
     key.Arguments.installInto(Data.getTrailingObjects<const void *>());
   }
 
