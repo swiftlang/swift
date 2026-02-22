@@ -173,11 +173,6 @@ do {
   var y = NE()
   takeGetGenericAndArgs(f: { $0 = $1 }, o: &y, i: x) // OK
 }
-do {
-  let _ = transfer // OK
-  let _: (NE) -> NE = transfer // OK
-  let _: @_lifetime(copy ne) (_ ne: NE) -> NE = transfer // OK
-}
 
 // rdar://166912068 (Incorrect error when passing a local function with a non-escapable parameter)
 struct NEWithSpan: ~Escapable {

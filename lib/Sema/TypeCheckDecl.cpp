@@ -2564,6 +2564,81 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
 
+      // For static methods, with no dependencies involving the self parameter,
+      // we can attach the same lifetime dependencies to the inner type as well.
+      //
+      // TODO: Do this for non-static methods etc. once we have closure context
+      // dependencies.
+      if (hasSelf && lifetimeDependenceInfo.has_value() && AFD->isStatic()) {
+        SmallVector<LifetimeDependenceInfo, 2> innerDependenceInfo;
+        innerDependenceInfo.reserve(lifetimeDependenceInfo->size());
+        ASSERT(AFD->hasImplicitSelfDecl());
+        const unsigned innerResultIndex = AFD->getParameters()->size();
+        const unsigned selfIndex = innerResultIndex;
+        const unsigned outerResultIndex = innerResultIndex + 1;
+        const auto cloneIndicesWithoutSelf =
+            [&](IndexSubset *indices) -> std::optional<IndexSubset *> {
+          if (!indices)
+            return indices;
+
+          if (indices->contains(selfIndex))
+            return std::nullopt;
+
+          auto bits = indices->getBitVector();
+          ASSERT(!bits.back() && "self index bit not set");
+          bits.pop_back();
+          return IndexSubset::get(Context, bits);
+        };
+        const auto cloneDependenceInfoWithoutSelf =
+            [&](const LifetimeDependenceInfo &outerDep)
+            -> std::optional<LifetimeDependenceInfo> {
+          const auto outerTargetIndex = outerDep.getTargetIndex();
+          if (outerTargetIndex == selfIndex) {
+            return std::nullopt;
+          }
+
+          // Fix the result index, since it gets pushed forward one by self (see
+          // LifetimeDependence.cpp).
+          const auto targetIndex = (outerTargetIndex == outerResultIndex)
+                                       ? innerResultIndex
+                                       : outerTargetIndex;
+
+          auto inherit = cloneIndicesWithoutSelf(outerDep.getInheritIndices());
+          if (!inherit)
+            return std::nullopt;
+          auto scope = cloneIndicesWithoutSelf(outerDep.getScopeIndices());
+          if (!scope)
+            return std::nullopt;
+          auto addressable =
+              cloneIndicesWithoutSelf(outerDep.getAddressableIndices());
+          if (!addressable)
+            return std::nullopt;
+          auto conditionallyAddressable = cloneIndicesWithoutSelf(
+              outerDep.getConditionallyAddressableIndices());
+          if (!conditionallyAddressable)
+            return std::nullopt;
+
+          return LifetimeDependenceInfo(
+              *inherit, *scope, targetIndex,
+              outerDep.hasImmortalSpecifier(), outerDep.isFromAnnotation(),
+              *addressable, *conditionallyAddressable);
+        };
+
+        bool lifetimeDependenceInfoUsesSelf = false;
+        for (const auto &outerDep : *lifetimeDependenceInfo) {
+
+          if (auto innerDep = cloneDependenceInfoWithoutSelf(outerDep)) {
+            innerDependenceInfo.push_back(*innerDep);
+          } else {
+            lifetimeDependenceInfoUsesSelf = true;
+            break;
+          }
+        }
+        if (!lifetimeDependenceInfoUsesSelf)
+          infoBuilder = infoBuilder.withLifetimeDependencies(
+              Context.AllocateCopy(innerDependenceInfo));
+      }
+
       auto info = infoBuilder.build();
 
       if (sig && !hasSelf) {
