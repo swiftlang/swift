@@ -2293,34 +2293,147 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
     auto *typeVar = entry.first;
     auto GP = entry.second;
 
-    swift::SmallSetVector<Type, 4> arguments;
+    SmallVector<Type, 4> arguments;
+    llvm::SmallVector<PackType *, 4> allPackTypes;
+    
     for (const auto &solution : solutions) {
       auto type = solution.typeBindings.lookup(typeVar);
-      // Type variables gathered from a solution's type binding context may not
-      // exist in another given solution because some solutions may have
-      // additional type variables not present in other solutions due to taking
-      // different paths in the solver.
       if (!type)
         continue;
 
-      // Contextual opaque result type is uniquely identified by
-      // declaration it's associated with, so we have to compare
-      // declarations instead of using pointer equality on such types.
       if (auto *opaque = type->getAs<OpaqueTypeArchetypeType>()) {
         auto *decl = opaque->getDecl();
-        arguments.remove_if([&](Type argType) -> bool {
-          if (auto *otherOpaque = argType->getAs<OpaqueTypeArchetypeType>()) {
-            return decl == otherOpaque->getDecl();
-          }
-          return false;
-        });
+        arguments.erase(
+          std::remove_if(arguments.begin(), arguments.end(),
+            [&](Type argType) -> bool {
+              if (auto *otherOpaque = argType->getAs<OpaqueTypeArchetypeType>()) {
+                return decl == otherOpaque->getDecl();
+              }
+              return false;
+            }),
+          arguments.end());
       }
 
-      arguments.insert(type);
+      if (auto *packType = type->getAs<PackType>()) {
+        allPackTypes.push_back(packType);
+      } else {
+        bool isDuplicate = false;
+        for (auto existingArg : arguments) {
+          if (type->isEqual(existingArg)) {
+            isDuplicate = true;
+            break;
+          }
+        }
+        
+        if (!isDuplicate)
+          arguments.push_back(type);
+      }
     }
-
-    if (arguments.size() > 1)
-      conflicts[GP].append(arguments.begin(), arguments.end());
+    
+    if (!allPackTypes.empty() && allPackTypes.size() > 1) {
+      unsigned numElements = allPackTypes[0]->getNumElements();
+      llvm::SmallVector<std::pair<PackType *, unsigned>, 4> packWithUniqueCount;
+      
+      for (auto *pack : allPackTypes) {
+        if (pack->getNumElements() != numElements)
+          continue;
+          
+        auto elements = pack->getElementTypes();
+        llvm::SmallSet<CanType, 4> uniqueTypes;
+        for (unsigned i = 0; i < numElements; ++i) {
+          uniqueTypes.insert(elements[i]->getCanonicalType());
+        }
+        
+        packWithUniqueCount.push_back({pack, uniqueTypes.size()});
+      }
+      
+      unsigned minUnique = numElements + 1;
+      unsigned maxUnique = 0;
+      for (auto &entry : packWithUniqueCount) {
+        minUnique = std::min(minUnique, entry.second);
+        maxUnique = std::max(maxUnique, entry.second);
+      }
+      
+      llvm::SmallVector<PackType *, 4> argumentPacks;
+      for (auto &entry : packWithUniqueCount) {
+        if (entry.second == minUnique || entry.second == maxUnique) {
+          argumentPacks.push_back(entry.first);
+        }
+      }
+      
+      for (auto *pack : argumentPacks) {
+        bool isDuplicate = false;
+        for (auto existingArg : arguments) {
+          if (auto *existingPack = existingArg->getAs<PackType>()) {
+            if (pack->getNumElements() == existingPack->getNumElements()) {
+              auto packElements = pack->getElementTypes();
+              auto existingElements = existingPack->getElementTypes();
+              
+              bool allEqual = true;
+              for (unsigned i = 0; i < pack->getNumElements(); ++i) {
+                if (!packElements[i]->getCanonicalType()->isEqual(
+                        existingElements[i]->getCanonicalType())) {
+                  allEqual = false;
+                  break;
+                }
+              }
+              
+              if (allEqual) {
+                isDuplicate = true;
+                break;
+              }
+            }
+          }
+        }
+        
+        if (!isDuplicate)
+          arguments.push_back(Type(pack));
+      }
+    } else if (allPackTypes.size() == 1) {
+      arguments.push_back(Type(allPackTypes[0]));
+    }
+    
+    if (arguments.size() > 1) {
+      auto &conflictList = conflicts[GP];
+      for (auto argType : arguments) {
+        bool isDuplicate = false;
+        
+        if (auto *packType = argType->getAs<PackType>()) {
+          for (auto existingType : conflictList) {
+            if (auto *existingPack = existingType->getAs<PackType>()) {
+              if (packType->getNumElements() == existingPack->getNumElements()) {
+                auto packElements = packType->getElementTypes();
+                auto existingElements = existingPack->getElementTypes();
+                
+                bool allEqual = true;
+                for (unsigned i = 0; i < packType->getNumElements(); ++i) {
+                  if (!packElements[i]->getCanonicalType()->isEqual(
+                          existingElements[i]->getCanonicalType())) {
+                    allEqual = false;
+                    break;
+                  }
+                }
+                
+                if (allEqual) {
+                  isDuplicate = true;
+                  break;
+                }
+              }
+            }
+          }
+        } else {
+          for (auto existingType : conflictList) {
+            if (argType->isEqual(existingType)) {
+              isDuplicate = true;
+              break;
+            }
+          }
+        }
+        
+        if (!isDuplicate)
+          conflictList.push_back(argType);
+      }
+    }
   }
 
   auto getGenericTypeDecl = [&](ArchetypeType *archetype) -> ValueDecl * {
