@@ -450,6 +450,11 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
 
     for (auto searchDir = clangHeaderSearchInfo.search_dir_begin();
          searchDir != clangHeaderSearchInfo.search_dir_end(); ++searchDir) {
+      // Header map lookup is not supported for now, so don't add the hmap
+      // paths to the search list.
+      if (searchDir->isHeaderMap())
+          continue;
+
       // Ensure search directories end in / so that we don't prefix match
       // against a folder that starts with the same substring.
       auto path = normalizePath(searchDir->getName());
