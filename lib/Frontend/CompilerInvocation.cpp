@@ -520,7 +520,7 @@ static void diagnoseSwiftVersion(std::optional<version::Version> &vers,
         [&](LanguageMode mode) { os << "'" << mode.versionString() << "'"; });
   }
 
-  diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, modesStr);
+  diags.diagnose(SourceLoc(), diag::note_valid_language_modes, modesStr);
 }
 
 /// Create a new Regex instance out of the string value in \p RpassArg.
