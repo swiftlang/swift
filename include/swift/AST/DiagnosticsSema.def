@@ -6241,6 +6241,9 @@ ERROR(unsafe_global_actor,none,
 ERROR(global_actor_arg,none,
       "global actor attribute %0 cannot have arguments",
       (Type))
+ERROR(global_actor_on_inheritance_clause,none,
+      "global actor %0 cannot be applied to type in inheritance clause",
+      (TypeRepr *))
 ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
 ERROR(global_actor_top_level_var,none,
