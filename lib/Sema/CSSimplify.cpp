@@ -3252,8 +3252,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // one without that lifetime dependency when the substituted type is
   // Escapable.
   //
-  // TODO: There should also be a subtype relationship from less-constrained to
-  // more-constrained lifetime dependencies.
+  // There is also a subtype relationship from less-constrained to
+  // more-constrained lifetime dependencies (see LifetimeDependenceInfo::convertibleTo).
   if (func1->getLifetimeDependencies() != func2->getLifetimeDependencies()) {
     auto escapable = getASTContext().getProtocol(KnownProtocolKind::Escapable)
       ->getDeclaredType();
@@ -3263,10 +3263,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       if (toDep) {
         // If a dependency is present for the same target in both types, then
         // the dependency must match.
-        if (fromDep != *toDep) {
+        if (!fromDep.convertibleTo(*toDep)) {
           return getTypeMatchFailure(locator);
         }
-        
+
         continue;
       }
       
