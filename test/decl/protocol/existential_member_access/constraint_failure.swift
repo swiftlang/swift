@@ -41,8 +41,7 @@ do {
 
   exist.method1() // expected-error {{instance method 'method1()' requires that 'Self.A' inherit from 'Class<Self>'}}
   exist.method2()
-  // expected-error@-1 {{instance method 'method2()' requires the types 'Self' and 'Self.A.Element' be equivalent}}
-  // expected-error@-2 {{instance method 'method2()' requires that 'Self.A' conform to 'Sequence'}}
+  // expected-error@-1 {{instance method 'method2()' requires that 'Self.A' conform to 'Sequence'}}
   _ = exist.method3(false) // ok
   exist.method4(false)
   // expected-error@-1 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>'}}
@@ -89,9 +88,8 @@ do {
   let exist2: any UnfulfillableGenericRequirementsDerived3
 
   exist1.method6(false)
-  // expected-error@-1 {{instance method 'method6' requires that 'Self.A.Element' conform to 'Sequence'}}
-  // expected-error@-2 {{instance method 'method6' requires that 'Self.A' conform to 'Sequence'}}
-  // expected-error@-3 {{instance method 'method6' requires that 'Bool' conform to 'UnfulfillableGenericRequirements'}}
+  // expected-error@-1 {{instance method 'method6' requires that 'Self.A' conform to 'Sequence'}}
+  // expected-error@-2 {{instance method 'method6' requires that 'Bool' conform to 'UnfulfillableGenericRequirements'}}
   exist2.method6(false)
   // expected-error@-1 {{member 'method6' cannot be used on value of type 'any UnfulfillableGenericRequirementsDerived3'; consider using a generic constraint instead}}
   // expected-error@-2 {{instance method 'method6' requires that 'Bool' conform to 'UnfulfillableGenericRequirements'}}

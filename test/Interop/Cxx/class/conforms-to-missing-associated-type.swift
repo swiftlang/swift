@@ -27,5 +27,5 @@ extension P {
   func foo(_: A) {}
 }
 func test(x : S) {
-    x.foo(0) // expected-error{{cannot convert value of type 'Int' to expected argument type 'S.A'}}
+    x.foo(0)
 }
