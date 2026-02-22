@@ -366,9 +366,9 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
       return;
 
     if (!paramIsOptional) {
-      if (parentDecl->isImplicitlyUnwrappedOptional())
-        if (!treatIUOResultAsError)
-          return;
+      bool parentIsIUO = parentDecl->isImplicitlyUnwrappedOptional();
+      if (parentIsIUO && !treatIUOResultAsError)
+        return;
 
       emittedError = true;
       auto diag = diags.diagnose(
@@ -376,9 +376,18 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
           isa<SubscriptDecl>(member), parentParamTy, paramTy);
       if (repr->isSimple()) {
         diag.fixItInsertAfter(repr->getEndLoc(), "?");
+        // If parent is IUO, also suggest '!' as an alternative
+        if (parentIsIUO) {
+          diag.fixItInsertAfter(repr->getEndLoc(), "!");
+        }
       } else {
         diag.fixItInsert(repr->getStartLoc(), "(");
         diag.fixItInsertAfter(repr->getEndLoc(), ")?");
+        // If parent is IUO, also suggest '!)' as an alternative
+        if (parentIsIUO) {
+          diag.fixItInsert(repr->getStartLoc(), "(");
+          diag.fixItInsertAfter(repr->getEndLoc(), ")!");
+        }
       }
       return;
     }
