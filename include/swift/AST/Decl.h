@@ -1224,6 +1224,9 @@ public:
   /// *ApplicationMain or an main attribute.
   ArtificialMainKind getArtificialMainKind() const;
 
+  /// Returns true if this can support borrow/mutate accessors.
+  bool canSupportBorrowAccessors() const;
+
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(const char *filename));
   void dump(raw_ostream &OS, unsigned Indent = 0) const;

@@ -3332,6 +3332,8 @@ NOTE(protocol_witness_settable_conflict,none,
 ERROR(protocol_witness_borrow_mutate_conflict, none,
       "candidate is not a stored property or a computed property with %0 accessor, but protocol requires it",
       (StringRef))
+ERROR(protocol_witness_borrow_mutate_unsupported, none,
+      "borrow/mutate protocol requirements can only be witnessed in a struct", ())
 
 NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
