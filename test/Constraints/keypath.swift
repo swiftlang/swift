@@ -342,3 +342,7 @@ func test_new_key_path_type_requirements() {
   // expected-error@-1 {{key path cannot refer to noncopyable type 'S'}}
   // expected-error@-2 {{local function 'test' requires that 'S' conform to 'Copyable'}}
 }
+
+func test_inout_tuple_lvalue_keypath_self(_ x: inout Int) {
+  _ = (x, x)[keyPath: \.self]
+}
