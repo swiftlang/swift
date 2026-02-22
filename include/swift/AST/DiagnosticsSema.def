@@ -6228,6 +6228,8 @@ ERROR(no_concurrency_module,none,
 ERROR(multiple_global_actors,none,
       "declaration can not have multiple global actor attributes (%0 and %1)",
       (Identifier, Identifier))
+NOTE(multiple_global_actors_note,none,
+      "remove the %0 attribute", (Identifier))
 ERROR(global_actor_disallowed,none,
       "%kindonly0 cannot have a global actor", (const Decl *))
 ERROR(global_actor_on_actor_class,none,
