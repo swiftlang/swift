@@ -5665,3 +5665,16 @@ bb2:
   unreachable
 }
 
+// CHECK-LABEL: sil [ossa] @test_init_borrow_addr_ossa : $@convention(thin) (@in_guaranteed MoveOnlyStruct) -> @out Builtin.Borrow<MoveOnlyStruct> {
+// CHECK-NOT:     init_borrow_addr
+// CHECK:         [[LOADED:%.*]] = load_borrow %1 : $*MoveOnlyStruct
+// CHECK:         [[BORROW:%.*]] = make_borrow [[LOADED]]
+// CHECK:         store [[BORROW]] to [trivial] %0 : $*Builtin.Borrow<MoveOnlyStruct>
+// CHECK:         end_borrow [[LOADED]]
+// CHECK-LABEL: } // end sil function 'test_init_borrow_addr_ossa'
+sil [ossa] @test_init_borrow_addr_ossa : $@convention(thin) (@in_guaranteed MoveOnlyStruct) -> @out Builtin.Borrow<MoveOnlyStruct> {
+bb0(%0 : $*Builtin.Borrow<MoveOnlyStruct>, %1 : $*MoveOnlyStruct):
+  init_borrow_addr %0 : $*Builtin.Borrow<MoveOnlyStruct> with %1 : $*MoveOnlyStruct
+  %r = tuple ()
+  return %r : $()
+}
