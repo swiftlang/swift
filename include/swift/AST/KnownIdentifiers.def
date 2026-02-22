@@ -333,6 +333,9 @@ IDENTIFIER(decodeNextArgument)
 IDENTIFIER(SerializationRequirement)
 IDENTIFIER_WITH_NAME(builderSelf, "$builderSelf")
 
+// Distributed actors - tracing hooks
+IDENTIFIER_(traceDistributedRemoteCall)
+
 // Attribute options
 IDENTIFIER(always)
 IDENTIFIER_(_always)

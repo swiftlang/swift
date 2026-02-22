@@ -113,9 +113,9 @@ void job_run_end(job_run_info info);
 } // namespace swift
 
 #if SWIFT_STDLIB_TRACING
-#include "TracingSignpost.h"
+#include "TracingConcurrencySignpost.h"
 #else
-#include "TracingStubs.h"
+#include "TracingConcurrencyStubs.h"
 #endif
 
 #endif
