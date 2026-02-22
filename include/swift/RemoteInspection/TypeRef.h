@@ -18,13 +18,14 @@
 #ifndef SWIFT_REFLECTION_TYPEREF_H
 #define SWIFT_REFLECTION_TYPEREF_H
 
-#include "llvm/ADT/PointerIntPair.h"
+#include "swift/ABI/MetadataValues.h"
+#include "swift/Basic/Unreachable.h"
+#include "swift/Demangling/ManglingFlavor.h"
+#include "swift/Remote/MetadataReader.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
-#include "swift/ABI/MetadataValues.h"
-#include "swift/Remote/MetadataReader.h"
-#include "swift/Basic/Unreachable.h"
 #include <ostream>
 namespace swift {
 namespace reflection {
@@ -215,13 +216,17 @@ public:
 // extra bits needed by TypeRefRequirement.
 class alignas(8) TypeRef {
   TypeRefKind Kind;
+  Mangle::ManglingFlavor Flavor;
 
 public:
-  TypeRef(TypeRefKind Kind) : Kind(Kind) {}
+  TypeRef(TypeRefKind Kind, Mangle::ManglingFlavor Flavor)
+      : Kind(Kind), Flavor(Flavor) {}
 
   TypeRefKind getKind() const {
     return Kind;
   }
+
+  Mangle::ManglingFlavor getManglingFlavor() const { return Flavor; }
 
   void dump() const;
   void dump(std::ostream &stream, unsigned Indent = 0) const;
@@ -257,19 +262,22 @@ public:
 class BuiltinTypeRef final : public TypeRef {
   std::string MangledName;
 
-  static TypeRefID Profile(const std::string &MangledName) {
+  static TypeRefID Profile(const std::string &MangledName,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addString(MangledName);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
-  BuiltinTypeRef(const std::string &MangledName)
-    : TypeRef(TypeRefKind::Builtin), MangledName(MangledName) {}
+  BuiltinTypeRef(const std::string &MangledName, Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::Builtin, Flavor), MangledName(MangledName) {}
 
   template <typename Allocator>
-  static const BuiltinTypeRef *create(Allocator &A, std::string MangledName) {
-    FIND_OR_CREATE_TYPEREF(A, BuiltinTypeRef, MangledName);
+  static const BuiltinTypeRef *create(Allocator &A, std::string MangledName,
+                                      Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, BuiltinTypeRef, MangledName, Flavor);
   }
 
   const std::string &getMangledName() const {
@@ -287,10 +295,12 @@ class NominalTypeTrait {
 
 protected:
   static TypeRefID Profile(const std::string &MangledName,
+                           Mangle::ManglingFlavor Flavor,
                            const TypeRef *Parent) {
     TypeRefID ID;
     ID.addPointer(Parent);
     ID.addString(MangledName);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
@@ -323,15 +333,16 @@ public:
 class NominalTypeRef final : public TypeRef, public NominalTypeTrait {
   using NominalTypeTrait::Profile;
 public:
-  NominalTypeRef(const std::string &MangledName,
+  NominalTypeRef(const std::string &MangledName, Mangle::ManglingFlavor Flavor,
                  const TypeRef *Parent = nullptr)
-    : TypeRef(TypeRefKind::Nominal), NominalTypeTrait(MangledName, Parent) {}
+      : TypeRef(TypeRefKind::Nominal, Flavor),
+        NominalTypeTrait(MangledName, Parent) {}
 
   template <typename Allocator>
-  static const NominalTypeRef *create(Allocator &A,
-                                      const std::string &MangledName,
-                                      const TypeRef *Parent = nullptr) {
-    FIND_OR_CREATE_TYPEREF(A, NominalTypeRef, MangledName, Parent);
+  static const NominalTypeRef *
+  create(Allocator &A, const std::string &MangledName,
+         Mangle::ManglingFlavor Flavor, const TypeRef *Parent = nullptr) {
+    FIND_OR_CREATE_TYPEREF(A, NominalTypeRef, MangledName, Flavor, Parent);
   }
 
   static bool classof(const TypeRef *TR) {
@@ -344,30 +355,32 @@ class BoundGenericTypeRef final : public TypeRef, public NominalTypeTrait {
 
   static TypeRefID Profile(const std::string &MangledName,
                            const std::vector<const TypeRef *> &GenericParams,
+                           Mangle::ManglingFlavor Flavor,
                            const TypeRef *Parent) {
     TypeRefID ID;
     ID.addPointer(Parent);
     ID.addString(MangledName);
     for (auto Param : GenericParams)
       ID.addPointer(Param);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
   BoundGenericTypeRef(const std::string &MangledName,
                       std::vector<const TypeRef *> GenericParams,
+                      Mangle::ManglingFlavor Flavor,
                       const TypeRef *Parent = nullptr)
-    : TypeRef(TypeRefKind::BoundGeneric),
-      NominalTypeTrait(MangledName, Parent),
-      GenericParams(GenericParams) {}
+      : TypeRef(TypeRefKind::BoundGeneric, Flavor),
+        NominalTypeTrait(MangledName, Parent), GenericParams(GenericParams) {}
 
   template <typename Allocator>
   static const BoundGenericTypeRef *
   create(Allocator &A, const std::string &MangledName,
          std::vector<const TypeRef *> GenericParams,
-         const TypeRef *Parent = nullptr) {
+         Mangle::ManglingFlavor Flavor, const TypeRef *Parent = nullptr) {
     FIND_OR_CREATE_TYPEREF(A, BoundGenericTypeRef, MangledName, GenericParams,
-                           Parent);
+                           Flavor, Parent);
   }
 
   const std::vector<const TypeRef *> &getGenericParams() const {
@@ -385,26 +398,28 @@ protected:
   std::vector<std::string> Labels;
 
   static TypeRefID Profile(const std::vector<const TypeRef *> &Elements,
-                           const std::vector<std::string> &Labels) {
+                           const std::vector<std::string> &Labels,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     for (auto Element : Elements)
       ID.addPointer(Element);
     for (auto Label : Labels)
       ID.addString(Label);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
   TupleTypeRef(std::vector<const TypeRef *> Elements,
-               std::vector<std::string> Labels)
-      : TypeRef(TypeRefKind::Tuple), Elements(std::move(Elements)),
+               std::vector<std::string> Labels, Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::Tuple, Flavor), Elements(std::move(Elements)),
         Labels(std::move(Labels)) {}
 
   template <typename Allocator>
-  static const TupleTypeRef *create(Allocator &A,
-                                    std::vector<const TypeRef *> Elements,
-                                    const std::vector<std::string> Labels) {
-    FIND_OR_CREATE_TYPEREF(A, TupleTypeRef, Elements, Labels);
+  static const TupleTypeRef *
+  create(Allocator &A, std::vector<const TypeRef *> Elements,
+         const std::vector<std::string> Labels, Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, TupleTypeRef, Elements, Labels, Flavor);
   }
 
   const std::vector<const TypeRef *> &getElements() const { return Elements; };
@@ -420,21 +435,25 @@ class PackTypeRef final : public TypeRef {
 protected:
   std::vector<const TypeRef *> Elements;
 
-  static TypeRefID Profile(const std::vector<const TypeRef *> &Elements) {
+  static TypeRefID Profile(const std::vector<const TypeRef *> &Elements,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     for (auto Element : Elements)
       ID.addPointer(Element);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
-  PackTypeRef(std::vector<const TypeRef *> Elements)
-      : TypeRef(TypeRefKind::Pack), Elements(std::move(Elements)) {}
+  PackTypeRef(std::vector<const TypeRef *> Elements,
+              Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::Pack, Flavor), Elements(std::move(Elements)) {}
 
   template <typename Allocator>
   static const PackTypeRef *create(Allocator &A,
-                                    std::vector<const TypeRef *> Elements) {
-    FIND_OR_CREATE_TYPEREF(A, PackTypeRef, Elements);
+                                   std::vector<const TypeRef *> Elements,
+                                   Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, PackTypeRef, Elements, Flavor);
   }
 
   const std::vector<const TypeRef *> &getElements() const { return Elements; };
@@ -449,21 +468,26 @@ protected:
   const TypeRef *Pattern;
   const TypeRef *Count;
 
-  static TypeRefID Profile(const TypeRef *Pattern, const TypeRef *Count) {
+  static TypeRefID Profile(const TypeRef *Pattern, const TypeRef *Count,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addPointer(Pattern);
     ID.addPointer(Count);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
-  PackExpansionTypeRef( const TypeRef *Pattern, const TypeRef *Count)
-      : TypeRef(TypeRefKind::PackExpansion), Pattern(Pattern), Count(Count) {}
+  PackExpansionTypeRef(const TypeRef *Pattern, const TypeRef *Count,
+                       Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::PackExpansion, Flavor), Pattern(Pattern),
+        Count(Count) {}
 
   template <typename Allocator>
-  static const PackExpansionTypeRef *create(Allocator &A,
-                                 const TypeRef *Pattern, const TypeRef *Count) {
-    FIND_OR_CREATE_TYPEREF(A, PackExpansionTypeRef, Pattern, Count);
+  static const PackExpansionTypeRef *
+  create(Allocator &A, const TypeRef *Pattern, const TypeRef *Count,
+         Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, PackExpansionTypeRef, Pattern, Count, Flavor);
   }
 
   const TypeRef *getPattern() const { return Pattern; }
@@ -486,7 +510,8 @@ class OpaqueArchetypeTypeRef final : public TypeRef {
 
   static TypeRefID
   Profile(StringRef idString, StringRef description, unsigned ordinal,
-          llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> argumentLists) {
+          llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> argumentLists,
+          Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addString(idString.str());
     ID.addInteger(ordinal);
@@ -495,18 +520,19 @@ class OpaqueArchetypeTypeRef final : public TypeRef {
       for (auto arg : argList)
         ID.addPointer(arg);
     }
-    
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
   OpaqueArchetypeTypeRef(
       StringRef id, StringRef description, unsigned ordinal,
-      llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> argumentLists)
-      : TypeRef(TypeRefKind::OpaqueArchetype), ID(id), Description(description),
-        Ordinal(ordinal) {
+      llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> argumentLists,
+      Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::OpaqueArchetype, Flavor), ID(id),
+        Description(description), Ordinal(ordinal) {
     std::vector<unsigned> argumentListLengths;
-    
+
     for (auto argList : argumentLists) {
       argumentListLengths.push_back(argList.size());
       AllArgumentsBuf.insert(AllArgumentsBuf.end(),
@@ -523,9 +549,10 @@ public:
   template <typename Allocator>
   static const OpaqueArchetypeTypeRef *
   create(Allocator &A, StringRef id, StringRef description, unsigned ordinal,
-         llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> arguments) {
-    FIND_OR_CREATE_TYPEREF(A, OpaqueArchetypeTypeRef,
-                           id, description, ordinal, arguments);
+         llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> arguments,
+         Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, OpaqueArchetypeTypeRef, id, description, ordinal,
+                           arguments, Flavor);
   }
 
   llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> getArgumentLists() const {
@@ -567,7 +594,8 @@ class FunctionTypeRef final : public TypeRef {
                            ExtendedFunctionTypeFlags ExtFlags,
                            FunctionMetadataDifferentiabilityKind DiffKind,
                            const TypeRef *GlobalActor,
-                           const TypeRef *ThrownError) {
+                           const TypeRef *ThrownError,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     for (const auto &Param : Parameters) {
       ID.addString(Param.getLabel().str());
@@ -580,30 +608,31 @@ class FunctionTypeRef final : public TypeRef {
     ID.addInteger(static_cast<uint64_t>(DiffKind.getIntValue()));
     ID.addPointer(GlobalActor);
     ID.addPointer(ThrownError);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
 
     return ID;
   }
 
 public:
   FunctionTypeRef(std::vector<Param> Params, const TypeRef *Result,
-                  FunctionTypeFlags Flags,
-                  ExtendedFunctionTypeFlags ExtFlags,
+                  FunctionTypeFlags Flags, ExtendedFunctionTypeFlags ExtFlags,
                   FunctionMetadataDifferentiabilityKind DiffKind,
-                  const TypeRef *GlobalActor,
-                  const TypeRef *ThrownError)
-      : TypeRef(TypeRefKind::Function), Parameters(Params), Result(Result),
-        Flags(Flags), ExtFlags(ExtFlags), DifferentiabilityKind(DiffKind),
-        GlobalActor(GlobalActor), ThrownError(ThrownError) {}
+                  const TypeRef *GlobalActor, const TypeRef *ThrownError,
+                  Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::Function, Flavor), Parameters(Params),
+        Result(Result), Flags(Flags), ExtFlags(ExtFlags),
+        DifferentiabilityKind(DiffKind), GlobalActor(GlobalActor),
+        ThrownError(ThrownError) {}
 
   template <typename Allocator>
-  static const FunctionTypeRef *create(
-      Allocator &A, std::vector<Param> Params, const TypeRef *Result,
-      FunctionTypeFlags Flags, ExtendedFunctionTypeFlags ExtFlags,
-      FunctionMetadataDifferentiabilityKind DiffKind,
-      const TypeRef *GlobalActor, const TypeRef *ThrownError) {
-    FIND_OR_CREATE_TYPEREF(
-        A, FunctionTypeRef, Params, Result, Flags, ExtFlags, DiffKind,
-        GlobalActor, ThrownError);
+  static const FunctionTypeRef *
+  create(Allocator &A, std::vector<Param> Params, const TypeRef *Result,
+         FunctionTypeFlags Flags, ExtendedFunctionTypeFlags ExtFlags,
+         FunctionMetadataDifferentiabilityKind DiffKind,
+         const TypeRef *GlobalActor, const TypeRef *ThrownError,
+         Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, FunctionTypeRef, Params, Result, Flags, ExtFlags,
+                           DiffKind, GlobalActor, ThrownError, Flavor);
   }
 
   const std::vector<Param> &getParameters() const { return Parameters; };
@@ -643,31 +672,33 @@ class ProtocolCompositionTypeRef final : public TypeRef {
   bool HasExplicitAnyObject;
 
   static TypeRefID Profile(std::vector<const TypeRef *> Protocols,
-                           const TypeRef *Superclass,
-                           bool HasExplicitAnyObject) {
+                           const TypeRef *Superclass, bool HasExplicitAnyObject,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addInteger((uint32_t)HasExplicitAnyObject);
     for (auto Protocol : Protocols) {
       ID.addPointer(Protocol);
     }
     ID.addPointer(Superclass);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
   ProtocolCompositionTypeRef(std::vector<const TypeRef *> Protocols,
                              const TypeRef *Superclass,
-                             bool HasExplicitAnyObject)
-    : TypeRef(TypeRefKind::ProtocolComposition),
-      Protocols(Protocols), Superclass(Superclass),
-      HasExplicitAnyObject(HasExplicitAnyObject) {}
+                             bool HasExplicitAnyObject,
+                             Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::ProtocolComposition, Flavor), Protocols(Protocols),
+        Superclass(Superclass), HasExplicitAnyObject(HasExplicitAnyObject) {}
 
   template <typename Allocator>
   static const ProtocolCompositionTypeRef *
   create(Allocator &A, std::vector<const TypeRef *> Protocols,
-         const TypeRef *Superclass, bool HasExplicitAnyObject) {
-    FIND_OR_CREATE_TYPEREF(A, ProtocolCompositionTypeRef, Protocols,
-                           Superclass, HasExplicitAnyObject);
+         const TypeRef *Superclass, bool HasExplicitAnyObject,
+         Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, ProtocolCompositionTypeRef, Protocols, Superclass,
+                           HasExplicitAnyObject, Flavor);
   }
 
   // These are either NominalTypeRef or ObjCProtocolTypeRef.
@@ -691,7 +722,8 @@ class ConstrainedExistentialTypeRef final : public TypeRef {
   std::vector<TypeRefRequirement> Requirements;
 
   static TypeRefID Profile(const ProtocolCompositionTypeRef *Protocol,
-                           std::vector<TypeRefRequirement> Requirements) {
+                           std::vector<TypeRefRequirement> Requirements,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addPointer(Protocol);
     for (auto reqt : Requirements) {
@@ -703,21 +735,24 @@ class ConstrainedExistentialTypeRef final : public TypeRef {
             unsigned(0)); // FIXME: Layout constraints aren't implemented yet
       ID.addInteger(unsigned(reqt.getKind()));
     }
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
   ConstrainedExistentialTypeRef(const ProtocolCompositionTypeRef *Protocol,
-                                std::vector<TypeRefRequirement> Requirements)
-      : TypeRef(TypeRefKind::ConstrainedExistential), Base(Protocol),
+                                std::vector<TypeRefRequirement> Requirements,
+                                Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::ConstrainedExistential, Flavor), Base(Protocol),
         Requirements(Requirements) {}
 
   template <typename Allocator>
   static const ConstrainedExistentialTypeRef *
   create(Allocator &A, const ProtocolCompositionTypeRef *Protocol,
-         std::vector<TypeRefRequirement> Requirements) {
+         std::vector<TypeRefRequirement> Requirements,
+         Mangle::ManglingFlavor Flavor) {
     FIND_OR_CREATE_TYPEREF(A, ConstrainedExistentialTypeRef, Protocol,
-                           Requirements);
+                           Requirements, Flavor);
   }
 
   const ProtocolCompositionTypeRef *getBase() const { return Base; }
@@ -740,7 +775,8 @@ class SymbolicExtendedExistentialTypeRef final : public TypeRef {
   static TypeRefID Profile(const ProtocolCompositionTypeRef *Protocol,
                            llvm::ArrayRef<TypeRefRequirement> Requirements,
                            llvm::ArrayRef<const TypeRef *> Arguments,
-                           ExtendedExistentialTypeShapeFlags Flags) {
+                           ExtendedExistentialTypeShapeFlags Flags,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addPointer(Protocol);
     for (auto reqt : Requirements) {
@@ -755,6 +791,7 @@ class SymbolicExtendedExistentialTypeRef final : public TypeRef {
 
     for (auto &Arg : Arguments)
       ID.addPointer(Arg);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
@@ -763,18 +800,20 @@ public:
       const ProtocolCompositionTypeRef *Protocol,
       llvm::ArrayRef<TypeRefRequirement> Requirements,
       llvm::ArrayRef<const TypeRef *> Args,
-      ExtendedExistentialTypeShapeFlags Flags)
-      : TypeRef(TypeRefKind::SymbolicExtendedExistential), Protocol(Protocol),
-        Requirements(Requirements), Arguments(Args), Flags(Flags) {}
+      ExtendedExistentialTypeShapeFlags Flags, Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::SymbolicExtendedExistential, Flavor),
+        Protocol(Protocol), Requirements(Requirements), Arguments(Args),
+        Flags(Flags) {}
 
   template <typename Allocator>
   static const SymbolicExtendedExistentialTypeRef *
   create(Allocator &A, const ProtocolCompositionTypeRef *Protocol,
          llvm::ArrayRef<TypeRefRequirement> Requirements,
          llvm::ArrayRef<const TypeRef *> Args,
-         ExtendedExistentialTypeShapeFlags Flags) {
+         ExtendedExistentialTypeShapeFlags Flags,
+         Mangle::ManglingFlavor Flavor) {
     FIND_OR_CREATE_TYPEREF(A, SymbolicExtendedExistentialTypeRef, Protocol,
-                           Requirements, Args, Flags);
+                           Requirements, Args, Flags, Flavor);
   }
 
   const ProtocolCompositionTypeRef *getProtocol() const { return Protocol; }
@@ -793,22 +832,27 @@ class MetatypeTypeRef final : public TypeRef {
   const TypeRef *InstanceType;
   bool WasAbstract;
 
-  static TypeRefID Profile(const TypeRef *InstanceType, bool WasAbstract) {
+  static TypeRefID Profile(const TypeRef *InstanceType, bool WasAbstract,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addPointer(InstanceType);
     ID.addInteger(static_cast<uint32_t>(WasAbstract));
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
+
 public:
-  MetatypeTypeRef(const TypeRef *InstanceType, bool WasAbstract)
-    : TypeRef(TypeRefKind::Metatype), InstanceType(InstanceType),
-      WasAbstract(WasAbstract) {}
+  MetatypeTypeRef(const TypeRef *InstanceType, bool WasAbstract,
+                  Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::Metatype, Flavor), InstanceType(InstanceType),
+        WasAbstract(WasAbstract) {}
 
   template <typename Allocator>
-  static const MetatypeTypeRef *create(Allocator &A,
-                                       const TypeRef *InstanceType,
-                                       bool WasAbstract = false) {
-    FIND_OR_CREATE_TYPEREF(A, MetatypeTypeRef, InstanceType, WasAbstract);
+  static const MetatypeTypeRef *
+  create(Allocator &A, const TypeRef *InstanceType, bool WasAbstract,
+         Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, MetatypeTypeRef, InstanceType, WasAbstract,
+                           Flavor);
   }
 
   bool wasAbstract() const {
@@ -827,20 +871,25 @@ public:
 class ExistentialMetatypeTypeRef final : public TypeRef {
   const TypeRef *InstanceType;
 
-  static TypeRefID Profile(const TypeRef *InstanceType) {
+  static TypeRefID Profile(const TypeRef *InstanceType,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addPointer(InstanceType);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
-  ExistentialMetatypeTypeRef(const TypeRef *InstanceType)
-    : TypeRef(TypeRefKind::ExistentialMetatype), InstanceType(InstanceType) {}
+  ExistentialMetatypeTypeRef(const TypeRef *InstanceType,
+                             Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::ExistentialMetatype, Flavor),
+        InstanceType(InstanceType) {}
 
   template <typename Allocator>
   static const ExistentialMetatypeTypeRef *
-  create(Allocator &A, const TypeRef *InstanceType) {
-    FIND_OR_CREATE_TYPEREF(A, ExistentialMetatypeTypeRef, InstanceType);
+  create(Allocator &A, const TypeRef *InstanceType,
+         Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, ExistentialMetatypeTypeRef, InstanceType, Flavor);
   }
 
   const TypeRef *getInstanceType() const {
@@ -856,21 +905,27 @@ class GenericTypeParameterTypeRef final : public TypeRef {
   const uint32_t Depth;
   const uint32_t Index;
 
-  static TypeRefID Profile(uint32_t Depth, uint32_t Index) {
+  static TypeRefID Profile(uint32_t Depth, uint32_t Index,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addInteger(Depth);
     ID.addInteger(Index);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
-  GenericTypeParameterTypeRef(uint32_t Depth, uint32_t Index)
-    : TypeRef(TypeRefKind::GenericTypeParameter), Depth(Depth), Index(Index) {}
+  GenericTypeParameterTypeRef(uint32_t Depth, uint32_t Index,
+                              Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::GenericTypeParameter, Flavor), Depth(Depth),
+        Index(Index) {}
 
   template <typename Allocator>
   static const GenericTypeParameterTypeRef *
-  create(Allocator &A, uint32_t Depth, uint32_t Index) {
-    FIND_OR_CREATE_TYPEREF(A, GenericTypeParameterTypeRef, Depth, Index);
+  create(Allocator &A, uint32_t Depth, uint32_t Index,
+         Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, GenericTypeParameterTypeRef, Depth, Index,
+                           Flavor);
   }
 
   uint32_t getDepth() const {
@@ -892,26 +947,29 @@ class DependentMemberTypeRef final : public TypeRef {
   std::string Protocol;
 
   static TypeRefID Profile(const std::string &Member, const TypeRef *Base,
-                           const std::string &Protocol) {
+                           const std::string &Protocol,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addString(Member);
     ID.addPointer(Base);
     ID.addString(Protocol);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
-
   DependentMemberTypeRef(const std::string &Member, const TypeRef *Base,
-                         const std::string &Protocol)
-    : TypeRef(TypeRefKind::DependentMember), Member(Member), Base(Base),
-      Protocol(Protocol) {}
+                         const std::string &Protocol,
+                         Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::DependentMember, Flavor), Member(Member),
+        Base(Base), Protocol(Protocol) {}
 
   template <typename Allocator>
   static const DependentMemberTypeRef *
-  create(Allocator &A, const std::string &Member,
-         const TypeRef *Base, const std::string &Protocol) {
-    FIND_OR_CREATE_TYPEREF(A, DependentMemberTypeRef, Member, Base, Protocol);
+  create(Allocator &A, const std::string &Member, const TypeRef *Base,
+         const std::string &Protocol, Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, DependentMemberTypeRef, Member, Base, Protocol,
+                           Flavor);
   }
 
   const std::string &getMember() const {
@@ -965,20 +1023,22 @@ public:
 class ForeignClassTypeRef final : public TypeRef {
   std::string Name;
 
-  static TypeRefID Profile(const std::string &Name) {
+  static TypeRefID Profile(const std::string &Name,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addString(Name);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
-  ForeignClassTypeRef(const std::string &Name)
-    : TypeRef(TypeRefKind::ForeignClass), Name(Name) {}
+  ForeignClassTypeRef(const std::string &Name, Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::ForeignClass, Flavor), Name(Name) {}
 
   template <typename Allocator>
-  static const ForeignClassTypeRef *create(Allocator &A,
-                                           const std::string &Name) {
-    FIND_OR_CREATE_TYPEREF(A, ForeignClassTypeRef, Name);
+  static const ForeignClassTypeRef *
+  create(Allocator &A, const std::string &Name, Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, ForeignClassTypeRef, Name, Flavor);
   }
 
   const std::string &getName() const {
@@ -995,20 +1055,24 @@ class ObjCClassTypeRef final : public TypeRef {
   std::string Name;
   static const ObjCClassTypeRef *UnnamedSingleton;
 
-  static TypeRefID Profile(const std::string &Name) {
+  static TypeRefID Profile(const std::string &Name,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addString(Name);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
+
 public:
-  ObjCClassTypeRef(const std::string &Name)
-    : TypeRef(TypeRefKind::ObjCClass), Name(Name) {}
+  ObjCClassTypeRef(const std::string &Name, Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::ObjCClass, Flavor), Name(Name) {}
 
   static const ObjCClassTypeRef *getUnnamed();
 
   template <typename Allocator>
-  static const ObjCClassTypeRef *create(Allocator &A, const std::string &Name) {
-    FIND_OR_CREATE_TYPEREF(A, ObjCClassTypeRef, Name);
+  static const ObjCClassTypeRef *create(Allocator &A, const std::string &Name,
+                                        Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, ObjCClassTypeRef, Name, Flavor);
   }
 
   const std::string &getName() const {
@@ -1024,21 +1088,24 @@ class ObjCProtocolTypeRef final : public TypeRef {
   std::string Name;
   static const ObjCProtocolTypeRef *UnnamedSingleton;
 
-  static TypeRefID Profile(const std::string &Name) {
+  static TypeRefID Profile(const std::string &Name,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addString(Name);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
+
 public:
-  ObjCProtocolTypeRef(const std::string &Name)
-    : TypeRef(TypeRefKind::ObjCProtocol), Name(Name) {}
+  ObjCProtocolTypeRef(const std::string &Name, Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::ObjCProtocol, Flavor), Name(Name) {}
 
   static const ObjCProtocolTypeRef *getUnnamed();
 
   template <typename Allocator>
-  static const ObjCProtocolTypeRef *create(Allocator &A,
-                                           const std::string &Name) {
-    FIND_OR_CREATE_TYPEREF(A, ObjCProtocolTypeRef, Name);
+  static const ObjCProtocolTypeRef *
+  create(Allocator &A, const std::string &Name, Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, ObjCProtocolTypeRef, Name, Flavor);
   }
 
   const std::string &getName() const {
@@ -1053,7 +1120,8 @@ public:
 class OpaqueTypeRef final : public TypeRef {
   static const OpaqueTypeRef *Singleton;
 
-  OpaqueTypeRef() : TypeRef(TypeRefKind::Opaque) {}
+  OpaqueTypeRef()
+      : TypeRef(TypeRefKind::Opaque, Mangle::ManglingFlavor::Default) {}
 
   static TypeRefID Profile() {
     return TypeRefID();
@@ -1070,14 +1138,17 @@ class ReferenceStorageTypeRef : public TypeRef {
   const TypeRef *Type;
 
 protected:
-  ReferenceStorageTypeRef(TypeRefKind Kind, const TypeRef *Type)
-    : TypeRef(Kind), Type(Type) {}
+  ReferenceStorageTypeRef(TypeRefKind Kind, const TypeRef *Type,
+                          Mangle::ManglingFlavor Flavor)
+      : TypeRef(Kind, Flavor), Type(Type) {}
 
-  static TypeRefID Profile(const TypeRef *Type) {
+  static TypeRefID Profile(const TypeRef *Type, Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addPointer(Type);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
+
 public:
   const TypeRef *getType() const {
     return Type;
@@ -1095,39 +1166,43 @@ public:
   }
 };
 
-#define REF_STORAGE(Name, ...) \
-  class Name##StorageTypeRef final : public ReferenceStorageTypeRef { \
-    using ReferenceStorageTypeRef::Profile; \
-  public: \
-    Name##StorageTypeRef(const TypeRef *Type) \
-      : ReferenceStorageTypeRef(TypeRefKind::Name##Storage, Type) {} \
-    template <typename Allocator> \
-    static const Name##StorageTypeRef *create(Allocator &A, \
-                                              const TypeRef *Type) { \
-      FIND_OR_CREATE_TYPEREF(A, Name##StorageTypeRef, Type); \
-    } \
-    static bool classof(const TypeRef *TR) { \
-      return TR->getKind() == TypeRefKind::Name##Storage; \
-    } \
+#define REF_STORAGE(Name, ...)                                                 \
+  class Name##StorageTypeRef final : public ReferenceStorageTypeRef {          \
+    using ReferenceStorageTypeRef::Profile;                                    \
+                                                                               \
+  public:                                                                      \
+    Name##StorageTypeRef(const TypeRef *Type, Mangle::ManglingFlavor Flavor)   \
+        : ReferenceStorageTypeRef(TypeRefKind::Name##Storage, Type, Flavor) {} \
+    template <typename Allocator>                                              \
+    static const Name##StorageTypeRef *                                        \
+    create(Allocator &A, const TypeRef *Type, Mangle::ManglingFlavor Flavor) { \
+      FIND_OR_CREATE_TYPEREF(A, Name##StorageTypeRef, Type, Flavor);           \
+    }                                                                          \
+    static bool classof(const TypeRef *TR) {                                   \
+      return TR->getKind() == TypeRefKind::Name##Storage;                      \
+    }                                                                          \
   };
 #include "swift/AST/ReferenceStorage.def"
 
 class SILBoxTypeRef final : public TypeRef {
   const TypeRef *BoxedType;
 
-  static TypeRefID Profile(const TypeRef *BoxedType) {
+  static TypeRefID Profile(const TypeRef *BoxedType,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addPointer(BoxedType);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
+
 public:
-  SILBoxTypeRef(const TypeRef *BoxedType)
-    : TypeRef(TypeRefKind::SILBox), BoxedType(BoxedType) {}
+  SILBoxTypeRef(const TypeRef *BoxedType, Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::SILBox, Flavor), BoxedType(BoxedType) {}
 
   template <typename Allocator>
-  static const SILBoxTypeRef *create(Allocator &A,
-                                     const TypeRef *BoxedType) {
-    FIND_OR_CREATE_TYPEREF(A, SILBoxTypeRef, BoxedType);
+  static const SILBoxTypeRef *create(Allocator &A, const TypeRef *BoxedType,
+                                     Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, SILBoxTypeRef, BoxedType, Flavor);
   }
 
   const TypeRef *getBoxedType() const {
@@ -1161,10 +1236,10 @@ protected:
   std::vector<Substitution> Substitutions;
   std::vector<TypeRefRequirement> Requirements;
 
-  static TypeRefID
-  Profile(const std::vector<Field> &Fields,
-          const std::vector<Substitution> &Substitutions,
-          const std::vector<TypeRefRequirement> &Requirements) {
+  static TypeRefID Profile(const std::vector<Field> &Fields,
+                           const std::vector<Substitution> &Substitutions,
+                           const std::vector<TypeRefRequirement> &Requirements,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     for (auto &f : Fields)
       ID.addPointer(f.getOpaqueValue());
@@ -1182,14 +1257,16 @@ protected:
         ID.addInteger(uint32_t(0));
       }
     }
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
   SILBoxTypeWithLayoutTypeRef(llvm::ArrayRef<Field> Fields,
                               llvm::ArrayRef<Substitution> Substitutions,
-                              llvm::ArrayRef<TypeRefRequirement> Requirements)
-      : TypeRef(TypeRefKind::SILBoxTypeWithLayout),
+                              llvm::ArrayRef<TypeRefRequirement> Requirements,
+                              Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::SILBoxTypeWithLayout, Flavor),
         Fields(Fields.begin(), Fields.end()),
         Substitutions(Substitutions.begin(), Substitutions.end()),
         Requirements(Requirements.begin(), Requirements.end()) {}
@@ -1198,9 +1275,10 @@ public:
   static const SILBoxTypeWithLayoutTypeRef *
   create(Allocator &A, llvm::ArrayRef<Field> Fields,
          llvm::ArrayRef<Substitution> Substitutions,
-         llvm::ArrayRef<TypeRefRequirement> Requirements) {
+         llvm::ArrayRef<TypeRefRequirement> Requirements,
+         Mangle::ManglingFlavor Flavor) {
     FIND_OR_CREATE_TYPEREF(A, SILBoxTypeWithLayoutTypeRef, Fields,
-                           Substitutions, Requirements);
+                           Substitutions, Requirements, Flavor);
   }
 
   static bool classof(const TypeRef *TR) {
@@ -1211,19 +1289,22 @@ public:
 class IntegerTypeRef final : public TypeRef {
   intptr_t Value;
 
-  static TypeRefID Profile(const intptr_t &Value) {
+  static TypeRefID Profile(const intptr_t &Value,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addInteger((uint64_t)Value);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
-  IntegerTypeRef(const intptr_t &Value)
-    : TypeRef(TypeRefKind::Integer), Value(Value) {}
+  IntegerTypeRef(const intptr_t &Value, Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::Integer, Flavor), Value(Value) {}
 
   template <typename Allocator>
-  static const IntegerTypeRef *create(Allocator &A, intptr_t Value) {
-    FIND_OR_CREATE_TYPEREF(A, IntegerTypeRef, Value);
+  static const IntegerTypeRef *create(Allocator &A, intptr_t Value,
+                                      Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, IntegerTypeRef, Value, Flavor);
   }
 
   const intptr_t &getValue() const {
@@ -1239,22 +1320,26 @@ class BuiltinFixedArrayTypeRef final : public TypeRef {
   const TypeRef *Size;
   const TypeRef *Element;
 
-  static TypeRefID Profile(const TypeRef *Size, const TypeRef *Element) {
+  static TypeRefID Profile(const TypeRef *Size, const TypeRef *Element,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addPointer(Size);
     ID.addPointer(Element);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
-  BuiltinFixedArrayTypeRef(const TypeRef *Size, const TypeRef *Element)
-    : TypeRef(TypeRefKind::BuiltinFixedArray), Size(Size), Element(Element) {}
+  BuiltinFixedArrayTypeRef(const TypeRef *Size, const TypeRef *Element,
+                           Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::BuiltinFixedArray, Flavor), Size(Size),
+        Element(Element) {}
 
   template <typename Allocator>
-  static const BuiltinFixedArrayTypeRef *create(Allocator &A,
-                                                const TypeRef *Size,
-                                                const TypeRef *Element) {
-    FIND_OR_CREATE_TYPEREF(A, BuiltinFixedArrayTypeRef, Size, Element);
+  static const BuiltinFixedArrayTypeRef *
+  create(Allocator &A, const TypeRef *Size, const TypeRef *Element,
+         Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, BuiltinFixedArrayTypeRef, Size, Element, Flavor);
   }
 
   const TypeRef *getSizeType() const {
@@ -1273,20 +1358,22 @@ public:
 class BuiltinBorrowTypeRef final : public TypeRef {
   const TypeRef *Referent;
 
-  static TypeRefID Profile(const TypeRef *Referent) {
+  static TypeRefID Profile(const TypeRef *Referent,
+                           Mangle::ManglingFlavor Flavor) {
     TypeRefID ID;
     ID.addPointer(Referent);
+    ID.addInteger(static_cast<uint32_t>(Flavor));
     return ID;
   }
 
 public:
-  BuiltinBorrowTypeRef(const TypeRef *Referent)
-    : TypeRef(TypeRefKind::BuiltinBorrow), Referent(Referent) {}
+  BuiltinBorrowTypeRef(const TypeRef *Referent, Mangle::ManglingFlavor Flavor)
+      : TypeRef(TypeRefKind::BuiltinBorrow, Flavor), Referent(Referent) {}
 
   template <typename Allocator>
-  static const BuiltinBorrowTypeRef *create(Allocator &A,
-                                                const TypeRef *Referent) {
-    FIND_OR_CREATE_TYPEREF(A, BuiltinBorrowTypeRef, Referent);
+  static const BuiltinBorrowTypeRef *
+  create(Allocator &A, const TypeRef *Referent, Mangle::ManglingFlavor Flavor) {
+    FIND_OR_CREATE_TYPEREF(A, BuiltinBorrowTypeRef, Referent, Flavor);
   }
 
   const TypeRef *getReferentType() const {
