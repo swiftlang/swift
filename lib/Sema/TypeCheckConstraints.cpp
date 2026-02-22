@@ -674,9 +674,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         target.markInvalid();
         return true;
       }
-      // FIXME: Once we ban forward references to bindings in closures, we can
-      // add this assert (https://github.com/swiftlang/swift/pull/85141).
-      // ABORT("Cannot type-check PatternBindingDecl without closure context");
+      ABORT("Cannot type-check PatternBindingDecl without closure context");
     }
   }
 
