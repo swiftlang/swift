@@ -35,7 +35,7 @@ func testF3(a: Int, b: Int) {
     let i: Int = f3    // expected-error{{cannot convert value of type '(Int, Int) throws -> Int' to specified type 'Int'}}
 
     _ = i
-  } catch {
+  } catch _ {
   } 
 }
 

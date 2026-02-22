@@ -1426,6 +1426,11 @@ ERROR(if_expr_must_be_syntactically_exhaustive,none,
 ERROR(do_catch_expr_must_be_syntactically_exhaustive,none,
       "'do catch' must have an unconditional 'catch' to be used as expression",
       ())
+
+WARNING(empty_catch_block,none,
+        "empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning",
+        ())
+
 ERROR(single_value_stmt_branch_empty,none,
       "expected expression in branch of '%0' expression",
       (StmtKind))
