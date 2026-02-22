@@ -65,3 +65,7 @@ struct Generic<T : P> {
   } // expected-error {{return from initializer without initializing all stored properties}}
 }
 
+func captureUninitialized() {
+  let fn: () -> Void // expected-note {{constant defined here}}
+  fn = { fn() } // expected-error {{constant 'fn' captured by a closure before being initialized}}
+}

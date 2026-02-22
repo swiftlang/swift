@@ -358,7 +358,8 @@ func test_no_crash_with_circular_ref_due_to_error() {
       // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
       // expected-error@-2 {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
       // expected-error@-3 {{cannot call value of non-function type 'Int?'}}
-      print(next)
+      // expected-note@-4 {{'next' declared here}}
+      print(next) // expected-error {{use of local variable 'next' before its declaration}}
       return x
     }
     return 0
@@ -676,20 +677,26 @@ func test_recursive_var_reference_in_multistatement_closure() {
 
   func test(optionalInt: Int?, themes: MyStruct?) {
     takeClosure {
-      let int = optionalInt { // expected-error {{cannot call value of non-function type 'Int?'}}
-        print(int)
+      let int = optionalInt {
+        // expected-error@-1 {{cannot call value of non-function type 'Int?'}}
+        // expected-note@-2 {{'int' declared here}}
+        print(int) // expected-error {{use of local variable 'int' before its declaration}}
       }
     }
 
     takeClosure {
-      let theme = themes?.someMethod() { // expected-error {{extra trailing closure passed in call}}
-        _ = theme
+      let theme = themes?.someMethod() {
+        // expected-error@-1 {{extra trailing closure passed in call}}
+        // expected-note@-2 {{'theme' declared here}}
+        _ = theme // expected-error {{use of local variable 'theme' before its declaration}}
       }
     }
 
     takeClosure {
-      let theme = themes?.filter({ $0 }) { // expected-error {{value of type 'MyStruct' has no member 'filter'}}
-        _ = theme
+      let theme = themes?.filter({ $0 }) {
+        // expected-error@-1 {{value of type 'MyStruct' has no member 'filter'}}
+        // expected-note@-2 {{'theme' declared here}}
+        _ = theme // expected-error {{use of local variable 'theme' before its declaration}}
       }
     }
   }

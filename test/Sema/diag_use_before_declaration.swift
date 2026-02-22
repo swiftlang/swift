@@ -80,6 +80,141 @@ func nested_scope_3() {
   }
 }
 
+func captureInClosure() {
+  let x = { (i: Int) in
+    currentTotal += i // expected-error {{use of local variable 'currentTotal' before its declaration}}
+  }
+
+  var currentTotal = 0 // expected-note {{'currentTotal' declared here}}
+
+  _ = x
+}
+
+class class77933460 {}
+
+func func77933460() {
+  var obj: class77933460 = { obj }()
+  // expected-error@-1 {{use of local variable 'obj' before its declaration}}
+  // expected-note@-2 {{'obj' declared here}}
+}
+
+protocol P {}
+
+enum E {
+  static func static_gen_fwd<T>(_ g: () -> T) -> T { g() }
+}
+
+func global_fwd(_ a: () -> Any) -> Any { a() }
+func global_gen_fwd<T>(_ g: () -> T) -> T { g() }
+func global_fwd_p(_ p: () -> any P) -> any P { p() }
+
+func forward_declared_let_captures() {
+  do {
+    let bad: Any = { bad }()
+    // expected-error@-1 {{use of local variable 'bad' before its declaration}}
+    // expected-note@-2 {{'bad' declared here}}
+  }
+
+  do {
+    func fwd(_ i: () -> Any) -> Any { i() }
+    let bad = fwd { bad }
+    // expected-error@-1 {{use of local variable 'bad' before its declaration}}
+    // expected-note@-2 {{'bad' declared here}}
+  }
+
+  do {
+    let bad = global_fwd { bad }
+    // expected-error@-1 {{use of local variable 'bad' before its declaration}}
+    // expected-note@-2 {{'bad' declared here}}
+  }
+
+  do {
+    let bad: Any = global_gen_fwd { bad }
+    // expected-error@-1 {{use of local variable 'bad' before its declaration}}
+    // expected-note@-2 {{'bad' declared here}}
+  }
+
+  do {
+    let bad: Any = E.static_gen_fwd { bad }
+    // expected-error@-1 {{use of local variable 'bad' before its declaration}}
+    // expected-note@-2 {{'bad' declared here}}
+  }
+
+  do {
+    let badNested: Any = global_fwd { { [badNested] in badNested }() }
+    // expected-error@-1 {{use of local variable 'badNested' before its declaration}}
+    // expected-note@-2 {{'badNested' declared here}}
+  }
+
+  do {
+    let badOpt: Any? = { () -> Any? in badOpt }()
+    // expected-error@-1 {{use of local variable 'badOpt' before its declaration}}
+    // expected-note@-2 {{'badOpt' declared here}}
+  }
+
+  do {
+    let badTup: (Any, Any) = { (badTup.0, badTup.1) }()
+    // expected-error@-1 2{{use of local variable 'badTup' before its declaration}}
+    // expected-note@-2 2{{'badTup' declared here}}
+  }
+
+  do {
+    let badTup: (Int, Any) = { (badTup.0, badTup.1) }()
+    // expected-error@-1 2{{use of local variable 'badTup' before its declaration}}
+    // expected-note@-2 2{{'badTup' declared here}}
+  }
+
+  do {
+    let (badTup3, badTup4): (Any, Any) = { (badTup4, badTup3) }()
+    // expected-error@-1 {{use of local variable 'badTup3' before its declaration}}
+    // expected-note@-2 {{'badTup3' declared here}}
+    // expected-error@-3 {{use of local variable 'badTup4' before its declaration}}
+    // expected-note@-4 {{'badTup4' declared here}}
+  }
+
+  do {
+    struct S { var p: Any }
+    let badStruct: S = { S(p: badStruct.p) }()
+    // expected-error@-1 {{use of local variable 'badStruct' before its declaration}}
+    // expected-note@-2 {{'badStruct' declared here}}
+  }
+
+  do {
+    enum EE {
+      case boring
+      case weird(Any)
+      case strange(Any)
+    }
+
+    let badEnum: EE = { .weird(EE.strange(badEnum)) }()
+    // expected-error@-1 {{use of local variable 'badEnum' before its declaration}}
+    // expected-note@-2 {{'badEnum' declared here}}
+  }
+
+  do {
+    let badproto: any P = global_fwd_p { badproto }
+    // expected-error@-1 {{use of local variable 'badproto' before its declaration}}
+    // expected-note@-2 {{'badproto' declared here}}
+  }
+}
+
+func forward_declared_local_lazy_captures() {
+  lazy var infiniteRecurse: Any = { infiniteRecurse }()
+  // expected-error@-1 {{use of local variable 'infiniteRecurse' before its declaration}}
+  // expected-note@-2 {{'infiniteRecurse' declared here}}
+
+  lazy var hmm: () -> Any = { hmm }
+  // expected-error@-1 {{use of local variable 'hmm' before its declaration}}
+  // expected-note@-2 {{'hmm' declared here}}
+}
+
+func forward_declared_computed_locals() {
+  // In principle we could allow these, but it's simpler to just reject them.
+  let x = z // expected-error {{use of local variable 'z' before its declaration}}
+  let y = { z } // expected-error {{use of local variable 'z' before its declaration}}
+  var z: Int { 0 } // expected-note 2{{'z' declared here}}
+}
+
 //===----------------------------------------------------------------------===//
 // Type scope
 //===----------------------------------------------------------------------===//

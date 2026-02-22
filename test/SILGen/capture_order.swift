@@ -109,16 +109,6 @@ func transitiveForwardCapture3() {
   }
 }
 
-func captureInClosure() {
-  let x = { (i: Int) in // expected-error {{closure captures 'currentTotal' before it is declared}}
-    currentTotal += i // expected-note {{captured here}}
-  }
-
-  var currentTotal = 0 // expected-note {{captured value declared here}}
-
-  _ = x
-}
-
 /// Regression tests
 
 // https://github.com/apple/swift/issues/47389
@@ -183,16 +173,6 @@ func f_57097() {
   // expected-warning@-1 {{variable 'r' was never mutated; consider changing to 'let' constant}}
 }
 
-class class77933460 {}
-
-func func77933460() {
-  var obj: class77933460 = { obj }()
-  // expected-error@-1 {{closure captures 'obj' before it is declared}}
-  // expected-note@-2 {{captured here}}
-  // expected-note@-3 {{captured value declared here}}
-  // expected-warning@-4 {{variable 'obj' was never mutated; consider changing to 'let' constant}}
-}
-
 // MARK: - Forward Declared Lets
 
 // https://github.com/swiftlang/swift/issues/84909
@@ -207,110 +187,6 @@ enum E {
 func global_fwd(_ a: () -> Any) -> Any { a() }
 func global_gen_fwd<T>(_ g: () -> T) -> T { g() }
 func global_fwd_p(_ p: () -> any P) -> any P { p() }
-
-func forward_declared_let_captures() {
-  do {
-    let bad: Any = { bad }()
-    // expected-error@-1 {{closure captures 'bad' before it is declared}}
-    // expected-note@-2 {{captured here}}
-    // expected-note@-3 {{captured value declared here}}
-  }
-
-  do {
-    func fwd(_ i: () -> Any) -> Any { i() }
-    let bad = fwd { bad }
-    // expected-error@-1 {{closure captures 'bad' before it is declared}}
-    // expected-note@-2 {{captured here}}
-    // expected-note@-3 {{captured value declared here}}
-  }
-
-  do {
-    let bad = global_fwd { bad }
-    // expected-error@-1 {{closure captures 'bad' before it is declared}}
-    // expected-note@-2 {{captured here}}
-    // expected-note@-3 {{captured value declared here}}
-  }
-
-  do {
-    let bad: Any = global_gen_fwd { bad }
-    // expected-error@-1 {{closure captures 'bad' before it is declared}}
-    // expected-note@-2 {{captured here}}
-    // expected-note@-3 {{captured value declared here}}
-  }
-
-  do {
-    let bad: Any = E.static_gen_fwd { bad }
-    // expected-error@-1 {{closure captures 'bad' before it is declared}}
-    // expected-note@-2 {{captured here}}
-    // expected-note@-3 {{captured value declared here}}
-  }
-
-  do {
-    let badNested: Any = global_fwd { { [badNested] in badNested }() }
-    // expected-error@-1 {{closure captures 'badNested' before it is declared}}
-    // expected-note@-2 {{captured here}}
-    // expected-note@-3 {{captured value declared here}}
-  }
-
-  do {
-    let badOpt: Any? = { () -> Any? in badOpt }()
-    // expected-error@-1 {{closure captures 'badOpt' before it is declared}}
-    // expected-note@-2 {{captured here}}
-    // expected-note@-3 {{captured value declared here}}
-  }
-
-  do {
-    let badTup: (Any, Any) = { (badTup.0, badTup.1) }()
-    // expected-error@-1 {{closure captures 'badTup' before it is declared}}
-    // expected-note@-2 {{captured here}}
-    // expected-note@-3 {{captured value declared here}}
-  }
-
-  do {
-    let badTup: (Int, Any) = { (badTup.0, badTup.1) }()
-    // expected-error@-1 {{closure captures 'badTup' before it is declared}}
-    // expected-note@-2 {{captured here}}
-    // expected-note@-3 {{captured value declared here}}
-  }
-
-  do {
-    let (badTup3, badTup4): (Any, Any) = { (badTup4, badTup3) }()
-    // expected-error@-1 {{closure captures 'badTup4' before it is declared}}
-    // expected-note@-2 {{captured here}}
-    // expected-note@-3 {{captured value declared here}}
-    // expected-error@-4 {{closure captures 'badTup3' before it is declared}}
-    // expected-note@-5 {{captured here}}
-    // expected-note@-6 {{captured value declared here}}
-  }
-
-  do {
-    struct S { var p: Any }
-    let badStruct: S = { S(p: badStruct.p) }()
-    // expected-error@-1 {{closure captures 'badStruct' before it is declared}}
-    // expected-note@-2 {{captured here}}
-    // expected-note@-3 {{captured value declared here}}
-  }
-
-  do {
-    enum EE {
-      case boring
-      case weird(Any)
-      case strange(Any)
-    }
-
-    let badEnum: EE = { .weird(EE.strange(badEnum)) }()
-    // expected-error@-1 {{closure captures 'badEnum' before it is declared}}
-    // expected-note@-2 {{captured here}}
-    // expected-note@-3 {{captured value declared here}}
-  }
-
-  do {
-    let badproto: any P = global_fwd_p { badproto }
-    // expected-error@-1 {{closure captures 'badproto' before it is declared}}
-    // expected-note@-2 {{captured here}}
-    // expected-note@-3 {{captured value declared here}}
-  }
-}
 
 func forward_declared_let_captures_local_fn() {
   do {
@@ -441,10 +317,13 @@ func forward_declared_let_captures_local_fn() {
   }
 }
 
-func forward_declared_local_lazy_captures() {
-  // runtime stack overflow
-  lazy var infiniteRecurse: Any = { infiniteRecurse }()
-
-  // function that returns itself
-  lazy var hmm: () -> Any = { hmm }
-}
+// FIXME: Currently they crash SILGen (TypeConverter-setCaptureTypeExpansionContext-e72208.swift)
+//func forward_declared_local_lazy_captures() {
+//  // runtime stack overflow
+//  var _infiniteRecurse: Any { infiniteRecurse }
+//  lazy var infiniteRecurse = _infiniteRecurse
+//
+//  // function that returns itself
+//  func _hmm() -> Any { hmm }
+//  lazy var hmm = _hmm
+//}
