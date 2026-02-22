@@ -2139,6 +2139,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_transitive_conformance,
                    Opts.SolverEnableTransitiveConformance);
 
+  Opts.SolverEnableBindingOptimizations =
+      Args.hasFlag(OPT_solver_enable_binding_optimizations,
+                   OPT_solver_disable_binding_optimizations,
+                   Opts.SolverEnableBindingOptimizations);
+
   Opts.SolverEnablePreparedOverloads =
       Args.hasFlag(OPT_solver_enable_prepared_overloads,
                    OPT_solver_disable_prepared_overloads,

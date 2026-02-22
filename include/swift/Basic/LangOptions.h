@@ -1027,6 +1027,9 @@ namespace swift {
     /// Enable generation of transitive conformance constraints.
     bool SolverEnableTransitiveConformance = true;
 
+    /// Enable experimental optimization to speed up binding of type variables.
+    bool SolverEnableBindingOptimizations = true;
+
     /// Enable experimental optimization to skip contradictory disjunction
     /// choices.
     bool SolverPruneDisjunctions = true;
