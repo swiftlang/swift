@@ -45,6 +45,7 @@ split_embedded_sources(
   EMBEDDED BidirectionalCollection.swift
   EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
+  EMBEDDED Borrow.swift
   EMBEDDED BorrowingSequence.swift
     NORMAL BridgeObjectiveC.swift
   EMBEDDED BridgeStorage.swift
@@ -99,6 +100,7 @@ split_embedded_sources(
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
   EMBEDDED InlineArray.swift
+  EMBEDDED Inout.swift
   EMBEDDED InputStream.swift
   EMBEDDED Instant.swift
   EMBEDDED Int128.swift
@@ -343,6 +345,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Addressab
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableTypes")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Lifetimes")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowAndMutateAccessors")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
