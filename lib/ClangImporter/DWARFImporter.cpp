@@ -204,11 +204,6 @@ void ClangImporter::Implementation::lookupTypeDeclDWARF(
   }
 }
 
-void ClangImporter::setDWARFImporterDelegate(DWARFImporterDelegate &delegate) {
+void ClangImporter::setDWARFImporterDelegate(DWARFImporterDelegate *delegate) {
   Impl.setDWARFImporterDelegate(delegate);
-}
-
-void ClangImporter::Implementation::setDWARFImporterDelegate(
-    DWARFImporterDelegate &delegate) {
-  DWARFImporter = &delegate;
 }

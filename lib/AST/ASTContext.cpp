@@ -2211,9 +2211,15 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
     clangLoader->addSearchPath(searchPath, isFramework, isSystem);
 }
 
-void ASTContext::addExplicitModulePath(StringRef name, std::string path) {
+ExplicitSwiftModuleMap *ASTContext::getExplicitSwiftModuleMap() {
   if (getImpl().TheExplicitSwiftModuleLoader)
-    getImpl().TheExplicitSwiftModuleLoader->addExplicitModulePath(name, path);
+    return getImpl().TheExplicitSwiftModuleLoader->getExplicitSwiftModuleMap();
+  return nullptr;
+}
+ExplicitClangModuleMap *ASTContext::getExplicitClangModuleMap() {
+  if (getImpl().TheExplicitSwiftModuleLoader)
+    return getImpl().TheExplicitSwiftModuleLoader->getExplicitClangModuleMap();
+  return nullptr;
 }
 
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,

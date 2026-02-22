@@ -20,6 +20,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -27,6 +28,7 @@
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/TargetParser/Triple.h"
+#include <optional>
 
 using namespace swift;
 using namespace swift::serialization;
@@ -503,7 +505,9 @@ static ValidationInfo validateControlBlock(
 static bool validateInputBlock(
     llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
-    SmallVectorImpl<SearchPath> *searchPaths) {
+    SmallVectorImpl<SearchPath> *searchPaths,
+    ExplicitSwiftModuleMap *explicitSwiftModuleMap,
+    ExplicitClangModuleMap *explicitClangModuleMap) {
   SmallVector<StringRef, 4> dependencyDirectories;
   SmallString<256> dependencyFullPathBuffer;
 
@@ -570,6 +574,54 @@ static bool validateInputBlock(
         searchPaths->push_back({std::string(blobData), isFramework, isSystem});
       }
       break;
+    case input_block::EXPLICIT_MODULE_MAP_ENTRY:
+      if (explicitSwiftModuleMap && explicitClangModuleMap) {
+        bool isFramework;
+        bool isSystem;
+        bool isBridgedHeaderDependency;
+        input_block::ExplicitModuleMapEntryLayout::readRecord(
+            scratch, isFramework, isSystem, isBridgedHeaderDependency);
+        StringRef rest, moduleName, moduleAlias, modulePath, moduleDocPath,
+            moduleSourceInfoPath, moduleCacheKey, clangModuleMapPath,
+            headerDependencyPath;
+        std::tie(moduleName, rest) = blobData.split('\0');
+        std::tie(modulePath, rest) = rest.split('\0');
+        std::tie(moduleAlias, rest) = rest.split('\0');
+        std::tie(moduleDocPath, rest) = rest.split('\0');
+        std::tie(moduleSourceInfoPath, rest) = rest.split('\0');
+        std::tie(moduleCacheKey, rest) = rest.split('\0');
+        std::tie(clangModuleMapPath, rest) = rest.split('\0');
+        auto optStr = [](StringRef s) -> std::optional<std::string> {
+          if (s.empty())
+            return std::nullopt;
+          return s.str();
+        };
+        if (clangModuleMapPath.empty()) {
+          std::vector<std::string> headerDependencyPaths;
+          while (!rest.empty()) {
+            std::tie(headerDependencyPath, rest) = rest.split('\0');
+            headerDependencyPaths.push_back(headerDependencyPath.str());
+          }
+          ExplicitSwiftModuleInputInfo entry(
+              modulePath.str(), optStr(moduleAlias), optStr(moduleDocPath),
+              optStr(moduleSourceInfoPath),
+              headerDependencyPaths.size()
+                  ? std::optional<std::vector<std::string>>(
+                        headerDependencyPaths)
+                  : std::nullopt,
+              isFramework, isSystem, optStr(moduleCacheKey));
+
+          explicitSwiftModuleMap->insert({moduleName, std::move(entry)});
+        } else {
+          ExplicitClangModuleInputInfo entry(
+              clangModuleMapPath.str(), modulePath.str(), optStr(moduleAlias),
+              isFramework, isSystem, isBridgedHeaderDependency,
+              optStr(moduleCacheKey));
+
+          explicitClangModuleMap->insert({moduleName, std::move(entry)});
+        }
+      }
+      break;
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
@@ -607,11 +659,11 @@ bool serialization::isSerializedAST(StringRef data) {
 }
 
 ValidationInfo serialization::validateSerializedAST(
-    StringRef data,
-    StringRef requiredSDK,
-    ExtendedValidationInfo *extendedInfo,
+    StringRef data, StringRef requiredSDK, ExtendedValidationInfo *extendedInfo,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
     SmallVectorImpl<SearchPath> *searchPaths,
+    ExplicitSwiftModuleMap *explicitSwiftModuleMap,
+    ExplicitClangModuleMap *explicitClangModuleMap,
     std::optional<llvm::Triple> target) {
   ValidationInfo result;
 
@@ -667,7 +719,8 @@ ValidationInfo serialization::validateSerializedAST(
         result.status = Status::Malformed;
         return result;
       }
-      if (validateInputBlock(cursor, scratch, dependencies, searchPaths)) {
+      if (validateInputBlock(cursor, scratch, dependencies, searchPaths,
+                             explicitSwiftModuleMap, explicitClangModuleMap)) {
         result.status = Status::Malformed;
         return result;
       }
@@ -1561,9 +1614,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           unsigned rawImportControl;
           bool scoped;
           bool hasSPI;
-          bool hasPath;
           input_block::ImportedModuleLayout::readRecord(
-              scratch, rawImportControl, scoped, hasSPI, hasPath);
+              scratch, rawImportControl, scoped, hasSPI);
           auto importKind = getActualImportControl(rawImportControl);
           if (!importKind) {
             // We don't know how to import this dependency.
@@ -1584,23 +1636,13 @@ ModuleFileSharedCore::ModuleFileSharedCore(
             (void)recordID;
           }
 
-          StringRef pathBlob;
-          if (hasPath) {
-            scratch.clear();
-
-            llvm::BitstreamEntry entry =
-                fatalIfUnexpected(cursor.advance(AF_DontPopBlockAtEnd));
-            unsigned recordID = fatalIfUnexpected(
-                cursor.readRecord(entry.ID, scratch, &pathBlob));
-            assert(recordID == input_block::IMPORTED_MODULE_PATH);
-            input_block::ImportedModulePathLayout::readRecord(scratch);
-            (void)recordID;
-          }
-
           Dependencies.push_back(
-              {blobData, spiBlob, pathBlob, importKind.value(), scoped});
+              {blobData, spiBlob, importKind.value(), scoped});
           break;
         }
+        case input_block::EXPLICIT_MODULE_MAP_ENTRY:
+          // Consumed by validateInputBlock.
+          break;
         case input_block::LINK_LIBRARY: {
           uint8_t rawKind;
           bool isStaticLibrary;

@@ -20,9 +20,10 @@
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
-#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "llvm/Object/COFF.h"
@@ -49,11 +50,13 @@ static bool validateModule(
     llvm::StringRef data, bool Verbose,
     swift::serialization::ValidationInfo &info,
     swift::serialization::ExtendedValidationInfo &extendedInfo,
-    llvm::SmallVectorImpl<swift::serialization::SearchPath> &searchPaths) {
+    llvm::SmallVectorImpl<swift::serialization::SearchPath> &searchPaths,
+    swift::ExplicitSwiftModuleMap &explicitSwiftModuleMap,
+    swift::ExplicitClangModuleMap &explicitClangModuleMap) {
   info = swift::serialization::validateSerializedAST(
       data,
       /*requiredSDK*/ StringRef(), &extendedInfo, /* dependencies*/ nullptr,
-      &searchPaths);
+      &searchPaths, &explicitSwiftModuleMap, &explicitClangModuleMap);
   if (info.status != swift::serialization::Status::Valid) {
     llvm::outs() << "error: validateSerializedAST() failed\n";
     return false;
@@ -113,7 +116,6 @@ static bool validateModule(
       llvm::outs() << "    " << optStr << " " << opt.second << "\n";
     }
   }
-
   return true;
 }
 
@@ -167,8 +169,18 @@ llvm::BumpPtrAllocator Alloc;
 
 static bool
 collectASTModules(llvm::cl::list<std::string> &InputNames,
-                  llvm::SmallVectorImpl<std::pair<char *, uint64_t>> &Modules) {
+                  std::vector<StringRef> &Modules,
+                  std::vector<std::unique_ptr<llvm::MemoryBuffer>> &buffers) {
   for (auto &name : InputNames) {
+    if (StringRef(name).ends_with(".swiftmodule")) {
+      auto buf = llvm::MemoryBuffer::getFile(name);
+      if (buf && *buf) {
+        Modules.push_back({(*buf)->getBufferStart(), (*buf)->getBufferSize()});
+        buffers.push_back(std::move(*buf));
+      }
+      continue;
+    }
+
     auto OF = llvm::object::ObjectFile::createObjectFile(name);
     if (!OF) {
       llvm::outs() << "error: " << name << " "
@@ -237,6 +249,59 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
   return true;
 }
 
+void print(llvm::raw_ostream &os,
+           const swift::ExplicitSwiftModuleInputInfo &info,
+           llvm::StringRef name) {
+  os << "  {\n";
+  os << "    \"moduleName\" : \"";
+  os.write_escaped(name);
+  os << "\",\n";
+  os << "    \"isFramework\" : " << info.isFramework << ",\n";
+  os << "    \"isSystem\" : " << info.isSystem << ",\n";
+  os << "    \"modulePath\" : \"";
+  os.write_escaped(info.modulePath);
+  os << "\",\n";
+  if (info.moduleDocPath) {
+    os << "    \"moduleDocPath\" : \"";
+    os.write_escaped(*info.moduleDocPath);
+    os << "\",\n";
+  }
+  if (info.moduleSourceInfoPath) {
+    os << "    \"moduleSourceInfoPath\" : \"";
+    os.write_escaped(*info.moduleSourceInfoPath);
+    os << "\",\n";
+  }
+  if (info.headerDependencyPaths) {
+    os << "    \"prebuiltHeaderDependencyPaths\" : [";
+    for (auto &dep : *info.headerDependencyPaths) {
+      os << '"';
+      os.write_escaped(dep);
+      os << "\",";
+    }
+    os << "],";
+  }
+  os << "  },\n";
+}
+
+void print(llvm::raw_ostream &os,
+           const swift::ExplicitClangModuleInputInfo &info, StringRef name) {
+  os << "  {\n";
+  os << "    \"moduleName\" : \"";
+  os.write_escaped(name);
+  os << "\",\n";
+  os << "    \"isFramework\" : " << info.isFramework << ",\n";
+  os << "    \"isSystem\" : " << info.isSystem << ",\n";
+  os << "    \"isBridgingHeaderDependency\" : "
+     << info.isBridgingHeaderDependency << ",\n";
+  os << "    \"modulePath\" : \"";
+  os.write_escaped(info.modulePath);
+  os << "\",\n";
+  os << "    \"moduleMapPath\" : \"";
+  os.write_escaped(info.moduleMapPath);
+  os << "\",\n";
+  os << "  },\n";
+}
+
 int main(int argc, char **argv) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
@@ -254,6 +319,10 @@ int main(int argc, char **argv) {
       "dump-module",
       desc("Dump the imported module after checking it imports just fine"),
       cat(Visible));
+
+  opt<bool> DumpExplicitModuleMap("dump-explicit-module-map",
+                                  desc("Dump the explicit Swift module map"),
+                                  cat(Visible));
 
   opt<bool> Verbose("verbose", desc("Dump information on the loaded module"),
                     cat(Visible));
@@ -314,8 +383,9 @@ int main(int argc, char **argv) {
 
   // Fetch the serialized module bitstreams from the Mach-O files and
   // register them with the module loader.
-  llvm::SmallVector<std::pair<char *, uint64_t>, 8> Modules;
-  if (!collectASTModules(InputNames, Modules))
+  std::vector<StringRef> Modules;
+  std::vector<std::unique_ptr<llvm::MemoryBuffer>> buffers;
+  if (!collectASTModules(InputNames, Modules, buffers))
     return 1;
 
   if (Modules.empty())
@@ -324,40 +394,70 @@ int main(int argc, char **argv) {
   swift::serialization::ValidationInfo info;
   swift::serialization::ExtendedValidationInfo extendedInfo;
   llvm::SmallVector<swift::serialization::SearchPath> searchPaths;
+  swift::ExplicitSwiftModuleMap explicitSwiftModuleMap;
+  swift::ExplicitClangModuleMap explicitClangModuleMap;
   for (auto &Module : Modules) {
+    if (!explicitSwiftModuleMap.empty() || !explicitClangModuleMap.empty()) {
+      llvm::errs() << "Only one main module with explicit module map may be "
+                      "specified!\n";
+      return 1;
+    }
     info = {};
     extendedInfo = {};
-    if (!validateModule(StringRef(Module.first, Module.second), Verbose,
-                        info, extendedInfo, searchPaths)) {
+    if (!validateModule(Module, Verbose, info, extendedInfo, searchPaths,
+                        explicitSwiftModuleMap, explicitClangModuleMap)) {
       llvm::errs() << "Malformed module!\n";
       return 1;
     }
   }
 
+  if (DumpExplicitModuleMap) {
+    llvm::outs() << "{\n";
+    for (auto &entry : explicitSwiftModuleMap) {
+      llvm::outs() << "\"moduleName\" : ";
+      llvm::outs().write_escaped(entry.getKey());
+      llvm::outs() << "\n";
+      print(llvm::outs(), entry.getValue(), entry.getKey());
+    }
+    for (auto &entry : explicitClangModuleMap) {
+      llvm::outs() << "\"moduleName\" : ";
+      llvm::outs().write_escaped(entry.getKey());
+      llvm::outs() << "\n";
+      print(llvm::outs(), entry.getValue(), entry.getKey());
+    }
+    llvm::outs() << "}\n";
+  }
+
   // Create a Swift compiler.
   llvm::SmallVector<std::string, 4> modules;
   swift::CompilerInstance CI;
-  swift::CompilerInvocation Invocation;
+  swift::CompilerInvocation invocation;
 
-  Invocation.setMainExecutablePath(
-      llvm::sys::fs::getMainExecutable(argv[0],
-          reinterpret_cast<void *>(&anchorForGetMainExecutable)));
+  if (!explicitSwiftModuleMap.empty() || !explicitClangModuleMap.empty()) {
+    // Deserialize the invocation from the main module.
+    auto result = invocation.loadFromSerializedAST(Modules.front());
+    if (result != swift::serialization::Status::Valid) {
+      llvm::errs() << "cannot deserialize invocation\n!";
+      return 1;
+    }
+  } else {
+    // Infer SDK and Target triple from the module.
+    invocation.setMainExecutablePath(llvm::sys::fs::getMainExecutable(
+        argv[0], reinterpret_cast<void *>(&anchorForGetMainExecutable)));
 
-  // Infer SDK and Target triple from the module.
-  if (!extendedInfo.getSDKPath().empty())
-    Invocation.setSDKPath(extendedInfo.getSDKPath().str());
-  Invocation.setTargetTriple(info.targetTriple);
-
-  Invocation.setModuleName("lldbtest");
-  Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
-  Invocation.getLangOptions().EnableMemoryBufferImporter = true;
-
-  if (!ResourceDir.empty()) {
-    Invocation.setRuntimeResourcePath(ResourceDir);
+    if (!extendedInfo.getSDKPath().empty())
+      invocation.setSDKPath(extendedInfo.getSDKPath().str());
+    invocation.setTargetTriple(info.targetTriple);
+    invocation.getLangOptions().EnableMemoryBufferImporter = true;
   }
+  invocation.setModuleName("lldbtest");
+  invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+
+  if (!ResourceDir.empty())
+    invocation.setRuntimeResourcePath(ResourceDir);
 
   std::string InstanceSetupError;
-  if (CI.setup(Invocation, InstanceSetupError)) {
+  if (CI.setup(invocation, InstanceSetupError)) {
     llvm::errs() << InstanceSetupError << '\n';
     return 1;
   }
@@ -366,7 +466,7 @@ int main(int argc, char **argv) {
   if (DummyDWARFImporter) {
     auto *ClangImporter = static_cast<swift::ClangImporter *>(
         CI.getASTContext().getClangModuleLoader());
-    ClangImporter->setDWARFImporterDelegate(dummyDWARFImporter);
+    ClangImporter->setDWARFImporterDelegate(&dummyDWARFImporter);
  }
 
   if (Verbose)
@@ -386,22 +486,21 @@ int main(int argc, char **argv) {
             break;
           }
         });
-
-  llvm::SmallString<0> error;
-  llvm::raw_svector_ostream errs(error);
-  llvm::Triple filter(Filter);
-  for (auto &Module : Modules) {
-    auto Result = parseASTSection(
-        *CI.getMemoryBufferSerializedModuleLoader(),
-        StringRef(Module.first, Module.second), filter);
-    if (auto E = Result.takeError()) {
-      std::string error = toString(std::move(E));
-      llvm::errs() << "error: Failed to parse AST section! " << error << "\n";
-      return 1;
+  if (explicitSwiftModuleMap.empty() && explicitClangModuleMap.empty()) {
+    llvm::SmallString<0> error;
+    llvm::raw_svector_ostream errs(error);
+    llvm::Triple filter(Filter);
+    for (auto &Module : Modules) {
+      auto Result = parseASTSection(*CI.getMemoryBufferSerializedModuleLoader(),
+                                    Module, filter);
+      if (auto E = Result.takeError()) {
+        std::string error = toString(std::move(E));
+        llvm::errs() << "error: Failed to parse AST section! " << error << "\n";
+        return 1;
+      }
+      modules.insert(modules.end(), Result->begin(), Result->end());
     }
-    modules.insert(modules.end(), Result->begin(), Result->end());
   }
-
   // Attempt to import all modules we found.
   for (auto path : modules) {
     if (Verbose)

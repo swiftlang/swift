@@ -458,10 +458,8 @@ bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
   return importer::isForwardDeclOfType(D);
 }
 
-ClangImporter::ClangImporter(ASTContext &ctx, DependencyTracker *tracker,
-                             DWARFImporterDelegate *dwarfImporterDelegate)
-    : ClangModuleLoader(tracker),
-      Impl(*new Implementation(ctx, tracker, dwarfImporterDelegate)) {}
+ClangImporter::ClangImporter(ASTContext &ctx, DependencyTracker *tracker)
+    : ClangModuleLoader(tracker), Impl(*new Implementation(ctx, tracker)) {}
 
 ClangImporter::~ClangImporter() {
   delete &Impl;
@@ -1417,12 +1415,11 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
   return CI;
 }
 
-std::unique_ptr<ClangImporter> ClangImporter::create(
-    ASTContext &ctx, const IRGenOptions *IRGenOpts, std::string swiftPCHHash,
-    DependencyTracker *tracker,
-    DWARFImporterDelegate *dwarfImporterDelegate, bool ignoreFileMapping) {
-  std::unique_ptr<ClangImporter> importer{
-      new ClangImporter(ctx, tracker, dwarfImporterDelegate)};
+std::unique_ptr<ClangImporter>
+ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
+                      std::string swiftPCHHash, DependencyTracker *tracker,
+                      bool ignoreFileMapping) {
+  std::unique_ptr<ClangImporter> importer{new ClangImporter(ctx, tracker)};
   auto &importerOpts = ctx.ClangImporterOpts;
 
   auto bridgingPCH = importerOpts.getPCHInputPath();
@@ -2895,8 +2892,7 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
 }
 
 ClangImporter::Implementation::Implementation(
-    ASTContext &ctx, DependencyTracker *dependencyTracker,
-    DWARFImporterDelegate *dwarfImporterDelegate)
+    ASTContext &ctx, DependencyTracker *dependencyTracker)
     : SwiftContext(ctx), ImportForwardDeclarations(
                              ctx.ClangImporterOpts.ImportForwardDeclarations),
       DisableSwiftBridgeAttr(ctx.ClangImporterOpts.DisableSwiftBridgeAttr),
@@ -2911,8 +2907,7 @@ ClangImporter::Implementation::Implementation(
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
       platformAvailability(ctx.LangOpts), nameImporter(),
       DisableSourceImport(ctx.ClangImporterOpts.DisableSourceImport),
-      SwiftDependencyTracker(dependencyTracker),
-      DWARFImporter(dwarfImporterDelegate) {}
+      SwiftDependencyTracker(dependencyTracker) {}
 
 ClangImporter::Implementation::~Implementation() {
 #ifndef NDEBUG
