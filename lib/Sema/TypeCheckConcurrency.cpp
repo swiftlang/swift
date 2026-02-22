@@ -2551,13 +2551,20 @@ namespace {
             return;
           }
 
-          // Conversions from non-Sendable types are handled by
-          // region-based isolation.
-          // Function conversions are used to inject concurrency attributes
-          // into interface types until that changes we won't be able to
-          // diagnose all of the cases here.
-          if (!fromFnType->isSendable())
+          // Conversions from non-Sendable types are generally handled by
+          // region-based isolation. However, converting from a
+          // @concurrent (NonIsolated async) type to nonisolated(nonsending)
+          // crosses an isolation boundary and needs Sendable checking
+          // even for non-@Sendable types (e.g. variable type annotations).
+          // See: https://github.com/swiftlang/swift/issues/87234
+          if (!fromFnType->isSendable()) {
+            if (fromFnType->isAsync() &&
+                fromIsolation.isNonIsolated() &&
+                toIsolation.isNonIsolatedCaller()) {
+              diagnoseNonSendableParametersAndResult(toFnType);
+            }
             return;
+          }
 
           switch (toIsolation.getKind()) {
           // Converting to `nonisolated(nonsending)` function type
