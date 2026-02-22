@@ -3760,6 +3760,8 @@ WARNING(duplicate_anyobject_class_inheritance,none,
   "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
 ERROR(inheritance_from_protocol_with_superclass,none,
   "inheritance from class-constrained protocol composition type %0", (Type))
+ERROR(concrete_type_in_conformance_composition,none,
+  "protocol conformance list cannot contain concrete type %0", (Type))
 WARNING(anyobject_class_inheritance_deprecated,Deprecation,
   "using 'class' keyword to define a class-constrained protocol is deprecated; "
   "use 'AnyObject' instead", ())
@@ -3769,6 +3771,8 @@ ERROR(inheritance_from_non_protocol_or_class,none,
   "inheritance from non-protocol, non-class type %0", (Type))
 ERROR(inheritance_from_non_protocol,none,
   "inheritance from non-protocol type %0", (Type))
+ERROR(conformance_to_non_protocol,none,
+  "non-protocol type %0 cannot be used in a conformance list", (Type))
 ERROR(inheritance_from_anyobject,none,
   "only protocols can inherit from 'AnyObject'", ())
 ERROR(superclass_not_first,none,
