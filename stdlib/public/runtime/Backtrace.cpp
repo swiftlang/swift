@@ -147,6 +147,9 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
 
   // outputPath
   NULL,
+
+  // closeFds
+  false,
 };
 
 }
@@ -776,6 +779,8 @@ _swift_processBacktracingSetting(llvm::StringRef key,
     }
   } else if (key.equals_insensitive("cache")) {
     _swift_backtraceSettings.cache = parseBoolean(value);
+  } else if (key.equals_insensitive("close-fds")) {
+    _swift_backtraceSettings.closeFds = parseBoolean(value);
   } else if (key.equals_insensitive("output-to")) {
     if (value.equals_insensitive("auto"))
       _swift_backtraceSettings.outputTo = OutputTo::Auto;

@@ -118,6 +118,9 @@ follows:
 |                 |         | related to the state of the backtracer.  This is |
 |                 |         | sometimes useful for testing.                    |
 +-----------------+---------+--------------------------------------------------+
+| close-fds       | false   | Close all file descriptors on the crashing       |
+|                 |         | process before starting to gather a crash log.   |
++-----------------+---------+--------------------------------------------------+
 
 (*) On macOS 26 and later, this defaults to ``tty`` rather than ``yes``. On
     earlier versions, the default is ``no``.
