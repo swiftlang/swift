@@ -26,11 +26,27 @@ class Methods {
   virtual ~Methods();
 
   int SimpleMethod(int);
+  int PrivateSimpleMethod(int) __attribute__((swift_private));
 
   int SimpleConstMethod(int) const;
   int some_value;
+  int private_value __attribute__((swift_private));
 
   static int SimpleStaticMethod(int);
+};
+
+int PrivateFunction() __attribute__((swift_private));
+
+class PrivateClass {} __attribute__((swift_private));
+
+class ClassWithImportedField {
+ public:
+  int field;
+};
+
+class ClassWithUnimportedField {
+ public:
+  int field __attribute__((swift_private));
 };
 
 class Methods2 {

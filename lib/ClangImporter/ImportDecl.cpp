@@ -1282,9 +1282,6 @@ namespace {
 
     Decl *VisitNamespaceDecl(const clang::NamespaceDecl *decl) {
       DeclContext *dc = nullptr;
-      // Do not import namespace declarations marked as 'swift_private'.
-      if (decl->hasAttr<clang::SwiftPrivateAttr>())
-        return nullptr;
       // Workaround for os module declaring `namespace os` on Darwin, causing
       // name lookup issues. That namespace only declares utility functions that
       // are not supposed to be used from Swift, so let's just not import the
@@ -9965,6 +9962,10 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
                                               bool &TypedefIsSuperfluous,
                                               bool &HadForwardDeclaration) {
   assert(ClangDecl);
+
+  // Don't import this decl if it has `__attribute__((swift_private))`
+  if (ClangDecl->hasAttr<clang::SwiftPrivateAttr>())
+    return nullptr;
 
   // If this decl isn't valid, don't import it. Bail now.
   if (ClangDecl->isInvalidDecl())
