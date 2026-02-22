@@ -216,7 +216,8 @@ public:
   IRGenDebugInfoImpl(const IRGenOptions &Opts, ClangImporter &CI,
                      IRGenModule &IGM, llvm::Module &M,
                      StringRef MainOutputFilenameForDebugInfo,
-                     StringRef PrivateDiscriminator);
+                     StringRef PrivateDiscriminator,
+                     StringRef CacheKeyForJob);
   ~IRGenDebugInfoImpl() {
     // FIXME: SILPassManager sometimes creates an IGM and doesn't finalize it.
     if (!FwdDeclTypes.empty())
@@ -2857,7 +2858,8 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        ClangImporter &CI, IRGenModule &IGM,
                                        llvm::Module &M,
                                        StringRef MainOutputFilenameForDebugInfo,
-                                       StringRef PD)
+                                       StringRef PD,
+                                       StringRef CacheKeyForJob)
     : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), M(M), DBuilder(M),
       IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap) {
   assert(Opts.DebugInfoLevel > IRGenDebugInfoLevel::None &&
@@ -2930,6 +2932,9 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   // Create a module for the current compile unit.
   auto *MDecl = IGM.getSwiftModule();
   StringRef Path = Opts.DebugModulePath;
+  if (Opts.DebugModuleSelfKey)
+    Path = CacheKeyForJob;
+
   if (Path.empty()) {
     llvm::sys::path::remove_filename(SourcePath);
     Path = SourcePath;
@@ -4127,9 +4132,10 @@ void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
 std::unique_ptr<IRGenDebugInfo> IRGenDebugInfo::createIRGenDebugInfo(
     const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
     llvm::Module &M, StringRef MainOutputFilenameForDebugInfo,
-    StringRef PrivateDiscriminator) {
+    StringRef PrivateDiscriminator, StringRef CacheKeyForJob) {
   return std::make_unique<IRGenDebugInfoImpl>(
-      Opts, CI, IGM, M, MainOutputFilenameForDebugInfo, PrivateDiscriminator);
+      Opts, CI, IGM, M, MainOutputFilenameForDebugInfo, PrivateDiscriminator,
+      CacheKeyForJob);
 }
 
 IRGenDebugInfo::~IRGenDebugInfo() {}
