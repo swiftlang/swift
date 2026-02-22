@@ -290,15 +290,15 @@ do {
 
 do {
   _ = try /x/; _ = try /x /
-  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{7-11=}}
 } // expected-error {{expected expression after operator}}
 do {
   _ = try? /x/; _ = try? /x /
-  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{7-12=}}
 } // expected-error {{expected expression after operator}}
 do {
   _ = try! /x/; _ = try! /x /
-  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{7-12=}}
 } // expected-error {{expected expression after operator}}
 
 _ = await /x/ // expected-warning {{no 'async' operations occur within 'await' expression}}{{5-11=}}
