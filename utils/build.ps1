@@ -1745,9 +1745,9 @@ function Build-CMakeProject {
         $AndroidPrebuiltRoot = "$AndroidNDKPath\toolchains\llvm\prebuilt\$($BuildPlatform.OS.ToString().ToLowerInvariant())-$($BuildPlatform.Architecture.LLVMName)"
         $AndroidSysroot = "$AndroidPrebuiltRoot\sysroot"
 
-        Add-KeyValueIfNew $Defines CMAKE_ANDROID_API "$AndroidAPILevel"
-        Add-KeyValueIfNew $Defines CMAKE_ANDROID_ARCH_ABI $Platform.Architecture.ABI
-        Add-KeyValueIfNew $Defines CMAKE_ANDROID_NDK "$AndroidNDKPath"
+        Add-KeyValueIfNew $Defines CMAKE_TOOLCHAIN_FILE "$AndroidNDKPath\build\cmake\android.toolchain.cmake"
+        Add-KeyValueIfNew $Defines ANDROID_ABI $Platform.Architecture.ABI
+        Add-KeyValueIfNew $Defines ANDROID_PLATFORM "android-$AndroidAPILevel"
 
         if ($UseASM) {
         }
@@ -1755,7 +1755,7 @@ function Build-CMakeProject {
         if ($UseC) {
           Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_TARGET $Platform.Triple
 
-          $CFLAGS = @("--sysroot=${AndroidSysroot}", "-ffunction-sections", "-fdata-sections")
+          $CFLAGS = @("-ffunction-sections", "-fdata-sections")
           if ($DebugInfo) {
             $CFLAGS += @("-gdwarf")
           }
@@ -1765,7 +1765,7 @@ function Build-CMakeProject {
         if ($UseCXX) {
           Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_TARGET $Platform.Triple
 
-          $CXXFLAGS = @("--sysroot=${AndroidSysroot}", "-ffunction-sections", "-fdata-sections")
+          $CXXFLAGS = @("-ffunction-sections", "-fdata-sections")
           if ($DebugInfo) {
             $CXXFLAGS += @("-gdwarf")
           }
