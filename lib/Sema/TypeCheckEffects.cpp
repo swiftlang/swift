@@ -4678,10 +4678,10 @@ private:
       Ctx.Diags.diagnose(E->getTryLoc(),
                          diag::effect_marker_on_single_value_stmt,
                          "try", SVE->getStmt()->getKind())
-        .highlight(E->getTryLoc());
+        .highlight(E->getTryLoc()).fixItRemove(E->getTryLoc());
       return;
     }
-    Ctx.Diags.diagnose(E->getTryLoc(), diag::no_throw_in_try);
+    Ctx.Diags.diagnose(E->getTryLoc(), diag::no_throw_in_try).fixItRemove(E->getTryLoc());
   }
 
   void diagnoseRedundantAwait(AwaitExpr *E) const {
@@ -4720,7 +4720,7 @@ private:
       Ctx.Diags.diagnose(loc,
                          diag::effect_marker_on_single_value_stmt,
                          "unsafe", SVE->getStmt()->getKind())
-        .highlight(E->getUnsafeLoc());
+        .highlight(E->getUnsafeLoc()).fixItRemove(E->getUnsafeLoc());
       return;
     }
 
