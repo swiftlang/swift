@@ -18,6 +18,21 @@ import SwiftShims
 internal func _swift_stdlib_getUnsafeArgvArgc(_: UnsafeMutablePointer<Int32>)
   -> UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
 
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+@_extern(c, "_NSGetExecutablePath")
+@usableFromInline
+func _NSGetExecutablePath(
+  _ buf: UnsafeMutablePointer<CChar>?,
+  _ bufsize: UnsafeMutablePointer<UInt32>
+) -> CInt
+#elseif os(Windows)
+@_silgen_name("_swift_stdlib_withExecutablePath")
+private func _withExecutablePath(_ body: (UnsafePointer<CWideChar>) -> Void)
+#else
+@_silgen_name("_swift_stdlib_withExecutablePath")
+private func _withExecutablePath(_ body: (UnsafePointer<CChar>) -> Void)
+#endif
+
 /// Command-line arguments for the current process.
 @frozen // namespace
 public enum CommandLine: ~BitwiseCopyable {}
@@ -117,6 +132,86 @@ extension CommandLine {
       _arguments = newValue
     }
   }
-}
 
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+  /// The path to the current executable as a null-terminated C string.
+  ///
+  /// The value of this property may not be canonical. If you need the canonical
+  /// path to the current executable, you can pass the value of this property to
+  /// [`realpath()`](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/realpath.3.html)
+  /// or use [`URL`](https://developer.apple.com/documentation/foundation/url)
+  /// to standardize the path.
+  ///
+  /// If the path to the current executable could not be determined, the value
+  /// of this property is `nil`.
+  ///
+  /// - Important: On some systems, it is possible to move an executable file on
+  ///   disk while it is running. If the current executable file is moved, the
+  ///   value of this property is not updated to its new path.
+  @_unavailableInEmbedded
+  @_alwaysEmitIntoClient
+  public static var _executablePathCString: ContiguousArray<CChar>? {
+    // _NSGetExecutablePath() returns non-zero if the provided buffer is too
+    // small and updates its *bufsize argument to the required value. Call it
+    // once to get the buffer size before allocating.
+    var byteCount = UInt32(0)
+    guard unsafe _NSGetExecutablePath(nil, &byteCount) == 0 else {
+      return nil
+    }
+    let result = unsafe ContiguousArray(
+      unsafeUninitializedCapacity: Int(byteCount)
+    ) { buffer, initializedCount in
+      if unsafe _NSGetExecutablePath(buffer.baseAddress!, &byteCount) == 0 {
+        initializedCount = Int(byteCount)
+      }
+    }
+    if result.isEmpty {
+      return nil
+    }
+    return result
+  }
+#else
+  /// The path to the current executable as a null-terminated C string.
+  ///
+  /// The value of this property may not be canonical. If you need the canonical
+  /// path to the current executable, you can pass the value of this property to
+  /// [`realpath()`](https://www.kernel.org/doc/man-pages/online/pages/man3/realpath.3.html)
+  /// ([`_wfullpath()`](https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fullpath-wfullpath?view=msvc-170)
+  /// on Windows) or use [`URL`](https://developer.apple.com/documentation/foundation/url)
+  /// to standardize the path.
+  ///
+  /// If the path to the current executable could not be determined, the value
+  /// of this property is `nil`.
+  ///
+  /// - Important: On some systems, it is possible to move an executable file on
+  ///   disk while it is running. If the current executable file is moved, the
+  ///   value of this property is not updated to its new path.
+  @_unavailableInEmbedded
+#if os(WASI)
+  @available(*, unavailable, message: "Unavailable on WASI")
+#endif
+  public static let _executablePathCString: ContiguousArray? = {
+#if os(Windows)
+    var result: ContiguousArray<CWideChar>?
+#else
+    var result: ContiguousArray<CChar>?
+#endif
+
+    unsafe _withExecutablePath { path in
+#if os(Windows)
+      let count = unsafe wcslen(path)
+#else
+      let count = unsafe strlen(path)
+#endif
+      if count > 0 {
+
+        let buffer = unsafe UnsafeBufferPointer(start: path, count: count + 1)
+        result = unsafe ContiguousArray(buffer)
+      }
+    }
+
+    return result
+  }()
+#endif
+}
 #endif // SWIFT_STDLIB_HAS_COMMANDLINE
