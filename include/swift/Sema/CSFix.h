@@ -1554,11 +1554,14 @@ public:
 class AllowTypeOrInstanceMember final : public AllowInvalidMemberRef {
   AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType,
                             ValueDecl *member, DeclNameRef name,
+                            Expr *baseExpr,
                             ConstraintLocator *locator)
       : AllowInvalidMemberRef(cs, FixKind::AllowTypeOrInstanceMember, baseType,
-                              member, name, locator) {
+                              member, name, locator),
+        BaseExpr(baseExpr) {
     assert(member);
   }
+  Expr *BaseExpr;
 
 public:
   std::string getName() const override {

@@ -137,7 +137,7 @@ func generic<T: P>(_ t: T) {
   let _: (Int) -> () = id(T.bar(t))
 
   _ = t.mut // expected-error{{cannot reference 'mutating' method as function value}}
-  _ = t.tum // expected-error{{static member 'tum' cannot be used on instance of type 'T'}}
+  _ = t.tum // expected-error{{static member 'tum' can only be used on the type 'T', not on the instance t}}
 }
 
 func genericClassP<T: ClassP>(_ t: T) {

@@ -4851,6 +4851,27 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
   return true;
 }
 
+StringRef AllowTypeOrInstanceMemberFailure::getInstanceNameFromBaseExpr() const {
+
+  if (!BaseExpr)
+    return "instance";
+
+  Expr *semantic = BaseExpr->getSemanticsProvidingExpr();
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(semantic)) {
+    return DRE->getDecl()->getBaseName().userFacingName();
+  }
+
+  auto &SM = getASTContext().SourceMgr;
+  auto SR = semantic->getSourceRange();
+
+  if (SR.isValid()) {
+    auto CSR = Lexer::getCharSourceRangeFromSourceRange(SM, SR);
+    return SM.extractText(CSR);
+  }
+  return "instance";
+}
+
 bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   auto loc = getLoc();
   auto *DC = getDC();
@@ -5096,8 +5117,8 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       Diag.emplace(
           emitDiagnostic(diag::could_not_use_enum_element_on_instance, Name));
     } else {
-      Diag.emplace(emitDiagnostic(diag::could_not_use_type_member_on_instance,
-                                  baseTy, Name));
+      Diag.emplace(emitDiagnostic(diag::static_can_only_be_used_on_type_not_instance,
+                                  Name, baseTy, getInstanceNameFromBaseExpr()));
     }
 
     Diag->highlight(getSourceRange());
