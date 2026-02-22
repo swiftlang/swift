@@ -44,33 +44,80 @@ STATISTIC(NumPreventedTooComplexGenericSpecializations,
           "# of prevented generic specializations with too complex "
           "generic type parameters");
 
+namespace {
 /// Set to true to enable the support for partial specialization.
-llvm::cl::opt<bool> EnablePartialSpecialization(
-    "sil-partial-specialization", llvm::cl::init(false),
-    llvm::cl::desc("Enable partial specialization of generics"));
+llvm::cl::opt<bool> &EnablePartialSpecialization() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-partial-specialization");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-partial-specialization", llvm::cl::init(false),
+      llvm::cl::desc("Enable partial specialization of generics"));
+  return *opt;
+}
+auto &EarlyInitEnablePartialSpecialization = EnablePartialSpecialization();
 
 /// If set, then generic specialization tries to specialize using
 /// all substitutions, even if they the replacement types are generic.
-llvm::cl::opt<bool> SupportGenericSubstitutions(
-    "sil-partial-specialization-with-generic-substitutions",
-    llvm::cl::init(false),
-    llvm::cl::desc("Enable partial specialization with generic substitutions"));
+llvm::cl::opt<bool> &SupportGenericSubstitutions() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-partial-specialization-with-generic-substitutions");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-partial-specialization-with-generic-substitutions",
+      llvm::cl::init(false),
+      llvm::cl::desc("Enable partial specialization with generic substitutions"));
+  return *opt;
+}
+auto &EarlyInitSupportGenericSubstitutions = SupportGenericSubstitutions();
 
 /// Set to true to print detected infinite generic specialization loops that
 /// were prevented.
-llvm::cl::opt<bool> PrintGenericSpecializationLoops(
-    "sil-print-generic-specialization-loops", llvm::cl::init(false),
-    llvm::cl::desc("Print detected infinite generic specialization loops that "
-                   "were prevented"));
+llvm::cl::opt<bool> &PrintGenericSpecializationLoops() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-generic-specialization-loops");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-generic-specialization-loops", llvm::cl::init(false),
+      llvm::cl::desc("Print detected infinite generic specialization loops that "
+                     "were prevented"));
+  return *opt;
+}
+auto &EarlyInitPrintGenericSpecializationLoops = PrintGenericSpecializationLoops();
 
-llvm::cl::opt<bool> VerifyFunctionsAfterSpecialization(
-    "sil-generic-verify-after-specialization", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Verify functions after they are specialized "
-        "'PrettyStackTraceFunction'-ing the original function if we fail."));
+llvm::cl::opt<bool> &VerifyFunctionsAfterSpecialization() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-generic-verify-after-specialization");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-generic-verify-after-specialization", llvm::cl::init(false),
+      llvm::cl::desc(
+          "Verify functions after they are specialized "
+          "'PrettyStackTraceFunction'-ing the original function if we fail."));
+  return *opt;
+}
+auto &EarlyInitVerifyFunctionsAfterSpecialization = VerifyFunctionsAfterSpecialization();
 
-llvm::cl::opt<bool> DumpFunctionsAfterSpecialization(
-    "sil-generic-dump-functions-after-specialization", llvm::cl::init(false));
+llvm::cl::opt<bool> &DumpFunctionsAfterSpecialization() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-generic-dump-functions-after-specialization");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-generic-dump-functions-after-specialization", llvm::cl::init(false));
+  return *opt;
+}
+auto &EarlyInitDumpFunctionsAfterSpecialization = DumpFunctionsAfterSpecialization();
+} // namespace
 
 static bool OptimizeGenericSubstitutions = false;
 
@@ -573,7 +620,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
 
   using namespace OptRemark;
   // We do not support partial specialization.
-  if (!EnablePartialSpecialization && Props.hasArchetype()) {
+  if (!EnablePartialSpecialization() && Props.hasArchetype()) {
     LLVM_DEBUG(llvm::dbgs() <<"    Partial specialization is not supported.\n");
     LLVM_DEBUG(ParamSubs.dump(llvm::dbgs()));
     return false;
@@ -644,7 +691,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   if (HasUnboundGenericParams) {
     // Bail if we cannot specialize generic substitutions, but all substitutions
     // were generic.
-    if (!HasConcreteGenericParams && !SupportGenericSubstitutions) {
+    if (!HasConcreteGenericParams && !SupportGenericSubstitutions()) {
       LLVM_DEBUG(llvm::dbgs() << "    Partial specialization is not supported "
                             "if all substitutions are generic.\n");
       LLVM_DEBUG(ParamSubs.dump(llvm::dbgs()));
@@ -678,7 +725,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
              << NV("Callee", Callee)
              << " occurs multiple times on the call chain";
     });
-    if (PrintGenericSpecializationLoops)
+    if (PrintGenericSpecializationLoops())
       llvm::errs() << "Detected and prevented an infinite "
                       "generic specialization loop for callee: "
                    << Callee->getName() << '\n';
@@ -711,7 +758,7 @@ ReabstractionInfo::ReabstractionInfo(
   if (Apply)
     Caller = Apply.getFunction();
 
-  if (!EnablePartialSpecialization || !HasUnboundGenericParams) {
+  if (!EnablePartialSpecialization() || !HasUnboundGenericParams) {
     // Fast path for full specializations.
     performFullSpecializationPreparation(Callee, ParamSubs);
   } else {
@@ -1149,7 +1196,7 @@ getGenericEnvironmentAndSignatureWithRequirements(
 /// because the specialized function will be non-generic.
 void ReabstractionInfo::performFullSpecializationPreparation(
     SILFunction *Callee, SubstitutionMap ParamSubs) {
-  assert((!EnablePartialSpecialization || !HasUnboundGenericParams) &&
+  assert((!EnablePartialSpecialization() || !HasUnboundGenericParams) &&
          "Only full specializations are handled here");
 
   this->Callee = Callee;
@@ -1313,7 +1360,7 @@ shouldBePartiallySpecialized(Type Replacement,
   if (Replacement->hasOpenedExistential())
     return false;
 
-  if (!SupportGenericSubstitutions) {
+  if (!SupportGenericSubstitutions()) {
     // Don't partially specialize if the replacement contains an archetype.
     if (Replacement->hasArchetype())
       return false;
@@ -1986,7 +2033,7 @@ void ReabstractionInfo::performPartialSpecializationPreparation(
                                            ParamSubs);
 
   // Create the partially specialized generic signature and generic environment.
-  if (SupportGenericSubstitutions)
+  if (SupportGenericSubstitutions())
     FSPS.createSpecializedGenericSignature(ParamSubs);
   else
     FSPS.createSpecializedGenericSignatureWithNonGenericSubs();
@@ -2186,7 +2233,7 @@ GenericFuncSpecializer::tryCreateSpecialization(bool forcePrespecialization) {
   SpecializedF->setSpecializationInfo(
       GenericSpecializationInformation::create(Caller, GenericFunc, Subs));
 
-  if (VerifyFunctionsAfterSpecialization) {
+  if (VerifyFunctionsAfterSpecialization()) {
     PrettyStackTraceSILFunction SILFunctionDumper(
         llvm::Twine("Generic function: ") + GenericFunc->getName() +
             ". Specialized Function: " + SpecializedF->getName(),
@@ -2194,7 +2241,7 @@ GenericFuncSpecializer::tryCreateSpecialization(bool forcePrespecialization) {
     SpecializedF->verify();
   }
 
-  if (DumpFunctionsAfterSpecialization) {
+  if (DumpFunctionsAfterSpecialization()) {
     llvm::dbgs() << llvm::Twine("Generic function: ") + GenericFunc->getName() +
                         ". Specialized Function: " + SpecializedF->getName();
     GenericFunc->dump();
@@ -3481,7 +3528,7 @@ void swift::trySpecializeApplyOfGeneric(
   // it easier to debug such problems since the original generic function is
   // easily at hand.
   SWIFT_DEFER {
-    if (VerifyFunctionsAfterSpecialization) {
+    if (VerifyFunctionsAfterSpecialization()) {
       PrettyStackTraceSILFunction SILFunctionDumper(
           llvm::Twine("Generic function: ") + RefF->getName() +
               ". Specialized Function: " + SpecializedF->getName(),
@@ -3504,7 +3551,7 @@ void swift::trySpecializeApplyOfGeneric(
     SILFunction *Thunk = ReabstractionThunkGenerator(FuncBuilder, ReInfo, PAI,
                                                      SpecializedF.getFunction())
                              .createThunk();
-    if (VerifyFunctionsAfterSpecialization) {
+    if (VerifyFunctionsAfterSpecialization()) {
       PrettyStackTraceSILFunction SILFunctionDumper(
           llvm::Twine("Thunk For Generic function: ") + RefF->getName() +
               ". Specialized Function: " + SpecializedF->getName(),

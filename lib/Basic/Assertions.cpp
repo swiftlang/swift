@@ -16,18 +16,37 @@
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Assertions.h"
 #include <iostream>
 
-llvm::cl::opt<bool> AssertContinue(
-    "assert-continue", llvm::cl::init(false),
-    llvm::cl::desc("Do not stop on an assertion failure"));
+namespace {
 
-llvm::cl::opt<bool> AssertHelp(
-    "assert-help", llvm::cl::init(false),
-    llvm::cl::desc("Print help for managing assertions"));
+// Use ManagedStatic to avoid duplicate registration when swiftBasic is linked
+// into multiple shared libraries/executables with LLVM as a DLL.
+// This follows the same pattern as LLVM's Debug.cpp.
+struct CreateAssertContinue {
+  static void *call() {
+    return new llvm::cl::opt<bool>(
+        "assert-continue", llvm::cl::init(false),
+        llvm::cl::desc("Do not stop on an assertion failure"));
+  }
+};
+
+struct CreateAssertHelp {
+  static void *call() {
+    return new llvm::cl::opt<bool>(
+        "assert-help", llvm::cl::init(false),
+        llvm::cl::desc("Print help for managing assertions"));
+  }
+};
+} // namespace
+
+static llvm::ManagedStatic<llvm::cl::opt<bool>, CreateAssertContinue>
+    AssertContinue;
+static llvm::ManagedStatic<llvm::cl::opt<bool>, CreateAssertHelp> AssertHelp;
 
 int CONDITIONAL_ASSERT_Global_enable_flag =
 #ifdef NDEBUG
@@ -43,7 +62,7 @@ static void ASSERT_help(llvm::raw_ostream &out) {
   }
   ASSERT_help_shown = 1;
 
-  if (!AssertHelp) {
+  if (!*AssertHelp) {
     out << "(to display assertion configuration options: -Xllvm -assert-help)\n";
     return;
   }
@@ -79,7 +98,7 @@ void ASSERT_failure(const char *expr, const char *filename, int line, const char
 
   ASSERT_help(out);
 
-  if (AssertContinue) {
+  if (*AssertContinue) {
     llvm::errs() << message;
     llvm::errs() << "Continuing after failed assertion (-Xllvm -assert-continue)\n";
     return;

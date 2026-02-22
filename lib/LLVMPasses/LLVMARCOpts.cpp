@@ -61,8 +61,22 @@ STATISTIC(NumStoreOnlyObjectsEliminated,
 STATISTIC(NumUnknownObjectRetainReleaseSRed,
           "Number of unknownretain/release strength reduced to retain/release");
 
-llvm::cl::opt<bool>
-DisableARCOpts("disable-llvm-arc-opts", llvm::cl::init(false));
+namespace {
+// Helper to get or create command line option, checking if already registered.
+llvm::cl::opt<bool> &DisableARCOpts() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("disable-llvm-arc-opts");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "disable-llvm-arc-opts", llvm::cl::init(false));
+  return *opt;
+}
+
+// Force early registration before command line parsing
+auto &EarlyInitDisableARCOpts = DisableARCOpts();
+} // namespace
 
 //===----------------------------------------------------------------------===//
 //                          Input Function Canonicalizer
@@ -1041,7 +1055,7 @@ static bool runSwiftARCOpts(Function &F, SwiftRCIdentity &RC) {
 }
 
 bool SwiftARCOpt::runOnFunction(Function &F) {
-  if (DisableARCOpts)
+  if (DisableARCOpts())
     return false;
 
   return runSwiftARCOpts(F, RC);
@@ -1051,7 +1065,7 @@ PreservedAnalyses SwiftARCOptPass::run(llvm::Function &F,
                                        llvm::FunctionAnalysisManager &AM) {
   bool changed = false;
 
-  if (!DisableARCOpts)
+  if (!DisableARCOpts())
     changed = runSwiftARCOpts(F, RC);
 
   if (!changed) {

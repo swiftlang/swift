@@ -3217,7 +3217,7 @@ void IRGenSILFunction::visitDynamicFunctionRefInst(DynamicFunctionRefInst *i) {
 
 void IRGenSILFunction::visitPreviousDynamicFunctionRefInst(
     PreviousDynamicFunctionRefInst *i) {
-  if (UseBasicDynamicReplacement) {
+  if (UseBasicDynamicReplacement()) {
     IGM.unimplemented(i->getLoc().getSourceLoc(),
       ": calling the original implementation of a dynamic function is not "
       "supported with -Xllvm -basic-dynamic-replacement");

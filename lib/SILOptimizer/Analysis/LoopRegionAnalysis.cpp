@@ -1088,28 +1088,69 @@ struct GraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
 
 } // end namespace llvm
 
-static llvm::cl::opt<unsigned>
-    MaxColumns("view-loop-regions-max-columns", llvm::cl::init(80),
-               llvm::cl::desc("Maximum width of a printed node"));
-
 namespace {
-enum class LongLineBehavior { None, Truncate, Wrap };
-} // end anonymous namespace
-static llvm::cl::opt<LongLineBehavior> LLBehavior(
-    "view-loop-regions-long-line-behavior",
-    llvm::cl::init(LongLineBehavior::Truncate),
-    llvm::cl::desc("Behavior when line width is greater than the "
-                   "value provided my -view-loop-regions-max-columns "
-                   "option"),
-    llvm::cl::values(
-        clEnumValN(LongLineBehavior::None, "none", "Print everything"),
-        clEnumValN(LongLineBehavior::Truncate, "truncate",
-                   "Truncate long lines"),
-        clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines")));
+llvm::cl::opt<unsigned> &MaxColumns() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("view-loop-regions-max-columns");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<unsigned>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<unsigned>(
+      "view-loop-regions-max-columns", llvm::cl::init(80),
+      llvm::cl::desc("Maximum width of a printed node"));
+  return *opt;
+}
+auto &EarlyInitMaxColumns = MaxColumns();
 
-static llvm::cl::opt<bool> RemoveUseListComments(
-    "view-loop-regions-remove-use-list-comments", llvm::cl::init(false),
-    llvm::cl::desc("Should use list comments be removed"));
+enum class LongLineBehavior { None, Truncate, Wrap };
+
+llvm::cl::opt<LongLineBehavior> &LLBehavior() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("view-loop-regions-long-line-behavior");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<LongLineBehavior>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<LongLineBehavior>(
+      "view-loop-regions-long-line-behavior",
+      llvm::cl::init(LongLineBehavior::Truncate),
+      llvm::cl::desc("Behavior when line width is greater than the "
+                     "value provided my -view-loop-regions-max-columns "
+                     "option"),
+      llvm::cl::values(
+          clEnumValN(LongLineBehavior::None, "none", "Print everything"),
+          clEnumValN(LongLineBehavior::Truncate, "truncate",
+                     "Truncate long lines"),
+          clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines")));
+  return *opt;
+}
+auto &EarlyInitLLBehavior = LLBehavior();
+
+llvm::cl::opt<bool> &RemoveUseListComments() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("view-loop-regions-remove-use-list-comments");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "view-loop-regions-remove-use-list-comments", llvm::cl::init(false),
+      llvm::cl::desc("Should use list comments be removed"));
+  return *opt;
+}
+auto &EarlyInitRemoveUseListComments = RemoveUseListComments();
+
+llvm::cl::opt<std::string> &TargetFunction() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("view-loop-regions-only-for-function");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "view-loop-regions-only-for-function", llvm::cl::init(""),
+      llvm::cl::desc("Only print out the loop regions for this function"));
+  return *opt;
+}
+auto &EarlyInitTargetFunction = TargetFunction();
+} // namespace
 
 namespace llvm {
 template <>
@@ -1261,9 +1302,6 @@ struct DOTGraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
 };
 } // namespace llvm
 
-static llvm::cl::opt<std::string> TargetFunction(
-    "view-loop-regions-only-for-function", llvm::cl::init(""),
-    llvm::cl::desc("Only print out the loop regions for this function"));
 #endif
 
 void LoopRegionFunctionInfo::viewLoopRegions() const {

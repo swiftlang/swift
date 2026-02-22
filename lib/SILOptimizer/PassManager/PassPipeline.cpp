@@ -42,33 +42,98 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool>
-    SILViewCFG("sil-view-cfg", llvm::cl::init(false),
-               llvm::cl::desc("Enable the sil cfg viewer pass"));
+namespace {
+llvm::cl::opt<bool> &SILViewCFG() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-view-cfg");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-view-cfg", llvm::cl::init(false),
+      llvm::cl::desc("Enable the sil cfg viewer pass"));
+  return *opt;
+}
+auto &EarlyInitSILViewCFG = SILViewCFG();
 
-static llvm::cl::opt<bool> SILViewCanonicalCFG(
-    "sil-view-canonical-cfg", llvm::cl::init(false),
-    llvm::cl::desc("Enable the sil cfg viewer pass after diagnostics"));
+llvm::cl::opt<bool> &SILViewCanonicalCFG() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-view-canonical-cfg");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-view-canonical-cfg", llvm::cl::init(false),
+      llvm::cl::desc("Enable the sil cfg viewer pass after diagnostics"));
+  return *opt;
+}
+auto &EarlyInitSILViewCanonicalCFG = SILViewCanonicalCFG();
 
-static llvm::cl::opt<bool> SILPrintCanonicalModule(
-    "sil-print-canonical-module", llvm::cl::init(false),
-    llvm::cl::desc("Print the textual SIL module after diagnostics"));
+llvm::cl::opt<bool> &SILPrintCanonicalModule() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-canonical-module");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-canonical-module", llvm::cl::init(false),
+      llvm::cl::desc("Print the textual SIL module after diagnostics"));
+  return *opt;
+}
+auto &EarlyInitSILPrintCanonicalModule = SILPrintCanonicalModule();
 
-static llvm::cl::opt<bool> SILPrintFinalOSSAModule(
-    "sil-print-final-ossa-module", llvm::cl::init(false),
-    llvm::cl::desc("Print the textual SIL module before lowering from OSSA"));
+llvm::cl::opt<bool> &SILPrintFinalOSSAModule() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-final-ossa-module");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-final-ossa-module", llvm::cl::init(false),
+      llvm::cl::desc("Print the textual SIL module before lowering from OSSA"));
+  return *opt;
+}
+auto &EarlyInitSILPrintFinalOSSAModule = SILPrintFinalOSSAModule();
 
-static llvm::cl::opt<bool> SILViewSILGenCFG(
-    "sil-view-silgen-cfg", llvm::cl::init(false),
-    llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
+llvm::cl::opt<bool> &SILViewSILGenCFG() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-view-silgen-cfg");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-view-silgen-cfg", llvm::cl::init(false),
+      llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
+  return *opt;
+}
+auto &EarlyInitSILViewSILGenCFG = SILViewSILGenCFG();
 
-static llvm::cl::opt<bool> SILPrintSILGenModule(
-    "sil-print-silgen-module", llvm::cl::init(false),
-    llvm::cl::desc("Enable printing the module after SILGen"));
+llvm::cl::opt<bool> &SILPrintSILGenModule() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-silgen-module");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-silgen-module", llvm::cl::init(false),
+      llvm::cl::desc("Enable printing the module after SILGen"));
+  return *opt;
+}
+auto &EarlyInitSILPrintSILGenModule = SILPrintSILGenModule();
 
-static llvm::cl::opt<bool> SILPrintFinalModule(
-    "sil-print-final-module", llvm::cl::init(false),
-    llvm::cl::desc("Enable printing the module after all SIL passes"));
+llvm::cl::opt<bool> &SILPrintFinalModule() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-final-module");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-final-module", llvm::cl::init(false),
+      llvm::cl::desc("Enable printing the module after all SIL passes"));
+  return *opt;
+}
+auto &EarlyInitSILPrintFinalModule = SILPrintFinalModule();
+} // namespace
 
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
@@ -318,10 +383,10 @@ SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
     P.addLifetimeDependenceInsertion();
     P.addLifetimeDependenceScopeFixup();
   }
-  if (SILViewSILGenCFG) {
+  if (SILViewSILGenCFG()) {
     addCFGPrinterPipeline(P, "SIL View SILGen CFG");
   }
-  if (SILPrintSILGenModule) {
+  if (SILPrintSILGenModule()) {
     addModulePrinterPipeline(P, "SIL Print SILGen Module");
   }
   return P;
@@ -342,10 +407,10 @@ SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
   // Otherwise run the rest of diagnostics.
   addMandatoryDiagnosticOptPipeline(P);
 
-  if (SILViewCanonicalCFG) {
+  if (SILViewCanonicalCFG()) {
     addCFGPrinterPipeline(P, "SIL View Canonical CFG");
   }
-  if (SILPrintCanonicalModule) {
+  if (SILPrintCanonicalModule()) {
     addModulePrinterPipeline(P, "SIL Print Canonical Module");
   }
   return P;
@@ -1014,7 +1079,7 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   if (Options.StopOptimizationAfterSerialization)
     return P;
 
-  if (SILPrintFinalOSSAModule) {
+  if (SILPrintFinalOSSAModule()) {
     addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
   }
   P.addAutodiffClosureSpecialization();
@@ -1043,10 +1108,10 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   addSILDebugInfoGeneratorPipeline(P);
 
   // Call the CFG viewer.
-  if (SILViewCFG) {
+  if (SILViewCFG()) {
     addCFGPrinterPipeline(P, "SIL Before IRGen View CFG");
   }
-  if (SILPrintFinalModule) {
+  if (SILPrintFinalModule()) {
     addModulePrinterPipeline(P, "SIL Print Final Module");
   }
 
@@ -1131,7 +1196,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // Has only an effect if the -sil-based-debuginfo option is specified.
   P.addSILDebugInfoGenerator();
 
-  if (SILPrintFinalModule) {
+  if (SILPrintFinalModule()) {
     addModulePrinterPipeline(P, "SIL Print Final Module");
   }
   return P;

@@ -81,6 +81,7 @@ namespace irgen {
 }
 }
 
-extern llvm::cl::opt<bool> UseBasicDynamicReplacement;
+// Helper to get or create command line option, checking if already registered.
+llvm::cl::opt<bool> &UseBasicDynamicReplacement();
 
 #endif

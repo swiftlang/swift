@@ -65,35 +65,96 @@ using namespace swift::silverifier;
 
 using Lowering::AbstractionPattern;
 
+namespace {
 // This flag controls the default behaviour when hitting a verification
 // failure (abort/exit).
-static llvm::cl::opt<bool> AbortOnFailure(
-                              "verify-abort-on-failure",
-                              llvm::cl::init(true));
+llvm::cl::opt<bool> &AbortOnFailure() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("verify-abort-on-failure");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "verify-abort-on-failure",
+      llvm::cl::init(true));
+  return *opt;
+}
+auto &EarlyInitAbortOnFailure = AbortOnFailure();
 
-static llvm::cl::opt<bool> ContinueOnFailure("verify-continue-on-failure",
-                                             llvm::cl::init(false));
+llvm::cl::opt<bool> &ContinueOnFailure() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("verify-continue-on-failure");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "verify-continue-on-failure",
+      llvm::cl::init(false));
+  return *opt;
+}
+auto &EarlyInitContinueOnFailure = ContinueOnFailure();
 
-static llvm::cl::opt<bool> DumpModuleOnFailure("verify-dump-module-on-failure",
-                                             llvm::cl::init(false));
+llvm::cl::opt<bool> &DumpModuleOnFailure() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("verify-dump-module-on-failure");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "verify-dump-module-on-failure",
+      llvm::cl::init(false));
+  return *opt;
+}
+auto &EarlyInitDumpModuleOnFailure = DumpModuleOnFailure();
 
 // This verification is affects primarily debug info and end users don't derive
 // a benefit from seeing its results.
-static llvm::cl::opt<bool> VerifyDIHoles("verify-di-holes", llvm::cl::init(
+llvm::cl::opt<bool> &VerifyDIHoles() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("verify-di-holes");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "verify-di-holes", llvm::cl::init(
 #ifndef NDEBUG
                                                                 true
 #else
                                                                 false
 #endif
                                                                 ));
+  return *opt;
+}
+auto &EarlyInitVerifyDIHoles = VerifyDIHoles();
 
-static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
-    "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
+llvm::cl::opt<bool> &SkipConvertEscapeToNoescapeAttributes() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("verify-skip-convert-escape-to-noescape-attributes");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
+  return *opt;
+}
+auto &EarlyInitSkipConvertEscapeToNoescapeAttributes = SkipConvertEscapeToNoescapeAttributes();
 
 // Allow unit tests to gradually migrate toward -allow-critical-edges=false.
-static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
-                                              llvm::cl::init(true));
-extern llvm::cl::opt<bool> SILPrintDebugInfo;
+llvm::cl::opt<bool> &AllowCriticalEdges() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("allow-critical-edges");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "allow-critical-edges",
+      llvm::cl::init(true));
+  return *opt;
+}
+auto &EarlyInitAllowCriticalEdges = AllowCriticalEdges();
+} // namespace
+
+extern llvm::cl::opt<bool> &SILPrintDebugInfo();
 
 void swift::verificationFailure(
     const Twine &complaint, const SILInstruction *atInstruction,
@@ -103,7 +164,7 @@ void swift::verificationFailure(
 
   auto *f = atInstruction->getFunction();
   StringRef funcName = f->getName();
-  if (ContinueOnFailure) {
+  if (ContinueOnFailure()) {
     out << "Begin Error in function " << funcName << "\n";
   }
 
@@ -113,7 +174,7 @@ void swift::verificationFailure(
 
   out << "Verifying instruction:\n";
   atInstruction->printInContext(ctx);
-  if (ContinueOnFailure) {
+  if (ContinueOnFailure()) {
     out << "End Error in function " << funcName << "\n";
     return;
   }
@@ -121,7 +182,7 @@ void swift::verificationFailure(
   if (f) {
     out << "In function:\n";
     f->print(out);
-    if (DumpModuleOnFailure) {
+    if (DumpModuleOnFailure()) {
       // Don't do this by default because modules can be _very_ large.
       out << "In module:\n";
       f->getModule().print(out);
@@ -130,7 +191,7 @@ void swift::verificationFailure(
 
   // We abort by default because we want to always crash in
   // the debugger.
-  if (AbortOnFailure)
+  if (AbortOnFailure())
     abort();
   else
     exit(1);
@@ -145,7 +206,7 @@ void swift::verificationFailure(
   auto *f = atArgument->getFunction();
   StringRef funcName = f->getName();
 
-  if (ContinueOnFailure) {
+  if (ContinueOnFailure()) {
     out << "Begin Error in function " << funcName << "\n";
   }
 
@@ -156,7 +217,7 @@ void swift::verificationFailure(
   out << "Verifying argument:\n";
   atArgument->printInContext(ctx);
 
-  if (ContinueOnFailure) {
+  if (ContinueOnFailure()) {
     out << "End Error in function " << funcName << "\n";
     return;
   }
@@ -164,7 +225,7 @@ void swift::verificationFailure(
   if (f) {
     out << "In function:\n";
     f->print(out);
-    if (DumpModuleOnFailure) {
+    if (DumpModuleOnFailure()) {
       // Don't do this by default because modules can be _very_ large.
       out << "In module:\n";
       f->getModule().print(out);
@@ -173,7 +234,7 @@ void swift::verificationFailure(
 
   // We abort by default because we want to always crash in
   // the debugger.
-  if (AbortOnFailure)
+  if (AbortOnFailure())
     abort();
   else
     exit(1);
@@ -187,7 +248,7 @@ void swift::verificationFailure(
 
   const SILFunction *f = atValue->getFunction();
   StringRef funcName = f->getName();
-  if (ContinueOnFailure) {
+  if (ContinueOnFailure()) {
     out << "Begin Error in function " << funcName << "\n";
   }
 
@@ -198,7 +259,7 @@ void swift::verificationFailure(
   out << "Verifying value:\n";
   atValue->printInContext(ctx);
 
-  if (ContinueOnFailure) {
+  if (ContinueOnFailure()) {
     out << "End Error in function " << funcName << "\n";
     return;
   }
@@ -206,7 +267,7 @@ void swift::verificationFailure(
   if (f) {
     out << "In function:\n";
     f->print(out);
-    if (DumpModuleOnFailure) {
+    if (DumpModuleOnFailure()) {
       // Don't do this by default because modules can be _very_ large.
       out << "In module:\n";
       f->getModule().print(out);
@@ -215,7 +276,7 @@ void swift::verificationFailure(
 
   // We abort by default because we want to always crash in
   // the debugger.
-  if (AbortOnFailure)
+  if (AbortOnFailure())
     abort();
   else
     exit(1);
@@ -229,7 +290,7 @@ void swift::verificationFailure(
 
   StringRef funcName = f->getName();
 
-  if (ContinueOnFailure) {
+  if (ContinueOnFailure()) {
     out << "Begin Error in function " << funcName << "\n";
   }
 
@@ -237,7 +298,7 @@ void swift::verificationFailure(
   if (extraContext)
     extraContext(ctx);
 
-  if (ContinueOnFailure) {
+  if (ContinueOnFailure()) {
     out << "End Error in function " << funcName << "\n";
     return;
   }
@@ -245,7 +306,7 @@ void swift::verificationFailure(
   if (f) {
     out << "In function:\n";
     f->print(out);
-    if (DumpModuleOnFailure) {
+    if (DumpModuleOnFailure()) {
       // Don't do this by default because modules can be _very_ large.
       out << "In module:\n";
       f->getModule().print(out);
@@ -254,7 +315,7 @@ void swift::verificationFailure(
 
   // We abort by default because we want to always crash in
   // the debugger.
-  if (AbortOnFailure)
+  if (AbortOnFailure())
     abort();
   else
     exit(1);
@@ -266,7 +327,7 @@ void swift::verificationFailure(
   llvm::raw_ostream &out = llvm::dbgs();
   SILPrintContext ctx(out);
 
-  if (ContinueOnFailure) {
+  if (ContinueOnFailure()) {
     out << "Begin Error in witness table ";
     wtable->getConformance()->printName(out);
     out << "\n";
@@ -278,7 +339,7 @@ void swift::verificationFailure(
 
   // We abort by default because we want to always crash in
   // the debugger.
-  if (AbortOnFailure)
+  if (AbortOnFailure())
     abort();
   else
     exit(1);
@@ -5576,7 +5637,7 @@ public:
 
     // After mandatory passes convert_escape_to_noescape should not have the
     // '[not_guaranteed]' or '[escaped]' attributes.
-    if (!SkipConvertEscapeToNoescapeAttributes &&
+    if (!SkipConvertEscapeToNoescapeAttributes() &&
         F.getModule().getStage() != SILStage::Raw) {
       require(ICI->isLifetimeGuaranteed(),
               "convert_escape_to_noescape [not_guaranteed] not "
@@ -7177,7 +7238,7 @@ public:
         requireNonCriticalSucc(termInst, "critical edges not allowed in OSSA");
       }
       // In Lowered SIL, they are allowed on conditional branches only.
-      if (!AllowCriticalEdges && !isa<CondBranchInst>(termInst)) {
+      if (!AllowCriticalEdges() && !isa<CondBranchInst>(termInst)) {
         requireNonCriticalSucc(termInst, "only cond_br critical edges allowed");
       }
     }
@@ -7186,7 +7247,7 @@ public:
   /// This pass verifies that there are no hole in debug scopes at -Onone.
   void verifyDebugScopeHoles(SILBasicBlock *BB) {
     VerifierErrorEmitterGuard guard(this, BB->getParent());
-    if (!VerifyDIHoles)
+    if (!VerifyDIHoles())
       return;
 
     // These transforms don't set everything they move to implicit.
@@ -7288,7 +7349,7 @@ public:
           "Pass -Xllvm -verify-di-holes=false to disable the verification\n";
         // Turn on debug info printing so that the log actually shows the bad
         // scopes.
-        SILPrintDebugInfo.setValue(true);
+        SILPrintDebugInfo().setValue(true);
         require(
             DS == LastSeenScope,
             "Basic block contains a non-contiguous lexical scope at -Onone");
