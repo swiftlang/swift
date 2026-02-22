@@ -2069,17 +2069,19 @@ class EnumTypeInfoBuilder {
     Cases.push_back({Name, /*offset=*/0, /*value=*/-1, nullptr, emptyTI});
   }
 
-  void addCase(const std::string &Name, const TypeRef *TR,
-               const TypeInfo *TI) {
+  void addCase(const std::string &Name, const TypeRef *TR, const TypeInfo *TI,
+               const TypeRef *IndirectPayloadTR = nullptr) {
     if (TI == nullptr) {
       markInvalid("no type info for case type", TR);
       static TypeInfo emptyTI;
-      Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, emptyTI});
+      Cases.push_back(
+          {Name, /*offset=*/0, /*value=*/-1, TR, emptyTI, IndirectPayloadTR});
     } else {
       Size = std::max(Size, TI->getSize());
       Alignment = std::max(Alignment, TI->getAlignment());
       BitwiseTakable &= TI->isBitwiseTakable();
-      Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, *TI});
+      Cases.push_back(
+          {Name, /*offset=*/0, /*value=*/-1, TR, *TI, IndirectPayloadTR});
     }
   }
 
@@ -2136,7 +2138,7 @@ public:
           ++NonGenericNonEmptyPayloadCases;
           LastPayloadCaseTR = CaseTR;
         }
-        addCase(Case.Name, CaseTR, CaseTI);
+        addCase(Case.Name, CaseTR, CaseTI, Case.Indirect ? Case.TR : nullptr);
       }
     }
     // For determining a layout strategy, cases w/ empty payload are treated the
