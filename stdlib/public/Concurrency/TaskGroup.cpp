@@ -1817,17 +1817,14 @@ reevaluate_if_taskgroup_has_results:;
       assumed = TaskGroupStatus{assumedStatus};
       continue; // We raced with something, try again.
     }
-    SWIFT_TASK_DEBUG_LOG("poll, after CAS: %s", status.to_string().c_str());
+#if !SWIFT_CONCURRENCY_EMBEDDED
+    SWIFT_TASK_DEBUG_LOG("poll, after CAS: %s", assumed.to_string(this).c_str());
+#endif
 
     // We're going back to running the task, so if we suspended before,
     // we need to flag it as running again.
     if (hasSuspended) {
-      // This will always return zero because we were just
-      // running this Task so its BasePriority (which is
-      // immutable) should've already been set on the thread.
-      [[maybe_unused]]
-      uint32_t opaque = waitingTask->flagAsRunning();
-      assert(opaque == 0);
+      waitingTask->flagAsRunningFromSuspended();
     }
 
     // Success! We are allowed to poll.

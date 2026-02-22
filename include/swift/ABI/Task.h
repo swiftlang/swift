@@ -77,9 +77,6 @@ class alignas(2 * alignof(void*)) Job :
 public:
   // Indices into SchedulerPrivate, for use by the runtime.
   enum {
-    /// The next waiting task link, an AsyncTask that is waiting on a future.
-    NextWaitingTaskIndex = 0,
-
     // The Dispatch object header is one pointer and two ints, which is
     // equivalent to three pointers on 32-bit and two pointers 64-bit. Set the
     // indexes accordingly so that DispatchLinkageIndex points to where Dispatch
@@ -94,7 +91,9 @@ public:
     DispatchQueueIndex = DispatchHasLongObjectHeader ? 0 : 1,
   };
 
-  // Reserved for the use of the scheduler.
+  // Reserved for the use of the scheduler. Since Task stealers
+  // allow a Task to be intrusively enqueued at any point of its
+  // lifecycle, this data must never be used by the runtime.
   void *SchedulerPrivate[2];
 
   /// WARNING: DO NOT MOVE.
@@ -182,6 +181,10 @@ public:
   void runSimpleInFullyEstablishedContext() {
     return RunJob(this); // 'return' forces tail call
   }
+
+  /// Gets the 32-bit Job ID from the job or the 64-bit
+  /// Task ID if this is an AsyncTask or AsyncTaskStealer
+  uint64_t getJobTaskId() const;
 };
 
 // The compiler will eventually assume these.
@@ -385,7 +388,7 @@ public:
 
   /// Set the task's ID field to the next task ID.
   void setTaskId();
-  uint64_t getTaskId();
+  uint64_t getTaskId() const;
 
   /// Get the task's resume function, for logging purposes only. This will
   /// attempt to see through the various adapters that are sometimes used, and
@@ -421,7 +424,7 @@ public:
   ///       running -> completed
   ///       running -> enqueued
   ///
-  /// The 4 methods below are how a task switches from one state to another.
+  /// The methods below are how a task switches from one state to another.
 
   /// Flag that this task is now running.  This can update
   /// the priority stored in the job flags if the priority has been
@@ -430,21 +433,36 @@ public:
   /// Generally this should be done immediately after updating
   /// ActiveTask.
   ///
-  /// When Dispatch is used for the default executor:
-  /// * If the return value is non-zero, it must be passed
-  ///   to swift_dispatch_thread_reset_override_self
-  ///   before returning to the executor.
-  /// * If the return value is zero, it may be ignored or passed to
-  ///   the aforementioned function (which will ignore values of zero).
-  /// The current implementation will always return zero
-  /// if you call flagAsRunning again before calling
-  /// swift_dispatch_thread_reset_override_self with the
-  /// initial value. This supports suspending and immediately
-  /// resuming a Task without returning up the callstack.
+  /// A task can become running either by first being enqueued, or directly
+  /// from being suspended. There is a separate function for each of these
+  /// scenarios, `flagAsRunningFromSuspended` and `flagAsRunningFromEnqueued`.
   ///
-  /// For all other default executors, flagAsRunning
-  /// will return zero which may be ignored.
-  uint32_t flagAsRunning();
+  /// flagAsRunningFromEnqueued can be invoked from 2 contexts - from
+  /// the intrusively linked Task itself or from a Task Stealer. As such,
+  /// it needs to be failable such that only the Job with the correct
+  /// allowedExclusionValue invokes the task successfully. If we failed
+  /// to transition the task to running, the remaining setup needs
+  /// to short-circuit and the task cannot be invoked by the caller.
+  ///
+  /// flagAsRunningFromEnqueued's invokeFlags argument lets us know which
+  /// context we are being called from which informs further decisions
+  /// about lifetime management and future enqueue semantics of the task.
+  ///
+  /// The second return value is an opaque value used to restore the state of
+  /// the thread before returning to the context invoking this Task (either the
+  /// executor or the caller of Task.immediate). When flagAsRunning succeeds,
+  /// Dispatch is the default executor, and priority escalation is enabled,
+  /// this value must be passed to swift_dispatch_thread_reset_override_self.
+  std::pair<bool, uint32_t> flagAsRunningFromEnqueued(uint8_t allowedExclusionValue, bool removeEnqueued);
+
+  /// This variant of flagAsRunning may be called if you are resumming
+  /// immediately after suspending. That is, you are on the same thread,
+  /// you have not enqueued onto any executor, and you have not called
+  /// swift_dispatch_thread_reset_override_self or done any other
+  /// cleanup work. This is intended for situations such as awaiting
+  /// where you may mark yourself as suspended but find out during
+  /// atomic state update that you may actually resume immediately.
+  void flagAsRunningFromSuspended();
 
   /// Flag that this task is now suspended with information about what it is
   /// waiting on.
@@ -807,12 +825,10 @@ public:
   }
 
 private:
-  /// Access the next waiting task, which establishes a singly linked list of
-  /// tasks that are waiting on a future.
-  AsyncTask *&getNextWaitingTask() {
-    return reinterpret_cast<AsyncTask *&>(
-        SchedulerPrivate[NextWaitingTaskIndex]);
-  }
+  /// Access the next waiting task, which establishes a singly linked
+  /// list of tasks that are waiting on a future. This function
+  /// assumes that this Task is suspended waiting on a another Task.
+  AsyncTask *&getNextWaitingTask();
 };
 
 // The compiler will eventually assume these.
