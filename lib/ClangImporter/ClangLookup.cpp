@@ -580,7 +580,25 @@ ClangImporter::Implementation::lookupAndImportPointee(NominalTypeDecl *Struct) {
 
   Struct->addMember(pointee);
   importedPointeeCache[Struct] = pointee;
+  importedOperatorStarCache.try_emplace(Struct, getter ? getter : setter);
   return pointee;
+}
+
+FuncDecl *ClangImporter::Implementation::lookupAndImportOperatorStar(
+    NominalTypeDecl *Struct) {
+  auto it = importedOperatorStarCache.find(Struct);
+  if (it != importedOperatorStarCache.end())
+    return it->second;
+
+  // __operatorStar() is synthesized when importing the .pointee computed
+  // property.
+  if (!lookupAndImportPointee(Struct)) {
+    importedOperatorStarCache.try_emplace(Struct, nullptr);
+    return nullptr;
+  }
+
+  it = importedOperatorStarCache.find(Struct);
+  return it != importedOperatorStarCache.end() ? it->second : nullptr;
 }
 
 FuncDecl *ClangImporter::Implementation::lookupAndImportSuccessor(
