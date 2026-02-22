@@ -1979,15 +1979,6 @@ namespace {
         if (closure->getThrowsLoc().isValid())
           return Type();
 
-        // Thrown type inferred from context.
-        if (auto contextualType = CS.getContextualType(
-                closure, /*forConstraint=*/false)) {
-          if (auto fnType = contextualType->getAs<AnyFunctionType>()) {
-            if (Type thrownErrorTy = fnType->getThrownError())
-              return thrownErrorTy;
-          }
-        }
-
         // We do not try to infer a thrown error type if one isn't immediately
         // available.
         return Type();

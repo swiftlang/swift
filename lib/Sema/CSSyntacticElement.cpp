@@ -761,8 +761,17 @@ private:
     auto module = dc->getParentModule();
     auto throwLoc = throwStmt->getThrowLoc();
     Type errorType;
-    if (auto catchNode = ASTScope::lookupCatchNode(module, throwLoc))
+    if (auto catchNode = ASTScope::lookupCatchNode(module, throwLoc)) {
       errorType = cs.getExplicitCaughtErrorType(catchNode);
+
+      if (!errorType) {
+        if (auto *closure = catchNode.dyn_cast<ClosureExpr *>()) {
+          auto *closureTy =
+              cs.simplifyType(cs.getType(closure))->castTo<FunctionType>();
+          errorType = closureTy->getEffectiveThrownErrorTypeOrNever();
+        }
+      }
+    }
 
     if (!errorType) {
       if (!cs.getASTContext().getErrorDecl()) {
