@@ -164,7 +164,7 @@ extension ASTGenVisitor {
       return self.generate(type: type)
 
     case .expr(let expr):
-      return self.generateIntegerType(expr: expr).asTypeRepr
+      return self.generateValueOrType(expr: expr).asTypeRepr
     }
   }
 
@@ -174,7 +174,7 @@ extension ASTGenVisitor {
       return self.generate(type: type)
 
     case .expr(let expr):
-      return self.generateIntegerType(expr: expr).asTypeRepr
+      return self.generateValueOrType(expr: expr).asTypeRepr
     }
   }
 
@@ -184,44 +184,41 @@ extension ASTGenVisitor {
       return self.generate(type: type)
 
     case .expr(let expr):
-      return self.generateIntegerType(expr: expr).asTypeRepr
+      return self.generateValueOrType(expr: expr).asTypeRepr
     }
   }
 
-  func generateIntegerType(expr node: ExprSyntax) -> BridgedIntegerTypeRepr {
-    var minusLoc = SourceLoc()
-    let literalExpr: IntegerLiteralExprSyntax
+  func generateValueOrType(expr node: ExprSyntax) -> BridgedGenericArgumentExprTypeRepr {
+    let bridgedArgumentExprText = extractRawText(node).bridged
+    let bridgedArgumentExpr: BridgedExpr
 
-    // The only expressions generic argument types support right now are
-    // integer literals, '123', and prefix operators for negative integer
-    // literals, '-123'.
-    switch node.as(ExprSyntaxEnum.self) {
-    case .integerLiteralExpr(let node):
-      literalExpr = node
+    // Generic value argument expressions can be integer literals, or
+    // arbitrary parenthesized integer expressions.
 
-    case .prefixOperatorExpr(let node):
-      let op = node.operator
-
+    // Because arbitrary expressions currently require an experimental
+    // language feature (LiteralExpressions), and prefix '-' for integer literals
+    // is otherwise supported, we handle the '-' prefix operator here as a special
+    // case by turning it into a negative IntegerLiteralExpr.
+    if case .prefixOperatorExpr(let prefixNode) = node.as(ExprSyntaxEnum.self) {
+      let op = prefixNode.operator
       guard op.text == "-" else {
         fatalError("Unknown prefix operator for generic argument type")
       }
-
-      guard let node = node.expression.as(IntegerLiteralExprSyntax.self) else {
+      guard let intLitExpr = prefixNode.expression.as(IntegerLiteralExprSyntax.self) else {
         fatalError("Unknown expression kind for generic argument type")
       }
-
-      minusLoc = self.generateSourceLoc(op)
-      literalExpr = node
-
-    default:
-      fatalError("Unknown expression kind for generic argument type")
+      let bridgedIntExpr = self.generate(integerLiteralExpr: intLitExpr)
+      bridgedIntExpr.setNegative(loc: self.generateSourceLoc(op))
+      bridgedArgumentExpr = bridgedIntExpr.asExpr
+    } else {
+      bridgedArgumentExpr = self.generate(expr: node)
     }
 
     return .createParsed(
       self.ctx,
-      string: self.copyAndStripUnderscores(text: literalExpr.literal.rawText),
-      loc: self.generateSourceLoc(literalExpr),
-      minusLoc: minusLoc
+      expr: bridgedArgumentExpr,
+      text: bridgedArgumentExprText,
+      loc: self.generateSourceLoc(node)
     )
   }
 }

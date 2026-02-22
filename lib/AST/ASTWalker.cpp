@@ -2436,8 +2436,9 @@ bool Traversal::visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T) {
   return doIt(T->getBase());
 }
 
-bool Traversal::visitIntegerTypeRepr(IntegerTypeRepr *T) {
-  return false;
+bool Traversal::visitGenericArgumentExprTypeRepr(GenericArgumentExprTypeRepr *T) {
+  return false; // Don't walk the inner expression; it will be type-checked
+                // independently by `resolveGenericArgumentExprTypeRepr`
 }
 
 Expr *Expr::walk(ASTWalker &walker) {

@@ -964,10 +964,68 @@ void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
   Printer.printKeyword("sil_box", Opts);
 }
 
-void IntegerTypeRepr::printImpl(ASTPrinter &Printer,
-                                const PrintOptions &Opts,
-                                NonRecursivePrintOptions nrOpts) const {
-  Printer.printText(getValue());
+void GenericArgumentExprTypeRepr::setArgExpr(Expr *E) {
+  assert((isa_and_nonnull<TypeExpr>(E) ||
+          isa_and_nonnull<IntegerLiteralExpr>(E)) &&
+         "Unexpected resolved generic argument expression type.");
+  assert(!ArgExpr.exprAfterResolution.getPointer() ||
+         ArgExpr.exprAfterResolution.getPointer() == E);
+  ArgExpr.exprAfterResolution.setPointer(E);
+  ArgExpr.exprAfterResolution.setInt(ResolutionStatus::Resolved);
+}
+
+void GenericArgumentExprTypeRepr::setFailedToResolve() {
+  assert(!ArgExpr.exprAfterResolution.getPointer());
+  ArgExpr.exprAfterResolution.setInt(ResolutionStatus::FailedToResolve);
+}
+
+void GenericArgumentExprTypeRepr::printImpl(
+    ASTPrinter &Printer, const PrintOptions &Opts,
+    NonRecursivePrintOptions nrOpts) const {
+  if (auto *typeExpr = getAsResolvedTypeExpr())
+    typeExpr->getTypeRepr()->print(Printer, Opts, nrOpts);
+  else if (auto *intLitExpr = getAsResolvedIntegerLiteralExpr()) {
+    if (intLitExpr->isNegative())
+      Printer << "-";
+    Printer << intLitExpr->getDigitsText();
+  } else
+    Printer << ArgText;
+}
+
+TypeExpr *GenericArgumentExprTypeRepr::getAsResolvedTypeExpr() const {
+  auto result = dyn_cast_or_null<TypeExpr>(getArgExpr());
+  assert((result &&
+          ArgExpr.exprAfterResolution.getInt() == ResolutionStatus::Resolved) ||
+         !result);
+  return result;
+}
+IntegerLiteralExpr *
+GenericArgumentExprTypeRepr::getAsResolvedIntegerLiteralExpr() const {
+  auto result = dyn_cast_or_null<IntegerLiteralExpr>(getArgExpr());
+  assert((result &&
+          ArgExpr.exprAfterResolution.getInt() == ResolutionStatus::Resolved) ||
+         !result);
+  return result;
+}
+
+bool GenericArgumentExprTypeRepr::isFailedToResolve() const {
+  auto result =
+      ArgExpr.exprAfterResolution.getInt() == ResolutionStatus::FailedToResolve;
+  assert((result && ArgExpr.exprAfterResolution.getPointer() == nullptr) ||
+         !result);
+  return result;
+}
+
+SourceLoc GenericArgumentExprTypeRepr::getStartLocImpl() const {
+  return getOriginalArgExpr()->getStartLoc();
+}
+
+SourceLoc GenericArgumentExprTypeRepr::getLoc() const {
+  return getOriginalArgExpr()->getLoc();
+}
+
+SourceLoc GenericArgumentExprTypeRepr::getEndLocImpl() const {
+  return getOriginalArgExpr()->getEndLoc();
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

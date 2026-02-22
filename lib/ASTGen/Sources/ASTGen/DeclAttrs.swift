@@ -1729,32 +1729,6 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateValueOrType(expr node: ExprSyntax) -> BridgedTypeRepr? {
-    var node = node
-
-    // Try value first.
-    let minusLoc: SourceLoc
-    if let prefixExpr = node.as(PrefixOperatorExprSyntax.self),
-      prefixExpr.operator.rawText == "-",
-      prefixExpr.expression.is(IntegerLiteralExprSyntax.self) {
-      minusLoc = self.generateSourceLoc(prefixExpr.operator)
-      node = prefixExpr.expression
-    } else {
-      minusLoc = nil
-    }
-    if let integerExpr = node.as(IntegerLiteralExprSyntax.self) {
-      let value = self.copyAndStripUnderscores(text: integerExpr.literal.rawText)
-      return BridgedIntegerTypeRepr.createParsed(
-        self.ctx,
-        string: value,
-        loc: self.generateSourceLoc(node), minusLoc: minusLoc
-      ).asTypeRepr
-    }
-
-    assert(!minusLoc.isValid)
-    return self.generateTypeRepr(expr: node)
-  }
-
   func generateRawLayoutAttr(attribute node: AttributeSyntax) -> BridgedRawLayoutAttr? {
     self.generateWithLabeledExprListArguments(attribute: node) { args in
       switch args.first?.label?.rawText {
@@ -1818,7 +1792,7 @@ extension ASTGenVisitor {
 
         // 'count:' can be integer literal or a generic parameter.
         let count = self.generateConsumingAttrOption(args: &args, label: "count") {
-          self.generateValueOrType(expr: $0)
+          self.generateValueOrType(expr: $0).asTypeRepr
         }
         guard let count else {
           return nil

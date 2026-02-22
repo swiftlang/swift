@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
@@ -294,10 +295,11 @@ BridgedExistentialTypeRepr BridgedExistentialTypeRepr_createParsed(
   return new (context) ExistentialTypeRepr(anyLoc, baseTy.unbridged());
 }
 
-BridgedIntegerTypeRepr
-BridgedIntegerTypeRepr_createParsed(BridgedASTContext cContext,
-                                    BridgedStringRef cString, SourceLoc loc,
-                                    SourceLoc minusLoc) {
+BridgedGenericArgumentExprTypeRepr
+BridgedGenericArgumentExprTypeRepr_createParsed(BridgedASTContext cContext,
+                                                BridgedExpr cExpr,
+                                                BridgedStringRef cText,
+                                                SourceLoc loc) {
   ASTContext &context = cContext.unbridged();
-  return new (context) IntegerTypeRepr(cString.unbridged(), loc, minusLoc);
+  return new (context) GenericArgumentExprTypeRepr(cExpr.unbridged(), cText.unbridged());
 }

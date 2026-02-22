@@ -1504,6 +1504,10 @@ public:
   /// NOTE: 'isStartOfInlineArrayTypeBody' must be true.
   ParserResult<TypeRepr> parseTypeInlineArray(SourceLoc lSquare);
 
+  /// Parse a simple integer literal value specified
+  /// as a generic value argument, with an optional '-' prefix.
+  ParserResult<TypeRepr> parseGenericValueLiteral();
+
   /// Parse a collection type.
   ///   type-simple:
   ///     '[' type ']'
@@ -1755,6 +1759,7 @@ public:
   bool canParseTypeTupleBody();
   bool canParseTypeAttribute();
   bool canParseGenericArguments();
+  bool canParseGenericValueLiteral();
 
   bool canParseTypedPattern();
 
