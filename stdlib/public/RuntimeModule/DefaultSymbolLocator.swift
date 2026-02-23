@@ -256,7 +256,7 @@ public class DefaultSymbolLocator: SymbolLocator {
 
         uuid = Array(theUUID[0..<16])
         age = theUUID[16..<20].withUnsafeBytes {
-          return $0.assumingMemoryBound(to: UInt32.self).baseAddress.pointee
+          return $0.assumingMemoryBound(to: UInt32.self).baseAddress!.pointee
         }
       }
     } else {
