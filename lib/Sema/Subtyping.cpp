@@ -180,16 +180,19 @@ bool ConstraintSystem::isConformanceTransitiveForSubtype(
   case ConversionBehavior::Array:
   case ConversionBehavior::Dictionary:
   case ConversionBehavior::Set:
-    // All subtypes of these have the same nominal type.
+    // All subtypes of these have the same nominal type,
+    // and conform to the same protocols.
     return true;
 
   case ConversionBehavior::Tuple:
-    // All subtypes of a tuple remain a tuple.
+    // All subtypes of a tuple remain a tuple, and conform
+    // to the same protocols.
     return true;
 
   case ConversionBehavior::Class:
-    // If a subclass conforms, so does the superclass.
-    return true;
+    // A subclass might conform to more protocols than a
+    // superclass.
+    return false;
 
   case ConversionBehavior::Double: {
     auto key = std::make_pair(behavior, proto);
@@ -210,12 +213,10 @@ bool ConstraintSystem::isConformanceTransitiveForSubtype(
       SmallVector<ProtocolConformance *, 1> results;
       decl->lookupConformance(proto, results);
       if (!results.empty()) {
-        result = false;
+        result = true;
         break;
       }
     }
-
-    result = true;
 
     // Cache the result.
     bool inserted =
@@ -236,11 +237,19 @@ bool ConstraintSystem::isConformanceTransitiveForSubtype(
     return false;
 
   case ConversionBehavior::AnyHashable:
+    // All Hashable types are subtypes of AnyHashable, so
+    // we cannot conclude anything about protocol conformance
+    // in this case.
+    return false;
+
   case ConversionBehavior::Pointer:
     // FIXME: Check pointer types.
     return false;
 
   case ConversionBehavior::Structural:
+    // FIXME: Metatypes and functions.
+    return false;
+
   case ConversionBehavior::Unknown:
     return false;
   }
