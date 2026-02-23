@@ -199,7 +199,7 @@ namespace swift {
     bool EnableExperimentalStringProcessing = true;
 
     /// Disable API availability checking.
-    bool DisableAvailabilityChecking = false;
+    bool DisableAvailabilityChecking = true;
 
     /// Optimization mode for unavailable declarations.
     std::optional<UnavailableDeclOptimization> UnavailableDeclOptimizationMode;
