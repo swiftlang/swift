@@ -110,6 +110,16 @@ public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
   /// Returns a borrowing iterator over the elements of this sequence.
   @lifetime(borrow self)
   func makeBorrowingIterator() -> BorrowingIterator
+  
+  var underestimatedCount: Int { get }
+  
+  func _customContainsEquatableElement(_ element: borrowing Element) -> Bool?
+}
+
+@available(SwiftStdlib 6.4, *)
+extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable {
+  public var underestimatedCount: Int { 0 }
+  public func _customContainsEquatableElement(_ element: borrowing Element) -> Bool? { nil }
 }
 
 @available(SwiftStdlib 6.4, *)
