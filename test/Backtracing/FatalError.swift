@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/FatalError
 // RUN: %target-codesign %t/FatalError
-// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/FatalError 2>&1 || true) | %FileCheck %s
+// RUN: not --crash env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/FatalError 2>&1 | %FileCheck %s
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

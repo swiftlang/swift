@@ -9,7 +9,7 @@ set(swiftDemanglingSources
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp"
-  "${SWIFT_SOURCE_DIR}/lib/Demangling/Errors.cpp")
+  "${SWIFT_SOURCE_DIR}/lib/Demangling/DemanglingErrorHandling.cpp")
 set(swiftDemanglingCRSources
   "${SWIFT_SOURCE_DIR}/lib/Demangling/CrashReporter.cpp")
 

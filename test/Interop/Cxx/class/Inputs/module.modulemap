@@ -172,3 +172,9 @@ module Mirror {
   requires cplusplus
   export *
 }
+
+module SuppressibleProtocols {
+  header "suppressible-protocols.h"
+  requires cplusplus
+  export *
+}

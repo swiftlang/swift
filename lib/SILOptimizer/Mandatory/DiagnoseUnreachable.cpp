@@ -775,7 +775,7 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
     // happens when passing a guaranteed argument through generic code paths
     // to no return functions.
     if (isa<EndBorrowInst>(currInst) || isa<EndAccessInst>(currInst) ||
-        isa<EndLifetimeInst>(currInst)) {
+        isa<EndLifetimeInst>(currInst) || isa<ExtendLifetimeInst>(currInst)) {
       return false;
     }
 

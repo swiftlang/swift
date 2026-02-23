@@ -14,7 +14,7 @@ public macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(
     module: "MacroDefinition", type: "StringifyMacro"
 )
 
-// CHECK: public func foo(param: (Swift.String, Swift.String) = #stringify(#fileID))
+// CHECK: public func foo(param: (Swift::String, Swift::String) = #stringify(#fileID))
 public func foo(param: (String, String) = #stringify(#fileID)) {
     print(param)
 }

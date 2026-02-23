@@ -9,19 +9,19 @@
 
 // Build this file as a module and check that it emits the expected warnings.
 // RUN: %empty-directory(%t/subtest-1)
-// RUN: %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/mcp -emit-module-interface-path %t/subtest-1/module_shadowing.swiftinterface %s -enable-library-evolution -module-name module_shadowing -I %t/lib -swift-version 5 2>&1 | %FileCheck --check-prefix OTHER --implicit-check-not TestModule %s
+// RUN: %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/mcp -emit-module-interface-path %t/subtest-1/module_shadowing.swiftinterface %s -enable-library-evolution -module-name module_shadowing -I %t/lib -disable-module-selectors-in-module-interface -swift-version 5 2>&1 | %FileCheck --check-prefix OTHER --implicit-check-not TestModule %s
 
 // Make sure that preserve-types-as-written disables this warning.
 // RUN: %empty-directory(%t/subtest-2)
-// RUN: %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/mcp -emit-module-interface-path %t/subtest-2/module_shadowing.swiftinterface %s -enable-library-evolution -module-name module_shadowing -I %t/lib -module-interface-preserve-types-as-written -swift-version 5 -verify
+// RUN: %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/mcp -emit-module-interface-path %t/subtest-2/module_shadowing.swiftinterface %s -enable-library-evolution -module-name module_shadowing -I %t/lib -disable-module-selectors-in-module-interface -module-interface-preserve-types-as-written -swift-version 5 -verify
 
 // alias-module-names-in-module-interface also disables this warning.
 // RUN: %empty-directory(%t/subtest-2)
-// RUN: %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/mcp -emit-module-interface-path %t/subtest-2/module_shadowing.swiftinterface %s -enable-library-evolution -module-name module_shadowing -I %t/lib -alias-module-names-in-module-interface -swift-version 5 -verify
+// RUN: %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/mcp -emit-module-interface-path %t/subtest-2/module_shadowing.swiftinterface %s -enable-library-evolution -module-name module_shadowing -I %t/lib -disable-module-selectors-in-module-interface -alias-module-names-in-module-interface -swift-version 5 -verify
 
 // Build this module in a different configuration where it will shadow itself.
 // RUN: %empty-directory(%t/subtest-3)
-// RUN: %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/mcp -emit-module-interface-path %t/subtest-3/ShadowyHorror.swiftinterface %s -enable-library-evolution -module-name ShadowyHorror -DSELF_SHADOW -swift-version 5 2>&1 | %FileCheck --check-prefix SELF --implicit-check-not TestModule %s
+// RUN: %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/mcp -emit-module-interface-path %t/subtest-3/ShadowyHorror.swiftinterface %s -enable-library-evolution -module-name ShadowyHorror -DSELF_SHADOW -disable-module-selectors-in-module-interface -swift-version 5 2>&1 | %FileCheck --check-prefix SELF --implicit-check-not TestModule %s
 
 // FIXME: Verify that the module-shadowing bugs we're trying to address haven't
 // been fixed (https://github.com/apple/swift/issues/43510).

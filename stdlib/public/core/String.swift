@@ -1150,3 +1150,12 @@ extension String {
     self._guts.isTriviallyIdentical(to: other._guts)
   }
 }
+
+extension String {
+  /// Compare the Unicode scalars of this string with another string, not
+  /// accounting for normalization.
+  func compareUnicodeScalars(_ other: String) -> Bool {
+    return _guts.isTriviallyIdentical(to: other._guts) ||
+        unicodeScalars.elementsEqual(other.unicodeScalars)
+  }
+}

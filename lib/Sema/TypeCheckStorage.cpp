@@ -130,7 +130,8 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
 
   // Just walk over the members of the type, forcing backing storage
   // for lazy properties and property wrappers to be synthesized.
-  for (auto *member : implDecl->getMembers()) {
+  implDecl->loadStorageMembers();
+  for (auto *member : implDecl->getCurrentMembersWithoutLoading()) {
     // Expand peer macros.
     (void)evaluateOrDefault(
         ctx.evaluator,
@@ -210,29 +211,28 @@ static void enumerateStoredPropertiesAndMissing(
         _addStoredProperty(var);
     }
   };
+  std::function<void(Decl *)> visitMember;
+  visitMember = [&](Decl *member) {
+    if (auto *var = dyn_cast<VarDecl>(member))
+      addStoredProperty(var);
+
+    member->visitAuxiliaryDecls(visitMember);
+
+    if (auto missing = dyn_cast<MissingMemberDecl>(member))
+      if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
+        addMissing(missing);
+  };
 
   // If we have a distributed actor, find the id and actorSystem
   // properties. We always want them first, and in a specific
   // order.
   if (auto idVar = decl->getDistributedActorIDProperty())
-    addStoredProperty(idVar);
+    visitMember(idVar);
   if (auto actorSystemVar = decl->getDistributedActorSystemProperty())
-    addStoredProperty(actorSystemVar);
-
-  for (auto *member : implDecl->getMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member)) {
-      addStoredProperty(var);
-    }
-
-    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
-      if (auto auxVar = dyn_cast<VarDecl>(auxDecl))
-        addStoredProperty(auxVar);
-    });
-
-    if (auto missing = dyn_cast<MissingMemberDecl>(member))
-      if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
-        addMissing(missing);
-  }
+    visitMember(actorSystemVar);
+  implDecl->loadStorageMembers();
+  for (auto *member : implDecl->getCurrentMembersWithoutLoading())
+    visitMember(member);
 }
 
 static bool isInSourceFile(IterableDeclContext *idc) {
@@ -345,15 +345,17 @@ InitializablePropertiesRequest::evaluate(Evaluator &evaluator,
     }
   };
 
-  for (auto *member : decl->getMembers()) {
+  std::function<void(Decl *)> visitMember;
+  visitMember = [&](Decl *member) {
     if (auto *var = dyn_cast<VarDecl>(member))
       maybeAddProperty(var);
 
-    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
-      if (auto auxVar = dyn_cast<VarDecl>(auxDecl))
-        maybeAddProperty(auxVar);
-    });
-  }
+    member->visitAuxiliaryDecls(visitMember);
+  };
+
+  decl->loadStorageMembers();
+  for (auto *member : decl->getCurrentMembersWithoutLoading())
+    visitMember(member);
 
   return decl->getASTContext().AllocateCopy(results);
 }
@@ -2819,8 +2821,6 @@ createBorrowMutateAccessorPrototype(AbstractStorageDecl *storage,
       params, Type(), dc);
   accessor->setSynthesized();
 
-  // TODO: Update self access kind when ownership variations are introduced for
-  // borrow and mutate accessors.
   if (kind == AccessorKind::Mutate) {
     accessor->setSelfAccessKind(SelfAccessKind::Mutating);
   } else {
@@ -2830,22 +2830,20 @@ createBorrowMutateAccessorPrototype(AbstractStorageDecl *storage,
   if (!storage->requiresOpaqueAccessor(kind))
     accessor->setForcedStaticDispatch(true);
 
-  // Make sure the coroutine is available enough to access
+  // Make sure the borrow/mutate accessor is available enough to access
   // the storage.
   SmallVector<const Decl *, 2> asAvailableAs;
   asAvailableAs.push_back(storage);
 
-  if (auto var = dyn_cast<VarDecl>(storage)) {
-    addPropertyWrapperAccessorAvailability(var, kind, asAvailableAs);
-  }
+  // Property wrappers should never appear during borrow/mutate synthesis.
+  // We only synthesize borrow/mutate accessors for stored properties when
+  // a protocol has borrow/mutate requirement. Since property wrappers are
+  // transformed into computed properties with get/set accessors, they cannot
+  // satisfy the protocol requirement.
+  ASSERT(!isa<VarDecl>(storage) ||
+         !cast<VarDecl>(storage)->hasAttachedPropertyWrapper());
 
   AvailabilityInference::applyInferredAvailableAttrs(accessor, asAvailableAs);
-
-  // A mutate accessor should have the same SPI visibility as the setter.
-  if (kind == AccessorKind::Mutate) {
-    if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set))
-      applyInferredSPIAccessControlAttr(accessor, setter, ctx);
-  }
 
   finishImplicitAccessor(accessor, ctx);
 

@@ -18,7 +18,8 @@
 ///
 /// - SeeAlso: https://en.cppreference.com/w/cpp/named_req/InputIterator
 public protocol UnsafeCxxInputIterator: Equatable {
-  associatedtype Pointee
+  associatedtype Pointee: ~Copyable
+  associatedtype DereferenceResult
 
   /// Returns the unwrapped result of C++ `operator*()`.
   ///
@@ -32,21 +33,43 @@ public protocol UnsafeCxxInputIterator: Equatable {
   /// Generally, Swift creates this property automatically for C++ types that
   /// define pre-increment `operator++()`.
   func successor() -> Self
+
+  /// Returns a `UnsafePointer` to the current element.
+  ///
+  /// Generally, this is the result of `operator*()`
+  func __operatorStar() -> DereferenceResult
 }
 
-extension UnsafePointer: @unsafe UnsafeCxxInputIterator {}
+extension UnsafePointer: @unsafe UnsafeCxxInputIterator
+where Pointee: ~Copyable {
+  public typealias DereferenceResult = Self
+  @inlinable
+  public func __operatorStar() -> DereferenceResult {
+    return unsafe self
+  }
+}
 
-extension UnsafeMutablePointer: @unsafe UnsafeCxxInputIterator {}
+extension UnsafeMutablePointer: @unsafe UnsafeCxxInputIterator
+where Pointee: ~Copyable {
+  public typealias DereferenceResult = UnsafePointer<Self.Pointee>
+  @inlinable
+  public func __operatorStar() -> DereferenceResult {
+    return unsafe UnsafePointer(self)
+  }
+}
 
-extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator {
+extension Optional: @unsafe UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator {
   public typealias Pointee = Wrapped.Pointee
+  public typealias DereferenceResult = Wrapped.DereferenceResult
 
   @inlinable
   public var pointee: Pointee {
-    if let value = self {
-      return value.pointee
+    _read {
+      guard let value = self else {
+        fatalError("Could not dereference nullptr")
+      }
+      yield value.pointee
     }
-    fatalError("Could not dereference nullptr")
   }
 
   @inlinable
@@ -56,6 +79,14 @@ extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator
     }
     fatalError("Could not increment nullptr")
   }
+
+  @inlinable
+  public func __operatorStar() -> DereferenceResult {
+    guard let value = self else {
+      fatalError("Could not dereference nullptr")
+    }
+    return unsafe value.__operatorStar()
+  }
 }
 
 public protocol UnsafeCxxMutableInputIterator: UnsafeCxxInputIterator {
@@ -63,7 +94,8 @@ public protocol UnsafeCxxMutableInputIterator: UnsafeCxxInputIterator {
   override var pointee: Pointee { get set }
 }
 
-extension UnsafeMutablePointer: UnsafeCxxMutableInputIterator {}
+extension UnsafeMutablePointer: UnsafeCxxMutableInputIterator
+where Pointee: ~Copyable {}
 
 /// Bridged C++ iterator that allows computing the distance between two of its
 /// instances, and advancing an instance by a given number of elements.
@@ -79,14 +111,17 @@ public protocol UnsafeCxxRandomAccessIterator: UnsafeCxxInputIterator {
   static func +=(lhs: inout Self, rhs: Distance)
 }
 
-extension UnsafePointer: @unsafe UnsafeCxxRandomAccessIterator {}
+extension UnsafePointer: @unsafe UnsafeCxxRandomAccessIterator
+where Pointee: ~Copyable {}
 
-extension UnsafeMutablePointer: @unsafe UnsafeCxxRandomAccessIterator {}
+extension UnsafeMutablePointer: @unsafe UnsafeCxxRandomAccessIterator
+where Pointee: ~Copyable {}
 
 public protocol UnsafeCxxMutableRandomAccessIterator:
 UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxMutableRandomAccessIterator {}
+extension UnsafeMutablePointer: UnsafeCxxMutableRandomAccessIterator
+where Pointee: ~Copyable {}
 
 /// Bridged C++ iterator that allows traversing elements of a random access
 /// collection that are stored in contiguous memory segments.

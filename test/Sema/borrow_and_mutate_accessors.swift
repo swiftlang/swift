@@ -21,20 +21,20 @@ struct Struct {
   }
 
   var k2: Klass {
-    mutating borrow { // expected-error{{mutating ownership modifier is not yet supported on a 'borrow' accessor}}
-      return _k
-    }
-    nonmutating mutate { // expected-error{{nonmutating ownership modifier is not yet supported on a 'mutate' accessor}}
-      return &_k // expected-error{{'&' may only be used to pass an argument to inout parameter}}
-    }
-  }
-
-  var k3: Klass {
     nonmutating borrow {
       return _k
     }
     mutating mutate {
       return &_k
+    }
+  }
+
+  var k3: Klass {
+    borrowing borrow {
+      return _k
+    }
+    borrowing mutate { // expected-error{{a 'mutate' accessor cannot be declared borrowing}}
+      return &_k // expected-error{{}}
     }
   }
 }
@@ -84,7 +84,8 @@ enum OrderStatus: ~Copyable {
 }
 
 public protocol Q {
-  var id: NonTrivial { borrow mutate } // expected-note{{protocol requires property 'id' with type 'NonTrivial'}} // expected-note{{}} // expected-note{{}} // expected-note{{}}
+  var id: NonTrivial { borrow mutate } // expected-note{{protocol requires property 'id' with type 'NonTrivial'}} // expected-note{{}} // expected-note{{}} // expected-note{{}} // expected-note{{}}
+
 }
 
 public struct NonTrivial {
@@ -179,3 +180,47 @@ public struct S7 : Q { // expected-error{{type 'S7' does not conform to protocol
     }
   }
 }
+
+// Borrow and mutate accessors with property observers
+struct S8 {
+  var _i: Int
+
+  var i: Int {
+    borrow {
+      return _i
+    }
+    mutate {
+      return &_i
+    }
+    willSet {} // expected-error {{'willSet' cannot be provided together with a 'borrow' accessor}}
+    didSet {} // expected-error {{'didSet' cannot be provided together with a 'borrow' accessor}}
+  }
+}
+
+// Borrow and mutate accessors with 'lazy' properties
+struct S9 {
+  var _i: Int = 0
+
+  lazy var i: Int { // expected-error {{'lazy' cannot be used on a computed property}}
+                    // expected-error@-1 {{lazy properties must have an initializer}}
+    borrow {
+      return _i
+    }
+  }
+}
+
+struct S10 {
+  var _i: Int = 0
+
+  lazy var i: Int { // expected-error {{'lazy' cannot be used on a computed property}}
+                    // expected-error@-1 {{lazy properties must have an initializer}}
+    borrow {
+      return _i
+    }
+  }
+}
+
+final class C : Q { // expected-error {{type 'C' does not conform to protocol 'Q'}} // expected-note{{add stubs for conformance}}
+  var id: NonTrivial = NonTrivial(k: Klass()) // expected-error{{borrow/mutate protocol requirements can only be witnessed in a struct}}
+}
+

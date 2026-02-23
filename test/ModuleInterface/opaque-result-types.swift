@@ -7,35 +7,35 @@
 public protocol Foo {}
 extension Int: Foo {}
 
-// CHECK-LABEL: public func foo(_: Swift.Int) -> some OpaqueResultTypes.Foo
+// CHECK-LABEL: public func foo(_: Swift::Int) -> some OpaqueResultTypes::Foo
 @available(SwiftStdlib 5.1, *)
 public func foo(_: Int) -> some Foo {
   return 1738
 }
 
-// CHECK-LABEL: @inlinable public func foo(_: Swift.String) -> some OpaqueResultTypes.Foo {
+// CHECK-LABEL: @inlinable public func foo(_: Swift::String) -> some OpaqueResultTypes::Foo {
 @available(SwiftStdlib 5.1, *)
 @inlinable public func foo(_: String) -> some Foo {
   return 679
 }
 
-// CHECK-LABEL: public func foo<T>(_ x: T) -> some OpaqueResultTypes.Foo where T : OpaqueResultTypes.Foo
+// CHECK-LABEL: public func foo<T>(_ x: T) -> some OpaqueResultTypes::Foo where T : OpaqueResultTypes::Foo
 @available(SwiftStdlib 5.1, *)
 public func foo<T: Foo>(_ x: T) -> some Foo {
   return x
 }
 
-// CHECK-LABEL: public var globalComputedVar: some OpaqueResultTypes.Foo {
+// CHECK-LABEL: public var globalComputedVar: some OpaqueResultTypes::Foo {
 // CHECK-NEXT:    get
 // CHECK-NEXT:  }
 @available(SwiftStdlib 5.1, *)
 public var globalComputedVar: some Foo { 123 }
 
-// CHECK-LABEL: public var globalVar: some OpaqueResultTypes.Foo{{$}}
+// CHECK-LABEL: public var globalVar: some OpaqueResultTypes::Foo{{$}}
 @available(SwiftStdlib 5.1, *)
 public var globalVar: some Foo = 123
 
-// CHECK-LABEL: public var globalVarTuple: (some OpaqueResultTypes.Foo, some OpaqueResultTypes.Foo){{$}}
+// CHECK-LABEL: public var globalVarTuple: (some OpaqueResultTypes::Foo, some OpaqueResultTypes::Foo){{$}}
 @available(SwiftStdlib 5.1, *)
 public var globalVarTuple: (some Foo, some Foo) = (123, foo(123))
 
@@ -54,7 +54,7 @@ public protocol AssocTypeInference {
 public struct Bar<T>: AssocTypeInference {
   public init() {}
 
-  // CHECK-LABEL: public func foo(_: Swift.Int) -> some OpaqueResultTypes.Foo
+  // CHECK-LABEL: public func foo(_: Swift::Int) -> some OpaqueResultTypes::Foo
   @available(SwiftStdlib 5.1, *)
   public func foo(_: Int) -> some Foo {
     return 20721
@@ -65,7 +65,7 @@ public struct Bar<T>: AssocTypeInference {
     return 219
   }
 
-  // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes.Foo where U : OpaqueResultTypes.Foo
+  // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes::Foo where U : OpaqueResultTypes::Foo
   @available(SwiftStdlib 5.1, *)
   public func foo<U: Foo>(_ x: U) -> some Foo {
     return x
@@ -75,7 +75,7 @@ public struct Bar<T>: AssocTypeInference {
   public struct Bas: AssocTypeInference {
     public init() {}
 
-    // CHECK-LABEL: public func foo(_: Swift.Int) -> some OpaqueResultTypes.Foo
+    // CHECK-LABEL: public func foo(_: Swift::Int) -> some OpaqueResultTypes::Foo
     @available(SwiftStdlib 5.1, *)
     public func foo(_: Int) -> some Foo {
       return 20721
@@ -86,7 +86,7 @@ public struct Bar<T>: AssocTypeInference {
       return 219
     }
 
-    // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes.Foo where U : OpaqueResultTypes.Foo
+    // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes::Foo where U : OpaqueResultTypes::Foo
     @available(SwiftStdlib 5.1, *)
     public func foo<U: Foo>(_ x: U) -> some Foo {
       return x
@@ -110,7 +110,7 @@ public struct Bar<T>: AssocTypeInference {
   public struct Bass<U: Foo>: AssocTypeInference {
     public init() {}
 
-    // CHECK-LABEL: public func foo(_: Swift.Int) -> some OpaqueResultTypes.Foo
+    // CHECK-LABEL: public func foo(_: Swift::Int) -> some OpaqueResultTypes::Foo
     @available(SwiftStdlib 5.1, *)
     public func foo(_: Int) -> some Foo {
       return 20721
@@ -121,13 +121,13 @@ public struct Bar<T>: AssocTypeInference {
       return 219
     }
 
-    // CHECK-LABEL: public func foo(_ x: U) -> some OpaqueResultTypes.Foo
+    // CHECK-LABEL: public func foo(_ x: U) -> some OpaqueResultTypes::Foo
     @available(SwiftStdlib 5.1, *)
     public func foo(_ x: U) -> some Foo {
       return x
     }
 
-    // CHECK-LABEL: public func foo<V>(_ x: V) -> some OpaqueResultTypes.Foo where V : OpaqueResultTypes.Foo
+    // CHECK-LABEL: public func foo<V>(_ x: V) -> some OpaqueResultTypes::Foo where V : OpaqueResultTypes::Foo
     @available(SwiftStdlib 5.1, *)
     public func foo<V: Foo>(_ x: V) -> some Foo {
       return x
@@ -174,7 +174,7 @@ public struct Zim: AssocTypeInference {
     return 219
   }
 
-  // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes.Foo where U : OpaqueResultTypes.Foo
+  // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes::Foo where U : OpaqueResultTypes::Foo
   @available(SwiftStdlib 5.1, *)
   public func foo<U: Foo>(_ x: U) -> some Foo {
     return x
@@ -194,7 +194,7 @@ public struct Zim: AssocTypeInference {
       return 219
     }
 
-    // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes.Foo where U : OpaqueResultTypes.Foo
+    // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes::Foo where U : OpaqueResultTypes::Foo
     @available(SwiftStdlib 5.1, *)
     public func foo<U: Foo>(_ x: U) -> some Foo {
       return x
@@ -214,7 +214,7 @@ public struct Zim: AssocTypeInference {
   public struct Zung<U: Foo>: AssocTypeInference {
     public init() {}
 
-    // CHECK-LABEL: public func foo(_: Swift.Int) -> some OpaqueResultTypes.Foo
+    // CHECK-LABEL: public func foo(_: Swift::Int) -> some OpaqueResultTypes::Foo
     @available(SwiftStdlib 5.1, *)
     public func foo(_: Int) -> some Foo {
       return 20721
@@ -230,7 +230,7 @@ public struct Zim: AssocTypeInference {
       return x
     }
 
-    // CHECK-LABEL: public func foo<V>(_ x: V) -> some OpaqueResultTypes.Foo where V : OpaqueResultTypes.Foo
+    // CHECK-LABEL: public func foo<V>(_ x: V) -> some OpaqueResultTypes::Foo where V : OpaqueResultTypes::Foo
     @available(SwiftStdlib 5.1, *)
     public func foo<V: Foo>(_ x: V) -> some Foo {
       return x

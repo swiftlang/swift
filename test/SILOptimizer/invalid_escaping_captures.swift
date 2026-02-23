@@ -274,3 +274,83 @@ struct TestInoutEscapeInClosure {
     }
   }
 }
+
+func badNoEscapeCaptureFromPack<each T>(_ fn: repeat () -> each T) { // expected-note@:43 {{parameter 'fn' is implicitly non-escaping}}
+  takesEscaping { // expected-error {{escaping closure captures non-escaping parameter 'fn'}}
+    let _ = (repeat (each fn)()) // expected-note@:22 {{captured here}}
+  }
+}
+
+func badNoEscapeCaptureFromPackIteration<each T>(_ fn: repeat () -> each T) { // expected-note@:52 {{parameter 'fn' is implicitly non-escaping}}
+  takesEscaping { // expected-error {{escaping closure captures non-escaping parameter 'fn'}}
+    for f in repeat each fn { // expected-note@:21 {{captured here}}
+      let _ = f()
+    }
+  }
+}
+
+func badNoEscapeCaptureFromDeferPack<each T>(_ fn: repeat () -> each T) { // expected-note@:48 {{parameter 'fn' is implicitly non-escaping}}
+  takesEscaping { // expected-error {{escaping closure captures non-escaping parameter 'fn'}}
+    defer { // expected-note {{captured indirectly by this call}}
+      let _ = (repeat (each fn)()) // expected-note@:24 {{captured here}}
+    }
+    let _ = 5
+  }
+}
+
+func badNoEscapeCaptureFromDeferedPackIteration<each T>(_ fn: repeat () -> each T) { // expected-note@:59 {{parameter 'fn' is implicitly non-escaping}}
+  takesEscaping { // expected-error {{escaping closure captures non-escaping parameter 'fn'}}
+    defer { // expected-note {{captured indirectly by this call}}
+      for f in repeat each fn { // expected-note@:23 {{captured here}}
+        let _ = f()
+      }
+    }
+    let _ = 42
+  }
+}
+
+func badNoEscapeCaptureFromDeferredEscapingPack<each T>(_ fn: repeat () -> each T) { // expected-note@:59 {{parameter 'fn' is implicitly non-escaping}}
+  defer {
+    takesEscaping { // expected-error {{escaping closure captures non-escaping parameter 'fn'}}
+      let _ = (repeat (each fn)()) // expected-note@:24 {{captured here}}
+    }
+  }
+  let _ = 5
+}
+
+func badNoEscapeCaptureFromDeferedEscapingPackIteration<each T>(_ fn: repeat () -> each T) { // expected-note@:67 {{parameter 'fn' is implicitly non-escaping}}
+  defer {
+    takesEscaping { // expected-error {{escaping closure captures non-escaping parameter 'fn'}}
+      for f in repeat each fn { // expected-note@:23 {{captured here}}
+        let _ = f()
+      }
+    }
+  }
+  let _ = 42
+}
+
+func badRepeatedNoEscapeCaptureFromPackIteration<each T>(_ fn: repeat () -> each T) { // expected-note {{parameter 'fn' is implicitly non-escaping}}
+  repeat takesEscaping { // expected-error {{escaping closure captures non-escaping parameter 'fn'}}
+    _ = (each fn)() // expected-note {{captured here}}
+  }
+}
+
+// TODO: test this case when we can compile repeat ... { defer { ... } }
+// https://github.com/swiftlang/swift/issues/87206
+// 
+// func badRepeatedDeferedNoEscapeCaptureFromPackIteration<each T>(_ fn: repeat () -> each T) { // expected note {{parameter 'fn' is implicitly non-escaping}}
+//   repeat takesEscaping { // expected error {{escaping closure captures non-escaping parameter 'fn'}}
+//     defer {
+//       _ = (each fn)() // expected note {{captured here}}
+//     }
+//   }
+// }
+
+
+func badNoEscapeCaptureAfterPackExpansion<each T>(_ fn: repeat () -> each T) {
+  let tup = (repeat each fn)
+
+  takesEscaping { // expected-error {{escaping closure captures non-escaping value}}
+    let _ = tup
+  }
+}

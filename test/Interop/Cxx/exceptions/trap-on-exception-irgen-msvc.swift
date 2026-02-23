@@ -19,5 +19,5 @@
 // CHECK: call {{.*}}i32 @"?freeFunctionNoThrow@@YAHH@Z"
 // CHECK: call swiftcc i32 @"$s4test8makeCInts5Int32VyF"()
 // CHECK: call {{.*}}i32 @"?freeFunctionThrows@@YAHH@Z"
-// CHECK: ret i32 %1
+// CHECK: ret i32 {{.*}}
 // CHECK-NEXT: }

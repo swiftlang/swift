@@ -472,3 +472,8 @@ do {
     let _: Int = res3
   }
 }
+
+// 6.2 would reject this expression, even though it is valid
+func tooAggressiveShrink() {
+  let _ = [1 / 1].map { $0 / 1.0 }
+}

@@ -24,3 +24,7 @@
 // CHECK-NOT:  func + (lhs: RValueArithmetic
 
 // CHECK:      func + (lhs: LValueAndRValueArithmetic, rhs: LValueAndRValueArithmetic) -> LValueAndRValueArithmetic
+
+// FIXME: this is currently imported due to quirks of NameImporter
+// FIXME-NOT: func * ({{.*}}: inout AllStar)
+// CHECK: func * (lhs: AllStar, rhs: AllStar) -> AllStar

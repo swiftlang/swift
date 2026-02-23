@@ -582,38 +582,6 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   return arraySIL;
 }
 
-/// Given a SILValue \p value, return the instruction immediately following the
-/// definition of the value. That is, if the value is defined by an
-/// instruction, return the instruction following the definition. Otherwise, if
-/// the value is a basic block parameter, return the first instruction of the
-/// basic block.
-SILInstruction *getInstructionFollowingValueDefinition(SILValue value) {
-  SILInstruction *definingInst = value->getDefiningInstruction();
-  if (definingInst) {
-    return &*std::next(definingInst->getIterator());
-  }
-  // Here value must be a basic block argument.
-  SILBasicBlock *bb = value->getParentBlock();
-  return &*bb->begin();
-}
-
-/// Given a SILValue \p value, create a copy of the value using copy_value in
-/// OSSA or retain in non-OSSA, if \p value is a non-trivial type. Otherwise, if
-/// \p value is a trivial type, return the value itself.
-SILValue makeOwnedCopyOfSILValue(SILValue value, SILFunction &fun) {
-  SILType type = value->getType();
-  if (type.isTrivial(fun) || type.isAddress())
-    return value;
-
-  SILInstruction *instAfterValueDefinition =
-      getInstructionFollowingValueDefinition(value);
-  SILLocation copyLoc = instAfterValueDefinition->getLoc();
-  SILBuilderWithScope builder(instAfterValueDefinition);
-  const TypeLowering &typeLowering = builder.getTypeLowering(type);
-  SILValue copy = typeLowering.emitCopyValue(builder, copyLoc, value);
-  return copy;
-}
-
 /// Generate SIL code that computes the constant given by the symbolic value
 /// `symVal`. Note that strings and struct-typed constant values will require
 /// multiple instructions to be emitted.
@@ -731,7 +699,8 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     if (originalClosureInst->getFunction() == &fun) {
       // Copy the closure, since the returned value must be owned and the
       // closure's lifetime must be extended until this point.
-      resultVal = makeOwnedCopyOfSILValue(originalClosureInst, fun);
+      resultVal = makeCopiedValueAvailable(originalClosureInst,
+                                           builder.getInsertionBB());
     } else {
       // If the closure captures a value that is not a constant, it should only
       // come from the caller of the log call. It should be handled by the then

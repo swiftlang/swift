@@ -218,6 +218,11 @@ public struct AsyncStream<Element> {
     /// needed cleanup in the cancellation handler. After reaching a terminal
     /// state as a result of cancellation, the `AsyncStream` sets the callback
     /// to `nil`.
+    ///
+    /// - Note: Because the system might call the `onTermination` callback as
+    /// part of task cancellation, it's subject to the same considerations for
+    /// avoiding deadlock as outlined in the documentation for
+    /// ``withTaskCancellationHandler(operation:onCancel:)``.
     public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
         return storage.getOnTermination()
@@ -329,7 +334,10 @@ public struct AsyncStream<Element> {
   ///         print(random)
   ///     }
   ///
-  ///
+  /// - Note: Because the system might call the `onCancel` callback as
+  /// part of task cancellation, it's subject to the same considerations for
+  /// avoiding deadlock as outlined in the documentation for
+  /// ``withTaskCancellationHandler(operation:onCancel:)``.
   @_silgen_name("$sScS9unfolding8onCancelScSyxGxSgyYac_yyYbcSgtcfC")
   @preconcurrency // Original API had `@Sendable` only on `onCancel`
   public init(

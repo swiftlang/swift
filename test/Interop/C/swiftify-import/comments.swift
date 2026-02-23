@@ -1,6 +1,5 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=CommentsClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s --strict-whitespace --match-full-lines
+// RUN: %target-swift-ide-test -print-module -module-to-print=CommentsClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x | %FileCheck %s --strict-whitespace --match-full-lines
 
 // Check that doc comments are carried over from clang to the safe macro expansion.
 

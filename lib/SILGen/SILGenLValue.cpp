@@ -3415,14 +3415,12 @@ LValue SILGenLValue::visitApplyExpr(ApplyExpr *e, SGFAccessKind accessKind,
         deref = ManagedValue::forBorrowedAddressRValue(
                  SGF.B.createDereferenceAddrBorrow(e, borrowValue.getValue()));
       } else {
-        SILValue derefValue
-          = SGF.B.createDereferenceBorrow(e, borrowValue.getValue());
-        SGF.emitManagedBorrowedRValueWithCleanup(derefValue);
+        deref = SGF.emitManagedBorrowedRValueWithCleanup(
+            SGF.B.createDereferenceBorrow(e, borrowValue.getValue()));
         // TODO: For borrow accessors, we form the proper borrow scope during
         // SILGenCleanup. Leave the returned result unchecked until that
         // cleanup occurs.
-        deref = ManagedValue::forBorrowedObjectRValue(
-                 SGF.B.createUncheckedOwnership(e, derefValue));
+        deref = SGF.B.createUncheckedOwnership(e, deref);
       }
     }
 

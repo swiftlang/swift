@@ -56,22 +56,6 @@ public func _setUpCast<DerivedValue, BaseValue>(
   }!
 }
 
-@_alwaysEmitIntoClient
-public func _setWitnessCast<SourceElement, TargetElement>(
-  _ source: Set<SourceElement>,
-  _ witness: (SourceElement) -> TargetElement
-) -> Set<TargetElement> {
-  return Set(
-    _mapping: source,
-    // String and NSString have different concepts of equality, so Set<NSString>
-    // may generate key collisions when "upcasted" to Set<String>.
-    // See rdar://problem/35995647
-    allowingDuplicates: (TargetElement.self == String.self)
-  ) { member in
-    witness(member)
-  }!
-}
-
 /// Called by the casting machinery.
 @_silgen_name("_swift_setDownCastIndirect")
 @_unavailableInEmbedded

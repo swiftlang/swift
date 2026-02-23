@@ -1,7 +1,7 @@
 // RUN: %target-swift-ide-test -print-module -cxx-interoperability-mode=upcoming-swift -I %swift_src_root/lib/ClangImporter/SwiftBridging -module-to-print=LifetimeOperationMethods -I %S/Inputs -source-filename=x | %FileCheck %s
 
 // CHECK: class RefCountedBox {
-// CHECK:   func doRetain() 
+// CHECK:   func doRetain()
 // CHECK:   func doRelease()
 // CHECK: }
 // CHECK: class DerivedRefCountedBox {
@@ -10,8 +10,8 @@
 // CHECK: }
 
 // CHECK: class DerivedHasRelease {
-// CHECK:   func doRelease()
 // CHECK:   func doRetainInBase()
+// CHECK:   func doRelease()
 // CHECK: }
 
 // CHECK: class TemplatedDerivedHasRelease<CFloat> {

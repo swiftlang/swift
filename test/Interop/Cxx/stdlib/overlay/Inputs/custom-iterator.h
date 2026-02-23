@@ -365,6 +365,33 @@ public:
   }
 };
 
+struct NonReferenceDereferenceOperator {
+private:
+  int value;
+
+public:
+  using iterator_category = std::input_iterator_tag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  NonReferenceDereferenceOperator(int value) : value(value) {}
+  NonReferenceDereferenceOperator(
+      const NonReferenceDereferenceOperator &other) = default;
+
+  int operator*() const { return value; }
+
+  NonReferenceDereferenceOperator &operator++() {
+    value++;
+    return *this;
+  }
+
+  bool operator==(const NonReferenceDereferenceOperator &other) const {
+    return value == other.value;
+  }
+};
+
 #if __cplusplus >= 202002L
 struct ConstContiguousIterator {
 private:

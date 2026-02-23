@@ -59,8 +59,6 @@ option(SwiftOverlay_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime lib
   ${SwiftCore_ENABLE_LIBRARY_EVOLUTION})
 option(SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment"
   ${SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT})
-option(${PROJECT_NAME}_ENABLE_DIRECT_RETAIN_RELEASE "Use direct retain release in overlays"
-  ${SwiftCore_ENABLE_DIRECT_RETAIN_RELEASE})
 
 add_compile_definitions(
   $<$<BOOL:${SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT}>:SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT>)
@@ -76,10 +74,7 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
-if(${PROJECT_NAME}_ENABLE_DIRECT_RETAIN_RELEASE)
-  find_package(SwiftSwiftDirectRuntime REQUIRED)
-  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-direct-retain-release>")
-endif()
+find_package(SwiftSwiftDirectRuntime)
 
 include(ExperimentalFeatures)
 

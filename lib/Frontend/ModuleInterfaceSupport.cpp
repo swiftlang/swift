@@ -892,7 +892,9 @@ bool swift::emitSwiftInterface(raw_ostream &out,
                               DisableModuleSelectorsInModuleInterface))
     useModuleSelectors = false;
 
-  bool useExportedModuleNames = Opts.printPublicInterface();
+  auto useExportedModuleNames = Opts.printPublicInterface()
+    ? PrintOptions::ExportedModuleNameUsage::Always
+    : PrintOptions::ExportedModuleNameUsage::IfLoaded;
   const PrintOptions printOptions = PrintOptions::printSwiftInterfaceFile(
       M, useModuleSelectors, Opts.PreserveTypesAsWritten,
       Opts.PrintFullConvention,

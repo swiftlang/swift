@@ -176,6 +176,25 @@ private struct FunctionChecker {
     case let apply as ApplySite:
       try checkApply(apply: apply)
 
+    case let destroy as DestroyValueInst:
+      let type = destroy.destroyedValue.type
+      if let nominal = type.nominal,
+         !nominal.hasClangNode,
+         nominal.valueTypeDestructor != nil,
+         !(destroy.destroyedValue.lookThoughOwnershipInstructions is DropDeinitInst)
+      {
+        throw Diagnostic(.deinit_not_visible, type, at: destroy.location)
+      }
+
+    case let destroy as DestroyAddrInst:
+      let type = destroy.destroyedAddress.type
+      if let nominal = type.nominal,
+         !nominal.hasClangNode,
+         nominal.valueTypeDestructor != nil
+      {
+        throw Diagnostic(.deinit_not_visible, type, at: destroy.location)
+      }
+
     case let bi as BuiltinInst:
       switch bi.id {
       case .AllocRaw:
@@ -187,6 +206,15 @@ private struct FunctionChecker {
            .BuildComplexEqualitySerialExecutorRef:
         // Those builtins implicitly create an existential.
         try checkConformance(bi.substitutionMap.conformances[0], location: bi.location)
+
+      case .DestroyArray:
+        let elementType = bi.substitutionMap.replacementType.loweredType(in: bi.parentFunction)
+        if let nominal = elementType.nominal,
+           !nominal.hasClangNode,
+           nominal.valueTypeDestructor != nil
+        {
+          throw Diagnostic(.deinit_not_visible, elementType, at: bi.location)
+        }
 
       default:
         break

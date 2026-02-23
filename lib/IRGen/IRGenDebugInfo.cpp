@@ -1277,6 +1277,15 @@ private:
     llvm::DICompositeType *DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
         DBuilder.getOrCreateArray(Members), RuntimeLang, nullptr, UniqueID);
+
+    if (auto SuperClassTy = UnsubstitutedType->getSuperclass()) {
+      auto SuperClassDbgTy = DebugTypeInfo::getFromTypeInfo(
+          SuperClassTy, IGM.getTypeInfoForUnlowered(SuperClassTy), IGM);
+      if (llvm::DIType *SuperClassDITy = getOrCreateType(SuperClassDbgTy)) {
+        DBuilder.retainType(DBuilder.createInheritance(
+            DITy, SuperClassDITy, 0, 0, llvm::DINode::FlagZero));
+      }
+    }
     return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 

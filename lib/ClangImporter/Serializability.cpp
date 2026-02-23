@@ -308,16 +308,14 @@ namespace {
         IsSerializable = false;
     }
     void writeDeclRef(const clang::Decl *decl) {
-      if (!decl) {
-        IsSerializable = false;
+      if (!decl)
         return;
-      }
       auto path = Impl.findStableSerializationPath(decl);
       if (!path) {
         IsSerializable = false;
         return;
       }
-      if (path.isSwiftDecl())
+      if (Impl.SwiftContext.getSwiftDeclForExportedClangDecl(decl))
         HasSwiftDecl = true;
     }
     void writeSourceLocation(clang::SourceLocation loc) {

@@ -208,4 +208,13 @@ OperatorsTestSuite.test("LValueAndRValueArithmetic.+") {
   expectEqual(269, (lhs + rhs).value)
 }
 
+OperatorsTestSuite.test("AllStar (unary vs binary *)") {
+  let a = AllStar()
+  let b = AllStar()
+  var c = a * b
+  // FIXME: unary non-member operator*() not imported as .pointee
+  // expectEqual(111 * 111, c.pointee)
+  expectEqual(111 * 111, c.L)
+}
+
 runAllTests()

@@ -1,7 +1,8 @@
-// RUN:%target-swift-frontend -emit-silgen %s -verify  -enable-experimental-feature BorrowAndMutateAccessors | %FileCheck %s
+// RUN:%target-swift-frontend -emit-silgen %s -verify  -enable-experimental-feature BorrowAndMutateAccessors  -strict-memory-safety | %FileCheck %s
 
 // REQUIRES: swift_feature_BorrowAndMutateAccessors
 
+@safe
 public struct Container<Element: ~Copyable >: ~Copyable {
   var _storage: UnsafeMutableBufferPointer<Element>
   var _count: Int
@@ -9,11 +10,11 @@ public struct Container<Element: ~Copyable >: ~Copyable {
   var first: Element {
     @_unsafeSelfDependentResult
     borrow {
-      return _storage.baseAddress.unsafelyUnwrapped.pointee
+      return unsafe _storage.baseAddress.unsafelyUnwrapped.pointee
     }
     @_unsafeSelfDependentResult
     mutate {
-      return &_storage.baseAddress.unsafelyUnwrapped.pointee
+      return unsafe &_storage.baseAddress.unsafelyUnwrapped.pointee
     }
   }
 
@@ -21,12 +22,12 @@ public struct Container<Element: ~Copyable >: ~Copyable {
     @_unsafeSelfDependentResult
     borrow {
       precondition(index >= 0 && index < _count, "Index out of bounds")
-      return _storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
+      return unsafe _storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
     }
     @_unsafeSelfDependentResult
     mutate {
       precondition(index >= 0 && index < _count, "Index out of bounds")
-      return &_storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
+      return unsafe &_storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
     }
   }
 }
@@ -171,6 +172,7 @@ public struct S {
   var _k: Klass
 }
 
+@safe
 public struct CopyableContainer {
   var _storage: UnsafeMutableBufferPointer<S>
   var _count: Int
@@ -178,7 +180,7 @@ public struct CopyableContainer {
   var first: S {
     @_unsafeSelfDependentResult
     borrow {
-      return _storage.baseAddress.unsafelyUnwrapped.pointee
+      return unsafe _storage.baseAddress.unsafelyUnwrapped.pointee
     }
   }
 
@@ -186,12 +188,12 @@ public struct CopyableContainer {
     @_unsafeSelfDependentResult
     borrow {
       precondition(index >= 0 && index < _count, "Index out of bounds")
-      return _storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee._k
+      return unsafe _storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee._k
     }
     @_unsafeSelfDependentResult
     mutate {
       precondition(index >= 0 && index < _count, "Index out of bounds")
-      return &_storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee._k
+      return unsafe &_storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee._k
     }
   }
 }
@@ -270,6 +272,7 @@ public struct CopyableContainer {
 
 public struct NC : ~Copyable {}
 
+@safe
 public struct NonCopyableContainer : ~Copyable {
   var _storage: UnsafeMutableBufferPointer<NC>
   var _count: Int
@@ -277,7 +280,7 @@ public struct NonCopyableContainer : ~Copyable {
   var first: NC {
     @_unsafeSelfDependentResult
     borrow {
-      return _storage.baseAddress.unsafelyUnwrapped.pointee
+      return unsafe _storage.baseAddress.unsafelyUnwrapped.pointee
     }
   }
 
@@ -285,12 +288,12 @@ public struct NonCopyableContainer : ~Copyable {
     @_unsafeSelfDependentResult
     borrow {
       precondition(index >= 0 && index < _count, "Index out of bounds")
-      return _storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
+      return unsafe _storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
     }
     @_unsafeSelfDependentResult
     mutate {
       precondition(index >= 0 && index < _count, "Index out of bounds")
-      return &_storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
+      return unsafe &_storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
     }
   }
 }

@@ -57,6 +57,7 @@ extension ASTGenVisitor {
         .Async,
         .Sendable,
         .Retroactive,
+        .Reparented,
         .Unchecked,
         .Unsafe,
         .Preconcurrency,
@@ -83,6 +84,9 @@ extension ASTGenVisitor {
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
       case .Differentiable:
         return (self.generateDifferentiableTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
+      case .Lifetime:
+        return (self.generateLifetimeTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
       case .OpaqueReturnTypeOf:
         return (self.generateOpaqueReturnTypeOfTypeAttr(attribute: node)?.asTypeAttribute)
@@ -244,6 +248,20 @@ extension ASTGenVisitor {
       parensRange: self.generateAttrParensRange(attribute: node),
       kind: differentiability,
       kindLoc: differentiabilityLoc
+    )
+  }
+
+  func generateLifetimeTypeAttr(attribute node: AttributeSyntax) -> BridgedLifetimeTypeAttr? {
+    guard let entry = self.generateLifetimeEntry(attribute: node) else {
+      return nil
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName),
+      parensRange: self.generateAttrParensRange(attribute: node),
+      entry: entry
     )
   }
   

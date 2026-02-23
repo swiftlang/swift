@@ -138,7 +138,9 @@ public:
   void solveBackwardWithUnion();
 
   /// Debug dump the BitDataflow state.
-  void dump() const;
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+  void print(llvm::raw_ostream &os) const;
 };
 
 } // end swift namespace

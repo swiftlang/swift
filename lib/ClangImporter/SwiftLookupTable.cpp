@@ -1964,6 +1964,26 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
     }
   }
 
+  if (auto methodDecl = dyn_cast<clang::CXXMethodDecl>(named)) {
+    // If the return type is a template instantiation, it is not possible to
+    // determine safety/unsafety of the method without instantiating the
+    // template. Let's add both safe and unsafe versions of the name to the
+    // lookup table.
+    if (auto returnTy = desugarIfElaborated(methodDecl->getReturnType());
+        isa<clang::TemplateSpecializationType>(returnTy)) {
+      auto importedName = nameImporter.importName(methodDecl, currentVersion);
+      if (importedName && importedName.getDeclName().isSpecial()) {
+        if (StringRef id = importedName.getDeclName().getBaseIdentifier().str();
+            id.starts_with("__") && id.ends_with("Unsafe")) {
+          StringRef safeId = id.drop_front(2).drop_back(6);
+          table.addEntry(
+              DeclBaseName(nameImporter.getContext().getIdentifier(safeId)),
+              named, importedName.getEffectiveContext());
+        }
+      }
+    }
+  }
+
   // Class template instantiations are imported lazily, however, the lookup
   // table must include their mangled name (__CxxTemplateInst...) to make it
   // possible to find these decls during deserialization. For any C++ typedef
@@ -2159,6 +2179,8 @@ void importer::finalizeLookupTable(
             nameImporter.getClangContext().getSourceManager(), diagLoc);
 
         DiagnosticEngine &swiftDiags = nameImporter.getContext().Diags;
+        if (decl->getOwningModule()->IsSystem)
+          continue;
         swiftDiags.diagnose(swiftSourceLoc, diag::unresolvable_clang_decl,
                             decl->getNameAsString(), swiftName->getName());
         StringRef moduleName =

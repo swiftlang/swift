@@ -19,10 +19,10 @@ ArgParsingTest::ArgParsingTest() : diags(sourceMgr) {}
 void ArgParsingTest::parseArgs(const Args &args) {
   std::vector<const char *> adjustedArgs;
 
-  if (this->langMode) {
+  if (this->languageMode) {
     adjustedArgs.reserve(args.size() + 2);
     adjustedArgs.push_back("-swift-version");
-    adjustedArgs.push_back(this->langMode->data());
+    adjustedArgs.push_back(this->languageMode->data());
   } else {
     adjustedArgs.reserve(args.size());
   }

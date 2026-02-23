@@ -339,6 +339,9 @@ public:
   /// A flag that indicates this dependency is associated with a static archive
   const bool isStatic;
 
+  /// A flag that indicates the module has strict memory safety.
+  const bool isStrictMemorySafety;
+
   /// Details common to Swift textual (interface or source) modules
   CommonSwiftTextualModuleDependencyDetails textualModuleDetails;
 
@@ -351,8 +354,8 @@ public:
       ArrayRef<ScannerImportStatementInfo> moduleImports,
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
       ArrayRef<StringRef> buildCommandLine, ArrayRef<LinkLibrary> linkLibraries,
-      bool isFramework, bool isStatic, StringRef RootID,
-      StringRef moduleCacheKey, StringRef userModuleVersion)
+      bool isFramework, bool isStatic, bool isStrictMemorySafety,
+      StringRef RootID, StringRef moduleCacheKey, StringRef userModuleVersion)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftInterface,
                                         moduleImports, optionalModuleImports,
                                         linkLibraries, moduleCacheKey),
@@ -360,6 +363,7 @@ public:
         compiledModuleCandidates(compiledModuleCandidates.begin(),
                                  compiledModuleCandidates.end()),
         isFramework(isFramework), isStatic(isStatic),
+        isStrictMemorySafety(isStrictMemorySafety),
         textualModuleDetails(buildCommandLine, RootID),
         userModuleVersion(userModuleVersion) {}
 
@@ -400,6 +404,9 @@ public:
   /// The chained bridging header source buffer if used.
   std::string chainedBridgingHeaderContent;
 
+  /// A list of dependency only imports.
+  std::vector<std::string> dependencyOnlyImports;
+
   SwiftSourceModuleDependenciesStorage(
       StringRef RootID, ArrayRef<StringRef> buildCommandLine,
       ArrayRef<ScannerImportStatementInfo> moduleImports,
@@ -438,6 +445,14 @@ public:
     chainedBridgingHeaderPath = path.str();
     chainedBridgingHeaderContent = buffer.str();
   }
+
+  void addDependencyOnlyImport(StringRef name) {
+    dependencyOnlyImports.push_back(name.str());
+  }
+
+  const std::vector<std::string> &getDependencyOnlyImports() const {
+    return dependencyOnlyImports;
+  }
 };
 
 /// Describes the dependencies of a pre-built Swift module (with no
@@ -456,16 +471,17 @@ public:
       ArrayRef<serialization::SearchPath> serializedSearchPaths,
       StringRef headerImport, StringRef definingModuleInterface,
       bool isFramework, bool isStatic, bool isBuiltWithCxxInterop,
-      StringRef moduleCacheKey, StringRef userModuleVersion)
+      bool isResilient, bool isStrictMemorySafety, StringRef moduleCacheKey,
+      StringRef userModuleVersion)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftBinary,
                                         moduleImports, optionalModuleImports,
                                         linkLibraries, moduleCacheKey),
         compiledModulePath(compiledModulePath), moduleDocPath(moduleDocPath),
         sourceInfoPath(sourceInfoPath), headerImport(headerImport),
         definingModuleInterfacePath(definingModuleInterface),
-        serializedSearchPaths(serializedSearchPaths),
-        isFramework(isFramework), isStatic(isStatic),
-        isBuiltWithCxxInterop(isBuiltWithCxxInterop),
+        serializedSearchPaths(serializedSearchPaths), isFramework(isFramework),
+        isStatic(isStatic), isBuiltWithCxxInterop(isBuiltWithCxxInterop),
+        isResilient(isResilient), isStrictMemorySafety(isStrictMemorySafety),
         userModuleVersion(userModuleVersion) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
@@ -506,6 +522,12 @@ public:
   /// A flag that indicates this dependency module was built
   /// with C++ interop enabled
   const bool isBuiltWithCxxInterop;
+
+  /// A flag that indicates the binary module is resilient.
+  const bool isResilient;
+
+  /// A flag that indicates the module has strict memory safety.
+  const bool isStrictMemorySafety;
 
   /// The user module version of this binary module.
   const std::string userModuleVersion;
@@ -548,9 +570,6 @@ public:
   /// The file dependencies
   const std::vector<std::string> fileDependencies;
 
-  /// CASID for the Root of CASFS. Empty if CAS is not used.
-  std::string CASFileSystemRootID;
-
   /// CASID for the Root of ClangIncludeTree. Empty if not used.
   std::string CASClangIncludeTreeRootID;
 
@@ -562,7 +581,6 @@ public:
                                ArrayRef<std::string> buildCommandLine,
                                ArrayRef<std::string> fileDependencies,
                                ArrayRef<LinkLibrary> linkLibraries,
-                               StringRef CASFileSystemRootID,
                                StringRef clangIncludeTreeRoot,
                                StringRef moduleCacheKey, bool IsSystem)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::Clang,
@@ -571,7 +589,6 @@ public:
         pcmOutputPath(pcmOutputPath), mappedPCMPath(mappedPCMPath),
         moduleMapFile(moduleMapFile), contextHash(contextHash),
         buildCommandLine(buildCommandLine), fileDependencies(fileDependencies),
-        CASFileSystemRootID(CASFileSystemRootID),
         CASClangIncludeTreeRootID(clangIncludeTreeRoot), IsSystem(IsSystem) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
@@ -622,13 +639,14 @@ public:
       ArrayRef<ScannerImportStatementInfo> moduleImports,
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
       ArrayRef<LinkLibrary> linkLibraries, bool isFramework, bool isStatic,
-      StringRef CASFileSystemRootID, StringRef moduleCacheKey,
-      StringRef userModuleVersion) {
+      bool isStrictMemorySafety, StringRef CASFileSystemRootID,
+      StringRef moduleCacheKey, StringRef userModuleVersion) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftInterfaceModuleDependenciesStorage>(
             swiftInterfaceFile, compiledCandidates, moduleImports,
             optionalModuleImports, buildCommands, linkLibraries, isFramework,
-            isStatic, CASFileSystemRootID, moduleCacheKey, userModuleVersion));
+            isStatic, isStrictMemorySafety, CASFileSystemRootID, moduleCacheKey,
+            userModuleVersion));
   }
 
   /// Describe the module dependencies for a serialized or parsed Swift module.
@@ -641,13 +659,15 @@ public:
       ArrayRef<serialization::SearchPath> serializedSearchPaths,
       StringRef headerImport, StringRef definingModuleInterface,
       bool isFramework, bool isStatic, bool isBuiltWithCxxInterop,
-      StringRef moduleCacheKey, StringRef userModuleVer) {
+      bool isResilient, bool isStrictMemorySafety, StringRef moduleCacheKey,
+      StringRef userModuleVer) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftBinaryModuleDependencyStorage>(
             compiledModulePath, moduleDocPath, sourceInfoPath, moduleImports,
             optionalModuleImports, linkLibraries, serializedSearchPaths,
-            headerImport, definingModuleInterface,isFramework, isStatic,
-            isBuiltWithCxxInterop, moduleCacheKey, userModuleVer));
+            headerImport, definingModuleInterface, isFramework, isStatic,
+            isBuiltWithCxxInterop, isResilient, isStrictMemorySafety,
+            moduleCacheKey, userModuleVer));
   }
 
   /// Describe the main Swift module.
@@ -679,12 +699,12 @@ public:
       StringRef pcmOutputPath, StringRef mappedPCMPath, StringRef moduleMapFile,
       StringRef contextHash, ArrayRef<std::string> nonPathCommandLine,
       ArrayRef<std::string> fileDependencies,
-      ArrayRef<LinkLibrary> linkLibraries, StringRef CASFileSystemRootID,
-      StringRef clangIncludeTreeRoot, StringRef moduleCacheKey, bool IsSystem) {
+      ArrayRef<LinkLibrary> linkLibraries, StringRef clangIncludeTreeRoot,
+      StringRef moduleCacheKey, bool IsSystem) {
     return ModuleDependencyInfo(std::make_unique<ClangModuleDependencyStorage>(
         pcmOutputPath, mappedPCMPath, moduleMapFile, contextHash,
         nonPathCommandLine, fileDependencies, linkLibraries,
-        CASFileSystemRootID, clangIncludeTreeRoot, moduleCacheKey, IsSystem));
+        clangIncludeTreeRoot, moduleCacheKey, IsSystem));
   }
 
   /// Retrieve the module-level imports.
@@ -884,9 +904,6 @@ public:
     else if (isSwiftSourceModule())
       cast<SwiftSourceModuleDependenciesStorage>(storage.get())
           ->textualModuleDetails.CASFileSystemRootID = rootID;
-    else if (isClangModule())
-      cast<ClangModuleDependencyStorage>(storage.get())->CASFileSystemRootID =
-          rootID;
     else
       llvm_unreachable("Unexpected module dependency kind");
   }
@@ -1004,6 +1021,12 @@ public:
 
   /// Add bridging header include tree.
   void addBridgingHeaderIncludeTree(StringRef ID);
+
+  /// Add dependency only import.
+  void addDependencyOnlyImport(StringRef Name);
+
+  /// Get dependency only imports.
+  const std::vector<std::string> &getDependencyOnlyImports() const;
 
   /// Set the chained bridging header buffer.
   void setChainedBridgingHeaderBuffer(StringRef path, StringRef buffer);
@@ -1151,6 +1174,10 @@ public:
   /// Query all Clang module dependencies.
   ModuleDependencyIDCollectionView
   getAllClangDependencies(const ModuleDependencyID &moduleID) const;
+
+  /// Query all Swift module dependencies.
+  ModuleDependencyIDCollectionView
+  getAllSwiftDependencies(const ModuleDependencyID &moduleID) const;
 
   /// Query all directly-imported Swift dependencies
   llvm::ArrayRef<ModuleDependencyID>

@@ -1199,6 +1199,8 @@ private:
 #endif
 };
 
+clang::CXXRecordDecl *getBridgedSmartPtr(AbstractionPattern pattern);
+
 } // namespace Lowering
 
 CanSILFunctionType getNativeSILFunctionType(

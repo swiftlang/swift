@@ -112,7 +112,7 @@ swift::getCxxShimModuleMapPath(SearchPathOptions &opts,
                                const llvm::Triple &triple) {
   return getActualModuleMapPath("libcxxshim.modulemap", opts, langOpts, triple,
                                 /*isArchSpecific*/ false,
-                                llvm::vfs::getRealFileSystem());
+                                llvm::vfs::createPhysicalFileSystem());
 }
 
 static llvm::opt::InputArgList
@@ -129,7 +129,7 @@ ClangImporter::createClangDriver(
     const LangOptions &LangOpts, const ClangImporterOptions &ClangImporterOpts,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs) {
 
-  auto diagVFS = vfs ? vfs : llvm::vfs::getRealFileSystem();
+  auto diagVFS = vfs ? vfs : llvm::vfs::createPhysicalFileSystem();
 
   auto diagOpts = std::make_unique<clang::DiagnosticOptions>();
   auto *silentDiagConsumer = new clang::DiagnosticConsumer();
@@ -618,7 +618,7 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
     bool suppressDiagnostic) {
   ClangInvocationFileMapping result;
   if (!vfs)
-    vfs = llvm::vfs::getRealFileSystem();
+    vfs = llvm::vfs::createPhysicalFileSystem();
 
   const llvm::Triple &triple = ctx.LangOpts.Target;
   llvm::SmallString<256> sysroot;

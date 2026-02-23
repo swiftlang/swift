@@ -387,7 +387,7 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
                                      const TypeLayout * const *payloadLayouts) {
   // Accumulate the layout requirements of the payloads.
   size_t payloadSize = 0, alignMask = 0;
-  bool isPOD = true, isBT = true, isBB = true;
+  bool isPOD = true, isBT = true, isBB = true, isAFD = false;
   for (unsigned i = 0; i < numPayloads; ++i) {
     const TypeLayout *payloadLayout = payloadLayouts[i];
     payloadSize
@@ -396,6 +396,7 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
     isPOD &= payloadLayout->flags.isPOD();
     isBT &= payloadLayout->flags.isBitwiseTakable();
     isBB &= payloadLayout->flags.isBitwiseBorrowable();
+    isAFD |= payloadLayout->flags.isAddressableForDependencies();
   }
   
   // Store the max payload size in the metadata.
@@ -425,6 +426,7 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
                      .withPOD(isPOD)
                      .withBitwiseTakable(isBT)
                      .withBitwiseBorrowable(isBB)
+                     .withAddressableForDependencies(isAFD)
                      .withEnumWitnesses(true)
                      .withInlineStorage(ValueWitnessTable::isValueInline(
                          isBT, totalSize, alignMask + 1)),

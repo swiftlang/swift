@@ -10,8 +10,8 @@ import Foundation
 import CxxClassWithNSStringInit
 
 // CHECK-IDE-TEST: struct S {
-// CHECK-IDE-TEST:   init()
 // CHECK-IDE-TEST:   init(A: NSString?, B: NSString?, C: NSString?)
+// CHECK-IDE-TEST:   init()
 // CHECK-IDE-TEST:   var A: NSString?
 // CHECK-IDE-TEST:   var B: NSString?
 // CHECK-IDE-TEST:   var C: NSString?

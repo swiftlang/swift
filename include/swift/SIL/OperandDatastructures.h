@@ -84,6 +84,8 @@ public:
     push(initialOperand);
   }
 
+  bool empty() const { return worklist.empty(); }
+
   /// Pops the last added element from the worklist or returns null, if the
   /// worklist is empty.
   Operand *pop() {

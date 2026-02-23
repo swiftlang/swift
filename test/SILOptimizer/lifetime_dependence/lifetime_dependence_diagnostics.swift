@@ -60,6 +60,8 @@ extension NEOptional where Wrapped: ~Escapable {
   public init(_ some: consuming Wrapped) { self = .some(some) }
 }
 
+extension NEOptional: Escapable where Wrapped: Escapable {}
+
 func takeClosure(_: () -> ()) {}
 
 // No mark_dependence is needed for a inherited scope.

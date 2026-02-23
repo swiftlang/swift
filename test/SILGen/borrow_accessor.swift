@@ -27,6 +27,16 @@ public struct S {
 public struct Wrapper {
   var _k: Klass
   var _s: S
+  var _id: Int
+
+  var id: Int {
+    borrow {
+      return _id
+    }
+    mutate {
+      return &_id
+    }
+  }
 
   var s: S {
     borrow {
@@ -82,9 +92,21 @@ public struct Wrapper {
     }
   }
 
-  var literal: Int {
-    borrow {
-      return 0
+  var k_ownership_modifier: Klass {
+    borrowing borrow {
+      return _k
+    }
+    mutating mutate {
+      return &_k
+    }
+  }
+
+  var id_ownership_modifier: Int {
+    borrowing borrow {
+      return _id
+    }
+    mutating mutate {
+      return &_id
     }
   }
 }
@@ -107,6 +129,16 @@ public struct GenWrapper<T> {
   var _w: SimpleWrapper<T>
   var _k: Klass
   var _s: S
+  var _id: Int
+
+  var id: Int {
+    borrow {
+      return _id
+    }
+    mutate {
+      return &_id
+    }
+  }
 
   public var prop: T {
     borrow {
@@ -189,9 +221,12 @@ public struct GenWrapper<T> {
     }
   }
 
-  var literal: Int {
-    borrow {
-      return 0
+  var prop_ownership_modifier: T {
+    borrowing borrow {
+      return _prop
+    }
+    mutating mutate {
+      return &_prop
     }
   }
 }
@@ -258,9 +293,12 @@ public struct NCWrapper: ~Copyable {
     }
   }
 
-  var literal: Int {
-    borrow {
-      return 0
+  var nc_ownership_modifier: NC {
+    borrowing borrow {
+      return _nc
+    }
+    mutating mutate {
+      return &_nc
     }
   }
 }
@@ -362,12 +400,6 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
     }
     mutate {
       return &self[0]
-    }
-  }
-
-  var literal: Int {
-    borrow {
-      return 0
     }
   }
 }
@@ -890,4 +922,22 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:  [[REG9:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[REG8]]
 // CHECK:  return [[REG9]]
 // CHECK: }
+
+public struct SafeContainer<Element: ~Copyable >: ~Copyable {
+  var _storage: UnsafeMutableBufferPointer<Element>
+  var _count: Int
+
+  public subscript(index: Int) -> Element {
+    @_unsafeSelfDependentResult
+    borrow {
+      precondition(index >= 0 && index < _count, "Index out of bounds")
+      return _storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
+    }
+    @_unsafeSelfDependentResult
+    nonmutating mutate {
+      precondition(index >= 0 && index < _count, "Index out of bounds")
+      return &_storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
+    }
+  }
+}
 

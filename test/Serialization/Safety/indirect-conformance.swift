@@ -23,10 +23,10 @@ public class IndirectConformant {
 }
 
 extension IndirectConformant: InternalProtocol {}
-// CHECK: extension Lib.IndirectConformant : Lib.PublicProtocol {}
+// CHECK: extension Lib::IndirectConformant : Lib::PublicProtocol {}
 
 extension String: InternalProtocol {}
-// CHECK: extension Swift.String : Lib.PublicProtocol {}
+// CHECK: extension Swift::String : Lib::PublicProtocol {}
 
 //--- Client.swift
 

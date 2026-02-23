@@ -15,6 +15,7 @@ import os
 from build_swift.build_swift.versions import Version
 
 from . import cmake_product
+from . import foundation
 from . import product
 from . import swift
 from . import swift_testing_macros
@@ -37,7 +38,8 @@ class SwiftTesting(product.Product):
     @classmethod
     def get_dependencies(cls):
         return [swift.Swift,
-                swift_testing_macros.SwiftTestingMacros]
+                swift_testing_macros.SwiftTestingMacros,
+                foundation.Foundation]
 
     def should_clean(self, host_target):
         # Workaround for 'swift-testing' not detecting compiler/stdlib changes.
@@ -99,8 +101,8 @@ class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
     def build(self, host_target):
         override_deployment_version = None
         if host_target.startswith('macosx'):
-            if Version(self.args.darwin_deployment_version_osx) < Version('10.15'):
-                override_deployment_version = '10.15'
+            if Version(self.args.darwin_deployment_version_osx) < Version('14.0'):
+                override_deployment_version = '14.0'
 
             # On Darwin platforms, specify a module ABI name suffix so that this
             # copy does not encounter runtime conflicts with a copy loaded from

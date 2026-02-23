@@ -209,7 +209,9 @@ copy_library_sources(Distributed "public" "Supplemental")
 copy_library_sources(Observation "public" "Supplemental")
 copy_library_sources(Synchronization "public" "Supplemental")
 copy_library_sources(Volatile "public" "Supplemental")
+
 copy_library_sources("" "public/RuntimeModule" "Supplemental/Runtime")
+copy_library_sources("" "public/libexec/swift-backtrace" "Supplemental/StackWalker")
 
 copy_library_sources(_RegexParser "Sources" "Supplemental/StringProcessing"
   ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")

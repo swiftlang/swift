@@ -169,12 +169,20 @@ const clang::Type *getUnderlyingType(const clang::EnumDecl *decl);
 inline bool isCFOptionsMacro(const clang::NamedDecl *decl,
                              clang::Preprocessor &preprocessor) {
   auto loc = decl->getEndLoc();
-  if (!loc.isMacroID())
-    return false;
-  return llvm::StringSwitch<bool>(preprocessor.getImmediateMacroName(loc))
-      .Case("CF_OPTIONS", true)
-      .Case("NS_OPTIONS", true)
-      .Default(false);
+  auto &sourceManager = preprocessor.getSourceManager();
+  while (loc.isMacroID()) {
+    auto macroName = preprocessor.getImmediateMacroName(loc);
+
+    bool isCFOptions = llvm::StringSwitch<bool>(macroName)
+                           .Case("CF_OPTIONS", true)
+                           .Case("NS_OPTIONS", true)
+                           .Default(false);
+    if (isCFOptions)
+      return true;
+
+    loc = sourceManager.getImmediateExpansionRange(loc).getBegin();
+  }
+  return false;
 }
 
 } // namespace importer

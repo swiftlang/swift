@@ -1180,7 +1180,7 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 
   ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, loader);
-  FirstDeclAndLazyMembers.setInt(true);
+  forceSetHasLazyMembers();
   contextInfo->memberData = contextData;
 
   ++NumLazyIterableDeclContexts;
@@ -1205,13 +1205,7 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   return true;
 }
 
-void IterableDeclContext::setHasLazyMembers(bool hasLazyMembers) const {
-  FirstDeclAndLazyMembers.setInt(hasLazyMembers);
-}
-
-void IterableDeclContext::loadAllMembers() const {
-  ASTContext &ctx = getASTContext();
-
+void IterableDeclContext::addParsedMembers() const {
   // For contexts within a source file, get the list of parsed members.
   if (getAsGenericContext()->getParentSourceFile()) {
     // Retrieve the parsed members. Even if we've already added the parsed
@@ -1228,18 +1222,35 @@ void IterableDeclContext::loadAllMembers() const {
       }
     }
   }
+}
 
-  if (!hasLazyMembers())
+void IterableDeclContext::loadStorageMembers() const {
+  addParsedMembers();
+
+  if (FirstDeclAndLazyMembers.getInt() == LazyMemberStatus::StorageLoaded ||
+      FirstDeclAndLazyMembers.getInt() == LazyMemberStatus::AllLoaded)
     return;
+  FirstDeclAndLazyMembers.setInt(LazyMemberStatus::StorageLoaded);
 
-  // Don't try to load all members re-entrant-ly.
-  setHasLazyMembers(false);
+  ASTContext &ctx = getASTContext();
+  auto ctxData = ctx.getOrCreateLazyIterableContextData(this,
+                                                        /*lazyLoader=*/nullptr);
+  ctxData->loader->loadStorageMembers(const_cast<Decl *>(getDecl()),
+                                      ctxData->memberData);
+}
 
-  const Decl *container = getDecl();
-  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
-    /*lazyLoader=*/nullptr);
-  contextInfo->loader->loadAllMembers(const_cast<Decl *>(container),
-                                      contextInfo->memberData);
+void IterableDeclContext::loadAllMembers() const {
+  loadStorageMembers();
+
+  if (FirstDeclAndLazyMembers.getInt() == LazyMemberStatus::AllLoaded)
+    return;
+  FirstDeclAndLazyMembers.setInt(LazyMemberStatus::AllLoaded);
+
+  ASTContext &ctx = getASTContext();
+  auto ctxData = ctx.getOrCreateLazyIterableContextData(this,
+                                                        /*lazyLoader=*/nullptr);
+  ctxData->loader->loadNonStorageMembers(const_cast<Decl *>(getDecl()),
+                                  ctxData->memberData);
 
   --NumUnloadedLazyIterableDeclContexts;
   // FIXME: (transitional) decrement the redundant "always-on" counter.
@@ -1268,10 +1279,9 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
   // If members were not deserialized, force load here.
   if (!didDeserializeMembers()) {
     // This needs to be set to force load all members if not done already.
-    setHasLazyMembers(true);
-    // Calling getMembers actually loads the members.
-    (void)getMembers();
-    assert(!hasLazyMembers());
+    forceSetHasLazyMembers();
+    loadAllMembers();
+    ASSERT(!hasLazyMembers());
     assert(didDeserializeMembers());
   }
   // Members could have been deserialized from other flows. Check

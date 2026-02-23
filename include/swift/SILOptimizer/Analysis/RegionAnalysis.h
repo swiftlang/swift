@@ -49,6 +49,10 @@ getApplyIsolationCrossing(SILInstruction *inst);
 // the computation.
 class PartitionOpTranslator;
 
+//===----------------------------------------------------------------------===//
+//                         MARK: BlockPartitionState
+//===----------------------------------------------------------------------===//
+
 class BlockPartitionState {
   friend RegionAnalysisFunctionInfo;
 
@@ -101,8 +105,8 @@ private:
   /// Recomputes the exit partition from the entry partition, and returns
   /// whether this changed the exit partition.
   ///
-  /// NOTE: This method ignored errors that arise. We process separately later
-  /// to discover if an error occured.
+  /// NOTE: This method ignores errors that arise. We process separately later
+  /// to discover if an error occurred.
   bool recomputeExitFromEntry(PartitionOpTranslator &translator);
 };
 
@@ -338,7 +342,7 @@ private:
     SILValue value;
 
     /// The actual base value that we found if we were looking for an address
-    /// equivilance class and had a non-Sendable base. If we have an object or
+    /// equivalence class and had a non-Sendable base. If we have an object or
     /// we do not have a separate base, this is SILValue().
     SILValue base;
 

@@ -69,6 +69,14 @@ BridgedDifferentiableTypeAttr BridgedDifferentiableTypeAttr_createParsed(
       atLoc, nameLoc, parensRange, {unbridged(cKind), kindLoc});
 }
 
+BridgedLifetimeTypeAttr BridgedLifetimeTypeAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceLoc nameLoc, swift::SourceRange parensRange,
+    BridgedLifetimeEntry entry) {
+  return new (cContext.unbridged())
+      LifetimeTypeAttr(atLoc, nameLoc, parensRange, entry.unbridged());
+}
+
 BridgedIsolatedTypeAttr BridgedIsolatedTypeAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceLoc nameLoc,
     SourceRange parensRange, BridgedIsolatedTypeAttrIsolationKind cIsolation,

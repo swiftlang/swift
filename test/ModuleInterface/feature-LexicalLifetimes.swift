@@ -15,6 +15,6 @@ public struct Permanent {}
 @_eagerMove
 public class Transient {}
 
-// CHECK: @_lexicalLifetimes public func lexicalInAModuleWithoutLexicalLifetimes(_ t: FeatureTest.Transient)
+// CHECK: @_lexicalLifetimes public func lexicalInAModuleWithoutLexicalLifetimes(_ t: FeatureTest::Transient)
 @_lexicalLifetimes
 public func lexicalInAModuleWithoutLexicalLifetimes(_ t: Transient) {}

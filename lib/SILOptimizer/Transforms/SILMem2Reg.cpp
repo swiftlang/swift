@@ -565,7 +565,7 @@ static bool isCaptured(SILValue def, bool *inSingleBlock) {
 }
 
 /// Returns true if the \p def is only stored into.
-static bool isWriteOnlyAllocation(SILValue def) {
+static bool isWriteOnlyAllocation(SILValue def, DeadEndBlocks *deb) {
   assert(isa<AllocStackInst>(def) || isa<StoreBorrowInst>(def));
 
   // For all users of the def:
@@ -573,14 +573,20 @@ static bool isWriteOnlyAllocation(SILValue def) {
     SILInstruction *user = use->getUser();
 
     // It is okay to store into the AllocStack.
-    if (auto *si = dyn_cast<StoreInst>(user))
+    if (auto *si = dyn_cast<StoreInst>(user)) {
+      if (deb && deb->isDeadEnd(user->getParent())) {
+        // Bail for stores in dead-end blocks, because this could result in the stored
+        // value to leak. We are not doing lifetime completion for the stored value.
+        return false;
+      }
       if (!isa<AllocStackInst>(si->getSrc()))
         continue;
+    }
 
     if (auto *sbi = dyn_cast<StoreBorrowInst>(user)) {
       // Since all uses of the alloc_stack will be via store_borrow, check if
       // there are any non-writes from the store_borrow location.
-      if (!isWriteOnlyAllocation(sbi)) {
+      if (!isWriteOnlyAllocation(sbi, deb)) {
         return false;
       }
       continue;
@@ -1798,7 +1804,7 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   promoteAllocationToPhi(livePhiBlocks);
 
   // Make sure that all of the allocations were promoted into registers.
-  assert(isWriteOnlyAllocation(asi) && "Non-write uses left behind");
+  assert(isWriteOnlyAllocation(asi, nullptr) && "Non-write uses left behind");
 
   SmallVector<SILValue> valuesToComplete;
 
@@ -2225,8 +2231,8 @@ bool MemoryToRegisters::promoteAllocation(AllocStackInst *alloc,
   }
 
   // Remove write-only AllocStacks.
-  if (isWriteOnlyAllocation(alloc) && !alloc->getType().isOrHasEnum() &&
-      !deadEndBlocksAnalysis->get(alloc->getFunction())->isDeadEnd(alloc->getParent()) &&
+  if (isWriteOnlyAllocation(alloc, deadEndBlocksAnalysis->get(alloc->getFunction())) &&
+      !alloc->getType().isOrHasEnum() &&
       !lexicalLifetimeEnsured(alloc)) {
     LLVM_DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: "<< *alloc);
     deleter.forceDeleteWithUsers(alloc);

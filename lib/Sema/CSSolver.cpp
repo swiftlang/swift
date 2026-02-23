@@ -24,6 +24,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/PreparedOverload.h"
 #include "swift/Sema/SolutionResult.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -44,7 +45,6 @@ using namespace constraints;
 #define DEBUG_TYPE "Constraint solver overall"
 #define JOIN2(X,Y) X##Y
 STATISTIC(NumSolutionAttempts, "# of solution attempts");
-STATISTIC(TotalNumTypeVariables, "# of type variables created");
 
 #define CS_STATISTIC(Name, Description) \
   STATISTIC(Overall##Name, Description);
@@ -56,22 +56,6 @@ STATISTIC(TotalNumTypeVariables, "# of type variables created");
   STATISTIC(Largest##Name, Description);
 #include "swift/Sema/ConstraintSolverStats.def"
 STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
-
-TypeVariableType *ConstraintSystem::createTypeVariable(
-                                     ConstraintLocator *locator,
-                                     unsigned options,
-                                     PreparedOverloadBuilder *preparedOverload) {
-  ++TotalNumTypeVariables;
-  auto tv = TypeVariableType::getNew(getASTContext(), assignTypeVariableID(),
-                                     locator, options);
-  if (preparedOverload) {
-    ASSERT(PreparingOverload);
-    preparedOverload->addedTypeVariable(tv);
-  } else {
-    addTypeVariable(tv);
-  }
-  return tv;
-}
 
 Solution ConstraintSystem::finalize() {
   assert(solverState);
@@ -1541,6 +1525,9 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
 void DisjunctionChoiceProducer::partitionGenericOperators(
     SmallVectorImpl<unsigned>::iterator first,
     SmallVectorImpl<unsigned>::iterator last) {
+  if (!CS.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks)
+    return;
+
   auto *argFnType = CS.getAppliedDisjunctionArgumentFunction(Disjunction);
   if (!isOperatorDisjunction(Disjunction) || !argFnType)
     return;
@@ -1695,7 +1682,9 @@ void DisjunctionChoiceProducer::partitionDisjunction(
 
   // Add existing operator bindings to the main partition first. This often
   // helps the solver find a solution fast.
-  existingOperatorBindingsForDisjunction(CS, Choices, everythingElse);
+  if (CS.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks)
+    existingOperatorBindingsForDisjunction(CS, Choices, everythingElse);
+
   for (auto index : everythingElse)
     taken.insert(Choices[index]);
 
@@ -1751,16 +1740,18 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   }
 
   // Partition SIMD operators.
-  if (isOperatorDisjunction(Disjunction) &&
-      !Choices[0]->getOverloadChoice().getName().getBaseIdentifier().isArithmeticOperator()) {
-    forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
-      if (isSIMDOperator(constraint->getOverloadChoice().getDecl())) {
-        simdOperators.push_back(index);
-        return true;
-      }
+  if (CS.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
+    if (isOperatorDisjunction(Disjunction) &&
+        !Choices[0]->getOverloadChoice().getName().getBaseIdentifier().isArithmeticOperator()) {
+      forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+        if (isSIMDOperator(constraint->getOverloadChoice().getDecl())) {
+          simdOperators.push_back(index);
+          return true;
+        }
 
-      return false;
-    });
+        return false;
+      });
+    }
   }
 
   // Gather the remaining options.
@@ -1879,6 +1870,9 @@ bool DisjunctionChoice::isUnaryOperator() const {
 
 void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
   assert(ExplicitConversion);
+
+  if (!cs.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks)
+    return;
 
   auto LHS = Choice->getFirstType();
   auto typeVar = LHS->getAs<TypeVariableType>();

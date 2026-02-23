@@ -1591,6 +1591,11 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto *valueMetatype = IGF.emitTypeMetadataRef(argTypes[1].getASTType());
     return emitBuiltinTaskLocalValuePush(IGF, key, value, valueMetatype);
   }
+  case BuiltinValueKind::TaskCancellationShieldPush:
+    out.add(emitBuiltinTaskCancellationShieldPush(IGF));
+    return;
+  case BuiltinValueKind::TaskCancellationShieldPop:
+    return emitBuiltinTaskCancellationShieldPop(IGF);
 
   // Builtins without IRGen implementations.
   case BuiltinValueKind::None:

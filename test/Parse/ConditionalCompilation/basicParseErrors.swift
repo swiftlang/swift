@@ -80,6 +80,9 @@ struct S {
 
 #endif
 
+#if os(Firmware)
+#endif
+
 #if arch(arn)
 #endif
 

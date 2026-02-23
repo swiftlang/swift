@@ -8,7 +8,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -84,10 +83,9 @@ TEST(ClangImporterTest, emitPCHInMemory) {
   swift::SerializationOptions serializationOpts;
   swift::SourceManager sourceMgr;
   swift::DiagnosticEngine diags(sourceMgr);
-  std::optional<clang::DarwinSDKInfo> SDKInfo;
   std::unique_ptr<ASTContext> context(ASTContext::get(
       langOpts, typecheckOpts, silOpts, searchPathOpts, options,
-      symbolGraphOpts, casOpts, serializationOpts, sourceMgr, diags, SDKInfo));
+      symbolGraphOpts, casOpts, serializationOpts, sourceMgr, diags));
   auto importer = ClangImporter::create(*context);
 
   std::string PCH = createFilename(cache, "bridging.h.pch");
@@ -108,7 +106,7 @@ static StringRef getLibstdcxxModulemapContents() {
     llvm::sys::path::remove_filename(libstdcxxModuleMapPath);
     llvm::sys::path::append(libstdcxxModuleMapPath, "libstdcxx.modulemap");
 
-    auto fs = llvm::vfs::getRealFileSystem();
+    auto fs = llvm::vfs::createPhysicalFileSystem();
     auto file = fs->openFileForRead(libstdcxxModuleMapPath);
     if (!file)
       return "";
@@ -201,7 +199,6 @@ TEST(ClangImporterTest, libStdCxxInjectionTest) {
   ClangImporterOptions options;
   CASOptions casOpts;
   SerializationOptions serializationOpts;
-  std::optional<clang::DarwinSDKInfo> SDKInfo;
   options.clangPath = "/usr/bin/clang";
   options.ExtraArgs.push_back(
       (llvm::Twine("--gcc-toolchain=") + "/opt/rh/devtoolset-9/root/usr")
@@ -209,7 +206,7 @@ TEST(ClangImporterTest, libStdCxxInjectionTest) {
   options.ExtraArgs.push_back("--gcc-toolchain");
   std::unique_ptr<ASTContext> context(ASTContext::get(
       langOpts, typecheckOpts, silOpts, searchPathOpts, options,
-      symbolGraphOpts, casOpts, serializationOpts, sourceMgr, diags, SDKInfo));
+      symbolGraphOpts, casOpts, serializationOpts, sourceMgr, diags));
 
   {
     LibStdCxxInjectionVFS vfs;

@@ -241,8 +241,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
                       workerCompilerInvocation->getSymbolGraphOptions(),
                       workerCompilerInvocation->getCASOptions(),
                       workerCompilerInvocation->getSerializationOptions(),
-                      ScanASTContext.SourceMgr, *workerDiagnosticEngine,
-                      workerCompilerInvocation->getSDKInfo()));
+                      ScanASTContext.SourceMgr, *workerDiagnosticEngine));
 
   scanningASTDelegate = std::make_unique<InterfaceSubContextDelegateImpl>(
       workerASTContext->SourceMgr, workerDiagnosticEngine.get(),
@@ -327,10 +326,9 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenModules) {
   diagnosticReporter.registerNamedClangModuleQuery();
-  auto clangModuleDependencies = clangScanningTool.getModuleDependencies(
-      moduleName.str(), clangScanningModuleCommandLineArgs,
-      clangScanningWorkingDirectoryPath, alreadySeenModules,
-      lookupModuleOutput);
+  auto clangModuleDependencies =
+      clangScanningTool.computeDependenciesByNameWithContext(
+          moduleName.str(), alreadySeenModules, lookupModuleOutput);
   if (!clangModuleDependencies) {
     llvm::handleAllErrors(
         clangModuleDependencies.takeError(),
@@ -483,6 +481,11 @@ SwiftDependencyTracker::SwiftDependencyTracker(
   StringRef AccessNotePath = CI.getLangOptions().AccessNotesPath;
   if (!AccessNotePath.empty())
     addCommonFile(AccessNotePath);
+
+  // const-gather-protocols-file
+  StringRef ConstProtocolFile = SearchPathOpts.ConstGatherProtocolListFilePath;
+  if (!ConstProtocolFile.empty())
+    addCommonFile(ConstProtocolFile);
 }
 
 void SwiftDependencyTracker::startTracking(bool includeCommonDeps) {
@@ -779,6 +782,20 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
           }
         });
     mainDependencies.updateCommandLine(buildArgs);
+  }
+
+  // Dependency only imports
+  {
+    for (auto &m : ScanASTContext.SearchPathOpts.DependencyOnlyModuleImports) {
+      // If module is seen, then it is not dependency only, ignore.
+      if (alreadyAddedModules.contains(m))
+        continue;
+
+      mainDependencies.addModuleImport(
+          m,
+          /*isExported=*/false, AccessLevel::Public, &alreadyAddedModules);
+      mainDependencies.addDependencyOnlyImport(m);
+    }
   }
 
   return mainDependencies;
@@ -2165,11 +2182,6 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
   auto clangArgs = invocation.getCC1CommandLine();
   llvm::for_each(clangArgs, addClangArg);
 
-  // CASFileSystemRootID.
-  std::string RootID = clangModuleDep.CASFileSystemRootID
-                           ? clangModuleDep.CASFileSystemRootID.value()
-                           : "";
-
   std::string IncludeTree =
       clangModuleDep.IncludeTreeID ? *clangModuleDep.IncludeTreeID : "";
 
@@ -2193,7 +2205,7 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
   llvm::StringSet<> alreadyAddedModules;
   auto bridgedDependencyInfo = ModuleDependencyInfo::forClangModule(
       pcmPath, mappedPCMPath, clangModuleDep.ClangModuleMapFile,
-      clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, LinkLibraries, RootID,
+      clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, LinkLibraries,
       IncludeTree, /*module-cache-key*/ "", clangModuleDep.IsSystem);
 
   std::vector<ModuleDependencyID> directDependencyIDs;

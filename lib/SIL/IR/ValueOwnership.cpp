@@ -639,7 +639,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(None, ConvertTaskToJob)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDefaultActor)
-CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDistributedRemoteActor)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, InitializeDistributedRemoteActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeNonDefaultDistributedActor)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, AutoDiffCreateLinearMapContextWithType)
 CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffProjectTopLevelSubcontext)
@@ -674,6 +674,8 @@ CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddPriorityEscalationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemovePriorityEscalationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskLocalValuePush)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskLocalValuePop)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPush)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPop)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

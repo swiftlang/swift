@@ -38,7 +38,7 @@ actor MyActor {
 }
 
 // CHECK-IR:      @swift_deletedAsyncMethodErrorTu =
-// CHECK-IR:      @"$e4main7MyActorCN" = global <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{
+// CHECK-IR:      @"$e4main7MyActorCN" = constant <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{
 // CHECK-IR-SAME:   ptr null,
 // CHECK-IR-SAME:   ptr @"$e4main7MyActorCfD{{(.ptrauth[.0-9]*)?}}",
 // CHECK-IR-SAME:   ptr null,

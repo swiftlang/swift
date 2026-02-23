@@ -185,6 +185,9 @@ public:
   /// literals. Return true on success and false on failure.
   bool tryInitialize(ApplyInst *apply);
 
+  /// Checks if the source operands of element stores can be legally extended.
+  bool canExtendElementSources();
+
   /// Return the SILValue of the array that is initialized.
   SILValue getArrayValue() {
     assert(arrayValue);
@@ -364,6 +367,18 @@ bool ArrayInfo::tryInitialize(ApplyInst *apply) {
     return false;
   // Collect information about uses of the array value.
   classifyUsesOfArray(arrayValue, /*isInInitSection=*/ true);
+  return true;
+}
+
+bool ArrayInfo::canExtendElementSources() {
+  if (getElementSILType().isTrivial(*arrayValue->getFunction())) {
+    return true;
+  }
+  for (auto *elementStore : elementStoreMap.values()) {
+    if (elementStore->getParentBlock() != arrayValue->getParentBlock()) {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -631,6 +646,9 @@ static bool tryUnrollForEachCallsOverArrayLiteral(ApplyInst *apply,
   ArrayRef<TryApplyInst *> forEachCalls = arrayInfo.getForEachUses();
   if (forEachCalls.empty())
     return false;
+  if (!arrayInfo.canExtendElementSources()) {
+    return false;
+  }
   // If the array is too large to unroll, bail out.
   if (!canUnrollForEachOfArray(arrayInfo, apply->getParent()->getModule()))
     return false;

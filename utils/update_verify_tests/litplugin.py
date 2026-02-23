@@ -101,7 +101,7 @@ def propagate_split_files(test_path, updated_files, commands):
         target = SplitFileTarget.create(file, commands, test_path, split_target_dir)
         if target:
             target.copyFrom(file)
-            new.append(target)
+            new.append(str(target))
         else:
             new.append(file)
     return new

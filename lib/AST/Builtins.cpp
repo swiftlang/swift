@@ -2460,6 +2460,14 @@ static ValueDecl *getDereferenceBorrow(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getTaskCancellationShieldPush(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _int(1));
+}
+
+static ValueDecl *getTaskCancellationShieldPop(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -3573,6 +3581,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::DereferenceBorrow:
     return getDereferenceBorrow(Context, Id);
+
+  case BuiltinValueKind::TaskCancellationShieldPush:
+    return getTaskCancellationShieldPush(Context, Id);
+
+  case BuiltinValueKind::TaskCancellationShieldPop:
+    return getTaskCancellationShieldPop(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

@@ -731,6 +731,7 @@ func _embeddedReportFatalError(prefix: StaticString, message: UnsafeBufferPointe
 }
 
 @inline(never)
+@usableFromInline
 func _embeddedReportFatalErrorInFile(prefix: StaticString, message: StaticString, file: StaticString, line: UInt) {
   print(file, terminator: ":")
   print(line, terminator: ": ")
@@ -740,6 +741,7 @@ func _embeddedReportFatalErrorInFile(prefix: StaticString, message: StaticString
 }
 
 @inline(never)
+@usableFromInline
 func _embeddedReportFatalErrorInFile(prefix: StaticString, message: UnsafeBufferPointer<UInt8>, file: StaticString, line: UInt) {
   print(file, terminator: ":")
   print(line, terminator: ": ")

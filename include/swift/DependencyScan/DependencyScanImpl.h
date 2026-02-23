@@ -206,9 +206,6 @@ typedef struct {
   swiftscan_string_set_t *command_line;
 
   /// The CASID for CASFileSystemRoot
-  swiftscan_string_ref_t cas_fs_root_id;
-
-  /// The CASID for CASFileSystemRoot
   swiftscan_string_ref_t clang_include_tree;
 
   /// ModuleCacheKey

@@ -184,6 +184,8 @@ DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
       return DarwinPlatformKind::VisionOSSimulator;
     return DarwinPlatformKind::VisionOS;
   }
+  if (triple.isAppleFirmware())
+    return DarwinPlatformKind::Firmware;
 
   llvm_unreachable("Unsupported Darwin platform");
 }
@@ -208,6 +210,8 @@ static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
     return "xros";
   case DarwinPlatformKind::VisionOSSimulator:
     return "xrsimulator";
+  case DarwinPlatformKind::Firmware:
+    return "firmware";
   }
   llvm_unreachable("Unsupported Darwin platform");
 }
@@ -246,6 +250,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
   case llvm::Triple::XROS:
+  case llvm::Triple::Firmware:
     return getPlatformNameForDarwin(getDarwinPlatformKind(triple));
   case llvm::Triple::Linux:
     if (triple.isAndroid())

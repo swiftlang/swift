@@ -2198,6 +2198,8 @@ static StringRef getBaselineFilename(llvm::Triple Triple) {
     return "windows.json";
   else if (Triple.isXROS())
     return "xros.json";
+  else if (Triple.isAppleFirmware())
+    return "firmware.json";
   else {
     llvm::errs() << "Unsupported triple target\n";
     exit(1);
@@ -2373,7 +2375,7 @@ public:
     SDK = ParsedArgs.getLastArgValue(OPT_sdk).str();
     BaselineSDK = ParsedArgs.getLastArgValue(OPT_bsdk).str();
     Triple = ParsedArgs.getLastArgValue(OPT_target).str();
-    SwiftVersion = ParsedArgs.getLastArgValue(OPT_swift_version).str();
+    SwiftVersion = ParsedArgs.getLastArgValue(OPT_language_mode).str();
     SystemFrameworkPaths = ParsedArgs.getAllArgValues(OPT_Fsystem);
     BaselineFrameworkPaths = ParsedArgs.getAllArgValues(OPT_BF);
     FrameworkPaths = ParsedArgs.getAllArgValues(OPT_F);

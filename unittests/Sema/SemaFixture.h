@@ -21,11 +21,10 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/TargetParser/Host.h"
 #include "llvm/Support/Path.h"
+#include "llvm/TargetParser/Host.h"
 #include "gtest/gtest.h"
 #include <string>
 
@@ -47,7 +46,6 @@ public:
   SerializationOptions SerializationOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
-  std::optional<clang::DarwinSDKInfo> SDKInfo;
 
   SemaTestBase() : Diags(SourceMgr) {
     LangOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());

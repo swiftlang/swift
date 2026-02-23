@@ -66,6 +66,7 @@ set(LLVM_TOOLCHAIN_TOOLS
       addr2line
       ar
       c++filt
+      cache-build-session
       dsymutil
       dwp
       # lipo

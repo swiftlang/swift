@@ -380,7 +380,7 @@ internal extension BacktraceJSONFormatter {
       if options.shouldSanitize {
         path = sanitizePath(path)
       }
-      write("\"path\": \"\(path)\", ", flush: false)
+      write("\"path\": \"\(escapeJSON(path))\", ", flush: false)
     }
 
     write("""

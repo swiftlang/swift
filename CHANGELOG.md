@@ -5,6 +5,53 @@
 
 ## Swift (next)
 
+* [SE-0504][]:
+  Introduced Task Cancellation Shields which temporarily prevent the observation of task
+  cancellation in a given scope. This functionality is intended for use with cleanup actions which
+  may otherwise not have run to completion (since their implementation may have been checking for
+  cancellation and returning early). It may also be used within `defer` blocks to conveniently
+  express such guaranteed-to-run-to-completion cleanups.
+
+  ```swift
+  Task.isCancelled // true
+  withTaskCancellationShield {
+    Task.isCancelled // false
+    cleanup() 
+  }
+  ```
+
+* Calling from Objective-C into into asynchronous Swift APIs will now attempt use `Task.immediate`
+  instead of `Task` when available. This reduces the initial enqueue delay which Task would incur
+  (by enqueueing on the global pool before calling the async target), and can improve performance
+  and ordering predictability of calling async code through these bridged APIs.
+
+* The raw span accessor properties of `Span` and `MutableSpan` (`bytes` and
+  `mutableBytes`) as well as the two generic `append()` methods of
+  `OutputRawSpan` are newly marked with `@unsafe`. These changes are corrections
+  for omissions in the SE-0458, SE-0467 and SE-0485 proposals or their
+  implementations.
+
+  These `@unsafe` annotations are required because of a permissible compiler
+  optimization involving values of types that contain padding. When the compiler
+  stores such a value to addressable memory, it is free to skip any padding
+  bytes. This can potentially leave those bytes uninitialized. This optimization
+  is safe when the memory is only ever read as the same type as the value
+  stored. However, when reinterpreting the memory as raw bytes, the potentially
+  uninitialized bytes violate the prerequisite that `RawSpan` and
+  `MutableRawSpan` represent fully initialized memory. In the case of
+  `OutputRawSpan`, they violate the postcondition that the memory it has written
+  is fully initialized.
+
+  It is safe to use `bytes` when the `Element` type of `Span` or `MutableSpan`
+  has neither internal nor trailing padding bytes, as every byte is then known
+  to be initialized. The same constraint applies to the type parameter of
+  `OutputSpan.append(_:as:)`.
+
+  To safely use `MutableSpan`'s `mutableBytes`, an additional safety constraint
+  applies when the memory is to later be used again as `Element`. In that case,
+  the non-padding bytes of `Element` must allow every bit pattern to be
+  permissible in a valid value of `Element`.
+
 * [SE-0491][]:
   You can now use a module selector to specify which module Swift should look inside to find a named declaration. A
   module selector is written before the name it qualifies and consists of the module name and two colons (`::`):
@@ -3914,7 +3961,7 @@ concurrency checking.
 
 * The C `long double` type is now imported as `Float80` on i386 and x86_64
   macOS and Linux. The tgmath functions in the Darwin and glibc modules now
-  support `Float80` as well as `Float` and `Double`. Several tgmath
+  support `Float80` as well as `Float` and `Double`. Several tgmath
   functions have been made generic over `[Binary]FloatingPoint` so that they
   will automatically be available for any conforming type.
 
@@ -10959,6 +11006,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0471]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
+[SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

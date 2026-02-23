@@ -1224,6 +1224,9 @@ public:
   /// *ApplicationMain or an main attribute.
   ArtificialMainKind getArtificialMainKind() const;
 
+  /// Returns true if this can support borrow/mutate accessors.
+  bool canSupportBorrowAccessors() const;
+
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(const char *filename));
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
@@ -1936,6 +1939,9 @@ public:
   bool isNonisolated() const {
     return getOptions().contains(ProtocolConformanceFlags::Nonisolated);
   }
+  bool isReparented() const {
+    return getOptions().contains(ProtocolConformanceFlags::Reparented);
+  }
 
   TypeExpr *getGlobalActorIsolationType() const {
     return globalActorIsolationType;
@@ -2251,6 +2257,8 @@ public:
   /// conformed to otherwise.
   std::optional<InvertibleProtocolKind>
   isAddingConformanceToInvertible() const;
+
+  bool isForReparenting() const;
 
   /// If this extension represents an imported Objective-C category, returns the
   /// category's name. Otherwise returns the empty identifier.
@@ -2704,9 +2712,8 @@ public:
   Expr *getInit(unsigned i) const {
     return getPatternList()[i].getInit();
   }
-  Expr *getExecutableInit(unsigned i) const {
-    return getPatternList()[i].getExecutableInit();
-  }
+  bool hasSingleVarConstantFoldedInit() const;
+  Expr *getExecutableInit(unsigned i) const;
   Expr *getOriginalInit(unsigned i) const {
     return getPatternList()[i].getOriginalInit();
   }
@@ -3411,8 +3418,12 @@ public:
   }
 
   /// Returns the protocol requirements that this decl conforms to.
+  ///
+  /// \param NTD If specified, the nominal to use for conformance lookup. This
+  /// is useful if you want to query for a subclass.
   ArrayRef<ValueDecl *>
-  getSatisfiedProtocolRequirements(bool Sorted = false) const;
+  getSatisfiedProtocolRequirements(bool Sorted = false,
+                                   NominalTypeDecl *NTD = nullptr) const;
 
   /// Determines the kind of access that should be performed by a
   /// DeclRefExpr or MemberRefExpr use of this value in the specified
@@ -4425,7 +4436,8 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   friend class DirectLookupRequest;
   friend class LookupAllConformancesInContextRequest;
   friend ArrayRef<ValueDecl *>
-  ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
+  ValueDecl::getSatisfiedProtocolRequirements(bool Sorted,
+                                              NominalTypeDecl *) const;
 
 protected:
   Type DeclaredTy;
@@ -5630,6 +5642,12 @@ public:
   /// Retrieve the transitive closure of the inherited protocols, not including
   /// this protocol itself.
   ArrayRef<ProtocolDecl *> getAllInheritedProtocols() const;
+
+  /// Retrieve the set of protocols that are reparenting this protocol,
+  /// plus the extension defining the relationship and the index into that
+  /// extension's InheritedTypes where it occurs.
+  ArrayRef<std::tuple<ProtocolDecl *, ExtensionDecl *, unsigned>>
+  getReparentingProtocols() const;
 
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
@@ -8944,9 +8962,9 @@ class EnumElementDecl : public DeclContext, public ValueDecl {
   ParameterList *Params;
   
   SourceLoc EqualsLoc;
-  
-  /// The raw value literal for the enum element, or null.
-  LiteralExpr *RawValueExpr;
+
+  /// The raw value expression for the enum element, or null.
+  Expr *RawValueExpr;
 
 protected:
   struct {
@@ -8957,7 +8975,7 @@ public:
   EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
                   ParameterList *Params,
                   SourceLoc EqualsLoc,
-                  LiteralExpr *RawValueExpr,
+                  Expr *RawValueExpr,
                   DeclContext *DC);
 
   /// Returns the string for the base name, or "_" if this is unnamed.
@@ -8977,20 +8995,17 @@ public:
   void setParameterList(ParameterList *params);
   ParameterList *getParameterList() const { return Params; }
 
-  /// Retrieves a fully typechecked raw value expression associated
-  /// with this enum element, if it exists.
+  /// Retrieves a raw value expression associated with this enum element, if it
+  /// exists, as it was written in the source.
+  Expr *getOriginalRawValueExpr() const;
+
+  /// Retrieves a fully-typechecked and (if LiteralExpressions experimental
+  /// feature is enabled) constant-folded raw value expression associated with
+  /// this enum element, if it exists.
   LiteralExpr *getRawValueExpr() const;
-  
-  /// Retrieves a "structurally" checked raw value expression associated
-  /// with this enum element, if it exists.
-  ///
-  /// The structural raw value may or may not have a type set, but it is
-  /// guaranteed to be suitable for retrieving any non-semantic information
-  /// like digit text for an integral raw value or user text for a string raw value.
-  LiteralExpr *getStructuralRawValueExpr() const;
-  
+
   /// Reset the raw value expression.
-  void setRawValueExpr(LiteralExpr *e);
+  void setRawValueExpr(Expr *e);
 
   /// Return the containing EnumDecl.
   EnumDecl *getParentEnum() const {
@@ -9016,7 +9031,7 @@ public:
 
   /// Do not call this!
   /// It exists to let the AST walkers get the raw value without forcing a request.
-  LiteralExpr *getRawValueUnchecked() const { return RawValueExpr; }
+  Expr *getRawValueUnchecked() const { return RawValueExpr; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::EnumElement;

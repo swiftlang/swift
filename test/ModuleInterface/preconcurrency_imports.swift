@@ -10,7 +10,7 @@
 
 // CHECK: {{^}}@preconcurrency import OtherLib
 // CHECK: {{^}}@preconcurrency import PreconcurrencyLib
-// CHECK: public struct Struct1 : Swift.Sendable
+// CHECK: public struct Struct1 : Swift::Sendable
 // CHECK: public struct Struct2
 
 //--- PreconcurrencyLib.swift

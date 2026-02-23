@@ -266,7 +266,7 @@ function(_add_host_variant_c_compile_flags target)
     else()
       target_compile_options(${target} PRIVATE
         $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-frtti>
-        $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>"SHELL:-Xclang -fno-rtti-data">)
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang -fno-rtti-data>")
     endif()
 
     # NOTE: VS 2017 15.3 introduced this to disable the static components of
@@ -813,15 +813,14 @@ function(add_swift_host_library name)
           $<$<COMPILE_LANGUAGE:C,CXX>:SHELL:/clang:-Xclang /clang:-ivfsoverlay /clang:-Xclang /clang:${ASHL_VFS_OVERLAY}>)
       else()
         target_compile_options(${name} PRIVATE
-          $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang -ivfsoverlay -Xclang ${ASHL_VFS_OVERLAY}">)
+          "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang -ivfsoverlay -Xclang ${ASHL_VFS_OVERLAY}>")
 
           # MSVC doesn't support -Xclang. We don't need to manually specify
           # the dependent libraries as `cl`/`clang-cl` does so.
           target_compile_options(${name} PRIVATE
-            $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=oldnames">
+            "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=oldnames>"
             # TODO(compnerd) handle /MT, /MTd
-            $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>">
-            )
+            "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>>")
       endif()
     endif()
 

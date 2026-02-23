@@ -1,6 +1,6 @@
-// XFAIL: *
-// This test currently fails because there's no way to explicitly refer to
-// a module that has been shadowed by another declaration, e.g., a namespace.
+// This test fails without module selectors enabled because there's no other way
+// to explicitly refer to a module that has been shadowed by another
+// declaration, e.g., a namespace.
 // Unlike in the prevent-module-shadowed-by-namespace.swift test, the textual
 // interface is generated with C++ interop enabled, which means namespaces are
 // not filtered out during name lookup when the interface is recompiled later.
@@ -13,7 +13,7 @@
 // (despite using a mix of C/C++ decls):
 //
 // RUN: %empty-directory(%t/lib)
-// RUN: %target-swift-emit-module-interface(%t/lib/shim.swiftinterface) %t/shim.swift -cxx-interoperability-mode=default -module-name shim -I %t/include
+// RUN: %target-swift-emit-module-interface(%t/lib/shim.swiftinterface) %t/shim.swift -cxx-interoperability-mode=default -enable-module-selectors-in-module-interface -module-name shim -I %t/include
 // RUN: %FileCheck %t/shim.swift < %t/lib/shim.swiftinterface
 // RUN: %target-swift-frontend %t/program.swift -typecheck -verify -cxx-interoperability-mode=default -I %t/include -I %t/lib
 
@@ -41,19 +41,37 @@ namespace c2cxx { typedef c2cxx_number number; }; // only available in C++
 // A shim around c2cxx that refers to a mixture of namespaced (C++) and
 // top-level (C) decls; requires cxx-interoperability-mode
 import c2cxx
-public func shimId(_ n: c2cxx.number) -> c2cxx_number { return n }
-//                      ^^^^^`- refers to the namespace
-// CHECK: public func shimId(_ n: c2cxx.c2cxx.number) -> c2cxx.c2cxx_number
-//                                ^^^^^\^^^^^`-namespace ^^^^^`-module
-//                                      `-module
 
+//                          ,-namespace
+//                         /
+//                      vvvvv
+public func shimId(_ n: c2cxx.number) -> c2cxx_number { return n }
+// CHECK: public func shimId(_ n: c2cxx::c2cxx.c2cxx::number) -> c2cxx::c2cxx_number
+//                                ^^^^^  ^^^^^ ^^^^^             ^^^^^
+//                                   \      \     \                 \
+//                                    `------\-----`-----------------`-module
+//                                            `-namespace
+
+//                                                            ,-namespace
+//                                                           /
+//                                                        vvvvv
 @inlinable public func shimIdInline(_ n: c2cxx_number) -> c2cxx.number {
-// CHECK:  public func shimIdInline(_ n: c2cxx.c2cxx_number) -> c2cxx.c2cxx.number
-//                                       ^^^^^`-module          ^^^^^\^^^^^`-namespace
-//                                                                    `-module
+// CHECK:  public func shimIdInline(_ n: c2cxx::c2cxx_number) -> c2cxx::c2cxx.c2cxx::number
+//                                       ^^^^^                   ^^^^^  ^^^^^ ^^^^^
+//                                          \                       \      \     \
+//                                           `-----------------------`------\-----`-module
+//                                                                           `-namespace
+
+// This declaration is printed verbatim because it's in an inlinable function
+// body.
+//                   ,-namespace
+//                  /
+//               vvvvv
           let m: c2cxx.number = n
 // CHECK: let m: c2cxx.number = n
-//               ^^^^^`-namespace
+//               ^^^^^
+//                  \
+//                   `-namespace
           return m
 }
 

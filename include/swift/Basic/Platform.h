@@ -35,7 +35,8 @@ namespace swift {
     WatchOS,
     WatchOSSimulator,
     VisionOS,
-    VisionOSSimulator
+    VisionOSSimulator,
+    Firmware,
   };
 
   /// Returns true if the given triple represents iOS running in a simulator.

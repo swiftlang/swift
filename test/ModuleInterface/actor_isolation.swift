@@ -19,7 +19,7 @@ import Preconcurrency
 public actor SomeActor {
   nonisolated func maine() { }
 
-  // CHECK: nonisolated public func takesIsolated(other: isolated {{(Test.)?}}SomeActor)
+  // CHECK: nonisolated public func takesIsolated(other: isolated {{(Test::)?}}SomeActor)
   public nonisolated func takesIsolated(other: isolated SomeActor) { }
 }
 
@@ -31,8 +31,8 @@ public struct SomeGlobalActor {
   public static let shared = SomeActor()
 }
 
-// CHECK: @{{(Test.)?}}SomeGlobalActor public protocol P1
-// CHECK-NEXT: @{{(Test.)?}}SomeGlobalActor func method()
+// CHECK: @{{(Test::)?}}SomeGlobalActor public protocol P1
+// CHECK-NEXT: @{{(Test::)?}}SomeGlobalActor func method()
 
 @available(SwiftStdlib 5.1, *)
 @SomeGlobalActor
@@ -41,7 +41,7 @@ public protocol P1 {
 }
 
 // CHECK: class C1
-// CHECK-NEXT: @{{(Test.)?}}SomeGlobalActor public func method()
+// CHECK-NEXT: @{{(Test::)?}}SomeGlobalActor public func method()
 
 @available(SwiftStdlib 5.1, *)
 public class C1: P1 {
@@ -53,17 +53,17 @@ public class C1: P1 {
 @SomeGlobalActor
 public class C2 { }
 
-// CHECK: @{{(Test.)?}}SomeGlobalActor public class C2
+// CHECK: @{{(Test::)?}}SomeGlobalActor public class C2
 
 @available(SwiftStdlib 5.1, *)
 public class C3: C2 { }
 
-// CHECK: public class C4 : Swift.UnsafeSendable
+// CHECK: public class C4 : Swift::UnsafeSendable
 
 @available(SwiftStdlib 5.1, *)
 public class C4: UnsafeSendable { }
 
-// CHECK: public class C5 : @unchecked Swift.Sendable
+// CHECK: public class C5 : @unchecked Swift::Sendable
 
 @available(SwiftStdlib 5.1, *)
 public class C5: @unchecked Sendable { }
@@ -72,7 +72,7 @@ public class C5: @unchecked Sendable { }
 @available(SwiftStdlib 5.1, *)
 public class C6 { }
 
-// CHECK: extension {{(Test.)?}}C6 : @unchecked Swift.Sendable
+// CHECK: extension {{(Test::)?}}C6 : @unchecked Swift::Sendable
 
 @available(SwiftStdlib 5.1, *)
 extension C6: @unchecked Sendable { }
@@ -81,7 +81,7 @@ extension C6: @unchecked Sendable { }
 @available(SwiftStdlib 5.1, *)
 public class C7 { }
 
-// CHECK: extension {{(Test.)?}}C7 : Swift.UnsafeSendable
+// CHECK: extension {{(Test::)?}}C7 : Swift::UnsafeSendable
 
 @available(SwiftStdlib 5.1, *)
 extension C7: UnsafeSendable { }
@@ -93,10 +93,10 @@ public protocol P2 {
 }
 
 
-// CHECK: class {{(Test.)?}}C8 : {{(Test.)?}}P2 {
+// CHECK: class {{(Test::)?}}C8 : {{(Test::)?}}P2 {
 @available(SwiftStdlib 5.1, *)
 public class C8 : P2 {
-  // CHECK: @{{(Test.)?}}SomeGlobalActor public func method()
+  // CHECK: @{{(Test::)?}}SomeGlobalActor public func method()
   public func method() {}
 }
 
@@ -111,4 +111,4 @@ public struct StructWithImplicitlyNonSendable {
 // bit in conformances which is not serialized and not present in the textual
 // form.
 
-// SYNTHESIZED: extension Test.C2 : Swift.Sendable {}
+// SYNTHESIZED: extension Test::C2 : Swift::Sendable {}

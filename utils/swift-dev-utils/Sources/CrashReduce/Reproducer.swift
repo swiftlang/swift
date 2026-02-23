@@ -91,7 +91,8 @@ public struct Reproducer: Sendable {
         noSDK: header.noSDK ?? false,
         noObjCInterop: header.noObjCInterop ?? false,
         languageMode: header.languageMode,
-        diagnosticStyle: header.diagnosticStyle
+        diagnosticStyle: header.diagnosticStyle,
+        frontendArgs: header.frontendArgs?.map { .value($0) } ?? []
       ),
       buffers: buffers,
       originalID: header.original,
@@ -169,6 +170,8 @@ public struct Reproducer: Sendable {
       "%target-swift-frontend -emit-ir\(extraOptsStr)"
     case .complete:
       "%target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics\(extraOptsStr)\(sourceOrderCompletion) -source-filename"
+    case .custom:
+      "%target-swift-frontend \(options.frontendArgs.map(\.printed).joined(separator: " "))"
     }
     inv += " "
     inv += options.reorderInputs(inputs).joined(separator: " ")
@@ -215,7 +218,9 @@ public struct Reproducer: Sendable {
       diagnosticStyle: options.diagnosticStyle,
       issueID: issueID,
       original: originalID,
-      splits: splits.isEmpty ? nil : splits
+      splits: splits.isEmpty ? nil : splits,
+      frontendArgs: options.frontendArgs.isEmpty ? nil
+                      : options.frontendArgs.flatMap(\.rawArgs)
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -254,6 +259,7 @@ extension Reproducer {
       case emitSIL = "emit-sil"
       case emitIR = "emit-ir"
       case complete
+      case custom
     }
     var kind: Kind
     var isDeterministic: Bool = true
@@ -266,12 +272,17 @@ extension Reproducer {
     var isJoined: Bool = false
     var diagnosticStyle: String?
     var primaryIdx: Int?
+    var frontendArgs: [Command.Argument] = []
 
-    static var typecheck: Self { .init(kind: .typecheck) }
-    static var emitSILGen: Self { .init(kind: .emitSILGen) }
-    static var emitSIL: Self { .init(kind: .emitSIL) }
-    static var emitIR: Self { .init(kind: .emitIR) }
-    static var complete: Self { .init(kind: .complete) }
+    static var typecheck: Self { Self(kind: .typecheck) }
+    static var emitSILGen: Self { Self(kind: .emitSILGen) }
+    static var emitSIL: Self { Self(kind: .emitSIL) }
+    static var emitIR: Self { Self(kind: .emitIR) }
+    static var complete: Self { Self(kind: .complete) }
+
+    static func custom(frontendArgs: [Command.Argument]) -> Self {
+      Self(kind: .custom, frontendArgs: frontendArgs)
+    }
   }
   struct Header: Codable {
     var kind: Options.Kind?
@@ -290,6 +301,7 @@ extension Reproducer {
     var issueID: Int?
     var original: String?
     var splits: [Int]?
+    var frontendArgs: [String]?
   }
 }
 
@@ -307,7 +319,7 @@ extension Reproducer.Options {
 
   func executablePath(for toolchain: Toolchain) -> AbsolutePath {
     switch kind {
-    case .typecheck, .emitSILGen, .emitSIL, .emitIR:
+    case .typecheck, .emitSILGen, .emitSIL, .emitIR, .custom:
       toolchain.swiftPath
     case .complete:
       toolchain.swiftIDETestPath
@@ -347,6 +359,9 @@ extension Reproducer.Options {
         "--code-completion", "-batch-code-completion", "-skip-filecheck",
         "-code-completion-diagnostics", "-source-filename"
       ]
+    case .custom:
+      args.append("-frontend")
+      args += frontendArgs.flatMap(\.rawArgs)
     }
     args += reorderInputs(inputs.map(\.rawPath))
     if useSourceOrderCompletion {

@@ -2,7 +2,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name UserModule
 // RUN: %FileCheck %s < %t.swiftinterface
 
-// CHECK: @unsafe public func getIntUnsafely() -> Swift.Int
+// CHECK: @unsafe public func getIntUnsafely() -> Swift::Int
 @unsafe public func getIntUnsafely() -> Int { 0 }
 
 public struct UnsafeIterator: @unsafe IteratorProtocol {
@@ -29,7 +29,7 @@ public protocol P {
   func f()
 }
 
-// CHECK: public struct X : @unsafe UserModule.P
+// CHECK: public struct X : @unsafe UserModule::P
 public struct X: @unsafe P {
 // CHECK:  @unsafe public func f()
   @unsafe public func f() { }

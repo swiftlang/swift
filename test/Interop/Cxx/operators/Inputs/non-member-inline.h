@@ -121,6 +121,14 @@ LValueAndRValueArithmetic operator+(const LValueAndRValueArithmetic &lhs,
   return {lhs.value + rhs.value};
 }
 
+struct AllStar { long L = 111; };
+inline long &operator*(AllStar &a) { return a.L; }
+inline AllStar operator*(const AllStar &lhs, const AllStar &rhs) {
+  AllStar a;
+  a.L = lhs.L * rhs.L;
+  return a;
+}
+
 // Make sure that we don't crash on templated operators
 template<typename T> struct S {};
 template<typename T> S<T> operator+(S<T> lhs, S<T> rhs);

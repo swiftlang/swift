@@ -37,7 +37,7 @@ func test5<T>(_ f : () async throws -> T)  rethrows->T { // expected-note{{add '
 }
 
 enum SomeEnum: Int {
-case foo = await 5 // expected-error{{raw value for enum case must be a literal}}
+  case foo = await 5 // expected-error{{raw value for enum case must be a literal}}
 }
 
 struct SomeStruct {

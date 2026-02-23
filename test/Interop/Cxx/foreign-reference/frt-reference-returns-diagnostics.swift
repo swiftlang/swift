@@ -28,3 +28,11 @@ func testBothAnnotations() {
   let _ = BothAnnotations.createByRef() 
   let _ = BothAnnotations.getByRef()
 }
+
+func testImmortal() {
+  let i = createImmortalIntBox()
+  let _ = i.builderPattern()
+
+  let d = createDerivedImmortalIntBox()
+  let _ = d.builderPattern()
+}

@@ -38,7 +38,7 @@
 
 // REQUIRES: swift_feature_ConciseMagicFile
 
-// CHECK: warning: upcoming feature 'ConciseMagicFile' is already enabled as of Swift version 6
+// CHECK: warning: upcoming feature 'ConciseMagicFile' already enabled as of the Swift 6 language mode
 
 #if hasFeature(ConciseMagicFile)
 let x = 0

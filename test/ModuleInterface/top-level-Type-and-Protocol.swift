@@ -12,13 +12,13 @@ public struct Type {}
 // CHECK-NEXT: }
 public protocol Protocol {}
 
-// CHECK: public func usesType(_ x: MyModule.`Type`)
+// CHECK: public func usesType(_ x: MyModule::`Type`)
 public func usesType(_ x: Type) {}
 
-// CHECK: public func genericProtocol<T>(_ x: T) where T : MyModule.`Protocol`
+// CHECK: public func genericProtocol<T>(_ x: T) where T : MyModule::`Protocol`
 public func genericProtocol<T: Protocol>(_ x: T) {}
 
-// CHECK: public func existentialProtocol(_ x: any MyModule.`Protocol`)
+// CHECK: public func existentialProtocol(_ x: any MyModule::`Protocol`)
 public func existentialProtocol(_ x: Protocol) {}
 
 // CHECK: public struct Parent {
@@ -36,11 +36,11 @@ public struct Parent {
   // CHECK-NEXT: }
 }
 
-// CHECK: public func usesNestedType(_ x: MyModule.Parent.`Type`)
+// CHECK: public func usesNestedType(_ x: MyModule::Parent.MyModule::`Type`)
 public func usesNestedType(_ x: Parent.`Type`) {}
 
-// CHECK: public func usesNestedTypeProtocol(_ x: MyModule.Parent.`Type`.`Protocol`)
+// CHECK: public func usesNestedTypeProtocol(_ x: MyModule::Parent.MyModule::`Type`.MyModule::`Protocol`)
 public func usesNestedTypeProtocol(_ x: Parent.`Type`.`Protocol`) {}
 
-// CHECK: public func usesNestedProtocol(_ x: MyModule.Parent.`Protocol`)
+// CHECK: public func usesNestedProtocol(_ x: MyModule::Parent.MyModule::`Protocol`)
 public func usesNestedProtocol(_ x: Parent.`Protocol`) {}

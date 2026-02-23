@@ -33,6 +33,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#define PROTECT_BACKTRACE_SETTINGS 1
 #else
 #if __has_include(<sys/mman.h>)
 #include <sys/mman.h>
@@ -93,7 +94,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   true,
 
   // interactive
-#if TARGET_OS_OSX || defined(__linux__) // || defined(_WIN32)
+#if TARGET_OS_OSX || defined(__linux__) || defined(_WIN32)
   OnOffTty::TTY,
 #else
   OnOffTty::Off,
@@ -140,6 +141,9 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
 
   // format
   OutputFormat::Text,
+
+  // inBacktracer
+  false,
 
   // swiftBacktracePath
   NULL,
@@ -322,7 +326,8 @@ bool isPrivileged() {
 #if SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 #if _WIN32
 bool writeProtectMemory(void *ptr, size_t size) {
-  return !!VirtualProtect(ptr, size, PAGE_READONLY, NULL);
+  DWORD dwOldProtect = 0;
+  return !!VirtualProtect(ptr, size, PAGE_READONLY, &dwOldProtect);
 }
 #else
 bool writeProtectMemory(void *ptr, size_t size) {
@@ -343,6 +348,9 @@ BacktraceInitializer::BacktraceInitializer() {
 
   if (backtracing)
     _swift_parseBacktracingSettings(backtracing);
+
+  _swift_backtraceSettings.inBacktracer
+    = swift::runtime::environment::SWIFT_IS_BACKTRACING();
 
 #if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
   if (!_swift_backtraceSettings.swiftBacktracePath) {
@@ -365,7 +373,7 @@ BacktraceInitializer::BacktraceInitializer() {
   if (_swift_backtraceSettings.enabled == OnOffTty::Default) {
 #if TARGET_OS_OSX
     _swift_backtraceSettings.enabled = OnOffTty::TTY;
-#elif defined(__linux__) // || defined(_WIN32)
+#elif defined(__linux__) || defined(_WIN32)
     _swift_backtraceSettings.enabled = OnOffTty::On;
 #else
     _swift_backtraceSettings.enabled = OnOffTty::Off;
@@ -432,25 +440,29 @@ BacktraceInitializer::BacktraceInitializer() {
   if (_swift_backtraceSettings.outputTo == OutputTo::File) {
     size_t len = strlen(_swift_backtraceSettings.outputPath);
     if (len > SWIFT_BACKTRACE_OUTPUT_PATH_SIZE - 1) {
-      swift::warning(0,
-                     "swift runtime: backtracer output path too long; output "
-                     "path setting will be ignored.\n");
+      if (!_swift_backtraceSettings.suppressWarnings) {
+        swift::warning(0,
+                       "swift runtime: backtracer output path too long; output "
+                       "path setting will be ignored.\n");
+      }
       _swift_backtraceSettings.outputTo = OutputTo::Auto;
     } else {
       memcpy(swiftBacktraceOutputPath,
              _swift_backtraceSettings.outputPath,
              len + 1);
+    }
 
 #if PROTECT_BACKTRACE_SETTINGS
-      if (!writeProtectMemory(swiftBacktraceOutputPath,
+    if (!writeProtectMemory(swiftBacktraceOutputPath,
                               sizeof(swiftBacktraceOutputPath))) {
+      if (!_swift_backtraceSettings.suppressWarnings) {
         swift::warning(0,
                        "swift runtime: unable to protect backtracer output "
                        "path; path setting will be ignored.\n");
-        _swift_backtraceSettings.outputTo = OutputTo::Auto;
       }
-#endif
+      _swift_backtraceSettings.outputTo = OutputTo::Auto;
     }
+#endif
   }
 
   if (_swift_backtraceSettings.outputTo == OutputTo::Auto) {
@@ -884,13 +896,22 @@ _swift_parseBacktracingSettings(const char *settings)
 // write protected so they can't be manipulated by an attacker using a buffer
 // overrun.
 const char * const environmentVarsToPassThrough[] = {
-  "LD_LIBRARY_PATH",
-  "DYLD_LIBRARY_PATH",
-  "DYLD_FRAMEWORK_PATH",
+  "SWIFT_BACKTRACE",
   "PATH",
   "TERM",
   "LANG",
-  "HOME"
+  #ifndef _WIN32
+  "LD_LIBRARY_PATH",
+  "DYLD_LIBRARY_PATH",
+  "DYLD_FRAMEWORK_PATH",
+  "HOME",
+  #else
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "SystemDrive",
+  "SystemRoot",
+  "USERPROFILE",
+  #endif
 };
 
 #define BACKTRACE_MAX_ENV_VARS lengthof(environmentVarsToPassThrough)
@@ -903,14 +924,30 @@ _swift_backtraceSetupEnvironment()
 
   std::memset(swiftBacktraceEnv, 0, sizeof(swiftBacktraceEnv));
 
-  // We definitely don't want this on in the swift-backtrace program
-  const char * const disable = "SWIFT_BACKTRACE=enable=no";
-  const size_t disableLen = std::strlen(disable) + 1;
-  std::memcpy(penv, disable, disableLen);
-  penv += disableLen;
-  remaining -= disableLen;
+  unsigned firstEnvVar = 0;
 
-  for (unsigned n = 0; n < BACKTRACE_MAX_ENV_VARS; ++n) {
+  // Remember that we're backtracing
+  const char * const backtracing = "SWIFT_IS_BACKTRACING=yes";
+  const size_t backtracingLen = std::strlen(backtracing) + 1;
+  std::memcpy(penv, backtracing, backtracingLen);
+  penv += backtracingLen;
+  remaining -= backtracingLen;
+
+  // If the backtracer itself crashes, ignore crashes in the backtracer that's
+  // backtracing the backtracer.  This means we'll get backtraces from the
+  // backtracer, but it won't go full-on recursive.
+  if (_swift_backtraceSettings.inBacktracer) {
+    const char * const disable = "SWIFT_BACKTRACE=enable=no";
+    const size_t disableLen = std::strlen(disable) + 1;
+    std::memcpy(penv, disable, disableLen);
+    penv += disableLen;
+    remaining -= disableLen;
+
+    // Skip the SWIFT_BACKTRACE settings from the user
+    firstEnvVar = 1;
+  }
+
+  for (unsigned n = firstEnvVar; n < BACKTRACE_MAX_ENV_VARS; ++n) {
     const char *name = environmentVarsToPassThrough[n];
     const char *value = getenv(name);
     if (!value)
@@ -1075,8 +1112,35 @@ _swift_backtrace_demangle(const char *mangledName,
       return outputBuffer;
     }
 #else
-    // On Windows, the mangling is different.
-    // ###TODO: Call __unDName()
+  } else {
+    // On Windows, we use the __unDNameEx function from the C library;
+    // this function isn't really documented, sadly.
+    typedef void *(__cdecl *malloc_func_t)(size_t);
+    typedef void (__cdecl *free_func_t)(void *);
+    typedef char *(__cdecl *get_param_t)(long);
+
+    extern char * __cdecl __unDNameEx(char *buffer,
+                                      const char *mangled,
+                                      int buflen,
+                                      malloc_func_t memalloc,
+                                      free_func_t memfree,
+                                      get_param_t getParameter,
+                                      unsigned long flags);
+
+    char *result = __unDNameEx(outputBuffer,
+                               mangledName,
+                               *outputBufferSize,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               0);
+
+    if (!result)
+      return nullptr;
+
+    *outputBufferSize = strlen(result) + 1;
+
+    return outputBuffer;
 #endif
   }
 
@@ -1085,6 +1149,12 @@ _swift_backtrace_demangle(const char *mangledName,
 
 #if SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 namespace {
+
+#ifdef _WIN32
+char cmdline_buf[32768];
+WCHAR cmdline_wbuf[32768];
+char pid_buf[22];
+#endif
 
 char addr_buf[18];
 char timeout_buf[22];
@@ -1126,6 +1196,10 @@ const char *backtracer_argv[] = {
   "full",                       // 32
   "--format",                   // 33
   "text",                       // 34
+#ifdef _WIN32
+  "--pid",                      // 35
+  pid_buf,                      // 36
+#endif // defined(_WIN32)
   NULL
 };
 
@@ -1138,6 +1212,116 @@ const char *
 trueOrFalse(OnOffTty oot) {
   return trueOrFalse(oot == OnOffTty::On);
 }
+
+#ifdef _WIN32
+// Convert an argument vector to an appropriately formatted flat command line.
+//
+// The rules for this are really odd; see
+//
+//   https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw
+//
+// for details.
+bool flattenCommandLine(char *buffer, size_t buflen, const char **argv) {
+  char *ptr = cmdline_buf;
+  char *end = cmdline_buf + sizeof(cmdline_buf);
+  const char **parg = backtracer_argv;
+
+#define PUT(ch)                                 \
+  do {                                          \
+    if (ptr == end)                             \
+      return false;                             \
+    *ptr++ = ch;                                \
+  } while(0)
+
+  while (*parg) {
+    const char *argument = *parg++;
+    int slashCount = 0;
+    bool quoted = false;
+
+    if (ptr > cmdline_buf) {
+      PUT(' ');
+    }
+
+    // Check if the argument contains spaces; if it does, we have to quote it
+    const char *pt2 = argument;
+    while (*pt2) {
+      char ch = *pt2++;
+      if (ch == ' ' || ch == '\t') {
+        quoted = true;
+        break;
+      }
+    }
+
+    if (quoted) {
+      PUT('"');
+    }
+
+    pt2 = argument;
+    while (*pt2) {
+      char ch = *pt2++;
+
+      switch (ch) {
+      case '\\':
+        ++slashCount;
+        break;
+      case '"':
+        {
+          char *pend = ptr + 2 * slashCount;
+          if (end - ptr < 2 * slashCount)
+            return false;
+          while (ptr < pend)
+            *ptr++ = '\\';
+          slashCount = 0;
+          PUT('\\');
+          PUT('"');
+        }
+        break;
+      default:
+        {
+          char *pend = ptr + slashCount;
+          if (end - ptr < slashCount)
+            return false;
+          while (ptr < pend)
+            *ptr++ = '\\';
+          slashCount = 0;
+          PUT(ch);
+        }
+        break;
+      }
+    }
+
+    if (slashCount) {
+      if (quoted) {
+        char *pend = ptr + 2 * slashCount;
+        if (end - ptr < 2 * slashCount)
+          return false;
+        while (ptr < pend)
+          *ptr++ = '\\';
+        PUT('"');
+      } else {
+        char *pend = ptr + slashCount;
+        if (end - ptr < slashCount)
+          return false;
+        while (ptr < pend)
+          *ptr++ = '\\';
+      }
+    } else if (quoted) {
+      PUT('"');
+    }
+
+    if (ptr == end)
+      return false;
+  }
+
+  PUT('\0');
+
+#undef PUT
+
+  return true;
+}
+
+#endif
+
 
 } // namespace
 #endif
@@ -1154,7 +1338,7 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 {
 #if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
   return false;
-#elif TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__linux__)
+#else
   // Set-up the backtracer's command line arguments
   switch (_swift_backtraceSettings.algorithm) {
   case UnwindAlgorithm::Fast:
@@ -1282,9 +1466,12 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   _swift_formatUnsigned(_swift_backtraceSettings.top, top_buf);
   _swift_formatAddress(crashInfo, addr_buf);
+  #ifdef _WIN32
+  _swift_formatUnsigned(GetCurrentProcessId(), pid_buf);
+  #endif
 
+  #if TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__linux__)
   // Set-up the environment array
-  pid_t child;
   const char *env[BACKTRACE_MAX_ENV_VARS + 1];
 
   const char *ptr = swiftBacktraceEnv;
@@ -1295,18 +1482,20 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   };
   env[nEnv] = 0;
 
+  pid_t child;
+
   // SUSv3 says argv and envp are "completely constant" and that the reason
   // posix_spawn() et al use char * const * is for compatibility.
-#ifdef __linux__
+  #ifdef __linux__
   int ret = safe_spawn(&child, swiftBacktracePath, memserver_fd,
                        const_cast<char * const *>(backtracer_argv),
                        const_cast<char * const *>(env));
-#else
+  #else
   int ret = posix_spawn(&child, swiftBacktracePath,
                         nullptr, nullptr,
                         const_cast<char * const *>(backtracer_argv),
                         const_cast<char * const *>(env));
-#endif
+  #endif
   if (ret < 0)
     return false;
 
@@ -1321,36 +1510,166 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   return false;
 
-  // ###TODO: Windows
+  #elif defined(_WIN32)
+  HANDLE hOutput;
+  if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
+    hOutput = GetStdHandle(STD_ERROR_HANDLE);
+  else
+    hOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+
+  // Windows actually uses a flat command line string with some rather
+  // odd parsing rules.
+  if (!flattenCommandLine(cmdline_buf, sizeof(cmdline_buf),
+                          backtracer_argv)) {
+    const char *message = "Flatten failed\n\n";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
+    return false;
+  }
+
+  // Convert the flat command line to wide characters
+  int len = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                  cmdline_buf, -1,
+                                  cmdline_wbuf,
+                                  sizeof(cmdline_wbuf) / sizeof(WCHAR));
+  if (!len) {
+    const char *message = "MBTWCS failed\n\n";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
+    return false;
+  }
+
+  PROCESS_INFORMATION processInfo;
+  STARTUPINFOW startupInfo;
+
+  memset(&processInfo, 0, sizeof(processInfo));
+  memset(&startupInfo, 0, sizeof(startupInfo));
+  startupInfo.cb = sizeof(startupInfo);
+
+  // Create the backtracer process
+  BOOL bRet = CreateProcessW(swiftBacktracePath,
+                             cmdline_wbuf,
+                             NULL,
+                             NULL,
+                             FALSE,
+                             0,
+                             swiftBacktraceEnv,
+                             NULL,
+                             &startupInfo,
+                             &processInfo);
+  if (!bRet) {
+    const char *message = "CreateProcess failed\n\n";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
+    WriteFile(hOutput, swiftBacktracePath, wcslen(swiftBacktracePath) * 2, NULL, NULL);
+    WriteFile(hOutput, "\n", 1, NULL, NULL);
+    WriteFile(hOutput, cmdline_wbuf, wcslen(cmdline_wbuf) * 2, NULL, NULL);
+    WriteFile(hOutput, "\n", 1, NULL, NULL);
+    DebugBreak();
+    return false;
+  }
+
+  CloseHandle(processInfo.hThread);
+
+  // Wait for the process to terminate
+  DWORD dwRet = WaitForSingleObject(processInfo.hProcess, INFINITE);
+
+  if (dwRet != WAIT_OBJECT_0) {
+    const char *message = "dwRet != WAIT_OBJECT_0\n\n";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
+    CloseHandle(processInfo.hProcess);
+    return false;
+  }
+
+  // Return based on the process exit code
+  DWORD dwExitCode;
+  if (!GetExitCodeProcess(processInfo.hProcess, &dwExitCode)) {
+    const char *message = "Can't get exit code\n\n";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
+    CloseHandle(processInfo.hProcess);
+    return false;
+  }
+
+  CloseHandle(processInfo.hProcess);
+  return dwExitCode == 0;
+  #endif
 #endif
 }
 
 // N.B. THIS FUNCTION MUST BE SAFE TO USE FROM A CRASH HANDLER.  On Linux
 // and macOS, that means it must be async-signal-safe.  On Windows, there
 // isn't an equivalent notion but a similar restriction applies.
-SWIFT_RUNTIME_STDLIB_INTERNAL void
-_swift_displayCrashMessage(int signum, const void *pc)
-{
-#if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
-  return;
+
+#if SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
+#ifdef _WIN32
+static sys_fd_t getOutputHandle() {
+  HANDLE hOutput;
+
+  if (_swift_backtraceSettings.outputTo == OutputTo::Stdout)
+    hOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+  else
+    hOutput = GetStdHandle(STD_ERROR_HANDLE);
+
+  return hOutput;
+}
+
+static void sys_print(sys_fd_t fd, const char *str) {
+  WriteFile(fd, str, strlen(str), NULL, NULL);
+}
 #else
+static sys_fd_t getOutputHandle() {
   int fd = STDERR_FILENO;
 
   if (_swift_backtraceSettings.outputTo == OutputTo::Stdout)
     fd = STDOUT_FILENO;
 
+  return fd;
+}
+
+static void sys_print(sys_fd_t fd, const char *str) {
+  write(fd, str, strlen(str));
+}
+#endif
+#endif // SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
+
+SWIFT_RUNTIME_STDLIB_INTERNAL void
+_swift_displayCrashMessage(
+  sys_signal_t signum,
+  const void *pc
+) {
+#if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
+  return;
+#else
+  sys_fd_t fd = getOutputHandle();
+
+  if (_swift_backtraceSettings.inBacktracer) {
+    const char *in_backtracer;
+    if (_swift_backtraceSettings.color == OnOffTty::On) {
+      in_backtracer = " failed\n\n"
+        "\U0001F4A3\U0001F4A3 \033[91mBacktracer crashed during backtracing;"
+        " attempting to backtrace backtracer:\033[0m\n";
+    } else {
+      in_backtracer = " failed ***\n\n"
+        "*** Backtracer crashed during backtracing;"
+        " attempting to backtrace backtracer: ***\n";
+    }
+    sys_print(fd, in_backtracer);
+  }
+
   const char *intro;
   if (_swift_backtraceSettings.color == OnOffTty::On) {
-    intro = "\n💣 \033[91mProgram crashed: ";
+    intro = "\n\U0001F4A3 \033[91mProgram crashed: ";
   } else {
     intro = "\n*** ";
   }
-  write(fd, intro, strlen(intro));
+  sys_print(fd, intro);
 
   char sigbuf[30];
+#ifdef _WIN32
+  strcpy(sigbuf, "Exception ");
+  _swift_formatHexDWORD(signum, sigbuf + 10);
+#else
   strcpy(sigbuf, "Signal ");
   _swift_formatUnsigned((unsigned)signum, sigbuf + 7);
-  write(fd, sigbuf, strlen(sigbuf));
+#endif
+  sys_print(fd, sigbuf);
 
   const char *message;
   if (!pc) {
@@ -1358,12 +1677,12 @@ _swift_displayCrashMessage(int signum, const void *pc)
   } else {
     message = ": Backtracing from 0x";
   }
-  write(fd, message, strlen(message));
+  sys_print(fd, message);
 
   if (pc) {
     char pcbuf[18];
     _swift_formatAddress(pc, pcbuf);
-    write(fd, pcbuf, strlen(pcbuf));
+    sys_print(fd, pcbuf);
   }
 
   const char *outro;
@@ -1372,7 +1691,7 @@ _swift_displayCrashMessage(int signum, const void *pc)
   } else {
     outro = "...";
   }
-  write(fd, outro, strlen(outro));
+  sys_print(fd, outro);
 #endif
 }
 

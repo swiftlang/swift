@@ -5,8 +5,8 @@
 // Demangling is disabled for now because older macOS can't demangle async
 // function names.  We test demangling elsewhere, so this is no big deal.
 
-// RUN: (env SWIFT_BACKTRACE=enable=yes,demangle=no,cache=no %target-run %t/CrashAsync 2>&1 || true) | %FileCheck %s
-// RUN: (env SWIFT_BACKTRACE=preset=friendly,enable=yes,demangle=no,cache=no %target-run %t/CrashAsync 2>&1 || true) | %FileCheck %s --check-prefix FRIENDLY
+// RUN: not --crash env SWIFT_BACKTRACE=enable=yes,demangle=no,cache=no %target-run %t/CrashAsync 2>&1 | %FileCheck %s
+// RUN: not --crash env SWIFT_BACKTRACE=preset=friendly,enable=yes,demangle=no,cache=no %target-run %t/CrashAsync 2>&1 | %FileCheck %s --check-prefix FRIENDLY
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

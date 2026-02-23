@@ -18,6 +18,7 @@
 #include "swift/IDE/SelectedOverloadInfo.h"
 #include "swift/IDE/SignatureHelp.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "swift/Sema/IDETypeChecking.h"
 
 using namespace swift;

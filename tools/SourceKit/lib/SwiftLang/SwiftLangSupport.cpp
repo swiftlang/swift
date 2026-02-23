@@ -259,7 +259,8 @@ class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
       return nullptr;
 
     auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
-        new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem()));
+        new llvm::vfs::OverlayFileSystem(
+            llvm::vfs::createPhysicalFileSystem()));
     OverlayFS->pushOverlay(std::move(InMemoryFS));
     return OverlayFS;
   }
@@ -1049,7 +1050,7 @@ SwiftLangSupport::getFileSystem(const std::optional<VFSOptions> &vfsOptions,
   }
 
   // Fallback to the real filesystem.
-  return llvm::vfs::getRealFileSystem();
+  return llvm::vfs::createPhysicalFileSystem();
 }
 
 void SwiftLangSupport::performWithParamsToCompletionLikeOperation(

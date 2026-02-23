@@ -5,6 +5,10 @@ target_compile_options(libstdcxx INTERFACE
 target_include_directories(libstdcxx INTERFACE
   $<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>>)
 
+# FIXME: Why is this not implicitly in the interface flags?
+target_include_directories(libstdcxx INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
+
 install(TARGETS libstdcxx
   EXPORT SwiftCxxOverlayTargets
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"

@@ -424,6 +424,7 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
 
   switch (target.getOS()) {
   case llvm::Triple::XROS:
+  case llvm::Triple::Firmware:
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:

@@ -481,3 +481,20 @@ struct TestNestedRequirementInference<T> {
     foo((x, s)) // expected-error {{instance method 'foo' requires the types 'T' and 'S.A' (aka 'Float') be equivalent}}
   }
 }
+
+//
+// Nested self-referential generic typealiases
+// (similar to a pattern used for `Task.Handle` backwards compatibility)
+//
+
+extension X where T == Never, U == Never {
+  typealias SelfRef1 = X
+  typealias SelfRef2 = generic.X
+  typealias SelfRef3 = generic::X
+}
+
+func testSelfRefs(
+  _: X.SelfRef1<Int, Int>, // expected-error {{cannot specialize non-generic type 'X<Never, Never>'}}
+  _: X.SelfRef2<Int, Int>, // no-error
+  _: X.SelfRef3<Int, Int> // no-error
+) {}

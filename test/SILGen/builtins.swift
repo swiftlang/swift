@@ -979,3 +979,17 @@ func testTaskLocalValuePush<Value>(_ key: Builtin.RawPointer, _ value: consuming
 func testTaskLocalValuePop() async {
   Builtin.taskLocalValuePop()
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins26taskCancellationShieldPushyyYaF : $@convention(thin) @async () -> () {
+// CHECK:   builtin "taskCancellationShieldPush"() : $Builtin.Int1
+// CHECK: } // end sil function '$s8builtins26taskCancellationShieldPushyyYaF'
+func taskCancellationShieldPush() async {
+  Builtin.taskCancellationShieldPush()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins25taskCancellationShieldPopyyYaF : $@convention(thin) @async () -> () {
+// CHECK:   builtin "taskCancellationShieldPop"() : $()
+// CHECK: } // end sil function '$s8builtins25taskCancellationShieldPopyyYaF'
+func taskCancellationShieldPop() async {
+  Builtin.taskCancellationShieldPop()
+}

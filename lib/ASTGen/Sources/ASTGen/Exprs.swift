@@ -564,8 +564,7 @@ extension ASTGenVisitor {
     let loc = self.generateSourceLoc(token)
 
     guard self.declContext.isClosureExpr else {
-      // TODO: Diagnose dollar identifier not in ClosureExpr
-      fatalError("dollar identifier not in ClosureExpr")
+      return self.createUnresolvedDeclRefExpr(token: token, kind: .ordinary).asExpr
     }
 
     guard let idx = parseDollarIdentifierIndex(text: token.rawText) else {

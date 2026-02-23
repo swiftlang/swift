@@ -1261,3 +1261,13 @@ SILValue SILGenBuilder::convertToImplicitActor(SILLocation loc,
     value = SGF.emitManagedBeginBorrow(loc, value).getValue();
   return createUncheckedValueCast(loc, value, type);
 }
+
+ManagedValue SILGenBuilder::createUncheckedOwnership(SILLocation loc,
+                                                     ManagedValue base) {
+  if (SGF.getTypeProperties(base.getType()).isTrivial()) {
+    return ManagedValue::forBorrowedRValue(base.getValue());
+  }
+
+  return ManagedValue::forBorrowedRValue(
+      createUncheckedOwnership(loc, base.getValue()));
+}

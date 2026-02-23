@@ -656,9 +656,6 @@ swift::classifyDynamicCast(SILFunction *function,
   // Function casts.
   if (auto sourceFunction = dyn_cast<FunctionType>(source)) {
     if (auto targetFunction = dyn_cast<FunctionType>(target)) {
-      // Note that this logic must be aligned with with tryCastToFunction() in
-      // stdlib/public/runtime/DynamicCast.cpp
-
       // A function cast can succeed if the function types can be identical,
       // or if the target type is throwier than the original.
 
@@ -677,10 +674,10 @@ swift::classifyDynamicCast(SILFunction *function,
             != sourceFunction->getRepresentation())
         return DynamicCastFeasibility::WillFail;
 
-      if (!AnyFunctionType::equalParams(sourceFunction.getParams(),
-                                        targetFunction.getParams()) &&
+      if (AnyFunctionType::equalParams(sourceFunction.getParams(),
+                                       targetFunction.getParams()) &&
           sourceFunction.getResult() == targetFunction.getResult())
-        return DynamicCastFeasibility::WillFail;
+        return DynamicCastFeasibility::WillSucceed;
 
       // Be conservative about function type relationships we may add in
       // the future.

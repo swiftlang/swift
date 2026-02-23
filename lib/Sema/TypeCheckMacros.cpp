@@ -285,7 +285,7 @@ initializePlugin(ASTContext &ctx, CompilerPlugin *plugin, StringRef libraryPath,
 #if SWIFT_BUILD_SWIFT_SYNTAX
     llvm::SmallString<128> resolvedLibraryPath;
     auto fs = ctx.CASOpts.HasImmutableFileSystem
-                  ? llvm::vfs::getRealFileSystem()
+                  ? llvm::vfs::createPhysicalFileSystem()
                   : ctx.SourceMgr.getFileSystem();
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
       return llvm::createStringError(err, err.message());
@@ -700,7 +700,7 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
       auto *var = dyn_cast<VarDecl>(attachedTo);
       if (var && var->isLet()) {
         ctx.Diags.diagnose(var->getLoc(), diag::let_accessor_expansion)
-            .warnUntilLanguageMode(6);
+            .warnUntilLanguageMode(LanguageMode::v6);
       }
 
       continue;

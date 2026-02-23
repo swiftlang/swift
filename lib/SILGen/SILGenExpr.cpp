@@ -406,12 +406,22 @@ ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
 
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
                                   std::optional<SILLocation> L) {
+  SILLocation loc = L ? *L : E;
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope writeback(*this);
     auto lv = emitLValue(load->getSubExpr(),
                          SGFAccessKind::BorrowedAddressRead);
-    emitCopyLValueInto(L ? *L : E, std::move(lv), I);
+    emitCopyLValueInto(loc, std::move(lv), I);
+    return;
+  }
+
+  if (I->isBorrow()) {
+    FormalEvaluationScope writeback(*this);
+    auto lv = emitLValue(E, SGFAccessKind::BorrowedObjectRead);
+    ManagedValue MV = emitBorrowedLValue(E, std::move(lv));
+    I->copyOrInitValueInto(*this, loc, std::move(MV), /*isInit*/ true);
+    std::move(writeback).deferPop();
     return;
   }
 
@@ -419,7 +429,7 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
   RValue result = emitRValue(E, SGFContext(I));
   if (result.isInContext())
     return;
-  std::move(result).ensurePlusOne(*this, E).forwardInto(*this, L ? *L : E, I);
+  std::move(result).ensurePlusOne(*this, E).forwardInto(*this, loc, I);
 }
 
 namespace {
@@ -474,9 +484,9 @@ namespace {
     RValue visitDerivedToBaseExpr(DerivedToBaseExpr *E, SGFContext C);
     RValue visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                        SGFContext C);
-    RValue
-    visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
-                                        SGFContext C);
+    RValue visitCollectionUpcastConversionExpr(
+             CollectionUpcastConversionExpr *E,
+             SGFContext C);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
     RValue visitPackExpansionExpr(PackExpansionExpr *E, SGFContext C);
     RValue visitPackElementExpr(PackElementExpr *E, SGFContext C);
@@ -1300,8 +1310,9 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   // FIXME: Much of this was copied from visitOptionalEvaluationExpr.
 
   // Prior to Swift 5, an optional try's subexpression is always wrapped in an additional optional
-  bool shouldWrapInOptional = !(SGF.getASTContext().isLanguageModeAtLeast(5));
-  
+  bool shouldWrapInOptional =
+      !(SGF.getASTContext().isLanguageModeAtLeast(LanguageMode::v5));
+
   auto &optTL = SGF.getTypeLowering(E->getType());
 
   Initialization *optInit = C.getEmitInto();
@@ -1533,10 +1544,12 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
   return RValue(SGF, E, ManagedValue::forObjectRValueWithoutOwnership(upcast));
 }
 
-RValue SILGenFunction::emitCollectionConversion(
-    SILLocation loc, FuncDecl *fn, CanType fromCollection, CanType toCollection,
-    ManagedValue mv, ClosureExpr *keyConversion, ClosureExpr *valueConversion,
-    SGFContext C) {
+RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
+                                                FuncDecl *fn,
+                                                CanType fromCollection,
+                                                CanType toCollection,
+                                                ManagedValue mv,
+                                                SGFContext C) {
   SmallVector<Type, 4> replacementTypes;
 
   auto fromArgs = cast<BoundGenericType>(fromCollection)->getGenericArgs();
@@ -1551,98 +1564,7 @@ RValue SILGenFunction::emitCollectionConversion(
   auto subMap =
     SubstitutionMap::get(genericSig, replacementTypes,
                          LookUpConformanceInModule());
-
-  SmallVector<ManagedValue, 3> args = { mv };
-  unsigned argIndex = 1;
-  for (ClosureExpr *closure : {keyConversion, valueConversion}) {
-    if (!closure) {
-      continue;
-    }
-
-    CanType origParamType = fn->getParameters()
-                                ->get(argIndex)
-                                ->getInterfaceType()
-                                ->getCanonicalType();
-    CanType substParamType = origParamType.subst(subMap)->getCanonicalType();
-
-    // Ensure that the closure has the appropriate type.
-    AbstractionPattern origParam(
-        fn->getGenericSignature().getCanonicalSignature(), origParamType);
-
-    auto paramConversion = Conversion::getSubstToOrig(
-        origParam, substParamType, getLoweredType(closure->getType()),
-        getLoweredType(origParam, substParamType));
-
-    auto value = emitConvertedRValue(closure, paramConversion);
-    args.push_back(value);
-    argIndex++;
-  }
-
-  return emitApplyOfLibraryIntrinsic(loc, fn, subMap, args, C);
-}
-
-static bool needsCustomConversion(ClosureExpr *closure) {
-  assert(closure);
-
-  Expr *body = closure->getSingleExpressionBody();
-  assert(body);
-
-  ParameterList const *params = closure->getParameters();
-  assert(params->size() == 1);
-  const ParamDecl *param = params->get(0);
-
-  auto isOrigValue = [=](Expr *E) -> bool {
-    if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
-      return DRE->getDecl() == param;
-    }
-    return false;
-  };
-
-  if (isOrigValue(body)) {
-    return false;
-  }
-
-  if (auto conv = dyn_cast<ImplicitConversionExpr>(body)) {
-    if (isa<ForeignObjectConversionExpr>(conv)) {
-      if (auto B2O = dyn_cast<BridgeToObjCExpr>(conv->getSubExpr())) {
-        conv = B2O;
-      }
-    }
-    if (isOrigValue(conv->getSubExpr())) {
-      switch (conv->getKind()) {
-        case ExprKind::Erasure:
-        case ExprKind::DerivedToBase:
-        case ExprKind::ArchetypeToSuper:
-        case ExprKind::AnyHashableErasure:
-        case ExprKind::MetatypeConversion:
-        case ExprKind::BridgeFromObjC:
-        case ExprKind::BridgeToObjC:
-        case ExprKind::InjectIntoOptional:
-          return false;
-        case ExprKind::FunctionConversion:
-          return true;
-        case ExprKind::CollectionUpcastConversion: {
-          auto upcast = cast<CollectionUpcastConversionExpr>(conv);
-          if (upcast->getKeyConversion() && needsCustomConversion(upcast->getKeyConversion())) {
-            return true;
-          }
-          return needsCustomConversion(upcast->getValueConversion());
-        }
-        case ExprKind::DestructureTuple: {
-          return false;
-        }
-        default: {
-          llvm_unreachable("unsupported collection element conversion");
-        }
-      }
-    }
-  }
-  if (auto OE = dyn_cast<OpenExistentialExpr>(body)) {
-    if (isOrigValue(OE->getExistentialValue())) {
-      return false;
-    }
-  }
-  return true;
+  return emitApplyOfLibraryIntrinsic(loc, fn, subMap, {mv}, C);
 }
 
 RValue RValueEmitter::
@@ -1660,37 +1582,18 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
 
   // Get the intrinsic function.
   FuncDecl *fn = nullptr;
-  ClosureExpr *keyConversion = nullptr;
-  ClosureExpr *valueConversion = nullptr;
   if (fromCollection->isArray()) {
-    if (needsCustomConversion(E->getValueConversion())) {
-      fn = SGF.SGM.getArrayWitnessCast(loc);
-      valueConversion = E->getValueConversion();
-    } else {
-      fn = SGF.SGM.getArrayForceCast(loc);
-    }
+    fn = SGF.SGM.getArrayForceCast(loc);
   } else if (fromCollection->isDictionary()) {
-    if (needsCustomConversion(E->getKeyConversion()) ||
-        needsCustomConversion(E->getValueConversion())) {
-      fn = SGF.SGM.getDictionaryWitnessCast(loc);
-      keyConversion = E->getKeyConversion();
-      valueConversion = E->getValueConversion();
-    } else {
-      fn = SGF.SGM.getDictionaryUpCast(loc);
-    }
+    fn = SGF.SGM.getDictionaryUpCast(loc);
   } else if (fromCollection->isSet()) {
-    if (needsCustomConversion(E->getValueConversion())) {
-      fn = SGF.SGM.getSetWitnessCast(loc);
-      valueConversion = E->getValueConversion();
-    } else {
-      fn = SGF.SGM.getSetUpCast(loc);
-    }
+    fn = SGF.SGM.getSetUpCast(loc);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
 
-  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection, mv,
-                                      keyConversion, valueConversion, C);
+  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection,
+                                      mv, C);
 }
 
 RValue

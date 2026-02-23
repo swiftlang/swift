@@ -433,7 +433,13 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
   return true;
 }
 
-// TODO: refactor this with SSAPrunedLiveness::computeLiveness.
+// TODO: Replace all calls to this with SSAPrunedLiveness::computeLiveness()
+// after extending that utility to handle unowned values and extending
+// PrunedLiveRange::recursivelyUpdateForDef to handle
+// OperandOwnership::ForwardingUnowned.
+//
+// findPointerEscape normally considers unowned values to be an escape, but the
+// RAUW utility relies on them being handled here.
 bool swift::findUsesOfSimpleValue(SILValue value,
                                   SmallVectorImpl<Operand *> *usePoints) {
   for (auto *use : value->getUses()) {
@@ -451,8 +457,17 @@ bool swift::findUsesOfSimpleValue(SILValue value,
         return false;
       }
       break;
-    case OperandOwnership::ForwardingUnowned:
+    case OperandOwnership::ForwardingUnowned: {
+      auto *forwardInst = dyn_cast<SingleValueInstruction>(use->getUser());
+      if (forwardInst) {
+        // only handle a single use so we don't need a visited set.
+        auto *use = forwardInst->getSingleUse();
+        if (use && use->get()->getOwnershipKind() == OwnershipKind::Unowned) {
+          return findUsesOfSimpleValue(forwardInst, usePoints);
+        }
+      }
       return false;
+    }
     default:
       break;
     }

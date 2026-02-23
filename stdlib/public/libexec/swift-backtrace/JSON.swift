@@ -53,7 +53,7 @@ extension CrashLog.Thread {
 extension SwiftBacktrace {
   static func captureCrashLog(
     imageMap: ImageMap,
-    backtraceDuration: timespec) -> CrashLog<HostContext.Address>? {
+    backtraceDuration: Duration) -> CrashLog<HostContext.Address>? {
 
     guard let target = target else {
       print("swift-backtrace: unable to get target",
@@ -84,12 +84,11 @@ extension SwiftBacktrace {
         CrashLog<HostContext.Address>.Image(fromImageMapImage: $0)
       }
 
-    let backtraceTime = Double(backtraceDuration.tv_sec)
-        + 1.0e-9 * Double(backtraceDuration.tv_nsec)
+    let backtraceTime = Double(duration: backtraceDuration)
 
     let crashLogCapture =
       CrashLogCapture<HostContext.GPRValue>(memoryReader: target.reader)
-    
+
     let threads = target.threads.map {
       var thread = CrashLog<HostContext.Address>.Thread(
         backtraceThread: $0,
@@ -103,7 +102,7 @@ extension SwiftBacktrace {
     }
 
     return CrashLog<HostContext.Address>(
-      timestamp: formatISO8601(now),
+      timestamp: now.iso8601,
       kind: "crashReport",
       description: description,
       faultAddress: hex(target.faultAddress),

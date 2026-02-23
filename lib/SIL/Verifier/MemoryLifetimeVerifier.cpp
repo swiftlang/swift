@@ -335,16 +335,16 @@ bool MemoryLifetimeVerifier::applyMayRead(Operand *argOp, SILValue addr) {
     return false;
   }
 
+  if (!addr)
+    return false;
+
   for (SILFunction *callee : callees) {
-    if (addr) {
-      if (callee->argumentMayRead(argOp, addr))
-        return true;
-    } else {
-      // We don't know which unknown sub-fields the argument effects refer to.
-      // Only if there are no argument effects at all, we know that the function
-      // may read from an unknown sub-field.
-      if (!callee->hasArgumentEffects())
-        return true;
+    // If the callee has no side-effects computed, yet, ignore it.
+    // This can happen if a store to an unused inout has been eliminated at a call site
+    // and afterwards the callee is specialized and therefore doesn't have the required
+    // side-effects computed, yet.
+    if (callee->hasArgumentEffects() && callee->argumentMayRead(argOp, addr)) {
+      return true;
     }
   }
   return false;
@@ -719,6 +719,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
             break;
           case StoreOwnershipQualifier::Assign:
             requireBitsSet(bits | ~nonTrivialLocations, SI->getDest(), &I);
+            locations.setBits(bits, SI->getDest());
             break;
           case StoreOwnershipQualifier::Trivial:
             locations.setBits(bits, SI->getDest());

@@ -1239,6 +1239,7 @@ bool ElementUseCollector::addClosureElementUses(PartialApplyInst *pai,
       case DIUseKind::Load:
       case DIUseKind::Escape:
       case DIUseKind::InOutArgument:
+      case DIUseKind::InOutSelfArgument:
         break;
       default:
         return false;

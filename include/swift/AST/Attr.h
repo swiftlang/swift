@@ -4274,6 +4274,17 @@ public:
 
   SWIFT_DEBUG_DUMPER(dump());
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;
+
+  /// Returns true if multiple instances of an attribute kind
+  /// can appear on a type.
+  static constexpr bool allowMultipleAttributes(TypeAttrKind TK) {
+    switch (TK) {
+    case swift::TypeAttrKind::Lifetime:
+      return true;
+    default:
+      return false;
+    }
+  }
 };
 
 class AtTypeAttrBase : public TypeAttribute {
@@ -4379,6 +4390,19 @@ public:
   SourceLoc getDifferentiabilityLoc() const {
     return DifferentiabilityLoc;
   }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+class LifetimeTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Lifetime> {
+  LifetimeEntry *entry;
+
+public:
+  LifetimeTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
+                   LifetimeEntry *entry)
+      : SimpleTypeAttr(atLoc, kwLoc, parens), entry(entry) {}
+
+  LifetimeEntry *getLifetimeEntry() const { return entry; }
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };

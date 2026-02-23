@@ -1609,6 +1609,7 @@ SILFunction *SwiftPassInvocation::lookupStdlibFunction(StringRef name) {
 }
 
 void SwiftPassInvocation::initializeSSAUpdater(SILFunction *function, SILType type, ValueOwnershipKind ownership) {
+  insertedPhisBySSAUpdater.clear();
   if (!ssaUpdater)
     ssaUpdater = new SILSSAUpdater(&insertedPhisBySSAUpdater);
   ssaUpdater->initialize(function, type, ownership);

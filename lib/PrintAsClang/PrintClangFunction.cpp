@@ -21,6 +21,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -290,7 +291,12 @@ public:
   visitExistentialType(ExistentialType *ty,
                        std::optional<OptionalTypeKind> optionalKind,
                        bool isInOutParam) {
-    if (ty->isObjCExistentialType()) {
+    bool hasSwiftSuperClass = false;
+    if (auto superClass = ty->getExistentialLayout().getSuperclass()) {
+      auto *CD = superClass->getClassOrBoundGenericClass();
+      hasSwiftSuperClass = !CD->isObjC();
+    }
+    if (ty->isObjCExistentialType() && !hasSwiftSuperClass) {
       declPrinter.withOutputStream(os).print(ty, optionalKind);
       if (isInOutParam) {
         os << " __strong";

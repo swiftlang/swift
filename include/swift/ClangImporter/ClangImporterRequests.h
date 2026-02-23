@@ -17,12 +17,14 @@
 #define SWIFT_CLANG_IMPORTER_REQUESTS_H
 
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/Hashing.h"
@@ -423,8 +425,10 @@ private:
 
 struct SafeUseOfCxxDeclDescriptor final {
   const clang::Decl *decl;
+  ASTContext& ctx;
 
-  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl) : decl(decl) {}
+  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl, ASTContext &ctx)
+      : decl(decl), ctx(ctx) {}
 
   friend llvm::hash_code hash_value(const SafeUseOfCxxDeclDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
@@ -659,6 +663,54 @@ private:
   // Evaluation.
   ExplicitSafety evaluate(Evaluator &evaluator,
                           ClangDeclExplicitSafetyDescriptor desc) const;
+};
+
+struct ClangRefCountedSmartPointerDescriptor final {
+  NominalTypeDecl *smartPtr;
+
+  ClangRefCountedSmartPointerDescriptor(NominalTypeDecl *smartPtr)
+      : smartPtr(smartPtr) {}
+
+  friend llvm::hash_code
+  hash_value(const ClangRefCountedSmartPointerDescriptor &desc) {
+    return llvm::hash_combine(desc.smartPtr);
+  }
+
+  friend bool operator==(const ClangRefCountedSmartPointerDescriptor &lhs,
+                         const ClangRefCountedSmartPointerDescriptor &rhs) {
+    return lhs.smartPtr == rhs.smartPtr;
+  }
+
+  friend bool operator!=(const ClangRefCountedSmartPointerDescriptor &lhs,
+                         const ClangRefCountedSmartPointerDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    ClangRefCountedSmartPointerDescriptor desc);
+SourceLoc extractNearestSourceLoc(ClangRefCountedSmartPointerDescriptor desc);
+
+/// Determine the safety of the given Clang declaration.
+class ClangRefCountedSmartPointer
+    : public SimpleRequest<ClangRefCountedSmartPointer,
+                           importer::RefCountedPtrRequestResult(
+                               ClangRefCountedSmartPointerDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+  bool isCached() const { return true; }
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  importer::RefCountedPtrRequestResult
+  evaluate(Evaluator &evaluator,
+           ClangRefCountedSmartPointerDescriptor desc) const;
 };
 
 #define SWIFT_TYPEID_ZONE ClangImporter

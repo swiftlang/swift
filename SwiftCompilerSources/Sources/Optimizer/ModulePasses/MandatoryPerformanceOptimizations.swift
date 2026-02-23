@@ -161,29 +161,15 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
           worklist.addWitnessMethods(of: conformance, moduleContext)
 
         default:
-          if !devirtualizeDeinits(of: bi, simplifyCtxt) {
-            // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
-            if moduleContext.enableWMORequiredDiagnostics {
-              context.diagnosticEngine.diagnose(.deinit_not_visible, at: bi.location)
-            }
-          }
+          _ = devirtualizeDeinits(of: bi, isMandatory: true, simplifyCtxt)
         }
 
       // We need to de-virtualize deinits of non-copyable types to be able to specialize the deinitializers.
       case let destroyValue as DestroyValueInst:
-        if !devirtualizeDeinits(of: destroyValue, simplifyCtxt) {
-          // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
-          if moduleContext.enableWMORequiredDiagnostics {
-            context.diagnosticEngine.diagnose(.deinit_not_visible, at: destroyValue.location)
-          }
-        }
+        _ = devirtualizeDeinits(of: destroyValue, isMandatory: true, simplifyCtxt)
+
       case let destroyAddr as DestroyAddrInst:
-        if !devirtualizeDeinits(of: destroyAddr, simplifyCtxt) {
-          // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
-          if moduleContext.enableWMORequiredDiagnostics {
-            context.diagnosticEngine.diagnose(.deinit_not_visible, at: destroyAddr.location)
-          }
-        }
+        _ = devirtualizeDeinits(of: destroyAddr, isMandatory: true, simplifyCtxt)
 
       case let iem as InitExistentialMetatypeInst:
         if iem.uses.ignoreDebugUses.isEmpty {
@@ -232,6 +218,16 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
     // Cleanup leftovers from simplification. The InitializeStaticGlobals pass cannot deal with dead
     // stores in global init functions.
     eliminateDeadStores(in: function, context)
+  }
+
+  // This cleanup is already done in `runSimplification`. However, `specializeApplies`, which runs
+  // afterwards, can create unreachable blocks and incomplete lifetimes, again.
+  _ = context.removeDeadBlocks(in: function)
+  if context.needBreakInfiniteLoops {
+    breakInfiniteLoops(in: function, context)
+  }
+  if context.needCompleteLifetimes {
+    completeLifetimes(in: function, context)
   }
 }
 

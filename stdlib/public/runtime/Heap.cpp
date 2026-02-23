@@ -83,6 +83,10 @@ static size_t computeAlignment(size_t alignMask) {
 //   The runtime may use either malloc or AlignedAlloc, and the standard library
 //   must deallocate using an identical alignment.
 void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
+  if (SWIFT_UNLIKELY(size == 0)) {
+    return swift_slowAlloc(1, alignMask);
+  }
+
   void *p;
   // This check also forces "default" alignment to use AlignedAlloc.
   if (alignMask <= MALLOC_ALIGN_MASK) {
@@ -91,12 +95,18 @@ void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
     size_t alignment = computeAlignment(alignMask);
     p = AlignedAlloc(size, alignment);
   }
-  if (!p) swift::swift_abortAllocationFailure(size, alignMask);
+  if (SWIFT_UNLIKELY(!p)) {
+    swift::swift_abortAllocationFailure(size, alignMask);
+  }
   return p;
 }
 
 void *swift::swift_slowAllocTyped(size_t size, size_t alignMask,
                                   MallocTypeId typeId) {
+  if (SWIFT_UNLIKELY(size == 0)) {
+    return swift_slowAllocTyped(1, alignMask, typeId);
+  }
+
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
   if (__builtin_available(macOS 15, iOS 17, tvOS 17, watchOS 10, *)) {
     void *p;
@@ -113,7 +123,9 @@ void *swift::swift_slowAllocTyped(size_t size, size_t alignMask,
       if (err != 0)
         p = nullptr;
     }
-    if (!p) swift::swift_abortAllocationFailure(size, alignMask);
+    if (SWIFT_UNLIKELY(!p)) {
+      swift::swift_abortAllocationFailure(size, alignMask);
+    }
     return p;
   }
 #endif
@@ -122,10 +134,16 @@ void *swift::swift_slowAllocTyped(size_t size, size_t alignMask,
 
 void *swift::swift_coroFrameAlloc(size_t size,
                                   MallocTypeId typeId) {
+  if (SWIFT_UNLIKELY(size == 0)) {
+    return swift_coroFrameAlloc(1, typeId);
+  }
+
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
   if (__builtin_available(macOS 15, iOS 17, tvOS 17, watchOS 10, *)) {
     void *p = malloc_type_malloc(size, typeId);
-    if (!p) swift::swift_abortAllocationFailure(size, 0);
+    if (SWIFT_UNLIKELY(!p)) {
+      swift::swift_abortAllocationFailure(size, 0);
+    }
     return p;
   }
 #endif

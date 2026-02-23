@@ -204,6 +204,10 @@ public:
   /// Imports a clang decl directly, rather than looking up its name.
   virtual Decl *importDeclDirectly(const clang::NamedDecl *decl) = 0;
 
+  /// Returns a decl that was imported earlier or null if it was not found in
+  /// the cache.
+  virtual Decl *lookupImportedDecl(const clang::NamedDecl *decl) = 0;
+
   /// Clones an imported \param decl from its base class to its derived class
   /// \param newContext where it is inherited. Its access level is determined
   /// with respect to \param inheritance, which signifies whether \param decl

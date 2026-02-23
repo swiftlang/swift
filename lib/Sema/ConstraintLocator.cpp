@@ -109,9 +109,9 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::CoercionOperand:
   case ConstraintLocator::PackExpansionType:
   case ConstraintLocator::ThrownErrorType:
+  case ConstraintLocator::FunctionSendability:
   case ConstraintLocator::FallbackType:
   case ConstraintLocator::KeyPathSubscriptIndex:
-  case ConstraintLocator::ImplicitForEachCompatMember:
   case ConstraintLocator::ExistentialMemberAccessConversion:
     return 0;
 
@@ -520,12 +520,12 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "thrown error type";
     break;
   }
+  case ConstraintLocator::FunctionSendability: {
+    out << "function sendability";
+    break;
+  }
   case ConstraintLocator::FallbackType: {
     out << "fallback type";
-    break;
-
-  case ConstraintLocator::ImplicitForEachCompatMember:
-    out << "implicit 'for' loop 'makeIterator'/'next' compatibility member";
     break;
 
   case ConstraintLocator::KeyPathSubscriptIndex:

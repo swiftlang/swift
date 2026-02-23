@@ -78,6 +78,7 @@ public:
   void serializeFunctionsInModule(SILPassManager *manager);
   void serializeWitnessTablesInModule();
   void serializeVTablesInModule();
+  void serializeMoveonlyDeinitsInModule();
 
 private:
   bool isReferenceSerializeCandidate(SILFunction *F, SILOptions options);
@@ -473,6 +474,24 @@ void CrossModuleOptimization::serializeVTablesInModule() {
       // serialize the vtable at all.
       if (!containsInternal)
         vt->setSerializedKind(getRightSerializedKind(M));
+    }
+  }
+}
+
+void CrossModuleOptimization::serializeMoveonlyDeinitsInModule() {
+  for (SILMoveOnlyDeinit *deinit : M.getMoveOnlyDeinits()) {
+    if (deinit->isAnySerialized())
+      continue;
+    SILFunction *deinitFunc = deinit->getImplementation();
+    if (!canUseFromInline(deinitFunc))
+      continue;
+
+    if (everything)
+      makeFunctionUsableFromInline(deinitFunc);
+    if (deinitFunc->hasValidLinkageForFragileRef(IsSerialized)) {
+      deinit->setSerializedKind(IsSerialized);
+    } else if (deinitFunc->hasValidLinkageForFragileRef(IsSerializedForPackage)) {
+      deinit->setSerializedKind(IsSerializedForPackage);
     }
   }
 }
@@ -1145,6 +1164,7 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
     // Serialize SIL v-tables and witness-tables if package-cmo is enabled.
     CMO.serializeVTablesInModule();
     CMO.serializeWitnessTablesInModule();
+    CMO.serializeMoveonlyDeinitsInModule();
   }
 };
 

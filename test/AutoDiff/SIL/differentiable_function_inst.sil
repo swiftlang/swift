@@ -20,7 +20,6 @@
 
 // Would need to update for arm64e.
 // UNSUPPORTED: CPU=arm64e
-// UNSUPPORTED: OS=wasip1
 
 sil_stage raw
 

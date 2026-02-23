@@ -1,14 +1,14 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -parse-as-library -Xfrontend -disable-availability-checking -Onone -o %t/ImageMap
-// RUN: %target-codesign %t/ImageMap
-// RUN: %target-run %t/ImageMap | tee %t/ImageMap.out
+// RUN: %target-build-swift %s -parse-as-library -Xfrontend -disable-availability-checking -Onone -o %t/ImageMap.exe
+// RUN: %target-codesign %t/ImageMap.exe
+// RUN: %target-run %t/ImageMap.exe > %t/ImageMap.out
 // RUN: cat %t/ImageMap.out | %FileCheck %s
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 import Runtime
 @_spi(Internal) import Runtime

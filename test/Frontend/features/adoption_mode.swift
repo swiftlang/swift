@@ -51,7 +51,7 @@
 // CHECK-SWIFT-5-NOT: warning:
 
 // CHECK-SWIFT-6-NOT: warning:
-// CHECK-SWIFT-6-COUNT-8: warning: upcoming feature 'DynamicActorIsolation' is already enabled as of Swift version 6{{$}}
+// CHECK-SWIFT-6-COUNT-8: warning: upcoming feature 'DynamicActorIsolation' already enabled as of the Swift 6 language mode{{$}}
 // CHECK-SWIFT-6-NOT: warning:
 
 // CHECK-NOT: error:

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=200
 // REQUIRES: tools-release,no_asan
 
 // TODO(performance): This should be converted in a scale test once performance issue is fixed

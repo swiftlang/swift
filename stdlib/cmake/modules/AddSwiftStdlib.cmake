@@ -1033,8 +1033,9 @@ function(add_swift_target_library_single target name)
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
     DEPLOYMENT_VERSION_XROS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_XROS}")
 
+  set(availability_macros)
   foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
-    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}")
+    list(APPEND availability_macros "-Xfrontend -define-availability -Xfrontend \"${def}\"")
 
     if("${def}" MATCHES "SwiftStdlib .*")
       # For each SwiftStdlib x.y, also define StdlibDeploymentTarget x.y, which,
@@ -1068,9 +1069,23 @@ function(add_swift_target_library_single target name)
         endif()
       endif()
 
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${current}")
+      list(APPEND availability_macros "-Xfrontend -define-availability -Xfrontend \"${current}\"")
     endif()
   endforeach()
+  list(JOIN availability_macros "\n" availability_macros_rsp_txt)
+  string(SHA1 availability_macros_sig "${CMAKE_CURRENT_BINARY_DIR};${availability_macros_rsp_txt}")
+  set(availability_macros_rsp_target "availability-macros-${availability_macros_sig}")
+  set(availability_macros_rsp_path "${CMAKE_CURRENT_BINARY_DIR}/availability-macros-${availability_macros_sig}.rsp")
+  # FIXME: Instead of spreading exact the same response files everywhere with random file names, we could make a centrialized availability macro response file repository.
+  if (NOT TARGET ${availability_macros_rsp_target})
+    file(WRITE "${availability_macros_rsp_path}.tmp" "${availability_macros_rsp_txt}\n")
+    add_custom_command_target(unused_var
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${availability_macros_rsp_path}.tmp" "${availability_macros_rsp_path}"
+      CUSTOM_TARGET_NAME ${availability_macros_rsp_target}
+      OUTPUT "${availability_macros_rsp_path}"
+      DEPENDS "${availability_macros_rsp_path}.tmp")
+  endif()
+  list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "@${availability_macros_rsp_path}")
 
   # Enable -target-min-inlining-version
   list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-target-min-inlining-version" "-Xfrontend" "min")
@@ -1102,6 +1117,7 @@ function(add_swift_target_library_single target name)
         ${SWIFTLIB_SINGLE_DEPENDS}
         ${SWIFTLIB_SINGLE_FILE_DEPENDS}
         ${SWIFTLIB_SINGLE_LINK_LIBRARIES}
+        ${availability_macros_rsp_target}
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
       ARCHITECTURE_SUBDIR_NAME ${SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME}
@@ -1588,19 +1604,19 @@ function(add_swift_target_library_single target name)
     if(NOT CMAKE_C_COMPILER_ID STREQUAL "MSVC")
       swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
       target_compile_options(${target} PRIVATE
-        "SHELL:-Xclang -ivfsoverlay -Xclang ${SWIFTLIB_SINGLE_VFS_OVERLAY}")
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang -ivfsoverlay -Xclang ${SWIFTLIB_SINGLE_VFS_OVERLAY}>")
 
       # MSVC doesn't support -Xclang. We don't need to manually specify
       # the dependent libraries as `cl` does so.
       target_compile_options(${target} PRIVATE
-        "SHELL:-Xclang --dependent-lib=oldnames"
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=oldnames>"
         # TODO(compnerd) handle /MT, /MTd
-        "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>>")
     endif()
   endif()
 
   target_compile_options(${target} PRIVATE
-    ${c_compile_flags})
+    "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${c_compile_flags}>")
   target_link_options(${target} PRIVATE
     ${link_flags})
   if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -1704,7 +1720,7 @@ function(add_swift_target_library_single target name)
 
   if(target_static AND NOT SWIFTLIB_SINGLE_INSTALL_WITH_SHARED)
     target_compile_options(${target_static} PRIVATE
-      ${c_compile_flags})
+      "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${c_compile_flags}>")
 
     # FIXME: The fallback paths here are going to be dynamic libraries.
 
@@ -1765,6 +1781,7 @@ endfunction()
 #     [INSTALL]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
+#     [IS_OSLOG]
 #     [ONLY_SWIFTMODULE]
 #     [NO_SWIFTMODULE]
 #     [INSTALL_WITH_SHARED]
@@ -1875,6 +1892,9 @@ endfunction()
 # IS_STDLIB_CORE
 #   Compile as the Swift standard library core.
 #
+# IS_OSLOG
+#   Treat the library as OSLog library.
+#
 # ONLY_SWIFTMODULE
 #   Do not build either static or shared, build just the .swiftmodule.
 #
@@ -1964,6 +1984,7 @@ function(add_swift_target_library name)
         IS_SDK_OVERLAY
         IS_STDLIB
         IS_STDLIB_CORE
+        IS_OSLOG
         IS_SWIFT_ONLY
         NOSWIFTRT
         ONLY_SWIFTMODULE
@@ -2135,6 +2156,10 @@ function(add_swift_target_library name)
   if (SWIFTLIB_IS_STDLIB)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-lexical-lifetimes=false")
+  endif()
+
+  if (SWIFTLIB_IS_OSLOG)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-assert-config;-Xfrontend;DisableReplacement")
   endif()
 
   if(NOT DEFINED SWIFTLIB_INSTALL_BINARY_SWIFTMODULE)
@@ -2608,13 +2633,17 @@ function(add_swift_target_library name)
       if(sdk STREQUAL "WINDOWS")
         if(SWIFT_COMPILER_IS_MSVC_LIKE)
           if (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreadedDebugDLL)
-            target_compile_options(${VARIANT_NAME} PRIVATE /MDd /D_DLL /D_DEBUG)
+            target_compile_options(${VARIANT_NAME} PRIVATE
+              "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:/MDd /D_DLL /D_DEBUG>")
           elseif (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreadedDebug)
-            target_compile_options(${VARIANT_NAME} PRIVATE /MTd /U_DLL /D_DEBUG)
+            target_compile_options(${VARIANT_NAME} PRIVATE
+              "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:/MTd /U_DLL /D_DEBUG>")
           elseif (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreadedDLL)
-            target_compile_options(${VARIANT_NAME} PRIVATE /MD /D_DLL /U_DEBUG)
+            target_compile_options(${VARIANT_NAME} PRIVATE
+              "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:/MD /D_DLL /U_DEBUG>")
           elseif (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreaded)
-            target_compile_options(${VARIANT_NAME} PRIVATE /MT /U_DLL /U_DEBUG)
+            target_compile_options(${VARIANT_NAME} PRIVATE
+              "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:/MT /U_DLL /U_DEBUG>")
           endif()
         endif()
       endif()
@@ -3061,14 +3090,14 @@ function(_add_swift_target_executable_single name)
       # MSVC doesn't support -Xclang. We don't need to manually specify
       # the dependent libraries as `cl` does so.
       target_compile_options(${name} PRIVATE
-        "SHELL:-Xclang --dependent-lib=oldnames"
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=oldnames>"
         # TODO(compnerd) handle /MT, /MTd
-        "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>>")
     endif()
   endif()
 
   target_compile_options(${name} PRIVATE
-    ${c_compile_flags})
+    "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${c_compile_flags}>")
   target_link_directories(${name} PRIVATE
     ${library_search_directories})
   target_link_options(${name} PRIVATE
@@ -3282,6 +3311,7 @@ function(add_swift_target_executable name)
     foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
       set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
       set(VARIANT_NAME "${name}${VARIANT_SUFFIX}")
+
       set(MODULE_VARIANT_SUFFIX "-swiftmodule${VARIANT_SUFFIX}")
       set(MODULE_VARIANT_NAME "${name}${MODULE_VARIANT_SUFFIX}")
 
@@ -3443,6 +3473,7 @@ function(add_swift_target_executable name)
     if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
       set(codesign_arg CODESIGN)
     endif()
+
     precondition(THIN_INPUT_TARGETS)
     _add_swift_lipo_target(SDK
                              ${sdk}
@@ -3461,35 +3492,15 @@ function(add_swift_target_executable name)
 
     precondition(resource_dir_sdk_subdir)
 
-    if(sdk STREQUAL "WINDOWS" AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
-      add_dependencies(${install_in_component} ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH})
-      swift_install_in_component(TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
-                                 RUNTIME
-                                   DESTINATION "bin"
-                                   COMPONENT "${install_in_component}"
-                                 LIBRARY
-                                   DESTINATION "libexec${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
-                                   COMPONENT "${install_in_component}"
-                                 ARCHIVE
-                                   DESTINATION "libexec${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
-                                   COMPONENT "${install_in_component}"
-                                 PERMISSIONS
-                                   OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                                   GROUP_READ GROUP_EXECUTE
-                                   WORLD_READ WORLD_EXECUTE)
-    else()
-      add_dependencies(${install_in_component} ${lipo_target})
-
-      set(install_dest "libexec${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}")
-      swift_install_in_component(FILES "${UNIVERSAL_NAME}"
-                                   DESTINATION ${install_dest}
-                                   COMPONENT "${install_in_component}"
-                                 PERMISSIONS
-                                   OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                                   GROUP_READ GROUP_EXECUTE
-                                   WORLD_READ WORLD_EXECUTE
-                                 "${optional_arg}")
-    endif()
+    set(install_dest "libexec${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}")
+    add_dependencies(${install_in_component} ${lipo_target})
+    swift_install_in_component(FILES ${UNIVERSAL_NAME}
+                                 DESTINATION ${install_dest}
+                                 COMPONENT "${install_in_component}"
+                               PERMISSIONS
+                                 OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                                 GROUP_READ GROUP_EXECUTE
+                                 WORLD_READ WORLD_EXECUTE)
 
     swift_is_installing_component(
       "${install_in_component}"
@@ -3513,8 +3524,8 @@ function(add_swift_target_executable name)
     if(SWIFTEXE_TARGET_BUILD_WITH_STDLIB)
       foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
         set(variant "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-        if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND
-           TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
+        if(TARGET "swift-stdlib${variant}" AND
+           TARGET "swift-test-stdlib${variant}")
           add_dependencies("swift-stdlib${variant}" ${lipo_target})
           add_dependencies("swift-test-stdlib${variant}" ${lipo_target})
         endif()
@@ -3524,8 +3535,10 @@ function(add_swift_target_executable name)
     if(SWIFTEXE_TARGET_BUILD_WITH_LIBEXEC)
       foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
         set(variant "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-        if(TARGET "swift-libexec${variant}")
+        if(TARGET "swift-libexec${variant}" AND
+           TARGET "swift-test-libexec${variant}")
           add_dependencies("swift-libexec${variant}" ${lipo_target})
+          add_dependencies("swift-test-stdlib${variant}" ${lipo_target})
         endif()
       endforeach()
     endif()
