@@ -563,6 +563,11 @@ checkWitnessAccessor(AbstractStorageDecl *witness,
       return RequirementMatch(witness, MatchKind::BorrowMutateConflict);
     }
   }
+  if (hasBorrow || hasMutate) {
+    if (!witness->getDeclContext()->getAsDecl()->canSupportBorrowAccessors()) {
+      return RequirementMatch(witness, MatchKind::BorrowMutateConflict);
+    }
+  }
   return std::nullopt;
 }
 
@@ -3312,8 +3317,13 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     if (!hasMutate) {
       diagMsg += "/mutate";
     }
-    diags.diagnose(witness, diag::protocol_witness_borrow_mutate_conflict,
-                   diagMsg);
+    auto *decl = witness->getDeclContext()->getAsDecl();
+    if (!decl->canSupportBorrowAccessors()) {
+      diags.diagnose(witness, diag::protocol_witness_borrow_mutate_unsupported);
+    } else {
+      diags.diagnose(witness, diag::protocol_witness_borrow_mutate_conflict,
+                     diagMsg);
+    }
     break;
   }
   }
