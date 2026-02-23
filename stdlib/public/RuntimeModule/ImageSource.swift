@@ -183,7 +183,7 @@ struct ImageSource: CustomStringConvertible {
       self.init(mapped: UnsafeRawBufferPointer(
                   start: base, count: size))
       #else
-      var fd = _swift_open(path, O_RDONLY, 0)
+      let fd = _swift_open(path, O_RDONLY, 0)
       if fd < 0 {
         throw ImageSourceError.posixError(_swift_get_errno())
       }
