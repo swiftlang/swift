@@ -864,6 +864,8 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
       }
     } else if (auto *ILE = Loc.getAsASTNode<IntegerLiteralExpr>()) {
       UserDstTy = ILE->getType();
+    } else if (auto *E = Loc.getAsASTNode<Expr>()) {
+      UserDstTy = E->getType();
     }
 
     // Assume that we're converting from a literal if the source type is
