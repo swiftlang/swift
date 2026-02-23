@@ -12404,7 +12404,6 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     parameters.push_back(param);
   }
 
-  // Propagate @Sendable from the contextual type to the closure.
   auto closureExtInfo = inferredClosureType->getExtInfo();
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
     if (!closureExtInfo.isSendable()) {
@@ -12413,6 +12412,23 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       } else if (contextualFnType->isSendable()) {
         closureExtInfo = closureExtInfo.withSendable();
       }
+    }
+
+    auto inferredThrownErrorType =
+        inferredClosureType->getEffectiveThrownErrorTypeOrNever();
+    // In a typed throws context a throwing closure (as determined from the
+    // body or an explicit type) assumes an error type of the context if it's
+    // fully resolved. Do nothing if closure is either non-throwing
+    // or has an explicit typed throws annotation.
+    if (inferredThrownErrorType->isErrorExistentialType()) {
+      auto errorTy = contextualFnType->getEffectiveThrownErrorTypeOrNever();
+      // Don't propagate if the contextual error type:
+      //   - requires inference;
+      //   - is `Never` which means the contextu is non-throwing;
+      //   - is `any Error` which already matches the inferred type of the closure.
+      if (!(errorTy->hasTypeVariable() || errorTy->isNever() ||
+            errorTy->isErrorExistentialType()))
+        closureExtInfo = closureExtInfo.withThrows(/*throws=*/true, errorTy);
     }
   }
 
