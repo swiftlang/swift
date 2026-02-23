@@ -187,6 +187,9 @@ LONG reallyHandleException(EXCEPTION_POINTERS *ExceptionInfo) {
   // It isn't safe to try to stop all the threads here on Windows, so we
   // delegate doing that to the backtracer process.
 
+  // Also, closing open file descriptors is
+  // not something we can easily do on Windows.
+
   if (!_swift_spawnBacktracer(&crashInfo)) {
     const char *message = _swift_backtraceSettings.color == OnOffTty::On
       ? " failed\n\n" : " failed ***\n\n";
@@ -194,14 +197,6 @@ LONG reallyHandleException(EXCEPTION_POINTERS *ExceptionInfo) {
   }
 
   return EXCEPTION_CONTINUE_SEARCH;
-}
-
-#define MIN_FD_TO_CLOSE 0
-#define MAX_FD_TO_CLOSE 1000
-
-void
-closeFds() {
-  // This is not something we can easily do on Windows.
 }
 
 void *pcFromContext(PCONTEXT Context) {

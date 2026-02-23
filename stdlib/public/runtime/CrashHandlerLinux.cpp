@@ -86,6 +86,7 @@ uint32_t currently_paused();
 void wait_paused(uint32_t expected, const struct timespec *timeout);
 int  memserver_start();
 int  memserver_entry(void *);
+void closeFds(int keepOpen);
 
 ssize_t safe_read(int fd, void *buf, size_t len) {
   uint8_t *ptr = (uint8_t *)buf;
@@ -203,7 +204,7 @@ _swift_installCrashHandler()
 
 namespace {
 
-// Older glibc and musl don't have these two syscalls
+// Older glibc and musl don't have these syscalls
 pid_t
 gettid()
 {
@@ -213,6 +214,13 @@ gettid()
 int
 tgkill(int tgid, int tid, int sig) {
   return syscall(SYS_tgkill, tgid, tid, sig);
+}
+
+#define CLOSE_RANGE_UNSHARE 0x2
+#define CLOSE_RANGE_CLOEXEC 0x4
+
+static int _close_range(unsigned int first, unsigned int last, int flags) {
+  return syscall(SYS_close_range, first, last, flags);
 }
 
 void
@@ -671,20 +679,21 @@ wait_paused(uint32_t expected, const struct timespec *timeout)
            || errno == EAGAIN);
 }
 
-#define MIN_FD_TO_CLOSE 0
-#define MAX_FD_TO_CLOSE 1000
+#define MIN_FD_TO_CLOSE 3
+#define MAX_FD_TO_CLOSE ~0
 
 void
-closeFds(int fd) {
-  for (int i = MIN_FD_TO_CLOSE; i < MAX_FD_TO_CLOSE; i++) {
-    // we don't attempt to close memserver_fd, if the mem server is in process
-    // we need to leave it open, if it's in a sub process then this function
-    // should be running on the parent (crashing) process and should already
-    // have closed it
-    if (i != STDOUT_FILENO && i != STDERR_FILENO && i != fd) {
-      close(i);
-    }
-  }
+closeFds(int keepOpen) {
+  // We don't attempt to close memserver_fd, if the mem server is in process
+  // we need to leave it open, if it's in a sub process then this function
+  // should be running on the parent (crashing) process and should already
+  // have closed it.
+
+  // Otherwise we close all file descriptors after stderr except the end of
+  // the pipe used by swift-backtrace.
+
+  _close_range(MIN_FD_TO_CLOSE, keepOpen-1, 0);
+  _close_range(keepOpen+1, MAX_FD_TO_CLOSE, 0);
 }
 
 // .. Memory server ............................................................
