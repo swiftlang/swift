@@ -201,15 +201,7 @@ LONG reallyHandleException(EXCEPTION_POINTERS *ExceptionInfo) {
 
 void
 closeFds() {
-  let stdOutFd = _fileno(stdout);
-  let stdErrFd = _fileno(stderr);
-  for (int i = MIN_FD_TO_CLOSE; i < MAX_FD_TO_CLOSE; i++) {
-    if (i != stdOutFd && i != stdErrFd) {
-      // _close should close the underlying file handle
-      // https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/close
-      _close(i);
-    }
-  }
+  // This is not something we can easily do on Windows.
 }
 
 void *pcFromContext(PCONTEXT Context) {
