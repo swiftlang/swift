@@ -534,7 +534,8 @@ bb0(%0 : @owned $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Buil
 // CHECK: bb0(%0 : @unowned $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : @owned $Builtin.NativeObject, %3 : @guaranteed $Builtin.NativeObject, %4 : @owned $Builtin.NativeObject, %5 : $Builtin.Int32, %6 : @owned $Builtin.NativeObject, %7 : @owned $Builtin.NativeObject):
 // CHECK: [[FUN:%.*]] = function_ref @large_closure_callee : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: [[CLOSURE:%.*]] = partial_apply [[FUN]](
-// CHECK: [[C:%.*]] = copy_value [[CLOSURE]]
+// CHECK: [[BB:%.*]] = begin_borrow [[CLOSURE]]
+// CHECK: [[C:%.*]] = copy_value [[BB]]
 // CHECK: apply [[C]](
 // CHECK: destroy_value [[CLOSURE]]
 

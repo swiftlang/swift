@@ -152,8 +152,8 @@ ERROR(error_load_resolved_plugin,none,
       "invalid value '%0' in '-load-resolved-plugin'; "
       "make sure to use format '<library path>#<plugin path>#<module names>' where library and plugin path can't both be empty", (StringRef))
 
-NOTE(note_valid_swift_versions, none,
-     "valid arguments to '-swift-version' are %0", (StringRef))
+NOTE(note_valid_language_modes, none,
+     "valid arguments to '-language-mode' are %0", (StringRef))
 
 ERROR(error_module_interface_requires_language_mode,none,
       "emitting module interface files requires '-language-mode'", ())

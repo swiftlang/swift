@@ -12,7 +12,7 @@
 
 #define DEBUG_TYPE "send-non-sendable"
 
-#include "swift/SIL/PrunedLiveness.h"
+#include "DiagnosticHelpers.h"
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Concurrency.h"
@@ -32,6 +32,7 @@
 #include "swift/SIL/OperandDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PatternMatch.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -46,6 +47,7 @@
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
+using namespace swift::siloptimizer;
 using namespace swift::PartitionPrimitives;
 using namespace swift::PatternMatch;
 using namespace swift::regionanalysisimpl;
@@ -364,78 +366,19 @@ findClosureUse(Operand *initialOperand) {
 //===----------------------------------------------------------------------===//
 
 template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseError(ASTContext &context, SourceLoc loc,
-                                        Diag<T...> diag, U &&...args) {
-  return std::move(context.Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                       .warnUntilLanguageMode(LanguageMode::v6));
-}
-
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseError(ASTContext &context, SILLocation loc,
-                                        Diag<T...> diag, U &&...args) {
-  return ::diagnoseError(context, loc.getSourceLoc(), diag,
-                         std::forward<U>(args)...);
-}
-
-template <typename... T, typename... U>
 static InFlightDiagnostic diagnoseError(const PartitionOp &op, Diag<T...> diag,
                                         U &&...args) {
-  return ::diagnoseError(op.getSourceInst()->getFunction()->getASTContext(),
-                         op.getSourceLoc().getSourceLoc(), diag,
-                         std::forward<U>(args)...);
-}
-
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseError(const Operand *op, Diag<T...> diag,
-                                        U &&...args) {
-  return ::diagnoseError(op->getUser()->getFunction()->getASTContext(),
-                         op->getUser()->getLoc().getSourceLoc(), diag,
-                         std::forward<U>(args)...);
-}
-
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseError(const SILInstruction *inst,
-                                        Diag<T...> diag, U &&...args) {
-  return ::diagnoseError(inst->getFunction()->getASTContext(),
-                         inst->getLoc().getSourceLoc(), diag,
-                         std::forward<U>(args)...);
-}
-
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseNote(ASTContext &context, SourceLoc loc,
-                                       Diag<T...> diag, U &&...args) {
-  return context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
-}
-
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseNote(ASTContext &context, SILLocation loc,
-                                       Diag<T...> diag, U &&...args) {
-  return ::diagnoseNote(context, loc.getSourceLoc(), diag,
-                        std::forward<U>(args)...);
+  return siloptimizer::diagnoseError(
+      op.getSourceInst()->getFunction()->getASTContext(),
+      op.getSourceLoc().getSourceLoc(), diag, std::forward<U>(args)...);
 }
 
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnoseNote(const PartitionOp &op, Diag<T...> diag,
                                        U &&...args) {
-  return ::diagnoseNote(op.getSourceInst()->getFunction()->getASTContext(),
-                        op.getSourceLoc().getSourceLoc(), diag,
-                        std::forward<U>(args)...);
-}
-
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseNote(const Operand *op, Diag<T...> diag,
-                                       U &&...args) {
-  return ::diagnoseNote(op->getUser()->getFunction()->getASTContext(),
-                        op->getUser()->getLoc().getSourceLoc(), diag,
-                        std::forward<U>(args)...);
-}
-
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseNote(const SILInstruction *inst,
-                                       Diag<T...> diag, U &&...args) {
-  return ::diagnoseNote(inst->getFunction()->getASTContext(),
-                        inst->getLoc().getSourceLoc(), diag,
-                        std::forward<U>(args)...);
+  return siloptimizer::diagnoseNote(
+      op.getSourceInst()->getFunction()->getASTContext(),
+      op.getSourceLoc().getSourceLoc(), diag, std::forward<U>(args)...);
 }
 
 //===----------------------------------------------------------------------===//

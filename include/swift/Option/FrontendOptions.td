@@ -444,6 +444,12 @@ def solver_enable_crash_on_valid_salvage : Flag<["-"], "solver-enable-crash-on-v
 def solver_disable_crash_on_valid_salvage : Flag<["-"], "solver-disable-crash-on-valid-salvage">,
   HelpText<"Accept valid solutions in diagnostic mode">;
 
+def solver_enable_transitive_conformance : Flag<["-"], "solver-enable-transitive-conformance">,
+  HelpText<"Enable transitive conformance constraint optimization">;
+
+def solver_disable_transitive_conformance : Flag<["-"], "solver-disable-transitive-conformance">,
+  HelpText<"Disable transitive conformance constraint optimization">;
+
 def disable_named_lazy_import_as_member_loading :
   Flag<["-"], "disable-named-lazy-import-as-member-loading">,
   HelpText<"Import all of a type's import-as-member globals together, as Swift "

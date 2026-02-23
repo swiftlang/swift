@@ -520,7 +520,7 @@ static void diagnoseSwiftVersion(std::optional<version::Version> &vers,
         [&](LanguageMode mode) { os << "'" << mode.versionString() << "'"; });
   }
 
-  diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, modesStr);
+  diags.diagnose(SourceLoc(), diag::note_valid_language_modes, modesStr);
 }
 
 /// Create a new Regex instance out of the string value in \p RpassArg.
@@ -1119,7 +1119,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
           FrontendOpts.RequestedAction);
   bool HadError = false;
 
-  if (auto A = Args.getLastArg(OPT_swift_version)) {
+  if (auto A = Args.getLastArg(OPT_language_mode)) {
     auto vers =
         VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
     bool isValid = false;
@@ -2133,6 +2133,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_solver_enable_crash_on_valid_salvage,
                    OPT_solver_disable_crash_on_valid_salvage,
                    Opts.CrashOnValidSalvage);
+
+  Opts.SolverEnableTransitiveConformance =
+      Args.hasFlag(OPT_solver_enable_transitive_conformance,
+                   OPT_solver_disable_transitive_conformance,
+                   Opts.SolverEnableTransitiveConformance);
 
   Opts.SolverEnablePreparedOverloads =
       Args.hasFlag(OPT_solver_enable_prepared_overloads,

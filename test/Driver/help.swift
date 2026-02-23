@@ -11,7 +11,7 @@
 // RUN: %swift_driver -help | %FileCheck -check-prefix NEGATIVE -check-prefix NEGATIVE-SWIFT %s
 
 // Options that work with both 'swiftc' and 'swift':
-// CHECK-DAG: -swift-version
+// CHECK-DAG: -language-mode
 
 // swiftc-only options:
 // CHECK-SWIFTC-DAG: -typecheck

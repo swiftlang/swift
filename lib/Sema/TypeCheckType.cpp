@@ -2082,6 +2082,19 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
 
   // Short-circuiting.
   if (repr->isInvalid()) return ErrorType::get(ctx);
+  // Reject member type access only when the base is explicitly written as an
+  // opaque type, e.g. `(some P).T`.
+  auto *baseRepr = repr->getBase()->getWithoutParens();
+  if (isa<OpaqueReturnTypeRepr>(baseRepr) ||
+      isa<NamedOpaqueReturnTypeRepr>(baseRepr)) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      diags.diagnose(repr->getNameLoc(),
+                     diag::opaque_type_member_type,
+                     repr->getNameRef(), parentTy)
+          .highlight(parentRange);
+    }
+    return ErrorType::get(ctx);
+  }
 
   // If the parent is a type parameter, the member is a dependent member,
   // and we skip much of the work below.

@@ -38,6 +38,8 @@ func useA(_:A){}
 
 public struct NE : ~Escapable {}
 
+public struct NCE : ~Copyable & ~Escapable {}
+
 public struct NEImmortal: ~Escapable {
   @_lifetime(immortal)
   public init() {}
@@ -407,6 +409,8 @@ func test(inline: InlineInt) {
 // Closures
 // =============================================================================
 
+func takesEscapingClosure(_: @escaping ()->()) {}
+
 /// Test an autoclosure that invokes a mutable method where `Self: ~Escapable`.
 /// The @inout_aliasable argument has an implicit @_lifetime(capture: copy capture),
 /// and no begin_access [dynamic] is present in the closure.
@@ -422,6 +426,18 @@ extension MutableSpan {
     return false
   }
 }
+
+/// '_overrideLifetime(arg, copying: ())' quiets the diagnostics on the caller side. But, when diagnosing the closure
+/// body itself, lifetime analysis must handle the boxed value.
+///
+/// rdar://170592353 (lifetime-dependent variable 'overriddenLifetime' escapes its scope)
+func testMutableCapture(arg: consuming NCE, action: @escaping (inout NCE) -> ()) {
+  var item = _overrideLifetime(arg, copying: ())
+  takesEscapingClosure {
+    action(&item)
+  }
+}
+
 
 // =============================================================================
 // Local variable analysis - address uses

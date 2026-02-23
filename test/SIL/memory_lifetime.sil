@@ -885,3 +885,33 @@ bb0(%0 : $Int):
   return %7
 }
 
+sil @dont_read_from_inout : $@convention(thin) (@inout Bool) -> ()
+
+sil [ossa] @no_read_from_inout : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $Bool
+  %8 = function_ref @dont_read_from_inout : $@convention(thin) (@inout Bool) -> ()
+  %9 = apply %8(%1) : $@convention(thin) (@inout Bool) -> ()
+  dealloc_stack %1 : $*Bool
+  %10 = tuple ()
+  return %10 : $()
+}
+
+struct BoolAndObj {
+  var b: Bool
+  var obj: AnyObject
+}
+
+sil [ossa] @test_store_assign : $@convention(thin) (@owned BoolAndObj, @owned AnyObject) -> () {
+bb0(%0 : @owned $BoolAndObj, %1 : @owned $AnyObject):
+  %2 = alloc_stack $BoolAndObj
+  %3 = struct_element_addr %2, #BoolAndObj.b
+  %4 = struct_element_addr %2, #BoolAndObj.obj
+  store %1 to [init] %4
+  store %0 to [assign] %2
+  %7 = load [take] %2
+  destroy_value %7
+  dealloc_stack %2
+  return undef : $()
+}
+

@@ -15,7 +15,7 @@
 // RUN: not %target-swiftc_driver -language-mode 5 -typecheck %s 2>&1 | %FileCheck --check-prefix ERROR_5 %s
 
 // BAD: invalid value
-// BAD: note: valid arguments to '-swift-version' are '4', '4.2', '5', '6'
+// BAD: note: valid arguments to '-language-mode' are '4', '4.2', '5', '6'
 
 #if swift(>=3)
 asdf

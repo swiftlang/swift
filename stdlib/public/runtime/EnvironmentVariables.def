@@ -125,6 +125,9 @@ VARIABLE(SWIFT_BACKTRACE, string, "",
          "crash catching and backtracing support in the runtime. "
          "See docs/Backtracing.rst in the Swift repository for details.")
 
+VARIABLE(SWIFT_IS_BACKTRACING, bool, false,
+         "Set to `true` if we are running the backtracer.")
+
 VARIABLE(SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE, string, "",
          "Allows for suppressing 'is current executor' equality check crashes. "
          "As since Swift 6.0 checking for current executor equality, may crash "

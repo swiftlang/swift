@@ -3332,6 +3332,8 @@ NOTE(protocol_witness_settable_conflict,none,
 ERROR(protocol_witness_borrow_mutate_conflict, none,
       "candidate is not a stored property or a computed property with %0 accessor, but protocol requires it",
       (StringRef))
+ERROR(protocol_witness_borrow_mutate_unsupported, none,
+      "borrow/mutate protocol requirements can only be witnessed in a struct", ())
 
 NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
@@ -6545,6 +6547,9 @@ ERROR(opaque_type_in_parameter,none,
       "'some' cannot appear in parameter position in %select{result|parameter}0"
       " type %1",
       (bool, Type))
+ERROR(opaque_type_member_type,none,
+      "cannot access member type %0 on opaque type %1",
+      (DeclNameRef, Type))
 
 // Function differentiability
 ERROR(attr_only_on_parameters_of_differentiable,none,

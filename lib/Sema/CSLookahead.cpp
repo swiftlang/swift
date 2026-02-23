@@ -22,8 +22,10 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/CSBindings.h"
 #include "swift/Sema/Subtyping.h"
 #include "llvm/ADT/BitVector.h"
@@ -38,8 +40,21 @@
 #define DEBUG_TYPE "CSLookahead"
 #include "llvm/Support/Debug.h"
 
+STATISTIC(NumDisjunctionsSkipped, "disjunctions skipped by pruning");
+STATISTIC(NumDisjunctionsAnalyzed, "disjunction pruning rounds");
+STATISTIC(NumDisjunctionsPruned, "disjunction pruning rounds");
+
 using namespace swift;
 using namespace constraints;
+
+SolverDisjunction &ConstraintSystem::getRemainingDisjunction(Constraint *disjunction) {
+  auto found = RemainingDisjunctions.find(disjunction);
+  if (found != RemainingDisjunctions.end())
+    return found->second;
+  found = RemainingDisjunctions.insert(
+      std::make_pair(disjunction, SolverDisjunction(disjunction))).first;
+  return found->second;
+}
 
 static void forEachDisjunctionChoice(
     ConstraintSystem &cs, Constraint *disjunction,
@@ -68,9 +83,10 @@ static void forEachDisjunctionChoice(
   }
 }
 
-static void pruneDisjunctionImpl(
-    ConstraintSystem &cs, Constraint *disjunction,
-    Constraint *applicableFn) {
+static const bool verifyIncrementalDisjunctionPruning = false;
+
+void SolverDisjunction::pruneDisjunctionIfNeeded(ConstraintSystem &cs,
+                                                 Constraint *applicableFn) {
   if (!cs.getASTContext().TypeCheckerOpts.SolverPruneDisjunctions)
     return;
 
@@ -80,9 +96,41 @@ static void pruneDisjunctionImpl(
   if (!applicableFn)
     return;
 
-  auto argFuncType =
-      applicableFn->getFirstType()->castTo<FunctionType>();
+  auto PO = PrintOptions::forDebugging();
 
+  // The below only depends on the overload choices and argument types, so
+  // we can skip it if the argument type is already known.
+  auto newFuncType =
+      cs.simplifyType(applicableFn->getFirstType())->castTo<FunctionType>();
+  if (newFuncType == argFuncType) {
+    ++NumDisjunctionsSkipped;
+    LLVM_DEBUG(llvm::dbgs() << "No change: " << newFuncType->getString(PO) << "\n");
+    if (verifyIncrementalDisjunctionPruning)
+      pruneDisjunction(cs, applicableFn, /*verify=*/true);
+    return;
+  }
+
+  ++NumDisjunctionsAnalyzed;
+  LLVM_DEBUG(llvm::dbgs() << "Apply function type change from: "
+                          << argFuncType->getString(PO)
+                          << " to "
+                          << newFuncType->getString(PO) << "\n");
+
+  // Save the old apply type in the trail. If we backtrack, we will
+  // un-disable any choices we disabled, and also restore the previous
+  // saved type for the disjunction.
+  if (cs.solverState) {
+    cs.recordChange(
+      SolverTrail::Change::PrunedDisjunction(disjunction, argFuncType));
+  }
+  argFuncType = newFuncType;
+
+  pruneDisjunction(cs, applicableFn, /*verify=*/false);
+}
+
+void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
+                                         Constraint *applicableFn,
+                                         bool verify) {
   auto argumentList = cs.getArgumentList(applicableFn->getLocator());
   ASSERT(argumentList);
 
@@ -95,29 +143,14 @@ static void pruneDisjunctionImpl(
     }
   }
 
-  SmallVector<FunctionType::Param, 8> argsWithLabels;
-  {
+  auto matchArguments = [&](OverloadChoice choice, FunctionType *overloadType)
+    -> std::optional<MatchCallArgumentResult> {
+    auto *decl = choice.getDecl();
+
+    SmallVector<FunctionType::Param, 8> argsWithLabels;
     argsWithLabels.append(argFuncType->getParams().begin(),
                           argFuncType->getParams().end());
     FunctionType::relabelParams(argsWithLabels, argumentList);
-  }
-
-  SmallVector<Type, 2> argTypes;
-  argTypes.resize(argFuncType->getNumParams());
-
-  for (unsigned i = 0, n = argFuncType->getNumParams(); i != n; ++i) {
-    const auto &param = argFuncType->getParams()[i];
-    // FIXME: Get rid of the usage of InOutType here.
-    auto argType = cs.simplifyType(param.getOldType());
-    argTypes[i] = argType;
-  }
-
-  auto resultType = cs.simplifyType(argFuncType->getResult());
-
-  auto matchArguments = [&](OverloadChoice choice, FunctionType *overloadType)
-    -> std::optional<MatchCallArgumentResult> {
-        auto *decl = choice.getDeclOrNull();
-    assert(decl);
 
     auto hasAppliedSelf =
         decl->hasCurriedSelf() &&
@@ -133,9 +166,13 @@ static void pruneDisjunctionImpl(
                               /*allow fixes*/ false, listener, std::nullopt);
   };
 
+  bool anyChanges = false;
+
   forEachDisjunctionChoice(
     cs, disjunction,
     [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
+      // Get the generic signature used for reasoning about type parameters
+      // in the overload's parameter and result types.
       GenericSignature genericSig;
       {
         if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -171,6 +208,12 @@ static void pruneDisjunctionImpl(
       for (unsigned paramIdx = 0, n = overloadType->getNumParams();
            paramIdx != n; ++paramIdx) {
         const auto &param = overloadType->getParams()[paramIdx];
+        const auto paramFlags = param.getParameterFlags();
+
+        // If parameter is variadic we cannot compare because we don't know
+        // real arity.
+        if (paramFlags.isVariadic())
+          continue;
 
         auto argIndices = matchings->parameterBindings[paramIdx];
         switch (argIndices.size()) {
@@ -189,27 +232,22 @@ static void pruneDisjunctionImpl(
 
         auto argIdx = argIndices.front();
         ASSERT(argIdx < argFuncType->getNumParams());
-        auto argType = argTypes[argIdx];
-        ASSERT(argType);
-
-        const auto paramFlags = param.getParameterFlags();
-
-        // If parameter is variadic we cannot compare because we don't know
-        // real arity.
-        if (paramFlags.isVariadic())
-          continue;
+        auto argParam = argFuncType->getParams()[argIdx];
 
         // FIXME: Get rid of the usage of InOutType here.
+        auto argType = argParam.getOldType();
         auto paramType = param.getOldType();
 
         if (paramFlags.isAutoClosure())
-          paramType = paramType->castTo<AnyFunctionType>()->getResult();
+          paramType = paramType->castTo<FunctionType>()->getResult();
 
         reason |= canPossiblyConvertTo(cs, argType, paramType, genericSig);
       }
 
       auto overloadResultType = overloadType->getResult();
-      reason |= canPossiblyConvertTo(cs, overloadResultType, resultType, genericSig);
+      auto applyResultType = argFuncType->getResult();
+      reason |= canPossiblyConvertTo(cs, overloadResultType,
+                                     applyResultType, genericSig);
 
       if (reason) {
         if (cs.isDebugMode()) {
@@ -243,15 +281,17 @@ static void pruneDisjunctionImpl(
             llvm::errs() << " conformance";
           llvm::errs() << ")\n";
         }
+        ASSERT(!verify);
 
         if (cs.solverState)
           cs.solverState->disableConstraint(choice);
         else
           choice->setDisabled();
+
+        if (!anyChanges) {
+          ++NumDisjunctionsPruned;
+          anyChanges = true;
+        }
       }
     });
-}
-
-void ConstraintSystem::pruneDisjunction(Constraint *disjunction, Constraint *applicableFn) {
-  pruneDisjunctionImpl(*this, disjunction, applicableFn);
 }

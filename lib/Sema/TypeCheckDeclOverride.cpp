@@ -2316,10 +2316,16 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
     // Objective-C protocols
     if (inheritedProto->isObjC()) return TypeWalker::Action::Continue;
 
-    // Associated types defined within reparentable protocols Q
-    // are not overridden by one defined in any reparented ones P, i.e.,
-    // if P was reparented by Q, then P's associated type serves as the anchor.
-    // We skip processing any protocols further inherited by the reparentable.
+    // Associated types defined within reparentable protocol RP
+    // are not "overridden" by one defined in a downstream protocol, i.e.,
+    // if P inherits from RP, then P's associated type does not override RP's,
+    // causing P's associated type to serves as the anchor.
+    //
+    // We skip processing any protocols further inherited by RP as they should
+    // all be @reparentable as well.
+    //
+    // See a corresponding bit of code in `swift::removeOverriddenDecls`, where
+    // we deprioritize @reparentable associated types in name-lookup too.
     if (inheritedProto->getAttrs().hasAttribute<ReparentableAttr>())
       return TypeWalker::Action::SkipNode;
 

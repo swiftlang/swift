@@ -1116,7 +1116,7 @@ extension LifetimeDependenceDefUseWalker {
       return escapingDependence(on: localAccess.operand!)
     case .outgoingArgument:
       let arg = allocation as! FunctionArgument
-      assert(arg.type.isAddress, "returned local must be allocated with an indirect argument")
+      assert(arg.type.isAddress || arg.type.isBox, "returned local must be allocated with an indirect argument")
       return inoutDependence(argument: arg, functionExit: localAccess.instruction!)
     case .inoutYield:
       return yieldedDependence(result: localAccess.operand!)

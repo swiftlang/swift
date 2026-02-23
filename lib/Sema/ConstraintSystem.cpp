@@ -36,6 +36,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/IDETypeChecking.h"
