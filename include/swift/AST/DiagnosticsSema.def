@@ -1300,6 +1300,18 @@ REMARK(module_loaded,none,
        "; source: '%2', loaded: '%3'",
        (Identifier, unsigned, StringRef, StringRef))
 
+REMARK(module_loading_swift_attempt,none,
+       "attempting to load Swift module '%0' from %1", (StringRef, StringRef))
+REMARK(module_loading_swift_failed,none,
+       "Swift module '%0' failed to load", (StringRef))
+       
+REMARK(module_loading_clang_attempt,none,
+       "attempting to load Clang module '%0'", (StringRef))
+REMARK(module_loading_clang_finished,none,
+       "loaded Clang module '%0' from %1", (StringRef, StringRef))
+REMARK(module_loading_clang_also_imported,none,
+       "load of Clang module '%0' also imported modules: %1", (StringRef, StringRef))
+
 REMARK(module_api_import,none,
        "%select{|implicitly used }4"
        "%kind0 is imported via %1"
