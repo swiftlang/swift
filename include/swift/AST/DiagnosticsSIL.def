@@ -245,7 +245,7 @@ ERROR(use_of_self_before_fully_init,none,
 NOTE(stored_property_not_initialized,none,
      "'%0' not initialized", (StringRef))
 NOTE(isolated_property_initializer,none,
-     "%1 default value of '%0' cannot be used in a %2 initalizer",
+     "%1 default value of '%0' cannot be used in a %2 initializer",
      (StringRef, ActorIsolation, ActorIsolation))
 
 ERROR(selfinit_multiple_times,none,
