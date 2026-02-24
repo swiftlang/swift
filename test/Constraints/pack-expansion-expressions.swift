@@ -143,6 +143,19 @@ func tupleExpansion<each T, each U>(
   _ = forward(repeat each tuple3)
 }
 
+// https://github.com/swiftlang/swift/issues/67091
+do {
+  func test<each T>(_: inout (repeat each T) -> Void) {}
+
+  var a: () -> Void
+  var b: (Bool) -> Void
+  var c: (Bool, Int) -> Void
+
+  test(&a)
+  test(&b)
+  test(&c)
+}
+
 protocol Generatable {
   static func generate() -> Self
 }
