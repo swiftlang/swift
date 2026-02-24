@@ -862,8 +862,6 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
         UserSrcTy = unaryArg->getType();
         UserDstTy = CE->getType();
       }
-    } else if (auto *ILE = Loc.getAsASTNode<IntegerLiteralExpr>()) {
-      UserDstTy = ILE->getType();
     } else if (auto *E = Loc.getAsASTNode<Expr>()) {
       UserDstTy = E->getType();
     }
