@@ -1916,6 +1916,23 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
         table.addEntry(importedName.getDeclName(), named,
                        importedName.getEffectiveContext());
 
+        // In C, enumerators of an unscoped enum nested in a record were
+        // historically reachable as top-level names. The primary entry above
+        // now files them under the enclosing record (matching C++), so add a
+        // second TU-context entry pointing at the same Clang decl that can be
+        // found by unqualified lookup.
+        if (!nameImporter.getContext().LangOpts.EnableCXXInterop) {
+          if (auto *ecd = dyn_cast<clang::EnumConstantDecl>(named)) {
+            if (auto *ed = dyn_cast<clang::EnumDecl>(ecd->getDeclContext());
+                ed && !ed->isScoped() &&
+                isa<clang::RecordDecl>(ed->getDeclContext())) {
+              auto *TU = ed->getASTContext().getTranslationUnitDecl();
+              table.addEntry(importedName.getDeclName(), named,
+                             EffectiveClangContext(TU));
+            }
+          }
+        }
+
         // Also add the subscript entry, if needed.
         if (version == currentVersion && importedName.isSubscriptAccessor()) {
           table.addEntry(DeclName(nameImporter.getContext(),

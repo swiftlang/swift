@@ -143,10 +143,15 @@ directRecordMemberLookup(ClangImporter &Importer,
   // lookup() just gives us all decls in the module of the given name.
   // Make sure that `whereDecl` is the parent of all the members we found.
   auto *whereCanonical = whereDecl->getCanonicalDecl();
+
+  // The same Clang decl can appear under multiple contexts, so dedup.
+  llvm::SmallPtrSet<const clang::NamedDecl *, 4> seen;
   for (auto entry : foundDecls) {
     auto *found = entry.dyn_cast<clang::NamedDecl *>();
     if (!found)
       continue; // What we found wasn't a NamedDecl
+    if (!seen.insert(found).second)
+      continue; // Already saw this Clang decl via a different context entry
 
     auto *foundCtx = found->getNonTransparentDeclContext();
     if (auto *foundCtxDecl = dyn_cast<clang::RecordDecl>(foundCtx)) {

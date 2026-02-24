@@ -15,9 +15,10 @@ func testDiags() {
 #endif
   let _: String = usVar2 // expected-error {{cannot convert value of type 'UInt16' to specified type 'String'}}
 
-  // The nested anonymous enum value should still have top-level scope, because
-  // that's how C works. It should also have the same type as the field (above).
-  let _: String = Struct.NestedConstant2
-  // expected-error@-1 {{type 'Struct' has no member 'NestedConstant2'}}
+  // The nested anonymous enum value appears as a member of its enclosing struct.
+  let nestedConstant2 = Struct.NestedConstant2
+
+  // We historically imported these at top-level scope. Check that this still works for backwards compat.
+  let _ = NestedConstant2
 }
 
