@@ -2095,6 +2095,14 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
 
     // Otherwise, complain.  Start with more specific diagnostics.
 
+    // Diagnose unused unstructured Task creation
+    if (callee && !call->isImplicit() && callee->isUnstructuredTaskCreation()) {
+      DE.diagnose(fn->getLoc(),
+                  diag::expression_unused_throwing_unstructured_task, callee)
+          .highlight(call->getArgs()->getSourceRange());
+      return;
+    }
+
     // Diagnose unused constructor calls.
     if (isa_and_nonnull<ConstructorDecl>(callee) && !call->isImplicit()) {
       DE.diagnose(fn->getLoc(), diag::expression_unused_init_result,

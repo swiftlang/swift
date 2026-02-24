@@ -200,7 +200,9 @@ extension Task where Failure == ${FAILURE_TYPE} {
 
 % # --------------------------------------------------------------------------------------------------------------------
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  % if not IS_THROWING:
   @discardableResult
+  % end
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public ${METHOD_VARIANT}(
@@ -212,7 +214,9 @@ extension Task where Failure == ${FAILURE_TYPE} {
 % # --------------------------------------------------------------------------------------------------------------------
 % if not HAS_TASK_EXECUTOR:
 #elseif $Embedded
+  % if not IS_THROWING:
   @discardableResult
+  % end
   @_alwaysEmitIntoClient
   ${"  \n".join(adjust_availability(['@available(SwiftStdlib 5.1, *)']))}
   public ${METHOD_VARIANT}(
@@ -296,7 +300,9 @@ extension Task where Failure == ${FAILURE_TYPE} {
   /// - Returns: A reference to the task.
 % end # IS_DEPRECATED
   ${"\n  ".join(adjust_availability(ALL_AVAILABILITY))}
+  % if not IS_THROWING:
   @discardableResult
+  % end
   public ${METHOD_VARIANT}(
     ${",\n    ".join(adjust_params_for_kind(PARAMS))}
   ) ${ARROW_RETURN_TYPE}{

@@ -5,6 +5,20 @@
 
 ## Swift (next)
 
+* Throwing unstructured task initializers (`Task.init`, `Task.immediate`, `Task.detached`, etc) 
+  now use typed-throws and will warn if an operation is throwing and the result of the task is not
+  stored or ignored. This addresses a long standing issue where it was too easy to miss that an 
+  operation was throwing:
+
+  ```swift
+  Task { // Unstructured throwing task created by 'init(priority:operation:)' is unused [#NoUseUnstructuredThrowingTask]
+    try example()
+  }
+  Task { // no warning, as previously
+    example()
+  }
+  ```
+
 * Calling from Objective-C into into asynchronous Swift APIs will now attempt use `Task.immediate`
   instead of `Task` when available. This reduces the initial enqueue delay which Task would incur
   (by enqueueing on the global pool before calling the async target), and can improve performance
