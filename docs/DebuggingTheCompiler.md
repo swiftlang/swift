@@ -61,6 +61,7 @@ benefit of all Swift developers.
     - [Multiple Logs at a Time](#multiple-logs-at-a-time)
 - [Compiler Tools/Options for Bug Hunting](#compiler-toolsoptions-for-bug-hunting)
     - [Using `clang-tidy` to run the Static Analyzer](#using-clang-tidy-to-run-the-static-analyzer)
+- [Exploring Compiler Performance](#exploring-compiler-performance)
 
 # Debugging the Compiler Itself
 
@@ -1355,4 +1356,22 @@ as follows:
 One can also use shell regex to visit multiple files in the same directory. Example:
 
     clang-tidy -p=$PATH_TO_BUILD/swift-macosx-$(uname -m)/compile_commands.json $FULL_PATH_TO_DIR/*.cpp
+
+# Exploring Compiler Performance
+
+The `-stats-output-dir` compiler option requests that `swiftc` emit a timing report
+which provides some insight into where the compiler is spending its time:
+
+    swiftc <other options> -stats-output-dir /tmp/subdir
+
+The directory named here must already exist.
+
+To survey the compiler performance in a large multi-project build,
+you can pass this through to each `swiftc` invocation from `swift build`:
+
+    swift build -Xswiftc -stats-output-dir -Xswiftc /tmp/subdir
+
+or from `xcodebuild`:
+
+    xcodebuild <other options> OTHER_SWIFT_FLAGS='$(inherited) -stats-output-dir /tmp/subdir'
 

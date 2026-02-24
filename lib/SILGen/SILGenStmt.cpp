@@ -741,6 +741,15 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
              diag::borrow_accessor_not_a_projection_note);
     return true;
   }
+  // For now diagnose multiple return statements in borrow/mutate accessors.
+  // We need additional support for this.
+  // 1. Address phis are banned in SIL.
+  // 2. borrowed from is not inserted in SILGenCleanup.
+  if (!ReturnDest.getBlock()->getPredecessorBlocks().empty()) {
+    diagnose(getASTContext(), ret->getStartLoc(),
+             diag::invalid_multiple_return_borrow_accessor);
+    return true;
+  }
 
   // Emit return value at +0.
   FormalEvaluationScope scope(*this);
@@ -765,8 +774,6 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
                                : SGFAccessKind::Write,
                            options);
 
-  // If the accessor is annotated with @_unsafeSelfDependentResultAttr,
-  // disable diagnosing the return expression.
   // If the accessor is annotated with @_unsafeSelfDependentResultAttr,
   // disable diagnosing the return expression.
   // This is needed to implement borrow accessors for Unsafe*Pointer based
@@ -816,15 +823,6 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
              diag::invalid_borrow_accessor_return);
     diagnose(getASTContext(), ret->getStartLoc(),
              diag::borrow_accessor_not_a_projection_note);
-    return true;
-  }
-  // For now diagnose multiple return statements in borrow/mutate accessors.
-  // We need additional support for this.
-  // 1. Address phis are banned in SIL.
-  // 2. borrowed from is not inserted in SILGenCleanup.
-  if (!ReturnDest.getBlock()->getPredecessorBlocks().empty()) {
-    diagnose(getASTContext(), ret->getStartLoc(),
-             diag::invalid_multiple_return_borrow_accessor);
     return true;
   }
 
@@ -1722,8 +1720,10 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     // A direct error value is passed to the epilog block as a BB argument.
     args.push_back(exn);
   } else if (shouldDiscard) {
-    if (exn && exn->getType().isAddress())
+    if (exn->getType().isAddress())
       B.createDestroyAddr(loc, exn);
+    else
+      B.createDestroyValue(loc, exn);
   }
 
   // Emit clean-ups needed prior to entering throw block.

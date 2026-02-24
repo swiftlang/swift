@@ -200,10 +200,8 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
 
   IRGenOptions IRGenOpts;
-  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, &IRGenOpts,
-                                               "", nullptr, nullptr,
-                                               true),
-                         true);
+  ASTCtx.addModuleLoader(
+      ClangImporter::create(ASTCtx, &IRGenOpts, "", nullptr, true), true);
   ModuleDecl *M =
       ModuleDecl::createEmpty(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   std::unique_ptr<Lowering::TypeConverter> TC(

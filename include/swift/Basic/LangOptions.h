@@ -1019,19 +1019,22 @@ namespace swift {
 
     /// Enable various older performance optimizations that have been subsumed
     /// by subsequent improvements to the solver.
-    bool SolverEnablePerformanceHacks = true;
+    bool SolverEnablePerformanceHacks = false;
 
     /// Enable the experimental "prepared overloads" optimization.
     bool SolverEnablePreparedOverloads = true;
 
+    /// Enable generation of transitive conformance constraints.
+    bool SolverEnableTransitiveConformance = true;
+
     /// Enable experimental optimization to skip contradictory disjunction
     /// choices.
-    bool SolverPruneDisjunctions = false;
+    bool SolverPruneDisjunctions = true;
 
     /// Enable experimental optimization to skip operators defined in protocol
     /// extensions if they are a refinement of a protocol requirement that also
     /// appears in the disjunction.
-    bool SolverOptimizeOperatorDefaults = false;
+    bool SolverOptimizeOperatorDefaults = true;
   };
 
   /// Options for controlling the behavior of the Clang importer.
@@ -1128,7 +1131,8 @@ namespace swift {
     /// When set, import SPI_AVAILABLE symbols with Swift SPI attributes.
     bool EnableClangSPI = true;
 
-    /// When set, don't enforce warnings with -Werror.
+    /// When set, don't enforce warnings with -Werror, and disable PCH
+    /// validation.
     bool DebuggerSupport = false;
 
     /// Prefer the serialized preprocessed header over the one on disk.

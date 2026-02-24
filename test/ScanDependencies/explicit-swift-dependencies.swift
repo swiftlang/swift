@@ -43,6 +43,7 @@ import F
 // ...
 // CHECK:                 "-explicit-interface-module-build",
 // CHECK-NEXT:            "-disable-implicit-swift-modules",
+// CHECK-NEXT:            "-disable-cross-import-overlay-search",
 // CHECK-NEXT:            "-Xcc",
 // CHECK-NEXT:            "-fno-implicit-modules",
 // CHECK-NEXT:            "-Xcc",

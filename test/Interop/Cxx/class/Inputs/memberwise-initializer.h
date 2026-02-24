@@ -82,4 +82,9 @@ struct ClassWithStaticAssert2 {
   int x, y;
 };
 
+struct ClassWithConstexprStatic {
+  int x;
+  static constexpr int y = 0;
+};
+
 #endif

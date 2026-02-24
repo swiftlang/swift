@@ -2333,6 +2333,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                     -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
                     -DFoundation_DIR=$(build_directory ${host} foundation)/cmake/modules
+                    -DSwiftTesting_DIR=$(build_directory ${host} swift_testing)/cmake/modules
                     -DLLVM_DIR=$(build_directory ${host} llvm)/lib/cmake/llvm
 
                     -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE:PATH=${LIBDISPATCH_SOURCE_DIR}

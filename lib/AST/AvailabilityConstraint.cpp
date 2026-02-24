@@ -294,6 +294,16 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
 
   getAvailabilityConstraintsForDecl(constraints, decl, context, flags);
 
+  // For requirements of reparentable protocols, add constraints from the
+  // enclosing protocol itself. We don't need to do this for ordinary protocols
+  // because of the rule that a protocol P cannot inherit from Q if Q is less
+  // available than P. Thus, the availability of the most derived protocol
+  // already carries the same or stricter constraints than its ancestors.
+  if (auto *proto = decl->getDeclContext()->getSelfProtocolDecl()) {
+    if (proto->getAttrs().hasAttribute<ReparentableAttr>())
+      getAvailabilityConstraintsForDecl(constraints, proto, context, flags);
+  }
+
   if (flags.contains(AvailabilityConstraintFlag::SkipEnclosingExtension))
     return constraints;
 

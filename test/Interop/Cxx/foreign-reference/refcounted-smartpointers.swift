@@ -31,6 +31,14 @@ func bridgedFunctionsWithOptionalInjection() {
     takesOptional(bridgedFunction3())
 }
 
+func notBridgedFunctions(_ r: RefCountedBase) {
+    print("noBridging")
+    var smartPtr = RefOfBase(r)
+    notBridgedFunction(&smartPtr)
+    notBridgedFunction2(RefOfBase(r))
+    notBridgedFunction3(consuming: RefOfBase(r))
+}
+
 conversions(RefCountedBase())
 // CHECK: created
 // CHECK: conversions
@@ -48,4 +56,8 @@ bridgedFunctions(RefCountedBase())
 bridgedFunctionsWithOptionalInjection()
 // CHECK: bridgingWithInjection
 // CHECK: created
+// CHECK: destroyed
+notBridgedFunctions(RefCountedBase())
+// CHECK: created
+// CHECK: noBridging
 // CHECK: destroyed

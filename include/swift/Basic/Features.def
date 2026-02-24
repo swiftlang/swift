@@ -619,6 +619,9 @@ EXPERIMENTAL_FEATURE(SourceWarningControl, true)
 /// Allows a `get` returning a noncopyable type have owned semantics in opaque interfaces.
 EXPERIMENTAL_FEATURE(UnderscoreOwned, true)
 
+/// Allows the standard library `Borrow` and `Inout` types to be used.
+EXPERIMENTAL_FEATURE(BorrowInout, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

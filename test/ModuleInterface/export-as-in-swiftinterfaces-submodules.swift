@@ -80,20 +80,20 @@ import Library.Submodule
 // PUBLIC-LABEL: public func foo
 // PRIVATE-LABEL: public func foo
 public func foo(
-  // PUBLIC-SAME: a: Library.LibraryCoreType
-  // PRIVATE-SAME: a: Library.LibraryCoreType
+  // PUBLIC-SAME: a: Library::LibraryCoreType
+  // PRIVATE-SAME: a: Library::LibraryCoreType
   a: LibraryCoreType,
-  // PUBLIC-SAME: b: Library.LibraryCoreSubmoduleType
-  // PRIVATE-SAME: b: LibraryCore.LibraryCoreSubmoduleType
+  // PUBLIC-SAME: b: Library::LibraryCoreSubmoduleType
+  // PRIVATE-SAME: b: LibraryCore::LibraryCoreSubmoduleType
   b: LibraryCoreSubmoduleType,
-  // PUBLIC-SAME: c: Library.LibraryCoreReexportedSubmoduleType
-  // PRIVATE-SAME: c: LibraryCore.LibraryCoreReexportedSubmoduleType
+  // PUBLIC-SAME: c: Library::LibraryCoreReexportedSubmoduleType
+  // PRIVATE-SAME: c: LibraryCore::LibraryCoreReexportedSubmoduleType
   c: LibraryCoreReexportedSubmoduleType,
-  // PUBLIC-SAME: d: Library.LibraryType
-  // PRIVATE-SAME: d: Library.LibraryType
+  // PUBLIC-SAME: d: Library::LibraryType
+  // PRIVATE-SAME: d: Library::LibraryType
   d: LibraryType,
-  // PUBLIC-SAME: e: Library.LibrarySubmoduleType
-  // PRIVATE-SAME: e: Library.LibrarySubmoduleType
+  // PUBLIC-SAME: e: Library::LibrarySubmoduleType
+  // PRIVATE-SAME: e: Library::LibrarySubmoduleType
   e: LibrarySubmoduleType
 ) {}
 
@@ -106,13 +106,13 @@ import LibraryCore.ReexportedSubmodule
 // PUBLIC-LABEL: public func foo
 // PRIVATE-LABEL: public func foo
 public func foo(
-  // PUBLIC-SAME: a: Library.LibraryCoreType
-  // PRIVATE-SAME: a: LibraryCore.LibraryCoreType
+  // PUBLIC-SAME: a: Library::LibraryCoreType
+  // PRIVATE-SAME: a: LibraryCore::LibraryCoreType
   a: LibraryCoreType,
-  // PUBLIC-SAME: b: Library.LibraryCoreSubmoduleType
-  // PRIVATE-SAME: b: LibraryCore.LibraryCoreSubmoduleType
+  // PUBLIC-SAME: b: Library::LibraryCoreSubmoduleType
+  // PRIVATE-SAME: b: LibraryCore::LibraryCoreSubmoduleType
   b: LibraryCoreSubmoduleType,
-  // PUBLIC-SAME: c: Library.LibraryCoreReexportedSubmoduleType
-  // PRIVATE-SAME: c: LibraryCore.LibraryCoreReexportedSubmoduleType
+  // PUBLIC-SAME: c: Library::LibraryCoreReexportedSubmoduleType
+  // PRIVATE-SAME: c: LibraryCore::LibraryCoreReexportedSubmoduleType
   c: LibraryCoreReexportedSubmoduleType
 ) {}

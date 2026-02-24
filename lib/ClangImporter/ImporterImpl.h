@@ -440,9 +440,12 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   using Version = importer::ImportNameVersion;
 
 public:
-  Implementation(ASTContext &ctx, DependencyTracker *dependencyTracker,
-                 DWARFImporterDelegate *dwarfImporterDelegate);
+  Implementation(ASTContext &ctx, DependencyTracker *dependencyTracker);
   ~Implementation();
+
+  void setDWARFImporterDelegate(DWARFImporterDelegate *dwarfImporterDelegate) {
+    DWARFImporter = dwarfImporterDelegate;
+  }
 
   class DiagnosticWalker : public clang::RecursiveASTVisitor<DiagnosticWalker> {
   public:
@@ -924,11 +927,6 @@ private:
   /// The DWARF importer delegate, if installed.
   DWARFImporterDelegate *DWARFImporter = nullptr;
 
-public:
-  /// Only used for testing.
-  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
-
-private:
   /// The list of Clang modules found in the debug info.
   llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
 

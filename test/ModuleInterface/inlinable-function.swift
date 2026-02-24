@@ -6,9 +6,9 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/TestFromModule.swiftinterface) -module-name Test
 // RUN: %FileCheck %s --check-prefix FROMMODULE --check-prefix CHECK < %t/TestFromModule.swiftinterface
 
-// CHECK-LABEL: public struct Foo : Swift.Hashable {
+// CHECK-LABEL: public struct Foo : Swift::Hashable {
 public struct Foo: Hashable {
-  // CHECK: public var inlinableGetPublicSet: Swift.Int {
+  // CHECK: public var inlinableGetPublicSet: Swift::Int {
   public var inlinableGetPublicSet: Int {
   // FROMSOURCE: @inlinable get {
   // FROMMODULE: @inlinable get{{$}}
@@ -25,10 +25,10 @@ public struct Foo: Hashable {
     // CHECK-NEXT: {{^}}  }
   }
 
-  // CHECK: public var noAccessors: Swift.Int{{$}}
+  // CHECK: public var noAccessors: Swift::Int{{$}}
   public var noAccessors: Int
 
-  // CHECK: public var hasDidSet: Swift.Int {
+  // CHECK: public var hasDidSet: Swift::Int {
   public var hasDidSet: Int {
     // CHECK-NEXT: get{{$}}
     // CHECK-NEXT: set{{(\(value\))?}}{{$}}
@@ -39,7 +39,7 @@ public struct Foo: Hashable {
     // CHECK-NEXT: {{^}}  }
   }
 
-  // CHECK: @_transparent public var transparent: Swift.Int {
+  // CHECK: @_transparent public var transparent: Swift::Int {
   // FROMMODULE-NEXT: get{{$}}
   // FROMSOURCE-NEXT: get {
   // FROMSOURCE-NEXT:   return 34
@@ -50,7 +50,7 @@ public struct Foo: Hashable {
     return 34
   }
 
-  // CHECK: public var transparentSet: Swift.Int {
+  // CHECK: public var transparentSet: Swift::Int {
   public var transparentSet: Int {
     // CHECK-NEXT: get{{$}}
     get {
@@ -82,7 +82,7 @@ public struct Foo: Hashable {
     }
   }
 
-  // CHECK: @inlinable public var inlinableProperty: Swift.Int {
+  // CHECK: @inlinable public var inlinableProperty: Swift::Int {
   @inlinable
   public var inlinableProperty: Int {
     // FROMMODULE:      get{{$}}
@@ -111,7 +111,7 @@ public struct Foo: Hashable {
     // CHECK-NEXT: }
   }
 
-  // CHECK: @inlinable public var inlinableReadAndModify: Swift.Int {
+  // CHECK: @inlinable public var inlinableReadAndModify: Swift::Int {
   @inlinable
   public var inlinableReadAndModify: Int {
     // FROMMODULE:      _read{{$}}
@@ -133,7 +133,7 @@ public struct Foo: Hashable {
     // CHECK-NEXT: }
   }
 
-  // CHECK: public var inlinableReadNormalModify: Swift.Int {
+  // CHECK: public var inlinableReadNormalModify: Swift::Int {
   public var inlinableReadNormalModify: Int {
     // FROMMODULE: @inlinable _read{{$}}
     // FROMSOURCE: @inlinable _read {
@@ -154,7 +154,7 @@ public struct Foo: Hashable {
     // CHECK-NEXT: }
   }
 
-  // CHECK: public var normalReadInlinableModify: Swift.Int {
+  // CHECK: public var normalReadInlinableModify: Swift::Int {
   public var normalReadInlinableModify: Int {
     // CHECK: _read{{$}}
     // CHECK-NOT: yield 0
@@ -175,7 +175,7 @@ public struct Foo: Hashable {
     // CHECK-NEXT: }
   }
 
-  // CHECK: public var normalReadAndModify: Swift.Int {
+  // CHECK: public var normalReadAndModify: Swift::Int {
   public var normalReadAndModify: Int {
     // CHECK-NEXT: _read{{$}}
     _read { yield 0 }
@@ -218,7 +218,7 @@ public struct Foo: Hashable {
     print("Not inlinable")
   }
 
-  // CHECK: public subscript(i: Swift.Int) -> Swift.Int {
+  // CHECK: public subscript(i: Swift::Int) -> Swift::Int {
   // CHECK-NEXT:   get{{$}}
   // FROMSOURCE-NEXT:   @inlinable set[[NEWVALUE]] { print("set") }
   // FROMMODULE-NEXT:   @inlinable set[[NEWVALUE]]{{$}}
@@ -228,7 +228,7 @@ public struct Foo: Hashable {
     @inlinable set { print("set") }
   }
 
-  // CHECK: public subscript(j: Swift.Int, k: Swift.Int) -> Swift.Int {
+  // CHECK: public subscript(j: Swift::Int, k: Swift::Int) -> Swift::Int {
   // FROMMODULE-NEXT:   @inlinable get{{$}}
   // FROMSOURCE-NEXT:   @inlinable get { return 0 }
   // CHECK-NEXT:   set[[NEWVALUE]]{{$}}
@@ -238,7 +238,7 @@ public struct Foo: Hashable {
     set { print("set") }
   }
 
-  // CHECK: @inlinable public subscript(l: Swift.Int, m: Swift.Int, n: Swift.Int) -> Swift.Int {
+  // CHECK: @inlinable public subscript(l: Swift::Int, m: Swift::Int, n: Swift::Int) -> Swift::Int {
   // FROMMODULE-NEXT:   get{{$}}
   // FROMSOURCE-NEXT:   get { return 0 }
   // FROMMODULE-NEXT:   set[[NEWVALUE]]{{$}}
@@ -250,8 +250,8 @@ public struct Foo: Hashable {
     set { print("set") }
   }
 
-  // FROMMODULE: @inlinable public init(value: Swift.Int){{$}}
-  // FROMSOURCE: @inlinable public init(value: Swift.Int) {
+  // FROMMODULE: @inlinable public init(value: Swift::Int){{$}}
+  // FROMSOURCE: @inlinable public init(value: Swift::Int) {
   // FROMSOURCE-NEXT: topLevelUsableFromInline()
   // FROMSOURCE-NEXT: noAccessors = value
   // FROMSOURCE-NEXT: hasDidSet = value

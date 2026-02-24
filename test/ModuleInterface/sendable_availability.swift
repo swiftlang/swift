@@ -28,18 +28,18 @@ extension X {
 
 // CHECK: @available(macOS, unavailable, introduced: 11.0)
 // CHECK-NEXT: @available(*, unavailable)
-// CHECK-NEXT: extension Library.X{{( )?}}: @unchecked Swift.Sendable {
+// CHECK-NEXT: extension Library::X{{( )?}}: @unchecked Swift::Sendable {
 
 // CHECK: @available(*, unavailable)
-// CHECK-NEXT: extension Library.Y{{( )?}}: @unchecked Swift.Sendable {
+// CHECK-NEXT: extension Library::Y{{( )?}}: @unchecked Swift::Sendable {
 
 // CHECK: @available(macOS, unavailable, introduced: 12.0)
 // CHECK-NEXT: @available(*, unavailable)
-// CHECK-NEXT: extension Library.X.A{{( )?}}: @unchecked Swift.Sendable {
+// CHECK-NEXT: extension Library::X.Library::A{{( )?}}: @unchecked Swift::Sendable {
 
 // CHECK: @available(macOS, unavailable, introduced: 11.0)
 // CHECK-NEXT: @available(*, unavailable)
-// CHECK-NEXT: extension Library.X.B{{( )?}}: @unchecked Swift.Sendable {
+// CHECK-NEXT: extension Library::X.Library::B{{( )?}}: @unchecked Swift::Sendable {
 
 // RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -target %target-cpu-apple-macosx12.0 -DLIBRARY -module-name Library -module-interface-preserve-types-as-written
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library

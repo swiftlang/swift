@@ -20,6 +20,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
@@ -27,6 +28,9 @@
 #include <tuple>
 
 #define DEBUG_TYPE "PotentialBindings"
+
+STATISTIC(NumBindingSetsSkipped, "binding sets that did not need recomputation");
+STATISTIC(NumBindingSetsRecomputed, "binding sets that required recomputation");
 
 using namespace swift;
 using namespace constraints;
@@ -52,6 +56,7 @@ static bool isDirectRequirement(ConstraintSystem &cs,
 BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
                        const PotentialBindings &info)
     : CS(CS), TypeVar(TypeVar), Info(info) {
+  GenerationNumber = Info.GenerationNumber;
 
   for (const auto &binding : info.Bindings)
     addBinding(binding);
@@ -67,6 +72,8 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
 
   for (auto &entry : info.AdjacentVars)
     AdjacentVars.insert(entry.first);
+
+  ASSERT(!IsDirty);
 }
 
 bool BindingSet::forClosureResult() const {
@@ -603,11 +610,17 @@ void BindingSet::inferTransitiveKeyPathBindings() {
                 AdjacentVars.insert(contextualRootVar);
                 AdjacentVars.insert(bindings.AdjacentVars.begin(),
                                     bindings.AdjacentVars.end());
+
+                // Note the fact that we modified the binding set.
+                markDirty();
               }
             } else {
               auto newBinding = binding.withSameSource(
                   inferredRootTy, AllowedBindingKind::Exact);
               addBinding(newBinding.asTransitiveFrom(keyPathTy));
+
+              // Note the fact that we modified the binding set.
+              markDirty();
             }
           }
         }
@@ -660,6 +673,9 @@ void BindingSet::inferTransitiveSupertypeBindings() {
 
       literal.setDirectRequirement(false);
       Literals.push_back(literal);
+
+      // Note the fact that we modified the binding set.
+      markDirty();
     }
 
     // TODO: We shouldn't need this in the future.
@@ -686,6 +702,9 @@ void BindingSet::inferTransitiveSupertypeBindings() {
       auto newBinding =
           binding.withSameSource(type, AllowedBindingKind::Supertypes);
       addBinding(newBinding.asTransitiveFrom(entry.first));
+
+      // Note the fact that we modified the binding set.
+      markDirty();
     }
   }
 }
@@ -735,6 +754,9 @@ void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
             }
 
             addBinding({protocolTy, AllowedBindingKind::Exact, constraint});
+
+            // Note the fact that we modified the binding set.
+            markDirty();
           }
         }
       }
@@ -879,6 +901,9 @@ bool BindingSet::finalizeKeyPathBindings() {
 
       Bindings = std::move(updatedBindings);
       Defaults.clear();
+
+      // Note the fact that we modified the binding set.
+      markDirty();
     }
   }
 
@@ -906,6 +931,9 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
         Bindings.remove_if([](const PotentialBinding &binding) {
           return binding.Kind == AllowedBindingKind::Supertypes;
         });
+
+        // Note the fact that we modified the binding set.
+        markDirty();
       }
     }
   }
@@ -1052,6 +1080,9 @@ void BindingSet::determineLiteralCoverage() {
         auto newBinding = binding->withType(adjustedTy);
         (void)Bindings.erase(binding);
         Bindings.insert(newBinding);
+
+        // Note the fact that we modified the binding set.
+        markDirty();
       }
 
       break;
@@ -1110,7 +1141,7 @@ void PotentialBindings::inferFromLiteral(Constraint *constraint) {
   Literals.emplace_back(protocol, constraint, defaultType, /*isDirect=*/true);
 }
 
-bool BindingSet::operator==(const BindingSet &other) {
+bool BindingSet::operator==(const BindingSet &other) const {
   if (AdjacentVars != other.AdjacentVars)
     return false;
 
@@ -1149,9 +1180,6 @@ bool BindingSet::operator==(const BindingSet &other) {
     if (x != y)
       return false;
   }
-
-  if (TransitiveProtocols != other.TransitiveProtocols)
-    return false;
 
   return true;
 }
@@ -1234,24 +1262,66 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
   BindingSet *bestBindings = nullptr;
 
-  // First, let's collect all of the possible bindings.
+  // First, let's construct a BindingSet for each type variable,
+  // from its PotentialBindings.
   for (auto *typeVar : getTypeVariables()) {
     auto &node = CG[typeVar];
-    node.resetBindingSet();
-    if (!typeVar->getImpl().hasRepresentativeOrFixed())
+
+    // If the type variable has been bound to a fixed type, we won't
+    // be considering it any further. Clear its binding set if it
+    // has one and move on.
+    if (typeVar->getImpl().hasRepresentativeOrFixed()) {
+      node.resetBindingSet();
+      continue;
+    }
+
+    // If we don't have a binding set yet, compute one.
+    if (!node.hasBindingSet()) {
       node.initBindingSet();
+      continue;
+    }
+
+    // If the node has a binding set already, check if it needs to
+    // be recomputed. This is the case if the PotentialBindings
+    // changed since last time, or if any of the "transitive inference"
+    // steps below changed the BindingSet for any reason.
+    if (!node.getBindingSet().isUpToDate()) {
+      ++NumBindingSetsRecomputed;
+      node.resetBindingSet();
+      node.initBindingSet();
+    } else {
+      ++NumBindingSetsSkipped;
+      node.getBindingSet().resetTransitiveProtocols();
+    }
   }
 
-  bool first = true;
-
-  // Now let's see if we could infer something for related type
-  // variables based on other bindings.
+  // Now let's perform transitive inference and ranking.
   for (auto *typeVar : getTypeVariables()) {
     auto &node = CG[typeVar];
     if (!node.hasBindingSet())
       continue;
 
     auto &bindings = node.getBindingSet();
+
+    // ****
+    // If any of the below change the binding set, they must also call
+    // markDirty().
+    // ****
+
+#define EXPENSIVE_CHECK 0
+#if EXPENSIVE_CHECK
+    BindingSet saved(*this, typeVar, node.getPotentialBindings());
+    ASSERT(bindings.getGenerationNumber() == saved.getGenerationNumber());
+    if (bindings != saved) {
+      ABORT([&](auto &out) {
+        out << "Binding set differs from freshly-recomputed one\n";
+        out << "\nold: ";
+        bindings.dump(out, 0);
+        out << "\nnew: ";
+        saved.dump(out, 0);
+      });
+    }
+#endif
 
     // Special handling for key paths.
     bindings.inferTransitiveKeyPathBindings();
@@ -1278,19 +1348,20 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
     bindings.inferTransitiveSupertypeBindings();
     bindings.determineLiteralCoverage();
 
+#if EXPENSIVE_CHECK
+    if (!bindings.isDirty() && saved != bindings) {
+      ABORT([&](auto &out) {
+        out << "Binding set changed but wasn't dirty\n";
+        out << "\nold: ";
+        saved.dump(out, 0);
+        out << "\nnew: ";
+        bindings.dump(out, 0);
+      });
+    }
+#endif
+
     if (!isViable)
       continue;
-
-    if (isDebugMode() && bindings.hasViableBindings()) {
-      if (first) {
-        llvm::errs().indent(solverState->getCurrentIndent())
-            << "(Potential Binding(s)\n";
-        first = false;
-      }
-      auto &log = llvm::errs().indent(solverState->getCurrentIndent() + 2);
-      bindings.dump(log, solverState->getCurrentIndent() + 2);
-      log << "\n";
-    }
 
     // If these are the first bindings, or they are better than what
     // we saw before, use them instead.
@@ -1298,9 +1369,32 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
       bestBindings = &bindings;
   }
 
-  if (isDebugMode() && !first) {
-    auto &log = llvm::errs().indent(solverState->getCurrentIndent());
-    log << ")\n";
+  if (isDebugMode()) {
+    bool first = true;
+
+    for (auto *typeVar : getTypeVariables()) {
+      auto &node = CG[typeVar];
+      if (!node.hasBindingSet())
+        continue;
+
+      const auto &bindings = node.getBindingSet();
+
+      if (isDebugMode() && bindings.hasViableBindings()) {
+        if (first) {
+          llvm::errs().indent(solverState->getCurrentIndent())
+              << "(Potential Binding(s)\n";
+          first = false;
+        }
+        auto &log = llvm::errs().indent(solverState->getCurrentIndent() + 2);
+        bindings.dump(log, solverState->getCurrentIndent() + 2);
+        log << "\n";
+      }
+
+      if (!first) {
+        auto &log = llvm::errs().indent(solverState->getCurrentIndent());
+        log << ")\n";
+      }
+    }
   }
 
   if (bestBindings)
@@ -1490,80 +1584,6 @@ bool swift::constraints::inference::checkTypeOfBinding(
   return true;
 }
 
-ConversionBehavior
-swift::constraints::inference::getConversionBehavior(Type type) {
-  if (type->is<StructType>()) {
-    if (type->isAnyHashable())
-      return ConversionBehavior::AnyHashable;
-    else if (type->isDouble() || type->isCGFloat())
-      return ConversionBehavior::Double;
-    else if (type->getAnyPointerElementType())
-      return ConversionBehavior::Pointer;
-
-    return ConversionBehavior::None;
-  }
-
-  if (auto *structTy = type->getAs<BoundGenericStructType>()) {
-    if (auto eltTy = structTy->getArrayElementType()) {
-      return ConversionBehavior::Array;
-    } else if (ConstraintSystem::isDictionaryType(structTy)) {
-      return ConversionBehavior::Dictionary;
-    } else if (ConstraintSystem::isSetType(structTy)) {
-      return ConversionBehavior::Set;
-    } else if (type->getAnyPointerElementType()) {
-      return ConversionBehavior::Pointer;
-    }
-
-    return ConversionBehavior::None;
-  }
-
-  if (auto *enumTy = type->getAs<BoundGenericEnumType>()) {
-    if (enumTy->getOptionalObjectType())
-      return ConversionBehavior::Optional;
-
-    return ConversionBehavior::None;
-  }
-
-  if (type->is<ClassType>() || type->is<BoundGenericClassType>())
-    return ConversionBehavior::Class;
-
-  if (type->is<EnumType>() ||
-      type->is<BuiltinType>() || type->is<ArchetypeType>())
-    return ConversionBehavior::None;
-
-  if (type->is<FunctionType>() || type->is<MetatypeType>())
-    return ConversionBehavior::Structural;
-
-  return ConversionBehavior::Unknown;
-}
-
-/// Check whether there exists a type that could be implicitly converted
-/// to a given type i.e. is the given type is Double or Optional<..> this
-/// function is going to return true because CGFloat could be converted
-/// to a Double and non-optional value could be injected into an optional.
-bool swift::constraints::inference::hasConversions(Type type) {
-  switch (getConversionBehavior(type)) {
-  case ConversionBehavior::None:
-    return false;
-  case ConversionBehavior::Array:
-    return hasConversions(type->getArrayElementType());
-  case ConversionBehavior::Dictionary: {
-    auto pair = ConstraintSystem::isDictionaryType(type);
-    return hasConversions(pair->first) || hasConversions(pair->second);
-  }
-  case ConversionBehavior::Set:
-    return hasConversions(*ConstraintSystem::isSetType(type));
-  case ConversionBehavior::Class:
-  case ConversionBehavior::AnyHashable:
-  case ConversionBehavior::Double:
-  case ConversionBehavior::Pointer:
-  case ConversionBehavior::Optional:
-  case ConversionBehavior::Structural:
-  case ConversionBehavior::Unknown:
-    return true;
-  }
-}
-
 bool BindingSet::isViable(PotentialBinding &binding) {
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
@@ -1608,7 +1628,7 @@ bool BindingSet::isViable(PotentialBinding &binding) {
     // subtype and other conversions.
     if (existing->Kind != AllowedBindingKind::Exact) {
       if (existingType->isKnownStdlibCollectionType() &&
-          hasConversions(existingType)) {
+          hasProperSubtypes(existingType)) {
         continue;
       }
     }
@@ -1651,7 +1671,7 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
         if (CS.shouldAttemptFixes())
           return false;
 
-        return !hasConversions(binding.BindingType);
+        return !hasProperSubtypes(binding.BindingType);
       })) {
     // Result type of subscript could be l-value so we can't bind it early.
     if (!TypeVar->getImpl().isSubscriptResultType() &&
@@ -2139,6 +2159,8 @@ void PotentialBindings::infer(Constraint *constraint) {
   if (!Constraints.insert(constraint))
     return;
 
+  ++GenerationNumber;
+
   // Record the change, if there are active scopes.
   if (CS.solverState)
     CS.recordChange(
@@ -2334,6 +2356,8 @@ void PotentialBindings::retract(Constraint *constraint) {
   if (!Constraints.remove(constraint))
     return;
 
+  ++GenerationNumber;
+
   // Record the change, if there are active scopes.
   if (CS.solverState)
     CS.recordChange(SolverTrail::Change::RetractedConstraintFromInference(
@@ -2430,6 +2454,8 @@ void PotentialBindings::dump(llvm::raw_ostream &out, unsigned indent) const {
   } else {
     out << "<<No type variable assigned>>\n";
   }
+
+  out << "generation: " << GenerationNumber << " ";
 
   out << "[constraints: ";
   interleave(
@@ -2556,6 +2582,8 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     attributes.push_back("delayed");
   if (isSubtypeOfExistentialType())
     attributes.push_back("subtype_of_existential");
+  if (isDirty())
+    attributes.push_back("dirty");
   if (!attributes.empty()) {
     out << "[attributes: ";
     interleave(attributes, out, ", ");

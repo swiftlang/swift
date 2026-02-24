@@ -84,8 +84,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypesWithDefaults>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
@@ -99,7 +98,7 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
-if(WIN32 AND ${CMAKE_SYSTEM_PROCESSOR} MATCHES "X86")
+if(WIN32 AND CMAKE_SYSTEM_PROCESSOR MATCHES "X86")
   # Turn on /safeseh for 32-bit x86 or we won't be able to link
   add_compile_options($<$<COMPILE_LANGUAGE:ASM_MASM>:/safeseh>)
 endif()
@@ -124,6 +123,7 @@ add_library(swiftRuntime
 if(${PROJECT_NAME}_ENABLE_BACKTRACING)
   target_sources(swiftRuntime PRIVATE
     Address.swift
+    AggregatingSymbolSource.swift
     Backtrace.swift
     Backtrace+Codable.swift
     BacktraceFormatter.swift
@@ -138,6 +138,7 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     CoreSymbolication.swift
     CrashLog.swift
     CrashLogCapture.swift
+    DefaultSymbolLocator.swift
     Dwarf.swift
     EightByteBuffer.swift
     Elf.swift
@@ -151,6 +152,19 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     ImageSource.swift
     Libc.swift
     LimitSequence.swift
+    PDBCache.swift
+    PDB/Bitset.swift
+    PDB/FunctionInfo.swift
+    PDB/Hashes.swift
+    PDB/ISO8859-1.swift
+    PDB/Module.swift
+    PDB/MultiStreamFile.swift
+    PDB/NameTableNI.swift
+    PDB/PDBFile.swift
+    PDB/PDBFile+SymbolSource.swift
+    PDB/SectionInfo.swift
+    PDB/String+EncodeAs.swift
+    PDB/Windows1252.swift
     MemoryReader.swift
     OSReleaseScanner.swift
     PeCoff.swift
@@ -160,6 +174,7 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     Runtime.swift
     RichFrame.swift
     SymbolicatedBacktrace.swift
+    SymbolLocator.swift
     Utils.swift
     Win32Unwinder.swift
   )
@@ -173,7 +188,7 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     if(processor STREQUAL "AMD64")
       target_sources(swiftRuntime PRIVATE
         get-cpu-context-x86_64.asm)
-    elseif(processor STREQUAL "X86")
+    elseif(processor STREQUAL "X86" OR processor STREQUAL "I686")
       target_sources(swiftRuntime PRIVATE
         get-cpu-context-i686.asm)
     elseif(processor STREQUAL "ARM64")
@@ -184,7 +199,7 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     endif()
   else()
     # Other platforms can use the shared `.S` file.
-    target_sources(swiftRuntime
+    target_sources(swiftRuntime PRIVATE
       get-cpu-context.S)
   endif()
 

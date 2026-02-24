@@ -520,7 +520,7 @@ static void diagnoseSwiftVersion(std::optional<version::Version> &vers,
         [&](LanguageMode mode) { os << "'" << mode.versionString() << "'"; });
   }
 
-  diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, modesStr);
+  diags.diagnose(SourceLoc(), diag::note_valid_language_modes, modesStr);
 }
 
 /// Create a new Regex instance out of the string value in \p RpassArg.
@@ -614,21 +614,19 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
             .Default(true);
   } else {
     // Any heuristics we might add would go here.
-    Opts.UseModuleSelectors = false;
+    Opts.UseModuleSelectors = true;
   }
 
   if (Opts.PreserveTypesAsWritten && Opts.UseModuleSelectors) {
     Opts.PreserveTypesAsWritten = false;
-    diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
-                   "-module-interface-preserve-types-as-written",
-                   "-enable-module-selectors-in-module-interface");
+    diags.diagnose(SourceLoc(), diag::ignoring_option_obsolete_module_selectors,
+                   "-module-interface-preserve-types-as-written");
   }
 
   if (Opts.AliasModuleNames && Opts.UseModuleSelectors) {
     Opts.AliasModuleNames = false;
-    diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
-                   "-alias-module-names-in-module-interface",
-                   "-enable-module-selectors-in-module-interface");
+    diags.diagnose(SourceLoc(), diag::ignoring_option_obsolete_module_selectors,
+                   "-alias-module-names-in-module-interface");
   }
 }
 
@@ -1121,7 +1119,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
           FrontendOpts.RequestedAction);
   bool HadError = false;
 
-  if (auto A = Args.getLastArg(OPT_swift_version)) {
+  if (auto A = Args.getLastArg(OPT_language_mode)) {
     auto vers =
         VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
     bool isValid = false;
@@ -2136,6 +2134,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_crash_on_valid_salvage,
                    Opts.CrashOnValidSalvage);
 
+  Opts.SolverEnableTransitiveConformance =
+      Args.hasFlag(OPT_solver_enable_transitive_conformance,
+                   OPT_solver_disable_transitive_conformance,
+                   Opts.SolverEnableTransitiveConformance);
+
   Opts.SolverEnablePreparedOverloads =
       Args.hasFlag(OPT_solver_enable_prepared_overloads,
                    OPT_solver_disable_prepared_overloads,
@@ -2686,6 +2689,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   Opts.DisableCrossImportOverlaySearch |=
       Args.hasArg(OPT_disable_cross_import_overlay_search);
+
+  for (auto &Mod : Args.getAllArgValues(OPT_dependency_only_import)) {
+    Opts.DependencyOnlyModuleImports.push_back(Mod);
+  }
 
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().

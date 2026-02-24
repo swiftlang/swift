@@ -1,7 +1,10 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=default -I %swift_src_root/lib/ClangImporter/SwiftBridging -Xcc -std=c++20)
 //
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=freebsd
+// Ubuntu 20.04 ships with an old version of libstdc++, which does not provide
+// std::contiguous_iterator_tag from C++20.
+// UNSUPPORTED: LinuxDistribution=ubuntu-20.04
+// UNSUPPORTED: LinuxDistribution=amzn-2
 
 import StdlibUnittest
 import CustomBorrowingSequence

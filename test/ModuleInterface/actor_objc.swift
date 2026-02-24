@@ -13,7 +13,7 @@
 import Foundation
 
 // CHECK-LABEL: @objc @_inheritsConvenienceInitializers
-// CHECK: public actor SomeActor : ObjectiveC.NSObject {
+// CHECK: public actor SomeActor : ObjectiveC::NSObject {
 // CHECK: @objc override public init()
 @available(SwiftStdlib 5.1, *)
 public actor SomeActor: NSObject {

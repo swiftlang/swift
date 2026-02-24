@@ -28,6 +28,15 @@ struct Struct {
       return &_k
     }
   }
+
+  var k3: Klass {
+    borrowing borrow {
+      return _k
+    }
+    borrowing mutate { // expected-error{{a 'mutate' accessor cannot be declared borrowing}}
+      return &_k // expected-error{{}}
+    }
+  }
 }
 
 extension Klass {
@@ -75,7 +84,8 @@ enum OrderStatus: ~Copyable {
 }
 
 public protocol Q {
-  var id: NonTrivial { borrow mutate } // expected-note{{protocol requires property 'id' with type 'NonTrivial'}} // expected-note{{}} // expected-note{{}} // expected-note{{}}
+  var id: NonTrivial { borrow mutate } // expected-note{{protocol requires property 'id' with type 'NonTrivial'}} // expected-note{{}} // expected-note{{}} // expected-note{{}} // expected-note{{}}
+
 }
 
 public struct NonTrivial {
@@ -208,5 +218,9 @@ struct S10 {
       return _i
     }
   }
+}
+
+final class C : Q { // expected-error {{type 'C' does not conform to protocol 'Q'}} // expected-note{{add stubs for conformance}}
+  var id: NonTrivial = NonTrivial(k: Klass()) // expected-error{{borrow/mutate protocol requirements can only be witnessed in a struct}}
 }
 

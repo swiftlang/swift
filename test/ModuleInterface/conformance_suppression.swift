@@ -3,6 +3,6 @@
 // RUN: %FileCheck %s < %t.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface -module-name Mojuel)
 
-// CHECK:     public enum RecollectionOrganization<T> : ~Swift.BitwiseCopyable, Swift.Copyable where T : ~Copyable {
+// CHECK:     public enum RecollectionOrganization<T> : ~Swift::BitwiseCopyable, Swift::Copyable where T : ~Copyable {
 // CHECK-NEXT: }
 public enum RecollectionOrganization<T : ~Copyable> : ~BitwiseCopyable, Copyable {}

@@ -291,7 +291,7 @@ extension arm_gprs {
     return X86_64Context(with: mcontext as! darwin_x86_64_mcontext)
   }
   #elseif os(Linux) && arch(x86_64)
-  init(with mctx: mcontext_t) { 
+  init(with mctx: mcontext_t) {
     gprs.setR(X86_64Register.rax.rawValue, to: UInt64(bitPattern: mctx.gregs.13))
     gprs.setR(X86_64Register.rbx.rawValue, to: UInt64(bitPattern: mctx.gregs.12))
     gprs.setR(X86_64Register.rcx.rawValue, to: UInt64(bitPattern: mctx.gregs.14))

@@ -27,7 +27,7 @@ internal import Glibc
 internal import Musl
 #endif
 
-/// Provides a per-thread image cache for ELF image processing.  This means
+/// Provides a per-thread image cache for PE-COFF image processing.  This means
 /// if you take multiple backtraces from a thread, you won't load the same
 /// image multiple times.
 final class PeImageCache {

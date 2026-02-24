@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -Onone -g -o %t/CrashWithThreads
 // RUN: %target-codesign %t/CrashWithThreads
-// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no,swift-backtrace=%backtracer %target-run %t/CrashWithThreads 2>&1 || true) | %FileCheck -vv %s -dump-input-filter=all
-// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no,swift-backtrace=%backtracer,threads=all %target-run %t/CrashWithThreads 2>&1 || true) | %FileCheck -vv %s -dump-input-filter=all
+// RUN: not --crash env SWIFT_BACKTRACE=enable=yes,cache=no,swift-backtrace=%backtracer %target-run %t/CrashWithThreads 2>&1 | %FileCheck -vv %s -dump-input-filter=all
+// RUN: not --crash env SWIFT_BACKTRACE=enable=yes,cache=no,swift-backtrace=%backtracer,threads=all %target-run %t/CrashWithThreads 2>&1 | %FileCheck -vv %s -dump-input-filter=all
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

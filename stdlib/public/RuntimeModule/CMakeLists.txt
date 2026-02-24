@@ -32,6 +32,7 @@ endif()
 
 set(backtracing_sources
   Address.swift
+  AggregatingSymbolSource.swift
   Backtrace.swift
   Backtrace+Codable.swift
   BacktraceFormatter.swift
@@ -46,6 +47,7 @@ set(backtracing_sources
   CoreSymbolication.swift
   CrashLog.swift
   CrashLogCapture.swift
+  DefaultSymbolLocator.swift
   Dwarf.swift
   EightByteBuffer.swift
   Elf.swift
@@ -59,6 +61,19 @@ set(backtracing_sources
   ImageSource.swift
   Libc.swift
   LimitSequence.swift
+  PDBCache.swift
+  PDB/Bitset.swift
+  PDB/FunctionInfo.swift
+  PDB/Hashes.swift
+  PDB/ISO8859-1.swift
+  PDB/Module.swift
+  PDB/MultiStreamFile.swift
+  PDB/NameTableNI.swift
+  PDB/PDBFile.swift
+  PDB/PDBFile+SymbolSource.swift
+  PDB/SectionInfo.swift
+  PDB/String+EncodeAs.swift
+  PDB/Windows1252.swift
   MemoryReader.swift
   OSReleaseScanner.swift
   PeCoff.swift
@@ -68,6 +83,7 @@ set(backtracing_sources
   Runtime.swift
   RichFrame.swift
   SymbolicatedBacktrace.swift
+  SymbolLocator.swift
   Utils.swift
   Win32Unwinder.swift
 )

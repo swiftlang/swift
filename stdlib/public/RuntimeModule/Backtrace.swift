@@ -33,7 +33,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   ///
   /// This is used as an opaque type; if you have some Address, you
   /// can ask if it's NULL, and you can attempt to convert it to a
-  /// FixedWidthInteger.
+  /// ``FixedWidthInteger``.
   ///
   /// This is intentionally _not_ a pointer, because you shouldn't be
   /// dereferencing them; they may refer to some other process, for
@@ -353,11 +353,11 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   /// Return a symbolicated version of the backtrace.
   ///
   /// - images:  Specifies the set of images to use for symbolication.
-  ///            If `nil`, the function will look to see if the `Backtrace`
+  ///            If `nil`, the function will look to see if the ``Backtrace``
   ///            has already captured images.  If it has, those will be
   ///            used; otherwise we will capture images at this point.
   ///
-  /// - options: Symbolication options; see `SymbolicationOptions`.
+  /// - options: Symbolication options; see ``SymbolicationOptions``.
   public func symbolicated(with images: ImageMap? = nil,
                            options: SymbolicationOptions = .default)
     -> SymbolicatedBacktrace? {
@@ -424,7 +424,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     return lines.joined(separator: "\n")
   }
 
-  /// Initialise a Backtrace from a sequence of `RichFrame`s
+  /// Initialise a Backtrace from a sequence of ``RichFrame``s
   @_spi(Internal)
   public init<Address: FixedWidthInteger>(architecture: String,
        frames: some Sequence<RichFrame<Address>>,

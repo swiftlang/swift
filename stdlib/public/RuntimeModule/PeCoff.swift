@@ -747,51 +747,17 @@ final class PeCoffImage {
     #endif
     return try? DwarfReader(source: self, shouldSwap: shouldSwap)
   }()
+}
 
-  typealias CallSiteInfo = DwarfReader<PeCoffImage>.CallSiteInfo
-
-  func inlineCallSites(
-    at relativeAddress: Address
-  ) -> ArraySlice<CallSiteInfo> {
-    // ###TODO: PDB support
-    let address = relativeAddress + Address(imageBase)
-
-    guard let dwarfReader else {
-      return [][0..<0]
-    }
-
-    return dwarfReader.lookupInlineCallSites(
-      at: DwarfReader<PeCoffImage>.Address(address)
-    )
-  }
-
-  typealias SourceLocation = SymbolicatedBacktrace.SourceLocation
-
-  func sourceLocation(
-    for relativeAddress: Address
-  ) throws -> SourceLocation? {
-    // ###TODO: PDB support
-    let address = relativeAddress + Address(imageBase)
-
-    guard let dwarfReader else {
-      return nil
-    }
-    return try dwarfReader.sourceLocation(
-      for: DwarfReader<PeCoffImage>.Address(address)
-    )
-  }
-
-  /// Look-up an address and find the corresponding function
-  func lookupSymbol(
-    address relativeAddress: Address
-  ) -> ImageSymbol? {
-    // ###TODO: PDB support
-    let address = relativeAddress + Address(imageBase)
+extension PeCoffImage: SymbolSource {
+  func lookupSymbol(address: SymbolSource.Address) -> SymbolSource.Symbol? {
+    let address = address + Address(imageBase)
 
     if let function = dwarfReader?.lookupFunction(at: address) {
       let offset = address - function.lowPC
-      return ImageSymbol(name: function.rawName,
-                         offset: Int(offset))
+      return SymbolSource.Symbol(name: function.rawName,
+                                 offset: Int(offset),
+                                 size: nil)
     } else if let functions {
       // If we don't have a DWARF reader, but we do have a function list,
       // try looking in the function list.
@@ -808,8 +774,9 @@ final class PeCoffImage {
         if address >= functions[mid].address {
           if mid + 1 == functions.count || address < functions[mid + 1].address {
             let offset = address - functions[mid].address
-            return ImageSymbol(name: functions[mid].name,
-                               offset: Int(offset))
+            return SymbolSource.Symbol(name: functions[mid].name,
+                                       offset: Int(offset),
+                                       size: nil)
           }
           min = mid + 1
         }
@@ -817,6 +784,44 @@ final class PeCoffImage {
     }
 
     return nil
+  }
+
+  func sourceLocation(
+    for relativeAddress: SymbolSource.Address
+  ) -> SymbolSource.SourceLocation? {
+    let address = relativeAddress + Address(imageBase)
+
+    guard let dwarfReader else {
+      return nil
+    }
+    return try? dwarfReader.sourceLocation(
+      for: DwarfReader<PeCoffImage>.Address(address)
+    )
+  }
+
+  func inlineCallSites(
+    at relativeAddress: SymbolSource.Address
+  ) -> Array<SymbolSource.CallSiteInfo> {
+    let address = relativeAddress + Address(imageBase)
+
+    guard let dwarfReader else {
+      return []
+    }
+
+    var result: [SymbolSource.CallSiteInfo] = []
+    for site in dwarfReader.lookupInlineCallSites(
+          at: DwarfReader<PeCoffImage>.Address(address)
+        ) {
+      result.append(SymbolSource.CallSiteInfo(rawName: site.rawName,
+                                              name: site.name,
+                                              location: SourceLocation(
+                                                path: site.filename,
+                                                line: site.line,
+                                                column: site.column
+                                              )))
+    }
+
+    return result
   }
 }
 
@@ -888,6 +893,31 @@ extension PeCoffImage: DwarfSource {
     case .debugCuIndex: return getSection(".debug_cu_index")
     case .debugTuIndex: return getSection(".debug_tu_index")
     }
+  }
+
+}
+
+@_spi(SymbolLocation)
+extension PeCoffImage: SymbolLocator.Image {
+
+  public var name: String? {
+    guard let path = self.path else {
+      return nil
+    }
+    let (_, filename) = splitpath(path)
+    return String(filename)
+  }
+
+  public var path: String? {
+    return source.path
+  }
+
+  public var uuid: [UInt8]? {
+    return codeview?.uuid
+  }
+
+  public var age: UInt32? {
+    return codeview?.age
   }
 
 }

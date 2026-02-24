@@ -1196,7 +1196,7 @@ Added: _$ss18_BorrowingSequenceMp
 Added: _$ss18_BorrowingSequenceP01_A8IteratorAB_s01_aC8ProtocolTn
 Added: _$ss18_BorrowingSequenceP05_makeA8Iterator01_aD0QzyFTj
 Added: _$ss18_BorrowingSequenceP05_makeA8Iterator01_aD0QzyFTq
-Added: _$ss18_BorrowingSequencePs01_A8IteratorABQzRszRi0_zrlE04makeaC0xyF
+Added: _$ss18_BorrowingSequencePs01_A8IteratorABQzRszRi0_z8_ElementABRj_zrlE05_makeaC0xyF
 Added: _$ss18_BorrowingSequenceTL
 Added: _$ss26_BorrowingIteratorProtocolMp
 Added: _$ss26_BorrowingIteratorProtocolP5_skip2byS2i_tFTj

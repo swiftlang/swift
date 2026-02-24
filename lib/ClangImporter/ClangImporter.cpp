@@ -458,10 +458,8 @@ bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
   return importer::isForwardDeclOfType(D);
 }
 
-ClangImporter::ClangImporter(ASTContext &ctx, DependencyTracker *tracker,
-                             DWARFImporterDelegate *dwarfImporterDelegate)
-    : ClangModuleLoader(tracker),
-      Impl(*new Implementation(ctx, tracker, dwarfImporterDelegate)) {}
+ClangImporter::ClangImporter(ASTContext &ctx, DependencyTracker *tracker)
+    : ClangModuleLoader(tracker), Impl(*new Implementation(ctx, tracker)) {}
 
 ClangImporter::~ClangImporter() {
   delete &Impl;
@@ -1404,15 +1402,24 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
           *CI, invocationArgs, clangDiags, importerOpts.clangPath.c_str()))
     return nullptr;
 
+  // Disable validation for PCH in LLDB. This option is not controllable via a
+  // command line option; setting it depending on the DebuggerSupport flag.
+  // LLDB makes a best effort to create a 100% compatible environment by
+  // deserializing its CompilerInvocation and Clang flags from the main Swift
+  // module, but it needs to be able to adjust other language options on top in
+  // a way that otherwise would make validation fail.
+  if (importerOpts.DebuggerSupport)
+    CI->getPreprocessorOpts().DisablePCHOrModuleValidation =
+      clang::DisableValidationForModuleKind::PCH;
+
   return CI;
 }
 
-std::unique_ptr<ClangImporter> ClangImporter::create(
-    ASTContext &ctx, const IRGenOptions *IRGenOpts, std::string swiftPCHHash,
-    DependencyTracker *tracker,
-    DWARFImporterDelegate *dwarfImporterDelegate, bool ignoreFileMapping) {
-  std::unique_ptr<ClangImporter> importer{
-      new ClangImporter(ctx, tracker, dwarfImporterDelegate)};
+std::unique_ptr<ClangImporter>
+ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
+                      std::string swiftPCHHash, DependencyTracker *tracker,
+                      bool ignoreFileMapping) {
+  std::unique_ptr<ClangImporter> importer{new ClangImporter(ctx, tracker)};
   auto &importerOpts = ctx.ClangImporterOpts;
 
   auto bridgingPCH = importerOpts.getPCHInputPath();
@@ -2885,8 +2892,7 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
 }
 
 ClangImporter::Implementation::Implementation(
-    ASTContext &ctx, DependencyTracker *dependencyTracker,
-    DWARFImporterDelegate *dwarfImporterDelegate)
+    ASTContext &ctx, DependencyTracker *dependencyTracker)
     : SwiftContext(ctx), ImportForwardDeclarations(
                              ctx.ClangImporterOpts.ImportForwardDeclarations),
       DisableSwiftBridgeAttr(ctx.ClangImporterOpts.DisableSwiftBridgeAttr),
@@ -2901,8 +2907,7 @@ ClangImporter::Implementation::Implementation(
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
       platformAvailability(ctx.LangOpts), nameImporter(),
       DisableSourceImport(ctx.ClangImporterOpts.DisableSourceImport),
-      SwiftDependencyTracker(dependencyTracker),
-      DWARFImporter(dwarfImporterDelegate) {}
+      SwiftDependencyTracker(dependencyTracker) {}
 
 ClangImporter::Implementation::~Implementation() {
 #ifndef NDEBUG

@@ -42,6 +42,7 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
 #include "swift/Sema/TypeVariableType.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
 
@@ -1876,31 +1877,33 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       assert(!argsWithLabels[argIdx].isAutoClosure() ||
              isSynthesizedArgument(argument));
 
-      // If parameter is a generic parameter, let's copy its
-      // conformance requirements (if any), to the argument
-      // be able to filter mismatching choices earlier.
-      if (auto *typeVar = paramTy->getAs<TypeVariableType>()) {
-        auto *locator = typeVar->getImpl().getLocator();
-        if (locator->isForGenericParameter()) {
-          auto &CG = cs.getConstraintGraph();
+      if (cs.getASTContext().TypeCheckerOpts.SolverEnableTransitiveConformance) {
+        // If parameter is a generic parameter, let's copy its
+        // conformance requirements (if any), to the argument
+        // be able to filter mismatching choices earlier.
+        if (auto *typeVar = paramTy->getAs<TypeVariableType>()) {
+          auto *locator = typeVar->getImpl().getLocator();
+          if (locator->isForGenericParameter()) {
+            auto &CG = cs.getConstraintGraph();
 
-          auto isTransferableConformance = [&typeVar](Constraint *constraint) {
-            if (constraint->getKind() != ConstraintKind::ConformsTo &&
-                constraint->getKind() != ConstraintKind::NonisolatedConformsTo)
-              return false;
+            auto isTransferableConformance = [&typeVar](Constraint *constraint) {
+              if (constraint->getKind() != ConstraintKind::ConformsTo &&
+                  constraint->getKind() != ConstraintKind::NonisolatedConformsTo)
+                return false;
 
-            auto requirementTy = constraint->getFirstType();
-            if (!requirementTy->isEqual(typeVar))
-              return false;
+              auto requirementTy = constraint->getFirstType();
+              if (!requirementTy->isEqual(typeVar))
+                return false;
 
-            return constraint->getSecondType()->is<ProtocolType>();
-          };
+              return constraint->getSecondType()->is<ProtocolType>();
+            };
 
-          for (auto *constraint : CG[typeVar].getConstraints()) {
-            if (isTransferableConformance(constraint))
-              cs.addConstraint(ConstraintKind::TransitivelyConformsTo, argTy,
-                               constraint->getSecondType(),
-                               constraint->getLocator());
+            for (auto *constraint : CG[typeVar].getConstraints()) {
+              if (isTransferableConformance(constraint))
+                cs.addConstraint(ConstraintKind::TransitivelyConformsTo, argTy,
+                                 constraint->getSecondType(),
+                                 constraint->getLocator());
+            }
           }
         }
       }
@@ -7454,8 +7457,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // would be handled by an existential promotion in cases where it's allowed,
   // and `Optional<T>` which would be handled by optional injection.
   //
-  // `LValueType`s are also ignored at this stage to avoid accidentally wrapping them. If they
-  //  are valid wrapping targets, they will be tuple-wrapped after the lvalue is converted.
+  // This logic is intended for concrete types, so `PackExpansionType` must be
+  // avoided to not tuple-wrap pack arguments.
+  //
+  // `LValueType`s are also ignored at this stage to avoid accidentally wrapping
+  // them. If they
+  //  are valid wrapping targets, they will be tuple-wrapped after the lvalue is
+  //  converted.
   if (isTupleWithUnresolvedPackExpansion(origType1) ||
       isTupleWithUnresolvedPackExpansion(origType2)) {
     auto isTypeVariableWrappedInOptional = [](Type type) {
@@ -7465,6 +7473,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return false;
     };
     if (isa<TupleType>(desugar1) != isa<TupleType>(desugar2) &&
+        !isa<PackExpansionType>(desugar1) &&
+        !isa<PackExpansionType>(desugar2) &&
         !isa<InOutType>(desugar1) && !isa<InOutType>(desugar2) &&
         !isa<LValueType>(desugar1) && !isa<LValueType>(desugar2) &&
         !isTypeVariableWrappedInOptional(desugar1) &&
@@ -8423,10 +8433,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (type1->isPlaceholder() || type2->isPlaceholder())
       return getTypeMatchSuccess();
 
-    // If parameter pack expansion contains more than one element and the other
-    // side is a tuple, record a fix.
+    // If we are applying args, we may be able to emit a tailored fix.
     auto *loc = getConstraintLocator(locator);
     if (loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+      // If parameter pack expansion contains more than one element and the
+      // other side is a tuple, record a fix.
       if (auto packExpansion = type2->getAs<PackExpansionType>()) {
         auto countType = simplifyType(packExpansion->getCountType(), flags);
         if (auto paramPack = countType->getAs<PackType>()) {
@@ -8437,6 +8448,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             }
             return getTypeMatchSuccess();
           }
+        }
+      }
+      // If the other side contains a pack expansion within a tuple, record a
+      // fix and wrap the parameter pack in a tuple.
+      if (auto tuple = type2->getAs<TupleType>()) {
+        if (type1->is<PackExpansionType>() &&
+            containsPackExpansionType(tuple)) {
+          if (recordFix(AllowInvalidPackExpansion::create(*this, loc))) {
+            return getTypeMatchFailure(loc);
+          }
+          return matchTypes(TupleType::get({type1}, type1->getASTContext()),
+                            type2, kind, flags, locator);
         }
       }
     }
@@ -8939,6 +8962,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // solve this yet.
   if (type->isTypeVariableOrMember())
     return formUnsolved();
+
+  // If we have a function type and are checking for Sendable conformance we
+  // need to delay if we have Sendable dependence.
+  if (auto *fnTy = type->getAs<FunctionType>()) {
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      if (fnTy->getSendableDependentType()) {
+        fnTy = simplifyType(fnTy)->castTo<FunctionType>();
+        type = fnTy;
+      }
+      if (fnTy->getSendableDependentType())
+        return formUnsolved();
+    }
+  }
 
   auto conformsToSubKind = kind;
   if (kind != ConstraintKind::NonisolatedConformsTo)
@@ -12389,11 +12425,32 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     parameters.push_back(param);
   }
 
-  // Propagate @Sendable from the contextual type to the closure.
   auto closureExtInfo = inferredClosureType->getExtInfo();
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
-    if (contextualFnType->isSendable())
-      closureExtInfo = closureExtInfo.withSendable();
+    if (!closureExtInfo.isSendable()) {
+      if (auto sendTy = contextualFnType->getSendableDependentType()) {
+        closureExtInfo = closureExtInfo.withSendableDependentType(sendTy);
+      } else if (contextualFnType->isSendable()) {
+        closureExtInfo = closureExtInfo.withSendable();
+      }
+    }
+
+    auto inferredThrownErrorType =
+        inferredClosureType->getEffectiveThrownErrorTypeOrNever();
+    // In a typed throws context a throwing closure (as determined from the
+    // body or an explicit type) assumes an error type of the context if it's
+    // fully resolved. Do nothing if closure is either non-throwing
+    // or has an explicit typed throws annotation.
+    if (inferredThrownErrorType->isErrorExistentialType()) {
+      auto errorTy = contextualFnType->getEffectiveThrownErrorTypeOrNever();
+      // Don't propagate if the contextual error type:
+      //   - requires inference;
+      //   - is `Never` which means the contextu is non-throwing;
+      //   - is `any Error` which already matches the inferred type of the closure.
+      if (!(errorTy->hasTypeVariable() || errorTy->isNever() ||
+            errorTy->isErrorExistentialType()))
+        closureExtInfo = closureExtInfo.withThrows(/*throws=*/true, errorTy);
+    }
   }
 
   // Propagate sending result from the contextual type to the closure.

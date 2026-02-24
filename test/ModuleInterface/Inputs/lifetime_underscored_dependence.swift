@@ -136,3 +136,9 @@ public func fullReassign(dest: inout AnotherView, source: AnotherView) {
 @inlinable public func takeFullReassign(
   closure: @_lifetime(dest: immortal, copy source) (_ dest: inout AnotherView, _ source: AnotherView) -> ()
 ) {}
+
+@inlinable
+public func takeReadBorrower(f: @_lifetime(borrow a) (_ a: AnotherView) -> AnotherView) {}
+
+@inlinable
+public func takeWriteBorrower(f: @_lifetime(&a) (_ a: inout AnotherView) -> AnotherView) {}

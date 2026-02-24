@@ -3686,7 +3686,8 @@ private:
       // Create !span.isEmpty as a prefix unary operator call
       auto notOpId = ctx.getIdentifier("!");
       auto *notOpRef = new (ctx) UnresolvedDeclRefExpr(
-          DeclNameRef(notOpId), DeclRefKind::PrefixOperator, DeclNameLoc());
+          DeclNameRef(notOpId), DeclRefKind::PrefixOperator,
+          DeclNameLoc(stmt->getForLoc()));
       auto *notOp = PrefixUnaryExpr::create(ctx, notOpRef, isEmptyRef);
       notOp->setImplicit();
 
@@ -3711,9 +3712,9 @@ private:
     auto *countVarRef =
         new (ctx) DeclRefExpr(countVar, DeclNameLoc(), /*implicit=*/true);
 
-    auto *lessThanOp = new (ctx)
-        UnresolvedDeclRefExpr(DeclNameRef(ctx.getIdentifier("<")),
-                              DeclRefKind::BinaryOperator, DeclNameLoc());
+    auto *lessThanOp = new (ctx) UnresolvedDeclRefExpr(
+        DeclNameRef(ctx.getIdentifier("<")), DeclRefKind::BinaryOperator,
+        DeclNameLoc(stmt->getForLoc()));
     auto *condition = BinaryExpr::create(ctx, indexRef, lessThanOp, countVarRef,
                                          /*implicit=*/true);
 
@@ -3896,6 +3897,7 @@ private:
 
     if (isBorrowing) {
       ASSERT(innerLoop);
+      innerLoop->setParentForEach(stmt);
       stmt->setContinueTarget(innerLoop);
     } else {
       stmt->setContinueTarget(whileStmt);

@@ -26,6 +26,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
@@ -828,56 +829,54 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 } // end anonymous namespace
 
 /// Determine whether the candidate type is a subclass of the superclass
-/// type.
+/// type. This check is approximate, because it disregards generic
+/// arguments.
 ///
 /// FIXME: This should be a common utility somewhere instead of being
 /// re-implemented in several places in the compiler.
 static bool isSubclassOf(Type candidateType, Type superclassType) {
-  // Conversion from a concrete type to its existential value.
-  if (superclassType->isExistentialType() && !superclassType->isAny()) {
-    auto layout = superclassType->getExistentialLayout();
-
-    if (auto layoutConstraint = layout.getLayoutConstraint()) {
-      if (layoutConstraint->isClass() &&
-          !(candidateType->isClassExistentialType() ||
-            candidateType->mayHaveSuperclass()))
-        return false;
-    }
-
-    if (layout.explicitSuperclass &&
-        !isSubclassOf(candidateType, layout.explicitSuperclass))
-      return false;
-
-    return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
-      if (auto superclass = P->getSuperclassDecl()) {
-        if (!isSubclassOf(candidateType,
-                          superclass->getDeclaredInterfaceType()))
-          return false;
-      }
-
-      auto result = TypeChecker::containsProtocol(candidateType, P,
-                                                  /*allowMissing=*/false);
-      return result.first || result.second;
-    });
-  }
-
-  if (auto *selfType = candidateType->getAs<DynamicSelfType>()) {
-    candidateType = selfType->getSelfType();
-  }
-
-  if (auto *archetypeType = candidateType->getAs<ArchetypeType>()) {
-    candidateType = archetypeType->getSuperclass();
-    if (!candidateType)
-      return false;
-  }
-
-  auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
   auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
-
-  if (!(subclassDecl && superclassDecl))
+  if (!superclassDecl)
     return false;
 
+  auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
+  if (!subclassDecl) {
+    candidateType = candidateType->getSuperclass();
+    if (!candidateType)
+      return false;
+    subclassDecl = candidateType->getClassOrBoundGenericClass();
+    if (!subclassDecl)
+      return false;
+  }
+
   return superclassDecl->isSuperclassOf(subclassDecl);
+}
+
+/// Determine whether the candidate type can be erased to the given
+/// existential type. This check is approximate, because it disregards
+/// conditional conformance and parameterized protocol types.
+///
+/// FIXME: This should be a common utility somewhere instead of being
+/// re-implemented in several places in the compiler.
+static bool isSubtypeOfExistentialType(Type candidateType, Type existentialType) {
+  auto layout = existentialType->getExistentialLayout();
+
+  if (auto layoutConstraint = layout.getLayoutConstraint()) {
+    if (layoutConstraint->isClass() &&
+        !(candidateType->isClassExistentialType() ||
+          candidateType->mayHaveSuperclass()))
+      return false;
+  }
+
+  if (layout.explicitSuperclass &&
+      !isSubclassOf(candidateType, layout.explicitSuperclass))
+    return false;
+
+  return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
+    auto result = TypeChecker::containsProtocol(candidateType, P,
+                                                /*allowMissing=*/false);
+    return result.first || result.second;
+  });
 }
 
 enum class MatchFlag {
@@ -1057,6 +1056,12 @@ scoreCandidateMatch(ConstraintSystem &cs,
     }
   }
 
+  // Conversion from a concrete type to its existential value.
+  if (paramType->isExistentialType()) {
+    if (isSubtypeOfExistentialType(candidateType, paramType))
+      return 100;
+  }
+
   // Candidate could be converted to a superclass.
   if (isSubclassOf(candidateType, paramType))
     return 100;
@@ -1079,20 +1084,17 @@ scoreCandidateMatch(ConstraintSystem &cs,
     }
   }
 
-  if (paramType->isAnyExistentialType()) {
-    // If the parameter is `Any` we assume that all candidates are
-    // convertible to it, which makes it a perfect match. The solver
-    // would then decide whether erasing to an existential is preferable.
-    if (paramType->isAny())
-      return 100;
-
-    // If the parameter is `Any.Type` we assume that all metatype
-    // candidates are convertible to it.
-    if (auto *EMT = paramType->getAs<ExistentialMetatypeType>()) {
-      if (EMT->getExistentialInstanceType()->isAny() &&
-          (candidateType->is<ExistentialMetatypeType>() ||
-           candidateType->is<MetatypeType>()))
-        return 100;
+  // Conversion from a metatype to an existential metatype.
+  if (auto *EMT = paramType->getAs<ExistentialMetatypeType>()) {
+    if (auto *candidateEMT = candidateType->getAs<AnyMetatypeType>()) {
+      auto instanceType = candidateEMT->getInstanceType();
+      // Concrete metatypes of existentials don't convert to existential
+      // metatypes.
+      if (candidateType->is<ExistentialMetatypeType>() ||
+          !instanceType->isExistentialType()) {
+        if (isSubtypeOfExistentialType(instanceType, EMT->getInstanceType()))
+          return 100;
+      }
     }
   }
 
@@ -1919,7 +1921,9 @@ ConstraintSystem::selectDisjunction() {
         applicableFn.get()->getFirstType()->getAs<FunctionType>();
     }
 
-    pruneDisjunction(disjunction, applicableFn.getPtrOrNull());
+    getRemainingDisjunction(disjunction)
+      .pruneDisjunctionIfNeeded(*this, applicableFn.getPtrOrNull());
+
     auto info = computeDisjunctionInfo(*this, disjunctions, index, favorings);
     favorings.try_emplace(disjunction, info);
 

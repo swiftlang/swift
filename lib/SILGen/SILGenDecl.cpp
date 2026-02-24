@@ -1513,6 +1513,13 @@ public:
 
     SGF.VarLocs[var] = SILGenFunction::VarLoc(bindValue.getValue(),
                                               SILAccessEnforcement::Unknown);
+
+    // Emit debug info for the borrowed noncopyable binding.
+    if (EmitDebugValueOnInit) {
+      RegularLocation VarLoc(var);
+      SILDebugVariable DbgVar(var->getName().str(), var->isLet(), /*ArgNo=*/0);
+      SGF.B.emitDebugDescription(VarLoc, bindValue.getValue(), DbgVar);
+    }
   }
 
   void finishInitialization(SILGenFunction &SGF) override {

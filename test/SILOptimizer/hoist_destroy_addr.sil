@@ -88,6 +88,11 @@ struct UnsafeMutablePointer<T> {
   var _rawValue: Builtin.RawPointer
 }
 
+struct Vector {
+  var storage: Builtin.FixedArray<2, AnyObject> { get set }
+}
+
+
 sil @unknown : $@convention(thin) () -> ()
 sil @nobarrier : $@convention(thin) () -> () {
   [global:]
@@ -1377,3 +1382,15 @@ entry(%c_addr_in : $*X):
   destroy_value %c_copy
   return %retval
 }
+
+// CHECK-LABEL: sil [ossa] @dont_destroy_source_of_addr_cast : {{.*}} {
+// CHECK:         store %1 to [assign] %2
+// CHECK-LABEL: } // end sil function 'dont_destroy_source_of_addr_cast'
+sil [ossa] @dont_destroy_source_of_addr_cast : $@convention(thin) (@inout Vector, @owned AnyObject) -> () {
+bb0(%0 : $*Vector, %1 : @owned $AnyObject):
+  %2 = unchecked_addr_cast %0 to $*AnyObject
+  store %1 to [assign] %2
+  %4 = tuple ()
+  return %4
+}
+
