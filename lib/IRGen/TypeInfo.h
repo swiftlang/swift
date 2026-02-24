@@ -438,6 +438,22 @@ public:
                                          ReferenceCounting *refcounting
                                              = nullptr) const;
 
+  /// This is virtual to support the optimizations which rely on the
+  /// representations of some structs being a single refcounted pointer.
+  virtual void strongCustomRetain(IRGenFunction &IGF, Explosion &e,
+                                  bool needsNullCheck) const {
+    llvm_unreachable(
+        "Only classes and some single field structs can implement this.");
+  }
+
+  /// This is virtual to support the optimizations which rely on the
+  /// representations of some structs being a single refcounted pointer.
+  virtual void strongCustomRelease(IRGenFunction &IGF, Explosion &e,
+                                   bool needsNullCheck) const {
+    llvm_unreachable(
+        "Only classes and some single field structs can implement this.");
+  }
+
   /// Should optimizations be enabled which rely on the representation
   /// for this type being a single Swift-retainable object pointer?
   ///

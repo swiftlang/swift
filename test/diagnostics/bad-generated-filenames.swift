@@ -5,9 +5,6 @@
 // RUN: c-index-test -read-diagnostics %t/serialized.dia > %t/serialized.txt 2>&1
 // RUN: %FileCheck %s -check-prefix CHECK-DIA < %t/serialized.txt
 
-// rdar://168250323
-// XFAIL: OS=freebsd
-
 import SlashA
 import SlashB
 
