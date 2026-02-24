@@ -271,30 +271,33 @@ void PotentialBinding::print(llvm::raw_ostream &out,
 
 bool BindingSet::isDelayed() const {
   if (auto *locator = TypeVar->getImpl().getLocator()) {
-    if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
-      // If first binding is a "fallback" to a protocol type,
-      // it means that this type variable should be delayed
-      // until it either gains more contextual information, or
-      // there are no other type variables to attempt to make
-      // forward progress.
-      if (Bindings.empty())
-        return true;
-
-      if (Bindings[0].BindingType->is<ProtocolType>()) {
-        auto *bindingLoc = Bindings[0].getLocator();
-        // This set shouldn't be delayed because there won't be any
-        // other inference sources when the protocol binding got
-        // inferred from a contextual type and the leading-dot chain
-        // this type variable is a base of, is connected directly to it.
-
-        if (!bindingLoc->findLast<LocatorPathElt::ContextualType>())
+    if (!CS.getASTContext().TypeCheckerOpts.SolverEnableBindingOptimizations ||
+        CS.shouldAttemptFixes()) {
+      if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
+        // If first binding is a "fallback" to a protocol type,
+        // it means that this type variable should be delayed
+        // until it either gains more contextual information, or
+        // there are no other type variables to attempt to make
+        // forward progress.
+        if (Bindings.empty())
           return true;
 
-        auto *chainResult =
-            getAsExpr<UnresolvedMemberChainResultExpr>(bindingLoc->getAnchor());
-        if (!chainResult || CS.getParentExpr(chainResult) ||
-            chainResult->getChainBase() != getAsExpr(locator->getAnchor()))
-          return true;
+        if (Bindings[0].BindingType->is<ProtocolType>()) {
+          auto *bindingLoc = Bindings[0].getLocator();
+          // This set shouldn't be delayed because there won't be any
+          // other inference sources when the protocol binding got
+          // inferred from a contextual type and the leading-dot chain
+          // this type variable is a base of, is connected directly to it.
+
+          if (!bindingLoc->findLast<LocatorPathElt::ContextualType>())
+            return true;
+
+          auto *chainResult =
+              getAsExpr<UnresolvedMemberChainResultExpr>(bindingLoc->getAnchor());
+          if (!chainResult || CS.getParentExpr(chainResult) ||
+              chainResult->getChainBase() != getAsExpr(locator->getAnchor()))
+            return true;
+        }
       }
     }
 
