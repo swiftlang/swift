@@ -169,6 +169,25 @@ ParserResult<Expr> Parser::parseExprArrow() {
   return makeParserResult(arrow);
 }
 
+/// For the `and`/`or` implicit receiver syntax, extract the receiver
+/// (base object) of the last method call in an expression.  For example,
+/// given `hw.split(",")[0].contains("h")`, this returns the sub-expression
+/// `hw.split(",")[0]` — the receiver of the outermost `.contains(...)` call.
+/// Returns nullptr when the receiver cannot be syntactically determined.
+static Expr *extractImplicitBase(Expr *E) {
+  if (!E)
+    return nullptr;
+  // For `base.method(args)`: CallExpr whose function is an UnresolvedDotExpr.
+  if (auto *callExpr = dyn_cast<CallExpr>(E)) {
+    if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(callExpr->getFn()))
+      return dotExpr->getBase();
+  }
+  // For `base.member` (no trailing call): UnresolvedDotExpr directly.
+  if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(E))
+    return dotExpr->getBase();
+  return nullptr;
+}
+
 /// parseExprSequence
 ///
 ///   expr-sequence(Mode):
@@ -179,6 +198,8 @@ ParserResult<Expr> Parser::parseExprArrow() {
 ///     '=' expr-unary
 ///     expr-is
 ///     expr-as
+///     'and' expr-sequence-element(Mode)
+///     'or'  expr-sequence-element(Mode)
 ///
 /// The sequencing for binary exprs is not structural, i.e., binary operators
 /// are not inherently right-associative. If present, '?' and ':' tokens must
@@ -188,6 +209,11 @@ ParserResult<Expr> Parser::parseExprArrow() {
 /// is not structural.  'try' is not permitted at arbitrary points in
 /// a sequence; in the places it's permitted, it's hoisted out to
 /// apply to everything to its right.
+///
+/// The contextual keywords 'and' and 'or' act as word-form aliases for '&&'
+/// and '||'.  When followed by a leading-dot expression such as
+/// `.method(args)`, the receiver of the preceding call is used as the
+/// implicit base, so `a.f() and .g()` is equivalent to `a.f() && a.g()`.
 ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
                                              bool isExprBasic,
                                              bool isForConditionalDirective) {
@@ -334,6 +360,56 @@ parse_operator:
     }
 
     case tok::identifier: {
+      // 'and' and 'or' are word-form aliases for '&&' and '||' respectively.
+      // When followed by a leading-dot expression, the receiver of the
+      // preceding call expression is used as the implicit base for the RHS.
+      if (Tok.isContextualKeyword("and") || Tok.isContextualKeyword("or")) {
+        bool isAnd = Tok.isContextualKeyword("and");
+        SourceLoc opLoc = consumeToken();
+
+        // Create a synthetic && or || operator reference.
+        Identifier opIdent = Context.getIdentifier(isAnd ? "&&" : "||");
+        auto *opExpr = new (Context)
+            UnresolvedDeclRefExpr(DeclNameRef(opIdent),
+                                  DeclRefKind::BinaryOperator,
+                                  DeclNameLoc(opLoc));
+        SequencedExprs.push_back(opExpr);
+
+        // If the next token is a leading '.' (not at a new line), check for
+        // implicit-receiver syntax: `lhs and .method(args)`.
+        // The receiver is extracted from the last operand in the sequence.
+        //
+        // SequencedExprs layout after pushing the operator:
+        //   [..., lhsOperand (size-2), opExpr (size-1)]
+        // We need at least 2 elements (one operand + the operator we pushed)
+        // to have a valid lhsOperand to extract the receiver from.
+        if (Tok.is(tok::period_prefix) && !Tok.isAtStartOfLine() &&
+            SequencedExprs.size() >= 2) {
+          // lhsOperand is the most-recently-parsed operand — at index size-2
+          // because we just pushed the operator at the back (index size-1).
+          Expr *lhsOperand = SequencedExprs[SequencedExprs.size() - 2];
+          if (Expr *implicitBase = extractImplicitBase(lhsOperand)) {
+            // Parse '.method(args)' using implicitBase as the receiver object.
+            // parseExprPostfixSuffix will see the leading '.' and produce
+            // UnresolvedDotExpr(implicitBase, method) + optional call suffix.
+            auto baseResult = makeParserResult(implicitBase);
+            auto rhs = parseExprPostfixSuffix(baseResult, isExprBasic,
+                                              /*periodHasKeyPathBehavior=*/false);
+            SequenceStatus |= rhs;
+            if (rhs.isNull())
+              return nullptr;
+            SequencedExprs.push_back(rhs.get());
+            if (SequenceStatus.isError() && !SequenceStatus.hasCodeCompletion())
+              break;
+            goto parse_operator;
+          }
+        }
+        // No implicit-receiver syntax; the RHS will be parsed normally in
+        // the next loop iteration.
+        Message = diag::expected_expr_after_operator;
+        break;
+      }
+
       // 'async' followed by 'throws' or '->' implies that we have an arrow
       // expression.
       if (!(Tok.isContextualKeyword("async") &&
