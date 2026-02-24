@@ -6405,6 +6405,9 @@ ERROR(expansion_expr_not_allowed,none,
 ERROR(invalid_expansion_argument,none,
       "cannot pass value pack expansion to non-pack parameter of type %0",
       (Type))
+NOTE(did_you_mean_tuple_pack_expansion,none,
+      "did you mean to expand the pack into a tuple?",
+      ())
 ERROR(expansion_not_variadic,none,
       "pack expansion %0 must contain at least one pack reference", (Type))
 ERROR(pack_reference_outside_expansion,none,

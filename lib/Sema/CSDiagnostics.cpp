@@ -27,6 +27,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -44,6 +45,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -6618,6 +6620,16 @@ bool InvalidPackExpansion::diagnoseAsError() {
     if (auto argInfo = getFunctionArgApplyInfo(locator)) {
       emitDiagnostic(diag::invalid_expansion_argument,
                      argInfo->getParamInterfaceType());
+      // If the pack expansion is being passed to a param that expects a tuple
+      // containing a pack, note this and add a fix-it.
+      if (auto tuple = argInfo->getParamInterfaceType()->getAs<TupleType>()) {
+        if (containsPackExpansionType(tuple)) {
+          auto range = getSourceRange();
+          emitDiagnostic(diag::did_you_mean_tuple_pack_expansion)
+              .fixItInsert(range.Start, "(")
+              .fixItInsertAfter(range.End, ")");
+        }
+      }
       return true;
     }
   }
