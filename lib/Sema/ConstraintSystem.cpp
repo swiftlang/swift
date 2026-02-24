@@ -2612,51 +2612,35 @@ static bool diagnoseAmbiguity(
     }
   }
 
-  // If each ambiguous solution shares the same set of fixes, diagnose the
-  // individual fixes directly instead of producing a generic overload error.
+  // If there are multiple kinds of fixes associated with this overload set,
+  // prefer diagnosing fixes that are common to all viable solutions instead
+  // of immediately falling back to a generic ambiguity diagnostic.
   {
     llvm::MapVector<std::pair<FixKind, ConstraintLocator *>,
                     SmallVector<std::pair<const Solution *,
                                           const ConstraintFix *>, 4>>
-        fixesByKindAndLocator;
+        fixesByKind;
     for (const auto &entry : aggregateFix) {
-      fixesByKindAndLocator[{entry.second->getKind(), entry.second->getLocator()}]
-          .push_back(entry);
+      auto *fix = entry.second;
+      fixesByKind[{fix->getKind(), fix->getLocator()}].push_back(entry);
     }
 
-    bool diagnosedAllCommonFixes = false;
-    {
-      DiagnosticTransaction transaction(DE);
+    bool diagnosedCommonFix = false;
+    for (auto &entry : fixesByKind) {
+      auto &commonFixes = entry.second;
 
-      bool allDiagnosed = true;
-      size_t coveredFixes = 0;
+      llvm::SmallPtrSet<const Solution *, 4> affectedSolutions;
+      for (const auto &fix : commonFixes)
+        affectedSolutions.insert(fix.first);
 
-      for (const auto &entry : fixesByKindAndLocator) {
-        const auto &commonFixes = entry.second;
+      if (affectedSolutions.size() != solutions.size())
+        continue;
 
-        // Only diagnose groups that are present in every viable solution.
-        if (!llvm::all_of(solutions, [&](const Solution &solution) {
-              return llvm::any_of(commonFixes, [&](const auto &fix) {
-                return fix.first == &solution;
-              });
-            })) {
-          continue;
-        }
-
-        coveredFixes += commonFixes.size();
-        if (!commonFixes.front().second->diagnoseForAmbiguity(commonFixes)) {
-          allDiagnosed = false;
-          break;
-        }
-      }
-
-      diagnosedAllCommonFixes =
-          coveredFixes == aggregateFix.size() && allDiagnosed;
-      if (!diagnosedAllCommonFixes)
-        transaction.abort();
+      diagnosedCommonFix |=
+          commonFixes.front().second->diagnoseForAmbiguity(commonFixes);
     }
 
-    if (diagnosedAllCommonFixes)
+    if (diagnosedCommonFix)
       return true;
   }
 
