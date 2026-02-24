@@ -336,18 +336,21 @@ static bool validateEnclosingSelfSubscript(SubscriptDecl *subscript) {
     return false;
 
   bool isValid = true;
-  for (unsigned i : {1U, 2U}) {
-    auto *param = indices->get(i);
+  auto checkKeyPathParam = [&](unsigned index) {
+    auto *param = indices->get(index);
     auto paramTy = param->getInterfaceType();
     if (paramTy->is<ErrorType>())
-      continue;
+      return;
 
-    if (!paramTy->isReferenceWritableKeyPath()) {
+    if (!paramTy->isWritableKeyPath() && !paramTy->isReferenceWritableKeyPath()) {
       param->diagnose(diag::property_wrapper_enclosing_self_subscript_keypath_type,
                       param->getArgumentName(), paramTy);
       isValid = false;
     }
-  }
+  };
+
+  checkKeyPathParam(/*wrapped/projected*/ 1);
+  checkKeyPathParam(/*storage*/ 2);
 
   return isValid;
 }

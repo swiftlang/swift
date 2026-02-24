@@ -14,8 +14,8 @@ public class Store {
     set {}
   }
   public static subscript(_enclosingInstance object: Any,
-                          wrapped wrappedKeyPath: Any, // expected-error {{parameter 'wrapped' of enclosing-self subscript has type .*; expected a 'ReferenceWritableKeyPath' type}}
-                          storage storageKeyPath: Any) // expected-error {{parameter 'storage' of enclosing-self subscript has type .*; expected a 'ReferenceWritableKeyPath' type}}
+                          wrapped wrappedKeyPath: Any, // expected-error {{parameter 'wrapped' of enclosing-self subscript should have either 'WritableKeyPath<...>' or 'ReferenceWritableKeyPath<...>' type \(got .*\)}}
+                          storage storageKeyPath: Any) // expected-error {{parameter 'storage' of enclosing-self subscript should have either 'WritableKeyPath<...>' or 'ReferenceWritableKeyPath<...>' type \(got .*\)}}
       -> Value {
     get { fatalError() }
     set {}
