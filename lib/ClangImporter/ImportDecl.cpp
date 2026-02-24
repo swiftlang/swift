@@ -10767,10 +10767,20 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     const bool isCanonicalInContext =
         (isa<clang::FieldDecl>(nd) || nd == nd->getCanonicalDecl());
     if (isCanonicalInContext && nd->getDeclContext() == clangRecord &&
-        Impl.isVisibleClangEntry(nd))
+        Impl.isVisibleClangEntry(nd)) {
       // We don't pass `swiftDecl` as `expectedDC` because we might be in a
       // recursive call that adds base class members to a derived class.
       Impl.insertMembersAndAlternates(nd, members);
+
+       // Unscoped enums have their enumerators present in the parent namespace,
+       // so load those too.
+      if (auto *ED = dyn_cast<clang::EnumDecl>(nd);
+          ED && !ED->isScoped()) {
+        for (auto *EDC : ED->enumerators()) {
+          Impl.insertMembersAndAlternates(EDC, members);
+        }
+      }
+    }
   }
 
   // Add the members here.
