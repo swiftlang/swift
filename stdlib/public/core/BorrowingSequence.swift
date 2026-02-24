@@ -166,16 +166,6 @@ extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyab
 }
 
 @available(SwiftStdlib 6.4, *)
-extension BorrowingSequence where Self: BorrowingIteratorProtocol & ~Escapable,
-  BorrowingIterator == Self, Element: ~Copyable
-{
-  @lifetime(borrow self)
-  public func makeBorrowingIterator() -> BorrowingIterator {
-    self
-  }
-}
-
-@available(SwiftStdlib 6.4, *)
 @frozen
 public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIteratorProtocol {
   @usableFromInline

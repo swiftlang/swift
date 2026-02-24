@@ -322,7 +322,7 @@ public protocol IteratorProtocol<Element> {
 /// makes no other requirements about element access, so routines that
 /// traverse a sequence should be considered O(*n*) unless documented
 /// otherwise.
-public protocol Sequence<Element>: BorrowingSequence {
+public protocol Sequence<Element> {
   /// A type representing the sequence's elements.
   associatedtype Element
 
@@ -330,11 +330,6 @@ public protocol Sequence<Element>: BorrowingSequence {
   /// encapsulates its iteration state.
   associatedtype Iterator: IteratorProtocol where Iterator.Element == Element
 
-  @available(SwiftStdlib 6.4, *)
-  associatedtype BorrowingIterator:
-    BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable
-    = BorrowingIteratorAdapter<Iterator>
-  
   // FIXME: <rdar://problem/34142121>
   // This typealias should be removed as it predates the source compatibility
   // guarantees of Swift 3, but it cannot due to a bug.
@@ -455,17 +450,6 @@ public protocol Sequence<Element>: BorrowingSequence {
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?
 }
-
-@available(SwiftStdlib 6.4, *)
-extension Sequence: @reparented BorrowingSequence
-  where BorrowingIterator == BorrowingIteratorAdapter<Iterator>
-{
-  @available(SwiftStdlib 6.4, *)
-  public func makeBorrowingIterator() -> BorrowingIterator {
-    BorrowingIteratorAdapter(iterator: makeIterator())
-  }
-}
-
 
 // Provides a default associated type witness for Iterator when the
 // Self type is both a Sequence and an Iterator.

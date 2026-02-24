@@ -689,8 +689,7 @@ extension PartialRangeFrom: RangeExpression {
   }
 }
 
-// FIXME: Explicit BorrowingSequence conformance is a source break
-extension PartialRangeFrom: Sequence, BorrowingSequence
+extension PartialRangeFrom: Sequence
   where Bound: Strideable, Bound.Stride: SignedInteger
 {
   public typealias Element = Bound
