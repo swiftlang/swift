@@ -1044,13 +1044,14 @@ namespace {
       if (!decl)
         return nullptr;
 
-      for (const auto *attr : decl->getAttrs())
-        if (const auto *customAttr = dyn_cast<CustomAttr>(attr))
-          if (customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
-                  "_refCountedPtr")) {
-            return ImportResult(decl->getDeclaredInterfaceType(),
-                                ImportHint::IntrusivelyRefCountedSmartPtr);
-          }
+      if (Bridging == Bridgeability::Full)
+        for (const auto *attr : decl->getAttrs())
+          if (const auto *customAttr = dyn_cast<CustomAttr>(attr))
+            if (customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
+                    "_refCountedPtr")) {
+              return ImportResult(decl->getDeclaredInterfaceType(),
+                                  ImportHint::IntrusivelyRefCountedSmartPtr);
+            }
 
       return decl->getDeclaredInterfaceType();
     }
@@ -2609,6 +2610,7 @@ ClangImporter::Implementation::importParameterType(
         *this, templateParamType, genericParams, attrs, addImportDiagnosticFn);
   }
 
+  Bridgeability bridging = Bridgeability::Full;
   if (!swiftParamTy) {
     // C++ reference types are brought in as direct
     // types most commonly.
@@ -2631,6 +2633,7 @@ ClangImporter::Implementation::importParameterType(
         else
           isInOut = true;
       }
+      bridging = Bridgeability::None;
     }
   }
 
@@ -2676,11 +2679,11 @@ ClangImporter::Implementation::importParameterType(
     // for the specific case when the throws conversion works, but is not
     // sufficient if it fails. (The correct, overarching fix is ClangImporter
     // being lazier.)
-    auto importedType = importType(paramTy, importKind, addImportDiagnosticFn,
-                                   allowNSUIntegerAsInt, Bridgeability::Full,
-                                   attrs, optionalityOfParam,
-                                   /*resugarNSErrorPointer=*/!paramIsError,
-                                   completionHandlerErrorParamIndex);
+    auto importedType =
+        importType(paramTy, importKind, addImportDiagnosticFn,
+                   allowNSUIntegerAsInt, bridging, attrs, optionalityOfParam,
+                   /*resugarNSErrorPointer=*/!paramIsError,
+                   completionHandlerErrorParamIndex);
     if (!importedType)
       return std::nullopt;
 
