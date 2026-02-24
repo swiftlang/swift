@@ -1036,6 +1036,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // Read and instantiate the specialize attributes.
   bool shouldAddSpecAttrs = fn->getSpecializeAttrs().empty();
   bool shouldAddEffectAttrs = !fn->hasArgumentEffects();
+  StringRef WasmImportModule;
+  StringRef WasmImportField;
   for (unsigned attrIdx = 0; attrIdx < numAttrs; ++attrIdx) {
     llvm::Expected<llvm::BitstreamEntry> maybeNext =
         SILCursor.advance(AF_DontPopBlockAtEnd);
@@ -1083,6 +1085,16 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
         break;
       case ExtraStringFlavor::Section:
         fn->setSection(blobData);
+        break;
+      case ExtraStringFlavor::WasmImportModule:
+        WasmImportModule = blobData;
+        if (!WasmImportField.empty())
+          fn->setWasmImportModuleAndField(WasmImportModule, WasmImportField);
+        break;
+      case ExtraStringFlavor::WasmImportName:
+        WasmImportField = blobData;
+        if (!WasmImportModule.empty())
+          fn->setWasmImportModuleAndField(WasmImportModule, WasmImportField);
         break;
       }
       continue;
@@ -4287,6 +4299,10 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
         break;
       case ExtraStringFlavor::Section:
         v->setSection(blobData);
+        break;
+      case ExtraStringFlavor::WasmImportModule:
+      case ExtraStringFlavor::WasmImportName:
+        // TODO: we still don't support wasm import on global variables
         break;
       }
       continue;
