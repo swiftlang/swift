@@ -10761,7 +10761,11 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
 
     // Skip this member if caller asked for storage and this isn't a field,
     // or vice versa.
-    if (storage != isa<clang::FieldDecl>(m))
+    //
+    // FIXME: also load eagerly function templates for now, even though they are
+    //        technically not storage members, because otherwise those templated
+    //        members can't be looked up from the SwiftLookupTable.
+    if (storage != isa<clang::FieldDecl, clang::FunctionTemplateDecl>(m))
       continue;
 
     // Make sure we always pull in record fields. Everything else had better
