@@ -1962,12 +1962,18 @@ void DefaultActorImpl::deallocate() {
 #endif
 }
 
+static size_t
+getDistributedRemoteActorAllocSize(const ClassMetadata *metadata);
+
 void DefaultActorImpl::deallocateUnconditional() {
   concurrency::trace::actor_deallocate(this);
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
   auto metadata = cast<ClassMetadata>(this->metadata);
-  swift_deallocClassInstance(this, metadata->getInstanceSize(),
+  size_t deallocSize = isDistributedRemote() ?
+      getDistributedRemoteActorAllocSize(metadata)
+      : metadata->getInstanceSize();
+  swift_deallocClassInstance(this, deallocSize,
                              metadata->getInstanceAlignMask());
 #else
   // Embedded Swift's runtime doesn't actually use the size/mask values.
@@ -2299,12 +2305,17 @@ static bool isDefaultActorClass(const ClassMetadata *metadata) {
 void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
 #if !SWIFT_CONCURRENCY_EMBEDDED
   auto metadata = cast<ClassMetadata>(actor->metadata);
+
   if (isDefaultActorClass(metadata))
     return swift_defaultActor_deallocate(static_cast<DefaultActor*>(actor));
 
-  swift_deallocObject(actor, metadata->getInstanceSize(),
+  size_t deallocSize = swift_distributed_actor_is_remote(actor) ?
+        getDistributedRemoteActorAllocSize(metadata)
+        : metadata->getInstanceSize();
+  swift_deallocObject(actor, deallocSize,
                       metadata->getInstanceAlignMask());
 #else
+  // TODO(distributed): Embedded should be able to handle remote actor references here
   return swift_defaultActor_deallocate(static_cast<DefaultActor*>(actor));
 #endif
 }
@@ -2774,25 +2785,50 @@ void swift::swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedAct
   asImpl(_actor)->initialize();
 }
 
+/// Compute the minimal allocation size for a 'remote' distributed actor reference.
+///
+/// Remote distributed actors are proxy objects that only need storage for the
+/// `id`, `actorSystem`, and `unownedExecutor` fields. Any user-defined stored
+/// properties beyond those three are never initialized or accessed on a remote
+/// instance, so we can trim the allocation at the offset where the first
+/// user-defined field would begin.
+static size_t
+getDistributedRemoteActorAllocSize(const ClassMetadata *metadata) {
+  auto description = metadata->getDescription();
+  uint32_t numFields = description->NumFields;
+
+  assert(numFields >= 3 &&
+         "distributed actor must have at least id, actorSystem, and "
+         "unownedExecutor fields");
+
+  if (numFields >= 4) {
+    // The 4th field is the first user-defined stored property.
+    // Its offset marks the end of the synthesized fields,
+    // so it is exactly  how much storage we need.
+    const auto *fieldOffsets = metadata->getFieldOffsets();
+    return fieldOffsets[3];
+  }
+
+  // Only the three required fields exist, remote-ref and local instances have the same size.
+  return metadata->getInstanceSize();
+}
+
 OpaqueValue*
 swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
   const ClassMetadata *metadata = actorType->getClassObject();
 
-  // TODO(distributed): make this allocation smaller
-  // ==== Allocate the memory for the remote instance
+  // Use a smaller allocation that only covers the id and actorSystem fields,
+  // since remote proxies never access user-defined stored properties.
+  size_t allocSize = getDistributedRemoteActorAllocSize(metadata);
+  assert(allocSize <= metadata->getInstanceSize() && "Remote reference size was larger than a local instance size!?");
   HeapObject *alloc = swift_allocObject(metadata,
-                                        metadata->getInstanceSize(),
+                                        allocSize,
                                         metadata->getInstanceAlignMask());
 
-  // TODO: remove this memset eventually, today we only do this to not have
-  //       to modify the destructor logic, as releasing zeroes is no-op
-  memset((void *)(alloc + 1), 0,
-         metadata->getInstanceSize() - sizeof(HeapObject));
+  // Zero the body so that the destructor can safely release fields without
+  // encountering uninitialized memory.
+  memset((void *)(alloc + 1), 0, allocSize - sizeof(HeapObject));
 
-  // TODO(distributed): a remote one does not have to have the "real"
-  //  default actor body, e.g. we don't need an executor at all; so
-  //  we can allocate more efficiently and only share the flags/status field
-  //  between the both memory representations
   // If it is a default actor, we reuse the same layout as DefaultActorImpl,
   // and store flags in the allocation directly as we initialize it.
   if (isDefaultActorClass(metadata)) {
