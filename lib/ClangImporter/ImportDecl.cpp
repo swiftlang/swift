@@ -2218,7 +2218,7 @@ namespace {
       fd->addAttribute(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));
 
       unsigned resultIndex = fd->getParameters()->size();
-      if (fd->hasImplicitSelfDecl()) {
+      if (fd->isInstanceMethod()) {
         ++resultIndex;
       }
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
@@ -4431,7 +4431,7 @@ namespace {
 
       auto swiftParams = result->getParameters();
       bool hasSelf =
-          result->hasImplicitSelfDecl() && !isa<ConstructorDecl>(result);
+          result->isInstanceMethod() && !isa<ConstructorDecl>(result);
       auto returnIdx = swiftParams->size() + hasSelf;
 
       if (inferSelfDependence(decl, result, returnIdx))

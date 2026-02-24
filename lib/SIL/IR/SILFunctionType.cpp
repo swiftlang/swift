@@ -5296,6 +5296,19 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     extInfo = extInfo.withThrows(true, innerExtInfo.getThrownError());
   if (innerExtInfo.isAsync())
     extInfo = extInfo.withAsync(true);
+  // TODO: Merge outer and inner lifetime dependencies
+  if (innerExtInfo.getLifetimeDependencies().size() > 0) {
+    ASSERT(extInfo.getLifetimeDependencies().size() == 0 &&
+           "We only support uncurrying function types where at most one of the "
+           "inner and outer type has lifetime dependencies, because we do not "
+           "yet support closure context lifetime dependencies.");
+
+    auto uncurriedLifetimes = LifetimeDependenceInfo::uncurry(
+        Context, innerExtInfo.getLifetimeDependencies(),
+        /* numInnerParams */ inner.getParams().size(),
+        /* numOuterParams */ curried.getParams().size());
+    extInfo = extInfo.withLifetimeDependencies(uncurriedLifetimes);
+  }
 
   // Distributed thunks are always `async throws`
   if (constant.isDistributedThunk()) {

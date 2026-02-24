@@ -8365,6 +8365,9 @@ public:
   }
   ParamDecl *getImplicitSelfDecl(bool createIfNeeded=true);
 
+  /// Whether the function is a non-static method.
+  bool isInstanceMethod() const { return hasImplicitSelfDecl() && !isStatic(); }
+
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const {
     return cast_or_null<AbstractFunctionDecl>(ValueDecl::getOverriddenDecl());

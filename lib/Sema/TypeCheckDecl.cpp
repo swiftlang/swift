@@ -2505,6 +2505,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     auto sig = AFD->getGenericSignature();
     bool hasSelf = AFD->hasImplicitSelfDecl();
+    bool isInstanceMethod = AFD->isInstanceMethod();
 
     AnyFunctionType::ExtInfoBuilder infoBuilder;
 
@@ -2558,8 +2559,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
           infoBuilder = infoBuilder.withSendingResult();
       }
 
-      // Lifetime dependencies only apply to the outer function type.
-      if (!hasSelf && lifetimeDependenceInfo.has_value()) {
+      // Lifetime dependencies only apply to the outer function type for
+      // instance methods.
+      if (lifetimeDependenceInfo.has_value() && !isInstanceMethod) {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
@@ -2579,7 +2581,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       auto selfParam = computeSelfParam(AFD);
       AnyFunctionType::ExtInfoBuilder selfInfoBuilder;
       maybeAddParameterIsolation(selfInfoBuilder, {selfParam});
-      if (lifetimeDependenceInfo.has_value()) {
+      if (lifetimeDependenceInfo.has_value() && isInstanceMethod) {
         selfInfoBuilder =
             selfInfoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }

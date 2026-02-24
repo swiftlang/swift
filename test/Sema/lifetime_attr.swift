@@ -261,3 +261,52 @@ func optionalWrap(ne: NE) -> NE? { ne }
 @_lifetime(copy a) // expected-error{{cannot copy the lifetime of an Escapable type}}
                    // expected-note@-1{{use '@_lifetime(borrow a)' instead}}
 func optionalEscapableUnwrap(a: Int?) -> NE { NE() }
+
+// MARK: Static Method Lifetimes
+
+struct EStruct {
+  @_lifetime(copy self, copy ne) // expected-error {{cannot copy the lifetime of an Escapable type}}
+                                 // expected-note@-1 {{use '@_lifetime(borrow self)' instead}}
+  func transferCopyingSelf(ne: NE) -> NE { ne }
+  @_lifetime(borrow self, copy ne) // OK
+  func transferBorrowingSelf(ne: NE) -> NE { ne }
+}
+
+struct NEStruct: ~Escapable {
+  @_lifetime(copy self, copy ne) // OK
+  func transferCopyingSelf(ne: NE) -> NE { ne }
+  @_lifetime(borrow self, copy ne) // OK
+  func transferBorrowingSelf(ne: NE) -> NE { ne }
+  @_lifetime(copy self, copy ne) // expected-error{{invalid lifetime dependence specifier on non-existent self}}
+  static func staticTransferCopyingSelf(ne: NE) -> NE { ne }
+  @_lifetime(borrow self, copy ne) // expected-error{{invalid lifetime dependence specifier on non-existent self}}
+  static func staticTransferBorrowingSelf(ne: NE) -> NE { ne }
+}
+func foo(_ closure: @_lifetime(copy span) (_ span: Span<Int>) -> Span<Int>, _ span: Span<Int>) -> Span<Int> {
+  return closure(span)
+}
+
+class Holder {
+  @_lifetime(copy span)
+  static func correct(_ span: Span<Int>) -> Span<Int> {
+    return span
+  }
+
+  @_lifetime(borrow span)
+  static func incorrect(_ span: Span<Int>) -> Span<Int> {
+    return span
+  }
+}
+
+func bar(_ span: Span<Int>) {
+  _ = foo(Holder.incorrect, span) // expected-error{{cannot convert value of type '@_lifetime(borrow 0) (Span<Int>) -> Span<Int>' to expected argument type '@_lifetime(copy span) (_ span: Span<Int>) -> Span<Int>'}}
+  _ = foo(Holder.correct, span) // OK
+}
+
+func baz1() -> @_lifetime(copy span) (_ span: Span<Int>) -> Span<Int> {
+  return Holder.correct // OK
+}
+
+func baz2() -> @_lifetime(copy span) (_ span: Span<Int>) -> Span<Int> {
+  return Holder.incorrect  // expected-error{{cannot convert return expression of type '@_lifetime(borrow 0) (Span<Int>) -> Span<Int>' to return type '@_lifetime(copy span) (_ span: Span<Int>) -> Span<Int>'}}
+}

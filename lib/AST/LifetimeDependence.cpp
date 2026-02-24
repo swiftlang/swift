@@ -515,9 +515,9 @@ class LifetimeDependenceChecker {
 
 public:
   static unsigned getResultIndex(AbstractFunctionDecl *afd) {
-    return afd->hasImplicitSelfDecl()
-      ? (unsigned)(afd->getParameters()->size() + 1)
-      : (unsigned)afd->getParameters()->size();
+    return afd->isInstanceMethod()
+               ? (unsigned)(afd->getParameters()->size() + 1)
+               : (unsigned)afd->getParameters()->size();
   }
 
   static unsigned getResultIndex(EnumElementDecl *eed) {
@@ -543,6 +543,8 @@ public:
   }
 
   static std::optional<ParamInfo> getSelfParamInfo(AbstractFunctionDecl *afd) {
+    if (!afd->isInstanceMethod())
+      return std::nullopt;
     auto *selfDecl = afd->getImplicitSelfDecl();
     if (!selfDecl)
       return std::nullopt;
@@ -2021,6 +2023,40 @@ LifetimeDependenceInfo::getFromAST(
   return LifetimeDependenceChecker(funcRepr, funcType, lifetimeAttributes, dc,
                                    env)
       .checkFuncType();
+}
+
+ArrayRef<LifetimeDependenceInfo> LifetimeDependenceInfo::uncurry(
+    ASTContext &ctx, ArrayRef<LifetimeDependenceInfo> inner,
+    unsigned numInnerParams, unsigned numOuterParams) {
+
+  const unsigned numUncurriedParams = numInnerParams + numOuterParams;
+
+  const auto uncurryIndices = [&](IndexSubset *indices) -> IndexSubset * {
+    if (!indices)
+      return nullptr;
+    return indices->extendingCapacity(ctx, numUncurriedParams);
+  };
+
+  SmallVector<LifetimeDependenceInfo, 2> uncurried;
+  // Process the inner dependencies
+  for (auto innerDep : inner) {
+    auto inherit = uncurryIndices(innerDep.getInheritIndices());
+    auto scope = uncurryIndices(innerDep.getScopeIndices());
+    auto addressable = uncurryIndices(innerDep.getAddressableIndices());
+    auto conditionallyAddressable =
+        uncurryIndices(innerDep.getConditionallyAddressableIndices());
+
+    // The inner result's dependencies become the uncurried result's
+    // dependencies.
+    const auto targetIndex = (innerDep.getTargetIndex() == numInnerParams)
+                                 ? numUncurriedParams
+                                 : innerDep.getTargetIndex();
+    uncurried.push_back(LifetimeDependenceInfo(
+        inherit, scope, targetIndex, innerDep.hasImmortalSpecifier(),
+        innerDep.isFromAnnotation(), addressable, conditionallyAddressable));
+  }
+
+  return ctx.AllocateCopy(uncurried);
 }
 
 void LifetimeDependenceInfo::dump() const {
