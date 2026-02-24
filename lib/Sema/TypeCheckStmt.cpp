@@ -2088,12 +2088,59 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       callee = dyn_cast<AbstractFunctionDecl>(
                  dynMemberRef->getMember().getDecl());
     
+    // If the callee has @_nonDiscardableThrow, check whether any closure
+    // argument has a non-Never thrown error type. If so, the result is
+    // non-discardable and we should warn.
+    //
+    // This handles a pattern where the closure's thrown error is captured by the returned value
+    // and may be queried in the future. For example, Task.init when throwing behaves like this:
+    // ```swift
+    // extension Task {
+    //   @_nonDiscardableThrow
+    //   public init(_: () throws(Failure) -> ()) -> Self
+    // ```
+    //
+    // So if we ignore the returned Task, we're going to miss the failure.
+    // Other "Future-like" types may have similar behavior where they "capture" the thrown failure for later inspection.
+    if (callee && !call->isImplicit() &&
+        callee->getAttrs().hasAttribute<NonDiscardableThrowAttr>()) {
+      Type thrownError = Type();
+      for (auto arg : *call->getArgs()) {
+        auto *argExpr = arg.getExpr();
+        // Look through implicit conversions to find the underlying expression.
+        while (auto *ICE = dyn_cast<ImplicitConversionExpr>(argExpr))
+          argExpr = ICE->getSubExpr();
+        auto argTy = argExpr->getType();
+        if (!argTy)
+          continue;
+        if (auto *fnTy = argTy->getAs<AnyFunctionType>()) {
+          thrownError = fnTy->getThrownError();
+        }
+      }
+
+      // If the error thrown by the closure is NOT Never, we warn about ignoring the error.
+      if (thrownError && !thrownError->isUninhabited()) {
+        DE.diagnose(fn->getLoc(),
+                    diag::expression_unused_throwing_unstructured_task, callee)
+            .highlight(call->getArgs()->getSourceRange());
+        return;
+      }
+    }
+
     // If the callee explicitly allows its result to be ignored, then don't
     // complain.
     if (callee && callee->getAttrs().getAttribute<DiscardableResultAttr>())
       return;
 
     // Otherwise, complain.  Start with more specific diagnostics.
+
+    // Diagnose unused unstructured Task creation
+    if (callee && !call->isImplicit() && callee->isUnstructuredTaskFactory()) {
+      DE.diagnose(fn->getLoc(),
+                  diag::expression_unused_throwing_unstructured_task, callee)
+          .highlight(call->getArgs()->getSourceRange());
+      return;
+    }
 
     // Diagnose unused constructor calls.
     if (isa_and_nonnull<ConstructorDecl>(callee) && !call->isImplicit()) {

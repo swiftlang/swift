@@ -5263,6 +5263,10 @@ WARNING(expression_unused_lvalue,NoUsage,
       (unsigned))
 WARNING(expression_unused_result_call,NoUsage,
         "result of call to %0 is unused", (const ValueDecl *))
+GROUPED_WARNING(expression_unused_throwing_unstructured_task,
+        NoUseUnstructuredThrowingTask, none,
+        "Unstructured throwing task created by %0 is unused",
+        (const ValueDecl *))
 WARNING(expression_unused_result_operator,NoUsage,
         "result of operator %0 is unused", (const ValueDecl *))
 WARNING(expression_unused_result_operator_name,NoUsage,
@@ -7414,6 +7418,14 @@ WARNING(discardable_result_on_void_never_function, none,
         "'@discardableResult' declared on a function returning "
         "'%select{Never|Void}0' "
         "is unnecessary", (bool))
+
+//------------------------------------------------------------------------------
+// MARK: @_nonDiscardableThrow
+//------------------------------------------------------------------------------
+
+ERROR(non_discardable_throw_no_throwing_closure_param, none,
+      "'@_nonDiscardableThrow' requires the function to have exactly one closure "
+      "parameter that uses typed throws", ())
 
 //------------------------------------------------------------------------------
 // MARK: Resilience diagnostics

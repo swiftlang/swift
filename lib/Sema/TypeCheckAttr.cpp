@@ -435,6 +435,7 @@ public:
   void visitExportAttr(ExportAttr *attr);
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
+  void visitNonDiscardableThrowAttr(NonDiscardableThrowAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
   void visitTypeEraserAttr(TypeEraserAttr *attr);
   void visitStorageRestrictionsAttr(StorageRestrictionsAttr *attr);
@@ -3920,6 +3921,33 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
                               resultIsVoid);
       }
     }
+  }
+}
+
+void AttributeChecker::visitNonDiscardableThrowAttr(NonDiscardableThrowAttr *attr) {
+  // The function must have exactly one closure parameter that uses typed
+  // throws (i.e. whose type is AnyFunctionType with a non-null thrown error).
+  auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
+  if (!AFD) {
+    diagnoseAndRemoveAttr(
+        attr, diag::non_discardable_throw_no_throwing_closure_param);
+    return;
+  }
+
+  auto hasThrowingClosureParams = 0;
+  for (auto *param : *AFD->getParameters()) {
+    auto paramTy = param->getInterfaceType();
+    if (auto *fnTy = paramTy->getAs<AnyFunctionType>()) {
+      if (fnTy->isThrowing()) {
+        hasThrowingClosureParams += 1;
+      }
+    }
+  }
+
+  // We support *exactly one* throwing closure parameter with this attribute.
+  if (hasThrowingClosureParams != 1) {
+    diagnoseAndRemoveAttr(
+        attr, diag::non_discardable_throw_no_throwing_closure_param);
   }
 }
 
