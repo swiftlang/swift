@@ -1449,18 +1449,21 @@ static DisjunctionInfo computeDisjunctionInfo(
           types.push_back({type, /*fromLiteral=*/true});
         }
 
-        auto binding =
-            inferTypeFromInitializerResultType(cs, typeVar, disjunctions);
 
-        if (auto instanceTy = binding.getPointer()) {
-          types.push_back({instanceTy,
-                           /*fromLiteral=*/false,
-                           /*fromInitializerCall=*/true});
+        if (cs.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
+          auto binding =
+              inferTypeFromInitializerResultType(cs, typeVar, disjunctions);
 
-          if (binding.getInt())
-            types.push_back({instanceTy->wrapInOptionalType(),
+          if (auto instanceTy = binding.getPointer()) {
+            types.push_back({instanceTy,
                              /*fromLiteral=*/false,
                              /*fromInitializerCall=*/true});
+
+            if (binding.getInt())
+              types.push_back({instanceTy->wrapInOptionalType(),
+                               /*fromLiteral=*/false,
+                               /*fromInitializerCall=*/true});
+          }
         }
       }
     } else {
