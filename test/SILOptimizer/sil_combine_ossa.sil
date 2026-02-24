@@ -5664,4 +5664,3 @@ bb2:
   destroy_value [dead_end] %0
   unreachable
 }
-
