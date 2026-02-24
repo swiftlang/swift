@@ -15,7 +15,7 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "FeatureSet.h"
-#include "InlinableText.h"
+#include "swift/AST/InlinableText.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"

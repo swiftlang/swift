@@ -1128,6 +1128,47 @@ void markDirectCallee(Expr *callee) {
   }
 }
 
+class TypeExprSimplifier final {
+  ASTContext &Ctx;
+  DeclContext *DC;
+  llvm::function_ref<bool(DiscardAssignmentExpr *)>
+      canSimplifyDiscardAssignmentExprCheck;
+  bool inGenericArgumentContext;
+
+  TypeExprSimplifier(DeclContext *dc,
+                     llvm::function_ref<bool(DiscardAssignmentExpr *)>
+                         canSimplifyDiscardAssignmentExpr,
+                     bool inGenericArgumentContext)
+      : Ctx(dc->getASTContext()), DC(dc),
+        canSimplifyDiscardAssignmentExprCheck(canSimplifyDiscardAssignmentExpr),
+        inGenericArgumentContext(inGenericArgumentContext) {}
+
+  ASTContext &getASTContext() const { return Ctx; }
+
+  /// Simplify expressions which are type sugar productions that got parsed
+  /// as expressions due to the parser not knowing which identifiers are
+  /// type names.
+  TypeExpr *simplifyTypeExpr(Expr *E);
+
+  /// Simplify unresolved dot expressions which are nested type productions.
+  TypeExpr *simplifyNestedTypeExpr(UnresolvedDotExpr *UDE);
+
+  /// Whether we can simplify the given discard assignment expr. Not possible
+  /// if it's been marked "valid" or if the current state of the AST disallows
+  /// such simplification (see \c canSimplifyPlaceholderTypes above).
+  bool canSimplifyDiscardAssignmentExpr(DiscardAssignmentExpr *DAE);
+
+public:
+  static TypeExpr *simplify(Expr *E, DeclContext *DC,
+                            llvm::function_ref<bool(DiscardAssignmentExpr *)>
+                                canSimplifyDiscardAssignmentExpr,
+                            bool inGenericArgumentContext = false) {
+    TypeExprSimplifier simplifier(DC, canSimplifyDiscardAssignmentExpr,
+                                  inGenericArgumentContext);
+    return simplifier.simplifyTypeExpr(E);
+  }
+};
+
 class PreCheckTarget final : public ASTWalker {
   ASTContext &Ctx;
   DeclContext *DC;
@@ -1150,16 +1191,6 @@ class PreCheckTarget final : public ASTWalker {
   /// we encounter SingleValueStmtExprs, and erase them as we walk up to a
   /// valid parent in the post walk.
   llvm::SetVector<SingleValueStmtExpr *> OutOfPlaceSingleValueStmtExprs;
-
-  /// Simplify expressions which are type sugar productions that got parsed
-  /// as expressions due to the parser not knowing which identifiers are
-  /// type names.
-  TypeExpr *simplifyTypeExpr(Expr *E);
-
-  /// Simplify unresolved dot expressions which are nested type productions.
-  TypeExpr *simplifyNestedTypeExpr(UnresolvedDotExpr *UDE);
-
-  TypeExpr *simplifyUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *USE);
 
   /// Simplify a key path expression into a canonical form.
   void resolveKeyPathExpr(KeyPathExpr *KPE);
@@ -1188,11 +1219,6 @@ class PreCheckTarget final : public ASTWalker {
   /// uses of '_' were "supposed" to be \c DiscardAssignmentExprs or patterns,
   /// which results in better diagnostics after type checking.
   bool possiblyInTypeContext(Expr *E);
-
-  /// Whether we can simplify the given discard assignment expr. Not possible
-  /// if it's been marked "valid" or if the current state of the AST disallows
-  /// such simplification (see \c canSimplifyPlaceholderTypes above).
-  bool canSimplifyDiscardAssignmentExpr(DiscardAssignmentExpr *DAE);
 
   /// In Swift < 5, diagnose and correct invalid multi-argument or
   /// argument-labeled interpolations. Returns \c true if the AST walk should
@@ -1437,12 +1463,6 @@ public:
     // Mark any valid SingleValueStmtExpr children.
     markAnyValidSingleValueStmts(expr);
 
-    // Type check the type parameters in an UnresolvedSpecializeExpr.
-    if (auto *us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
-      if (auto *typeExpr = simplifyUnresolvedSpecializeExpr(us))
-        return Action::Continue(typeExpr);
-    }
-
     // Check whether this is standalone `self` in init accessor, which
     // is invalid.
     if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
@@ -1533,9 +1553,15 @@ public:
           return Action::Continue(DAE);
     }
 
+    auto canSimplifyDiscardAssignmentExpr = [&](DiscardAssignmentExpr *DAE) {
+      return !CorrectDiscardAssignmentExprs.count(DAE) &&
+             possiblyInTypeContext(DAE);
+    };
+
     // If this is a sugared type that needs to be folded into a single
     // TypeExpr, do it.
-    if (auto *simplified = simplifyTypeExpr(expr))
+    if (auto *simplified = TypeExprSimplifier::simplify(
+            expr, DC, canSimplifyDiscardAssignmentExpr))
       return Action::Continue(simplified);
 
     // Diagnose a '_' that isn't on the immediate LHS of an assignment. We
@@ -1851,7 +1877,7 @@ void PreCheckTarget::diagnoseOutOfPlaceSingleValueStmtExprs(
   }
 }
 
-TypeExpr *PreCheckTarget::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
+TypeExpr *TypeExprSimplifier::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   if (!UDE->getName().isSimpleName() ||
       UDE->getName().isSpecial())
     return nullptr;
@@ -1913,7 +1939,7 @@ TypeExpr *PreCheckTarget::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     return nullptr;
   }
 
-  auto *TyExpr = dyn_cast<TypeExpr>(UDE->getBase());
+  auto *TyExpr = simplifyTypeExpr(UDE->getBase());
   if (!TyExpr)
     return nullptr;
 
@@ -1978,22 +2004,6 @@ TypeExpr *PreCheckTarget::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   return nullptr;
 }
 
-TypeExpr *PreCheckTarget::simplifyUnresolvedSpecializeExpr(
-    UnresolvedSpecializeExpr *us) {
-  // If this is a reference type a specialized type, form a TypeExpr.
-  // The base should be a TypeExpr that we already resolved.
-  if (auto *te = dyn_cast_or_null<TypeExpr>(us->getSubExpr())) {
-    if (auto *declRefTR =
-            dyn_cast_or_null<DeclRefTypeRepr>(te->getTypeRepr())) {
-      return TypeExpr::createForSpecializedDecl(
-          declRefTR, us->getUnresolvedParams(),
-          SourceRange(us->getLAngleLoc(), us->getRAngleLoc()), getASTContext());
-    }
-  }
-
-  return nullptr;
-}
-
 /// Whether the given expression "looks like" a (possibly sugared) type. For
 /// example, `(foo, bar)` "looks like" a type, but `foo + bar` does not.
 bool PreCheckTarget::exprLooksLikeAType(Expr *expr) {
@@ -2032,12 +2042,14 @@ bool PreCheckTarget::possiblyInTypeContext(Expr *E) {
 
 /// Only allow simplification of a DiscardAssignmentExpr if it hasn't already
 /// been explicitly marked as correct, and the current AST state allows it.
-bool PreCheckTarget::canSimplifyDiscardAssignmentExpr(
+bool TypeExprSimplifier::canSimplifyDiscardAssignmentExpr(
     DiscardAssignmentExpr *DAE) {
-  return !CorrectDiscardAssignmentExprs.count(DAE) &&
-         possiblyInTypeContext(DAE);
+  if (inGenericArgumentContext) {
+    ASSERT(canSimplifyDiscardAssignmentExprCheck(DAE));
+    return true;
+  }
+  return canSimplifyDiscardAssignmentExprCheck(DAE);
 }
-
 
 /// In Swift < 5, diagnose and correct invalid multi-argument or
 /// argument-labeled interpolations. Returns \c true if the AST walk should
@@ -2251,7 +2263,7 @@ static bool isTildeOperator(Expr *expr) {
 /// Simplify expressions which are type sugar productions that got parsed
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
-TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
+TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
   // If it's already a type expression, return it.
   if (auto typeExpr = dyn_cast<TypeExpr>(E))
     return typeExpr;
@@ -2259,6 +2271,42 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
   // Fold member types.
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     return simplifyNestedTypeExpr(UDE);
+  }
+
+  // Fold unresolved named referencs
+  if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+    if (auto resolvedExpr = TypeChecker::resolveDeclRefExpr(UDRE, DC))
+      return simplifyTypeExpr(resolvedExpr);
+    else
+      return nullptr;
+  }
+
+  // In a generic argument context, a value generic parameter reference
+  // (TypeValueExpr) can be treated as a type — its inner TypeRepr
+  // resolves to a GenericTypeParamType through normal type resolution.
+  if (auto *TVE = dyn_cast<TypeValueExpr>(E); TVE && inGenericArgumentContext) {
+    return new (Ctx) TypeExpr(TVE->getRepr());
+  }
+
+  // Fold unresolved specializations
+  if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(E)) {
+    if (auto simplifiedSubExpr = simplifyTypeExpr(USE->getSubExpr())) {
+      // If this is a reference type a specialized type, form a TypeExpr.
+      // The base should be a TypeExpr that we already resolved.
+      if (auto *te = dyn_cast_or_null<TypeExpr>(simplifiedSubExpr)) {
+        if (auto *declRefTR =
+                dyn_cast_or_null<DeclRefTypeRepr>(te->getTypeRepr())) {
+          return TypeExpr::createForSpecializedDecl(
+              declRefTR, USE->getUnresolvedParams(),
+              SourceRange(USE->getLAngleLoc(), USE->getRAngleLoc()),
+              getASTContext());
+        }
+      } else {
+        return nullptr;
+      }
+    } else {
+      return nullptr;
+    }
   }
 
   // Fold '_' into a placeholder type, if we're allowed.
@@ -2278,7 +2326,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
       TyExpr = dyn_cast<TypeExpr>(OOE->getSubExpr());
       QuestionLoc = OOE->getLoc();
     } else {
-      TyExpr = dyn_cast<TypeExpr>(cast<BindOptionalExpr>(E)->getSubExpr());
+      TyExpr = simplifyTypeExpr(cast<BindOptionalExpr>(E)->getSubExpr());
       QuestionLoc = cast<BindOptionalExpr>(E)->getQuestionLoc();
     }
     if (!TyExpr) return nullptr;
@@ -2287,7 +2335,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
     assert(!TyExpr->isImplicit() && InnerTypeRepr &&
            "This doesn't work on implicit TypeExpr's, "
            "the TypeExpr should have been built correctly in the first place");
-    
+
     // The optional evaluation is passed through.
     if (isa<OptionalEvaluationExpr>(E))
       return TyExpr;
@@ -2315,9 +2363,9 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
 
   // Fold (T) into a type T with parens around it.
   if (auto *PE = dyn_cast<ParenExpr>(E)) {
-    auto *TyExpr = dyn_cast<TypeExpr>(PE->getSubExpr());
+    auto *TyExpr = simplifyTypeExpr(PE->getSubExpr());
     if (!TyExpr) return nullptr;
-    
+
     TupleTypeReprElement InnerTypeRepr[] = { TyExpr->getTypeRepr() };
     assert(!TyExpr->isImplicit() && InnerTypeRepr[0].Type &&
            "SubscriptExpr doesn't work on implicit TypeExpr's, "
@@ -2327,12 +2375,14 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
                                               PE->getSourceRange());
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
-  
+
   // Fold a tuple expr like (T1,T2) into a tuple type (T1,T2).
   if (auto *TE = dyn_cast<TupleExpr>(E)) {
-    // FIXME: Decide what to do about ().  It could be a type or an expr.
     if (TE->getNumElements() == 0)
-      return nullptr;
+      return inGenericArgumentContext
+                 ? new (Ctx) TypeExpr(
+                       TupleTypeRepr::createEmpty(Ctx, TE->getSourceRange()))
+                 : nullptr;
 
     SmallVector<TupleTypeReprElement, 4> Elts;
     unsigned EltNo = 0;
@@ -2361,7 +2411,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
         Ctx, Elts, TE->getSourceRange());
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
-  
+
 
   // Fold [T] into an array type.
   if (auto *AE = dyn_cast<ArrayExpr>(E)) {
@@ -2384,7 +2434,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
       return nullptr;
 
     TypeRepr *keyTypeRepr, *valueTypeRepr;
-    
+
     if (auto EltTuple = dyn_cast<TupleExpr>(DE->getElement(0))) {
       auto *KeyTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(0));
       if (!KeyTyExpr)
@@ -2393,13 +2443,13 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
       auto *ValueTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(1));
       if (!ValueTyExpr)
         return nullptr;
-     
+
       keyTypeRepr = KeyTyExpr->getTypeRepr();
       valueTypeRepr = ValueTyExpr->getTypeRepr();
     } else {
       auto *TE = dyn_cast<TypeExpr>(DE->getElement(0));
       if (!TE) return nullptr;
-      
+
       auto *TRE = dyn_cast_or_null<TupleTypeRepr>(TE->getTypeRepr());
       while (TRE->isParenType()) {
         TRE = dyn_cast_or_null<TupleTypeRepr>(TRE->getElementType(0));
@@ -2508,7 +2558,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
                          ResultTypeRepr);
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
-  
+
   // Fold '~P' into a composition type.
   if (auto *unaryExpr = dyn_cast<PrefixUnaryExpr>(E)) {
     if (isTildeOperator(unaryExpr->getFn())) {
@@ -2854,6 +2904,15 @@ Expr *PreCheckTarget::wrapMemberChainIfNeeded(Expr *E) {
       wrapped = new (Ctx) OptionalEvaluationExpr(wrapped);
   }
   return wrapped;
+}
+
+TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
+                                                       Expr *E) {
+  auto canSimplifyDiscardAssignmentExpr = [&](DiscardAssignmentExpr *DAE) {
+    return true;
+  };
+  return TypeExprSimplifier::simplify(E, DC, canSimplifyDiscardAssignmentExpr,
+                                      true);
 }
 
 bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target) {

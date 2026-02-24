@@ -34,6 +34,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/InlinableText.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LookupKinds.h"
@@ -80,7 +81,6 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
-#include "InlinableText.h"
 #include <algorithm>
 
 using namespace swift;
