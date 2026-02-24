@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
+// https://github.com/swiftlang/swift/issues/87406
 
 public enum List<Element> {
       case empty
