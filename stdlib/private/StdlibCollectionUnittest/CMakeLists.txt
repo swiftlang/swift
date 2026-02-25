@@ -1,4 +1,5 @@
 set(swift_stdlib_unittest_compile_flags)
+list(APPEND swift_stdlib_unittest_compile_flags "-Xfrontend" "-disable-availability-checking")
 
 add_swift_target_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the

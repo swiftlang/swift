@@ -22,7 +22,7 @@ StdListTestSuite.test("ListOfInt conforms to CxxBorrowingSequence") {
     var iterator : CxxBorrowingIterator<List> = lst.makeBorrowingIterator()
     var counter = 0
     while true {
-        var span = iterator._nextSpan()
+        var span = iterator.nextSpan()
         if (span.count == 0) { break }
         for i in 0..<span.count {
             expectEqual(span[i], arr[counter])
@@ -42,7 +42,7 @@ StdListTestSuite.test("ListOfNonCopyable conforms to CxxBorrowingSequence") {
     var iterator = lst.makeBorrowingIterator()
     var counter = 0
     while true {
-        var span = iterator._nextSpan()
+        var span = iterator.nextSpan()
         if (span.count == 0) { break }
         for i in 0..<span.count {
             expectEqual(getNumber(span[i]), arr[counter])

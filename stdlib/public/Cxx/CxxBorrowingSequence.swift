@@ -20,12 +20,11 @@
 /// types must conform to `UnsafeCxxInputIterator`.
 
 @available(SwiftStdlib 6.3, *)
-public protocol CxxBorrowingSequence<_Element> : _BorrowingSequence, ~Copyable, ~Escapable {
+public protocol CxxBorrowingSequence<Element> : BorrowingSequence, ~Copyable, ~Escapable {
   override associatedtype Element: ~Copyable
-  override associatedtype _Element: ~Copyable
-  override associatedtype _BorrowingIterator: _BorrowingIteratorProtocol<_Element> & ~Copyable & ~Escapable = CxxBorrowingIterator<Self>
+  override associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = CxxBorrowingIterator<Self>
   associatedtype RawIterator: UnsafeCxxInputIterator
-    where RawIterator.Pointee == _Element, RawIterator.DereferenceResult == UnsafePointer<_Element>
+    where RawIterator.Pointee == Element, RawIterator.DereferenceResult == UnsafePointer<Element>
 
   /// Do not implement this function manually in Swift.
   func __beginUnsafe() -> RawIterator
@@ -36,8 +35,8 @@ public protocol CxxBorrowingSequence<_Element> : _BorrowingSequence, ~Copyable, 
 
 @frozen
 @available(SwiftStdlib 6.3, *)
-public struct CxxBorrowingIterator<T>: _BorrowingIteratorProtocol, ~Escapable, ~Copyable where T: CxxBorrowingSequence & ~Copyable & ~Escapable, T._Element: ~Copyable {
-  public typealias _Element = T.RawIterator.Pointee
+public struct CxxBorrowingIterator<T>: BorrowingIteratorProtocol, ~Escapable, ~Copyable where T: CxxBorrowingSequence & ~Copyable & ~Escapable, T.Element: ~Copyable {
+  public typealias Element = T.RawIterator.Pointee
 
   @usableFromInline
   internal var current: T.RawIterator
@@ -52,10 +51,10 @@ public struct CxxBorrowingIterator<T>: _BorrowingIteratorProtocol, ~Escapable, ~
   }
 
   @inlinable
-  public mutating func _skip(by offset: Int) -> Int {
+  public mutating func skip(by offset: Int) -> Int {
     var remainder = offset
     while remainder > 0 {
-      let span = _nextSpan(maximumCount: remainder)
+      let span = nextSpan(maximumCount: remainder)
       if span.isEmpty { break }
       remainder &-= span.count
     }
@@ -65,18 +64,18 @@ public struct CxxBorrowingIterator<T>: _BorrowingIteratorProtocol, ~Escapable, ~
 
 // For non-contiguous iterators, we create a span of size one for each element
 @available(SwiftStdlib 6.3, *)
-extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T._Element: ~Copyable {
-  // FIXME methods `_skip(by:)` and `_nextSpan()` should be inherited from BorrowingSequence,
+extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.Element: ~Copyable {
+  // FIXME methods `skip(by:)` and `nextSpan()` should be inherited from BorrowingSequence,
   // but currently are not because of a bug. These will be removed once it gets fixed. 
   @inlinable
   @_lifetime(&self)
-  public mutating func _nextSpan() -> Span<_Element> {
-    _nextSpan(maximumCount: Int.max)
+  public mutating func nextSpan() -> Span<Element> {
+    nextSpan(maximumCount: Int.max)
   }
 
   @inlinable
   @_lifetime(&self)
-  public mutating func _nextSpan(maximumCount: Int) -> Span<_Element> {
+  public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
     if self.current == self.end {
       return Span()
     }
@@ -91,11 +90,11 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T._Element: ~Cop
 
 // For contiguous iterators, we can make iteration more efficient by creating a span with multiple, contiguous, elements
 @available(SwiftStdlib 6.3, *)
-extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.RawIterator: UnsafeCxxContiguousIterator, T._Element: ~Copyable {
+extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.RawIterator: UnsafeCxxContiguousIterator, T.Element: ~Copyable {
   @inlinable
   @_lifetime(&self)
-  public mutating func _nextSpan() -> Span<_Element> {
-    _nextSpan(maximumCount: Int.max)
+  public mutating func nextSpan() -> Span<Element> {
+    nextSpan(maximumCount: Int.max)
   }
 
   public var count: Int {
@@ -104,7 +103,7 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.RawIterator: U
 
   @inlinable
   @_lifetime(&self)
-  public mutating func _nextSpan(maximumCount: Int) -> Span<_Element> {
+  public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
     if self.current == self.end {
       return Span()
     }
@@ -119,7 +118,7 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.RawIterator: U
 }
 
 @available(SwiftStdlib 6.3, *)
-extension CxxBorrowingSequence where _Element: ~Copyable, Self: ~Copyable {
+extension CxxBorrowingSequence where Element: ~Copyable, Self: ~Copyable {
   @inlinable
   @_lifetime(borrow self)
   public borrowing func makeBorrowingIterator() -> CxxBorrowingIterator<Self> {
