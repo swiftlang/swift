@@ -6790,7 +6790,8 @@ static ClosureExpr *buildClosureElementConversion(
   auto *fnTy = FunctionType::get(ArrayRef(closureParam), destType, extInfo);
   closure->setType(fnTy);
 
-  closure->setCaptureInfo(CaptureInfo::empty());
+  // Conversion closures don't capture values, but might capture types from the environment
+  // Don't set empty capture info prematurely.
 
   rewriter.cs.cacheType(closure);
   return closure;
