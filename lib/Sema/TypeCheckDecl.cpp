@@ -3054,18 +3054,14 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
     return false;
 
   if (nominalGenericParams.size() != typealiasGenericParams.size()) {
-    unsigned nominalMaxDepth = nominalGenericParams.back()->getDepth();
-    unsigned typealiasMaxDepth = typealiasGenericParams.back()->getDepth();
-    unsigned maxDepth = std::max(nominalMaxDepth, typealiasMaxDepth);
-
     while (!nominalGenericParams.empty() &&
-           nominalGenericParams.back()->getDepth() == maxDepth) {
-      nominalGenericParams = nominalGenericParams.drop_back();
+           nominalGenericParams.front()->getDepth() == 0U) {
+      nominalGenericParams = nominalGenericParams.drop_front();
     }
 
     while (!typealiasGenericParams.empty() &&
-           typealiasGenericParams.back()->getDepth() == maxDepth) {
-      typealiasGenericParams = typealiasGenericParams.drop_back();
+           typealiasGenericParams.front()->getDepth() == 0U) {
+      typealiasGenericParams = typealiasGenericParams.drop_front();
     }
   }
 
