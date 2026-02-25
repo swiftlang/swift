@@ -55,29 +55,59 @@ public class DefaultSymbolLocator: SymbolLocator {
 
   var cache: [CacheKey: any SymbolSource] = [:]
 
-  private func findSymbolsForElf(image: any Image) -> (any SymbolSource)? {
-    func loadElfImage(path: String, uuid: [UInt8]?) -> ElfImageCache.Result? {
-      let elfCache = ElfImageCache.threadLocal
+  private func loadElfImage(path: String, uuid: [UInt8]?) -> ElfImageCache.Result? {
+    let elfCache = ElfImageCache.threadLocal
 
-      guard let result = elfCache.lookup(path: path) else {
-        return nil
-      }
-
-      switch result {
-        case let .elf32Image(elfImage):
-          if elfImage.uuid != uuid {
-            return nil
-          }
-
-        case let .elf64Image(elfImage):
-          if elfImage.uuid != uuid {
-            return nil
-          }
-      }
-
-      return result
+    guard let result = elfCache.lookup(path: path) else {
+      return nil
     }
 
+    switch result {
+      case let .elf32Image(elfImage):
+        if elfImage.uuid != uuid {
+          return nil
+        }
+
+      case let .elf64Image(elfImage):
+        if elfImage.uuid != uuid {
+          return nil
+        }
+    }
+
+    return result
+  }
+
+  private func loadPeCoffImage(
+    path: String, uuid: [UInt8]?, age: UInt32?
+  ) -> PeCoffImage? {
+    let peCache = PeImageCache.threadLocal
+
+    guard let peImage = peCache.lookup(path: path) else {
+      return nil
+    }
+
+    if let codeview = peImage.codeview,
+        let uuid,
+        let age,
+        codeview.uuid != uuid
+          || codeview.age != age {
+      return nil
+    }
+    return peImage
+  }
+
+  private func elfDebugSymPath(for image: any Image) -> String? {
+    guard let uuid = image.uuid else {
+      return nil
+    }
+
+    let uuidString = hex(uuid)
+    let uuidSuffix = uuidString.dropFirst(2)
+    let uuidPrefix = uuidString.prefix(2)
+    return "\(elfSymbolPath)\(sep)\(uuidPrefix)\(sep)\(uuidSuffix).debug"
+  }
+
+  private func findSymbolsForElf(image: any Image) -> (any SymbolSource)? {
     func toSymbolSource(_ result: ElfImageCache.Result) -> (any SymbolSource)? {
       switch result {
         case let .elf32Image(elfImage):
@@ -98,22 +128,8 @@ public class DefaultSymbolLocator: SymbolLocator {
       return source
     }
 
-    // Now try finding it using the UUID
-    if let uuid = image.uuid {
-      let uuidString = hex(uuid)
-      let uuidSuffix = uuidString.dropFirst(2)
-      let uuidPrefix = uuidString.prefix(2)
-      let path = "\(elfSymbolPath)\(sep)\(uuidPrefix)\(sep)\(uuidSuffix).debug"
-      if let result = loadElfImage(path: path, uuid: image.uuid) {
-        let source = toSymbolSource(result)
-        cache[.uuid(uuid)] = source
-        return source
-      }
-    }
-
     // We must be able to load the original image (as an ELF image)
-    guard let imagePath = find(image: image),
-          let result = loadElfImage(path: imagePath, uuid: image.uuid) else {
+    guard let (imagePath, result) = findElf(image: image) else {
       return nil
     }
 
@@ -134,17 +150,17 @@ public class DefaultSymbolLocator: SymbolLocator {
 
       let tryLink = { (_ link: String) -> (any SymbolSource)? in
         let path1 = "\(imageDir)\(sep)\(link)"
-        if let result = loadElfImage(path: path1, uuid: image.uuid) {
+        if let result = self.loadElfImage(path: path1, uuid: image.uuid) {
           return toSymbolSource(result)
         }
 
         let path2 = "\(imageDir)\(sep).debug\(sep)\(link)"
-        if let result = loadElfImage(path: path2, uuid: image.uuid) {
+        if let result = self.loadElfImage(path: path2, uuid: image.uuid) {
           return toSymbolSource(result)
         }
 
         let path3 = "\(elfSymbolPath)\(sep)\(imageDir)\(sep)\(link)"
-        if let result = loadElfImage(path: path3, uuid: image.uuid) {
+        if let result = self.loadElfImage(path: path3, uuid: image.uuid) {
           return toSymbolSource(result)
         }
 
@@ -220,25 +236,6 @@ public class DefaultSymbolLocator: SymbolLocator {
 
   private func findSymbolsForPeCoff(image: any Image) -> (any SymbolSource)? {
     var result: (any SymbolSource)? = nil
-
-    func loadPeCoffImage(
-      path: String, uuid: [UInt8]?, age: UInt32?
-    ) -> PeCoffImage? {
-      let peCache = PeImageCache.threadLocal
-
-      guard let peImage = peCache.lookup(path: path) else {
-        return nil
-      }
-
-      if let codeview = peImage.codeview,
-         let uuid,
-         let age,
-         codeview.uuid != uuid
-           || codeview.age != age {
-        return nil
-      }
-      return peImage
-    }
 
     let uuid: [UInt8]?
     let age: UInt32?
@@ -390,40 +387,45 @@ public class DefaultSymbolLocator: SymbolLocator {
     return nil
   }
 
+  private func findElf(image: any Image) ->
+    (path: String, result: ElfImageCache.Result)? {
+
+    // check the debug/symbols path first
+    if let debugSymPath = elfDebugSymPath(for: image),
+      let result = loadElfImage(path: debugSymPath, uuid: image.uuid) {
+      return (debugSymPath,result)
+    }
+
+    // then the image path specified in the Image
+    if let imagePath = image.path,
+        let result = loadElfImage(path: imagePath, uuid: image.uuid) {
+      return (imagePath,result)
+    }
+
+    return nil
+  }
+
+  private func findPeCoff(image: any Image) ->
+    (path: String, result: PeCoffImage)? {
+
+    if let imagePath = image.path, let peCoff = loadPeCoffImage(
+      path: imagePath,
+      uuid: image.uuid,
+      age: image.age) {
+
+      return (imagePath, peCoff)
+    }
+
+    return nil
+  }
+
   public func find(image: any Image) -> String? {
-    let elfCache = ElfImageCache.threadLocal
-    let peCache = PeImageCache.threadLocal
-
-    guard let imagePath = image.path else {
-      return nil
+    if let elfImageInfo = findElf(image: image) {
+      return elfImageInfo.path
     }
 
-    if let result = elfCache.lookup(path: imagePath) {
-      switch result {
-        case let .elf32Image(elfImage):
-          if elfImage.uuid != image.uuid {
-            return nil
-          }
-
-        case let .elf64Image(elfImage):
-          if elfImage.uuid != image.uuid {
-            return nil
-          }
-      }
-
-      return imagePath
-    }
-
-    if let peImage = peCache.lookup(path: imagePath) {
-      if let codeview = peImage.codeview,
-         let uuid = image.uuid,
-         let age = image.age,
-         codeview.uuid != uuid
-           || codeview.age != age {
-        return nil
-      }
-
-      return imagePath
+    if let peCoffImageInfo = findPeCoff(image: image) {
+      return peCoffImageInfo.path
     }
 
     return nil
