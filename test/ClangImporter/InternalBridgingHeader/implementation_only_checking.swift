@@ -22,6 +22,9 @@ public func f() -> Any {
 
 // CHECK: var 'red' imported as 'internal' from bridging header
 
+@c @implementation
+public func cImpl(_ a: MyPoint) { } // No error on public reference to `MyPoint`
+
 @frozen
 public struct FrozenStruct {
     var p: MyPoint // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}

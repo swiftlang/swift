@@ -77,6 +77,7 @@ using CheckDeclAccessCallback = void(AccessScope, SourceLoc, ImportAccessLevel);
 class AccessControlCheckerBase {
 protected:
   bool checkUsableFromInline;
+  bool ignoreImportAccessLevel;
 
   bool shouldSkipChecking(const ValueDecl *decl);
 
@@ -122,8 +123,10 @@ protected:
                        AccessScope contextAccessScope, const DeclContext *useDC,
                        llvm::function_ref<CheckDeclAccessCallback> diagnose);
 
-  AccessControlCheckerBase(bool checkUsableFromInline)
-      : checkUsableFromInline(checkUsableFromInline) {}
+  AccessControlCheckerBase(bool checkUsableFromInline,
+                           bool ignoreImportAccessLevel)
+      : checkUsableFromInline(checkUsableFromInline),
+        ignoreImportAccessLevel(ignoreImportAccessLevel) {}
 
 public:
   void checkGenericParamAccess(
@@ -291,7 +294,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   if (type) {
     std::optional<AccessScope> typeAccessScope =
         TypeAccessScopeChecker::getAccessScope(type, useDC,
-                                               checkUsableFromInline);
+                                               checkUsableFromInline,
+                                               ignoreImportAccessLevel);
 
     // Note: This means that the type itself is invalid for this particular
     // context, because it references declarations from two incompatible scopes.
@@ -318,7 +322,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
 
     auto typeReprAccessScope =
         TypeAccessScopeChecker::getAccessScope(typeRepr, useDC,
-                                               checkUsableFromInline);
+                                               checkUsableFromInline,
+                                               ignoreImportAccessLevel);
     if (!typeReprAccessScope.has_value())
       return;
 
@@ -358,7 +363,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       typeRepr, problematicAccessScope, useDC, checkUsableFromInline);
 
   ImportAccessLevel complainImport = std::nullopt;
-  if (complainRepr) {
+  if (complainRepr && !ignoreImportAccessLevel) {
     const ValueDecl *VD = complainRepr->getBoundDecl();
     assert(VD &&
            "findTypeDeclWithAccessScope should return bound TypeReprs only");
@@ -680,11 +685,14 @@ class AccessControlChecker : public AccessControlCheckerBase,
                              public DeclVisitor<AccessControlChecker> {
 public:
 
-  AccessControlChecker(bool allowUsableFromInline)
-    : AccessControlCheckerBase(allowUsableFromInline) {}
+  AccessControlChecker(bool allowUsableFromInline,
+                       bool ignoreImportAccessLevel)
+    : AccessControlCheckerBase(allowUsableFromInline,
+                               ignoreImportAccessLevel) {}
 
   AccessControlChecker()
-      : AccessControlCheckerBase(/*checkUsableFromInline=*/false) {}
+      : AccessControlCheckerBase(/*checkUsableFromInline=*/false,
+                                 /*ignoreImportAccessLevel=*/false) {}
 
   void visit(Decl *D) {
     if (D->isInvalid() || D->isImplicit())
@@ -1440,7 +1448,8 @@ class UsableFromInlineChecker : public AccessControlCheckerBase,
                                 public DeclVisitor<UsableFromInlineChecker> {
 public:
   UsableFromInlineChecker()
-      : AccessControlCheckerBase(/*checkUsableFromInline=*/true) {}
+      : AccessControlCheckerBase(/*checkUsableFromInline=*/true,
+                                 /*ignoreImportAccessLevel=*/false) {}
 
   void visit(Decl *D) {
     if (!D->getASTContext().isLanguageModeAtLeast(LanguageMode::v4_2))
@@ -2907,7 +2916,10 @@ void swift::checkAccessControl(Decl *D) {
   if (isa<ValueDecl>(D) || isa<PatternBindingDecl>(D)) {
     bool allowInlineable =
         D->getDeclContext()->isInSpecializeExtensionContext();
-    AccessControlChecker(allowInlineable).visit(D);
+    bool ignoreImportAccessLevel =
+        D->getInnermostDeclContext()->isInObjCImplementationContext();
+
+    AccessControlChecker(allowInlineable, ignoreImportAccessLevel).visit(D);
     UsableFromInlineChecker().visit(D);
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     checkExtensionAccess(ED);
