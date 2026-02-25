@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 // FIXME: No simd module on linux rdar://problem/20795411
-// XFAIL: OS=linux-gnu, OS=windows-msvc, OS=openbsd, OS=linux-android, OS=linux-androideabi
+// XFAIL: OS=linux-gnu, OS=windows-msvc, OS=openbsd, OS=linux-android, OS=linux-androideabi, OS=freebsd
 // XFAIL: CPU=wasm32
 
 import simd
@@ -17,4 +17,3 @@ d += int4(0) // expected-error{{'+=' is unavailable: integer vector types do not
 d -= int4(0) // expected-error{{'-=' is unavailable: integer vector types do not support checked arithmetic; use the wrapping operator '&-=' instead}}
 d *= int4(0) // expected-error{{'*=' is unavailable: integer vector types do not support checked arithmetic; use the wrapping operator '&*=' instead}}
 d *= 0 // expected-error{{'*=' is unavailable: integer vector types do not support checked arithmetic; use the wrapping operator '&*=' instead}}
-
