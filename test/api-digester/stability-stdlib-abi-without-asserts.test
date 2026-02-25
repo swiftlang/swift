@@ -944,4 +944,7 @@ Func _hashValue(for:) has mangled name changing from 'Swift._hashValue<A where A
 Func _hashValue(for:) has parameter 0 changing from Default to Shared
 Func _hashValue(for:) is now with @_preInverseGenerics
 
+// CommandLine.executablePath
+Func _NSGetExecutablePath(_:_:) is a new API without '@available'
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
