@@ -154,17 +154,38 @@ public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
   @lifetime(borrow self)
   func makeBorrowingIterator() -> BorrowingIterator
   
+  /// A value less than or equal to the number of elements in the sequence,
+  /// calculated nondestructively.
   var underestimatedCount: Int { get }
   
+  /// Internal customization point for fast `contains(_:)` checks.
   func _customContainsEquatableElement(_ element: borrowing Element) -> Bool?
 }
 
 @available(SwiftStdlib 6.4, *)
 extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable {
-  @_disfavoredOverload
+  @inlinable
   public var underestimatedCount: Int { 0 }
-  @_disfavoredOverload
+  @inlinable
   public func _customContainsEquatableElement(_ element: borrowing Element) -> Bool? { nil }
+}
+
+// FIXME: Elminate these overloads once Sequence is reparented.
+
+@available(SwiftStdlib 6.4, *)
+extension Sequence where Self: BorrowingSequence {
+  @inlinable
+  public var underestimatedCount: Int { 0 }
+  @inlinable
+  public func _customContainsEquatableElement(_ element: Element) -> Bool? { nil }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension Collection where Self: BorrowingSequence {
+  @inlinable
+  public var underestimatedCount: Int { 0 }
+  @inlinable
+  public func _customContainsEquatableElement(_ element: Element) -> Bool? { nil }
 }
 
 @available(SwiftStdlib 6.4, *)
