@@ -1,8 +1,9 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=10000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=10000 -language-mode 4
+// RUN: %target-swift-frontend -typecheck %s -solver-scope-threshold=1000 -language-mode 5 -solver-enable-prune-disjunctions
 
 // REQUIRES: no_asan
 
-// Valid expression, type checks with default limits but slow
+// Type checks quickly in Swift 5 language mode, but slow in Swift 4 mode for some reason.
 
 struct S {
     var t: Double

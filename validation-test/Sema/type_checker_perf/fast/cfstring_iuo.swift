@@ -2,8 +2,6 @@
 
 // REQUIRES: objc_interop
 
-// This is valid, but slow.
-
 import Foundation
 
 func f(str: CFString!) {
