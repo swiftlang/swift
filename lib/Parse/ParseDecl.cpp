@@ -8051,6 +8051,13 @@ struct Parser::ParsedAccessors {
         func(accessor);
   }
 
+  bool hasAccessorRequiringExplicitType() const {
+    return llvm::any_of(Accessors, [](AccessorDecl *accessor) {
+      return !accessor->isObservingAccessor() &&
+             accessor->getAccessorKind() != AccessorKind::Init;
+    });
+  }
+
   /// Find the first accessor that can be used to perform mutation.
   AccessorDecl *findFirstMutator() const {
     if (Init) return Init;
@@ -8664,12 +8671,11 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
     return nullptr;
 
   if (!typedPattern) {
-    if (accessors.Get || accessors.Set || accessors.Address ||
-        accessors.MutableAddress) {
+    if (accessors.hasAccessorRequiringExplicitType()) {
       SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
         pattern->getBoundName().getLength());
       diagnose(pattern->getLoc(), diag::computed_property_missing_type)
-        .fixItInsert(locAfterPattern, ": <# Type #>");
+          .fixItInsert(locAfterPattern, ": <# Type #>");
       Invalid = true;
     }
   }
