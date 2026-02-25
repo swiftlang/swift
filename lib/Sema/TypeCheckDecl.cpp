@@ -2998,20 +2998,20 @@ AllMembersRequest::evaluate(
 
 static bool isBoundToFullyConcreteType(TypeAliasDecl *typealias,
                                        NominalTypeDecl *nominal) {
-  if (!nominal->hasGenericParamList()){
+  if (!nominal->hasGenericParamList()) {
     return false;
   }
 
-  auto nominalBound = nominal->getDeclaredInterfaceType()->getAs<BoundGenericType>();
-  auto typealiasBound = typealias->getUnderlyingType()->getAs<BoundGenericType>();
+  auto nominalBound =
+      nominal->getDeclaredInterfaceType()->getAs<BoundGenericType>();
+  auto typealiasBound =
+      typealias->getUnderlyingType()->getAs<BoundGenericType>();
 
   if ((nominalBound == nullptr) || (typealiasBound == nullptr))
     return false;
 
-  auto nominalGenericArguments =
-      nominalBound->getGenericArgs();
-  auto typealiasGenericArguments =
-       typealiasBound->getGenericArgs();
+  auto nominalGenericArguments = nominalBound->getGenericArgs();
+  auto typealiasGenericArguments = typealiasBound->getGenericArgs();
 
   for (size_t i = 0; i < nominalGenericArguments.size(); i++) {
     auto nominalBoundGenericType = nominalGenericArguments[i];
@@ -3050,7 +3050,7 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   auto nominalGenericParams = nominalSig.getGenericParams();
   auto typealiasGenericParams = typealiasSig.getGenericParams();
 
-  if(typealiasGenericParams.size() >nominalGenericParams.size())
+  if (typealiasGenericParams.size() > nominalGenericParams.size())
     return false;
 
   if (nominalGenericParams.size() != typealiasGenericParams.size()) {
