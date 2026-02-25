@@ -2390,6 +2390,10 @@ static void applySolutionToClosurePropertyWrappers(ClosureExpr *closure,
 
     // Set the interface type of each property wrapper synthesized var
     auto *backingVar = param->getPropertyWrapperBackingProperty();
+    auto *wrappedValueVar = param->getPropertyWrapperWrappedValueVar();
+    if (!backingVar || !wrappedValueVar)
+      continue;
+
     auto backingType = solution.simplifyType(solution.getType(backingVar))
                            ->mapTypeOutOfEnvironment();
     backingVar->setInterfaceType(backingType);
@@ -2400,7 +2404,6 @@ static void applySolutionToClosurePropertyWrappers(ClosureExpr *closure,
               ->mapTypeOutOfEnvironment());
     }
 
-    auto *wrappedValueVar = param->getPropertyWrapperWrappedValueVar();
     auto wrappedValueType =
         solution.simplifyType(solution.getType(wrappedValueVar))
             ->mapTypeOutOfEnvironment();
