@@ -4053,10 +4053,25 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
       ? CastConsumptionKind::BorrowAlways
       : CastConsumptionKind::CopyOnSuccess;
 
+  // Since a ManagedValue's cleanup won't reflect an EndBorrow cleanup pushed
+  // on behalf of ManagedValue::borrow(), we workaround that by looking to see
+  // if the clean-up depth changes.
+  // FIXME: there needs to be a better way to handle this.
+  std::optional<CleanupHandle> endBorrowExn;
+  ManagedValue borrowedExn;
+  {
+    auto before = Cleanups.getCleanupsDepth();
+    borrowedExn = exn.borrow(*this, S);
+    auto after = Cleanups.getCleanupsDepth();
+    if (before != after) {
+      endBorrowExn = Cleanups.getTopCleanup();
+    }
+  }
+
   // Our model is that sub-cases get the exception at +0 and the throw (if we
   // need to rethrow the exception) gets the exception at +1 since we need to
   // trampoline it's ownership to our caller.
-  ConsumableManagedValue subject = {exn.borrow(*this, S), consumptionKind};
+  ConsumableManagedValue subject = {borrowedExn, consumptionKind};
 
   auto failure = [&](SILLocation location) {
     // If we fail to match anything, just rethrow the exception.
@@ -4067,6 +4082,12 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
     if (!ThrowDest.isValid()) {
       B.createUnreachable(S);
       return;
+    }
+
+    // End the borrow used to match on the subject prior to us throwing it, as
+    // we don't want the end_borrow to be emitted after its consumption.
+    if (endBorrowExn) {
+      Cleanups.popAndEmitCleanup(*endBorrowExn, S, IsForUnwind);
     }
 
     // Since we borrowed exn before sending it to our subcases, we know that it
