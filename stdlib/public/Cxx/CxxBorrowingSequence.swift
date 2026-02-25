@@ -19,7 +19,7 @@
 /// `end()` which return input iterators into the C++ sequence. The iterator
 /// types must conform to `UnsafeCxxInputIterator`.
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 public protocol CxxBorrowingSequence<Element> : BorrowingSequence, ~Copyable, ~Escapable {
   override associatedtype Element: ~Copyable
   override associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = CxxBorrowingIterator<Self>
@@ -34,7 +34,7 @@ public protocol CxxBorrowingSequence<Element> : BorrowingSequence, ~Copyable, ~E
 }
 
 @frozen
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 public struct CxxBorrowingIterator<T>: BorrowingIteratorProtocol, ~Escapable, ~Copyable where T: CxxBorrowingSequence & ~Copyable & ~Escapable, T.Element: ~Copyable {
   public typealias Element = T.RawIterator.Pointee
 
@@ -63,7 +63,7 @@ public struct CxxBorrowingIterator<T>: BorrowingIteratorProtocol, ~Escapable, ~C
 }
 
 // For non-contiguous iterators, we create a span of size one for each element
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.Element: ~Copyable {
   // FIXME methods `skip(by:)` and `nextSpan()` should be inherited from BorrowingSequence,
   // but currently are not because of a bug. These will be removed once it gets fixed. 
@@ -89,7 +89,7 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.Element: ~Copy
 }
 
 // For contiguous iterators, we can make iteration more efficient by creating a span with multiple, contiguous, elements
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.RawIterator: UnsafeCxxContiguousIterator, T.Element: ~Copyable {
   @inlinable
   @_lifetime(&self)
@@ -117,7 +117,7 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.RawIterator: U
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 extension CxxBorrowingSequence where Element: ~Copyable, Self: ~Copyable {
   @inlinable
   @_lifetime(borrow self)
