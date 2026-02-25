@@ -155,6 +155,19 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING
 set(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES "" CACHE STRING
     "List of extra target triples to build the embedded Swift standard library for")
 
+set(SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/llvm-ar";crsU
+    CACHE STRING
+    "Archiver to use when building static archives for non Darwin platform targeting the macOS SDK.
+    This is required when using Xcode 26.4 beta 1 and later.")
+
+if(SWIFT_HOST_VARIANT STREQUAL "macosx")
+  list(GET SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS 0 ARCHIVER_EXECUTABLE)
+  if(NOT IS_EXECUTABLE "${ARCHIVER_EXECUTABLE}")
+    message(WARNING "'${ARCHIVER_EXECUTABLE}' is not a valid program, unsetting SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS to be able to pick up a different value at next run.")
+    unset(SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS CACHE)
+  endif()
+endif()
+
 if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "linux") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "wasi") AND
