@@ -7178,17 +7178,41 @@ swift::getModuleCachePathFromClang(const clang::CompilerInstance &Clang) {
 
 clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
     ASTContext &ctx, clang::FunctionTemplateDecl *func, SubstitutionMap subst) {
-  SmallVector<clang::TemplateArgument, 4> templateSubst;
-  std::unique_ptr<TemplateInstantiationError> error =
-      ctx.getClangTemplateArguments(func->getTemplateParameters(),
-                                    subst.getReplacementTypes(), templateSubst);
-
   auto getFuncName = [&]() -> std::string {
     std::string funcName;
     llvm::raw_string_ostream funcNameStream(funcName);
     func->printQualifiedName(funcNameStream);
     return funcName;
   };
+
+  // Instantiating C++ function templates with Swift functions results in
+  // unintended bridging to ObjC blocks, which pulls the blocks runtime.
+  // Disallow substituting template params with Swift functions here and ask the
+  // user to use std::function instead.
+  for (auto type : subst.getReplacementTypes()) {
+    SILFunctionTypeRepresentation repr;
+    if (const auto *funcType = type->getAs<FunctionType>())
+      repr = convertRepresentation(funcType->getRepresentation());
+    else if (const auto *silFuncType = type->getAs<SILFunctionType>())
+      repr = silFuncType->getRepresentation();
+    else
+      continue;
+
+    if (getSILFunctionLanguage(repr) == SILFunctionLanguage::C)
+      continue;
+
+    // TODO: Use the location of the apply here.
+    Impl.diagnose(
+        HeaderLoc(func->getBeginLoc()),
+        diag::unable_to_substitute_cxx_template_argument_with_swift_closure,
+        getFuncName(), type);
+    return nullptr;
+  }
+
+  SmallVector<clang::TemplateArgument, 4> templateSubst;
+  std::unique_ptr<TemplateInstantiationError> error =
+      ctx.getClangTemplateArguments(func->getTemplateParameters(),
+                                    subst.getReplacementTypes(), templateSubst);
 
   if (error) {
     std::string failedTypesStr;
