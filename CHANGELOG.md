@@ -5,6 +5,17 @@
 
 ## Swift (next)
 
+* [SE-0489][]:
+  When you encounter errors while encoding or decoding `Codable` types, the resulting error messages are now more human-readable thanks improved `debugDescription` output.
+
+  Before:
+
+  `typeMismatch(Swift.String, Swift.DecodingError.Context(codingPath: [_CodingKey(stringValue: "Index 0", intValue: 0), CodingKeys(stringValue: "address", intValue: nil), CodingKeys(stringValue: "city", intValue: nil), CodingKeys(stringValue: "birds", intValue: nil), _CodingKey(stringValue: "Index 1", intValue: 1), CodingKeys(stringValue: "name", intValue: nil)], debugDescription: "Expected to decode String but found number instead.", underlyingError: nil))`
+
+  After:
+
+  `DecodingError.typeMismatch: expected value of type String. Path: [0].address.city.birds[1].name. Debug description: Expected to decode String but found number instead.`
+
 * [SE-0504][]:
   Introduced Task Cancellation Shields which temporarily prevent the observation of task
   cancellation in a given scope. This functionality is intended for use with cleanup actions which
@@ -11007,6 +11018,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
 [SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
+[SE-0489]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0489-codable-error-printing.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
