@@ -123,7 +123,7 @@ else()
   # everything and there are various places where we link runtime code with
   # code built by the host compiler. Disable sanitizers for the runtime for
   # now.
-  add_compile_options(-fno-sanitize=all)
+  add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-fno-sanitize=all>")
 endif()
 
 # Do not enforce checks for LLVM's ABI-breaking build settings.
