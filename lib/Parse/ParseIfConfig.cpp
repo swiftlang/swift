@@ -865,7 +865,8 @@ Result Parser::parseIfConfigRaw(
       llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
       ParserResult<Expr> result = parseExprSequence(diag::expected_expr,
                                                       /*isBasic*/true,
-                                                      /*isForDirective*/true);
+                                                      /*isForDirective*/true,
+                                                      /*isGenericArg*/false);
       if (result.hasCodeCompletion())
         return makeParserCodeCompletionStatus();
       if (result.isNull())

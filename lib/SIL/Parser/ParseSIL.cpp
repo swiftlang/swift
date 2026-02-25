@@ -1119,7 +1119,7 @@ bool SILParser::parseASTTypeOrValue(CanType &result,
                                     GenericSignature genericSig,
                                     GenericParamList *genericParams,
                                     bool forceContextualType) {
-  auto parsedType = P.parseTypeOrValue();
+  auto parsedType = P.parseGenericArgument();
   if (parsedType.isNull()) return true;
 
   // If we weren't given a specific generic context to resolve the type

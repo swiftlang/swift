@@ -750,7 +750,7 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
   if (!startsWithGreater(Tok)) {
     while (true) {
       // Note: This can be a value type, e.g. 'InlineArray<3, Int>'.
-      ParserResult<TypeRepr> Ty = parseTypeOrValue(diag::expected_type);
+      ParserResult<TypeRepr> Ty = parseGenericArgument(diag::expected_type);
       if (Ty.isNull() || Ty.hasCodeCompletion()) {
         // Skip until we hit the '>'.
         RAngleLoc = skipUntilGreaterInTypeList();
@@ -1341,7 +1341,7 @@ ParserResult<TypeRepr> Parser::parseTypeInlineArray(SourceLoc lSquare) {
 
   // 'isStartOfInlineArrayTypeBody' means we should at least have a type and
   // 'of' to start with.
-  auto count = parseTypeOrValue();
+  auto count = parseGenericArgument();
   if (count.isNull())
     return makeParserError();
 
@@ -1353,7 +1353,7 @@ ParserResult<TypeRepr> Parser::parseTypeInlineArray(SourceLoc lSquare) {
 
   // Allow parsing a value for better recovery, Sema will diagnose any
   // mismatch.
-  auto element = parseTypeOrValue();
+  auto element = parseGenericArgument();
   if (element.hasCodeCompletion() || element.isNull())
     return element;
 
@@ -1535,42 +1535,54 @@ Parser::parseTypeImplicitlyUnwrappedOptional(ParserResult<TypeRepr> base) {
   return makeParserResult(ParserStatus(base), TyR);
 }
 
-ParserResult<TypeRepr> Parser::parseTypeOrValue() {
-  return parseTypeOrValue(diag::expected_type);
+ParserResult<TypeRepr> Parser::parseGenericArgument() {
+  return parseGenericArgument(diag::expected_type);
 }
 
-ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
+ParserResult<TypeRepr> Parser::parseGenericArgument(Diag<> MessageID,
                                                 ParseTypeReason reason) {
-  if (canParseGenericValueLiteral())
-    return parseGenericValueLiteral();
+  if (!Context.LangOpts.hasFeature(Feature::LiteralExpressions)) {
+    if (canParseGenericValueLiteral())
+      return parseGenericValueLiteral();
+    return parseType(MessageID, reason);
+  }
 
   // Look ahead to consider if this is a generic value expression
   // or possibly a tuple type with a postfix grammar
-  bool shouldParseValueExpr = false;
-  if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
-      Tok.is(tok::l_paren)) {
+  bool shouldParseUnambiguousValueExpr = false;
+  if (Tok.is(tok::l_paren)) {
     BacktrackingScope backtrack(*this);
     skipSingle();
     if (Tok.is(tok::comma) || startsWithGreater(Tok) ||
         (Tok.isContextualKeyword("of") && !Tok.isAtStartOfLine()))
-      shouldParseValueExpr = true;
+      shouldParseUnambiguousValueExpr = true;
   }
 
-  if (shouldParseValueExpr) {
-    // Ensure that constituent references get parsed as declaration references,
-    // not type references.
-    llvm::SaveAndRestore<PatternBindingState> X(
-        InBindingPattern, PatternBindingState::NotInBinding);
-    auto expr = parseExprPrimary(MessageID, false);
-    if (expr.isNull()) {
-      diagnose(Tok, MessageID);
-      return makeParserError();
-    }
-    return makeParserResult(
-        new (Context) GenericArgumentExprTypeRepr(expr.get(), &Context));
+  if (Tok.isMinus())
+    Tok.setKind(tok::oper_prefix);
+
+  llvm::SaveAndRestore<PatternBindingState> X(
+      InBindingPattern, PatternBindingState::NotInBinding);
+  ParserResult<Expr> parsedExpr;
+  if (shouldParseUnambiguousValueExpr) {
+    parsedExpr = parseExprPrimary(MessageID, false);
   } else {
-    return parseType(MessageID, reason);
+    parsedExpr = parseExprSequence(MessageID, /*isBasicExpr=*/ true,
+                                   /*isForConditionalDirective=*/ false,
+                                   /*isGenericArgTypeExpr=*/ true);
   }
+
+  if (parsedExpr.isNull()) {
+    diagnose(Tok, MessageID);
+    return makeParserError();
+  }
+
+  return makeParserResult(
+      new (Context) GenericArgumentExprTypeRepr(parsedExpr.get(), &Context));
+}
+
+bool Parser::isGenericArgumentExpressionDelimiter() {
+  return (Tok.isAnyOperator() && Tok.getText() == "==") || startsWithGreater(Tok) || Tok.is(tok::comma);
 }
 
 bool Parser::canParseGenericValueLiteral() {
@@ -1605,7 +1617,8 @@ ParserResult<TypeRepr> Parser::parseGenericValueLiteral() {
 // Speculative type list parsing
 //===----------------------------------------------------------------------===//
 
-static bool isGenericTypeDisambiguatingToken(Parser &P) {
+static bool isGenericTypeDisambiguatingToken(Parser &P,
+                                             bool isGenericArgTypeExpr) {
   auto &tok = P.Tok;
   switch (tok.getKind()) {
   default:
@@ -1631,9 +1644,19 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
     if (tok.getText() == "&")
       return true;
 
+    // Inside a generic argument expression, '>' closes an outer
+    // generic argument list. It can't be a comparison operator because
+    // parseExprSequence stops at '>' in a generic argument expression too.
+    if (isGenericArgTypeExpr && P.isGenericArgumentExpressionDelimiter())
+      return true;
+
     LLVM_FALLTHROUGH;
   case tok::oper_binary_unspaced:
   case tok::oper_postfix:
+    // Inside a generic argument expression, '>' closes the list.
+    if (isGenericArgTypeExpr && P.isGenericArgumentExpressionDelimiter())
+      return true;
+
     // These might be '?' or '!' type modifiers.
     return P.isOptionalToken(tok) || P.isImplicitlyUnwrappedOptionalToken(tok);
 
@@ -1644,14 +1667,14 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
   }
 }
 
-bool Parser::canParseAsGenericArgumentList() {
+bool Parser::canParseAsGenericArgumentList(bool isGenericArgTypeExpr) {
   if (!Tok.isAnyOperator() || Tok.getText() != "<")
     return false;
 
   BacktrackingScope backtrack(*this);
 
   if (canParseGenericArguments())
-    return isGenericTypeDisambiguatingToken(*this);
+    return isGenericTypeDisambiguatingToken(*this, isGenericArgTypeExpr);
 
   return false;
 }
@@ -1668,11 +1691,16 @@ bool Parser::canParseGenericArguments() {
   }
 
   do {
-    if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
-        Tok.is(tok::l_paren))
-      skipSingle();
-    else if (!canParseType())
+    if (Context.LangOpts.hasFeature(Feature::LiteralExpressions)) {
+      if (Tok.is(tok::l_paren))
+        skipSingle();
+      else
+        skipUntilGreaterOrComma();
+    } else if (canParseGenericValueLiteral()) {
+      parseGenericValueLiteral();
+    } else if (!canParseType()) {
       return false;
+    }
 
     // Parse the comma, if the list continues.
     // This could be the trailing comma.
@@ -1707,17 +1735,6 @@ bool Parser::canParseTypeSimple() {
       if (!canParseTypeIdentifier())
         return false;
     }
-
-    // '-' can only appear before integers being used as types like '-123'.
-    if (Tok.isMinus()) {
-      consumeToken();
-
-      if (!Tok.is(tok::integer_literal))
-        return false;
-
-      consumeToken();
-    }
-
     break;
   case tok::kw_protocol:
     return canParseOldStyleProtocolComposition();
@@ -1740,10 +1757,6 @@ bool Parser::canParseTypeSimple() {
   case tok::kw__:
     consumeToken();
     break;
-  case tok::integer_literal:
-    consumeToken();
-    break;
-
   default:
     return false;
   }
@@ -1894,11 +1907,21 @@ bool Parser::canParseStartOfInlineArrayType() {
   // expression or type. We specifically look for any type, not just integers
   // for better recovery in e.g cases where the user writes '[Int of 2]'. We
   // only do type-scalar since variadics would be ambiguous e.g 'Int...of'.
-  if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
-      Tok.is(tok::l_paren))
-    skipSingle(); // Assume a parentheses-delimited value expression
-  else if (!canParseTypeScalar())
+
+  if (Context.LangOpts.hasFeature(Feature::LiteralExpressions)) {
+    if (Tok.is(tok::l_paren))
+      skipSingle();
+    else {
+      CancellableBacktrackingScope backtrack(*this);
+      if (!skipUntilOfOrEndOfLine())
+        return false;
+      backtrack.cancelBacktrack();
+    }
+  } else if (canParseGenericValueLiteral()) {
+    parseGenericValueLiteral();
+  } else if (!canParseTypeScalar()) {
     return false;
+  }
 
   // For now we don't allow multi-line since that would require
   // disambiguation.
