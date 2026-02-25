@@ -3012,6 +3012,7 @@ static bool isBoundToFullyConcreteType(TypeAliasDecl *typealias,
       nominalBound->getGenericArgs();
   auto typealiasGenericArguments =
        typealiasBound->getGenericArgs();
+
   for (size_t i = 0; i < nominalGenericArguments.size(); i++) {
     auto nominalBoundGenericType = nominalGenericArguments[i];
     auto typealiasBoundGenericType = typealiasGenericArguments[i];
@@ -3019,9 +3020,8 @@ static bool isBoundToFullyConcreteType(TypeAliasDecl *typealias,
       continue;
     }
 
-    if (typealiasBoundGenericType->hasTypeParameter()) {
+    if (typealiasBoundGenericType->hasTypeParameter())
       return false;
-    }
   }
 
   return true;
@@ -3065,9 +3065,8 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
     }
   }
 
-  if (nominalGenericParams.size() != typealiasGenericParams.size()) {
+  if (nominalGenericParams.size() != typealiasGenericParams.size())
     return false;
-  }
 
   if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
                   typealiasGenericParams.begin(),
