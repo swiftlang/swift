@@ -299,6 +299,9 @@ public:
                                              Type GlobalActorBound,
                                              ModuleDecl *Module);
 
+  std::string mangleConversionThunk(CanSILFunctionType ThunkType, Type FromType,
+                                    Type ToType, ModuleDecl *Module);
+
   void appendDistributedThunk(const AbstractFunctionDecl *thunk,
                               bool asReference);
   std::string mangleDistributedThunkRef(const AbstractFunctionDecl *thunk);
