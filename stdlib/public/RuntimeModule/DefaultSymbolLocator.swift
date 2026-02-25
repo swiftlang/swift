@@ -40,7 +40,9 @@ fileprivate let elfSymbolPath = "\(symbolPath)/.build-id"
 #endif
 
 @_spi(SymbolLocation)
-public class DefaultSymbolLocator: SymbolLocator {
+open class DefaultSymbolLocator: SymbolLocator {
+
+  public init() {}
 
   public typealias Image = SymbolLocator.Image
   public typealias ImageFormat = SymbolLocator.ImageFormat
@@ -129,7 +131,8 @@ public class DefaultSymbolLocator: SymbolLocator {
     }
 
     // We must be able to load the original image (as an ELF image)
-    guard let (imagePath, result) = findElf(image: image) else {
+    guard let (imagePath, result) =
+      findElf(image: image, paths: findSymbolPaths(image: image)) else {
       return nil
     }
 
@@ -387,19 +390,23 @@ public class DefaultSymbolLocator: SymbolLocator {
     return nil
   }
 
-  private func findElf(image: any Image) ->
+  open func findImagePaths(image: any Image) -> [String] {
+    [image.path]
+    .compactMap { $0 }
+  }
+
+  open func findSymbolPaths(image: any Image) -> [String] {
+    [elfDebugSymPath(for: image), image.path]
+    .compactMap { $0 }
+  }
+
+  private func findElf(image: any Image, paths: [String]) ->
     (path: String, result: ElfImageCache.Result)? {
 
-    // check the debug/symbols path first
-    if let debugSymPath = elfDebugSymPath(for: image),
-      let result = loadElfImage(path: debugSymPath, uuid: image.uuid) {
-      return (debugSymPath,result)
-    }
-
-    // then the image path specified in the Image
-    if let imagePath = image.path,
-        let result = loadElfImage(path: imagePath, uuid: image.uuid) {
-      return (imagePath,result)
+    for path in paths {
+      if let result = loadElfImage(path: path, uuid: image.uuid) {
+        return (path,result)
+      }
     }
 
     return nil
@@ -420,7 +427,10 @@ public class DefaultSymbolLocator: SymbolLocator {
   }
 
   public func find(image: any Image) -> String? {
-    if let elfImageInfo = findElf(image: image) {
+    if let elfImageInfo = findElf(
+      image: image,
+      paths: findImagePaths(image: image)) {
+
       return elfImageInfo.path
     }
 

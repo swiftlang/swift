@@ -363,7 +363,6 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     -> SymbolicatedBacktrace? {
     return symbolicated(with: images,
                         platform: .default,
-                        alternativeSymbolFilePaths: [],
                         options: options)
   }
 
@@ -385,15 +384,17 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   @_spi(Internal)
   public func symbolicated(with images: ImageMap? = nil,
                            platform: SymbolicationPlatform,
-                           alternativeSymbolFilePaths: [String],
-                           options: SymbolicationOptions = .default)
+                           options: SymbolicationOptions = .default,
+                           symbolLocator: SymbolLocator =
+                            DefaultSymbolLocator.shared,
+                           )
     -> SymbolicatedBacktrace? {
     return SymbolicatedBacktrace.symbolicate(
       backtrace: self,
       images: images,
       platform: platform,
-      alternativeSymbolFilePaths: alternativeSymbolFilePaths,
-      options: options
+      options: options,
+      symbolLocator: symbolLocator
     )
   }
 
