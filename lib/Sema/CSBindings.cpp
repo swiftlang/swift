@@ -1183,11 +1183,54 @@ static std::optional<bool> subsumeBinding(PotentialBinding &binding,
 }
 
 void BindingSet::reduceBinding(PotentialBinding &binding) {
+  bool checkConformanceConstraints =
+      !CS.shouldAttemptFixes() &&
+      CS.getASTContext().TypeCheckerOpts.SolverEnableBindingOptimizations &&
+      !Protocols.empty() &&
+      !canBeNil();
+
   switch (binding.Kind) {
-  case AllowedBindingKind::Exact:
+  case AllowedBindingKind::Exact: {
+    // If an exact binding type doesn't conform to a protocol, our type
+    // variable's adjacent constraints are mutually unsatisfiable, and
+    // our partial solution so far is contradictory.
+    auto type = binding.BindingType->getWithoutSpecifierType();
+    bool conforms = llvm::all_of(Protocols,
+        [&](ProtocolDecl *proto) -> bool {
+          return !CS.lookupConformance(type, proto).isInvalid();
+        });
+    if (!conforms) {
+      // Our partial solution so far is contradictory. Promote this
+      // binding to attempt immediately.
+      markConflicting();
+
+      // Preserve the binding kind, which is Exact.
+      break;
+    }
     break;
+  }
 
   case AllowedBindingKind::Subtypes: {
+    if (checkConformanceConstraints) {
+      // It is possible that T does not conform to P, but some subtype of T
+      // does, so in general we cannot do anything here. However, handle
+      // the special case of a subtype binding to T? where T? does not
+      // conform to P, but T does. This reduces to a subtype binding to T.
+      if (auto objectType = binding.BindingType->getOptionalObjectType()) {
+        bool objectConforms = llvm::any_of(Protocols,
+            [&](ProtocolDecl *proto) -> bool {
+              return (!CS.lookupConformance(objectType, proto).isInvalid() &&
+                      CS.lookupConformance(binding.BindingType, proto).isInvalid());
+            });
+        if (objectConforms) {
+          binding.BindingType = objectType;
+          // Preserve the binding kind of Subtypes. However, we might
+          // upgrade it to Exact below if the object type has no
+          // proper subtypes.
+        }
+      }
+    }
+
     // Optimization. If the type has no proper subtypes, and the lvalue
     // state of the type variable is known, we can rewrite a subtype
     // binding into an exact binding. If the lvalue state isn't known,
@@ -1196,7 +1239,7 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
     if (!hasProperSubtypes(binding.BindingType)) {
       switch (getLValueState()) {
       case KnownLValueKind::Unknown:
-        // Can't do anything
+        // Can't do anything.
         break;
 
       case KnownLValueKind::LValue:
@@ -1209,13 +1252,71 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
         break;
       }
     }
+
+    if (checkConformanceConstraints) {
+      // If we have X conv $T0, $T0 conforms P, we can check if X
+      // has to conform to P. If it has to, but it doesn't, then
+      // his type variable's adjacent constraints are mutually
+      // unsatisfiable.
+      bool conforms = llvm::all_of(Protocols,
+          [&](ProtocolDecl *proto) -> bool {
+            return checkTransitiveSubtypeConformance(
+                  CS, binding.BindingType, proto);
+          });
+
+      if (!conforms) {
+        // Our partial solution so far is contradictory. Promote this
+        // binding to attempt immediately.
+        markConflicting();
+        binding.Kind = AllowedBindingKind::Exact;
+        break;
+      }
+    }
+
     break;
   }
+  case AllowedBindingKind::Supertypes: {
+    if (checkConformanceConstraints) {
+      // If we have X conv $T0, $T0 conforms P, we can check if X
+      // has to conform to P. If it has to, but it doesn't, then
+      // his type variable's adjacent constraints are mutually
+      // unsatisfiable.
+      bool conforms = llvm::all_of(Protocols,
+          [&](ProtocolDecl *proto) -> bool {
+            return checkTransitiveSupertypeConformance(
+                  CS, binding.BindingType, proto);
+          });
 
-  case AllowedBindingKind::Supertypes:
+      if (!conforms) {
+        // Our partial solution so far is contradictory. Promote this
+        // binding to attempt immediately.
+        markConflicting();
+        binding.Kind = AllowedBindingKind::Exact;
+        break;
+      }
+    }
+    
+    // If we have X conv $T0, $T0 conforms P, and X has no
+    // supertypes other than AnyHashable, Optional<T>, and
+    // the existentials, we can promote the binding to an
+    // exact binding.
+    if (!hasProperSupertypes(binding.BindingType)) {
+      bool condition = llvm::any_of(Protocols,
+          [&](ProtocolDecl *proto) {
+        return (!proto->existentialConformsToSelf() &&
+                CS.isConformanceTransitiveForSupertype(
+                  ConversionBehavior::None, proto));
+      });
+
+      if (condition) {
+        binding.Kind = AllowedBindingKind::Exact;
+        break;
+      }
+    }
     break;
-
+  }
   case AllowedBindingKind::Fallback:
+    // FIXME: Figure out what to do here.
     break;
   }
 }
