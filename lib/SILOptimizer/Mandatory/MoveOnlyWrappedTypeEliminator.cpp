@@ -65,9 +65,9 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   llvm::SmallSetVector<SILInstruction *, 8> &pendingInsts;
   llvm::SmallVector<SILInstruction *, 8> deferredInsts;
 
-  SILMoveOnlyWrappedTypeEliminatorVisitor(llvm::SmallSetVector<SILInstruction *, 8> &pendingInsts):
-    pendingInsts(pendingInsts)
-  {}
+  SILMoveOnlyWrappedTypeEliminatorVisitor(
+      llvm::SmallSetVector<SILInstruction *, 8> &pendingInsts)
+      : pendingInsts(pendingInsts) {}
 
   // If 'user's operand is not yet visited, push it onto the end of
   // 'pendingInsts' and pretend we didn't see it yet. This is only relevant for
@@ -216,6 +216,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(CheckedCastBranch)
   NO_UPDATE_NEEDED(ClassMethod)
   NO_UPDATE_NEEDED(ConvertFunction)
+  NO_UPDATE_NEEDED(ConvertEscapeToNoEscape)
   NO_UPDATE_NEEDED(CopyAddr)
   NO_UPDATE_NEEDED(DeallocBox)
   NO_UPDATE_NEEDED(DeallocStack)
@@ -259,9 +260,9 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
     return true;
   }
 
-#define ELIMINATE_POTENTIAL_IDENTITY_CAST(NAME) \
-  bool visit##NAME##Inst(NAME##Inst *cast) { \
-    return eliminateIdentityCast(cast); \
+#define ELIMINATE_POTENTIAL_IDENTITY_CAST(NAME)                                \
+  bool visit##NAME##Inst(NAME##Inst *cast) {                                   \
+    return eliminateIdentityCast(cast);                                        \
   }
   ELIMINATE_POTENTIAL_IDENTITY_CAST(Upcast)
   ELIMINATE_POTENTIAL_IDENTITY_CAST(UncheckedAddrCast)
@@ -419,7 +420,7 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
   }
 
   SILMoveOnlyWrappedTypeEliminatorVisitor visitor{touchedInsts};
-  while(true) {
+  while (true) {
     while (!touchedInsts.empty()) {
       visitor.visit(touchedInsts.pop_back_val());
     }
