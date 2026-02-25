@@ -466,7 +466,7 @@ And the module structure to support such applications looks like this:
 ┌────────────────────────────────────────────────┐      ┌──────────────────────────────────────────────┐
 │             Client Module                      │      │               Server Module                  │
 │================================================│      │==============================================│
-│ let g = try $Greeter.resolve(...) /*new*/      │      │ distributed actor EnglishGreeter: Greeter {  │
+│ let greeter = try $Greeter.resolve(...) /*new*/│      │ distributed actor EnglishGreeter: Greeter {  │
 │ try await greeter.hello(name: ...)             │      │   distributed func greet(name: String) {     │
 └────────────────────────────────────────────────┘      │     "Greeting in english, for \(name)!"      │
 /* Client cannot know about EnglishGreeter type */      │   }                                          │      
