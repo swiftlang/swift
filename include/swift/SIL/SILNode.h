@@ -525,30 +525,35 @@ template <class To>
 struct cast_convert_val<To, swift::SILNode*, swift::SILNode*> {
   using ret_type = typename cast_retty<To, swift::SILNode*>::ret_type;
   static ret_type doit(swift::SILNode *node) {
-    return swift::cast_from_SILNode<To>::doit(node);
+    using swift::cast_from_SILNode;
+    return cast_from_SILNode<To>::doit(node);
   }
 };
 template <class To>
 struct cast_convert_val<To, const swift::SILNode *, const swift::SILNode *> {
-  using ret_type = typename cast_retty<To, const swift::SILNode*>::ret_type;
+  using SILNode = swift::SILNode;
+  using ret_type = typename cast_retty<To, const SILNode*>::ret_type;
   static ret_type doit(const swift::SILNode *node) {
-    return swift::cast_from_SILNode<To>::doit(const_cast<swift::SILNode*>(node));
+    using ::swift::cast_from_SILNode;
+    return cast_from_SILNode<To>::doit(const_cast<SILNode*>(node));
   }
 };
 template <class To>
 struct cast_convert_val<To, swift::SILInstruction*, swift::SILInstruction*> {
   using ret_type = typename cast_retty<To, swift::SILInstruction*>::ret_type;
   static ret_type doit(swift::SILInstruction *inst) {
-    return swift::cast_from_SILInstruction<To>::doit(inst);
+    using ::swift::cast_from_SILInstruction;
+    return cast_from_SILInstruction<To>::doit(inst);
   }
 };
 template <class To>
 struct cast_convert_val<To, const swift::SILInstruction *,
                             const swift::SILInstruction *> {
-  using ret_type = typename cast_retty<To, const swift::SILInstruction*>::ret_type;
-  static ret_type doit(const swift::SILInstruction *inst) {
-    return swift::cast_from_SILInstruction<To>::
-             doit(const_cast<swift::SILInstruction*>(inst));
+  using SILInstruction = swift::SILInstruction;
+  using ret_type = typename cast_retty<To, const SILInstruction*>::ret_type;
+  static ret_type doit(const SILInstruction *inst) {
+    using ::swift::cast_from_SILInstruction;
+    return cast_from_SILInstruction<To>::doit(const_cast<SILInstruction*>(inst));
   }
 };
 
