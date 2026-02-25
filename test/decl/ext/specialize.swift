@@ -127,7 +127,7 @@ struct S14 {
 extension S14.A {
   func test() {
     let int: Int
-    let _: U = int // error
+    let _: U = int // expected-error {{cannot convert value of type 'Int' to specified type 'U'}}
   }
 }
 
