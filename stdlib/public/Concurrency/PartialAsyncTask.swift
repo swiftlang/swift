@@ -908,7 +908,7 @@ public nonisolated(nonsending) func withUnsafeContinuation<T>(
 @unsafe
 @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
 public func withUnsafeContinuation<T>( // source-compatibility overload
-  isolation: isolated (any Actor)? = #isolation,
+  isolation: isolated (any Actor)?,
   _ fn: (UnsafeContinuation<T, Never>) -> Void
 ) async -> sending T {
   return await Builtin.withUnsafeContinuation {
@@ -944,9 +944,24 @@ public func withUnsafeContinuation<T>( // source-compatibility overload
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @unsafe
-public nonisolated(nonsending) func withUnsafeThrowingContinuation<T>(
+public nonisolated(nonsending) func withUnsafeThrowingContinuation<T, E>(
+  _ fn: (UnsafeContinuation<T, E>) -> Void
+) async throws(E) -> sending T {
+  do {
+    return try await Builtin.withUnsafeThrowingContinuation {
+      unsafe fn(UnsafeContinuation<T, E>($0))
+    }
+  } catch {
+    throw error as! E
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@unsafe
+public nonisolated(nonsending) func withUnsafeThrowingContinuation<T>( // nonsending + untyped throws
   _ fn: (UnsafeContinuation<T, Error>) -> Void
-) async throws -> sending T {
+) async throws(Error) -> sending T {
   return try await Builtin.withUnsafeThrowingContinuation {
     unsafe fn(UnsafeContinuation<T, Error>($0))
   }
@@ -955,9 +970,24 @@ public nonisolated(nonsending) func withUnsafeThrowingContinuation<T>(
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @unsafe
+public nonisolated(nonsending) func withUnsafeThrowingContinuation<E>(
+  _ fn: (UnsafeContinuation<Void, E>) -> Void
+) async throws(E) {
+  do {
+    return try await Builtin.withUnsafeThrowingContinuation {
+      unsafe fn(UnsafeContinuation<Void, E>($0))
+    }
+  } catch {
+    throw error as! E
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@unsafe
 @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
-public func withUnsafeThrowingContinuation<T>(
-  isolation: isolated (any Actor)? = #isolation,
+public func withUnsafeThrowingContinuation<T>( // source-compatibility overload
+  isolation: isolated (any Actor)?,
   _ fn: (UnsafeContinuation<T, Error>) -> Void
 ) async throws -> sending T {
   return try await Builtin.withUnsafeThrowingContinuation {
