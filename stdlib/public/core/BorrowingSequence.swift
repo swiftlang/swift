@@ -161,7 +161,9 @@ public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
 
 @available(SwiftStdlib 6.4, *)
 extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable {
+  @_disfavoredOverload
   public var underestimatedCount: Int { 0 }
+  @_disfavoredOverload
   public func _customContainsEquatableElement(_ element: borrowing Element) -> Bool? { nil }
 }
 
