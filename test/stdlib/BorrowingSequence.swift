@@ -10,17 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults)
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults -enable-experimental-feature BorrowingSequence)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
+// REQUIRES: swift_feature_BorrowingSequence
 
 import StdlibUnittest
 
 var suite = TestSuite("BorrowingSequence Tests")
 defer { runAllTests() }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable {
   func reduce<T: ~Copyable>(
     _ initial: consuming T,
@@ -55,7 +56,7 @@ extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyab
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: Copyable {
   func collectViaBorrowing() -> [Element] {
     var borrowIterator = makeBorrowingIterator()
