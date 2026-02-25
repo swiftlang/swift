@@ -3050,6 +3050,9 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   auto nominalGenericParams = nominalSig.getGenericParams();
   auto typealiasGenericParams = typealiasSig.getGenericParams();
 
+  if(typealiasGenericParams.size() >nominalGenericParams.size())
+    return false;
+
   if (nominalGenericParams.size() != typealiasGenericParams.size()) {
     unsigned nominalMaxDepth = nominalGenericParams.back()->getDepth();
     unsigned typealiasMaxDepth = typealiasGenericParams.back()->getDepth();
