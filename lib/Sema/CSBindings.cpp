@@ -1182,30 +1182,45 @@ static std::optional<bool> subsumeBinding(PotentialBinding &binding,
   return std::nullopt;
 }
 
-void BindingSet::addBinding(PotentialBinding binding) {
-  // Optimization. If the type has no proper subtypes, and the lvalue
-  // state of the type variable is known, we can rewrite a subtype
-  // binding into an exact binding. If the lvalue state isn't known,
-  // then every type T still has @lvalue T as a subtype, so this
-  // isn't sound in that case.
-  if (binding.Kind == AllowedBindingKind::Subtypes &&
-      !hasProperSubtypes(binding.BindingType)) {
-    switch (getLValueState()) {
-    case KnownLValueKind::Unknown:
-      // Can't do anything
-      break;
+void BindingSet::reduceBinding(PotentialBinding &binding) {
+  switch (binding.Kind) {
+  case AllowedBindingKind::Exact:
+    break;
 
-    case KnownLValueKind::LValue:
-      if (!binding.BindingType->is<LValueType>())
-        binding.BindingType = LValueType::get(binding.BindingType);
-      LLVM_FALLTHROUGH;
+  case AllowedBindingKind::Subtypes: {
+    // Optimization. If the type has no proper subtypes, and the lvalue
+    // state of the type variable is known, we can rewrite a subtype
+    // binding into an exact binding. If the lvalue state isn't known,
+    // then every type T still has @lvalue T as a subtype, so this
+    // isn't sound in that case.
+    if (!hasProperSubtypes(binding.BindingType)) {
+      switch (getLValueState()) {
+      case KnownLValueKind::Unknown:
+        // Can't do anything
+        break;
 
-    case KnownLValueKind::RValue:
-      binding.Kind = AllowedBindingKind::Exact;
-      break;
+      case KnownLValueKind::LValue:
+        if (!binding.BindingType->is<LValueType>())
+          binding.BindingType = LValueType::get(binding.BindingType);
+        LLVM_FALLTHROUGH;
+
+      case KnownLValueKind::RValue:
+        binding.Kind = AllowedBindingKind::Exact;
+        break;
+      }
     }
+    break;
   }
 
+  case AllowedBindingKind::Supertypes:
+    break;
+
+  case AllowedBindingKind::Fallback:
+    break;
+  }
+}
+
+void BindingSet::addBinding(PotentialBinding binding) {
   if (binding.isTransitive() &&
       !checkTypeOfBinding(TypeVar, binding.BindingType))
     return;
@@ -1227,6 +1242,8 @@ void BindingSet::addBinding(PotentialBinding binding) {
         return;
     }
   }
+
+  reduceBinding(binding);
 
   bool isClosureParameterType = TypeVar->getImpl().isClosureParameterType();
   llvm::SmallSetVector<PotentialBinding, 1> joined;
