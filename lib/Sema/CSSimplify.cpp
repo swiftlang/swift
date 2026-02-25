@@ -9210,11 +9210,18 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
     // If this is a `nil` literal, it would be a contextual failure.
     if (auto *Nil = getAsExpr<NilLiteralExpr>(anchor)) {
-      auto *fixLocator = getConstraintLocator(
-          getContextualType(Nil, /*forConstraint=*/false)
-              ? locator.withPathElement(LocatorPathElt::ContextualType(
-                    getContextualTypePurpose(Nil)))
-              : locator);
+      ConstraintLocator *fixLocator = nullptr;
+      if (auto contextualInfo = getContextualTypeInfo(Nil)) {
+        fixLocator = contextualInfo->locator;
+      }
+
+      if (!fixLocator) {
+        fixLocator = getConstraintLocator(
+            getContextualType(Nil, /*forConstraint=*/false)
+                ? locator.withPathElement(LocatorPathElt::ContextualType(
+                      getContextualTypePurpose(Nil)))
+                : locator);
+      }
 
       // Only requirement placed directly on `nil` literal is
       // `ExpressibleByNilLiteral`, so if `nil` is an argument
@@ -9232,7 +9239,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       auto *fix =
           ContextualMismatch::create(*this, protocolTy, type, fixLocator);
 
-      return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+      auto impact = 1u;
+      using SingleValueStmtResult = LocatorPathElt::SingleValueStmtResult;
+      if (auto branchElt = fixLocator->findLast<SingleValueStmtResult>()) {
+        // Mirror the existing branch scoring for contextual mismatches, but
+        // keep the first branch expensive enough that concrete errors in
+        // sibling branches still win diagnostics over a `nil` mismatch.
+        impact = branchElt->getIndex() > 0 ? 9 + branchElt->getIndex() : 5;
+      }
+      return recordFix(fix, impact) ? SolutionKind::Error
+                                    : SolutionKind::Solved;
     }
 
     // If there is a missing conformance between source and destination
