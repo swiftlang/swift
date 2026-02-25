@@ -3545,3 +3545,26 @@ function(add_swift_target_executable name)
 
   endforeach()
 endfunction()
+
+function(embedded_amend_archive_commands_on_darwin_host target triple)
+  # This is a temporary solution while we work on porting the build
+  # on the Embedded stdlib to the Runtime build system, where each platform
+  # is built by a separate CMake invocation, thus allowing to set the archiver
+  # properly in the toolchain file.
+  if(SWIFT_HOST_VARIANT STREQUAL "macosx" AND SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS)
+    if(triple MATCHES "-elf$" OR triple MATCHES "-eabi$" OR triple MATCHES "-wasm$")
+      # There is no way to change the archive commands only for a few targets, so
+      # we resort going double work (and assume the previous commands exit successfully)
+      add_custom_command(TARGET ${target}
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E rm $<TARGET_FILE:${target}>
+        COMMAND ${SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS}
+          $<TARGET_FILE:${target}>
+          "$<LIST:JOIN,$<TARGET_PROPERTY:${target},STATIC_LIBRARY_OPTIONS>,;>"
+          "$<LIST:JOIN,$<TARGET_OBJECTS:${target}>,;>"
+        COMMAND ${CMAKE_COMMAND} -E touch $<TARGET_FILE:${target}>
+        VERBATIM
+        COMMAND_EXPAND_LISTS)
+    endif()
+  endif()
+endfunction()

@@ -69,6 +69,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
         )
       set_property(TARGET embedded-exclusivity-${impl}-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
 
+      embedded_amend_archive_commands_on_darwin_host(embedded-exclusivity-${impl}-${mod} ${triple})
+
       add_dependencies(embedded-exclusivity embedded-exclusivity-${impl}-${mod})
     endforeach()
   endforeach()
