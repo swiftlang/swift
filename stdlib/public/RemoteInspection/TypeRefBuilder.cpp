@@ -623,8 +623,11 @@ public:
   BuiltinTypeDescriptorImpl(RemoteRef<BuiltinTypeDescriptor> BTD,
                             TypeRefBuilder &Builder)
       : BuiltinTypeDescriptorBase(BTD->Size, BTD->getAlignment(),
-                                       BTD->Stride, BTD->NumExtraInhabitants,
-                                       BTD->isBitwiseTakable()),
+                                  BTD->Stride, BTD->NumExtraInhabitants,
+                                  BTD->isBitwiseTakable()
+                                    ? BitwiseBorrowability::TakableAndBorrowable
+                                    : BitwiseBorrowability::None,
+                                  /*AFD*/ false),
         BTD(BTD), Builder(Builder) {}
 
   ~BuiltinTypeDescriptorImpl() override {}
