@@ -16,8 +16,7 @@ if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
 endif()
 
 set(swift_stdlib_unittest_compile_flags
-  "-Xfrontend" "-disable-objc-attr-requires-foundation-module"
-  "-Xfrontend" "-disable-availability-checking")
+  "-Xfrontend" "-disable-objc-attr-requires-foundation-module")
 
 list(APPEND swift_stdlib_unittest_compile_flags "-enable-experimental-feature" "Lifetimes")
 
