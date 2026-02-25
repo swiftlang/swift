@@ -517,13 +517,28 @@ extension Substring: StringProtocol {
   ///   `withCString(_:)` method. The pointer argument is valid only for the
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable // specialization
-  public func withCString<Result>(
-    _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
+  @_alwaysEmitIntoClient // (Primarily @inlinable) specialization
+  public func withCString<Result, E: Error>(
+    _ body: (UnsafePointer<CChar>) throws(E) -> Result) throws(E) -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
     return try unsafe String(self).withCString(body)
   }
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withCString<Result>(
+      _ body: (UnsafePointer<CChar>) throws -> Result
+    ) throws -> Result
+  )
+  @usableFromInline
+  internal func __rethrows_withCString<Result>(
+    _ body: (UnsafePointer<CChar>) throws -> Result
+  ) throws -> Result {
+    return try unsafe withCString(body)
+  }
+#endif // !hasFeature(Embedded)
 
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of code units.
@@ -541,15 +556,32 @@ extension Substring: StringProtocol {
   ///   - targetEncoding: The encoding in which the code units should be
   ///     interpreted.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable // specialization
-  public func withCString<Result, TargetEncoding: _UnicodeEncoding>(
+  @_alwaysEmitIntoClient // (Primarily @inlinable) specialization
+  public func withCString<Result, TargetEncoding: _UnicodeEncoding, E: Error>(
     encodedAs targetEncoding: TargetEncoding.Type,
-    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
+  ) throws(E) -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
     return try unsafe String(self).withCString(encodedAs: targetEncoding, body)
   }
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withCString<Result, TargetEncoding: Unicode.Encoding>(
+      encodedAs targetEncoding: TargetEncoding.Type,
+      _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+    ) throws -> Result
+  )
+  @usableFromInline
+  internal func __rethrows_withCString<Result, TargetEncoding: Unicode.Encoding>(
+    encodedAs targetEncoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+  ) throws -> Result {
+    return try unsafe withCString(encodedAs: targetEncoding, body)
+  }
+#endif // !hasFeature(Embedded)
 }
 
 extension Substring {

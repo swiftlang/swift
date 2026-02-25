@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -72,12 +72,16 @@ internal func _isScalarNFCQC(
 }
 
 extension _StringGutsSlice {
-  internal func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
+  internal func _withNFCCodeUnits<E: Error>(
+    _ f: (UInt8) throws(E) -> Void
+  ) throws(E) {
     let substring = String(_guts)[range]
     // Fast path: If we're already NFC (or ASCII), then we don't need to do
     // anything at all.
     if _fastPath(_guts.isNFC) {
-      try substring.utf8.forEach(f)
+      for byte in substring.utf8 {
+        try f(byte)
+      }
       return
     }
 
@@ -90,8 +94,8 @@ extension _StringGutsSlice {
       // Because we have access to the fastUTF8, we can go through that instead
       // of accessing the UTF8 view on String.
       if isNFCQC {
-        try unsafe withFastUTF8 {
-          for unsafe byte in unsafe $0 {
+        try unsafe withFastUTF8 { buffer throws(E) in
+          for unsafe byte in unsafe buffer {
             try f(byte)
           }
         }
@@ -116,8 +120,8 @@ extension _StringGutsSlice {
     }
 
     for scalar in substring.unicodeScalars._internalNFC {
-      try scalar.withUTF8CodeUnits {
-        for unsafe byte in unsafe $0 {
+      try scalar.withUTF8CodeUnits { buffer throws(E) in
+        for unsafe byte in unsafe buffer {
           try f(byte)
         }
       }

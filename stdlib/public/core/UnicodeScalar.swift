@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -520,20 +520,35 @@ extension Unicode.Scalar {
   }
 
   // Access the scalar as encoded in UTF-8
-  @inlinable
+  @_alwaysEmitIntoClient
   @safe
-  internal func withUTF8CodeUnits<Result>(
-    _ body: (UnsafeBufferPointer<UInt8>) throws -> Result
-  ) rethrows -> Result {
+  internal func withUTF8CodeUnits<Result, E: Error>(
+    _ body: (UnsafeBufferPointer<UInt8>) throws(E) -> Result
+  ) throws(E) -> Result {
     let encodedScalar = UTF8.encode(self)!
     var (codeUnits, utf8Count) = encodedScalar._bytes
 
     // The first code unit is in the least significant byte of codeUnits.
     codeUnits = codeUnits.littleEndian
-    return try unsafe Swift._withUnprotectedUnsafePointer(to: &codeUnits) {
-      return try unsafe $0.withMemoryRebound(to: UInt8.self, capacity: 4) {
-        return try unsafe body(UnsafeBufferPointer(start: $0, count: utf8Count))
+    return try unsafe Swift._withUnprotectedUnsafePointer(to: &codeUnits) { buffer throws(E) in
+      return try unsafe buffer.withMemoryRebound(to: UInt8.self, capacity: 4) { rebound throws(E) in
+        return try unsafe body(UnsafeBufferPointer(start: rebound, count: utf8Count))
       }
     }
   }
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withUTF8CodeUnits<Result>(
+      _ body: (UnsafeBufferPointer<UInt8>) throws -> Result
+    ) throws -> Result
+  )
+  @usableFromInline
+  internal func __rethrows_withUTF8CodeUnits<Result>(
+    _ body: (UnsafeBufferPointer<UInt8>) throws -> Result
+  ) throws -> Result {
+    return try self.withUTF8CodeUnits(body)
+  }
+#endif // !hasFeature(Embedded)
 }
