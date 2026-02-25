@@ -6013,8 +6013,11 @@ namespace {
         mainModule->getImportedModules(importedModules,
                                        ModuleDecl::getImportFilterAll());
 
+        llvm::SmallSet<ModuleDecl *, 16> seenModules;
         for (auto &import : importedModules) {
           if (import.importedModule->isNonSwiftModule())
+            continue;
+          if (!seenModules.insert(import.importedModule).second)
             continue;
 
           if (T *result = resolveSwiftDeclImpl<T>(
