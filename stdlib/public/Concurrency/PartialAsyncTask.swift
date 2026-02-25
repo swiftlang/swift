@@ -903,6 +903,19 @@ public nonisolated(nonsending) func withUnsafeContinuation<T>(
   }
 }
 
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@unsafe
+@available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
+public func withUnsafeContinuation<T>( // source-compatibility overload
+  isolation: isolated (any Actor)? = #isolation,
+  _ fn: (UnsafeContinuation<T, Never>) -> Void
+) async -> sending T {
+  return await Builtin.withUnsafeContinuation {
+    unsafe fn(UnsafeContinuation<T, Never>($0))
+  }
+}
+
 /// Invokes the passed in closure with a unsafe continuation for the current task.
 ///
 /// The body of the closure executes synchronously on the calling task, and once it returns
@@ -932,6 +945,19 @@ public nonisolated(nonsending) func withUnsafeContinuation<T>(
 @_alwaysEmitIntoClient
 @unsafe
 public nonisolated(nonsending) func withUnsafeThrowingContinuation<T>(
+  _ fn: (UnsafeContinuation<T, Error>) -> Void
+) async throws -> sending T {
+  return try await Builtin.withUnsafeThrowingContinuation {
+    unsafe fn(UnsafeContinuation<T, Error>($0))
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@unsafe
+@available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
+public func withUnsafeThrowingContinuation<T>(
+  isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Error>) -> Void
 ) async throws -> sending T {
   return try await Builtin.withUnsafeThrowingContinuation {
