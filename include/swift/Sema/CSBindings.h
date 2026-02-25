@@ -710,6 +710,10 @@ private:
   /// \param binding The binding to add.
   void addBinding(PotentialBinding binding);
 
+  /// Rewrite certain bindings into a simpler form based on this type variable's
+  /// adjacent conformance constraints.
+  void reduceBinding(PotentialBinding &binding);
+
   void addDefault(Constraint *constraint);
 
   StringRef getLiteralBindingKind(LiteralBindingKind K) const {
