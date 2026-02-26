@@ -74,6 +74,7 @@ class SwiftMacroTestGen: SyntaxVisitor {
       res
       .with(\.body, createBody(res, selfParam: selfParam))
       .with(\.name, "call_\(res.name.withoutBackticks)")
+      .with(\.leadingTrivia, res.leadingTrivia.withoutComments)
     if let surroundingType {
       res =
         res
@@ -302,6 +303,31 @@ extension AttributeListSyntax.Element {
     case .attribute(let a): return a.isObsolete
     case .ifConfigDecl: return false
     }
+  }
+}
+
+extension Trivia {
+  var withoutComments: Trivia {
+    var prevWasComment = false
+    return Trivia(pieces: self.pieces.filter { piece in
+      let isComment = switch piece {
+        case .blockComment, .lineComment, .docBlockComment, .docLineComment:
+          true
+        default:
+          false
+      }
+      if isComment {
+        prevWasComment = true
+        return false
+      }
+      if prevWasComment {
+        prevWasComment = false
+        if case .newlines = piece {
+          return false
+        }
+      }
+      return true
+    })
   }
 }
 

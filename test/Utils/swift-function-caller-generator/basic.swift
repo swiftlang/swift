@@ -4,6 +4,7 @@
 // RUN: %diff %t/out.swift %t/out.swift.expected
 
 //--- test.swift
+/// doc comment
 func foo(x: Int) -> Int
 
 func bar(_ y: UnsafePointer<CInt>)
