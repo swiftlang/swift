@@ -1,0 +1,32 @@
+// RUN: %swift -swift-version 4 -target arm64e-apple-ios12.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls | %FileCheck %s
+
+// REQUIRES: CPU=arm64e
+// REQUIRES: OS=ios
+
+// Verify that block isa pointers (__NSConcreteStackBlock) are signed with
+// the ObjCIsaPointers schema (DA key, disc 0x6AE1) on arm64e.
+//
+// Crash pattern from D93951803 (Crash 11/15): objc_msgSend authenticates
+// all isa pointers with autda(DA, blend(addr, 0x6AE1)). If the block isa
+// is stored unsigned, the auth fails with EXC_BAD_ACCESS (code=261).
+//
+// This test verifies the isa field in the block header is signed.
+
+import Builtin
+
+sil @invoke_fn : $@convention(c) (@inout_aliasable @block_storage Builtin.RawPointer) -> ()
+
+sil @test_block_isa_signing : $@convention(thin) (@inout_aliasable @block_storage Builtin.RawPointer) -> @convention(block) () -> () {
+entry(%0 : $*@block_storage Builtin.RawPointer):
+  %i = function_ref @invoke_fn : $@convention(c) (@inout_aliasable @block_storage Builtin.RawPointer) -> ()
+  %b = init_block_storage_header %0 : $*@block_storage Builtin.RawPointer, invoke %i : $@convention(c) (@inout_aliasable @block_storage Builtin.RawPointer) -> (), type $@convention(block) () -> ()
+  return %b : $@convention(block) () -> ()
+}
+
+// The block header's isa field (field 0) should be signed with ptrauth.
+// On arm64e, this means the store of __NSConcreteStackBlock to the isa slot
+// should go through ptrauth.sign with DA key (key 2) and disc 0x6AE1.
+//
+// CHECK-LABEL: define swiftcc ptr @test_block_isa_signing
+// CHECK: call i64 @llvm.ptrauth.sign(i64 {{.*}}, i32 2, i64
+// CHECK: store
