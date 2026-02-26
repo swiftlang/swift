@@ -1308,3 +1308,26 @@ Added: _$ss9UniqueBoxVsRi_zrlE7pointerSpyxGvg
 
 // Cross-encoding strcmp for Foundation
 Added: __swift_unicodeBuffersEqual_nonNormalizing
+
+// RigidArray
+Added: _$ss10RigidArrayVMa
+Added: _$ss10RigidArrayVMn
+Added: _$ss10RigidArrayVsRi_zrlE6_countSivM
+Added: _$ss10RigidArrayVsRi_zrlE6_countSivg
+Added: _$ss10RigidArrayVsRi_zrlE6_countSivs
+Added: _$ss10RigidArrayVsRi_zrlE8_storageSryxGvM
+Added: _$ss10RigidArrayVsRi_zrlE8_storageSryxGvg
+Added: _$ss10RigidArrayVsRi_zrlE8_storageSryxGvs
+Added: _$ss10RigidArrayVsSHRzRi_zrlE9hashValueSivg
+Added: _$ss10RigidArrayVyxGSHsSHRzRi_zrlMc
+Added: _$ss10RigidArrayVyxGSQsSQRzRi_zrlMc
+
+// UniqueArray
+Added: _$ss11UniqueArrayVMa
+Added: _$ss11UniqueArrayVMn
+Added: _$ss11UniqueArrayVsRi_zrlE8_storages05RigidB0VyxGvM
+Added: _$ss11UniqueArrayVsRi_zrlE8_storages05RigidB0VyxGvr
+Added: _$ss11UniqueArrayVsRi_zrlE8_storages05RigidB0VyxGvs
+Added: _$ss11UniqueArrayVsSHRzRi_zrlE9hashValueSivg
+Added: _$ss11UniqueArrayVyxGSHsSHRzRi_zrlMc
+Added: _$ss11UniqueArrayVyxGSQsSQRzRi_zrlMc
