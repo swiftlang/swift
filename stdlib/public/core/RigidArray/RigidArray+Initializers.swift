@@ -1,34 +1,31 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift Collections open source project
+// This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2026 Apple Inc. and the Swift project authors
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if !COLLECTIONS_SINGLE_MODULE
-import InternalCollectionsUtilities
-import ContainersPreview
-#endif
-
-#if compiler(>=6.2)
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Initializes a new rigid array with zero capacity and no elements.
   ///
   /// - Complexity: O(1)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_transparent
   public init() {
     unsafe _storage = .init(start: nil, count: 0)
     _count = 0
   }
   
   /// Initializes a new rigid array with the specified capacity and no elements.
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public init(capacity: Int) {
     precondition(capacity >= 0, "Array capacity must be nonnegative")
     if capacity > 0 {
@@ -40,7 +37,7 @@ extension RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Creates a new array with the specified capacity, directly initializing
   /// its storage using an output span.
@@ -52,7 +49,8 @@ extension RigidArray where Element: ~Copyable {
   ///       is allowed to add fewer than `capacity` items. The array is
   ///       initialized with however many items the callback adds to the
   ///       output span before it returns (or before it throws an error).
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public init<E: Error>(
     capacity: Int,
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
@@ -62,8 +60,8 @@ extension RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
-extension RigidArray /*where Element: Copyable*/ {
+@available(SwiftStdlib 6.4, *)
+extension RigidArray where Element: Copyable {
   /// Creates a new array containing the specified number of a single,
   /// repeated value.
   ///
@@ -73,6 +71,8 @@ extension RigidArray /*where Element: Copyable*/ {
   ///     `repeating` parameter. `count` must be zero or greater.
   ///
   /// - Complexity: O(`count`)
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public init(repeating repeatedValue: Element, count: Int) {
     self.init(capacity: count)
     unsafe _freeSpace.initialize(repeating: repeatedValue)
@@ -80,20 +80,8 @@ extension RigidArray /*where Element: Copyable*/ {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
-extension RigidArray where Element: ~Copyable {
-  /// Creates a new rigid array taking over the storage of the specified
-  /// unique array instance, consuming it in the process.
-  ///
-  /// - Complexity: O(1)
-  @inlinable
-  public init(consuming array: consuming UniqueArray<Element>) {
-    self = array._storage
-  }
-}
-
-@available(SwiftStdlib 5.0, *)
-extension RigidArray /*where Element: Copyable*/ {
+@available(SwiftStdlib 6.4, *)
+extension RigidArray where Element: Copyable {
   /// Creates a new array with the specified capacity, holding a copy
   /// of the contents of a given sequence.
   ///
@@ -101,8 +89,9 @@ extension RigidArray /*where Element: Copyable*/ {
   ///   - capacity: The storage capacity of the new array.
   ///   - contents: The sequence whose contents to copy into the new array.
   ///      The sequence must not contain more than `capacity` elements.
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  @inline(__always)
+  @_transparent
   public init(
     capacity: Int,
     copying contents: some Sequence<Element>
@@ -110,50 +99,7 @@ extension RigidArray /*where Element: Copyable*/ {
     self.init(capacity: capacity)
     self.append(copying: contents)
   }
-  
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
-  /// Creates a new array with the specified capacity, holding a copy
-  /// of the contents of a given container.
-  ///
-  /// - Parameters:
-  ///   - capacity: The storage capacity of the new array, or nil to allocate
-  ///      just enough capacity to store the contents.
-  ///   - contents: The container whose contents to copy into the new array.
-  ///      The container must not contain more than `capacity` elements.
-  @_alwaysEmitIntoClient
-  @inline(__always)
-  public init<Source: BorrowingSequence<Element> & ~Copyable & ~Escapable>(
-    capacity: Int,
-    copying contents: borrowing Source
-  ) {
-    self.init(capacity: capacity)
-    self.append(copying: contents)
-  }
-  
-#endif
-  
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
-  /// Creates a new array with the specified capacity, holding a copy
-  /// of the contents of a given container.
-  ///
-  /// - Parameters:
-  ///   - capacity: The storage capacity of the new array, or nil to allocate
-  ///      just enough capacity to store the contents.
-  ///   - contents: The container whose contents to copy into the new array.
-  ///      The container must not contain more than `capacity` elements.
-  @_alwaysEmitIntoClient
-  @inline(__always)
-  public init<Source: BorrowingSequence<Element> & Sequence<Element>>(
-    capacity: Int,
-    copying contents: Source
-  ) {
-    self.init(capacity: capacity)
-    self.append(copying: contents)
-  }
-#endif
-  
-  // FIXME: Add a version that's generic over `Container`, with an optional capacity
-  
+
   /// Creates a new array with the specified capacity, holding a copy
   /// of the contents of a given collection.
   ///
@@ -162,8 +108,9 @@ extension RigidArray /*where Element: Copyable*/ {
   ///      just enough capacity to store the contents.
   ///   - contents: The collection whose contents to copy into the new array.
   ///      The collection must not contain more than `capacity` elements.
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  @inline(__always)
+  @_transparent
   public init(
     capacity: Int? = nil,
     copying contents: some Collection<Element>
@@ -180,8 +127,9 @@ extension RigidArray /*where Element: Copyable*/ {
   ///      just enough capacity to store the contents of the span.
   ///   - span: The span whose contents to copy into the new array.
   ///      The span must not contain more than `capacity` elements.
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  @inline(__always)
+  @_transparent
   public init(
     capacity: Int? = nil,
     copying span: Span<Element>
@@ -190,7 +138,3 @@ extension RigidArray /*where Element: Copyable*/ {
     self.append(copying: span)
   }
 }
-
-// FIXME: Add init(moving:), init(consuming:)
-
-#endif

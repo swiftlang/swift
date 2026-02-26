@@ -1,22 +1,16 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift Collections open source project
+// This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if !COLLECTIONS_SINGLE_MODULE
-import InternalCollectionsUtilities
-import ContainersPreview
-#endif
-
-#if compiler(>=6.2)
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Removes and returns the element at the specified position.
   ///
@@ -28,7 +22,8 @@ extension RigidArray where Element: ~Copyable {
   /// - Returns: The removed element.
   ///
   /// - Complexity: O(`count`)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   @discardableResult
   public mutating func remove(at index: Int) -> Element {
     _checkItemIndex(index)
@@ -41,7 +36,8 @@ extension RigidArray where Element: ~Copyable {
   /// Removes all elements from the array, preserving its allocated capacity.
   ///
   /// - Complexity: O(*n*), where *n* is the original count of the array.
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func removeAll() {
     unsafe _items.deinitialize()
     _count = 0
@@ -54,7 +50,8 @@ extension RigidArray where Element: ~Copyable {
   /// - Returns: The last element of the original array.
   ///
   /// - Complexity: O(1)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   @discardableResult
   public mutating func removeLast() -> Element {
     precondition(!isEmpty, "Cannot remove last element from an empty array")
@@ -74,7 +71,8 @@ extension RigidArray where Element: ~Copyable {
   ///   the count of the array.
   ///
   /// - Complexity: O(`k`)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func removeLast(_ k: Int) {
     if k == 0 { return }
     precondition(
@@ -95,7 +93,8 @@ extension RigidArray where Element: ~Copyable {
   ///   of the range must be valid indices of the array.
   ///
   /// - Complexity: O(`count`)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func removeSubrange(_  bounds: Range<Int>) {
     _checkValidBounds(bounds)
     guard !bounds.isEmpty else { return }
@@ -110,6 +109,7 @@ extension RigidArray where Element: ~Copyable {
   ///   range must be valid indices of the array.
   ///
   /// - Complexity: O(`count`)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func removeSubrange(_  bounds: some RangeExpression<Int>) {
     // FIXME: Remove this in favor of a standard algorithm.
@@ -117,7 +117,7 @@ extension RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Removes and returns the last element of the array, if there is one.
   ///
@@ -125,6 +125,7 @@ extension RigidArray where Element: ~Copyable {
   ///     otherwise, `nil`.
   ///
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func popLast() -> Element? {
     // FIXME: Remove this in favor of a standard algorithm.
@@ -132,5 +133,3 @@ extension RigidArray where Element: ~Copyable {
     return removeLast()
   }
 }
-
-#endif

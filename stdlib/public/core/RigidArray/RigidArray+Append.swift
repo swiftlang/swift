@@ -1,22 +1,16 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift Collections open source project
+// This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2026 Apple Inc. and the Swift project authors
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if !COLLECTIONS_SINGLE_MODULE
-import InternalCollectionsUtilities
-import ContainersPreview
-#endif
-
-#if compiler(>=6.2)
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Adds an element to the end of the array.
   ///
@@ -26,7 +20,8 @@ extension RigidArray where Element: ~Copyable {
   /// - Parameter item: The element to append to the collection.
   ///
   /// - Complexity: O(1)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func append(_ item: consuming Element) {
     precondition(!isFull, "RigidArray capacity overflow")
     unsafe _storage.initializeElement(at: _count, to: item)
@@ -43,7 +38,8 @@ extension RigidArray where Element: ~Copyable {
   /// - Returns: `item` if the array is full; otherwise nil.
   ///
   /// - Complexity: O(1)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func pushLast(_ item: consuming Element) -> Element? {
     if isFull { return item }
     append(item)
@@ -51,7 +47,7 @@ extension RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Append a given number of items to the end of this array by populating
   /// an output span.
@@ -72,6 +68,7 @@ extension RigidArray where Element: ~Copyable {
   ///       the output span before it returns (or before it throws an error).
   ///
   /// - Complexity: O(`newItemCount`)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func append<E: Error>(
     addingCount newItemCount: Int,
@@ -79,17 +76,17 @@ extension RigidArray where Element: ~Copyable {
   ) throws(E) {
     precondition(newItemCount >= 0, "Cannot add a negative number of items")
     precondition(freeCapacity >= newItemCount, "RigidArray capacity overflow")
-    let buffer = _freeSpace._extracting(first: newItemCount)
-    var span = OutputSpan(buffer: buffer, initializedCount: 0)
+    let buffer = unsafe _freeSpace._extracting(first: newItemCount)
+    var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
     defer {
-      _count &+= span.finalize(for: buffer)
+      _count &+= unsafe span.finalize(for: buffer)
       span = OutputSpan()
     }
     return try initializer(&span)
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Moves the elements of a buffer to the end of this array, leaving the
   /// buffer uninitialized.
@@ -102,6 +99,7 @@ extension RigidArray where Element: ~Copyable {
   ///        the array.
   ///
   /// - Complexity: O(`items.count`)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func append(
     moving items: UnsafeMutableBufferPointer<Element>
@@ -113,29 +111,6 @@ extension RigidArray where Element: ~Copyable {
     _count &+= items.count
   }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
-  /// Moves the elements of a input span to the end of this array, leaving the
-  /// span empty.
-  ///
-  /// If the array does not have sufficient capacity to hold all items in its
-  /// storage, then this triggers a runtime error.
-  ///
-  /// - Parameters:
-  ///    - items: An input span whose contents need to be appended to this array.
-  ///
-  /// - Complexity: O(`items.count`)
-  @_alwaysEmitIntoClient
-  public mutating func append(
-    moving items: inout InputSpan<Element>
-  ) {
-    items.withUnsafeMutableBufferPointer { buffer, count in
-      let source = buffer._extracting(last: count)
-      unsafe self.append(moving: source)
-      count = 0
-    }
-  }
-#endif
-
   /// Moves the elements of an output span to the end of this array, leaving the
   /// span empty.
   ///
@@ -146,64 +121,20 @@ extension RigidArray where Element: ~Copyable {
   ///    - items: An output span whose contents need to be appended to this array.
   ///
   /// - Complexity: O(`items.count`)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func append(
     moving items: inout OutputSpan<Element>
   ) {
-    items.withUnsafeMutableBufferPointer { buffer, count in
-      let source = buffer._extracting(first: count)
+    unsafe items.withUnsafeMutableBufferPointer { buffer, count in
+      let source = unsafe buffer._extracting(first: count)
       unsafe self.append(moving: source)
       count = 0
     }
   }
-
-  /// Appends the elements of a given array to the end of this array by moving
-  /// them between the containers. On return, the input array becomes empty, but
-  /// it is not destroyed, and it preserves its original storage capacity.
-  ///
-  /// If the target array does not have sufficient capacity to hold all items
-  /// in the source array, then this triggers a runtime error.
-  ///
-  /// - Parameters:
-  ///    - items: An array whose items to move to the end of this array.
-  ///
-  /// - Complexity: O(`items.count`)
-  @_alwaysEmitIntoClient
-  public mutating func append(
-    moving items: inout RigidArray<Element>
-  ) {
-    // FIXME: Remove this in favor of a generic algorithm over range-replaceable containers
-    items.edit { span in
-      self.append(moving: &span)
-    }
-  }
 }
 
-@available(SwiftStdlib 5.0, *)
-extension RigidArray where Element: ~Copyable {
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
-  /// Appends the elements of a given container to the end of this array by
-  /// consuming the source container.
-  ///
-  /// If the target array does not have sufficient capacity to hold all items
-  /// in the source array, then this triggers a runtime error.
-  ///
-  /// - Parameters:
-  ///    - items: A container whose contents to move into this array.
-  ///
-  /// - Complexity: O(`items.count`)
-  @_alwaysEmitIntoClient
-  public mutating func append(
-    consuming items: consuming RigidArray<Element>
-  ) {
-    // FIXME: Remove this in favor of a generic algorithm over consumable containers
-    var items = items
-    self.append(moving: &items)
-  }
-#endif
-}
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray {
   /// Copies the elements of a buffer to the end of this array.
   ///
@@ -215,6 +146,7 @@ extension RigidArray {
   ///       the array.
   ///
   /// - Complexity: O(`newElements.count`)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func append(
     copying newElements: UnsafeBufferPointer<Element>
@@ -238,6 +170,7 @@ extension RigidArray {
   ///        the array.
   ///
   /// - Complexity: O(`newElements.count`)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func append(
     copying items: UnsafeMutableBufferPointer<Element>
@@ -254,6 +187,7 @@ extension RigidArray {
   ///    - newElements: A span whose contents to copy into the array.
   ///
   /// - Complexity: O(`newElements.count`)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func append(copying items: Span<Element>) {
     unsafe items.withUnsafeBufferPointer { source in
@@ -262,7 +196,7 @@ extension RigidArray {
   }
 
   @_alwaysEmitIntoClient
-  @inline(__always)
+  @_transparent
   internal mutating func _append<S: Sequence<Element>>(
     prefixOf items: S
   ) -> S.Iterator {
@@ -270,39 +204,6 @@ extension RigidArray {
     _count += c
     return it
   }
-  
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
-  @inlinable
-  internal mutating func _append<
-    Source: BorrowingSequence<Element> & ~Copyable & ~Escapable
-  >(
-    copying newElements: borrowing Source
-  ) {
-    let target = _freeSpace
-    _count += newElements._copyContents(intoPrefixOf: target)
-  }
-#endif
-
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
-  /// Copies the elements of a borrowing sequence to the end of this array.
-  ///
-  /// If the array does not have sufficient capacity to hold all items in the
-  /// source sequence, then this triggers a runtime error.
-  ///
-  /// - Parameters:
-  ///    - newElements: A container whose contents to copy into the array.
-  ///
-  /// - Complexity: O(`newElements.count`)
-  @_alwaysEmitIntoClient
-  @inline(__always)
-  public mutating func append<
-    Source: BorrowingSequence<Element> & ~Copyable & ~Escapable
-  >(
-    copying newElements: borrowing Source
-  ) {
-    _append(copying: newElements)
-  }
-#endif
 
   /// Copies the elements of a sequence to the end of this array.
   ///
@@ -313,6 +214,7 @@ extension RigidArray {
   ///    - newElements: The new elements to copy into the array.
   ///
   /// - Complexity: O(*m*), where *m* is the length of `newElements`.
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func append(copying newElements: some Sequence<Element>) {
     let done: Void? = newElements.withContiguousStorageIfAvailable { buffer in
@@ -324,24 +226,4 @@ extension RigidArray {
     var it = self._append(prefixOf: newElements)
     precondition(it.next() == nil, "RigidArray capacity overflow")
   }
-  
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
-  /// Copies the elements of a borrowing sequence to the end of this array.
-  ///
-  /// If the array does not have sufficient capacity to hold all items in the
-  /// source sequence, then this triggers a runtime error.
-  ///
-  /// - Parameters:
-  ///    - newElements: The new elements to copy into the array.
-  ///
-  /// - Complexity: O(*m*), where *m* is the length of `newElements`.
-  @_alwaysEmitIntoClient
-  @inline(__always)
-  public mutating func append<
-    Source: BorrowingSequence<Element> & Sequence<Element>
-  >(copying newElements: Source) {
-    _append(copying: newElements)
-  }
-#endif
 }
-#endif

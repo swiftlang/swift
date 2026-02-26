@@ -1,43 +1,14 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift Collections open source project
+// This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2026 Apple Inc. and the Swift project authors
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
-#if !COLLECTIONS_SINGLE_MODULE
-import InternalCollectionsUtilities
-import ContainersPreview
-#endif
-
-#if compiler(<6.2)
-
-/// A fixed capacity, heap allocated, noncopyable array of potentially
-/// noncopyable elements.
-@frozen
-@available(*, unavailable, message: "RigidArray requires a Swift 6.2 toolchain")
-public struct RigidArray<Element: ~Copyable>: ~Copyable {
-  @usableFromInline
-  internal var _storage: UnsafeMutableBufferPointer<Element>
-
-  @usableFromInline
-  internal var _count: Int
-
-  deinit {
-    _storage.extracting(0 ..< _count).deinitialize()
-    _storage.deallocate()
-  }
-
-  public init() {
-    fatalError()
-  }
-}
-
-#else
 
 /// A fixed capacity, heap allocated, noncopyable array of potentially
 /// noncopyable elements.
@@ -76,9 +47,9 @@ public struct RigidArray<Element: ~Copyable>: ~Copyable {
 /// For use cases outside of these narrow domains, we generally recommmend
 /// the use of ``UniqueArray`` rather than `RigidArray`. (For copyable elements,
 /// the standard `Array` is an even more convenient choice.)
-@available(SwiftStdlib 5.0, *)
-@safe
+@available(SwiftStdlib 6.4, *)
 @frozen
+@safe
 public struct RigidArray<Element: ~Copyable>: ~Copyable {
   @usableFromInline
   internal var _storage: UnsafeMutableBufferPointer<Element>
@@ -93,32 +64,53 @@ public struct RigidArray<Element: ~Copyable>: ~Copyable {
   }
   
   @_alwaysEmitIntoClient
-  package init(_storage: UnsafeMutableBufferPointer<Element>, count: Int) {
-    self._storage = _storage
+  internal init(_storage: UnsafeMutableBufferPointer<Element>, count: Int) {
+    unsafe self._storage = _storage
     self._count = count
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
-
-//MARK: - Basics
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
+  /// A Boolean value indicating whether this array contains no elements.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var isEmpty: Bool {
+    count == 0
+  }
+
+  /// The number of elements in this array.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var count: Int {
+    _count
+  }
+
   /// The maximum number of elements this rigid array can hold.
   ///
   /// - Complexity: O(1)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   @_transparent
-  public var capacity: Int { _assumeNonNegative(unsafe _storage.count) }
+  public var capacity: Int {
+    _assumeNonNegative(unsafe _storage.count)
+  }
 
   /// The number of additional elements that can be added to this array without
   /// exceeding its storage capacity.
   ///
   /// - Complexity: O(1)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   @_transparent
   public var freeCapacity: Int {
     _assumeNonNegative(capacity &- count)
@@ -129,34 +121,37 @@ extension RigidArray where Element: ~Copyable {
   /// and it cannot accommodate any additional elements.
   ///
   /// - Complexity: O(1)
-  @inlinable
-  @inline(__always)
-  public var isFull: Bool { freeCapacity == 0 }
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var isFull: Bool {
+    freeCapacity == 0
+  }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
-  @inlinable
+  @_alwaysEmitIntoClient
   internal var _items: UnsafeMutableBufferPointer<Element> {
     unsafe _storage.extracting(Range(uncheckedBounds: (0, _count)))
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   internal var _freeSpace: UnsafeMutableBufferPointer<Element> {
     unsafe _storage.extracting(Range(uncheckedBounds: (_count, capacity)))
   }
 }
 
-//MARK: - Span creation
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// A span over the elements of this array, providing direct read-only access.
   ///
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_transparent
   public var span: Span<Element> {
     @_lifetime(borrow self)
-    @inlinable
     get {
       let result = unsafe Span(_unsafeElements: _items)
       return unsafe _overrideLifetime(result, borrowing: self)
@@ -167,22 +162,24 @@ extension RigidArray where Element: ~Copyable {
   /// mutating access.
   ///
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_transparent
   public var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
-    @inlinable
     mutating get {
       let result = unsafe MutableSpan(_unsafeElements: _items)
       return unsafe _overrideLifetime(result, mutating: &self)
     }
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   @_lifetime(borrow self)
   internal func _span(in range: Range<Int>) -> Span<Element> {
     span.extracting(range)
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   @_lifetime(&self)
   internal mutating func _mutableSpan(
     in range: Range<Int>
@@ -192,7 +189,7 @@ extension RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Arbitrarily edit the storage underlying this array by invoking a
   /// user-supplied closure with a mutable `OutputSpan` view over it.
@@ -211,13 +208,14 @@ extension RigidArray where Element: ~Copyable {
   /// - Returns: This method returns the result of its function argument.
   /// - Complexity: Adds O(1) overhead to the complexity of the function
   ///    argument.
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func edit<E: Error, R: ~Copyable>(
     _ body: (inout OutputSpan<Element>) throws(E) -> R
   ) throws(E) -> R {
-    var span = OutputSpan(buffer: _storage, initializedCount: _count)
+    var span = unsafe OutputSpan(buffer: _storage, initializedCount: _count)
     defer {
-      _count = span.finalize(for: _storage)
+      _count = unsafe span.finalize(for: _storage)
       span = OutputSpan()
     }
     return try body(&span)
@@ -225,7 +223,7 @@ extension RigidArray where Element: ~Copyable {
 
   // FIXME: Stop using and remove this in favor of `edit`
   @unsafe
-  @inlinable
+  @_alwaysEmitIntoClient
   internal mutating func _unsafeEdit<E: Error, R: ~Copyable>(
     _ body: (UnsafeMutableBufferPointer<Element>, inout Int) throws(E) -> R
   ) throws(E) -> R {
@@ -234,16 +232,16 @@ extension RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
-  @inlinable
+  @_alwaysEmitIntoClient
   internal func _contiguousSubrange(following index: inout Int) -> Range<Int> {
     precondition(index >= 0 && index <= _count, "Index out of bounds")
     defer { index = _count }
     return unsafe Range(uncheckedBounds: (index, _count))
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   internal func _contiguousSubrange(preceding index: inout Int) -> Range<Int> {
     precondition(index >= 0 && index <= _count, "Index out of bounds")
     defer { index = 0 }
@@ -251,9 +249,7 @@ extension RigidArray where Element: ~Copyable {
   }
 }
 
-//MARK: - Container primitives
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Return a borrowing span over the maximal storage chunk following the
   /// specified position in the array. The span provides direct read-only access
@@ -262,9 +258,9 @@ extension RigidArray where Element: ~Copyable {
   /// - Parameter index: A valid index in the array, including the end index.
   ///
   /// - Complexity: O(1)
-  @inlinable
+  @_alwaysEmitIntoClient
   @_lifetime(borrow self)
-  public func span(after index: inout Int) -> Span<Element> {
+  internal func span(after index: inout Int) -> Span<Element> {
     _span(in: _contiguousSubrange(following: &index))
   }
 
@@ -275,14 +271,14 @@ extension RigidArray where Element: ~Copyable {
   /// - Parameter index: A valid index in the array, including the end index.
   ///
   /// - Complexity: O(1)
-  @inlinable
+  @_alwaysEmitIntoClient
   @_lifetime(borrow self)
-  public func span(before index: inout Int) -> Span<Element> {
+  internal func span(before index: inout Int) -> Span<Element> {
     _span(in: _contiguousSubrange(preceding: &index))
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Return a mutable span over the maximal storage chunk following the
   /// specified position in the array. The span provides direct mutating access
@@ -291,8 +287,9 @@ extension RigidArray where Element: ~Copyable {
   /// - Parameter index: A valid index in the array, including the end index.
   ///
   /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
   @_lifetime(&self)
-  public mutating func mutableSpan(
+  internal mutating func mutableSpan(
     after index: inout Int
   ) -> MutableSpan<Element> {
     _mutableSpan(in: _contiguousSubrange(following: &index))
@@ -305,6 +302,7 @@ extension RigidArray where Element: ~Copyable {
   /// - Parameter index: A valid index in the array, including the end index.
   ///
   /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
   @_lifetime(&self)
   public mutating func mutableSpan(
     before index: inout Int
@@ -313,9 +311,7 @@ extension RigidArray where Element: ~Copyable {
   }
 }
 
-//MARK: - Resizing
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Grow or shrink the capacity of a rigid array instance without discarding
   /// its contents.
@@ -328,7 +324,8 @@ extension RigidArray where Element: ~Copyable {
   ///    greater than or equal to the current count.
   ///
   /// - Complexity: O(`count`)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func reallocate(capacity newCapacity: Int) {
     precondition(newCapacity >= count, "RigidArray capacity overflow")
     guard newCapacity != capacity else { return }
@@ -348,21 +345,21 @@ extension RigidArray where Element: ~Copyable {
   /// Otherwise the array is left as is.
   ///
   /// - Complexity: O(`count`)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func reserveCapacity(_ n: Int) {
     guard capacity < n else { return }
     reallocate(capacity: n)
   }
 }
 
-//MARK: - Copying helpers
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray {
   /// Copy the contents of this array into a newly allocated rigid array
   /// instance with just enough capacity to hold all its elements.
   ///
   /// - Complexity: O(`count`)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public func clone() -> Self {
     clone(capacity: self.count)
@@ -375,7 +372,8 @@ extension RigidArray {
   ///    `capacity` must be greater than or equal to `count`.
   ///
   /// - Complexity: O(`count`)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public func clone(capacity: Int) -> Self {
     precondition(capacity >= count, "RigidArray capacity overflow")
     var result = RigidArray<Element>(capacity: capacity)
@@ -386,12 +384,9 @@ extension RigidArray {
   }
 }
 
-
-//MARK: - Opening and closing gaps
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
-  @inlinable
+  @_alwaysEmitIntoClient
   internal mutating func _closeGap(
     at index: Int, count: Int
   ) {
@@ -404,8 +399,8 @@ extension RigidArray where Element: ~Copyable {
     assert(i == target.endIndex)
   }
 
-  @inlinable
   @unsafe
+  @_alwaysEmitIntoClient
   internal mutating func _openGap(
     at index: Int, count: Int
   ) -> UnsafeMutableBufferPointer<Element> {
@@ -428,8 +423,8 @@ extension RigidArray where Element: ~Copyable {
   ///
   /// - Returns: A buffer pointer addressing the newly opened gap, to be
   ///     initialized by the caller.
-  @inlinable
   @unsafe
+  @_alwaysEmitIntoClient
   internal mutating func _resizeGap(
     in subrange: Range<Int>, to newItemCount: Int
   ) -> UnsafeMutableBufferPointer<Element> {
@@ -448,5 +443,3 @@ extension RigidArray where Element: ~Copyable {
     return unsafe _storage.extracting(gapRange)
   }
 }
-
-#endif

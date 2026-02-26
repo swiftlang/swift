@@ -1,38 +1,30 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift Collections open source project
+// This source file is part of the Swift.org open source project
 //
 // Copyright (c) 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6.2)
-
-#if !COLLECTIONS_SINGLE_MODULE
-import InternalCollectionsUtilities
-#endif
-
-@available(SwiftStdlib 5.0, *)
-extension RigidArray /*: Equatable */ where Element: Equatable /* & ~Copyable */ {
-  public func isTriviallyIdentical(to other: borrowing Self) -> Bool {
-    self._storage._isIdentical(to: other._storage)
-    && self._count == other._count
-  }
-}
-
-
-@available(SwiftStdlib 5.0, *)
-extension RigidArray /*: Equatable */ where Element: Equatable /* & ~Copyable */ {
-  @inlinable
+@available(SwiftStdlib 6.4, *)
+extension RigidArray: Equatable where Element: Equatable & ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public static func ==(
     left: borrowing Self,
     right: borrowing Self
   ) -> Bool {
     left.span._elementsEqual(to: right.span)
   }
-}
 
-#endif
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: borrowing Self) -> Bool {
+    unsafe self._count == other._count &&
+    self._storage.isTriviallyIdentical(to: other._storage)
+  }
+}

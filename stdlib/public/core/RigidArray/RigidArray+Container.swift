@@ -1,134 +1,122 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift Collections open source project
+// This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2025 - 2026 Apple Inc. and the Swift project authors
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if !COLLECTIONS_SINGLE_MODULE
-import InternalCollectionsUtilities
-import ContainersPreview
-#endif
-
-#if compiler(>=6.2)
-
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
-@available(SwiftStdlib 5.0, *)
-extension RigidArray: BorrowingSequence where Element: ~Copyable {
-  public typealias BorrowingIterator = Span<Element>.BorrowingIterator
-  
-  @inlinable
-  public var estimatedCount: EstimatedCount {
-    .exactly(count)
-  }
-  
-  @_alwaysEmitIntoClient
-  @inline(__always)
-  public func makeBorrowingIterator() -> BorrowingIterator {
-    self.span.makeBorrowingIterator()
-  }
-}
-#endif
-
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
-@available(SwiftStdlib 5.0, *)
-extension RigidArray: Container where Element: ~Copyable {
-}
-#endif
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// A Boolean value indicating whether this array contains no elements.
   ///
   /// - Complexity: O(1)
-  @inlinable
-  @inline(__always)
-  public var isEmpty: Bool { count == 0 }
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var isEmpty: Bool {
+    count == 0
+  }
 
   /// The number of elements in this array.
   ///
   /// - Complexity: O(1)
-  @inlinable
-  @inline(__always)
-  public var count: Int { _count }
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var count: Int {
+    _count
+  }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// A type that represents a position in the array: an integer offset from the
   /// start.
   ///
   /// Valid indices consist of the position of every element and a "past the
   /// end” position that’s not valid for use as a subscript argument.
+  @available(SwiftStdlib 6.4, *)
   public typealias Index = Int
 
   /// The position of the first element in a nonempty array. This is always zero.
   ///
   /// - Complexity: O(1)
-  @inlinable
-  @inline(__always)
-  public var startIndex: Int { 0 }
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var startIndex: Int {
+    0
+  }
 
   /// The array’s "past the end” position—that is, the position one greater than
   /// the last valid subscript argument. This is always equal to the array's
   /// count.
   ///
   /// - Complexity: O(1)
-  @inlinable
-  @inline(__always)
-  public var endIndex: Int { count }
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var endIndex: Int {
+    count
+  }
 
   /// The range of indices that are valid for subscripting the array.
   ///
   /// - Complexity: O(1)
-  @inlinable
-  @inline(__always)
-  public var indices: Range<Int> { unsafe Range(uncheckedBounds: (0, count)) }
-  
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  package func _checkItemIndex(_ index: Int) {
+  public var indices: Range<Int> {
+    unsafe Range(uncheckedBounds: (0, count))
+  }
+
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal func _checkItemIndex(_ index: Int) {
     precondition(
       UInt(bitPattern: index) < UInt(bitPattern: _count),
       "Index out of bounds")
   }
-  
+
   @_alwaysEmitIntoClient
   @_transparent
-  package func _checkValidIndex(_ index: Int) {
+  internal func _checkValidIndex(_ index: Int) {
     precondition(
       UInt(bitPattern: index) <= UInt(bitPattern: _count),
       "Index out of bounds")
   }
-  
+
   @_alwaysEmitIntoClient
   @_transparent
-  package func _checkValidBounds(_ subrange: Range<Int>) {
+  internal func _checkValidBounds(_ subrange: Range<Int>) {
     precondition(
       subrange.lowerBound >= 0 && subrange.upperBound <= _count,
       "Index range out of bounds")
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
-  @inlinable @inline(__always)
+  @_alwaysEmitIntoClient
+  @_transparent
   internal func _ptr(to index: Int) -> UnsafePointer<Element> {
     _checkItemIndex(index)
-    let p = _storage.baseAddress.unsafelyUnwrapped.advanced(by: index)
-    return UnsafePointer(p)
+    let p = unsafe _storage.baseAddress.unsafelyUnwrapped.advanced(by: index)
+    return unsafe UnsafePointer(p)
   }
 
-  @inlinable @inline(__always)
+  @_alwaysEmitIntoClient
+  @_transparent
   internal mutating func _mutablePtr(
     to index: Int
   ) -> UnsafeMutablePointer<Element> {
     _checkItemIndex(index)
-    return _storage.baseAddress.unsafelyUnwrapped.advanced(by: index)
+    return unsafe _storage.baseAddress.unsafelyUnwrapped.advanced(by: index)
   }
 
   /// Accesses the element at the specified position.
@@ -138,20 +126,24 @@ extension RigidArray where Element: ~Copyable {
   ///     to the `endIndex` property.
   ///
   /// - Complexity: O(1)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public subscript(position: Int) -> Element {
-    @inline(__always)
-    unsafeAddress {
-      _ptr(to: position)
+    @_transparent
+    @_unsafeSelfDependentResult
+    borrow {
+      unsafe _ptr(to: position).pointee
     }
-    @inline(__always)
-    unsafeMutableAddress {
-      _mutablePtr(to: position)
+
+    @_transparent
+    @_unsafeSelfDependentResult
+    mutate {
+      unsafe &_mutablePtr(to: position).pointee
     }
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Exchanges the values at the specified indices of the array.
   ///
@@ -162,14 +154,16 @@ extension RigidArray where Element: ~Copyable {
   /// - Parameter j: The index of the second valud to swap.
   ///
   /// - Complexity: O(1)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func swapAt(_ i: Int, _ j: Int) {
     _checkItemIndex(i)
     _checkItemIndex(j)
     unsafe _items.swapAt(i, j)
   }
 }
-@available(SwiftStdlib 5.0, *)
+
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Returns the position immediately after the given index.
   ///
@@ -182,9 +176,12 @@ extension RigidArray where Element: ~Copyable {
   ///     than `endIndex`.
   /// - Returns: The index immediately following `i`.
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  @inline(__always)
-  public func index(after index: Int) -> Int { index + 1 }
+  @_transparent
+  public func index(after index: Int) -> Int {
+    index + 1
+  }
   
   /// Returns the position immediately before the given index.
   ///
@@ -197,9 +194,12 @@ extension RigidArray where Element: ~Copyable {
   ///     than `startIndex`.
   /// - Returns: The index immediately preceding `i`.
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  @inline(__always)
-  public func index(before index: Int) -> Int { index - 1 }
+  @_transparent
+  public func index(before index: Int) -> Int {
+    index - 1
+  }
 
   /// Replaces the given index with its successor.
   ///
@@ -211,9 +211,12 @@ extension RigidArray where Element: ~Copyable {
   /// - Parameter index: A valid index of the array. `i` must be less
   ///     than `endIndex`.
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  @inline(__always)
-  public func formIndex(after index: inout Int) { index += 1 }
+  @_transparent
+  public func formIndex(after index: inout Int) {
+    index += 1
+  }
 
   /// Replaces the given index with its predecessor.
   ///
@@ -225,9 +228,12 @@ extension RigidArray where Element: ~Copyable {
   /// - Parameter index: A valid index of the array. `i` must be greater than
   ///     `startIndex`.
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  @inline(__always)
-  public func formIndex(before index: inout Int) { index -= 1 }
+  @_transparent
+  public func formIndex(before index: inout Int) {
+    index -= 1
+  }
 
   /// Returns an index that is the specified distance from the given index.
   ///
@@ -246,8 +252,9 @@ extension RigidArray where Element: ~Copyable {
   ///    If `n` is negative, this is the same value as the result of `abs(n)`
   ///    calls to `index(before:)`.
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  @inline(__always)
+  @_transparent
   public func index(_ index: Int, offsetBy n: Int) -> Int {
     index + n
   }
@@ -264,8 +271,9 @@ extension RigidArray where Element: ~Copyable {
   ///    to start, the result is zero.
   /// - Returns: The distance between `start` and `end`.
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  @inline(__always)
+  @_transparent
   public func distance(from start: Index, to end: Index) -> Int {
     end - start
   }
@@ -301,93 +309,13 @@ extension RigidArray where Element: ~Copyable {
   ///    Likewise, if `n < 0`, a limit that is greater than `index` has no
   ///    effect.
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public func formIndex(
-    _ index: inout Index, offsetBy n: inout Int, limitedBy limit: Index
+    _ index: inout Index,
+    offsetBy n: inout Int,
+    limitedBy limit: Index
   ) {
     index._advance(by: &n, limitedBy: limit)
   }
-
-  /// Return a span over the array's storage that begins with the element at
-  /// the given index, and extends to the end of the contiguous storage chunk
-  /// that contains it, but no more than `maximumCount` items.
-  ///
-  /// On return, the index is updated to address the next item following the
-  /// end of the returned span.
-  ///
-  /// This method can be used to efficiently process the items of a container in
-  /// bulk, by directly iterating over its piecewise contiguous pieces of
-  /// storage:
-  ///
-  ///     var index = items.startIndex
-  ///     while true {
-  ///       let span = items.nextSpan(after: &index, maximumCount: 4)
-  ///       if span.isEmpty { break }
-  ///       // Process items in `span`
-  ///     }
-  ///
-  /// The `maximumCount` argument gives the caller control over the number of
-  /// items it receives from the iterator. This lets the caller avoid getting
-  /// more elements than it would be able to immediately process, which would
-  /// significantly complicate container use.
-  ///
-  /// If the caller is able to process any number available items, it can signal
-  /// that by passing `Int.max` as the `maximumCount`, or simply by calling the
-  /// `nexSpan(after:)` method, which does precisely that. This is frequently
-  /// the case when the caller simply wants to iterate over the entire
-  /// container in a single loop.
-  ///
-  /// `maximumCount` sets an upper bound. To read a specific number of items,
-  /// the caller usually needs to invoke `nextSpan` in a loop:
-  ///
-  ///     var items: some Container<Int>
-  ///     var index = items.startIndex
-  ///     var remainder = numberOfItemsToRead
-  ///     while remainder > 0 {
-  ///       let next = items.nextSpan(after: &index, maximumCount: remainder)
-  ///       guard !next.isEmpty else {
-  ///         // Container does not have enough items
-  ///         break
-  ///       }
-  ///       remainder -= next.count
-  ///       // Process items in `next`
-  ///     }
-  ///
-  /// - Note: The spans returned by this method are not guaranteed to be
-  ///    disjunct. Some containers may use the same storage chunk (or parts of a
-  ///    storage chunk) multiple times, to repeat their contents.
-  ///
-  /// - Note: Repeated invocations of `nextSpan` on the same container and index
-  ///    are not guaranteed to return identical results. (This is particularly
-  ///    the case with containers that can store contents in their "inline"
-  ///    representation. Such containers may not always have a unique address
-  ///    in memory; the locations of the spans exposed by this method may vary
-  ///    between different borrows of the same container.)
-  ///
-  /// - Parameter index: A valid index in the container, including the end
-  ///     index. On return, this index is advanced by the count of the resulting
-  ///     span, to simplify iteration.
-  /// - Parameter maximumCount: The maximum number of items the caller is able
-  ///     to process immediately. `maximumCount` must be greater than zero.
-  ///     If you are able to process an arbitrary number of items, set
-  ///     `maximumCount` to `Int.max`, or call the `nextSpan(after:)` method.
-  /// - Returns: A span over contiguous storage that starts at the given index.
-  ///     If the input index is the end index, then this returns an empty span.
-  ///     Otherwise the result is non-empty, with its first element matching the
-  ///     element at the input index.
-  /// - Complexity: O(1)
-  @inlinable
-  @_lifetime(borrow self)
-  public func nextSpan(
-    after index: inout Int, maximumCount: Int
-  ) -> Span<Element> {
-    _checkValidIndex(index)
-    precondition(maximumCount > 0, "maximumCount must be positive")
-    let start = index
-    index = start &+ Swift.min(maximumCount, _count &- start)
-    return _span(in: Range(uncheckedBounds: (start, index)))
-  }
 }
-
-#endif
-

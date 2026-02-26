@@ -1,22 +1,16 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift Collections open source project
+// This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2026 Apple Inc. and the Swift project authors
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if !COLLECTIONS_SINGLE_MODULE
-import InternalCollectionsUtilities
-import ContainersPreview
-#endif
-
-#if compiler(>=6.2)
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Inserts a new element into the array at the specified position.
   ///
@@ -35,7 +29,8 @@ extension RigidArray where Element: ~Copyable {
   ///   `index` must be a valid index in the array.
   ///
   /// - Complexity: O(`self.count`)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func insert(_ item: consuming Element, at index: Int) {
     _checkValidIndex(index)
     precondition(!isFull, "RigidArray capacity overflow")
@@ -50,7 +45,7 @@ extension RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Inserts a given number of new items into this array at the specified
   /// position, using a callback to directly initialize array storage by
@@ -92,8 +87,8 @@ extension RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`self.count` + `newItemCount`) in addition to the complexity
   ///    of the callback invocations.
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  @inline(__always)
   public mutating func insert<E: Error>(
     addingCount newItemCount: Int,
     at index: Int,
@@ -104,9 +99,9 @@ extension RigidArray where Element: ~Copyable {
     precondition(newItemCount <= freeCapacity, "RigidArray capacity overflow")
     let target = unsafe _openGap(at: index, count: newItemCount)
     _count &+= newItemCount
-    var span = OutputSpan(buffer: target, initializedCount: 0)
+    var span = unsafe OutputSpan(buffer: target, initializedCount: 0)
     defer {
-      let c = span.finalize(for: target)
+      let c = unsafe span.finalize(for: target)
       if c < newItemCount {
         _closeGap(at: index &+ c, count: newItemCount &- c)
         _count &-= newItemCount &- c
@@ -117,7 +112,7 @@ extension RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
   /// Moves the elements of a fully initialized buffer into this array,
   /// starting at the specified position, and leaving the buffer
@@ -136,45 +131,16 @@ extension RigidArray where Element: ~Copyable {
   ///       `index` must be a valid index in the array.
   ///
   /// - Complexity: O(`self.count` + `items.count`)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func insert(
     moving items: UnsafeMutableBufferPointer<Element>,
     at index: Int
   ) {
     insert(addingCount: items.count, at: index) { target in
-      target._append(moving: items)
+      unsafe target._append(moving: items)
     }
   }
-
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
-  /// Moves the elements of an input span into this array,
-  /// starting at the specified position, and leaving the span empty.
-  ///
-  /// All existing elements at or following the specified position are moved to
-  /// make room for the new items.
-  ///
-  /// If the capacity of the array isn't sufficient to accommodate the new
-  /// elements, then this method triggers a runtime error.
-  ///
-  /// - Parameters:
-  ///    - items: An input span whose contents to move into
-  ///        the array.
-  ///    - index: The position at which to insert the new items.
-  ///       `index` must be a valid index in the array.
-  ///
-  /// - Complexity: O(`self.count` + `items.count`)
-  @_alwaysEmitIntoClient
-  public mutating func insert(
-    moving items: inout InputSpan<Element>,
-    at index: Int
-  ) {
-    items.withUnsafeMutableBufferPointer { buffer, count in
-      let source = buffer._extracting(last: count)
-      unsafe self.insert(moving: source, at: index)
-      count = 0
-    }
-  }
-#endif
 
   /// Moves the elements of an output span into this array,
   /// starting at the specified position, and leaving the span empty.
@@ -192,13 +158,14 @@ extension RigidArray where Element: ~Copyable {
   ///       `index` must be a valid index in the array.
   ///
   /// - Complexity: O(`self.count` + `items.count`)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func insert(
     moving items: inout OutputSpan<Element>,
     at index: Int
   ) {
-    items.withUnsafeMutableBufferPointer { buffer, count in
-      let source = buffer._extracting(first: count)
+    unsafe items.withUnsafeMutableBufferPointer { buffer, count in
+      let source = unsafe buffer._extracting(first: count)
       unsafe self.insert(moving: source, at: index)
       count = 0
     }
@@ -221,6 +188,7 @@ extension RigidArray where Element: ~Copyable {
   ///       `index` must be a valid index in the array.
   ///
   /// - Complexity: O(`count` + `items.count`)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func insert(
     moving items: inout RigidArray<Element>,
@@ -234,37 +202,7 @@ extension RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
-extension RigidArray where Element: ~Copyable {
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
-  /// Inserts the elements of a given array into the given position in this
-  /// array by consuming the source container.
-  ///
-  /// All existing elements at or following the specified position are moved to
-  /// make room for the new items.
-  ///
-  /// If the capacity of the array isn't sufficient to accommodate the new
-  /// elements, then this method triggers a runtime error.
-  ///
-  /// - Parameters:
-  ///    - items: The array whose contents to move into `self`.
-  ///    - index: The position at which to insert the new items.
-  ///       `index` must be a valid index in the array.
-  ///
-  /// - Complexity: O(`count` + `items.count`)
-  @_alwaysEmitIntoClient
-  public mutating func insert(
-    consuming items: consuming RigidArray<Element>,
-    at index: Int
-  ) {
-    // FIXME: Remove this in favor of a generic algorithm over consumable containers
-    var items = items
-    self.insert(moving: &items, at: index)
-  }
-#endif
-}
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension RigidArray {
   /// Copies the elements of a fully initialized buffer pointer into this
   /// array at the specified position.
@@ -286,13 +224,14 @@ extension RigidArray {
   ///       a valid index of the array.
   ///
   /// - Complexity: O(`count` + `newElements.count`)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func insert(
     copying newElements: UnsafeBufferPointer<Element>, at index: Int
   ) {
     guard newElements.count > 0 else { return }
     self.insert(addingCount: newElements.count, at: index) { target in
-      target._append(copying: newElements)
+      unsafe target._append(copying: newElements)
     }
   }
 
@@ -316,8 +255,8 @@ extension RigidArray {
   ///       a valid index of the array.
   ///
   /// - Complexity: O(`count` + `newElements.count`)
-  @inlinable
-  @inline(__always)
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func insert(
     copying newElements: UnsafeMutableBufferPointer<Element>,
     at index: Int
@@ -343,8 +282,8 @@ extension RigidArray {
   ///        a valid index of the array.
   ///
   /// - Complexity: O(`count` + `newElements.count`)
-  @inlinable
-  @inline(__always)
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func insert(
     copying newElements: Span<Element>, at index: Int
   ) {
@@ -354,28 +293,7 @@ extension RigidArray {
     }
   }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
   @_alwaysEmitIntoClient
-  internal mutating func _insertContainer<
-    C: Container<Element> & ~Copyable & ~Escapable
-  >(
-    at index: Int,
-    copying items: borrowing C,
-    newCount: Int
-  ) {
-    var it = items.makeBorrowingIterator()
-    insert(addingCount: newCount, at: index) { target in
-      while !target.isFull {
-        let source = it.nextSpan(maximumCount: target.freeCapacity)
-        precondition(!source.isEmpty, "Broken container: mismatching count")
-        target._append(copying: source)
-      }
-    }
-    precondition(it.nextSpan().isEmpty, "Broken container: mismatching count")
-  }
-#endif
-
-  @inlinable
   internal mutating func _insertCollection(
     at index: Int,
     copying items: some Collection<Element>,
@@ -401,38 +319,6 @@ extension RigidArray {
     _count += newCount
   }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
-  /// Copies the elements of a container into this array at the specified
-  /// position.
-  ///
-  /// The new elements are inserted before the element currently at the
-  /// specified index. If you pass the array’s `endIndex` as the `index`
-  /// parameter, then the new elements are appended to the end of the array.
-  ///
-  /// All existing elements at or following the specified position are moved to
-  /// make room for the new item.
-  ///
-  /// If the capacity of the array isn't sufficient to accommodate the new
-  /// elements, then this method triggers a runtime error.
-  ///
-  /// - Parameters:
-  ///    - newElements: The new elements to insert into the array.
-  ///    - index: The position at which to insert the new elements. It must be
-  ///        a valid index of the array.
-  ///
-  /// - Complexity: O(`self.count` + `newElements.count`).
-  @_alwaysEmitIntoClient
-  @inline(__always)
-  public mutating func insert<
-    C: Container<Element> & ~Copyable & ~Escapable
-  >(
-    copying newElements: borrowing C, at index: Int
-  ) {
-    _insertContainer(
-      at: index, copying: newElements, newCount: newElements.count)
-  }
-#endif
-
   /// Copies the elements of a collection into this array at the specified
   /// position.
   ///
@@ -452,46 +338,12 @@ extension RigidArray {
   ///        a valid index of the array.
   ///
   /// - Complexity: O(`count` + `newElements.count`)
-  @inlinable
-  @inline(__always)
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func insert(
     copying newElements: some Collection<Element>, at index: Int
   ) {
     _insertCollection(
       at: index, copying: newElements, newCount: newElements.count)
   }
-
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
-  /// Copies the elements of a container into this array at the specified
-  /// position.
-  ///
-  /// The new elements are inserted before the element currently at the
-  /// specified index. If you pass the array’s `endIndex` as the `index`
-  /// parameter, then the new elements are appended to the end of the array.
-  ///
-  /// All existing elements at or following the specified position are moved to
-  /// make room for the new item.
-  ///
-  /// If the capacity of the array isn't sufficient to accommodate the new
-  /// elements, then this method triggers a runtime error.
-  ///
-  /// - Parameters:
-  ///    - newElements: The new elements to insert into the array.
-  ///    - index: The position at which to insert the new elements. It must be
-  ///        a valid index of the array.
-  ///
-  /// - Complexity: O(`self.count` + `newElements.count`)
-  @_alwaysEmitIntoClient
-  @inline(__always)
-  public mutating func insert<
-    C: Container<Element> & Collection<Element>
-  >(
-    copying newElements: borrowing C, at index: Int
-  ) {
-    _insertContainer(
-      at: index, copying: newElements, newCount: newElements.count)
-  }
-#endif
 }
-
-#endif
