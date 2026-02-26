@@ -2875,6 +2875,25 @@ void IsCustomAvailabilityDomainPermanentlyEnabled::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
+// ObjCKeyPathStringRequest caching.
+//----------------------------------------------------------------------------//
+
+std::optional<Expr *> ObjCKeyPathStringRequest::getCachedResult() const {
+  auto *KP = std::get<0>(getStorage());
+  if (!KP->ObjCStringLiteralExpr)
+    return std::nullopt;
+
+  return KP->ObjCStringLiteralExpr;
+}
+
+void ObjCKeyPathStringRequest::cacheResult(Expr *strExpr) const {
+  auto *KP = std::get<0>(getStorage());
+  ASSERT(strExpr);
+  ASSERT(!KP->ObjCStringLiteralExpr || KP->ObjCStringLiteralExpr == strExpr);
+  KP->ObjCStringLiteralExpr = strExpr;
+}
+
+//----------------------------------------------------------------------------//
 // DesugarForEachStmtRequest computation.
 //----------------------------------------------------------------------------//
 std::optional<BraceStmt *> DesugarForEachStmtRequest::getCachedResult() const {

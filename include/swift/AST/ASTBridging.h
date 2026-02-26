@@ -2782,11 +2782,11 @@ BridgedVarargTypeRepr_createParsed(BridgedASTContext cContext,
                                    BridgedTypeRepr base,
                                    swift::SourceLoc ellipsisLoc);
 
-SWIFT_NAME(
-    "BridgedIntegerTypeRepr.createParsed(_:string:loc:minusLoc:)")
-BridgedIntegerTypeRepr BridgedIntegerTypeRepr_createParsed(
-    BridgedASTContext cContext, BridgedStringRef cString, swift::SourceLoc loc,
-    swift::SourceLoc minusLoc);
+SWIFT_NAME("BridgedGenericArgumentExprTypeRepr.createParsed(_:expr:loc:)")
+BridgedGenericArgumentExprTypeRepr
+BridgedGenericArgumentExprTypeRepr_createParsed(BridgedASTContext cContext,
+                                                BridgedExpr cExpr,
+                                                swift::SourceLoc loc);
 
 SWIFT_NAME("BridgedTypeRepr.dump(self:)")
 void BridgedTypeRepr_dump(BridgedTypeRepr type);

@@ -1759,9 +1759,8 @@ public:
 
 /// Given that we've allocated space to hold a scalar value, try to rewrite
 /// the uses of the scalar to be uses of the address.
-static void rewriteUsesOfSscalar(StructLoweringState &pass,
-                                 SILValue address, SILValue scalar,
-                                 StoreInst *storeToAddress) {
+static void rewriteUsesOfScalar(StructLoweringState &pass, SILValue address,
+                                SILValue scalar, StoreInst *storeToAddress) {
   // Copy the uses, since we're going to edit them.
   SmallVector<Operand *, 8> uses(scalar->getUses());
   for (Operand *scalarUse : uses) {
@@ -1812,7 +1811,7 @@ static void allocateAndSetForInstResult(StructLoweringState &pass,
   auto store = createStoreInit(pass, II, inst->getLoc(), instResult, alloc);
 
   // Traverse all the uses of instResult - see if we can replace
-  rewriteUsesOfSscalar(pass, alloc, instResult, store);
+  rewriteUsesOfScalar(pass, alloc, instResult, store);
 }
 
 static void allocateAndSetForArgument(StructLoweringState &pass,
@@ -1832,7 +1831,7 @@ static void allocateAndSetForArgument(StructLoweringState &pass,
   auto store = createStoreInit(pass, II, loc, value, alloc);
 
   // Traverse all the uses of value - see if we can replace
-  rewriteUsesOfSscalar(pass, alloc, value, store);
+  rewriteUsesOfScalar(pass, alloc, value, store);
 }
 
 static bool allUsesAreReplaceable(StructLoweringState &pass,
@@ -2142,8 +2141,13 @@ static void rewriteFunction(StructLoweringState &pass,
     SILType currSILType = instr->getType();
     SILType newSILType = pass.getNewSILType(pass.F->getLoweredFunctionType(),
                                             currSILType);
-    auto *newInstr = allocBuilder.createAllocStack(instr->getLoc(), newSILType,
-                                                   instr->getVarInfo());
+    auto varInfo = instr->getVarInfo();
+    // Update the debug variable type to match the new SSA type so the
+    // SIL verifier does not see a mismatch between the two.
+    if (varInfo && varInfo->Type)
+      varInfo->Type = newSILType.getObjectType();
+    auto *newInstr =
+        allocBuilder.createAllocStack(instr->getLoc(), newSILType, varInfo);
     instr->replaceAllUsesWith(newInstr);
     instr->getParent()->erase(instr);
   }

@@ -84,7 +84,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypesWithDefaults>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
@@ -98,7 +98,7 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
-if(WIN32 AND ${CMAKE_SYSTEM_PROCESSOR} MATCHES "X86")
+if(WIN32 AND CMAKE_SYSTEM_PROCESSOR MATCHES "X86")
   # Turn on /safeseh for 32-bit x86 or we won't be able to link
   add_compile_options($<$<COMPILE_LANGUAGE:ASM_MASM>:/safeseh>)
 endif()
@@ -199,7 +199,7 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     endif()
   else()
     # Other platforms can use the shared `.S` file.
-    target_sources(swiftRuntime
+    target_sources(swiftRuntime PRIVATE
       get-cpu-context.S)
   endif()
 

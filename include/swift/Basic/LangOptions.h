@@ -1024,6 +1024,9 @@ namespace swift {
     /// Enable the experimental "prepared overloads" optimization.
     bool SolverEnablePreparedOverloads = true;
 
+    /// Enable generation of transitive conformance constraints.
+    bool SolverEnableTransitiveConformance = true;
+
     /// Enable experimental optimization to skip contradictory disjunction
     /// choices.
     bool SolverPruneDisjunctions = true;

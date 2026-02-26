@@ -15,42 +15,42 @@
   public static let shared = Actor()
 }
 
-// CHECK: @Test.GlobalActor public func funcBoundToGlobalActor()
+// CHECK: @Test::GlobalActor public func funcBoundToGlobalActor()
 @available(SwiftStdlib 5.1, *)
 @GlobalActor public func funcBoundToGlobalActor() { }
 
-// CHECK: public func funcWithParameterBoundToGlobalActor(_ x: Test.ClassBoundToGlobalActor)
+// CHECK: public func funcWithParameterBoundToGlobalActor(_ x: Test::ClassBoundToGlobalActor)
 @available(SwiftStdlib 5.1, *)
 public func funcWithParameterBoundToGlobalActor(_ x: ClassBoundToGlobalActor) { }
 
-// CHECK: @Test.GlobalActor public class ClassBoundToGlobalActor
+// CHECK: @Test::GlobalActor public class ClassBoundToGlobalActor
 @available(SwiftStdlib 5.1, *)
 @GlobalActor public class ClassBoundToGlobalActor { }
 
-// CHECK: extension Test.ClassBoundToGlobalActor
+// CHECK: extension Test::ClassBoundToGlobalActor
 @available(SwiftStdlib 5.1, *)
 extension ClassBoundToGlobalActor {
   public func someMethod() { }
 }
 
-// CHECK: @Test.GlobalActor public class DerivedFromClassBoundToGlobalActor : Test.ClassBoundToGlobalActor
+// CHECK: @Test::GlobalActor public class DerivedFromClassBoundToGlobalActor : Test::ClassBoundToGlobalActor
 @available(SwiftStdlib 5.1, *)
 public class DerivedFromClassBoundToGlobalActor: ClassBoundToGlobalActor {}
 
 // CHECK: public class NoActorClass
 @available(SwiftStdlib 5.1, *)
 public class NoActorClass {
-  // CHECK: @Test.GlobalActor public var varBoundToGlobalActor: Swift.Int
+  // CHECK: @Test::GlobalActor public var varBoundToGlobalActor: Swift::Int
   @GlobalActor public var varBoundToGlobalActor: Int
   
-  // CHECK: @Test.GlobalActor public init()
+  // CHECK: @Test::GlobalActor public init()
   @GlobalActor public init() {
     self.varBoundToGlobalActor = 0
   }
 
-  // CHECK: @Test.GlobalActor public func methodBoundToGlobalActor()
+  // CHECK: @Test::GlobalActor public func methodBoundToGlobalActor()
   @GlobalActor public func methodBoundToGlobalActor() { }
 }
 
-// CHECK: extension Test.GlobalActor : _Concurrency.GlobalActor {}
-// CHECK: extension Test.ClassBoundToGlobalActor : Swift.Sendable {}
+// CHECK: extension Test::GlobalActor : _Concurrency::GlobalActor {}
+// CHECK: extension Test::ClassBoundToGlobalActor : Swift::Sendable {}

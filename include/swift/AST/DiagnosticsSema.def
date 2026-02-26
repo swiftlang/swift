@@ -3332,6 +3332,8 @@ NOTE(protocol_witness_settable_conflict,none,
 ERROR(protocol_witness_borrow_mutate_conflict, none,
       "candidate is not a stored property or a computed property with %0 accessor, but protocol requires it",
       (StringRef))
+ERROR(protocol_witness_borrow_mutate_unsupported, none,
+      "borrow/mutate protocol requirements can only be witnessed in a struct", ())
 
 NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
@@ -6228,6 +6230,8 @@ ERROR(no_concurrency_module,none,
 ERROR(multiple_global_actors,none,
       "declaration can not have multiple global actor attributes (%0 and %1)",
       (Identifier, Identifier))
+NOTE(multiple_global_actors_note,none,
+      "%0 attribute previously declared here", (const Decl *))
 ERROR(global_actor_disallowed,none,
       "%kindonly0 cannot have a global actor", (const Decl *))
 ERROR(global_actor_on_actor_class,none,
@@ -6403,6 +6407,9 @@ ERROR(expansion_expr_not_allowed,none,
 ERROR(invalid_expansion_argument,none,
       "cannot pass value pack expansion to non-pack parameter of type %0",
       (Type))
+NOTE(did_you_mean_tuple_pack_expansion,none,
+      "did you mean to expand the pack into a tuple?",
+      ())
 ERROR(expansion_not_variadic,none,
       "pack expansion %0 must contain at least one pack reference", (Type))
 ERROR(pack_reference_outside_expansion,none,
@@ -6545,6 +6552,9 @@ ERROR(opaque_type_in_parameter,none,
       "'some' cannot appear in parameter position in %select{result|parameter}0"
       " type %1",
       (bool, Type))
+ERROR(opaque_type_member_type,none,
+      "cannot access member type %0 on opaque type %1",
+      (DeclNameRef, Type))
 
 // Function differentiability
 ERROR(attr_only_on_parameters_of_differentiable,none,
@@ -8727,6 +8737,13 @@ ERROR(availability_value_generic_type_only_version_newer, none,
       (AvailabilityDomain, AvailabilityRange))
 ERROR(invalid_value_for_type_same_type,none,
       "cannot constrain type parameter %0 to be integer %1", (Type, Type))
+
+ERROR(nonliteral_integer_generic_value,none,
+      "generic value must be an integer literal", ())
+ERROR(nonliteral_integer_expr_generic_value,none,
+      "generic value must be an integer literal expression", ())
+ERROR(integer_generic_expr_closure_not_supported,none,
+      "closures are not supported in generic value literal expressions", ())
 
 //===----------------------------------------------------------------------===//
 // MARK: InlineArray

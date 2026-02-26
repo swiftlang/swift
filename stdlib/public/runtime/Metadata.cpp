@@ -31,7 +31,6 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/RemoteInspection/GenericMetadataCacheEntry.h"
 #include "swift/Runtime/Borrow.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/EnvironmentVariables.h"

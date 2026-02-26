@@ -245,7 +245,7 @@ ERROR(use_of_self_before_fully_init,none,
 NOTE(stored_property_not_initialized,none,
      "'%0' not initialized", (StringRef))
 NOTE(isolated_property_initializer,none,
-     "%1 default value of '%0' cannot be used in a %2 initalizer",
+     "%1 default value of '%0' cannot be used in a %2 initializer",
      (StringRef, ActorIsolation, ActorIsolation))
 
 ERROR(selfinit_multiple_times,none,
@@ -1134,7 +1134,7 @@ NOTE(regionbasedisolation_isolated_conformance_introduced, none,
 
 // Error that is only used when the send non sendable emitter cannot discover any
 // information to give a better diagnostic.
-ERROR(regionbasedisolation_task_or_actor_isolated_sent, none,
+GROUPED_ERROR(regionbasedisolation_task_or_actor_isolated_sent, RegionIsolation, none,
       "task or actor-isolated value cannot be sent", ())
 
 //===
@@ -1143,19 +1143,19 @@ ERROR(regionbasedisolation_task_or_actor_isolated_sent, none,
 NOTE(regionbasedisolation_inout_sending_must_be_reinitialized, none,
      "'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value",
      ())
-ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
+GROUPED_ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, RegionIsolation, none,
       "'inout sending' parameter %0 cannot be %1 at end of function",
       (Identifier, StringRef))
 NOTE(regionbasedisolation_inout_sending_cannot_be_actor_isolated_note, none,
       "%1 %0 risks causing races in between %1 uses and caller uses since caller assumes value is not actor isolated",
       (Identifier, StringRef))
-ERROR(regionbasedisolation_inout_sending_cannot_be_returned_param, none,
+GROUPED_ERROR(regionbasedisolation_inout_sending_cannot_be_returned_param, RegionIsolation, none,
       "'inout sending' parameter %0 cannot be returned",
       (Identifier))
-ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value, none,
+GROUPED_ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value, RegionIsolation, none,
       "%0 cannot be returned",
       (Identifier))
-ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value_result, none,
+GROUPED_ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value_result, RegionIsolation, none,
       "result of %kind0 cannot be returned",
       (const ValueDecl *))
 NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_param, none,
@@ -1179,13 +1179,13 @@ NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_actor_return_val
 //===
 // Out Sending
 
-ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_type, none,
+GROUPED_ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_type, RegionIsolation, none,
       "returning a %1 %0 value as a 'sending' result risks causing data races",
       (Type, StringRef))
 NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_type, none,
       "returning a %1 %0 value risks causing races since the caller assumes the value can be safely sent to other isolation domains",
       (Type, StringRef))
-ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_named, none,
+GROUPED_ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_named, RegionIsolation, none,
       "returning %1 %0 as a 'sending' result risks causing data races",
       (Identifier, StringRef))
 NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named, none,
@@ -1196,10 +1196,10 @@ NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named, none,
 // non-Sendable Results
 
 // Example: returning main-actor isolated result to a custom-actor isolated context risks causing data races
-ERROR(rbi_isolation_crossing_result, none,
+GROUPED_ERROR(rbi_isolation_crossing_result, RegionIsolation, none,
       "non-Sendable %0-typed result can not be returned from %1 %kind2 to %3 context",
       (Type, StringRef, const ValueDecl *, StringRef))
-ERROR(rbi_isolation_crossing_result_no_decl, none,
+GROUPED_ERROR(rbi_isolation_crossing_result_no_decl, RegionIsolation, none,
       "non-Sendable %0-typed result can not be returned from %1 function to %2 context",
       (Type, StringRef, StringRef))
 NOTE(rbi_non_sendable_nominal,none,
@@ -1214,7 +1214,7 @@ NOTE(rbi_add_generic_parameter_sendable_conformance,none,
      "consider making generic parameter %0 conform to the 'Sendable' protocol",
      (Type))
 
-ERROR(regionbasedisolation_inout_sending_in_same_region, none,
+GROUPED_ERROR(regionbasedisolation_inout_sending_in_same_region, RegionIsolation, none,
       "'inout sending' parameters %0 and %1 can be potentially accessed from each other at function return risking data races in caller",
       (Identifier, Identifier))
 NOTE(regionbasedisolation_inout_sending_in_same_region_note, none,
@@ -1232,7 +1232,7 @@ ERROR(executor_factory_must_conform, none,
 
 // TODO: print the name of the nominal type
 ERROR(deinit_not_visible, none,
-      "deinit of non-copyable type not visible in the current module", ())
+      "deinit of non-copyable type %0 not visible in the current module", (Type))
 
 ERROR(lifetime_variable_outside_scope, none,
       "lifetime-dependent variable '%0' escapes its scope", (Identifier))
@@ -1275,6 +1275,8 @@ NOTE(borrow_accessor_not_a_projection_note, none,
 ERROR(invalid_multiple_return_borrow_accessor, none,
       "multiple return statements in borrow accessors are not yet supported",
       ())
-
+ERROR(unsupported_borrow_abstraction, none,
+      "cannot witness borrow requirement for result type %0",
+      (Type))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

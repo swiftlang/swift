@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature SendingArgsAndResults -strict-concurrency=complete
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -enable-experimental-feature SendingArgsAndResults -strict-concurrency=complete
 
 // REQUIRES: swift_feature_SendingArgsAndResults
 
@@ -13,7 +13,18 @@ func testArgResult(_ x: sending String) -> sending String {
 }
 
 func testVarDeclDoesntWork() {
-  var x: sending String // expected-error {{'sending' may only be used on parameter}}
+  var x: sending String // expected-error {{'sending' may only be used on parameters and results}}
+  let y: sending String // expected-error {{'sending' may only be used on parameters and results}}
+
+  struct S {
+    var opaqueStored: sending some Equatable = 0 // expected-error {{'sending' may only be used on parameters and results}}
+    let opaqueStoredImmutable: sending some Equatable = 0 // expected-error {{'sending' may only be used on parameters and results}}
+    var opaqueComputed: sending some Equatable { 0 } // expected-error {{'sending' may only be used on parameters and results}}
+    var opaqueWriteback: sending some Equatable { // expected-error {{'sending' may only be used on parameters and results}}
+      get { 0 }
+      set {}
+    }
+  }
 }
 
 func testVarDeclTupleElt() -> (sending String, String) {} // expected-error {{'sending' cannot be applied to tuple elements}}

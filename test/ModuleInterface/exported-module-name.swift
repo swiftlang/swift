@@ -8,12 +8,12 @@
 // CHECK: import CoreKit
 import CoreKit
 
-// CHECK-LABEL: public struct CKThingWrapper : Swift.RawRepresentable {
+// CHECK-LABEL: public struct CKThingWrapper : Swift::RawRepresentable {
 public struct CKThingWrapper: RawRepresentable {
   public var rawValue: CKThing
   public init(rawValue: CKThing) {
     self.rawValue = rawValue
   }
   // Note that this is CoreKit.CKThing, not ExportAsCoreKit.CKThing
-  // CHECK: public typealias RawValue = CoreKit.CKThing
+  // CHECK: public typealias RawValue = CoreKit::CKThing
 } // CHECK: {{^}$}}

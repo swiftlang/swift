@@ -41,9 +41,11 @@ struct CustomActor {
 @CustomActor func transferToCustomDirect(_ t: NonSendableKlass) async {}
 func useValueIndirect<T>(_ t: T) {}
 func useValueDirect(_ t: NonSendableKlass) {}
+func useValueOpaque(_ t: some OpaqueP) {}
 
 func transferValueDirect(_ x: sending NonSendableKlass) {}
 func transferValueIndirect<T>(_ x: sending T) {}
+func transferValueOpaque(_ t: sending some OpaqueP) {}
 
 func transferResult() -> sending NonSendableKlass { NonSendableKlass() }
 func transferResultWithArg(_ x: NonSendableKlass) -> sending NonSendableKlass { NonSendableKlass() }
@@ -95,6 +97,12 @@ func sendParameter<T>(_ t: sending T) {}
 actor MyActor {
   private var ns = NonSendableKlass()
 }
+
+protocol OpaqueP {}
+extension NonSendableKlass: OpaqueP {}
+
+func opaqueSendingResult() -> sending (some OpaqueP) { NonSendableKlass() }
+func opaqueSendingResultAsync() async -> sending (some OpaqueP) { NonSendableKlass() }
 
 /////////////////
 // MARK: Tests //
@@ -319,4 +327,42 @@ extension MyActor {
 
     return value
   }
+}
+
+////////////////////////////////
+// MARK: Opaque Results Tests //
+////////////////////////////////
+
+func test_opaque_sending_result_basic() {
+ let x = opaqueSendingResult()
+ let y = opaqueSendingResult()
+
+ sendParameter(x)
+ sendParameter(y)
+}
+
+func test_opaque_sending_result_async() async {
+  let x = await opaqueSendingResultAsync()
+  useValueIndirect(x)
+}
+
+@MainActor
+func test_opaque_sending_result_main_actor() async {
+  let x: some OpaqueP = await opaqueSendingResultAsync()
+  sendParameter(x)
+  // expected-warning @-1 {{sending 'x' risks causing data races}}
+  // expected-note @-2 {{'x' used after being passed as a 'sending' parameter; Later uses could race}}
+  useValueOpaque(x)
+  // expected-note @-1 {{access can happen concurrently}}
+}
+
+func test_opaque_sending_result_async_race_detected() async {
+  let x = await opaqueSendingResultAsync()
+  useValueIndirect(x)
+  sendParameter(x)
+}
+
+struct TestOpaqueSendingSubscript {
+  subscript(i: Int) -> sending some OpaqueP { NonSendableKlass() }
+  subscript(send i: sending Int) -> sending some OpaqueP { NonSendableKlass() }
 }

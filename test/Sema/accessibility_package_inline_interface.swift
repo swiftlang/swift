@@ -16,7 +16,7 @@
 // CHECK-UTILS:   @usableFromInline
 // CHECK-UTILS:   package init()
 // CHECK-UTILS:   @usableFromInline
-// CHECK-UTILS:   package var pkgVar: Swift.Double
+// CHECK-UTILS:   package var pkgVar: Swift::Double
 // CHECK-UTILS:   @usableFromInline
 // CHECK-UTILS:   deinit
 // CHECK-UTILS: }
@@ -34,7 +34,7 @@
 // CHECK-UTILS:   @usableFromInline
 // CHECK-UTILS:   internal init()
 // CHECK-UTILS:   @usableFromInline
-// CHECK-UTILS:   internal var internalVar: Swift.Double
+// CHECK-UTILS:   internal var internalVar: Swift::Double
 // CHECK-UTILS:   @usableFromInline
 // CHECK-UTILS:   deinit
 // CHECK-UTILS: }

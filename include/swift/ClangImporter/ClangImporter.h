@@ -181,8 +181,7 @@ private:
 
   ClangInvocationFileMapping clangFileMapping;
 
-  ClangImporter(ASTContext &ctx, DependencyTracker *tracker,
-                DWARFImporterDelegate *dwarfImporterDelegate);
+  ClangImporter(ASTContext &ctx, DependencyTracker *tracker);
 
   /// Creates a clone of Clang importer's compiler instance that has been
   /// configured for operations on precompiled outputs (either emitting a
@@ -207,17 +206,11 @@ public:
   ///
   /// \param tracker The object tracking files this compilation depends on.
   ///
-  /// \param dwarfImporterDelegate A helper object that can synthesize
-  /// Clang Decls from debug info. Used by LLDB.
-  ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
-  create(ASTContext &ctx,
-         const IRGenOptions *IRGenOpts = nullptr,
-         std::string swiftPCHHash = "",
-         DependencyTracker *tracker = nullptr,
-         DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
+  create(ASTContext &ctx, const IRGenOptions *IRGenOpts = nullptr,
+         std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
          bool ignoreFileMapping = false);
 
   static std::string getClangSystemOverlayFile(const SearchPathOptions &Opts);
@@ -230,6 +223,10 @@ public:
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS,
       bool suppressDiagnostics = false,
       llvm::function_ref<StringRef(StringRef)> allocateString = nullptr);
+
+  /// Install a helper object that can synthesize Clang Decls from debug
+  /// info. Used by LLDB.
+  void setDWARFImporterDelegate(DWARFImporterDelegate *dwarfImporterDelegate);
 
   std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
@@ -271,9 +268,6 @@ public:
   ClangImporter &operator=(ClangImporter &&) = delete;
 
   ~ClangImporter();
-
-  /// Only to be used by lldb-moduleimport-test.
-  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
 
   /// Create a new clang::DependencyCollector customized to
   /// ClangImporter's specific uses.

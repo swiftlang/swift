@@ -26,9 +26,9 @@ public enum PubEnum {
 // CHECK: -package-name barpkg
 // CHECK: public enum PubEnum {
 // CHECK:   case red, green
-// CHECK:   public static func == (a: Bar.PubEnum, b: Bar.PubEnum) -> Swift.Bool
-// CHECK:   public func hash(into hasher: inout Swift.Hasher)
-// CHECK:   public var hashValue: Swift.Int {
+// CHECK:   public static func == (a: Bar::PubEnum, b: Bar::PubEnum) -> Swift::Bool
+// CHECK:   public func hash(into hasher: inout Swift::Hasher)
+// CHECK:   public var hashValue: Swift::Int {
 // CHECK:     get
 // CHECK:   }
 // CHECK: }
@@ -45,7 +45,7 @@ public func pubFunc(arg: PubEnum) {
   }
 }
 
-// CHECK: @_transparent public func pubFunc(arg: Bar.PubEnum) {
+// CHECK: @_transparent public func pubFunc(arg: Bar::PubEnum) {
 // CHECK:   switch arg {
 // CHECK:   case .red:
 // CHECK:     print("r")
@@ -60,11 +60,11 @@ package enum PkgEnum {
   case blue, yellow
 }
 
-// CHECK-PKG: package enum PkgEnum : Swift.Sendable {
+// CHECK-PKG: package enum PkgEnum : Swift::Sendable {
 // CHECK-PKG:   case blue, yellow
-// CHECK-PKG:   package static func == (a: Bar.PkgEnum, b: Bar.PkgEnum) -> Swift.Bool
-// CHECK-PKG:   package func hash(into hasher: inout Swift.Hasher)
-// CHECK-PKG:   package var hashValue: Swift.Int {
+// CHECK-PKG:   package static func == (a: Bar::PkgEnum, b: Bar::PkgEnum) -> Swift::Bool
+// CHECK-PKG:   package func hash(into hasher: inout Swift::Hasher)
+// CHECK-PKG:   package var hashValue: Swift::Int {
 // CHECK-PKG:     get
 // CHECK-PKG:   }
 // CHECK-PKG: }
@@ -79,11 +79,11 @@ package enum UfiPkgEnum {
 // CHECK: package enum UfiPkgEnum {
 // CHECK:   case one, two
 // CHECK:   @usableFromInline
-// CHECK:   package static func == (a: Bar.UfiPkgEnum, b: Bar.UfiPkgEnum) -> Swift.Bool
+// CHECK:   package static func == (a: Bar::UfiPkgEnum, b: Bar::UfiPkgEnum) -> Swift::Bool
 // CHECK:   @usableFromInline
-// CHECK:   package func hash(into hasher: inout Swift.Hasher)
+// CHECK:   package func hash(into hasher: inout Swift::Hasher)
 // CHECK:   @usableFromInline
-// CHECK:   package var hashValue: Swift.Int {
+// CHECK:   package var hashValue: Swift::Int {
 // CHECK:     @usableFromInline
 // CHECK:     get
 // CHECK:   }
@@ -100,7 +100,7 @@ package func pkgFunc(arg: UfiPkgEnum) {
     print("def")
   }
 }
-// CHECK: @inlinable package func pkgFunc(arg: Bar.UfiPkgEnum) {
+// CHECK: @inlinable package func pkgFunc(arg: Bar::UfiPkgEnum) {
 // CHECK:   switch arg {
 // CHECK:   case .one:
 // CHECK:     print("1")
@@ -119,13 +119,13 @@ package func pkgFunc(arg: UfiPkgEnum) {
   public package(set) var five: String
 }
 // CHECK: @frozen public struct FrozenPub {
-// CHECK:   public var one: Swift.String
-// CHECK:   internal var two: Swift.String
-// CHECK:   private var three: Swift.String
-// CHECK:   @_hasStorage public var four: Swift.String {
+// CHECK:   public var one: Swift::String
+// CHECK:   internal var two: Swift::String
+// CHECK:   private var three: Swift::String
+// CHECK:   @_hasStorage public var four: Swift::String {
 // CHECK:     get
 // CHECK:   }
-// CHECK:   @_hasStorage public var five: Swift.String {
+// CHECK:   @_hasStorage public var five: Swift::String {
 // CHECK:     get
 // CHECK:   }
 // CHECK: }
@@ -137,9 +137,9 @@ package struct PkgStruct {
   package private(set) var four: String
 }
 
-// CHECK-PKG: package struct PkgStruct : Swift.Sendable {
-// CHECK-PKG:   package var one: Swift.String
-// CHECK-PKG:   package var four: Swift.String {
+// CHECK-PKG: package struct PkgStruct : Swift::Sendable {
+// CHECK-PKG:   package var one: Swift::String
+// CHECK-PKG:   package var four: Swift::String {
 // CHECK-PKG:     get
 // CHECK-PKG:   }
 // CHECK-PKG: }
@@ -161,12 +161,12 @@ public class PubKlass {
 }
 
 // CHECK: public class PubKlass {
-// CHECK:   public var pubVarInPub: Swift.String
-// CHECK-PKG:   package var pkgVarInPub: Swift.String
-// CHECK:   public var pubVarPrivSetInPub: Swift.Int {
+// CHECK:   public var pubVarInPub: Swift::String
+// CHECK-PKG:   package var pkgVarInPub: Swift::String
+// CHECK:   public var pubVarPrivSetInPub: Swift::Int {
 // CHECK:     get
 // CHECK:   }
-// CHECK:   public var pubVarPkgSetInPub: Swift.Int {
+// CHECK:   public var pubVarPkgSetInPub: Swift::Int {
 // CHECK:     get
 // CHECK:   }
 // CHECK:   public init()
@@ -191,8 +191,8 @@ package class PkgKlass {
 }
 
 // CHECK-PKG: package class PkgKlass {
-// CHECK-PKG:   package var pkgVarInPkg: Swift.String
-// CHECK-PKG:   package var pkgVarPrivSetInPkg: Swift.Int {
+// CHECK-PKG:   package var pkgVarInPkg: Swift::String
+// CHECK-PKG:   package var pkgVarPrivSetInPkg: Swift::Int {
 // CHECK-PKG:     get
 // CHECK-PKG:   }
 // CHECK-PKG:   package init()
@@ -205,7 +205,7 @@ public protocol PubProto {
 }
 
 // CHECK: public protocol PubProto {
-// CHECK:   var p1: Swift.String { get set }
+// CHECK:   var p1: Swift::String { get set }
 // CHECK:   func f1()
 // CHECK: }
 
@@ -217,8 +217,8 @@ public extension PubProto {
   func f2() { print("f2") }
 }
 
-// CHECK: extension Bar.PubProto {
-// CHECK:   public var p2: Swift.Int {
+// CHECK: extension Bar::PubProto {
+// CHECK:   public var p2: Swift::Int {
 // CHECK:     get
 // CHECK:   }
 // CHECK:   public func f1()
@@ -232,11 +232,11 @@ extension PubProto {
   public func f3() { print("f3") } // expected to show up in public interface
 }
 
-// CHECK: extension Bar.PubProto {
-// CHECK:   public var p3: Swift.Int {
+// CHECK: extension Bar::PubProto {
+// CHECK:   public var p3: Swift::Int {
 // CHECK:     get
 // CHECK:   }
-// CHECK-PKG:   package var p4: Swift.Int {
+// CHECK-PKG:   package var p4: Swift::Int {
 // CHECK-PKG:     get
 // CHECK-PKG:   }
 // CHECK:   public func f3()
@@ -247,7 +247,7 @@ package protocol PkgProto {
   func g1()
 }
 // CHECK-PKG: package protocol PkgProto {
-// CHECK-PKG:   var k1: Swift.String { get set }
+// CHECK-PKG:   var k1: Swift::String { get set }
 // CHECK-PKG:   func g1()
 // CHECK-PKG: }
 
@@ -256,8 +256,8 @@ package extension PkgProto {
   func g1() { print("g1 ext") }
   func g2() { print("g2") }
 }
-// CHECK-PKG: extension Bar.PkgProto {
-// CHECK-PKG:   package var k2: Swift.Int {
+// CHECK-PKG: extension Bar::PkgProto {
+// CHECK-PKG:   package var k2: Swift::Int {
 // CHECK-PKG:     get
 // CHECK-PKG:   }
 // CHECK-PKG:   package func g1()
@@ -270,31 +270,31 @@ extension PkgProto {
   package func g3() { print("g3") }
 }
 
-// CHECK-PKG: extension Bar.PkgProto {
-// CHECK-PKG:   package var k3: Swift.Int {
+// CHECK-PKG: extension Bar::PkgProto {
+// CHECK-PKG:   package var k3: Swift::Int {
 // CHECK-PKG:     get
 // CHECK-PKG:   }
 // CHECK-PKG:   package func g3()
 // CHECK-PKG: }
 
 public func pub(x: Int, y: String) { print("pub func") }
-// CHECK: public func pub(x: Swift.Int, y: Swift.String)
+// CHECK: public func pub(x: Swift::Int, y: Swift::String)
 
 @_spi(LibBar) public func spi(x: Int, y: String) { print("spi func") }
-// CHECK-PRIV: @_spi(LibBar) public func spi(x: Swift.Int, y: Swift.String)
+// CHECK-PRIV: @_spi(LibBar) public func spi(x: Swift::Int, y: Swift::String)
 
 @usableFromInline
 package func ufipkg(x: Int, y: String) { print("ufi pkg func") }
 // CHECK: @usableFromInline
-// CHECK: package func ufipkg(x: Swift.Int, y: Swift.String)
+// CHECK: package func ufipkg(x: Swift::Int, y: Swift::String)
 
 package func pkg(x: Int, y: String) { print("pkg func") }
-// CHECK-PKG: package func pkg(x: Swift.Int, y: Swift.String)
+// CHECK-PKG: package func pkg(x: Swift::Int, y: Swift::String)
 
 func int(x: Int, y: String) { print("int func") }
 private func priv(x: Int, y: String) { print("priv func") }
 
-// CHECK: extension Bar.PubEnum : Swift.Equatable {}
-// CHECK: extension Bar.PubEnum : Swift.Hashable {}
-// CHECK: extension Bar.FrozenPub : Swift.Sendable {}
+// CHECK: extension Bar::PubEnum : Swift::Equatable {}
+// CHECK: extension Bar::PubEnum : Swift::Hashable {}
+// CHECK: extension Bar::FrozenPub : Swift::Sendable {}
 

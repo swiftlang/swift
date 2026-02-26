@@ -100,7 +100,7 @@ public:
   }
 
   void strongCustomRetain(IRGenFunction &IGF, Explosion &e,
-                          bool needsNullCheck) const {
+                          bool needsNullCheck) const override {
     assert(getReferenceCounting() == ReferenceCounting::Custom &&
            "only supported for custom ref-counting");
 
@@ -129,7 +129,7 @@ public:
   }
 
   void strongCustomRelease(IRGenFunction &IGF, Explosion &e,
-                           bool needsNullCheck) const {
+                           bool needsNullCheck) const override {
     assert(getReferenceCounting() == ReferenceCounting::Custom &&
            "only supported for custom ref-counting");
 

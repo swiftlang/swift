@@ -30,6 +30,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/ThrownErrorDestination.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/AccessControls.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -4137,6 +4138,8 @@ public:
   ///
   /// Closures with untyped throws will produce "any Error", functions that
   /// cannot throw or are specified to throw "Never" will return std::nullopt.
+  SWIFT_UNAVAILABLE_IN_SILGEN_MSG(
+      "use 'TypeConverter::getClosureTypeInfo' instead")
   std::optional<Type> getEffectiveThrownType() const;
 
   /// \brief Return whether this closure is async when fully applied.
@@ -5927,6 +5930,8 @@ class KeyPathExpr : public Expr {
   /// a contextual root type.
   bool HasLeadingDot = false;
 
+  friend class ObjCKeyPathStringRequest;
+
 public:
   /// A single stored component, which will be one of:
   /// - an unresolved DeclNameRef, which has to be type-checked
@@ -6392,6 +6397,7 @@ public:
   /// Retrieve the string literal expression, which will be \c NULL prior to
   /// type checking and a string literal after type checking for an
   /// @objc key path.
+  /// FIXME: Ideally this would lazily evaluate ObjCKeyPathStringRequest.
   Expr *getObjCStringLiteralExpr() const {
     return ObjCStringLiteralExpr;
   }

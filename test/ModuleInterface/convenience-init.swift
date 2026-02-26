@@ -25,7 +25,7 @@ public class Base {
 }
 
 public class Derived: Base {
-  // CHECK: {{^}}  public init(z: Swift.Int)
+  // CHECK: {{^}}  public init(z: Swift::Int)
   public init(z: Int) {
     super.init(x: z)
   }
@@ -42,8 +42,8 @@ public class Derived2: Base {
     super.init(x: 1)
   }
 
-  // MERGE: {{^}}  override public convenience init(x: Swift.Int)
-  // SINGLE: {{^}}  override convenience public init(x: Swift.Int)
+  // MERGE: {{^}}  override public convenience init(x: Swift::Int)
+  // SINGLE: {{^}}  override convenience public init(x: Swift::Int)
   override convenience public init(x: Int) {
     self.init()
   }

@@ -15,7 +15,7 @@
 // NORMAL_ARGS-DAG: -o{{$}}
 // NORMAL_ARGS-DAG: foo-{{[a-z0-9]+}}.o
 // NORMAL_ARGS-DAG: -c{{$}}
-// NORMAL_ARGS-DAG: -swift-version
+// NORMAL_ARGS-DAG: -language-mode
 // NORMAL_ARGS-DAG: -module-name
 // NORMAL_ARGS-DAG: -emit-module-path
 // NORMAL_ARGS-DAG: -emit-module-doc-path

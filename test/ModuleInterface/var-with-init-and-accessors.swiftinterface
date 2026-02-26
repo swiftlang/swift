@@ -10,7 +10,7 @@
     }
 }
 // INTERFACE: @frozen public struct Struct {
-// INTERFACE-LABEL: @_hasStorage public var values: [Swift.Int] = .init() { @_accessorBlock
+// INTERFACE-LABEL: @_hasStorage public var values: [Swift::Int] = .init() { @_accessorBlock
 // INTERFACE-NEXT:     @_transparent get
 // INTERFACE-NEXT:     set
 // INTERFACE-NEXT:   }

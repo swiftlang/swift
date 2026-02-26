@@ -2218,7 +2218,7 @@ namespace {
       fd->addAttribute(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));
 
       unsigned resultIndex = fd->getParameters()->size();
-      if (fd->hasImplicitSelfDecl()) {
+      if (fd->isInstanceMethod()) {
         ++resultIndex;
       }
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
@@ -2629,10 +2629,14 @@ namespace {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd) &&
               !isa<clang::TypeAliasTemplateDecl>(nd) &&
               !isa<clang::FunctionTemplateDecl>(nd)) {
-            // We don't know what this member is.
-            // Assume it may be important in C.
-            hasUnreferenceableStorage = true;
-            hasMemberwiseInitializer = false;
+            auto varDecl = dyn_cast<clang::VarDecl>(nd);
+            // Static fields don't affect the memberwise initializer.
+            if (!(varDecl && varDecl->isStaticDataMember())) {
+              // We don't know what this member is.
+              // Assume it may be important in C.
+              hasUnreferenceableStorage = true;
+              hasMemberwiseInitializer = false;
+            }
           }
           continue;
         }
@@ -4427,7 +4431,7 @@ namespace {
 
       auto swiftParams = result->getParameters();
       bool hasSelf =
-          result->hasImplicitSelfDecl() && !isa<ConstructorDecl>(result);
+          result->isInstanceMethod() && !isa<ConstructorDecl>(result);
       auto returnIdx = swiftParams->size() + hasSelf;
 
       if (inferSelfDependence(decl, result, returnIdx))
@@ -10757,7 +10761,11 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
 
     // Skip this member if caller asked for storage and this isn't a field,
     // or vice versa.
-    if (storage != isa<clang::FieldDecl>(m))
+    //
+    // FIXME: also load eagerly function templates for now, even though they are
+    //        technically not storage members, because otherwise those templated
+    //        members can't be looked up from the SwiftLookupTable.
+    if (storage != isa<clang::FieldDecl, clang::FunctionTemplateDecl>(m))
       continue;
 
     // Make sure we always pull in record fields. Everything else had better

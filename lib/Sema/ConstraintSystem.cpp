@@ -36,6 +36,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -505,7 +506,8 @@ Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
   // FIXME: This will need to change when we do inference of thrown error
   // types in closures.
   if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
-    return getClosureType(closure)->getEffectiveThrownErrorTypeOrNever();
+    auto closureTy = simplifyType(getType(closure))->castTo<FunctionType>();
+    return closureTy->getEffectiveThrownErrorTypeOrNever();
   }
 
   if (!ctx.LangOpts.hasFeature(Feature::FullTypedThrows))

@@ -34,6 +34,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/InlinableText.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LookupKinds.h"
@@ -50,6 +51,7 @@
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/StorageImpl.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
@@ -79,7 +81,6 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
-#include "InlinableText.h"
 #include <algorithm>
 
 using namespace swift;
@@ -632,7 +633,8 @@ bool Decl::isBackDeployed() const {
   if (auto VD = dyn_cast<ValueDecl>(this)) {
     auto access =
         VD->getFormalAccessScope(/*useDC=*/nullptr,
-                                 /*treatUsableFromInlineAsPublic=*/true);
+                                 /*treatUsableFromInlineAsPublic=*/true,
+                                 /*ignoreImportAccessLevel=*/false);
     if (!access.isPublic())
       return false;
   }
@@ -2824,7 +2826,8 @@ ExportedLevel VarDecl::isLayoutExposedToClients() const {
   // Is it a member of a frozen type?
   auto nominalAccess =
     parent->getFormalAccessScope(/*useDC=*/nullptr,
-                                 /*treatUsableFromInlineAsPublic=*/true);
+                                 /*treatUsableFromInlineAsPublic=*/true,
+                                 /*ignoreImportAccessLevel=*/false);
   if (nominalAccess.isPublic() &&
       (parent->getAttrs().hasAttribute<FrozenAttr>() ||
        parent->getAttrs().hasAttribute<FixedLayoutAttr>()))
@@ -3760,7 +3763,8 @@ bool AbstractStorageDecl::isResilient() const {
   // Non-public global and static variables always have a
   // fixed layout.
   auto accessScope = getFormalAccessScope(/*useDC=*/nullptr,
-                                          /*treatUsableFromInlineAsPublic=*/true);
+                                          /*treatUsableFromInlineAsPublic=*/true,
+                                          /*ignoreImportAccessLevel=*/false);
   if (!accessScope.isPublicOrPackage())
     return false;
 
@@ -4660,9 +4664,11 @@ bool ValueDecl::isLocalCapture() const {
 }
 
 ArrayRef<ValueDecl *>
-ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
-  // Dig out the nominal type.
-  NominalTypeDecl *NTD = getDeclContext()->getSelfNominalTypeDecl();
+ValueDecl::getSatisfiedProtocolRequirements(bool Sorted,
+                                            NominalTypeDecl *NTD) const {
+  // Dig out the nominal type if needed.
+  if (!NTD)
+    NTD = getDeclContext()->getSelfNominalTypeDecl();
   if (!NTD || isa<ProtocolDecl>(NTD))
     return {};
 
@@ -5028,7 +5034,8 @@ bool ValueDecl::hasAttributeWithInlinableSemantics() const {
   // @inline(always) implies @inlinable on "public" (open, public, package)
   // declarations.
   AccessScope access =
-        getFormalAccessScope(nullptr, /*treatUsableFromInlineAsPublic*/false);
+        getFormalAccessScope(nullptr, /*treatUsableFromInlineAsPublic*/false,
+                             /*ignoreImportAccessLevel*/false);
   if (!access.isPublicOrPackage())
     return false;
 
@@ -5332,7 +5339,8 @@ static AccessScope
 getAccessScopeForFormalAccess(const ValueDecl *VD,
                               AccessLevel formalAccess,
                               const DeclContext *useDC,
-                              bool treatUsableFromInlineAsPublic) {
+                              bool treatUsableFromInlineAsPublic,
+                              bool ignoreImportAccessLevel) {
   AccessLevel access = getAdjustedFormalAccess(VD, formalAccess, useDC,
                                                treatUsableFromInlineAsPublic);
   const DeclContext *resultDC = VD->getDeclContext();
@@ -5371,17 +5379,19 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     resultDC = resultDC->getParent();
   }
 
-  auto localImportRestriction = VD->getImportAccessFrom(useDC);
-  if (localImportRestriction.has_value()) {
-    AccessLevel importAccessLevel =
-      localImportRestriction.value().accessLevel;
-    auto isVisible = access >= AccessLevel::Public ||
-      (access == AccessLevel::Package &&
-       useDC->getParentModule()->inSamePackage(resultDC->getParentModule()));
+  if (!ignoreImportAccessLevel) {
+    auto localImportRestriction = VD->getImportAccessFrom(useDC);
+    if (localImportRestriction.has_value()) {
+      AccessLevel importAccessLevel =
+        localImportRestriction.value().accessLevel;
+      auto isVisible = access >= AccessLevel::Public ||
+        (access == AccessLevel::Package &&
+         useDC->getParentModule()->inSamePackage(resultDC->getParentModule()));
 
-    if (access > importAccessLevel && isVisible) {
-      access = std::min(access, importAccessLevel);
-      resultDC = useDC->getParentSourceFile();
+      if (access > importAccessLevel && isVisible) {
+        access = std::min(access, importAccessLevel);
+        resultDC = useDC->getParentSourceFile();
+      }
     }
   }
 
@@ -5412,9 +5422,11 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
 
 AccessScope
 ValueDecl::getFormalAccessScope(const DeclContext *useDC,
-                                bool treatUsableFromInlineAsPublic) const {
+                                bool treatUsableFromInlineAsPublic,
+                                bool ignoreImportAccessLevel) const {
   return getAccessScopeForFormalAccess(this, getFormalAccess(), useDC,
-                                       treatUsableFromInlineAsPublic);
+                                       treatUsableFromInlineAsPublic,
+                                       ignoreImportAccessLevel);
 }
 
 /// Checks if \p VD may be used from \p useDC, taking \@testable imports into
@@ -5460,7 +5472,8 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
 
   AccessScope accessScope = getAccessScopeForFormalAccess(
       VD, access, useDC,
-      /*treatUsableFromInlineAsPublic*/ includeInlineable);
+      /*treatUsableFromInlineAsPublic*/ includeInlineable,
+      /*ignoreImportAccessLevel*/ false);
   if (accessScope.getDeclContext() == useDC)
     return true;
   if (!AccessScope(useDC).isChildOf(accessScope))
@@ -5619,7 +5632,8 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
 
 bool ValueDecl::isMoreVisibleThan(ValueDecl *other) const {
   auto scope = getFormalAccessScope(/*UseDC=*/nullptr,
-                                    /*treatUsableFromInlineAsPublic=*/true);
+                                    /*treatUsableFromInlineAsPublic=*/true,
+                                    /*ignoreImportAccessLevel=*/false);
 
   // 'other' may have come from a @testable import, so we need to upgrade it's
   // visibility to public here. That is not the same as whether 'other' is
@@ -5627,7 +5641,8 @@ bool ValueDecl::isMoreVisibleThan(ValueDecl *other) const {
   // differently in that case.
   auto otherScope =
       other->getFormalAccessScope(getDeclContext(),
-                                  /*treatUsableFromInlineAsPublic=*/true);
+                                  /*treatUsableFromInlineAsPublic=*/true,
+                                  /*ignoreImportAccessLevel=*/false);
 
   if (scope.isPublic())
     return !otherScope.isPublic();
@@ -5840,7 +5855,8 @@ bool NominalTypeDecl::isFormallyResilient() const {
   // Private and (unversioned) internal types always have a
   // fixed layout.
   if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true).isPublicOrPackage())
+                            /*treatUsableFromInlineAsPublic=*/true,
+                            /*ignoreImportAccessLevel=*/false).isPublicOrPackage())
     return false;
 
   // Check for an explicit @_fixed_layout or @frozen attribute.
@@ -7054,6 +7070,20 @@ ArtificialMainKind Decl::getArtificialMainKind() const {
   llvm_unreachable("type has no @Main attr?!");
 }
 
+bool Decl::canSupportBorrowAccessors() const {
+  if (isa<StructDecl>(this)) {
+    return true;
+  }
+  if (auto *extension = dyn_cast<ExtensionDecl>(this)) {
+    auto *extendedNominal = extension->getExtendedNominal();
+    if (extendedNominal && isa<StructDecl>(extendedNominal)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 static bool isOverridingDecl(const ValueDecl *Derived,
                              const ValueDecl *Base) {
   while (Derived) {
@@ -7256,7 +7286,8 @@ bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
 
   // Non-public, non-versioned enums are always exhaustive.
   AccessScope accessScope = getFormalAccessScope(/*useDC*/ nullptr,
-                                                 /*respectVersioned*/ true);
+                                                 /*treatUsableFromInlineAsPublic*/ true,
+                                                 /*ignoreImportAccessLevel*/ false);
   if (!accessScope.isPublicOrPackage())
     return true;
 
@@ -7963,7 +7994,8 @@ AccessScope
 AbstractStorageDecl::getSetterFormalAccessScope(const DeclContext *useDC,
                                     bool treatUsableFromInlineAsPublic) const {
   return getAccessScopeForFormalAccess(this, getSetterFormalAccess(), useDC,
-                                       treatUsableFromInlineAsPublic);
+                                       treatUsableFromInlineAsPublic,
+                                       /*ignoreImportAccessLevel*/ false);
 }
 
 void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {
@@ -10906,7 +10938,8 @@ bool AbstractFunctionDecl::isResilient() const {
   // Functions in non-public access scopes are not resilient.
   auto accessScope =
       getFormalAccessScope(/*useDC=*/nullptr,
-                           /*treatUsableFromInlineAsPublic=*/true);
+                           /*treatUsableFromInlineAsPublic=*/true,
+                           /*ignoreImportAccessLevel=*/false);
   if (!accessScope.isPublicOrPackage())
     return false;
 

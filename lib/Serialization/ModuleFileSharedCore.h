@@ -123,7 +123,6 @@ public:
   public:
     const StringRef RawPath;
     const StringRef RawSPIs;
-    const StringRef BinaryModulePath;
 
   private:
     using ImportFilterKind = ModuleDecl::ImportFilterKind;
@@ -138,9 +137,9 @@ public:
       return static_cast<ImportFilterKind>(1 << RawImportControl);
     }
 
-    Dependency(StringRef path, StringRef spiGroups, StringRef binaryModulePath,
-               bool isHeader, ImportFilterKind importControl, bool isScoped)
-        : RawPath(path), RawSPIs(spiGroups), BinaryModulePath(binaryModulePath),
+    Dependency(StringRef path, StringRef spiGroups, bool isHeader,
+               ImportFilterKind importControl, bool isScoped)
+        : RawPath(path), RawSPIs(spiGroups),
           RawImportControl(rawControlFromKind(importControl)),
           IsHeader(isHeader), IsScoped(isScoped) {
       assert(llvm::popcount(static_cast<unsigned>(importControl)) == 1 &&
@@ -149,15 +148,14 @@ public:
     }
 
   public:
-    Dependency(StringRef path, StringRef spiGroups, StringRef binaryModulePath,
+    Dependency(StringRef path, StringRef spiGroups,
                ImportFilterKind importControl, bool isScoped)
-        : Dependency(path, spiGroups, binaryModulePath, false, importControl,
-                     isScoped) {}
+        : Dependency(path, spiGroups, false, importControl, isScoped) {}
 
     static Dependency forHeader(StringRef headerPath, bool exported) {
       auto importControl =
           exported ? ImportFilterKind::Exported : ImportFilterKind::Default;
-      return Dependency(headerPath, {}, {}, true, importControl, false);
+      return Dependency(headerPath, {}, true, importControl, false);
     }
 
     bool isExported() const {

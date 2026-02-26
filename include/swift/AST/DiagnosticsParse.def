@@ -1945,6 +1945,9 @@ ERROR(expected_rangle_primary_associated_type_list,PointsToFirstBadToken,
 ERROR(expected_primary_associated_type_name,PointsToFirstBadToken,
       "expected an identifier to name primary associated type", ())
 
+ERROR(expected_integer_generic_value,none,
+      "expected integer literal for generic value", ())
+
 //------------------------------------------------------------------------------
 // MARK: Conditional compilation parsing diagnostics
 //------------------------------------------------------------------------------

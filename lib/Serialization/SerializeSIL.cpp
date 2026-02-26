@@ -608,6 +608,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
   if (!F.section().empty())
     ++numTrailingRecords;
+  if (!F.wasmImportModuleName().empty())
+    ++numTrailingRecords;
+  if (!F.wasmImportFieldName().empty())
+    ++numTrailingRecords;
 
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
@@ -648,6 +652,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // record count above.
   writeExtraStringIfNonEmpty(ExtraStringFlavor::AsmName, F.asmName());
   writeExtraStringIfNonEmpty(ExtraStringFlavor::Section, F.section());
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::WasmImportModule,
+                             F.wasmImportModuleName());
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::WasmImportName,
+                             F.wasmImportFieldName());
 
   if (NoBody)
     return;
@@ -3341,12 +3349,6 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 }
 
 void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
-  // Do not emit deinit for non-public nominal types unless everything has to be
-  // serialized.
-  if (!Options.SerializeAllSIL && deinit.getNominalDecl()->getEffectiveAccess() <
-                                 swift::AccessLevel::Package)
-    return;
-
   SILFunction *impl = deinit.getImplementation();
   if (!Options.SerializeAllSIL &&
       // Package CMO for MoveOnlyDeinit is not supported so

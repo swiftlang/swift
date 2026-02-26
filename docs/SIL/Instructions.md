@@ -2794,7 +2794,7 @@ will be an `@isolated(any)` function type.
 
 **Ownership Semantics of Closure Context during Invocation**: By
 default, an escaping `partial_apply` (`partial_apply` without
-`[on_stack]]` creates a closure whose invocation takes ownership of the
+`[on_stack]`) creates a closure whose invocation takes ownership of the
 context, meaning that a call implicitly releases the closure.
 
 If the `partial_apply` is marked with the flag `[callee_guaranteed]`,

@@ -231,6 +231,8 @@ struct ActorReferenceResult {
   const ActorIsolation isolation;
 
 private:
+  struct Builder;
+
   static ActorReferenceResult
   forSameConcurrencyDomain(ActorIsolation isolation,
                            Options options = std::nullopt);

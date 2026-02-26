@@ -85,7 +85,7 @@ extension Optional: @unsafe UnsafeCxxInputIterator where Wrapped: UnsafeCxxInput
     guard let value = self else {
       fatalError("Could not dereference nullptr")
     }
-    return unsafe value.__operatorStar()
+    return value.__operatorStar()
   }
 }
 

@@ -18,9 +18,9 @@ extension P {
   public static func blah4<T>(_: Self.Nested) where Self : Foo<T> {}
 }
 
-// CHECK-LABEL: extension Test.P {
-// CHECK-NEXT:    public static func blah1<T>(_: Self) where Self == Test.Foo<T>
-// CHECK-NEXT:    public static func blah2<T>(_: Test.Foo<T>.Nested) where Self == Test.Foo<T>
-// CHECK-NEXT:    public static func blah3<T>(_: Self) where Self : Test.Foo<T>
-// CHECK-NEXT:    public static func blah4<T>(_: Test.Foo<T>.Nested) where Self : Test.Foo<T>
+// CHECK-LABEL: extension Test::P {
+// CHECK-NEXT:    public static func blah1<T>(_: Self) where Self == Test::Foo<T>
+// CHECK-NEXT:    public static func blah2<T>(_: Test::Foo<T>.Test::Nested) where Self == Test::Foo<T>
+// CHECK-NEXT:    public static func blah3<T>(_: Self) where Self : Test::Foo<T>
+// CHECK-NEXT:    public static func blah4<T>(_: Test::Foo<T>.Test::Nested) where Self : Test::Foo<T>
 // CHECK-NEXT:  }

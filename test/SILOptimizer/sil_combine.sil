@@ -4361,41 +4361,6 @@ sil @test_type_value_concrete_negative : $@convention(thin) () -> Int {
   return %val : $Int
 }
 
-// CHECK-LABEL: sil @test_init_borrow_addr_generic : $@convention(thin) <T> (@in_guaranteed T) -> @out Builtin.Borrow<T> {
-// CHECK:         init_borrow_addr %0 : $*Builtin.Borrow<T> with %1 : $*T
-// CHECK-LABEL: } // end sil function 'test_init_borrow_addr_generic'
-sil @test_init_borrow_addr_generic : $@convention(thin) <T> (@in_guaranteed T) -> @out Builtin.Borrow<T> {
-bb0(%0 : $*Builtin.Borrow<T>, %1 : $*T):
-  init_borrow_addr %0 : $*Builtin.Borrow<T> with %1 : $*T
-  %r = tuple ()
-  return %r : $()
-}
-
-// CHECK-LABEL: sil @test_init_borrow_addr_loadable : $@convention(thin) (@in_guaranteed Int) -> @out Builtin.Borrow<Int> {
-// CHECK-NOT:     init_borrow_addr
-// CHECK:         [[LOADED_INT:%.*]] = load %1 : $*Int
-// CHECK:         [[BORROW:%.*]] = make_borrow [[LOADED_INT]]
-// CHECK:         store [[BORROW]] to %0 : $*Builtin.Borrow<Int>
-// CHECK-LABEL: } // end sil function 'test_init_borrow_addr_loadable'
-sil @test_init_borrow_addr_loadable : $@convention(thin) (@in_guaranteed Int) -> @out Builtin.Borrow<Int> {
-bb0(%0 : $*Builtin.Borrow<Int>, %1 : $*Int):
-  init_borrow_addr %0 : $*Builtin.Borrow<Int> with %1 : $*Int
-  %r = tuple ()
-  return %r : $()
-}
-
-// CHECK-LABEL: sil @test_init_borrow_addr_addressonly : $@convention(thin) (@in_guaranteed AddressOnlyEnum) -> @out Builtin.Borrow<AddressOnlyEnum> {
-// CHECK-NOT:     init_borrow_addr
-// CHECK:         [[BORROW:%.*]] = make_addr_borrow %1 : $*AddressOnlyEnum
-// CHECK:         store [[BORROW]] to %0 : $*Builtin.Borrow<AddressOnlyEnum>
-// CHECK-LABEL: } // end sil function 'test_init_borrow_addr_addressonly'
-sil @test_init_borrow_addr_addressonly : $@convention(thin) (@in_guaranteed AddressOnlyEnum) -> @out Builtin.Borrow<AddressOnlyEnum> {
-bb0(%0 : $*Builtin.Borrow<AddressOnlyEnum>, %1 : $*AddressOnlyEnum):
-  init_borrow_addr %0 : $*Builtin.Borrow<AddressOnlyEnum> with %1 : $*AddressOnlyEnum
-  %r = tuple ()
-  return %r : $()
-}
-
 // CHECK-LABEL: sil @test_dereference_borrow : $@convention(thin) (Int) -> Int {
 // CHECK:       bb0([[INT:%.*]] : $Int):
 // CHECK-NEXT:    return [[INT]] : $Int

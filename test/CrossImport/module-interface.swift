@@ -41,6 +41,6 @@ public func shadow(_: DeclaringLibrary.ShadowTy, _: ShadowTy) {}
 // CHECK-DAG: import BystandingLibrary
 // CHECK-DAG: import _OverlayLibrary
 
-// CHECK-DAG: public func fn(_: DeclaringLibrary.DeclaringLibraryTy, _: BystandingLibrary.BystandingLibraryTy, _: _OverlayLibrary.OverlayLibraryTy)
-// CHECK-DAG: public func alias(_: _OverlayLibrary.OverlayLibraryTy)
-// CHECK-DAG: public func shadow(_: _OverlayLibrary.ShadowTy, _: _OverlayLibrary.ShadowTy)
+// CHECK-DAG: public func fn(_: DeclaringLibrary::DeclaringLibraryTy, _: BystandingLibrary::BystandingLibraryTy, _: _OverlayLibrary::OverlayLibraryTy)
+// CHECK-DAG: public func alias(_: _OverlayLibrary::OverlayLibraryTy)
+// CHECK-DAG: public func shadow(_: _OverlayLibrary::ShadowTy, _: _OverlayLibrary::ShadowTy)

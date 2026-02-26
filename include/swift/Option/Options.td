@@ -285,18 +285,18 @@ def sdk : Separate<["-"], "sdk">,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
-def swift_version : Separate<["-"], "swift-version">,
-  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
-         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
-  HelpText<"Interpret input according to a specific Swift language version number">,
-  MetaVarName<"<vers>">;
-
 def language_mode : Separate<["-"], "language-mode">,
   Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Interpret input according to a specific Swift language mode">,
-  MetaVarName<"<mode>">,
-  Alias<swift_version>;
+  MetaVarName<"<mode>">;
+
+def swift_version : Separate<["-"], "swift-version">,
+  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Interpret input according to a specific Swift language version number">,
+  MetaVarName<"<vers>">,
+  Alias<language_mode>;
 
 def min_swift_runtime_version
     : Separate<["-"], "min-swift-runtime-version">,

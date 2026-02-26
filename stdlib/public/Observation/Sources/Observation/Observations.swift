@@ -166,7 +166,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
   public struct Iterator: AsyncIteratorProtocol {
     // the state ivar serves two purposes:
     // 1) to store a critical region of state of the mutations
-    // 2) to idenitify the termination of _this_ sequence
+    // 2) to identify the termination of _this_ sequence
     var state: _ManagedCriticalState<State>?
     let emit: Emit
     var started = false

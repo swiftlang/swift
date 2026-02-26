@@ -12,7 +12,6 @@
 
 #include "swift/IDE/CompletionLookup.h"
 #include "CodeCompletionResultBuilder.h"
-#include "ExprContextAnalysis.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"

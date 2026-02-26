@@ -23,6 +23,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/InlinableText.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
@@ -964,10 +965,55 @@ void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
   Printer.printKeyword("sil_box", Opts);
 }
 
-void IntegerTypeRepr::printImpl(ASTPrinter &Printer,
-                                const PrintOptions &Opts,
-                                NonRecursivePrintOptions nrOpts) const {
-  Printer.printText(getValue());
+void GenericArgumentExprTypeRepr::setArgExpr(Expr *E) {
+  auto validInput = isa_and_nonnull<TypeExpr, IntegerLiteralExpr, ErrorExpr>(E);
+  ASSERT(validInput && "Unexpected resolved generic argument expression type.");
+  ASSERT(!resolvedExpr || resolvedExpr == E);
+  resolvedExpr = E;
+}
+
+StringRef
+GenericArgumentExprTypeRepr::getExprText(SmallVectorImpl<char> &scratch) const {
+  return swift::extractInlinableText(*Ctx, originalArgExpr, scratch);
+}
+
+void GenericArgumentExprTypeRepr::printImpl(
+    ASTPrinter &Printer, const PrintOptions &Opts,
+    NonRecursivePrintOptions nrOpts) const {
+  if (auto *typeExpr = getAsResolvedTypeExpr())
+    typeExpr->getTypeRepr()->print(Printer, Opts, nrOpts);
+  else if (auto *intLitExpr = getAsResolvedIntegerLiteralExpr()) {
+    if (intLitExpr->isNegative())
+      Printer << "-";
+    Printer << intLitExpr->getDigitsText();
+  } else {
+    SmallString<32> exprTextBuffer;
+    Printer << getExprText(exprTextBuffer);
+  }
+}
+
+TypeExpr *GenericArgumentExprTypeRepr::getAsResolvedTypeExpr() const {
+  return dyn_cast_or_null<TypeExpr>(getArgExpr());
+}
+IntegerLiteralExpr *
+GenericArgumentExprTypeRepr::getAsResolvedIntegerLiteralExpr() const {
+  return dyn_cast_or_null<IntegerLiteralExpr>(getArgExpr());
+}
+
+bool GenericArgumentExprTypeRepr::failedToResolve() const {
+  return isa_and_nonnull<ErrorExpr>(getArgExpr());
+}
+
+SourceLoc GenericArgumentExprTypeRepr::getStartLocImpl() const {
+  return getOriginalArgExpr()->getStartLoc();
+}
+
+SourceLoc GenericArgumentExprTypeRepr::getLoc() const {
+  return getOriginalArgExpr()->getLoc();
+}
+
+SourceLoc GenericArgumentExprTypeRepr::getEndLocImpl() const {
+  return getOriginalArgExpr()->getEndLoc();
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

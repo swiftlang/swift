@@ -100,6 +100,15 @@ public struct Wrapper {
       return &_k
     }
   }
+
+  var id_ownership_modifier: Int {
+    borrowing borrow {
+      return _id
+    }
+    mutating mutate {
+      return &_id
+    }
+  }
 }
 
 public struct SimpleWrapper<T> {

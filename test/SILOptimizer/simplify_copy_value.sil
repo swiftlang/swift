@@ -10,6 +10,8 @@ import SwiftShims
 
 sil @cl : $@convention(thin) () -> Int
 
+actor A {}
+
 // CHECK-LABEL: sil [ossa] @remove_copy :
 // CHECK:         [[F:%.*]] = thin_to_thick_function %0 : $@convention(thin) () -> Int to $@callee_guaranteed () -> Int
 // CHECK-NEXT:    destroy_value [[F]]
@@ -24,5 +26,15 @@ bb0:
   return %4 : $()
 }
 
-
+// CHECK-LABEL: sil [ossa] @dont_remove_copy_of_idra_builtin :
+// CHECK:         %2 = copy_value %1
+// CHECK:       } // end sil function 'dont_remove_copy_of_idra_builtin'
+sil [ossa] @dont_remove_copy_of_idra_builtin : $@convention(thin) @async () -> @owned (A, A) {
+bb0:
+  %0 = metatype $@thick A.Type
+  %1 = builtin "initializeDistributedRemoteActor"(%0) : $A
+  %2 = copy_value %1
+  %3 = tuple (%1, %2)
+  return %3
+}
 

@@ -1394,7 +1394,6 @@ ArrayRef<ValueDecl *>
 NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
                                              const ValueDecl *member,
                                              bool sorted) const {
-  assert(member->getDeclContext()->getSelfNominalTypeDecl() == this);
   assert(!isa<ProtocolDecl>(this));
   prepareConformanceTable();
   return ConformanceTable->getSatisfiedProtocolRequirementsForMember(member,

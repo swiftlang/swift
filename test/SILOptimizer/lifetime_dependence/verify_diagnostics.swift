@@ -38,9 +38,19 @@ func useA(_:A){}
 
 public struct NE : ~Escapable {}
 
+public struct NCE : ~Copyable & ~Escapable {}
+
 public struct NEImmortal: ~Escapable {
   @_lifetime(immortal)
   public init() {}
+}
+
+struct CNE<T: ~Escapable>: ~Escapable {
+    let ne: T
+    @_lifetime(copy ne)
+    init(ne: T) {
+        self.ne = ne
+    }
 }
 
 class C {}
@@ -405,7 +415,13 @@ func test(inline: InlineInt) {
 
 // =============================================================================
 // Closures
+//
+// TODO: Add more diagnostic tests when implementing closure context
+// dependencies, including SILOptimizer diagnostic tests such as the one this
+// originated as.
 // =============================================================================
+
+func takesEscapingClosure(_: @escaping ()->()) {}
 
 /// Test an autoclosure that invokes a mutable method where `Self: ~Escapable`.
 /// The @inout_aliasable argument has an implicit @_lifetime(capture: copy capture),
@@ -421,6 +437,33 @@ extension MutableSpan {
     }
     return false
   }
+}
+
+/// '_overrideLifetime(arg, copying: ())' quiets the diagnostics on the caller side. But, when diagnosing the closure
+/// body itself, lifetime analysis must handle the boxed value.
+///
+/// rdar://170592353 (lifetime-dependent variable 'overriddenLifetime' escapes its scope)
+func testMutableCapture(arg: consuming NCE, action: @escaping (inout NCE) -> ()) {
+  var item = _overrideLifetime(arg, copying: ())
+  takesEscapingClosure {
+    action(&item)
+  }
+}
+
+// Implicit dependence on a nonescaping closure context.
+//
+// TODO: remove the _overrideLifetime when context dependencies are tracked.
+@_lifetime(borrow value)
+func testBasicClosureDependency(value: AnyObject, body: () -> NE) -> NE {
+  return _overrideLifetime(body(), borrowing: value)
+}
+
+// Implicit dependence on a nonescaping closure context. The result is escaping in the current generic context, so
+// should not be diagnosed as an escape.
+//
+// TODO: remove the _overrideLifetime when context dependencies are tracked.
+func testIndirectClosureResult<T>(f: () -> CNE<T>) -> CNE<T> {
+  return _overrideLifetime(f(), copying: ())
 }
 
 // =============================================================================

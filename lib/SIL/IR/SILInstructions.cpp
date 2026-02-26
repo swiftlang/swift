@@ -1734,10 +1734,6 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
     // return false.
     return false;
   }
-
-  // We found only one trivial field.
-  assert(FoundNonTrivialField && "Struct is non-trivial, but does not have a "
-                                 "non-trivial field?!");
   return true;
 }
 

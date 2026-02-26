@@ -728,12 +728,6 @@ bool typeCheckForCodeCompletion(
     constraints::SyntacticElementTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
-/// Check the key-path expression.
-///
-/// Returns the type of the last component of the key-path.
-std::optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
-                                         bool requireResultType = false);
-
 /// Type check whether the given type declaration includes members of
 /// unsupported recursive value types.
 ///
@@ -926,6 +920,11 @@ void checkConformancesInContext(IterableDeclContext *idc);
 
 /// Check that the type of the given property conforms to NSCopying.
 ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
+
+/// Simplify generic argument expressions which are type sugar productions that
+/// got parsed as expressions due to the parser not knowing which identifiers
+/// are type names.
+TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E);
 
 /// \name Name lookup
 ///

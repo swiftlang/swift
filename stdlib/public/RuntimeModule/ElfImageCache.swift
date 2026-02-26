@@ -44,7 +44,7 @@ final class ElfImageCache {
     case elf32Image(Elf32Image)
     case elf64Image(Elf64Image)
   }
-  func lookup(path: String?, alternativePaths: [String] = []) -> Result? {
+  func lookup(path: String?) -> Result? {
     guard let path = path else {
       return nil
     }
@@ -54,7 +54,7 @@ final class ElfImageCache {
     if let image = elf64[path] {
       return .elf64Image(image)
     }
-    if let source = try? ImageSource(path: path, alternativePaths: alternativePaths) {
+    if let source = try? ImageSource(path: path) {
       if let elfImage = try? Elf32Image(source: source) {
         elf32[path] = elfImage
         return .elf32Image(elfImage)

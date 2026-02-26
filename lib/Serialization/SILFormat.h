@@ -86,6 +86,10 @@ enum class ExtraStringFlavor : uint8_t {
   AsmName,
   /// section attribute
   Section,
+  /// wasm import module name for @_extern(wasm)
+  WasmImportModule,
+  /// wasm import field/name for @_extern(wasm)
+  WasmImportName,
 };
 
 /// The record types within the "sil-index" block.

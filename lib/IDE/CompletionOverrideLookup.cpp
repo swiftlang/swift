@@ -31,7 +31,27 @@ bool CompletionOverrideLookup::addAccessControl(
   if (AccessOfContext < AccessLevel::Public)
     return false;
 
+  // If we have something like this:
+  //
+  // public protocol P { func foo() }
+  // public class B { func foo() {} }
+  // public class C: B, P {
+  //   #^COMPLETE^#
+  // }
+  //
+  // The formal access level for the overriden decl is internal, but it needs
+  // to be public to satisfy the conformance. Check to see if there are any
+  // requirements that demand public.
   AccessLevel Access = std::min(VD->getFormalAccess(), AccessOfContext);
+  if (Access < AccessLevel::Public) {
+     auto reqs = VD->getSatisfiedProtocolRequirements(/*sorted*/ false,
+                                                      CurrentNominal);
+    for (auto req : reqs) {
+      auto *proto = cast<ProtocolDecl>(req->getDeclContext());
+      Access = std::max(Access, proto->getFormalAccess());
+    }
+  }
+
   // Only emit 'public', not needed otherwise.
   if (Access < AccessLevel::Public)
     return false;
