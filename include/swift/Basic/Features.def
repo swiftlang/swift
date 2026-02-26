@@ -280,6 +280,7 @@ LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)"
 LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
 LANGUAGE_FEATURE(ClosureLifetimes, 0, "Support @_lifetime on function types")
 BASELINE_LANGUAGE_FEATURE(ExcludePrivateFromMemberwiseInit, 502, "Exclude private initialized properties from memberwise init")
+LANGUAGE_FEATURE(BuiltinMarkDependence, 0, "markDependence Builtin")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.

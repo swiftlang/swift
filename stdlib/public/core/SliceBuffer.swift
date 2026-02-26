@@ -109,6 +109,16 @@ internal struct _SliceBuffer<Element>
     }
   }
 
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal func getSubscriptBaseAddress() -> UnsafeMutablePointer<Element> {
+#if $BuiltinMarkDependence
+    return unsafe Builtin.markDependence(subscriptBaseAddress, owner)
+#else
+    return unsafe subscriptBaseAddress
+#endif
+  }
+
   @inlinable
   internal var _hasNativeBuffer: Bool {
     return (endIndexAndFlags & 1) != 0
@@ -181,7 +191,7 @@ internal struct _SliceBuffer<Element>
 
   @inlinable
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
-    return unsafe subscriptBaseAddress + startIndex
+    return unsafe getSubscriptBaseAddress() + startIndex
   }
 
   @inlinable
@@ -261,7 +271,7 @@ internal struct _SliceBuffer<Element>
     _internalInvariant(bounds.upperBound >= bounds.lowerBound)
     _internalInvariant(bounds.upperBound <= endIndex)
     let c = bounds.count
-    unsafe target.initialize(from: subscriptBaseAddress + bounds.lowerBound, count: c)
+    unsafe target.initialize(from: getSubscriptBaseAddress() + bounds.lowerBound, count: c)
     return unsafe target + c
   }
 
@@ -374,7 +384,7 @@ internal struct _SliceBuffer<Element>
   internal func getElement(_ i: Int) -> Element {
     _internalInvariant(i >= startIndex, "slice index is out of range (before startIndex)")
     _internalInvariant(i < endIndex, "slice index is out of range")
-    return unsafe subscriptBaseAddress[i]
+    return unsafe getSubscriptBaseAddress()[i]
   }
 
   /// Access the element at `position`.
@@ -389,7 +399,7 @@ internal struct _SliceBuffer<Element>
     nonmutating set {
       _internalInvariant(position >= startIndex, "slice index is out of range (before startIndex)")
       _internalInvariant(position < endIndex, "slice index is out of range")
-      unsafe subscriptBaseAddress[position] = newValue
+      unsafe getSubscriptBaseAddress()[position] = newValue
     }
   }
 
