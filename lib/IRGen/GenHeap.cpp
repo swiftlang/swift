@@ -32,6 +32,7 @@
 #include "swift/SIL/SILModule.h"
 
 #include "ClassTypeInfo.h"
+#include "Callee.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
@@ -1963,6 +1964,14 @@ llvm::Value *IRGenFunction::getDynamicSelfMetadata() {
 /// Given a non-tagged object pointer, load a pointer to its class object.
 llvm::Value *irgen::emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
                                                   llvm::Value *object) {
+  // On arm64e, swift_isaMask doesn't strip PAC bits from the isa pointer.
+  // Use object_getClass instead, which properly authenticates the isa
+  // before returning. This applies whenever the IsaEncoding::ObjC path
+  // is selected (e.g., for archetype types in generic class contexts).
+  if (auto &schema = IGF.IGM.getOptions().PointerAuth.ObjCIsaPointers) {
+    (void)schema;
+    return emitHeapMetadataRefForUnknownHeapObject(IGF, object);
+  }
   if (IGF.IGM.TargetInfo.hasISAMasking()) {
     object = IGF.Builder.CreateBitCast(object, IGF.IGM.PtrTy);
     llvm::Value *metadata = IGF.Builder.CreateLoad(
@@ -1995,6 +2004,15 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
         slot, IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment()));
     if (IGF.IGM.EnableValueNames && object->hasName())
       metadata->setName(llvm::Twine(object->getName()) + ".metadata");
+    // On arm64e, the isa/metadata pointer is signed by the ObjC runtime
+    // with DA key, address-diverse, discriminator 0x6AE1. Authenticate
+    // before using it as a base address for vtable dispatch.
+    if (auto &schema = IGF.IGM.getOptions().PointerAuth.ObjCIsaPointers) {
+      auto isaAuthInfo = PointerAuthInfo::emit(IGF, schema,
+                                               object,
+                                               PointerAuthEntity());
+      return emitPointerAuthAuth(IGF, metadata, isaAuthInfo);
+    }
     return metadata;
   }
       
