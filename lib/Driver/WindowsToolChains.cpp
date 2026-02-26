@@ -133,6 +133,15 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
       context.Args.hasFlag(options::OPT_static_stdlib,
                            options::OPT_no_static_stdlib, false);
 
+  if (wantsStaticStdlib) {
+    // Windows dispatch headers declare exported APIs as dllimport. When
+    // statically linking the stdlib, those symbols may be satisfied by
+    // dispatch.lib and trigger LNK4217 ("locally defined symbol imported").
+    // Suppress that warning so -Xlinker /WX can be used successfully.
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back("/IGNORE:4217");
+  }
+
   SmallVector<std::string, 4> RuntimeLibPaths;
   getRuntimeLibraryPaths(RuntimeLibPaths, context.Args, context.OI.SDKPath,
                          /*Shared=*/!wantsStaticStdlib);
