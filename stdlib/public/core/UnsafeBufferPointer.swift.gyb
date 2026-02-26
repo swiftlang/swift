@@ -580,8 +580,10 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     return unsafe Self(start: baseAddress, count: newCount)
   }
 
+  // Note: This is public because 'libCompatibilitySpan' builds the span sources
+  // as a separate module, so it doesn't have access to 'internal' stdlib API.
   @_alwaysEmitIntoClient
-  internal func _extracting(uncheckedFrom start: Int, to end: Int) -> Self {
+  public func _extracting(uncheckedFrom start: Int, to end: Int) -> Self {
     guard let base = self.baseAddress else {
       return Self(_empty: ())
     }
@@ -618,8 +620,10 @@ extension UnsafeMutableBufferPointer where Element: Copyable {
     _internalInvariant(i == self.endIndex)
   }
 
+  // Note: This is public because 'libCompatibilitySpan' builds the span sources
+  // as a separate module, so it doesn't have access to 'internal' stdlib API.
   @_alwaysEmitIntoClient
-  internal func _initializeAll(
+  public func _initializeAll(
     fromContentsOf source: UnsafeBufferPointer<Element>
   ) {
     let i = unsafe self.initialize(fromContentsOf: source)
@@ -641,8 +645,10 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
     return source.count
   }
 
+  // Note: This is public because 'libCompatibilitySpan' builds the span sources
+  // as a separate module, so it doesn't have access to 'internal' stdlib API.
   @_alwaysEmitIntoClient
-  internal func _moveInitializeAll(fromContentsOf source: Self) {
+  public func _moveInitializeAll(fromContentsOf source: Self) {
     let i = unsafe self.moveInitialize(fromContentsOf: source)
     _internalInvariant(i == self.endIndex)
   }
