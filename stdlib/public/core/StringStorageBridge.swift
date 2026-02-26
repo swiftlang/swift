@@ -128,38 +128,37 @@ extension _AbstractStringStorage {
       return utf16[nativeNonASCIIOffset: offset]
     }
   }
-
-  @_effects(readonly)
-  internal func _nativeIsEqual<T:_AbstractStringStorage>(
-    _ nativeOther: T
-  ) -> Int8 {
-    if count != nativeOther.count {
-      return 0
-    }
-    return unsafe (start == nativeOther.start ||
-      (memcmp(start, nativeOther.start, count) == 0)) ? 1 : 0
-  }
   
   @inline(__always)
   @_effects(readonly)
   internal func _isEqualToBuffer(
     ptr: UnsafeRawPointer,
-    count otherCount: Int,
+    count otherByteCount: Int,
     encoding: UInt
   ) -> Bool {
-    let ourEncoding = if isASCII {
-      _cocoaASCIIEncoding
-    } else {
-      _cocoaUTF8Encoding
+    if count == 0 {
+      return otherByteCount == 0
     }
-    return unsafe _swift_unicodeBuffersEqual_nonNormalizing(
-      bytes: start,
-      count: count,
-      encoding: ourEncoding,
-      bytes: ptr,
-      count: otherCount,
-      encoding: encoding
-    )
+    if otherByteCount == 0 {
+      return false
+    }
+    let lhs = unsafe Span(_unsafeStart: start, count: count).bytes
+    let rhs = unsafe RawSpan(_unsafeStart: ptr, byteCount: otherByteCount)
+    switch encoding {
+    case _cocoaASCIIEncoding, _cocoaUTF8Encoding:
+      if lhs.isIdentical(to: rhs) {
+        return true
+      }
+      return isEqual(bytes: lhs, bytes: rhs)
+    case _cocoaUTF16Encoding:
+      if isASCII {
+        return isEqual(asciiBytes: lhs, utf16Bytes: rhs)
+      } else {
+        return isEqual(utf8Bytes: lhs, utf16Bytes: rhs)
+      }
+    default:
+      fatalError("Unsupported encoding")
+    }
   }
 
   @inline(__always)
@@ -172,17 +171,23 @@ extension _AbstractStringStorage {
     if self === other {
       return 1
     }
+    
+    defer { _fixLifetime(other) }
 
     // Handle the case where both strings were bridged from Swift.
     // We can't use String.== because it doesn't match NSString semantics.
     let knownOther = _KnownCocoaString(other)
     switch knownOther {
     case .storage:
-      return unsafe _nativeIsEqual(
-        _unsafeUncheckedDowncast(other, to: __StringStorage.self))
+      let nativeOther = _unsafeUncheckedDowncast(other, to: __StringStorage.self)
+      let lhs = unsafe Span(_unsafeStart: start, count: count).bytes
+      let rhs = unsafe Span(_unsafeStart: nativeOther.start, count: nativeOther.count).bytes
+      return isEqual(bytes: lhs, bytes: rhs)
     case .shared:
-      return unsafe _nativeIsEqual(
-        _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
+      let nativeOther = _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self)
+      let lhs = unsafe Span(_unsafeStart: start, count: count).bytes
+      let rhs = unsafe Span(_unsafeStart: nativeOther.start, count: nativeOther.count).bytes
+      return isEqual(bytes: lhs, bytes: rhs)
     default:
       // We're allowed to crash, but for compatibility reasons NSCFString allows
       // non-strings here.
@@ -585,7 +590,7 @@ fileprivate func isEqual(
     }
 }
 
-@inline(__always)
+@inline(__always) @_effects(releasenone)
 fileprivate func isEqual(
   bytes lhs: RawSpan,
   bytes rhs: RawSpan
