@@ -601,6 +601,7 @@ static bool usesFeatureReparenting(Decl *decl) {
 UNINTERESTING_FEATURE(AnyAppleOSAvailability)
 UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowInout)
+UNINTERESTING_FEATURE(BorrowingSequence)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
