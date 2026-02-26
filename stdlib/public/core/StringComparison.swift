@@ -528,16 +528,21 @@ fileprivate func isEqual(
       return false
     }
     for lhsIdx in lhs.byteOffsets {
-      // Bounds checking handled by looping over `byteOffsets`
-      let l = unsafe lhs.unsafeLoadUnaligned(
+      /*
+       Promote ascii to 2 byte rather than truncating utf16 to 1 byte to match
+       NSString's behavior, which guards against invalid utf16 contents.
+       
+       Bounds checking handled by looping over `byteOffsets`
+       */
+      let l = unsafe UInt16(lhs.unsafeLoadUnaligned(
         fromUncheckedByteOffset: lhsIdx,
         as: UInt8.self
-      )
+      ))
       // Bounds checking handled by the count * 2 verification earlier
-      let r = unsafe UInt8(truncatingIfNeeded: rhs.unsafeLoadUnaligned(
+      let r = unsafe rhs.unsafeLoadUnaligned(
         fromUncheckedByteOffset: lhsIdx &* 2,
         as: UInt16.self
-      ))
+      )
       if l != r {
         return false
       }
