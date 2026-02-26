@@ -713,6 +713,18 @@ static Expr *lookThroughProjections(Expr *expr) {
   return lookThroughProjections(lookupExpr->getBase());
 }
 
+static bool isGlobalLetRefExpr(Expr *expr) {
+  auto *decl = dyn_cast<DeclRefExpr>(expr);
+  if (!decl) {
+    return false;
+  }
+  auto *varDecl = dyn_cast<VarDecl>(decl->getDecl());
+  if (!varDecl || !varDecl->isLet() || !varDecl->isGlobalStorage()) {
+    return false;
+  }
+  return true;
+}
+
 bool SILGenFunction::emitBorrowOrMutateAccessorResult(
     SILLocation loc, Expr *ret, SmallVectorImpl<SILValue> &directResults) {
   auto *afd = cast<AbstractFunctionDecl>(FunctionDC->getAsDecl());
@@ -752,6 +764,9 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
   }
 
   // Emit return value at +0.
+
+  auto *baseExpr = lookThroughProjections(storageRefResult.getStorageRef());
+
   FormalEvaluationScope scope(*this);
   LValueOptions options;
 
@@ -759,10 +774,11 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
     options = options.forGuaranteedAddressReturn(true);
   } else {
     assert(cast<AccessorDecl>(afd)->isBorrowAccessor());
-    if (F.getSelfArgument()->getType().isObject()) {
-      options = options.forGuaranteedReturn(true);
-    } else {
+    if (F.getSelfArgument()->getType().isAddress() ||
+        isGlobalLetRefExpr(baseExpr)) {
       options = options.forGuaranteedAddressReturn(true);
+    } else {
+      options = options.forGuaranteedReturn(true);
     }
   }
 
@@ -807,8 +823,8 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
 
   // If the return expression is not a transitive projection of self,
   // diagnose.
-  auto *baseExpr = lookThroughProjections(storageRefResult.getStorageRef());
-  if (!baseExpr->isSelfExprOf(afd)) {
+
+  if (!baseExpr->isSelfExprOf(afd) && !isGlobalLetRefExpr(baseExpr)) {
     diagnose(getASTContext(), ret->getStartLoc(),
              diag::invalid_borrow_accessor_return);
     diagnose(getASTContext(), ret->getStartLoc(),

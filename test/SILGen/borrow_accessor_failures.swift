@@ -30,6 +30,8 @@ public struct S {
   }
 }
 
+var global_var = Klass()
+
 public struct Wrapper {
   var _k: Klass
   var _s: S
@@ -125,6 +127,12 @@ public struct Wrapper {
   var opt_klass: Klass? {
     borrow {
       return _k // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+    }
+  }
+
+  var global_var_prop: Klass {
+    borrow {
+      return global_var // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
     }
   }
 }
