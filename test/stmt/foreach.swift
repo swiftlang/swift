@@ -5,10 +5,10 @@ struct BadContainer1 {
 }
 
 func bad_containers_1(bc: BadContainer1) {
-  for e in bc { } // expected-error {{for-in loop requires 'BadContainer1' to conform to 'Sequence'}}
+  for e in bc { } // expected-error{{for-in loop requires 'BadContainer1' to conform to 'Sequence'}}
 }
 
-struct BadContainer2 : Sequence { // expected-error {{type 'BadContainer2' does not conform to protocol 'Sequence'}}
+struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol 'Sequence'}}
   var generate : Int
 }
 
