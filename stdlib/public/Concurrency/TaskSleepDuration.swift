@@ -116,19 +116,15 @@ extension Task where Success == Never, Failure == Never {
 
               let job = Builtin.convertTaskToJob(sleepTask)
 
-              if #available(StdlibDeploymentTarget 6.3, *) {
-                #if !$Embedded
-                if let executor = Task.currentSchedulingExecutor {
-                  executor.enqueue(ExecutorJob(context: job),
-                                   at: instant,
-                                   tolerance: tolerance,
-                                   clock: clock)
-                  return
-                }
-                #endif
-              } else {
-                fatalError("we shouldn't get here; if we have, availability is broken")
+              #if !$Embedded
+              if let executor = Task.currentSchedulingExecutor {
+                executor.enqueue(ExecutorJob(context: job),
+                                 at: instant,
+                                 tolerance: tolerance,
+                                 clock: clock)
+                return
               }
+              #endif
 
               // If there is no current scheduling executor, fall back to
               // calling _enqueueJobGlobalWithDeadline().
@@ -136,26 +132,18 @@ extension Task where Success == Never, Failure == Never {
                                                               clock: clock)
               let toleranceSeconds: Int64
               let toleranceNanoseconds: Int64
-              if #available(StdlibDeploymentTarget 6.3, *) {
-                if let tolerance = tolerance {
-                  (toleranceSeconds, toleranceNanoseconds)
-                    = durationComponents(for: tolerance, clock: clock)
-                } else {
-                  toleranceSeconds = 0
-                  toleranceNanoseconds = -1
-                }
+              if let tolerance = tolerance {
+                (toleranceSeconds, toleranceNanoseconds)
+                  = durationComponents(for: tolerance, clock: clock)
               } else {
-                fatalError("we shouldn't get here; if we have, availability is broken")
+                toleranceSeconds = 0
+                toleranceNanoseconds = -1
               }
 
-              if #available(StdlibDeploymentTarget 5.9, *) {
-                _enqueueJobGlobalWithDeadline(
-                  seconds, nanoseconds,
-                  toleranceSeconds, toleranceNanoseconds,
-                  clockID.rawValue, UnownedJob(context: job))
-              } else {
-                fatalError("we shouldn't get here; if we have, availability is broken")
-              }
+              _enqueueJobGlobalWithDeadline(
+                seconds, nanoseconds,
+                toleranceSeconds, toleranceNanoseconds,
+                clockID.rawValue, UnownedJob(context: job))
               return
 
             case .activeContinuation, .finished:
