@@ -4485,12 +4485,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
 
   std::vector<SILVTable::Entry> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
-  while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
-         kind != SIL_DEFAULT_WITNESS_TABLE &&
-         kind != SIL_DEFAULT_OVERRIDE_TABLE && kind != SIL_FUNCTION &&
-         kind != SIL_PROPERTY && kind != SIL_MOVEONLY_DEINIT) {
-    assert(kind == SIL_VTABLE_ENTRY &&
-           "Content of Vtable should be in SIL_VTABLE_ENTRY.");
+  while (kind == SIL_VTABLE_ENTRY) {
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
     unsigned RawEntryKind, IsNonOverridden;
