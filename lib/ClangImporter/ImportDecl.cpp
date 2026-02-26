@@ -103,6 +103,10 @@
 STATISTIC(NumTotalImportedEntities, "# of imported clang entities");
 STATISTIC(NumFactoryMethodsAsInitializers,
           "# of factory methods mapped to initializers");
+STATISTIC(
+    NumSkippedDuplicateImportedSwiftModulesForForwardDeclaredObjCTypes,
+    "# of duplicate imported Swift modules skipped while resolving "
+    "forward-declared ObjC types");
 
 using namespace swift;
 using namespace importer;
@@ -6017,8 +6021,10 @@ namespace {
         for (auto &import : importedModules) {
           if (import.importedModule->isNonSwiftModule())
             continue;
-          if (!seenModules.insert(import.importedModule).second)
+          if (!seenModules.insert(import.importedModule).second) {
+            ++NumSkippedDuplicateImportedSwiftModulesForForwardDeclaredObjCTypes;
             continue;
+          }
 
           if (T *result = resolveSwiftDeclImpl<T>(
                   decl, name, hasKnownSwiftName, import.importedModule,
