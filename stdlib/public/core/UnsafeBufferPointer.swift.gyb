@@ -572,7 +572,82 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   public func extracting(_ bounds: UnboundedRange) -> Self {
     unsafe self
   }
+
+  @_alwaysEmitIntoClient
+  internal func _extracting(first maxLength: Int) -> Self {
+    _precondition(maxLength >= 0, "Cannot have a prefix of negative length")
+    let newCount = Swift.min(maxLength, count)
+    return unsafe Self(start: baseAddress, count: newCount)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _extracting(uncheckedFrom start: Int, to end: Int) -> Self {
+    guard let base = self.baseAddress else {
+      return Self(_empty: ())
+    }
+    return unsafe Self(start: base + start, count: end &- start)
+  }
 }
+
+%if Mutable:
+extension UnsafeMutableBufferPointer where Element: Copyable {
+  /// Initialize slots at the start of this buffer by copying data from `source`.
+  ///
+  /// If `Element` is not bitwise copyable, then the memory region addressed by `self` must be
+  /// entirely uninitialized, while `source` must be fully initialized.
+  ///
+  /// The `source` buffer must fit entirely in `self`.
+  ///
+  /// - Returns: The index after the last item that was initialized in this buffer.
+  @_alwaysEmitIntoClient
+  internal func _initializePrefix(
+    copying source: UnsafeBufferPointer<Element>
+  ) -> Int {
+    if source.isEmpty { return 0 }
+    _precondition(source.count <= self.count)
+    unsafe self.baseAddress._unsafelyUnwrappedUnchecked.initialize(
+      from: source.baseAddress._unsafelyUnwrappedUnchecked,
+      count: source.count
+    )
+    return source.count
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _initializeAll(fromContentsOf source: Self) {
+    let i = unsafe self.initialize(fromContentsOf: source)
+    _internalInvariant(i == self.endIndex)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _initializeAll(
+    fromContentsOf source: UnsafeBufferPointer<Element>
+  ) {
+    let i = unsafe self.initialize(fromContentsOf: source)
+    _internalInvariant(i == self.endIndex)
+  }
+}
+
+extension UnsafeMutableBufferPointer where Element: ~Copyable {
+  @_alwaysEmitIntoClient
+  internal func _moveInitializePrefix(
+    from source: UnsafeMutableBufferPointer<Element>
+  ) -> Int {
+    if source.isEmpty { return 0 }
+    _debugPrecondition(source.count <= self.count)
+    unsafe self.baseAddress._unsafelyUnwrappedUnchecked.moveInitialize(
+      from: source.baseAddress._unsafelyUnwrappedUnchecked,
+      count: source.count
+    )
+    return source.count
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _moveInitializeAll(fromContentsOf source: Self) {
+    let i = unsafe self.moveInitialize(fromContentsOf: source)
+    _internalInvariant(i == self.endIndex)
+  }
+}
+%end
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
