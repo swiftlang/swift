@@ -978,7 +978,7 @@ public:
                             SmallVectorImpl<SILValue> &directResultsBuffer,
                             SmallVectorImpl<CleanupHandle> &cleanups);
 
-  /// Check to see if an initalization for a SingleValueStmtExpr is active, and
+  /// Check to see if an initialization for a SingleValueStmtExpr is active, and
   /// if the provided expression is for one of its branches. If so, returns the
   /// initialization to use for the expression. Otherwise returns \c nullptr.
   InitializationPtr getSingleValueStmtInit(Expr *E);
