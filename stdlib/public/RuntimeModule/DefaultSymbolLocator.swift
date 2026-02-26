@@ -130,9 +130,16 @@ open class DefaultSymbolLocator: SymbolLocator {
       return source
     }
 
+    if let uuid = image.uuid, let (imagePath, result) =
+      findElf(image: image, paths: findElfSymbolPaths(image: image)) {
+      let source = toSymbolSource(result)
+      cache[.uuid(uuid)] = source
+      return source
+    }
+
     // We must be able to load the original image (as an ELF image)
     guard let (imagePath, result) =
-      findElf(image: image, paths: findSymbolPaths(image: image)) else {
+      findElf(image: image, paths: findImagePaths(image: image)) else {
       return nil
     }
 
@@ -276,8 +283,13 @@ open class DefaultSymbolLocator: SymbolLocator {
 
     // See if we can load the image
     let peImage: PeCoffImage?
-    if let path = find(image: image) {
-      peImage = loadPeCoffImage(path: path, uuid: uuid, age: age)
+    if let peCoff = findPeCoff(
+      image: image,
+      uuid: uuid,
+      age: age,
+      paths: findPeCoffSymbolPaths(image: image)) {
+
+      peImage = peCoff.result
     } else {
       peImage = nil
     }
@@ -391,13 +403,27 @@ open class DefaultSymbolLocator: SymbolLocator {
   }
 
   open func findImagePaths(image: any Image) -> [String] {
-    [image.path]
-    .compactMap { $0 }
+    guard let imagePath = image.path else {
+      return []
+    }
+
+    return [imagePath]
   }
 
-  open func findSymbolPaths(image: any Image) -> [String] {
-    [elfDebugSymPath(for: image), image.path]
-    .compactMap { $0 }
+  open func findElfSymbolPaths(image: any Image) -> [String] {
+    guard let symbolPath = elfDebugSymPath(for: image) else {
+      return []
+    }
+
+    return [symbolPath]
+  }
+
+  open func findPeCoffSymbolPaths(image: any Image) -> [String] {
+    guard let imagePath = image.path else {
+      return []
+    }
+
+    return [imagePath]
   }
 
   private func findElf(image: any Image, paths: [String]) ->
@@ -412,15 +438,21 @@ open class DefaultSymbolLocator: SymbolLocator {
     return nil
   }
 
-  private func findPeCoff(image: any Image) ->
+  private func findPeCoff(
+    image: any Image,
+    uuid: [UInt8]?,
+    age: UInt32?,
+    paths: [String]) ->
     (path: String, result: PeCoffImage)? {
 
-    if let imagePath = image.path, let peCoff = loadPeCoffImage(
-      path: imagePath,
-      uuid: image.uuid,
-      age: image.age) {
+    for path in paths {
+      if let peCoff = loadPeCoffImage(
+        path: path,
+        uuid: uuid,
+        age: age) {
 
-      return (imagePath, peCoff)
+        return (path, peCoff)
+      }
     }
 
     return nil
@@ -434,7 +466,12 @@ open class DefaultSymbolLocator: SymbolLocator {
       return elfImageInfo.path
     }
 
-    if let peCoffImageInfo = findPeCoff(image: image) {
+    if let peCoffImageInfo = findPeCoff(
+      image: image,
+      uuid: image.uuid,
+      age: image.age,
+      paths: findImagePaths(image: image)) {
+
       return peCoffImageInfo.path
     }
 
