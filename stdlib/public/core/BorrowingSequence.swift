@@ -174,16 +174,20 @@ extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyab
 
 @available(SwiftStdlib 6.4, *)
 extension Sequence where Self: BorrowingSequence {
+  @available(SwiftStdlib 6.4, *)
   @inlinable
   public var underestimatedCount: Int { 0 }
+  @available(SwiftStdlib 6.4, *)
   @inlinable
   public func _customContainsEquatableElement(_ element: Element) -> Bool? { nil }
 }
 
 @available(SwiftStdlib 6.4, *)
 extension Collection where Self: BorrowingSequence {
+  @available(SwiftStdlib 6.4, *)
   @inlinable
   public var underestimatedCount: Int { 0 }
+  @available(SwiftStdlib 6.4, *)
   @inlinable
   public func _customContainsEquatableElement(_ element: Element) -> Bool? { nil }
 }
