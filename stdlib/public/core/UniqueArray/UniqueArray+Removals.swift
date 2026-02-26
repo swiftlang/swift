@@ -1,29 +1,23 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift Collections open source project
+// This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if !COLLECTIONS_SINGLE_MODULE
-import InternalCollectionsUtilities
-import ContainersPreview
-#endif
-
-#if compiler(>=6.2)
-
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Removes all elements from the array, optionally preserving its
   /// allocated capacity.
   ///
   /// - Complexity: O(*n*), where *n* is the original count of the array.
-  @inlinable
-  @inline(__always)
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     if keepCapacity {
       _storage.removeAll()
@@ -39,9 +33,9 @@ extension UniqueArray where Element: ~Copyable {
   /// - Returns: The last element of the original array.
   ///
   /// - Complexity: O(1)
-  @inlinable
-  @inline(__always)
+  @available(SwiftStdlib 6.4, *)
   @discardableResult
+  @_alwaysEmitIntoClient
   public mutating func removeLast() -> Element {
     _storage.removeLast()
   }
@@ -57,7 +51,8 @@ extension UniqueArray where Element: ~Copyable {
   ///    the count of the array.
   ///
   /// - Complexity: O(`k`)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func removeLast(_ k: Int) {
     _storage.removeLast(k)
   }
@@ -72,9 +67,9 @@ extension UniqueArray where Element: ~Copyable {
   /// - Returns: The removed element.
   ///
   /// - Complexity: O(`self.count`)
-  @inlinable
-  @inline(__always)
+  @available(SwiftStdlib 6.4, *)
   @discardableResult
+  @_alwaysEmitIntoClient
   public mutating func remove(at index: Int) -> Element {
     _storage.remove(at: index)
   }
@@ -88,7 +83,8 @@ extension UniqueArray where Element: ~Copyable {
   ///   of the range must be valid indices of the array.
   ///
   /// - Complexity: O(`self.count`)
-  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public mutating func removeSubrange(_  bounds: Range<Int>) {
     _storage.removeSubrange(bounds)
   }
@@ -99,6 +95,7 @@ extension UniqueArray where Element: ~Copyable {
   ///   of the range must be valid indices of the array.
   ///
   /// - Complexity: O(`self.count`)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func removeSubrange(_  bounds: some RangeExpression<Int>) {
     // FIXME: Remove this in favor of a standard algorithm.
@@ -106,7 +103,7 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Removes and returns the last element of the array, if there is one.
   ///
@@ -114,11 +111,10 @@ extension UniqueArray where Element: ~Copyable {
   ///    otherwise, `nil`.
   ///
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func popLast() -> Element? {
     if isEmpty { return nil }
     return removeLast()
   }
 }
-
-#endif
