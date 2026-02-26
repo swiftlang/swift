@@ -172,8 +172,6 @@ extension _AbstractStringStorage {
       return 1
     }
     
-    defer { _fixLifetime(other) }
-
     // Handle the case where both strings were bridged from Swift.
     // We can't use String.== because it doesn't match NSString semantics.
     let knownOther = _KnownCocoaString(other)
@@ -695,7 +693,6 @@ fileprivate func isEqual(
   _ lhsEncoding: UInt
 ) -> Int8 {
   let ns = unsafe unsafeBitCast(ns, to: _CocoaString.self)
-  defer { _fixLifetime(ns) }
   
   let rhsCount = _stdlib_binary_CFStringGetLength(ns)
   
