@@ -374,6 +374,8 @@ extension _StringGutsSlice {
   }
 }
 
+#if _runtime(_ObjC)
+
 fileprivate extension RawSpan {
   @inline(__always)
   func decodeUTF8(ofWidth width: Int, at index: Int) -> UInt32? {
@@ -549,43 +551,6 @@ fileprivate func isEqual(
     }
     return true
 }
-
-@_effects(releasenone)
-internal func isEqual<LHSEncoding: _UnicodeEncoding, RHSEncoding: _UnicodeEncoding>(
-  bytes lhs: RawSpan,
-  encoding lhsEnc: LHSEncoding.Type,
-  bytes rhs: RawSpan,
-  encoding rhsEnc: RHSEncoding.Type
-) -> Bool {
-  let possibleUTF16EdgeCase = lhsEnc != rhsEnc &&
-      (lhsEnc == Unicode.UTF16.self || rhsEnc == Unicode.UTF16.self)
-  if let trivialCheck = lhs.contentsAreTriviallyIdentical(
-    to: rhs,
-    possibleUTF16EdgeCase: possibleUTF16EdgeCase) {
-    return trivialCheck
-  }
-  // ASCII == UTF8 can just use memcmp
-  if (lhsEnc == rhsEnc) ||
-      (lhsEnc == Unicode.ASCII.self && rhsEnc == Unicode.UTF8.self) ||
-      (lhsEnc == Unicode.UTF8.self && rhsEnc == Unicode.ASCII.self) {
-    return isEqual(bytes: lhs, bytes: rhs)
-  }
-  if lhsEnc == Unicode.UTF8.self && rhsEnc == Unicode.UTF16.self {
-    return isEqual(utf8Bytes: lhs, utf16Bytes: rhs)
-  }
-  if lhsEnc == Unicode.UTF16.self && rhsEnc == Unicode.UTF8.self {
-    return isEqual(utf8Bytes: rhs, utf16Bytes: lhs)
-  }
-  if lhsEnc == Unicode.ASCII.self && rhsEnc == Unicode.UTF16.self {
-    return isEqual(asciiBytes: lhs, utf16Bytes: rhs)
-  }
-  if lhsEnc == Unicode.UTF16.self && rhsEnc == Unicode.ASCII.self {
-    return isEqual(asciiBytes: rhs, utf16Bytes: lhs)
-  }
-  fatalError("Unsupported combination of encodings")
-}
-
-#if _runtime(_ObjC)
 
 @_effects(releasenone)
 @c @_spi(Foundation) public func _swift_unicodeBuffersEqual_nonNormalizing(
