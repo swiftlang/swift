@@ -179,15 +179,19 @@ extension _AbstractStringStorage {
     let knownOther = _KnownCocoaString(other)
     switch knownOther {
     case .storage:
-      let nativeOther = _unsafeUncheckedDowncast(other, to: __StringStorage.self)
-      let lhs = unsafe Span(_unsafeStart: start, count: count).bytes
-      let rhs = unsafe Span(_unsafeStart: nativeOther.start, count: nativeOther.count).bytes
-      return isEqual(bytes: lhs, bytes: rhs)
+      let nativeOther = unsafe _unsafeUncheckedDowncast(other, to: __StringStorage.self)
+      return unsafe nativeOther._isEqualToBuffer(
+        ptr: start,
+        count: count,
+        encoding: isASCII ? _cocoaASCIIEncoding : _cocoaUTF8Encoding
+      ) ? 1 : 0
     case .shared:
-      let nativeOther = _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self)
-      let lhs = unsafe Span(_unsafeStart: start, count: count).bytes
-      let rhs = unsafe Span(_unsafeStart: nativeOther.start, count: nativeOther.count).bytes
-      return isEqual(bytes: lhs, bytes: rhs)
+      let nativeOther = unsafe _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self)
+      return unsafe nativeOther._isEqualToBuffer(
+        ptr: start,
+        count: count,
+        encoding: isASCII ? _cocoaASCIIEncoding : _cocoaUTF8Encoding
+      ) ? 1 : 0
     default:
       // We're allowed to crash, but for compatibility reasons NSCFString allows
       // non-strings here.
