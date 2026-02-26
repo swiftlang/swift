@@ -199,7 +199,7 @@ public func swift_deallocObject(object: Builtin.RawPointer, allocatedSize: Int, 
 }
 
 func swift_deallocObject(object: UnsafeMutablePointer<HeapObject>, allocatedSize: Int, allocatedAlignMask: Int) {
-  unsafe free(UnsafeMutableRawPointer(object))
+  unsafe swift_slowDealloc(UnsafeMutableRawPointer(object), allocatedSize, allocatedAlignMask)
 }
 
 @c
@@ -212,7 +212,7 @@ func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>, alloca
     return
   }
 
-  unsafe free(UnsafeMutableRawPointer(object))
+  unsafe swift_slowDealloc(UnsafeMutableRawPointer(object), allocatedSize, allocatedAlignMask)
 }
 
 @c
@@ -293,8 +293,14 @@ public func swift_allocBox(_ metadata: Builtin.RawPointer) -> (Builtin.RawPointe
 }
 
 @c
-public func swift_deallocBox(_ object: Builtin.RawPointer) {
-  unsafe free(UnsafeMutableRawPointer(object))
+public func swift_deallocBox(_ pointer: UnsafeMutableRawPointer) {
+  let object = unsafe pointer.bindMemory(to: HeapObject.self, capacity: 1)
+  let metadata = unsafe _swift_embedded_get_heap_object_metadata_pointer(object)
+  unsafe swift_slowDealloc(
+    UnsafeMutableRawPointer(object),
+    _swift_embedded_metadata_get_size(metadata),
+    _swift_embedded_metadata_get_align_mask(metadata)
+  )
 }
 
 @_silgen_name("swift_makeBoxUnique")
