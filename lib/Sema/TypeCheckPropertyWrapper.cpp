@@ -335,24 +335,23 @@ static bool validateEnclosingSelfSubscript(SubscriptDecl *subscript) {
   if (!indices || indices->size() != 3)
     return false;
 
-  bool isValid = true;
-  auto checkKeyPathParam = [&](unsigned index) {
+  auto checkKeyPathParam = [&](unsigned index) -> bool {
     auto *param = indices->get(index);
     auto paramTy = param->getInterfaceType();
-    if (paramTy->is<ErrorType>())
-      return;
+    if (paramTy->hasError())
+      return true;
 
     if (!paramTy->isWritableKeyPath() && !paramTy->isReferenceWritableKeyPath()) {
       param->diagnose(diag::property_wrapper_enclosing_self_subscript_keypath_type,
                       param->getArgumentName(), paramTy);
-      isValid = false;
+      return false;
     }
+    return true;
   };
 
-  checkKeyPathParam(/*wrapped/projected*/ 1);
-  checkKeyPathParam(/*storage*/ 2);
-
-  return isValid;
+  bool wrappedOrProjectedOK = checkKeyPathParam(/*wrapped/projected*/ 1);
+  bool storageOK = checkKeyPathParam(/*storage*/ 2);
+  return wrappedOrProjectedOK && storageOK;
 }
 
 PropertyWrapperTypeInfo
