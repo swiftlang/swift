@@ -1435,9 +1435,21 @@ namespace {
     {
       AccessorArgs result;
       if (base) {
-        result.base = SGF.prepareAccessorBaseArgForFormalAccess(loc, base,
-                                                                BaseFormalType,
-                                                                accessor);
+        auto selfParam = SGF.SGM.Types.getConstantSelfParameter(SGF.getTypeExpansionContext(), accessor);
+        
+        // If this is a consuming accessor and the value is already +1, move it directly
+        // instead of making base a borrow and copying later.
+        bool shouldMoveDirectly = selfParam.isConsumedInCaller()
+                                  && base.isPlusOne(SGF)
+                                  && base.getType().isMoveOnly();
+        
+        if (shouldMoveDirectly) {
+          result.base = SGF.prepareAccessorBaseArg(loc, base, BaseFormalType, accessor);
+        } else {
+          result.base = SGF.prepareAccessorBaseArgForFormalAccess(loc, base,
+                                                                  BaseFormalType,
+                                                                  accessor);
+        }
       }
 
       if (!Indices.isNull())
