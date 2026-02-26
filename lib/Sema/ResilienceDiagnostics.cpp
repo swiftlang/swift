@@ -307,7 +307,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
                                               const ExportContext &where) {
   assert(where.mustOnlyReferenceExportedDecls());
 
-  auto definingModule = D->getModuleContext();
+  auto definingModule = D->getModuleContextForNameLookup();
   auto downgradeToWarning = DowngradeToWarning::No;
 
   auto reason = where.getExportabilityReason();
