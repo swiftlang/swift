@@ -144,6 +144,17 @@ public:
     return getName().str() == "immortal";
   }
 
+  /// A specifier indicating that the target depends on variables in the
+  /// captured context.
+  static constexpr StringRef CapturesContextSpecifier = "captures";
+
+  bool isCapturesSpecifier() const {
+    if (getDescriptorKind() != LifetimeDescriptor::DescriptorKind::Named) {
+      return false;
+    }
+    return getName().str() == CapturesContextSpecifier;
+  }
+
   std::string getString() const;
 };
 
@@ -191,15 +202,23 @@ public:
 };
 
 class LifetimeDependenceInfo {
+public:
+  struct Flags {
+    bool hasImmortalSpecifier : 1;
+    bool isFromAnnotation : 1;
+    bool dependsOnClosureContext : 1;
+  };
+  // Packed bit-field.
+  static_assert(sizeof(Flags) == sizeof(char));
+
+private:
   IndexSubset *inheritLifetimeParamIndices;
   IndexSubset *scopeLifetimeParamIndices;
-  // The outer bool is the "isFromAnnotation" bit. The inner one is the
-  // "hasImmortalSpecifier" bit.
-  llvm::PointerIntPair<llvm::PointerIntPair<IndexSubset *, 1, bool>, 1, bool>
-      addressableParamIndicesAndImmortalAndFromAnnotation;
+  IndexSubset *addressableParamIndices;
   IndexSubset *conditionallyAddressableParamIndices;
 
   unsigned targetIndex;
+  Flags flags;
 
   static unsigned numParams(IndexSubset *paramIndices) {
     return paramIndices ? paramIndices->getCapacity() : 0;
@@ -213,18 +232,17 @@ public:
   /// Fully-initialized dependence info.
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices,
-                         unsigned targetIndex, bool hasImmortalSpecifier,
-                         bool isFromAnnotation,
+                         unsigned targetIndex,
                          IndexSubset *addressableParamIndices,
-                         IndexSubset *conditionallyAddressableParamIndices)
+                         IndexSubset *conditionallyAddressableParamIndices,
+                         Flags flags)
       : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
         scopeLifetimeParamIndices(scopeLifetimeParamIndices),
-        addressableParamIndicesAndImmortalAndFromAnnotation(
-            {addressableParamIndices, hasImmortalSpecifier}, isFromAnnotation),
+        addressableParamIndices(addressableParamIndices),
         conditionallyAddressableParamIndices(
             conditionallyAddressableParamIndices),
-        targetIndex(targetIndex) {
-    ASSERT(this->hasImmortalSpecifier() || hasDependencySource());
+        targetIndex(targetIndex), flags(flags) {
+    ASSERT(!empty());
     ASSERT(!inheritLifetimeParamIndices ||
            !inheritLifetimeParamIndices->isEmpty());
     ASSERT(!scopeLifetimeParamIndices || !scopeLifetimeParamIndices->isEmpty());
@@ -260,25 +278,22 @@ public:
   /// addressable parameter indices unset for now.
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices,
-                         unsigned targetIndex, bool hasImmortalSpecifier,
-                         bool isFromAnnotation)
+                         unsigned targetIndex, Flags flags)
       : LifetimeDependenceInfo(inheritLifetimeParamIndices,
                                scopeLifetimeParamIndices, targetIndex,
-                               hasImmortalSpecifier, isFromAnnotation,
                                // set during SIL type lowering
-                               nullptr, nullptr) {}
+                               nullptr, nullptr, flags) {}
 
   operator bool() const { return !empty(); }
 
   bool empty() const {
     return !hasImmortalSpecifier() && inheritLifetimeParamIndices == nullptr &&
-           scopeLifetimeParamIndices == nullptr;
+           !dependsOnClosureContext() && scopeLifetimeParamIndices == nullptr;
   }
 
-  bool hasImmortalSpecifier() const {
-    return addressableParamIndicesAndImmortalAndFromAnnotation.getPointer()
-        .getInt();
-  }
+  Flags getFlags() const { return flags; }
+
+  bool hasImmortalSpecifier() const { return flags.hasImmortalSpecifier; }
 
   bool isImmortal() const {
     return hasImmortalSpecifier() && !hasDependencySource();
@@ -288,9 +303,11 @@ public:
   /// the source program (Swift or SIL). Such dependencies are likely to differ
   /// from the default (inferred) ones, so they must be included when printing a
   /// Swift function's type.
-  bool isFromAnnotation() const {
-    return addressableParamIndicesAndImmortalAndFromAnnotation.getInt();
-  }
+  bool isFromAnnotation() const { return flags.isFromAnnotation; }
+
+  /// Whether the target depends on the closure context.
+  /// This is implicitly true for any function type.
+  bool dependsOnClosureContext() const { return flags.dependsOnClosureContext; }
 
   unsigned getTargetIndex() const { return targetIndex; }
 
@@ -301,8 +318,7 @@ public:
     return scopeLifetimeParamIndices != nullptr;
   }
   bool hasAddressableParamIndices() const {
-    return addressableParamIndicesAndImmortalAndFromAnnotation.getPointer()
-               .getPointer() != nullptr;
+    return addressableParamIndices != nullptr;
   }
 
   unsigned getParamIndicesLength() const {
@@ -327,10 +343,7 @@ public:
   /// This indicates that any dependency on the parameter value is dependent
   /// not only on the value, but the memory location of a particular instance
   /// of the value.
-  IndexSubset *getAddressableIndices() const {
-    return addressableParamIndicesAndImmortalAndFromAnnotation.getPointer()
-        .getPointer();
-  }
+  IndexSubset *getAddressableIndices() const { return addressableParamIndices; }
   /// Return the set of parameters which may have addressable dependencies
   /// depending on the type of the parameter.
   ///
@@ -382,10 +395,10 @@ public:
 
   /// Compute a LifetimeDependenceInfo list for the uncurried form of a curried
   /// function whose inner type has LifetimeDependenceInfo list
-  /// 'inner'.
+  /// 'inner' and whose outer type has LifetimeDependenceInfo list 'outer'.
   ///
-  /// TODO: Add support for merging with lifetime dependencies from the outer
-  /// type. The outer type's result's dependencies should be copied to any
+  /// The lifetime dependencies from the outer type are merged with those of the
+  /// inner type. The outer type's result's dependencies are copied to any
   /// inner-type dependencies that include closure context dependencies,
   /// replacing the closure context dependence for those entries.
   ///
@@ -393,10 +406,12 @@ public:
   /// numOuterParams: number of parameters of the outer function type
   static ArrayRef<LifetimeDependenceInfo>
   uncurry(ASTContext &ctx, ArrayRef<LifetimeDependenceInfo> inner,
-          unsigned numInnerParams, unsigned numOuterParams);
+          unsigned numInnerParams, ArrayRef<LifetimeDependenceInfo> outer,
+          unsigned numOuterParams);
 
   bool operator==(const LifetimeDependenceInfo &other) const {
     return this->hasImmortalSpecifier() == other.hasImmortalSpecifier() &&
+           this->dependsOnClosureContext() == other.dependsOnClosureContext() &&
            this->getTargetIndex() == other.getTargetIndex() &&
            this->getInheritIndices() == other.getInheritIndices() &&
            this->getAddressableIndices() == other.getAddressableIndices() &&

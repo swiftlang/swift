@@ -238,7 +238,7 @@ Similarly, an implicit initializer of a non-Escapable struct defaults to `@_life
 
 Function types can also have lifetime dependencies. This makes it possible to pass a callback function parameter that returns a non-Escapable type.
 The annotation syntax is the same as above, and the default lifetime inference rules for non-member functions apply.
-Support for lifetime dependencies on captured values is not yet implemented, so methods and certain closures (see below) cannot be passed.
+In addition to dependencies on the parameters, a function type's outputs can have dependencies on a captured context.
 
 Examples:
 
@@ -269,11 +269,12 @@ func takeProcessor2(ne0: NE, ne1: NE,
 }
 ```
 
-Currently, there is no way to express lifetime dependencies on the captured context.
-Closures can use the captured context, but cannot return or write to captured `~Escapable` values.
+A dependence on a closure's context can be expressed with the `captures` source keyword.
+A `captures` dependence is inferred by default for all function types.
+Closures can use the captured context, but cannot write to captured `~Escapable` values.
 
 ```swift
-func takePicker(/* DEFAULT: @_lifetime(copy ne0, copy ne1) */
+func takePicker(/* DEFAULT: @_lifetime(captures, copy ne0, copy ne1) */
                 picker: (NE, NE) -> NE) {
     let x = NE()
     let y = NE()
@@ -284,7 +285,7 @@ func predicate(ne: NE) -> Bool { ... }
 // OK, only parameters are used
 takePicker { ne0, ne1 in ne0 }
 
-// Error: Captured ~Escapable variable ne2 escapes.
+// OK, the inferred lifetime for the result includes a `captures` dependence.
 let ne2 = NE()
 takePicker { ne0, ne1 in ne2 }
 
@@ -306,6 +307,7 @@ The rules for matching are as follows:
 - The lifetime dependencies for an individual target match if every dependence source present in the original function is also present for that target in the interface.
 - The matching dependencies must be of the same kind: a `copy` constraint in the original function must have a matching `copy` constraint in the interface.
 - An `immortal` dependency is treated as an empty list of sources: on a function it will match any interface, but only another `immortal` dependency can match an `immortal` dependency on an interface.
+- A `captures` dependence can be added but not removed.
 - Dependencies with an `Escapable` source or target in the original function may be ignored, as described in "Dependency type requirements" above.
 - For the lifetimes to match overall, they must match for each lifetime target in the original function.
 

@@ -180,7 +180,8 @@ BridgedLifetimeDependenceInfo::BridgedLifetimeDependenceInfo(
           info.getConditionallyAddressableIndices()),
       targetIndex(info.getTargetIndex()),
       hasImmortalSpecifier(info.hasImmortalSpecifier()),
-      fromAnnotation(info.isFromAnnotation()) {}
+      fromAnnotation(info.isFromAnnotation()),
+      dependsOnClosureContext(info.dependsOnClosureContext()) {}
 
 SwiftInt BridgedLifetimeDependenceInfoArray::count() const {
   return lifetimeDependenceInfoArray.unbridged<swift::LifetimeDependenceInfo>().size();
@@ -192,7 +193,8 @@ BridgedLifetimeDependenceInfoArray::at(SwiftInt index) const {
 }
 
 bool BridgedLifetimeDependenceInfo::empty() const {
-  return !hasImmortalSpecifier && inheritLifetimeParamIndices == nullptr &&
+  return !hasImmortalSpecifier && !dependsOnClosureContext &&
+         inheritLifetimeParamIndices == nullptr &&
          scopeLifetimeParamIndices == nullptr;
 }
 
