@@ -1,14 +1,12 @@
-// RUN: %target-swift-frontend -parse-as-library -swift-version 6 -emit-sil -verify %s
+// RUN: %target-swift-frontend -parse-as-library -swift-version 6 -target %target-swift-6.2-abi-triple -emit-sil -verify %s
 // REQUIRES: concurrency
 
-@available(SwiftStdlib 6.2, *)
 func sync() -> Task<String, Never> {
   Task.immediate {
     return ""
   }
 }
 
-@available(SwiftStdlib 6.2, *)
 func async() async throws {
   let t1 = Task.immediate {
     return ""
@@ -43,7 +41,6 @@ func async() async throws {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
 actor TestSelfCapture {
   func method() {}
 
@@ -54,7 +51,6 @@ actor TestSelfCapture {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
 struct TestThrowing {
   func test() {
     // expected-error@+1{{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '@isolated(any) () async -> Void'}}

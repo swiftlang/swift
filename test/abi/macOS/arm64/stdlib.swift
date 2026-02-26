@@ -1256,3 +1256,13 @@ Added: _$sSTss17BorrowingSequenceRzrlE31_customContainsEquatableElementySbSg0F0S
 Added: _$sSlss17BorrowingSequenceRzrlE19underestimatedCountSivg
 Added: _$sSlss17BorrowingSequenceRzrlE19underestimatedCountSivpMV
 Added: _$sSlss17BorrowingSequenceRzrlE31_customContainsEquatableElementySbSg0F0STQzF
+
+// Borrow
+Added: _$ss6BorrowVMa
+Added: _$ss6BorrowVMn
+Added: _$ss6BorrowVsRi_zrlE7builtinxBWvg
+
+// Inout
+Added: _$ss5InoutVMa
+Added: _$ss5InoutVMn
+Added: _$ss5InoutVsRi_zrlE7pointerSpyxGvg

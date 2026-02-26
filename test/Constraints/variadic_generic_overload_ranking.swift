@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -verify -swift-version 5 -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -target %target-swift-5.9-abi-triple -verify -swift-version 5 | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s33variadic_generic_overload_ranking05test_d15_concrete_over_A0yyF
 func test_ranking_concrete_over_variadic() {

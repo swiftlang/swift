@@ -3195,7 +3195,8 @@ public:
   /// \sa hasOpenAccess
   AccessScope
   getFormalAccessScope(const DeclContext *useDC = nullptr,
-                       bool treatUsableFromInlineAsPublic = false) const;
+                       bool treatUsableFromInlineAsPublic = false,
+                       bool ignoreImportAccessLevel = false) const;
 
 
   /// Copy the formal access level and @usableFromInline attribute from

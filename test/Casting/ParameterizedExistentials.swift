@@ -15,12 +15,12 @@
 // -----------------------------------------------------------------------------
 // RUN: %empty-directory(%t)
 //
-// RUN: %target-build-swift -swift-version 5 -g -Onone -Xfrontend -disable-availability-checking -module-name a -c %s -o %t/ParameterizedExistentials.swift.Onone.o
+// RUN: %target-build-swift -target %target-swift-5.7-abi-triple -swift-version 5 -g -Onone -module-name a -c %s -o %t/ParameterizedExistentials.swift.Onone.o
 // RUN: %target-swiftc_driver %t/ParameterizedExistentials.swift.Onone.o -o %t/a.swift5.Onone.out
 // RUN: %target-codesign %t/a.swift5.Onone.out
 // RUN: %target-run %t/a.swift5.Onone.out
 //
-// RUN: %target-build-swift -swift-version 5 -g -O -Xfrontend -disable-availability-checking -module-name a -c %s -o %t/ParameterizedExistentials.swift.O.o
+// RUN: %target-build-swift -target %target-swift-5.7-abi-triple -swift-version 5 -g -O -module-name a -c %s -o %t/ParameterizedExistentials.swift.O.o
 // RUN: %target-swiftc_driver %t/ParameterizedExistentials.swift.O.o -o %t/a.swift5.O.out
 // RUN: %target-codesign %t/a.swift5.O.out
 // RUN: %target-run %t/a.swift5.O.out

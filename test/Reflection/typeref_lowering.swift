@@ -12,8 +12,8 @@
 // RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library %no-fixup-chains -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
 // RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift %S/Inputs/main.swift -emit-module -emit-executable %no-fixup-chains -module-name TypeLowering -o %t/TypesToReflect
 
-// RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-reflection-dump %t/TypesToReflect %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
+// RUN: %target-swift-reflection-dump %t/TypesToReflect %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
 
 12TypeLowering11BasicStructV
 // CHECK-64:      (struct TypeLowering.BasicStruct)
@@ -1280,3 +1280,140 @@ $1_SiBV
 // CHECK-32-NEXT:   (integer value=2)
 // CHECK-32-NEXT:   (struct Swift.Int))
 // CHECK-32-NEXT: (array size=8 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1)
+
+SiBW
+// CHECK-64:      (builtin_borrow
+// CHECK-64-NEXT:   (struct Swift.Int))
+// CHECK-64-NEXT: (borrow size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)
+
+// CHECK-32:      (builtin_borrow
+// CHECK-32-NEXT:   (struct Swift.Int))
+// CHECK-32-NEXT: (borrow size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)
+
+$1_SiBVBW
+// FixedArray is addressable-for-dependencies, so it uses pointer representation for Borrow
+// CHECK-64:      (builtin_borrow
+// CHECK-64-NEXT:   (builtin_fixed_array
+// CHECK-64-NEXT:     (integer value=2)
+// CHECK-64-NEXT:     (struct Swift.Int))
+// CHECK-64-NEXT: (borrow size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)
+
+// CHECK-32:      (builtin_borrow
+// CHECK-32-NEXT:   (builtin_fixed_array
+// CHECK-32-NEXT:     (integer value=2)
+// CHECK-32-NEXT:     (struct Swift.Int))
+// CHECK-32-NEXT: (borrow size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)
+
+12TypeLowering10SimpleEnumOBW
+// SimpleEnum has extra inhabitants, and Borrow<SimpleEnum> uses the value representation, so shares
+// those extra inhabitants
+// CHECK:         (builtin_borrow
+// CHECK-NEXT:      (enum TypeLowering.SimpleEnum))
+// CHECK-NEXT:    (borrow size=1 alignment=1 stride=1 num_extra_inhabitants=253 bitwise_takable=1)
+
+$1_12TypeLowering10SimpleEnumOBVBW
+// FixedArray is addressable-for-dependencies, so it uses pointer representation for Borrow
+// CHECK-64:      (builtin_borrow
+// CHECK-64-NEXT:   (builtin_fixed_array
+// CHECK-64-NEXT:     (integer value=2)
+// CHECK-64-NEXT:     (enum TypeLowering.SimpleEnum))
+// CHECK-64-NEXT: (borrow size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)
+
+// CHECK-32:      (builtin_borrow
+// CHECK-32-NEXT:   (builtin_fixed_array
+// CHECK-32-NEXT:     (integer value=2)
+// CHECK-32-NEXT:     (enum TypeLowering.SimpleEnum))
+// CHECK-32-NEXT: (borrow size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)
+
+// single-payload non-AFD enum, so the enum itself uses value representation
+12TypeLowering23NormalSinglePayloadEnumOBW
+// CHECK-64:         (builtin_borrow
+// CHECK-64-NEXT:      (enum TypeLowering.NormalSinglePayloadEnum))
+// CHECK-64-NEXT:    (borrow size=9 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1)
+// 
+// CHECK-32:         (builtin_borrow
+// CHECK-32-NEXT:      (enum TypeLowering.NormalSinglePayloadEnum))
+// CHECK-32-NEXT:    (borrow size=5 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1)
+
+// single-payload AFD enum, so the enum uses pointer representation
+12TypeLowering20AFDSinglePayloadEnumOBW
+// CHECK-64:         (builtin_borrow
+// CHECK-64-NEXT:      (enum TypeLowering.AFDSinglePayloadEnum))
+// CHECK-64-NEXT:    (borrow size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)
+// 
+// CHECK-32:         (builtin_borrow
+// CHECK-32-NEXT:      (enum TypeLowering.AFDSinglePayloadEnum))
+// CHECK-32-NEXT:    (borrow size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)
+
+// multi-payload non-AFD enum, so the enum itself uses value representation
+12TypeLowering22NormalMultiPayloadEnumOBW
+// CHECK-64:         (builtin_borrow
+// CHECK-64-NEXT:      (enum TypeLowering.NormalMultiPayloadEnum))
+// CHECK-64-NEXT:    (borrow size=9 alignment=8 stride=16 num_extra_inhabitants=254 bitwise_takable=1)
+// 
+// CHECK-32:         (builtin_borrow
+// CHECK-32-NEXT:      (enum TypeLowering.NormalMultiPayloadEnum))
+// CHECK-32-NEXT:    (borrow size=5 alignment=4 stride=8 num_extra_inhabitants=254 bitwise_takable=1)
+
+// multi-payload AFD enum, so the enum uses pointer representation
+12TypeLowering19AFDMultiPayloadEnumOBW
+// CHECK-64:         (builtin_borrow
+// CHECK-64-NEXT:      (enum TypeLowering.AFDMultiPayloadEnum))
+// CHECK-64-NEXT:    (borrow size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)
+// 
+// CHECK-32:         (builtin_borrow
+// CHECK-32-NEXT:      (enum TypeLowering.AFDMultiPayloadEnum))
+// CHECK-32-NEXT:    (borrow size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)
+
+// small struct with no AFD fields, uses value representation
+12TypeLowering12NormalStructVBW
+// CHECK-64:         (builtin_borrow
+// CHECK-64-NEXT:      (struct TypeLowering.NormalStruct))
+// CHECK-64-NEXT:    (borrow size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1)
+// 
+// CHECK-32:         (builtin_borrow
+// CHECK-32-NEXT:      (struct TypeLowering.NormalStruct))
+// CHECK-32-NEXT:    (borrow size=8 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1)
+
+
+// small struct with AFD field, uses pointer representation
+12TypeLowering9AFDStructVBW
+// CHECK-64:         (builtin_borrow
+// CHECK-64-NEXT:      (struct TypeLowering.AFDStruct))
+// CHECK-64-NEXT:    (borrow size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)
+// 
+// CHECK-32:         (builtin_borrow
+// CHECK-32-NEXT:      (struct TypeLowering.AFDStruct))
+// CHECK-32-NEXT:    (borrow size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)
+
+// 3x pointer struct, uses value representation
+12TypeLowering11NotQuiteBigVBW
+// CHECK-64:         (builtin_borrow
+// CHECK-64-NEXT:      (struct TypeLowering.NotQuiteBig))
+// CHECK-64-NEXT:    (borrow size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1)
+// 
+// CHECK-32:         (builtin_borrow
+// CHECK-32-NEXT:      (struct TypeLowering.NotQuiteBig))
+// CHECK-32-NEXT:    (borrow size=12 alignment=4 stride=12 num_extra_inhabitants=0 bitwise_takable=1)
+
+// 4x pointer struct, uses value representation
+12TypeLowering9AlmostBigVBW
+// CHECK-64:         (builtin_borrow
+// CHECK-64-NEXT:      (struct TypeLowering.AlmostBig))
+// CHECK-64-NEXT:    (borrow size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1)
+// 
+// CHECK-32:         (builtin_borrow
+// CHECK-32-NEXT:      (struct TypeLowering.AlmostBig))
+// CHECK-32-NEXT:    (borrow size=16 alignment=4 stride=16 num_extra_inhabitants=0 bitwise_takable=1)
+
+// 5x pointer struct, uses pointer representation
+12TypeLowering3BigVBW
+// CHECK-64:         (builtin_borrow
+// CHECK-64-NEXT:      (struct TypeLowering.Big))
+// CHECK-64-NEXT:    (borrow size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)
+// 
+// CHECK-32:         (builtin_borrow
+// CHECK-32-NEXT:      (struct TypeLowering.Big))
+// CHECK-32-NEXT:    (borrow size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)
+
+

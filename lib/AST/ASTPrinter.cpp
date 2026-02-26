@@ -2447,6 +2447,58 @@ bool isNonSendableExtension(const Decl *D) {
 
 bool ShouldPrintChecker::shouldPrint(const Decl *D,
                                      const PrintOptions &Options) {
+  // Skip constructors defined in Objective-C categories that are not
+  // publicly imported according to the interface type being generated
+  if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
+    if (CD->isImplicit() && Options.IsForSwiftInterface &&
+        Options.CurrentModule) {
+      // For inherited constructors, check the original declaration
+      auto *checkDecl = CD;
+      if (auto *overridden = CD->getOverriddenDecl()) {
+        checkDecl = overridden;
+      }
+      auto definingModule = checkDecl->getModuleContext();
+      // Check how the defining module is imported
+      if (auto *SF = CD->getDeclContext()->getParentSourceFile()) {
+        // Don't check import status for self-imports
+        if (definingModule != SF->getParentModule()) {
+          auto restrictedKind = SF->getRestrictedImportKind(definingModule);
+          switch (restrictedKind) {
+          // MissingImport and ImplementationOnly: skip in all interfaces
+          case RestrictedImportKind::MissingImport:
+          case RestrictedImportKind::ImplementationOnly:
+            return false;
+          // SPIOnly: skip in public interfaces
+          case RestrictedImportKind::SPIOnly:
+            if (Options.printPublicInterface())
+              return false;
+            break;
+          case RestrictedImportKind::None:
+            break;
+          }
+          // Check access level
+          if (auto importAccess = SF->getImportAccessLevel(definingModule)) {
+            auto accessLevel = importAccess->accessLevel;
+            switch (accessLevel) {
+            // Internal and below: skip in all interfaces
+            case AccessLevel::Private:
+            case AccessLevel::FilePrivate:
+            case AccessLevel::Internal:
+              return false;
+            // Package: skip in non-package interfaces only
+            case AccessLevel::Package:
+              if (!Options.printPackageInterface())
+                return false;
+              break;
+            default:
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;

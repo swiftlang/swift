@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift
 
 var global: Int = 5
 func testGlobal() {
@@ -69,7 +69,7 @@ struct FooWrapper<T> {
 
 struct Foo {
     @FooWrapper var wrapperTest: String
-    
+
     func consumeSelf() {
         _ = consume self
     }
