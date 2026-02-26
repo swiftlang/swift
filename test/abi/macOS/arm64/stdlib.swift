@@ -1208,3 +1208,14 @@ Added: _$ss4SpanVsRi_zrlE05_nextA012maximumCountAByxGSi_tF
 Added: _$ss4SpanVsRi_zrlE22_makeBorrowingIteratorAByxGyF
 Added: _$ss4SpanVyxGs18_BorrowingSequencesRi_zrlMc
 Added: _$ss4SpanVyxGs26_BorrowingIteratorProtocolsRi_zrlMc
+
+// Borrow
+Added: _$ss6BorrowVMa
+Added: _$ss6BorrowVMn
+Added: _$ss6BorrowVsRi_zrlE7builtinxBWvg
+
+// Inout
+Added: _$ss5InoutVMa
+Added: _$ss5InoutVMn
+Added: _$ss5InoutVsRi_zrlE7pointerSpyxGvg
+
