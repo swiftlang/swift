@@ -542,7 +542,7 @@ fileprivate extension RawSpan {
   }
 }
 
-@_effects(releasenone)
+@_effects(readonly)
 fileprivate func isEqual(
   utf8Bytes lhs: RawSpan,
   utf16Bytes rhs: RawSpan
@@ -594,7 +594,7 @@ fileprivate func isEqual(
     }
 }
 
-@inline(__always) @_effects(releasenone)
+@inline(__always) @_effects(readonly)
 fileprivate func isEqual(
   bytes lhs: RawSpan,
   bytes rhs: RawSpan
@@ -614,7 +614,7 @@ fileprivate func isEqual(
   }
 }
 
-@_effects(releasenone)
+@_effects(readonly)
 fileprivate func isEqual(
   asciiBytes lhs: RawSpan,
   utf16Bytes rhs: RawSpan
@@ -645,7 +645,7 @@ fileprivate func isEqual(
     return true
 }
 
-@_effects(releasenone)
+@_effects(readonly)
 @c @_spi(Foundation) public func _swift_unicodeBuffersEqual_nonNormalizing(
   bytes rawLHS: UnsafeRawPointer,
   count lhsCount: Int,
@@ -686,7 +686,7 @@ fileprivate func isEqual(
 
 // See swift_stdlib_connectNSBaseClasses. This method is installed onto
 // NSString in Foundation via ObjC runtime shenanigans
-@_effects(releasenone)
+@_effects(readonly)
 @c internal func _swift_NSStringIsEqualToBytesImpl(
   _ ns: UnsafeRawPointer,
   _ _cmd: UInt, //SEL
