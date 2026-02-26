@@ -1,4 +1,4 @@
-# TODO: Hook up the CommandLine support sources
+swift_embedded_guard()
 
 gyb_expand(AtomicInt.swift.gyb AtomicInt.swift
   FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
@@ -395,10 +395,3 @@ generate_plist(swiftCore "${CMAKE_PROJECT_VERSION}" swiftCore)
 embed_manifest(swiftCore)
 
 include("${SwiftCore_VENDOR_MODULE_DIR}/swiftCore.cmake" OPTIONAL)
-
-# TODO: Embedded SwiftCore builds
-# FIXME: Embedded builds should be separate CMake invocations because they are
-#        building for a different environment. I'm not sure how CMake will
-#        handle their build model though, so we'll continue to cram them in here
-#        as they are for now, but should eventually tie into the rest of the
-#        build graph normally.
