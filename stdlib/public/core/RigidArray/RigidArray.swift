@@ -75,26 +75,6 @@ extension RigidArray: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
 @available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
-  /// A Boolean value indicating whether this array contains no elements.
-  ///
-  /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public var isEmpty: Bool {
-    count == 0
-  }
-
-  /// The number of elements in this array.
-  ///
-  /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public var count: Int {
-    _count
-  }
-
   /// The maximum number of elements this rigid array can hold.
   ///
   /// - Complexity: O(1)
