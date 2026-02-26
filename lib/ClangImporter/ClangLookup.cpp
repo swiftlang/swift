@@ -33,7 +33,6 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
@@ -67,17 +66,17 @@ namespace {
 ///
 /// Validates that the name we looked up matches the resulting imported name.
 class CollectLookupResults {
-  DeclName name;
+  /// Match by base name, since that is what MemberLookupTable is keyed on for
+  /// laziness (i.e., see type of MemberLookupTable::isLazilyComplete).
+  DeclBaseName name;
   TinyPtrVector<ValueDecl *> &result;
 
 public:
-  CollectLookupResults(DeclName name, TinyPtrVector<ValueDecl *> &result)
+  CollectLookupResults(DeclBaseName name, TinyPtrVector<ValueDecl *> &result)
       : name(name), result(result) {}
 
   void add(ValueDecl *imported) {
-    // Match by base name, since that is what MemberLookupTable is keyed on for
-    // laziness (i.e., see type of MemberLookupTable::isLazilyComplete).
-    if (imported->getBaseName() == name.getBaseName())
+    if (imported->getBaseName() == name)
       result.push_back(imported);
 
     // Expand any macros introduced by the Clang importer.
@@ -93,7 +92,7 @@ public:
         return;
 
       // Only produce results that match the requested name.
-      if (!valueDecl->getName().matchesRef(name))
+      if (valueDecl->getBaseName() != name)
         return;
 
       result.push_back(valueDecl);
@@ -102,131 +101,202 @@ public:
 };
 } // anonymous namespace
 
-static SmallVector<SwiftLookupTable::SingleEntry, 4>
-lookupInClassTemplateSpecialization(
-    ASTContext &ctx, const clang::ClassTemplateSpecializationDecl *clangDecl,
-    DeclName name) {
-  // TODO: we could make this faster if we can cache class templates in the
-  // lookup table as well.
-  // Import all the names to figure out which ones we're looking for.
-  SmallVector<SwiftLookupTable::SingleEntry, 4> found;
-  for (auto member : clangDecl->decls()) {
-    auto *namedDecl = dyn_cast<clang::NamedDecl>(member);
-    if (!namedDecl)
-      continue;
+static SmallVector<const clang::NamedDecl *, 4>
+directRecordMemberLookup(ClangImporter &Importer,
+                         const clang::RecordDecl *whereDecl, DeclName name) {
 
-    auto memberName = ctx.getClangModuleLoader()->importName(namedDecl);
-    if (!memberName)
-      continue;
+  SmallVector<const clang::NamedDecl *, 4> result;
 
-    // Use the base names here because *sometimes* our input name won't have
-    // any arguments.
-    if (name.getBaseName().compare(memberName.getBaseName()) == 0)
-      found.push_back(namedDecl);
-  }
+  // Class template instances aren't in the lookup table.
+  // Import all member names to figure out which one(s) we're looking for.
+  if (isa<clang::ClassTemplateSpecializationDecl>(whereDecl)) {
+    // TODO: we could make this faster if we can cache class templates in the
+    //       lookup table as well.
 
-  return found;
-}
+    for (auto *member : whereDecl->decls()) {
+      auto *namedDecl = dyn_cast<clang::NamedDecl>(member);
+      if (!namedDecl)
+        continue;
 
-static bool isDirectLookupMemberContext(const clang::Decl *foundClangDecl,
-                                        const clang::Decl *memberContext,
-                                        const clang::Decl *parent) {
-  if (memberContext->getCanonicalDecl() == parent->getCanonicalDecl())
-    return true;
-  if (auto *namespaceDecl = dyn_cast<clang::NamespaceDecl>(memberContext)) {
-    if (namespaceDecl->isInline()) {
-      if (auto *memberCtxParent =
-              dyn_cast<clang::Decl>(namespaceDecl->getParent()))
-        return isDirectLookupMemberContext(foundClangDecl, memberCtxParent,
-                                           parent);
+      auto memberName = Importer.importName(namedDecl);
+      if (!memberName)
+        continue;
+
+      // Use the base names here because *sometimes* our input name won't have
+      // any arguments.
+      if (name.getBaseName() == memberName.getBaseName())
+        result.push_back(namedDecl);
     }
-  }
-  // Enum constant decl can be found in the parent context of the enum decl.
-  if (auto *ED = dyn_cast<clang::EnumDecl>(memberContext)) {
-    if (isa<clang::EnumConstantDecl>(foundClangDecl)) {
-      if (auto *firstDecl = dyn_cast<clang::Decl>(ED->getDeclContext()))
-        return firstDecl->getCanonicalDecl() == parent->getCanonicalDecl();
-    }
-  }
-  return false;
-}
 
-static_assert(
-    std::is_same_v<SwiftLookupTable::SingleEntry, ClangDirectLookupEntry>,
-    "ClangDirectLookupRequest should return same type as entries in "
-    "SwiftLookupTable");
-
-SmallVector<ClangDirectLookupEntry, 4>
-ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
-                                   ClangDirectLookupDescriptor desc) const {
-  auto &ctx = desc.decl->getASTContext();
-  auto *clangDecl = desc.clangDecl;
-  // Class templates aren't in the lookup table.
-  if (auto *spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
-    return lookupInClassTemplateSpecialization(ctx, spec, desc.name);
-
-  SwiftLookupTable *lookupTable;
-  if (isa<clang::NamespaceDecl>(clangDecl)) {
-    // DeclContext of a namespace imported into Swift is the __ObjC module.
-    lookupTable = ctx.getClangModuleLoader()->findLookupTable(nullptr);
-  } else {
-    auto *clangModule =
-        importer::getClangOwningModule(clangDecl, clangDecl->getASTContext());
-    lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
+    return result;
   }
 
-  auto foundDecls = lookupTable->lookup(
-      SerializedSwiftName(desc.name.getBaseName()), EffectiveClangContext());
+  auto *clangModule =
+      importer::getClangOwningModule(whereDecl, whereDecl->getASTContext());
+
+  auto *lookupTable = Importer.findLookupTable(clangModule);
+
+  auto foundDecls = lookupTable->lookup(SerializedSwiftName(name.getBaseName()),
+                                        EffectiveClangContext());
+
+  // lookup() just gives us all decls in the module of the given name.
   // Make sure that `clangDecl` is the parent of all the members we found.
-  SmallVector<SwiftLookupTable::SingleEntry, 4> filteredDecls;
-  llvm::copy_if(foundDecls, std::back_inserter(filteredDecls),
-                [clangDecl](SwiftLookupTable::SingleEntry decl) {
-                  auto *foundClangDecl = decl.dyn_cast<clang::NamedDecl *>();
-                  if (!foundClangDecl)
-                    return false;
-                  auto *first = foundClangDecl->getDeclContext();
-                  auto *second = cast<clang::DeclContext>(clangDecl);
-                  if (auto *firstDecl = dyn_cast<clang::Decl>(first)) {
-                    if (auto *secondDecl = dyn_cast<clang::Decl>(second)) {
-                      return isDirectLookupMemberContext(foundClangDecl,
-                                                         firstDecl, secondDecl);
-                    }
-                    return false;
-                  }
-                  return first == second;
-                });
-  return filteredDecls;
+  for (auto entry : foundDecls) {
+    auto *found = entry.dyn_cast<clang::NamedDecl *>();
+    if (!found)
+      continue; // What we found wasn't a NamedDecl
+
+    auto *foundCtx = found->getNonTransparentDeclContext();
+    if (auto *foundCtxDecl = dyn_cast<clang::RecordDecl>(foundCtx)) {
+      // Context of found decl is also a decl; compare canonical decl of each
+      if (foundCtxDecl->getCanonicalDecl() == whereDecl->getCanonicalDecl())
+        result.push_back(found);
+    } else {
+      if (foundCtx == cast<clang::DeclContext>(whereDecl))
+        result.push_back(found);
+    }
+  }
+
+  return result;
 }
 
 TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
     Evaluator &evaluator, CXXNamespaceMemberLookupDescriptor desc) const {
-  EnumDecl *namespaceDecl = desc.namespaceDecl;
   DeclName name = desc.name;
-  auto *clangNamespaceDecl =
-      cast<clang::NamespaceDecl>(namespaceDecl->getClangDecl());
-  auto &ctx = namespaceDecl->getASTContext();
+  auto &ctx = desc.namespaceDecl->getASTContext();
+
+  auto *theNamespace =
+      cast<clang::NamespaceDecl>(desc.namespaceDecl->getClangDecl())
+          ->getCanonicalDecl();
 
   TinyPtrVector<ValueDecl *> result;
-  CollectLookupResults collector(name, result);
 
-  llvm::SmallPtrSet<clang::NamedDecl *, 8> importedDecls;
-  for (auto redecl : clangNamespaceDecl->redecls()) {
-    auto allResults = evaluateOrDefault(
-        ctx.evaluator, ClangDirectLookupRequest({namespaceDecl, redecl, name}),
-        {});
+  auto *lookupTable = ctx.getClangModuleLoader()->findLookupTable(nullptr);
+  auto foundDecls = lookupTable->lookup(SerializedSwiftName(name.getBaseName()),
+                                        EffectiveClangContext());
 
-    for (auto found : allResults) {
-      auto clangMember = cast<clang::NamedDecl *>(found);
-      auto it = importedDecls.insert(clangMember);
-      // Skip over members already found during lookup in prior redeclarations.
-      if (!it.second)
-        continue;
-      if (auto import =
-              ctx.getClangModuleLoader()->importDeclDirectly(clangMember))
-        collector.add(cast<ValueDecl>(import));
+  CollectLookupResults collector(name.getBaseName(), result);
+  llvm::SmallPtrSet<clang::NamedDecl *, 8> seenDecls;
+  for (auto foundEntry : foundDecls) {
+    auto *foundDecl = foundEntry.dyn_cast<clang::NamedDecl *>();
+    if (!foundDecl)
+      continue; // What we found wasn't a NamedDecl
+
+    auto *foundCtx = foundDecl->getNonTransparentDeclContext();
+
+    auto wasFound = false;
+    while (auto *foundNamespace =
+               dyn_cast_or_null<clang::NamespaceDecl>(foundCtx)) {
+      // Compare theNamespace with the namespace enclosing the found decl,
+      // as well as any outer namespaces if it is inline.
+      if (foundNamespace->getCanonicalDecl() == theNamespace) {
+        wasFound = true;
+        break;
+      }
+
+      if (!foundNamespace->isInline())
+        break;
+
+      foundCtx = foundNamespace->getParent();
+    }
+
+    if (!wasFound)
+      continue;
+
+    if (!seenDecls.insert(foundDecl).second)
+      continue; // We've already seen this; a re-declaration?
+    if (auto *import =
+            ctx.getClangModuleLoader()->importDeclDirectly(foundDecl))
+      collector.add(cast<ValueDecl>(import));
+  }
+  return result;
+}
+
+llvm::SmallVector<ValueDecl *, 16> CXXNamespaceMemberEnumeration::evaluate(
+    Evaluator &evaluator, CXXNamespaceMemberEnumerationDescriptor desc) const {
+  auto *namespaceEnum = desc.namespaceEnum;
+  auto *namespaceDecl =
+      cast<clang::NamespaceDecl>(namespaceEnum->getClangDecl());
+  auto &ctx = namespaceEnum->getASTContext();
+  auto *clangModuleLoader = ctx.getClangModuleLoader();
+
+  llvm::SmallVector<ValueDecl *, 16> result;
+
+  // Keep track of which names we've seen and which decls we've imported.
+  // When we lookup a member by name, we import all of them at once.
+  llvm::SmallSet<DeclName, 16> seenNames;
+  llvm::SmallPtrSet<Decl *, 16> seenImports;
+
+  auto importMember = [&](const clang::NamedDecl *nd) {
+    auto name = clangModuleLoader->importName(nd);
+    if (!name || !seenNames.insert(name).second)
+      return;
+
+    auto importedMembers = evaluateOrDefault(
+        ctx.evaluator,
+        CXXNamespaceMemberLookup({cast<EnumDecl>(namespaceEnum), name}), {});
+
+    for (auto *imported : importedMembers) {
+      if (seenImports.insert(imported).second)
+        result.push_back(imported);
+    }
+  };
+
+  // If this is non-null, we will only import members from that module
+  const clang::Module *owningModule = nullptr;
+  if (!desc.includeOtherModules && namespaceDecl->getOwningModule())
+    owningModule = namespaceDecl->getOwningModule()->getTopLevelModule();
+
+  auto importSpecializations = [&](const clang::ClassTemplateDecl *tmpl) {
+    if (!desc.includeSpecializations)
+      return;
+
+    // Add all specializations to a worklist so we don't accidentally mutate
+    // the list of decls we're iterating over.
+    llvm::SmallPtrSet<const clang::ClassTemplateSpecializationDecl *, 16>
+        specWorklist;
+    specWorklist.insert_range(tmpl->specializations());
+
+    for (auto *spec : specWorklist) {
+      auto *imported = clangModuleLoader->importDeclDirectly(spec);
+      if (imported && seenImports.insert(imported).second)
+        result.push_back(cast<ValueDecl>(imported));
+    }
+  };
+
+  auto Redecls =
+      llvm::SmallVector<clang::NamespaceDecl *, 2>(namespaceDecl->redecls());
+  std::stable_sort(Redecls.begin(), Redecls.end(), [&](auto *LHS, auto *RHS) {
+    // Sort according to module name, if any (a namespace redeclaration will not
+    // have an owning Clang module if it is declared in a bridging header).
+    if (!LHS->getOwningModule() || !RHS->getOwningModule())
+      return (bool)LHS->getOwningModule() < (bool)RHS->getOwningModule();
+    return LHS->getOwningModule()->Name < RHS->getOwningModule()->Name;
+  });
+
+  for (auto *redecl : Redecls) {
+    // Skip namespace declarations that come from other top-level modules
+    // if there's such a requirement (i.e., if owningModule is non-null)
+    if (owningModule && redecl->getOwningModule() &&
+        owningModule != redecl->getOwningModule()->getTopLevelModule())
+      continue;
+
+    for (auto *member : redecl->decls()) {
+      if (auto *classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
+        importSpecializations(classTemplate);
+      }
+
+      if (auto *nd = dyn_cast<clang::NamedDecl>(member)) {
+        importMember(nd);
+      }
+
+      // Unscoped enums have their enumerators present in the parent namespace.
+      if (auto *ed = dyn_cast<clang::EnumDecl>(member); ed && !ed->isScoped()) {
+        for (const auto *ecd : ed->enumerators())
+          importMember(ecd);
+      }
     }
   }
-
   return result;
 }
 
@@ -250,23 +320,16 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       !ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers) &&
       cxxRecordDecl && importer::getPrivateFileIDAttrs(cxxRecordDecl).empty();
 
-  auto directResults = evaluateOrDefault(
-      ctx.evaluator,
-      ClangDirectLookupRequest({recordDecl, recordDecl->getClangDecl(), name}),
-      {});
+  auto directResults = directRecordMemberLookup(
+      Importer, cast<clang::RecordDecl>(recordDecl->getClangDecl()), name);
 
   // The set of declarations we found.
   TinyPtrVector<ValueDecl *> result;
-  CollectLookupResults collector(name, result);
+  CollectLookupResults collector(name.getBaseName(), result);
 
   // Find the results that are actually a member of "recordDecl".
   ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
-  for (auto foundEntry : directResults) {
-    auto found = cast<clang::NamedDecl *>(foundEntry);
-    if (dyn_cast<clang::Decl>(found->getDeclContext()) !=
-        recordDecl->getClangDecl())
-      continue;
-
+  for (auto found : directResults) {
     // We should not import 'found' if the following are all true:
     //
     // -  Feature::ImportNonPublicCxxMembers is not enabled
@@ -444,8 +507,7 @@ static auto filterMethodOverloads(clang::LookupResult &R,
                                   const clang::CXXRecordDecl *Origin) {
   return llvm::make_filter_range(
       llvm::map_range(
-          llvm::make_range(ResultIterator{R.begin()},
-                           ResultIterator{R.end()}),
+          llvm::make_range(ResultIterator{R.begin()}, ResultIterator{R.end()}),
           [=](std::pair<const clang::NamedDecl *, clang::AccessSpecifier> da) {
             auto [nd, access] = da;
 

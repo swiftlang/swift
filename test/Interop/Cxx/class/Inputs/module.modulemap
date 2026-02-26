@@ -71,6 +71,11 @@ module MutabilityAnnotations {
   requires cplusplus
 }
 
+module NestedEnums {
+  header "nested-enums.h"
+  requires cplusplus
+}
+
 module NoDiscard {
  header "nodiscard.h"
  requires cplusplus  

@@ -20,10 +20,8 @@ var publicClosedEnumVar: PublicPrivate.PublicClosedEnum
 var publicOpenEnumVar: PublicPrivate.PublicOpenEnum
 var publicFlagEnumVar: PublicPrivate.PublicFlagEnum
 
-// TODO: nested enum members aren't being imported correctly yet (#54905)
-// Once they are, verify that they are accessible.
-// print(PublicPrivate.PublicEnumValue1)
-// print(PublicPrivate.PublicAnonymousEnumValue)
+print(PublicPrivate.PublicEnumValue1)
+print(PublicPrivate.PublicAnonymousEnumValue1)
 print(PublicPrivate.PublicClosedEnum.value1)
 print(PublicPrivate.PublicOpenEnum.value1)
 
@@ -40,9 +38,7 @@ var privateClosedEnumVar: PublicPrivate.PrivateClosedEnum // expected-error {{'P
 var privateOpenEnumVar: PublicPrivate.PrivateOpenEnum // expected-error {{'PrivateOpenEnum' is inaccessible due to 'private' protection level}}
 var privateFlagEnumVar: PublicPrivate.PrivateFlagEnum // expected-error {{'PrivateFlagEnum' is inaccessible due to 'private' protection level}}
 
-// TODO: nested enum members aren't being imported correctly yet (#54905)
-// Once they are, verify that this throws an error (similar to above).
-// print(PublicPrivate.PrivateEnumValue1)
-// print(PublicPrivate.PrivateAnonymousEnumValue1)
+print(PublicPrivate.PrivateEnumValue1) // expected-error {{'PrivateEnumValue1' is inaccessible due to 'private' protection level}}
+print(PublicPrivate.PrivateAnonymousEnumValue1) // expected-error {{'PrivateAnonymousEnumValue1' is inaccessible due to 'private' protection level}}
 print(PublicPrivate.PrivateOpenEnum.value1) // expected-error {{'PrivateOpenEnum' is inaccessible due to 'private' protection level}}
 print(PublicPrivate.PrivateClosedEnum.value1) // expected-error {{'PrivateClosedEnum' is inaccessible due to 'private' protection level}}

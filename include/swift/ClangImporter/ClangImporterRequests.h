@@ -36,59 +36,6 @@ class DeclName;
 class EnumDecl;
 enum class ExplicitSafety;
 
-/// The input type for a clang direct lookup request.
-struct ClangDirectLookupDescriptor final {
-  Decl *decl;
-  const clang::Decl *clangDecl;
-  DeclName name;
-
-  ClangDirectLookupDescriptor(Decl *decl, const clang::Decl *clangDecl,
-                              DeclName name)
-      : decl(decl), clangDecl(clangDecl), name(name) {}
-
-  friend llvm::hash_code hash_value(const ClangDirectLookupDescriptor &desc) {
-    return llvm::hash_combine(desc.name, desc.decl, desc.clangDecl);
-  }
-
-  friend bool operator==(const ClangDirectLookupDescriptor &lhs,
-                         const ClangDirectLookupDescriptor &rhs) {
-    return lhs.name == rhs.name && lhs.decl == rhs.decl &&
-           lhs.clangDecl == rhs.clangDecl;
-  }
-
-  friend bool operator!=(const ClangDirectLookupDescriptor &lhs,
-                         const ClangDirectLookupDescriptor &rhs) {
-    return !(lhs == rhs);
-  }
-};
-
-void simple_display(llvm::raw_ostream &out,
-                    const ClangDirectLookupDescriptor &desc);
-SourceLoc extractNearestSourceLoc(const ClangDirectLookupDescriptor &desc);
-
-/// This matches SwiftLookupTable::SingleEntry
-using ClangDirectLookupEntry =
-    llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
-                       clang::ModuleMacro *>;
-
-/// Uses the appropriate SwiftLookupTable to find a set of clang decls given
-/// their name.
-class ClangDirectLookupRequest
-    : public SimpleRequest<ClangDirectLookupRequest,
-                           SmallVector<ClangDirectLookupEntry, 4>(
-                               ClangDirectLookupDescriptor),
-                           RequestFlags::Uncached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  SmallVector<ClangDirectLookupEntry, 4>
-  evaluate(Evaluator &evaluator, ClangDirectLookupDescriptor desc) const;
-};
-
 /// The input type for a namespace member lookup request.
 struct CXXNamespaceMemberLookupDescriptor final {
   EnumDecl *namespaceDecl;
@@ -96,7 +43,7 @@ struct CXXNamespaceMemberLookupDescriptor final {
 
   CXXNamespaceMemberLookupDescriptor(EnumDecl *namespaceDecl, DeclName name)
       : namespaceDecl(namespaceDecl), name(name) {
-    assert(isa<clang::NamespaceDecl>(namespaceDecl->getClangDecl()));
+    ASSERT(isa<clang::NamespaceDecl>(namespaceDecl->getClangDecl()));
   }
 
   friend llvm::hash_code
@@ -120,7 +67,7 @@ void simple_display(llvm::raw_ostream &out,
 SourceLoc
 extractNearestSourceLoc(const CXXNamespaceMemberLookupDescriptor &desc);
 
-/// Uses ClangDirectLookup to find a named member inside of the given namespace.
+/// Find a named member inside of the given Clang namespace.
 class CXXNamespaceMemberLookup
     : public SimpleRequest<CXXNamespaceMemberLookup,
                            TinyPtrVector<ValueDecl *>(
@@ -135,6 +82,63 @@ private:
   // Evaluation.
   TinyPtrVector<ValueDecl *>
   evaluate(Evaluator &evaluator, CXXNamespaceMemberLookupDescriptor desc) const;
+};
+
+struct CXXNamespaceMemberEnumerationDescriptor final {
+  EnumDecl *namespaceEnum;
+  bool includeSpecializations;
+  bool includeOtherModules;
+
+  CXXNamespaceMemberEnumerationDescriptor(EnumDecl *namespaceDecl,
+                                          bool includeSpecializations,
+                                          bool includeOtherModules)
+      : namespaceEnum(namespaceDecl),
+        includeSpecializations(includeSpecializations),
+        includeOtherModules(includeOtherModules) {
+    ASSERT(isa<clang::NamespaceDecl>(namespaceDecl->getClangDecl()));
+  }
+
+  friend llvm::hash_code
+  hash_value(const CXXNamespaceMemberEnumerationDescriptor &desc) {
+    return llvm::hash_combine(desc.namespaceEnum, desc.includeSpecializations,
+                              desc.includeOtherModules);
+  }
+
+  friend bool operator==(const CXXNamespaceMemberEnumerationDescriptor &lhs,
+                         const CXXNamespaceMemberEnumerationDescriptor &rhs) {
+    return lhs.namespaceEnum == rhs.namespaceEnum &&
+           lhs.includeSpecializations == rhs.includeSpecializations &&
+           lhs.includeOtherModules == rhs.includeOtherModules;
+  }
+
+  friend bool operator!=(const CXXNamespaceMemberEnumerationDescriptor &lhs,
+                         const CXXNamespaceMemberEnumerationDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const CXXNamespaceMemberEnumerationDescriptor &desc);
+SourceLoc
+extractNearestSourceLoc(const CXXNamespaceMemberEnumerationDescriptor &desc);
+
+/// Enumerate and import all members of a C++ namespace.
+///
+/// This is a very expensive operation.
+class CXXNamespaceMemberEnumeration
+    : public SimpleRequest<CXXNamespaceMemberEnumeration,
+                           llvm::SmallVector<ValueDecl *, 16>(
+                               CXXNamespaceMemberEnumerationDescriptor),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::SmallVector<ValueDecl *, 16>
+  evaluate(Evaluator &evaluator,
+           CXXNamespaceMemberEnumerationDescriptor desc) const;
 };
 
 /// The input type for a record member lookup request.
@@ -196,7 +200,7 @@ void simple_display(llvm::raw_ostream &out,
 SourceLoc
 extractNearestSourceLoc(const ClangRecordMemberLookupDescriptor &desc);
 
-/// Uses ClangDirectLookup to find a named member inside of the given record.
+/// Find a named member inside of the given Clang record.
 class ClangRecordMemberLookup
     : public SimpleRequest<ClangRecordMemberLookup,
                            TinyPtrVector<ValueDecl *>(
