@@ -67,6 +67,11 @@ int _swift_alignedAllocate(void * EMBEDDED_SWIFT_NULLABLE * EMBEDDED_SWIFT_NONNU
  * Parameters:
  *   - `ptr`: The pointer to be freed. If it is NULL, the operation does
  *     nothing.
+ *   - `size`: the number of allocated bytes, which may be -1 if it is not
+ *     known.
+ *   - `alignment`: the minimum alignment of the resulting pointer, which must
+ *     be a power of at least as large as `sizeof(void *)`, or be zero to
+ *     indicate that the alignment is not known.
  *
  * This function is required when using any Embedded Swift facility that
  * requires memory allocation from the heap, whether explicitly (e.g., via the
@@ -75,7 +80,7 @@ int _swift_alignedAllocate(void * EMBEDDED_SWIFT_NULLABLE * EMBEDDED_SWIFT_NONNU
  * 
  * This function can be implemented as a direct call to `free`.
  */
-void _swift_free(void * EMBEDDED_SWIFT_NONNULL ptr);
+void _swift_alignedFree(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size);
 
 /**
  * Writes a single character to standard output.
