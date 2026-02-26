@@ -154,6 +154,7 @@ split_embedded_sources(
   # RigidArray sources
   EMBEDDED RigidArray/RigidArray.swift
   EMBEDDED RigidArray/RigidArray+Append.swift
+  EMBEDDED RigidArray/RigidArray+Container.swift
   EMBEDDED RigidArray/RigidArray+Descriptions.swift
   EMBEDDED RigidArray/RigidArray+Equatable.swift
   EMBEDDED RigidArray/RigidArray+Hashable.swift
@@ -233,6 +234,7 @@ split_embedded_sources(
   # UniqueArray sources
   EMBEDDED UniqueArray/UniqueArray.swift
   EMBEDDED UniqueArray/UniqueArray+Append.swift
+  EMBEDDED UniqueArray/UniqueArray+Container.swift
   EMBEDDED UniqueArray/UniqueArray+Descriptions.swift
   EMBEDDED UniqueArray/UniqueArray+Equatable.swift
   EMBEDDED UniqueArray/UniqueArray+Hashable.swift

@@ -293,6 +293,7 @@
   "RigidArray": [
     "RigidArray.swift",
     "RigidArray+Append.swift",
+    "RigidArray+Container.swift",
     "RigidArray+Descriptions.swift",
     "RigidArray+Equatable.swift",
     "RigidArray+Hashable.swift",
@@ -304,6 +305,7 @@
   "UniqueArray": [
     "UniqueArray.swift",
     "UniqueArray+Append.swift",
+    "UniqueArray+Container.swift",
     "UniqueArray+Descriptions.swift",
     "UniqueArray+Equatable.swift",
     "UniqueArray+Hashable.swift",

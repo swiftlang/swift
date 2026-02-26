@@ -145,6 +145,7 @@ add_library(swiftCore
   # RigidArray sources
   RigidArray/RigidArray.swift
   RigidArray/RigidArray+Append.swift
+  RigidArray/RigidArray+Container.swift
   RigidArray/RigidArray+Descriptions.swift
   RigidArray/RigidArray+Equatable.swift
   RigidArray/RigidArray+Hashable.swift
@@ -227,6 +228,7 @@ add_library(swiftCore
   # UniqueArray sources
   UniqueArray/UniqueArray.swift
   UniqueArray/UniqueArray+Append.swift
+  UniqueArray/UniqueArray+Container.swift
   UniqueArray/UniqueArray+Descriptions.swift
   UniqueArray/UniqueArray+Equatable.swift
   UniqueArray/UniqueArray+Hashable.swift
