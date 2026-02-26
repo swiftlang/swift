@@ -47,6 +47,9 @@ class FindCapturedVars : public ASTWalker {
   /// Opened element environments introduced by `repeat` expressions.
   llvm::SetVector<GenericEnvironment *> VisitingPackExpansionEnv;
 
+  /// Opened existential environments.
+  llvm::SetVector<GenericEnvironment *> VisitingOpenedExistentialEnv;
+
   /// A set of local generic environments we've encountered that were not
   /// in the above stack; those are the captures.
   ///
@@ -191,18 +194,25 @@ public:
     // perform it accurately.
     if (type->hasArchetype() || type->hasTypeParameter()) {
       type.walk(TypeCaptureWalker(ObjC, [&](Type t) {
-        // Record references to element archetypes that were bound
-        // outside the body of the current closure.
         if (auto *element = t->getAs<ElementArchetypeType>()) {
+          // Record references to element archetypes that were bound
+          // outside the body of the current closure.
           auto *env = element->getGenericEnvironment();
           if (VisitingForEachEnv.count(env) == 0 &&
-              VisitingPackExpansionEnv.count(env) == 0)
+              VisitingPackExpansionEnv.count(env) == 0) {
             CapturedEnvironments.insert(env);
-        }
-
-        if (t->is<PrimaryArchetypeType>() ||
-            t->is<PackArchetypeType>() ||
-            t->is<GenericTypeParamType>()) {
+          }
+        } else if (auto openedExistential = t->getAs<ExistentialArchetypeType>()) {
+          // Record references to existential archetypes opened
+          // outside the body of the current closure.
+          auto *env = openedExistential->getGenericEnvironment();
+          if (VisitingOpenedExistentialEnv.count(env) == 0) {
+            CapturedEnvironments.insert(env);
+            recordUseOfGenericType(t);
+          }
+        } else if (t->is<PrimaryArchetypeType>() ||
+                   t->is<PackArchetypeType>() ||
+                   t->is<GenericTypeParamType>()) {
           recordUseOfGenericType(t);
         }
       }));
@@ -694,6 +704,13 @@ public:
       }
     }
 
+    if (auto openExistential = dyn_cast<OpenExistentialExpr>(E)) {
+      auto *env =
+          openExistential->getOpenedArchetype()->getGenericEnvironment();
+      assert(VisitingOpenedExistentialEnv.count(env) == 0);
+      VisitingOpenedExistentialEnv.insert(env);
+    }
+
     if (auto typeValue = dyn_cast<TypeValueExpr>(E)) {
       checkType(typeValue->getParamType(), E->getLoc());
     }
@@ -734,6 +751,13 @@ public:
 
         VisitingPackExpansionEnv.pop_back();
       }
+    } else if (auto openExistential = dyn_cast<OpenExistentialExpr>(E)) {
+      auto *env =
+          openExistential->getOpenedArchetype()->getGenericEnvironment();
+      assert(env == VisitingOpenedExistentialEnv.back());
+      (void)env;
+
+      VisitingOpenedExistentialEnv.pop_back();
     }
 
     return Action::Continue(E);
