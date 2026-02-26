@@ -116,12 +116,6 @@ public:
     return reinterpret_cast<const SerialExecutorWitnessTable*>(table);
   }
 
-  /// Do we have to do any work to start running as the requested
-  /// executor?
-  bool mustSwitchToRun(ExecutorRef newExecutor) const {
-    return Identity != newExecutor.Identity;
-  }
-
   /// Is this executor the main executor?
   bool isMainExecutor() const;
 
