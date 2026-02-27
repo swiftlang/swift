@@ -1429,6 +1429,22 @@ tryOptimizeGenericDisjunction(ConstraintSystem &cs, Constraint *disjunction,
     if (AFD->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
       return false;
 
+    // If a function has been converted to typed throws, let's ignore it
+    // when it's generic only over a thrown type now just like we would
+    // regular `throws` version.
+    if (auto thrownType = AFD->getThrownInterfaceType()) {
+      auto genericParams = AFD->getGenericParams();
+      // If there is only one generic parameter, check if it appears
+      // inside of thrown type i.e. `throws(E)` or `throws(MyError<E>)`.
+      if (thrownType->hasTypeParameter() && genericParams->size() == 1) {
+        auto paramTy =
+            genericParams->getParams().front()->getDeclaredInterfaceType();
+        if (thrownType.findIf(
+                [&paramTy](Type type) { return type->isEqual(paramTy); }))
+          return false;
+      }
+    }
+
     auto funcType = AFD->getInterfaceType();
     auto hasAnyOrOptional = funcType.findIf([](Type type) -> bool {
       if (type->getOptionalObjectType())

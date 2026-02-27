@@ -4205,6 +4205,23 @@ public:
                                            TypeMatchOptions flags,
                                            ConstraintLocatorBuilder locator);
 
+  enum ImpliedResultConversionKind : unsigned {
+    /// Usual subtyping rules apply.
+    None,
+    /// Accept Never subtype $T only.
+    FromNever,
+    /// Accept Never subtype $T, and $T subtype Void.
+    ToVoid
+  };
+
+  /// Determines if special subtyping rules for implied result contexts apply.
+  ///
+  /// We allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for
+  /// closure literals and expressions representing an implied result of
+  /// closures and if/switch expressions.
+  ImpliedResultConversionKind
+  getImpliedResultConversionKind(ConstraintLocator *locator);
+
 public: // FIXME: public due to statics in CSSimplify.cpp
   /// Attempt to match up types \c type1 and \c type2, which in effect
   /// is solving the given type constraint between these two types.

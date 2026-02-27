@@ -3263,6 +3263,7 @@ function Build-XCTest([Hashtable] $Platform) {
       CMAKE_Swift_FLAGS = $SwiftFlags;
       ENABLE_TESTING = "NO";
       XCTest_INSTALL_NESTED_SUBDIR = "YES";
+      SwiftTesting_DIR = (Get-ProjectCMakeModules $Platform Testing);
     }
 }
 
@@ -3286,7 +3287,7 @@ function Test-XCTest {
       Get-ProjectBinaryCache $BuildPlatform DynamicFoundation
     }
 
-    $env:Path = "$(Get-ProjectBinaryCache $BuildPlatform XCTest);${FoundationBinaryCache}\bin;${DispatchBinaryCache};${SwiftRuntime}\usr\bin;${env:Path};$UnixToolsBinDir"
+    $env:Path = "$(Get-ProjectBinaryCache $BuildPlatform XCTest);$(Get-ProjectBinaryCache $BuildPlatform Testing)\bin;${FoundationBinaryCache}\bin;${DispatchBinaryCache};${SwiftRuntime}\usr\bin;${env:Path};$UnixToolsBinDir"
     $env:SDKROOT = Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK
 
     Build-CMakeProject `
@@ -4361,8 +4362,8 @@ if (-not $SkipBuild) {
     }
 
     foreach ($Build in $WindowsSDKBuilds) {
-      Invoke-BuildStep Build-XCTest $Build
       Invoke-BuildStep Build-Testing $Build
+      Invoke-BuildStep Build-XCTest $Build
     }
 
     Write-PlatformInfoPlist Windows
@@ -4435,8 +4436,8 @@ if (-not $SkipBuild) {
     }
 
     foreach ($Build in $AndroidSDKBuilds) {
-      Invoke-BuildStep Build-XCTest $Build
       Invoke-BuildStep Build-Testing $Build
+      Invoke-BuildStep Build-XCTest $Build
     }
 
     Write-PlatformInfoPlist Android
