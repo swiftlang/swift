@@ -1270,6 +1270,17 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
   // (Supertypes, Subtypes)
   if (existing.Kind == AllowedBindingKind::Supertypes &&
       binding.Kind == AllowedBindingKind::Subtypes) {
+    // FIXME: Do this in diagnostic mode also
+    if (!CS.shouldAttemptFixes()) {
+      // The existing lower bound should be a subtype of the new upper bound.
+      if (canPossiblyConvertTo(CS, existing.BindingType, binding.BindingType,
+                               GenericSignature())) {
+        binding.Kind = AllowedBindingKind::Exact;
+        markConflicting();
+        return true;
+      }
+    }
+
     // FIXME: Dubious.
     if (binding.BindingType->isEqual(existing.BindingType))
       return true;
