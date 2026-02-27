@@ -7224,6 +7224,10 @@ public:
   /// type we can represent.
   Type getExistentialType() const;
 
+  /// Determine whether it's possible for this type to have an isolated
+  /// conformance. This could be prohibited in the generic signature.
+  bool mayHaveIsolatedConformance() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_ArchetypeType
