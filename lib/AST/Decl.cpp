@@ -2836,8 +2836,20 @@ ExportedLevel VarDecl::isLayoutExposedToClients() const {
 
   // Class layouts are not exposed to clients, except for subclassing.
   if (isa<ClassDecl>(parent) &&
-      !parent->hasOpenAccess(getDeclContext()))
-    return ExportedLevel::None;
+      !parent->hasOpenAccess(getDeclContext())) {
+
+    if (!parent->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+      return ExportedLevel::None;
+
+    // In embedded, we need to ensure the class has a deinit marked
+    // '@export(interface)'.
+    for (auto member : parent->getMembers()) {
+      if (isa<DestructorDecl>(member) &&
+          member->isNeverEmittedIntoClient()) {
+        return ExportedLevel::None;
+      }
+    }
+  }
 
   auto M = getDeclContext()->getParentModule();
   if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
