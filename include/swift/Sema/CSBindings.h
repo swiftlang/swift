@@ -431,17 +431,29 @@ class BindingSet {
 
   llvm::SmallPtrSet<TypeVariableType *, 4> AdjacentVars;
 
-  /// Set whenever transitive inference changes the binding set
-  /// after the constructor.
-  bool IsDirty = false;
-  /// Generation number of PotentialBindings.
+  /// Generation number of PotentialBindings at the time this BindingSet
+  /// was constructed.
   unsigned GenerationNumber = 0;
+
+  /// Flag indicating if we were in salvage when we constructed this
+  /// BindingSet.
+  bool Salvage : 1;
+
+  /// Set to true if the transitive inference process modified the binding set
+  /// after it was constructed.
+  bool IsDirty : 1;
+
   /// Computed early by computeLValueState().
-  KnownLValueKind LValueState = KnownLValueKind::Unknown;
+  unsigned LValueState : 2;
+
   /// Set when adding a binding that contradicts an existing binding
   /// or a conformance constraint on the type variable. See addBinding()
   /// and reduceBinding().
-  bool IsConflicting = 0;
+  bool IsConflicting : 1;
+
+  void setLValueState(KnownLValueKind kind) {
+    LValueState = unsigned(kind);
+  }
 
 public:
   swift::SmallVector<PotentialBinding, 4> Bindings;
@@ -492,12 +504,10 @@ public:
   }
 
   /// Check if this binding set is known to be up to date.
-  bool isUpToDate() const {
-    return (GenerationNumber == Info.GenerationNumber && !IsDirty);
-  }
+  bool isUpToDate() const;
 
   KnownLValueKind getLValueState() const {
-    return LValueState;
+    return KnownLValueKind(LValueState);
   }
 
   /// Whether we deduced that the adjacent constraints on this type

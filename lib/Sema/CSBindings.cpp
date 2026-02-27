@@ -57,6 +57,11 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
                        const PotentialBindings &info)
     : CS(CS), TypeVar(TypeVar), Info(info) {
   GenerationNumber = Info.GenerationNumber;
+  Salvage = CS.shouldAttemptFixes();
+  IsDirty = false;
+  IsConflicting = false;
+  LValueState = unsigned(KnownLValueKind::Unknown);
+
   computeLValueState();
 
   // Collect protocols first, so that addBinding() can make use of them.
@@ -90,22 +95,28 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
   ASSERT(!IsDirty);
 }
 
+bool BindingSet::isUpToDate() const {
+  return (!IsDirty &&
+          GenerationNumber == Info.GenerationNumber &&
+          Salvage == CS.shouldAttemptFixes());
+}
+
 void BindingSet::computeLValueState() {
   // If this type variable is not an lvalue, there is nothing to check.
   if (!TypeVar->getImpl().canBindToLValue()) {
-    LValueState = KnownLValueKind::RValue;
+    setLValueState(KnownLValueKind::RValue);
     return;
   }
 
   // If this type variable appears on the left-hand side of an LValueObject
   // constraint, we know it has to be bound to an lvalue type.
   if (!Info.LValueOf.empty()) {
-    LValueState = KnownLValueKind::LValue;
+    setLValueState(KnownLValueKind::LValue);
     return;
   }
 
   // Assume something is an rvalue unless proven otherwise.
-  LValueState = KnownLValueKind::RValue;
+  setLValueState(KnownLValueKind::RValue);
 
   for (auto *constraint : Info.DelayedBy) {
     // If this type variable is delayed by a disjunction or member reference,
@@ -117,7 +128,7 @@ void BindingSet::computeLValueState() {
     case ConstraintKind::ValueMember:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::OptionalObject:
-      LValueState = KnownLValueKind::Unknown;
+      setLValueState(KnownLValueKind::Unknown);
       return;
 
     // This handles subscript result types, which require one more level of
@@ -149,7 +160,7 @@ void BindingSet::computeLValueState() {
             case ConstraintKind::Disjunction:
             case ConstraintKind::ValueMember:
             case ConstraintKind::UnresolvedValueMember:
-              LValueState = KnownLValueKind::Unknown;
+              setLValueState(KnownLValueKind::Unknown);
               return;
             default:
               break;
