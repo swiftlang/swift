@@ -2890,6 +2890,10 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
         dispatch_DIR = (Get-ProjectCMakeModules $Platform CDispatch);
 
+        # FIXME(hjyamauchi) Should dynamic to libdispatch https://github.com/swiftlang/swift/issues/87548
+        CMAKE_CXX_FLAGS = $(if ($Static) { @("-Ddispatch_STATIC") } else { @() });
+        CMAKE_Swift_FLAGS = $(if ($Static) { @("-Xcc", "-static-libclosure") } else { @() });
+
         # FIXME(compnerd) remove this once the default option is flipped to `ON`.
         SwiftCore_ENABLE_BACKTRACING = "YES";
         # FIXME(compnerd) remove this once the default option is flipped to `ON`.
