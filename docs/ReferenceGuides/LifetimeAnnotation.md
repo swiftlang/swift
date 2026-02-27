@@ -295,3 +295,52 @@ takePicker { ne0, ne1 in
 }
 
 ```
+
+## Lifetime Subtyping
+
+For a function, method or closure to conform to an interface, the lifetime dependencies must match those specified by the interface. This applies to protocol method requirements and function types.
+Lifetime dependencies match if they are identical, or if the interface has a superset of the function's lifetime dependencies.
+It is safe to *add* lifetime dependencies, because the original, "real" dependencies will still be enforced.
+
+The rules for matching are as follows:
+- The lifetime dependencies for an individual target match if every dependence source present in the original function is also present for that target in the interface.
+- The matching dependencies must be of the same kind: a `copy` constraint in the original function must have a matching `copy` constraint in the interface.
+- An `immortal` dependency is treated as an empty list of sources: on a function it will match any interface, but only another `immortal` dependency can match an `immortal` dependency on an interface.
+- Dependencies with an `Escapable` source or target in the original function may be ignored, as described in "Dependency type requirements" above.
+- For the lifetimes to match overall, they must match for each lifetime target in the original function.
+
+```swift
+protocol P {
+  @_lifetime(copy a, copy c)
+  func foo(a: NE, b: NE, c: NE) -> NE
+}
+
+// OK: The only dependence, "result: copy a", is present in the protocol.
+struct SubsetAP: P {
+  @_lifetime(copy a)
+  func foo(a: NE, b: NE, c: NE) -> NE { a }
+}
+// Error: Result's "copy c" dependence is not present in the protocol.
+struct SupersetCopyP: P {
+  @_lifetime(copy a, copy b, copy c)
+  func foo(a: NE, b: NE, c: NE) -> NE { b }
+}
+```
+
+These test files have many examples of successful and unsuccessful lifetime subtype matching:
+- `test/decl/protocol/conforms/lifetime.swift`
+- `test/Sema/lifetime_dependence_functype.swift`
+
+For protocol method requirement parameters with function types, the subtyping rules apply in the opposite direction to what one might expect. A conforming implementation must accept any function that could be passed to the interface specified by the protocol. This means that the function type can have *more* restrictive lifetime:
+
+```swift
+protocol R {
+  func bar(
+    f: @_lifetime(copy a, copy c) (_ a: NE, _ b: NE, _ c: NE) -> NE)
+}
+// OK: Can accept functions of type @_lifetime(copy a, copy c) (_ a: NE, _ b: NE, _ c: NE) -> NE
+struct SupersetCopyR: R {
+  func bar(
+    f: @_lifetime(copy a, copy b, copy c) (_ a: NE, _ b: NE, _ c: NE) -> NE) {}
+}
+```
