@@ -122,3 +122,13 @@ func test_default_arguments_do_not_interfere() {
   _ = S(a: 42) { _ = 42 }
   _ = S(b: "") { _ = 42 }
 }
+
+// https://github.com/swiftlang/swift/issues/86461
+// Closure return type mismatch with callAsFunction should emit error, not crash.
+func test_callAsFunction_closure_return_type_mismatch() {
+  struct C {
+    func callAsFunction(_ update: () -> Int) {}
+  }
+
+  _ = C { } // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+}
