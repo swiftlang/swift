@@ -660,6 +660,19 @@ void BindingSet::inferTransitiveProtocolRequirements() {
   } while (!workList.empty());
 }
 
+static AllowedBindingKind flipBindingKind(AllowedBindingKind kind) {
+  switch (kind) {
+  case AllowedBindingKind::Exact:
+    return AllowedBindingKind::Exact;
+  case AllowedBindingKind::Supertypes:
+    return AllowedBindingKind::Subtypes;
+  case AllowedBindingKind::Subtypes:
+    return AllowedBindingKind::Supertypes;
+  case AllowedBindingKind::Fallback:
+    return AllowedBindingKind::Fallback;
+  }
+}
+
 void BindingSet::inferTransitiveKeyPathBindings() {
   // If the current type variable represents a key path root type
   // let's try to transitively infer its type through bindings of
@@ -672,9 +685,12 @@ void BindingSet::inferTransitiveKeyPathBindings() {
       if (node.hasBindingSet()) {
         const auto &bindings = node.getBindingSet();
 
+        // Look through all of the keypath type's bindings.
         for (auto &binding : bindings.Bindings) {
+          SmallVector<Type, 2> bindingOptionals;
           auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
 
+          auto inferredRootKind = AllowedBindingKind::Exact;
           Type inferredRootTy;
           if (bindingTy->isKnownKeyPathType()) {
             // AnyKeyPath doesn't have a root type.
@@ -683,16 +699,21 @@ void BindingSet::inferTransitiveKeyPathBindings() {
 
             auto *BGT = bindingTy->castTo<BoundGenericType>();
             inferredRootTy = BGT->getGenericArgs()[0];
+
+            // The generic argument of a keypath type is invariant.
+            inferredRootKind = AllowedBindingKind::Exact;
           } else if (auto *fnType = bindingTy->getAs<FunctionType>()) {
-            if (fnType->getNumParams() == 1)
+            if (fnType->getNumParams() == 1) {
               inferredRootTy = fnType->getParams()[0].getParameterType();
+
+              // The parameter of a function type is contravariant.
+              inferredRootKind = binding.Kind;
+            }
           }
 
           if (inferredRootTy) {
             // If contextual root is not yet resolved, let's try to see if
-            // there are any bindings in its set. The bindings could be
-            // transitively used because conversions between generic arguments
-            // are not allowed.
+            // there are any bindings in its set.
             if (auto *contextualRootVar = inferredRootTy->getAs<TypeVariableType>()) {
               auto &node = CS.getConstraintGraph()[contextualRootVar];
               if (node.hasBindingSet()) {
@@ -702,9 +723,36 @@ void BindingSet::inferTransitiveKeyPathBindings() {
                 if (bindings.isDelayed())
                   continue;
 
-                // Copy the bindings over to the root.
-                for (const auto &binding : bindings.Bindings)
-                  addBinding(binding.asTransitiveFrom(contextualRootVar));
+                // Look at all of the inferred root type's bindings, and copy
+                // them over to our binding set.
+                for (const auto &binding : bindings.Bindings) {
+                  AllowedBindingKind newKind;
+
+                  // Only consider bindings with the correct variance.
+
+                  // If we're looking at an exact binding, add a new binding
+                  // with the variance of the binding we're using to look
+                  // through.
+                  if (binding.Kind == AllowedBindingKind::Exact)
+                    newKind = inferredRootKind;
+                  // If the binding we're using to look through is exact,
+                  // preserve the variance.
+                  else if (inferredRootKind == AllowedBindingKind::Exact)
+                    newKind = binding.Kind;
+                  // If the binding we're using to look through has the
+                  // smae variance as the binding we're looking at, add
+                  // it and preserve its variance.
+                  else if (inferredRootKind == binding.Kind)
+                    newKind = inferredRootKind;
+                  // Skip the binding if it has the opposite variance of
+                  // the one we're looking through.
+                  else
+                    continue;
+
+                  auto newBinding = binding.withSameSource(
+                      binding.BindingType, newKind);
+                  addBinding(newBinding.asTransitiveFrom(contextualRootVar));
+                }
 
                 // Make a note that the key path root is transitively adjacent
                 // to contextual root type variable and all of its variables.
@@ -717,8 +765,11 @@ void BindingSet::inferTransitiveKeyPathBindings() {
                 markDirty();
               }
             } else {
+
+              // We have a concrete root type. Add a binding for it to
+              // our binding set.
               auto newBinding = binding.withSameSource(
-                  inferredRootTy, AllowedBindingKind::Exact);
+                  inferredRootTy, flipBindingKind(inferredRootKind));
               addBinding(newBinding.asTransitiveFrom(keyPathTy));
 
               // Note the fact that we modified the binding set.
