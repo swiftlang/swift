@@ -3,7 +3,9 @@
 
 // REQUIRES: swift_feature_BorrowAndMutateAccessors
 
-public final class Klass {}
+public final class Klass {
+  let id: Int = 0
+}
 
 public struct NC : ~Copyable {}
 
@@ -144,6 +146,12 @@ public struct Wrapper {
   var global_k4: AnyObject {
     borrow {
       return global_generic
+    }
+  }
+
+  var class_let: Int {
+    borrow {
+      return _k.id
     }
   }
 }

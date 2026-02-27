@@ -135,6 +135,12 @@ public struct Wrapper {
       return global_var // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
     }
   }
+
+  var class_var: Int {
+    borrow {
+      return _k.id // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+    }
+  }
 }
 
 public struct SimpleWrapper<T> {
