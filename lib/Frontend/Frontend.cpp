@@ -516,7 +516,8 @@ void CompilerInstance::setupOutputBackend() {
     CASOutputBackend = createSwiftCachingOutputBackend(
         *CAS, *ResultCache, *CompileJobBaseKey, InAndOuts,
         Invocation.getFrontendOptions(),
-        Invocation.getFrontendOptions().RequestedAction);
+        Invocation.getFrontendOptions().RequestedAction,
+        Invocation.getCASOptions().WriteOutputHashXAttr);
 
     if (Invocation.getIRGenOptions().UseCASBackend) {
       auto OutputFiles = InAndOuts.copyOutputFilenames();

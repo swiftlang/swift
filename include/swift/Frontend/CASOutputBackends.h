@@ -47,7 +47,8 @@ public:
                         llvm::cas::ObjectRef BaseKey,
                         const FrontendInputsAndOutputs &InputsAndOutputs,
                         const FrontendOptions &Opts,
-                        FrontendOptions::ActionType Action);
+                        FrontendOptions::ActionType Action,
+                        bool WriteOutputHashXAttr);
   ~SwiftCASOutputBackend();
 
   llvm::Error storeCachedDiagnostics(unsigned InputIndex,

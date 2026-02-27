@@ -928,7 +928,8 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
   if (!replayCachedCompilerOutputsForInput(
           CAS, Comp.Output, Input, Comp.InputIndex, Inst.getDiags(), DH,
           Backend, Instance.Invocation.getFrontendOptions(), *CDP, Remarks,
-          UseCASBackend)) {
+          UseCASBackend,
+          Instance.Invocation.getCASOptions().WriteOutputHashXAttr)) {
     Inst.getDiags().diagnose(SourceLoc(), diag::cache_replay_failed,
                              "failed to load all outputs");
   }

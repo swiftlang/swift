@@ -836,6 +836,7 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
       OPT_cache_compile_job, OPT_no_cache_compile_job, /*Default=*/false);
   Opts.EnableCachingRemarks |= Args.hasArg(OPT_cache_remarks);
   Opts.CacheSkipReplay |= Args.hasArg(OPT_cache_disable_replay);
+  Opts.WriteOutputHashXAttr |= Args.hasArg(OPT_write_output_hash_xattr);
   if (const Arg *A = Args.getLastArg(OPT_cas_path))
     Opts.CASOpts.CASPath = A->getValue();
 
@@ -864,6 +865,12 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
 
   if (!Opts.ClangIncludeTree.empty() || !Opts.ClangIncludeTreeFileList.empty())
     Opts.HasImmutableFileSystem = true;
+
+  if (Opts.WriteOutputHashXAttr && !Opts.EnableCaching) {
+    Diags.diagnose(SourceLoc(),
+                         diag::error_write_output_hash_xattr_requires_caching);
+    return true;
+  }
 
   return false;
 }
@@ -4181,6 +4188,17 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.UseCASBackend |= Args.hasArg(OPT_cas_backend);
   Opts.EmitCASIDFile |= Args.hasArg(OPT_cas_emit_casid_file);
+
+  if (CASOpts.WriteOutputHashXAttr && Opts.UseCASBackend) {
+    Diags.diagnose(SourceLoc(), diag::error_option_incompatible,
+                         "-cas-backend", "-write-output-hash-xattr");
+    return true;
+  }
+  if (CASOpts.WriteOutputHashXAttr && Opts.EmitCASIDFile) {
+    Diags.diagnose(SourceLoc(), diag::error_option_incompatible,
+                         "-cas-emit-casid-file", "-write-output-hash-xattr");
+    return true;
+  }
 
   Opts.DebugCallsiteInfo |= Args.hasArg(OPT_debug_callsite_info);
 

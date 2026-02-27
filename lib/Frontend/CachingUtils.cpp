@@ -36,6 +36,7 @@
 #include "llvm/MCCAS/MCCASObjectV1.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
+#include "llvm/CASUtil/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -60,9 +61,10 @@ llvm::IntrusiveRefCntPtr<SwiftCASOutputBackend> createSwiftCachingOutputBackend(
     llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
     llvm::cas::ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
-    const FrontendOptions &Opts, FrontendOptions::ActionType Action) {
+    const FrontendOptions &Opts, FrontendOptions::ActionType Action,
+    bool WriteOutputHashXAttr) {
   return makeIntrusiveRefCnt<SwiftCASOutputBackend>(
-      CAS, Cache, BaseKey, InputsAndOutputs, Opts, Action);
+      CAS, Cache, BaseKey, InputsAndOutputs, Opts, Action, WriteOutputHashXAttr);
 }
 
 Error cas::CachedResultLoader::replay(CallbackTy Callback) {
@@ -147,7 +149,7 @@ static bool replayCachedCompilerOutputsImpl(
     ArrayRef<CacheInputEntry> Inputs, ObjectStore &CAS, DiagnosticEngine &Diag,
     const FrontendOptions &Opts, CachingDiagnosticsProcessor &CDP,
     DiagnosticHelper *DiagHelper, OutputBackend &Backend, bool CacheRemarks,
-    bool UseCASBackend) {
+    bool UseCASBackend, bool WriteOutputHashXAttr) {
   bool CanReplayAllOutput = true;
   struct OutputEntry {
     std::string Path;
@@ -317,6 +319,13 @@ static bool replayCachedCompilerOutputsImpl(
                     toString(std::move(E)));
       continue;
     }
+    if (WriteOutputHashXAttr &&
+        Output.Kind == Opts.InputsAndOutputs.getPrincipalOutputType()) {
+      if (auto E = llvm::cas::writeCASHashXAttr(
+              CAS.getID(Output.Proxy.getRef()), Output.Path))
+        Diag.diagnose(SourceLoc(), diag::error_cas, "writing output hash xattr",
+                      toString(std::move(E)));
+    }
     if (CacheRemarks)
       Diag.diagnose(SourceLoc(), diag::replay_output, Output.Path,
                     Output.Key.toString());
@@ -330,7 +339,8 @@ static bool replayCachedCompilerOutputsImpl(
 bool replayCachedCompilerOutputs(
     ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
     DiagnosticEngine &Diag, const FrontendOptions &Opts,
-    CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend) {
+    CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend,
+    bool WriteOutputHashXAttr) {
   // Compute all the inputs need replay.
   llvm::SmallVector<CacheInputEntry> Inputs;
   auto AllInputs = Opts.InputsAndOutputs.getAllInputs();
@@ -385,18 +395,20 @@ bool replayCachedCompilerOutputs(
   llvm::vfs::OnDiskOutputBackend Backend;
   return replayCachedCompilerOutputsImpl(Inputs, CAS, Diag, Opts, CDP,
                                          /*DiagHelper=*/nullptr, Backend,
-                                         CacheRemarks, UseCASBackend);
+                                         CacheRemarks, UseCASBackend,
+                                         WriteOutputHashXAttr);
 }
 
 bool replayCachedCompilerOutputsForInput(
     ObjectStore &CAS, ObjectRef OutputRef, const InputFile &Input,
     unsigned InputIndex, DiagnosticEngine &Diag, DiagnosticHelper &DiagHelper,
     OutputBackend &OutBackend, const FrontendOptions &Opts,
-    CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend) {
+    CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend,
+    bool WriteOutputHashXAttr) {
   llvm::SmallVector<CacheInputEntry> Inputs = {{Input, InputIndex, OutputRef}};
   return replayCachedCompilerOutputsImpl(Inputs, CAS, Diag, Opts, CDP,
                                          &DiagHelper, OutBackend, CacheRemarks,
-                                         UseCASBackend);
+                                         UseCASBackend, WriteOutputHashXAttr);
 }
 
 std::unique_ptr<llvm::MemoryBuffer>
