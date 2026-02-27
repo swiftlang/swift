@@ -54,21 +54,25 @@ set(SWIFT_SYNTAX_MODULES
   SwiftLibraryPluginProvider
 )
 
+set(SWIFT_SYNTAX_TEST_MODULES
+  # For macro plugin testing.
+  _SwiftSyntaxGenericTestSupport
+  SwiftSyntaxMacrosGenericTestSupport
+)
+
 # Install shared runtime libraries
 if(CMAKE_SYSTEM_NAME MATCHES Windows)
   swift_install_in_component(TARGETS ${SWIFT_SYNTAX_MODULES}
                              RUNTIME
                              DESTINATION "bin"
                              COMPONENT swift-syntax-lib)
-else()
-  swift_install_in_component(TARGETS ${SWIFT_SYNTAX_MODULES}
-                             LIBRARY
-                             DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
-                             COMPONENT swift-syntax-lib)
-endif()
 
-# Install import libraries in Windows.
-if(CMAKE_SYSTEM_NAME MATCHES Windows)
+  swift_install_in_component(TARGETS ${SWIFT_SYNTAX_TEST_MODULES}
+                             RUNTIME
+                             DESTINATION "bin"
+                             COMPONENT swift-syntax-dev)
+
+  # Install import libraries.
   list(TRANSFORM SWIFT_SYNTAX_MODULES
        PREPEND "${CMAKE_IMPORT_LIBRARY_PREFIX}"
        OUTPUT_VARIABLE SWIFT_SYNTAX_IMPORT_LIBRARIES)
@@ -80,26 +84,38 @@ if(CMAKE_SYSTEM_NAME MATCHES Windows)
        OUTPUT_VARIABLE SWIFT_SYNTAX_IMPORT_LIBRARIES)
   swift_install_in_component(PROGRAMS "${SWIFT_SYNTAX_IMPORT_LIBRARIES}"
                              DESTINATION lib
+                             COMPONENT swift-syntax-dev)
+else()
+  swift_install_in_component(TARGETS ${SWIFT_SYNTAX_MODULES}
+                             LIBRARY
+                             DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
                              COMPONENT swift-syntax-lib)
+  swift_install_in_component(TARGETS ${SWIFT_SYNTAX_TEST_MODULES}
+                             LIBRARY
+                             DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
+                             COMPONENT swift-syntax-dev)
 endif()
 
 add_dependencies(swift-syntax-lib
   ${SWIFT_SYNTAX_MODULES})
+add_dependencies(swift-syntax-dev
+  ${SWIFT_SYNTAX_MODULES} ${SWIFT_SYNTAX_TEST_MODULES})
 
 if(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
     add_dependencies(swift-syntax-lib swift-stdlib-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+    add_dependencies(swift-syntax-dev swift-stdlib-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
 endif()
 
 # Install Swift module interface files.
-foreach(module ${SWIFT_SYNTAX_MODULES})
+foreach(module ${SWIFT_SYNTAX_MODULES} ${SWIFT_SYNTAX_TEST_MODULES})
   set(module_dir "${module}.swiftmodule")
   set(module_file "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${module_dir}/${SWIFT_HOST_MODULE_TRIPLE}")
   swift_install_in_component(FILES "${module_file}.swiftinterface" "${module_file}.private.swiftinterface"
                              DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/${module_dir}"
-                             COMPONENT swift-syntax-lib)
+                             COMPONENT swift-syntax-dev)
 endforeach()
 
-export(TARGETS ${SWIFT_SYNTAX_MODULES}
+export(TARGETS ${SWIFT_SYNTAX_MODULES} ${SWIFT_SYNTAX_TEST_MODULES}
        NAMESPACE SwiftSyntax::
        FILE ${CMAKE_BINARY_DIR}/cmake/modules/SwiftSyntaxConfig.cmake
        EXPORT_LINK_INTERFACE_LIBRARIES)
