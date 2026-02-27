@@ -62,7 +62,7 @@ public func _cxxOverrideLifetime<
 ///
 /// C++ standard library type `std::span` conforms to this protocol.
 public protocol CxxSpan<Element> {
-  associatedtype Element
+  associatedtype Element: ~Copyable
   associatedtype Size: BinaryInteger
 
   init()
@@ -72,7 +72,7 @@ public protocol CxxSpan<Element> {
   func __dataUnsafe() -> UnsafePointer<Element>?
 }
 
-extension CxxSpan {
+extension CxxSpan where Element: ~Copyable {
   /// Creates a C++ span from a Swift UnsafeBufferPointer
   @_alwaysEmitIntoClient
   public init(_ unsafeBufferPointer: UnsafeBufferPointer<Element>) {
@@ -100,7 +100,7 @@ extension CxxSpan {
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
-extension Span {
+extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @unsafe
   @_unsafeNonescapableResult
@@ -116,7 +116,7 @@ extension Span {
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
-extension MutableSpan {
+extension MutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @unsafe
   @_unsafeNonescapableResult
@@ -132,7 +132,7 @@ extension MutableSpan {
 }
 
 public protocol CxxMutableSpan<Element> {
-  associatedtype Element
+  associatedtype Element: ~Copyable
   associatedtype Size: BinaryInteger
 
   init()
@@ -142,7 +142,7 @@ public protocol CxxMutableSpan<Element> {
   func __dataUnsafe() -> UnsafeMutablePointer<Element>?
 }
 
-extension CxxMutableSpan {
+extension CxxMutableSpan where Element: ~Copyable {
   /// Creates a C++ span from a Swift UnsafeMutableBufferPointer
   @_alwaysEmitIntoClient
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {

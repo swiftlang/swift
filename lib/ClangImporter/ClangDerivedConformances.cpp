@@ -921,6 +921,11 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   conformToCxxBorrowingSequenceIfNedded(impl, decl, clangDecl,
                                         rawIteratorConformance);
 
+  // `CxxSequence` and `CxxRandomAccessCollection` protocols require `Element`
+  // to be Copyable and Escapable
+  if (!pointeeTy->isCopyable() || !pointeeTy->isEscapable())
+    return;
+
   // CxxSequence conformance.
   // Take the default definition of `Iterator` from CxxSequence protocol. This
   // type is currently `CxxIterator<Self>`.
