@@ -88,8 +88,12 @@ class SubscriptDecl;
 class ValueDecl;
 
 /// Check whether the given declaration context is from a system module.
+/// Uses dyn_cast because the DeclContext may originate from a Swift module
+/// re-imported via a -Swift.h bridging header, not a Clang module.
 inline bool isInSystemModule(const DeclContext *D) {
-  return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
+  if (auto *clangUnit = dyn_cast<ClangModuleUnit>(D->getModuleScopeContext()))
+    return clangUnit->isSystemModule();
+  return false;
 }
 
 /// Describes the kind of conversion to apply to a constant value.
