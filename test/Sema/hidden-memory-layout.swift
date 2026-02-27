@@ -676,6 +676,7 @@ public class PublicClassUser: ProtocolFromDirect {
 
 public class PublicClassUserWithoutDeinit: ProtocolFromDirect {
 // expected-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
+// expected-embedded-note @-2 4 {{add a '@export(interface)' deinit to the class for properties to reference a hidden dependency. This is a restriction in Embedded mode.}}
 
   public init() { fatalError() }
 
