@@ -1116,10 +1116,20 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
   // (Exact, Exact)
   if (existing.Kind == AllowedBindingKind::Exact &&
       binding.Kind == AllowedBindingKind::Exact) {
-    if (binding.BindingType->isEqual(existing.BindingType))
+    // If we have two incompatible Exact bindings, our partial solution so far
+    // is unsatisfiable. Mark this binding set as conflicting, so that we
+    // attempt it next and fail as soon as possible.
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && !*result) {
+      markConflicting();
+    }
+
+    // In any case, drop all Exact bindings but the first one, because it
+    // doesn't matter which one we attempt.
+    if (!CS.shouldAttemptFixes())
       return false;
 
-    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    // FIXME: Drop exact bindings in diagnostic mode also
     if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
         return false;
