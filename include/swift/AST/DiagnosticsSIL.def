@@ -1267,11 +1267,11 @@ ERROR(noncopyable_shared_case_block_unimplemented, none,
 
 /// Borrow and mutate accessors
 ERROR(invalid_borrow_accessor_return, none,
-      "invalid return value from borrow accessor", ())
+      "invalid return value from a %0 accessor", (StringRef))
 NOTE(borrow_accessor_not_a_projection_note, none,
-     "borrow accessors can return either stored properties or computed "
-     "properties that have borrow accessors",
-     ())
+     "%0 accessors can return stored properties, computed properties with "
+     "%0 accessors or global 'let' declarations",
+     (StringRef))
 ERROR(invalid_multiple_return_borrow_accessor, none,
       "multiple return statements in borrow accessors are not yet supported",
       ())
