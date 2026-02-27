@@ -92,10 +92,13 @@ extension CxxSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @unsafe
   public init(_ span: Span<Element>) {
-    let (p, c) = unsafe unsafeBitCast(span, to: (UnsafeRawPointer?, Int).self)
-    unsafe precondition(p != nil, "Span should not point to nil")
-    let binding = unsafe p!.bindMemory(to: Element.self, capacity: c)
-    unsafe self.init(binding, Size(c))
+    let p = unsafe span.withUnsafeBufferPointer {
+        unsafe $0
+    }
+    defer {
+      _fixLifetime(span)
+    }
+    unsafe self.init(p)
   }
 }
 
@@ -155,9 +158,12 @@ extension CxxMutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @unsafe
   public init(_ span: consuming MutableSpan<Element>) {
-    let (p, c) = unsafe unsafeBitCast(span, to: (UnsafeMutableRawPointer?, Int).self)
-    unsafe precondition(p != nil, "Span should not point to nil")
-    let binding = unsafe p!.bindMemory(to: Element.self, capacity: c)
-    unsafe self.init(binding, Size(c))
+    let p = unsafe span.withUnsafeMutableBufferPointer {
+        unsafe $0
+    }
+    defer {
+      _fixLifetime(span)
+    }
+    unsafe self.init(p)
   }
 }
