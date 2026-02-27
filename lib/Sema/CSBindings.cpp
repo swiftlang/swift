@@ -1141,6 +1141,18 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
   // (Exact, Supertypes)
   if (existing.Kind == AllowedBindingKind::Exact &&
       binding.Kind == AllowedBindingKind::Supertypes) {
+    // FIXME: Do this in diagnostic mode also
+    if (!CS.shouldAttemptFixes()) {
+      // Existing exact binding must be a supertype of the new lower bound.
+      if (canPossiblyConvertTo(CS, binding.BindingType, existing.BindingType,
+                               GenericSignature())) {
+        markConflicting();
+      }
+
+      // Once we have an Exact binding, we don't need anything else.
+      return false;
+    }
+
     if (binding.BindingType->isEqual(existing.BindingType))
       return false;
   }
