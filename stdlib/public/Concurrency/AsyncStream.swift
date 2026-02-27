@@ -466,7 +466,9 @@ extension AsyncStream {
   /// - Returns: A tuple containing the stream and its continuation. The continuation should be passed to the
   /// producer while the stream should be passed to the consumer.
   @available(SwiftStdlib 5.1, *)
+  #if !hasFeature(Embedded)
   @backDeployed(before: SwiftStdlib 5.9)
+  #endif
   public static func makeStream(
       of elementType: Element.Type = Element.self,
       bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded

@@ -1988,7 +1988,7 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
 
     diagnoseBorrowInoutType(currentDecl, repr->getLoc(), DC);
     diagnoseBorrowingSequenceType(currentDecl, repr->getLoc(), DC);
-    
+
     repr->setValue(currentDecl, currentDC);
     return current;
   }
@@ -2222,7 +2222,7 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
     member = memberTypes.back().Member;
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
-    
+
     diagnoseBorrowingSequenceType(member, repr->getLoc(), DC);
   }
 
