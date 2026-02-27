@@ -6,6 +6,9 @@
 // RUN: %check-interop-cxx-header-in-clang(%t/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function -Wc++98-compat-extra-semi -DDEBUG=1)
 
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_BorrowingSequence
+// REQUIRES: swift_feature_Reparenting
+// REQUIRES: swift_feature_AddressableParameters
 
 // CHECK: namespace swift SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("swift") {
 

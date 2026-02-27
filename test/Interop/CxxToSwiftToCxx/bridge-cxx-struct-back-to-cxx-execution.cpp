@@ -13,6 +13,9 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_BorrowingSequence
+// REQUIRES: swift_feature_Reparenting
+// REQUIRES: swift_feature_AddressableParameters
 
 //--- header.h
 
