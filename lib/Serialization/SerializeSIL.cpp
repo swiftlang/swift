@@ -3303,9 +3303,12 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
 }
 
 void SILSerializer::writeSILVTable(const SILVTable &vt) {
+  auto &astContext = vt.getClass()->getASTContext();
   // Do not emit vtables for non-public classes unless everything has to be
   // serialized.
   if (!Options.SerializeAllSIL &&
+      // In Embedded we should serialize everything.
+      !astContext.LangOpts.hasFeature(Feature::Embedded) &&
       vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Package)
     return;
 
@@ -3314,7 +3317,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 
   // Use the mangled name of the class as a key to distinguish between classes
   // which have the same name (but are in different contexts).
-  Mangle::ASTMangler mangler(vt.getClass()->getASTContext());
+  Mangle::ASTMangler mangler(astContext);
   std::string mangledClassName = mangler.mangleNominalType(vt.getClass());
   size_t nameLength = mangledClassName.size();
   char *stringStorage = (char *)StringTable.Allocate(nameLength, 1);
