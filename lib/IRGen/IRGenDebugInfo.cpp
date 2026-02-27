@@ -2293,8 +2293,11 @@ private:
           return createSpecializedEnumType(EnumTy, Decl, MangledName,
                                            SizeInBits, AlignInBits, Scope, File,
                                            FwdDeclLine, Flags);
-        if (CompletedDbgTy)
-          return createEnumType(*CompletedDbgTy, Decl, MangledName, AlignInBits,
+        // If we do not know the size of this type, pass a size of 0.
+        // FIXME: createEnumType should not require a sized debug info type.
+        if (!CompletedDbgTy)
+          CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy, 0);
+        return createEnumType(*CompletedDbgTy, Decl, MangledName, AlignInBits,
                                 Scope, L.File, L.Line, Flags);
       }
       return createOpaqueStructWithSizedContainer(
@@ -2803,12 +2806,16 @@ private:
     if (auto *Decl = DbgTy.getDecl())
       Name = Decl->getName().str();
 
-    // If this is a forward decl, create one for this mangled name and don't
-    // cache it.
-    if (!isa<PrimaryArchetypeType>(DbgTy.getType()) &&
-        !isa<TypeAliasType>(DbgTy.getType()) &&
-        (DbgTy.isForwardDecl() || DbgTy.isFixedBuffer() ||
-         !completeType(DbgTy))) {
+    // If this type can have a definition that provides us with its layout/size,
+    // then only emit a forward declaration.
+    // TODO: This check can probably be simplified and generalized.
+    const bool RequiresSize =
+      !isa<PrimaryArchetypeType>(DbgTy.getType()) &&
+      !DbgTy.getType()->hasArchetype() &&
+      !isa<TypeAliasType>(DbgTy.getType());
+    const bool HasNoFixedSize = DbgTy.isForwardDecl() || DbgTy.isFixedBuffer() ||
+        !completeType(DbgTy);
+    if (RequiresSize && HasNoFixedSize) {
       // In LTO type uniquing is performed based on the UID. Forward
       // declarations may not have a unique ID to avoid a forward declaration
       // winning over a full definition.

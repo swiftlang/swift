@@ -8,7 +8,7 @@ struct Slab<let N: Int, Element: ~Copyable>: ~Copyable {
 
 extension Slab: Copyable where Element: Copyable {}
 
-// CHECK-DAG: !DICompositeType({{.*}}name: "$sxq_BVD"
+// CHECK-DAG: !DICompositeType({{.*}}name: "Builtin.FixedArray"
 func genericBA<let N: Int, Element>(_: Builtin.FixedArray<N, Element>) {}
 
 // CHECK-DAG: !DICompositeType({{.*}}name: "$s4main4SlabVyxq_GD"
