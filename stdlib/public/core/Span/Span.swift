@@ -931,7 +931,8 @@ extension Span where Element: ~Copyable {
 @available(SwiftStdlib 6.4, *)
 extension Span: BorrowingSequence where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
-  @_lifetime(borrow self)
+  @inlinable
+  @lifetime(borrow self)
   public func makeBorrowingIterator() -> SpanIterator<Element> {
     SpanIterator(self)
   }

@@ -623,6 +623,7 @@ extension InlineArray: BorrowingSequence where Element: ~Copyable {
   public typealias BorrowingIterator = SpanIterator<Element>
   
   @available(SwiftStdlib 6.4, *)
+  @inlinable
   @lifetime(borrow self)
   public func makeBorrowingIterator() -> SpanIterator<Element> {
     SpanIterator(self.span)

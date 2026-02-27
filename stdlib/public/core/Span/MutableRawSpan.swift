@@ -771,6 +771,7 @@ extension MutableRawSpan {
 @available(SwiftStdlib 6.4, *)
 extension MutableRawSpan: BorrowingSequence {
   @available(SwiftStdlib 6.4, *)
+  @inlinable
   @lifetime(borrow self)
   public func makeBorrowingIterator() -> SpanIterator<UInt8> {
     SpanIterator(self.bytes._span)
