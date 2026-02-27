@@ -5367,6 +5367,16 @@ Type getDynamicSelfReplacementType(Type baseObjTy, const ValueDecl *member,
 
 ValueDecl *getOverloadChoiceDecl(Constraint *choice);
 
+/// Determine whether this type is considered `Sendable` when captured
+/// i.e. a base type of a partially applied member reference.
+///
+/// The requirement here is more strict than regular `Sendable` conformance:
+///  - The type has to conform to `Sendable`;
+///  - All referenced type parameters have to conform to `SendableMetatype`.
+///
+/// This function requires the type to be fully resolved.
+bool isSendableCapture(Type type);
+
 /// Find any references to external type variables used in the body of a
 /// conjunction element (e.g closures, taps, if/switch expressions).
 ///
