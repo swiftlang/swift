@@ -291,12 +291,35 @@ extension CheckedContinuation {
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
 @inlinable
+@_alwaysEmitIntoClient
+@available(SwiftStdlib 5.1, *)
+// ABI Note: We need to use @abi here because the ABI of this function otherwise conflicts with the legacy
+// @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit actor parameter
+@abi(
+  nonisolated(nonsending) func withCheckedContinuationNonisolatedNonsending<T>(
+    function: String,
+    _ body: (CheckedContinuation<T, Never>) -> Void
+  ) async -> sending T
+)
+public nonisolated(nonsending) func withCheckedContinuation<T>(
+  function: String = #function,
+  _ body: (CheckedContinuation<T, Never>) -> Void
+) async -> sending T {
+  return await Builtin.withUnsafeContinuation {
+    let unsafeContinuation = unsafe UnsafeContinuation<T, Never>($0)
+    return body(unsafe CheckedContinuation(continuation: unsafeContinuation,
+                                           function: function))
+  }
+}
+
+@inlinable
 @available(SwiftStdlib 5.1, *)
 #if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
-public func withCheckedContinuation<T>(
-  isolation: isolated (any Actor)? = #isolation,
+@available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
+public func withCheckedContinuation<T>( // source-compatibility overload
+  isolation: isolated (any Actor)?,
   function: String = #function,
   _ body: (CheckedContinuation<T, Never>) -> Void
 ) async -> sending T {
@@ -355,12 +378,61 @@ public func _unsafeInheritExecutor_withCheckedContinuation<T>(
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
 @inlinable
+@_alwaysEmitIntoClient
+@available(SwiftStdlib 5.1, *)
+// ABI Note: We need to use @abi here because the ABI of this function otherwise conflicts with the legacy
+// @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit actor parameter
+@abi(
+  nonisolated(nonsending) func withCheckedThrowingContinuationNonisolatedNonsending<T, E>(
+    function: String,
+    _ body: (CheckedContinuation<T, E>) -> Void
+  ) async throws(E) -> sending T
+)
+public nonisolated(nonsending) func withCheckedThrowingContinuation<T, E>(
+  function: String = #function,
+  _ body: (CheckedContinuation<T, E>) -> Void
+) async throws(E) -> sending T {
+  do {
+    return try await Builtin.withUnsafeThrowingContinuation {
+      let unsafeContinuation = unsafe UnsafeContinuation<T, E>($0)
+      return body(unsafe CheckedContinuation(continuation: unsafeContinuation,
+                                             function: function))
+    }
+  } catch {
+    throw error as! E
+  }
+}
+
+@inlinable
+@_alwaysEmitIntoClient
+@available(SwiftStdlib 5.1, *)
+// ABI Note: We need to use @abi here because the ABI of this function otherwise conflicts with the legacy
+// @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit actor parameter
+@abi(
+  nonisolated(nonsending) func withCheckedThrowingContinuationNonisolatedNonsending<T>(
+    function: String,
+    _ body: (CheckedContinuation<T, Error>) -> Void
+  ) async throws(Error) -> sending T
+)
+public nonisolated(nonsending) func withCheckedThrowingContinuation<T>( // nonsending + untyped throws
+  function: String = #function,
+  _ body: (CheckedContinuation<T, Error>) -> Void
+) async throws(Error) -> sending T {
+  return try await Builtin.withUnsafeThrowingContinuation {
+    let unsafeContinuation = unsafe UnsafeContinuation<T, Error>($0)
+    return body(unsafe CheckedContinuation(continuation: unsafeContinuation,
+                                           function: function))
+  }
+}
+
+@inlinable
 @available(SwiftStdlib 5.1, *)
 #if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
+@available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
 public func withCheckedThrowingContinuation<T>(
-  isolation: isolated (any Actor)? = #isolation,
+  isolation: isolated (any Actor)?,
   function: String = #function,
   _ body: (CheckedContinuation<T, Error>) -> Void
 ) async throws -> sending T {
