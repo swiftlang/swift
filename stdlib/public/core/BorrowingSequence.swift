@@ -170,7 +170,8 @@ extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyab
   public func _customContainsEquatableElement(_ element: borrowing Element) -> Bool? { nil }
 }
 
-// FIXME: Elminate these overloads once Sequence is reparented.
+// FIXME: Elminate these overloads once Sequence is reparented, they break ambiguity for
+// types that conform to both BorrowingSequence and Sequence or Collection.
 
 @available(SwiftStdlib 6.4, *)
 extension Sequence where Self: BorrowingSequence {
@@ -223,55 +224,5 @@ extension Sequence where Self: BorrowingSequence {
   @_transparent
   public func makeBorrowingIterator() -> BorrowingIteratorAdapter<Iterator> {
     BorrowingIteratorAdapter(iterator: makeIterator())
-  }
-}
-
-// MARK: Conformances
-
-@available(SwiftStdlib 6.4, *)
-extension Span: BorrowingSequence where Element: ~Copyable {
-  @available(SwiftStdlib 6.4, *)
-  @_lifetime(borrow self)
-  public func makeBorrowingIterator() -> SpanIterator<Element> {
-    SpanIterator(self)
-  }
-}
-
-@available(SwiftStdlib 6.4, *)
-extension MutableSpan: BorrowingSequence where Element: ~Copyable {
-  @available(SwiftStdlib 6.4, *)
-  @lifetime(borrow self)
-  public func makeBorrowingIterator() -> SpanIterator<Element> {
-    SpanIterator(self.span)
-  }
-}
-
-@available(SwiftStdlib 6.4, *)
-extension RawSpan: BorrowingSequence {
-  @available(SwiftStdlib 6.4, *)
-  @lifetime(borrow self)
-  public func makeBorrowingIterator() -> SpanIterator<UInt8> {
-    SpanIterator(self._span)
-  }
-}
-
-@available(SwiftStdlib 6.4, *)
-extension MutableRawSpan: BorrowingSequence {
-  @available(SwiftStdlib 6.4, *)
-  @lifetime(borrow self)
-  public func makeBorrowingIterator() -> SpanIterator<UInt8> {
-    SpanIterator(self.bytes._span)
-  }
-}
-
-@available(SwiftStdlib 6.2, *)
-extension InlineArray: BorrowingSequence where Element: ~Copyable {
-  @available(SwiftStdlib 6.4, *)
-  public typealias BorrowingIterator = SpanIterator<Element>
-  
-  @available(SwiftStdlib 6.4, *)
-  @lifetime(borrow self)
-  public func makeBorrowingIterator() -> SpanIterator<Element> {
-    SpanIterator(self.span)
   }
 }
