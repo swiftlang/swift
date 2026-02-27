@@ -1,0 +1,16 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+
+// RUN: %update-generated-tests %t/test.txt
+// RUN: %diff %t/test.txt %t/test.expected
+
+//--- test.txt
+// GENERATED-BY: echo hello
+// GENERATED-HASH: 5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03
+this test output has been manually edited
+
+//--- test.expected
+// GENERATED-BY: echo hello
+// GENERATED-HASH: 5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03
+this test output has been manually edited
+
