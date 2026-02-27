@@ -1,4 +1,10 @@
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.7-abi-triple -dump-ast | %FileCheck %s
+//===----------------------------------------------------------------------===//
+///
+/// * The `SWIFT-5` prefix is checked only in Swift 5 mode.
+/// * The `SWIFT-6` prefix is checked only in Swift 6 mode.
+/// * The `SWIFT-5-AND-6` prefix is checked both in Swift 5 and Swift 6 mode.
+///
+//===----------------------------------------------------------------------===//
 
 /// Used to verify the type of an expression. Use like this:
 /// ```
@@ -33,27 +39,35 @@ extension Array: P where Element: P {
 extension Double: Q { }
 extension String: Q { }
 
+func acceptAnyGeneric(_: some Any) {}
 func acceptGeneric<T: P>(_: T) -> T.A? { nil }
 func acceptCollection<C: Collection>(_ c: C) -> C.Element { c.first! }
 
 // --- Simple opening of existential values
 func testSimpleExistentialOpening(p: any P, pq: any P & Q, c: any Collection) {
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   let pa = acceptGeneric(p)
   let _: Int = pa // expected-error{{cannot convert value of type '(any Q)?' to specified type 'Int'}}
 
   var vp = p
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   let vpa = acceptGeneric(vp)
   let _: Int = vpa // expected-error{{cannot convert value of type '(any Q)?' to specified type 'Int'}}
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   let pqa = acceptGeneric(pq)
   let _: Int = pqa  // expected-error{{cannot convert value of type '(any Q)?' to specified type 'Int'}}
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
-  let element = acceptCollection(c) 
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  let element = acceptCollection(c)
   let _: Int = element // expected-error{{cannot convert value of type 'Any' to specified type 'Int'}}
+
+  do {
+    let a: Any
+    // SWIFT-5-NOT: open_existential_expr {{.*}} location={{.*}}:[[@LINE+2]]:{{[0-9]+}} range=
+    // SWIFT-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+    acceptAnyGeneric(a)
+  }
 }
 
 // --- Requirements on nested types
@@ -66,7 +80,7 @@ func takeCollectionOfPs<C: Collection>(_: C) -> C.Element.A?
 }
 
 func testCollectionOfPs(cp: any CollectionOfPs) {
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   let e = takeCollectionOfPs(cp)
   let _: Int = e // expected-error{{cannot convert value of type '(any Q)?' to specified type 'Int'}}
 }
@@ -79,11 +93,11 @@ extension P {
 }
 
 func testMultipleOpened(a: any P, b: any P & Q) {
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   let r1 = takeTwoGenerics(a, b)
   let _: Int = r1  // expected-error{{cannot convert value of type '(any P, any P & Q)' to specified type 'Int'}}
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   let r2 = a.combineThePs(b)
   let _: Int = r2  // expected-error{{cannot convert value of type '(any Q, any Q)?' to specified type 'Int'}}
 }
@@ -94,7 +108,7 @@ func conjureValue<T: P>(of type: T.Type) -> T? {
 }
 
 func testMagic(pt: any P.Type) {
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   let pOpt = conjureValue(of: pt)
   let _: Int = pOpt // expected-error{{cannot convert value of type '(any P)?' to specified type 'Int'}}
 }
@@ -182,7 +196,7 @@ func takesInOut<T: P>(_ value: inout T) { }
 
 func passesInOut(i: Int) {
   var p: any P = i
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   takesInOut(&p)
 }
 
@@ -190,7 +204,7 @@ func takesOptional<T: P>(_ value: T?) { }
 // expected-note@-1{{required by global function 'takesOptional' where 'T' = 'any P'}}
 
 func passesToOptional(p: any P, pOpt: (any P)?) {
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   takesOptional(p) // okay
   takesOptional(pOpt) // expected-error{{type 'any P' cannot conform to 'P'}}
   // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
@@ -199,24 +213,24 @@ func passesToOptional(p: any P, pOpt: (any P)?) {
 
 @available(SwiftStdlib 5.1, *)
 func testReturningOpaqueTypes(p: any P) {
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   let q = p.getQ()
   let _: Int = q  // expected-error{{cannot convert value of type 'any Q' to specified type 'Int'}}
 
   p.getCollectionOf() // expected-error{{member 'getCollectionOf' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   let q2 = getPQ(p)
   let _: Int = q2  // expected-error{{cannot convert value of type 'any Q' to specified type 'Int'}}
 
   getCollectionOfP(p) // expected-error{{type 'any P' cannot conform to 'P'}}
   // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   let fi = funnyIdentity(p)
   let _: Int = fi // expected-error{{cannot convert value of type '(any P)?' to specified type 'Int'}}
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = arrayOfOne(p) // okay, arrays are covariant in their argument
 
   _ = createX(p) // expected-error{{type 'any P' cannot conform to 'P'}}
@@ -236,7 +250,7 @@ func overloadedGenericFunctionTakingP<T: P>(_: T) { }
 
 func testTakeValueAndClosure(p: any P) {
   // Type-erase when not provided with a generic function.
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   takeValueAndClosure(p) { x in
     var types = SwiftTypePair(typeOf: x, type2: SwiftType<any P>.self)
     types.assertTypesAreEqual()
@@ -246,10 +260,10 @@ func testTakeValueAndClosure(p: any P) {
 
   // Do not erase when referring to a generic function.
   // FIXME:
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   takeValueAndClosure(p, body: genericFunctionTakingP)
   // FIXME:
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   takeValueAndClosure(p, body: overloadedGenericFunctionTakingP)
   takeValueAndClosure(p, body: genericFunctionTakingPQ) // expected-error{{global function 'genericFunctionTakingPQ' requires that 'T' conform to 'Q'}}
 
@@ -288,47 +302,47 @@ func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
   func overloaded<T: B>(_: T) -> (x: Int, y: T.C) { fatalError() }
   func overloaded<T: P>(_: T) -> Int { 42 }
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getC(v) // Ok
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getC(v) as any P // Ok
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getE(v) // Ok
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getE(v) as any P1<Double> // Ok
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getTuple(v) // Ok
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getTuple(v) as (any B, any P) // Ok
   // Ok because T.C.A == Double
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getNoError(v)
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getComplex(v) // Ok
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getComplex(v) as ([(x: (a: any P, b: Int), y: Int)], [Int : any P]) // Ok
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = overloaded(v) // Ok
 
   func acceptsAny<T>(_: T) {}
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   acceptsAny(getC(v)) // Ok
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   acceptsAny(getC(v) as any P) // Ok
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   acceptsAny(getComplex(v)) // Ok
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   acceptsAny(getComplex(v) as ([(x: (a: any P, b: Int), y: Int)], [Int : any P]))
 
   func getAssocNoRequirements<T: B>(_: T) -> (Int, [T.D]) { fatalError() }
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getAssocNoRequirements(v) // Ok, `D` doesn't have any requirements
 
   // Test existential opening from protocol extension access
@@ -340,35 +354,35 @@ func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
 
   func getF<T: D>(_: T) -> T.E { fatalError() }
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getF(otherV) // Ok `E` doesn't have a `where` clause
 
   func getSelf<T: B>(_: T) -> T { fatalError() } // expected-note {{found this candidate}}
   func getSelf<T: D>(_: T) -> T { fatalError() } // expected-note {{found this candidate}}
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getSelf(v) // Ok
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getSelf(v) as any B // Ok
   _ = getSelf(otherV) as any B & D // expected-error {{ambiguous use of 'getSelf'}}
 
   func getBDSelf<T: D>(_: T) -> T { fatalError() }
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getBDSelf(otherV) // Ok
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getBDSelf(otherV) as any B & D // Ok
 
   func getP<T: P>(_: T) {}
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   getP(getC(v)) // Ok
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   getP(v.getC()) // Ok
 
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   getP((getC(v) as any P))   // Ok - parens avoid opening suppression
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   getP((v.getC() as any P))  // Ok - parens avoid opening suppression
 }
 
@@ -480,7 +494,7 @@ do {
   func nestedMetatypeCallee<T>(_ t: T) {}
 
   let t = String.Type.Type.Type.self as (any Q.Type.Type.Type.Type)
-  // CHECK-NOT: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6-NOT: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   nestedMetatypeCallee(t)
 }
 
@@ -492,7 +506,7 @@ do {
   // expected-note@-1 {{required by local function 'f' where 'T' = 'any P'}}
 
   let p: any P
-  // CHECK-NOT: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6-NOT: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   f(p)
   // expected-error@-1 {{type 'any P' cannot conform to 'P'}}
   // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
@@ -509,7 +523,7 @@ do {
 
   // expected-error@+1 {{cannot pass immutable value as inout argument: 'rValueP' is a 'let' constant}}
   foo(&rValueP)
-  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   foo(&lValueP)
 }
 
@@ -518,7 +532,7 @@ do {
     func foo<T : BitwiseCopyable>(_: T) -> T {}
 
     let exist: any Any.Type
-    // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+    // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
     let result = foo(exist)
     do {
       // FIXME: The result type should be 'any Any.Type'
@@ -532,7 +546,7 @@ do {
     func foo<T : BitwiseCopyable>(_: T) -> T {}
 
     let exist: any Any.Type.Type
-    // CHECK-NOT: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+    // SWIFT-5-AND-6-NOT: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
     let result = foo(exist)
     do {
       var types = SwiftTypePair(typeOf: result, type2: SwiftType<any Any.Type.Type>.self)
@@ -544,10 +558,16 @@ do {
     func foo<T>(_: T) -> T {}
 
     let exist: any Any.Type
-    // CHECK-NOT: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+    // SWIFT-5-NOT: open_existential_expr {{.*}} location={{.*}}:[[@LINE+2]]:{{[0-9]+}} range=
+    // SWIFT-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
     let result = foo(exist)
     do {
+      #if swift(<6)
       var types = SwiftTypePair(typeOf: result, type2: SwiftType<any Any.Type>.self)
+      #else
+      // FIXME: Should be 'any Any.Type' regardless of language mode.
+      var types = SwiftTypePair(typeOf: result, type2: SwiftType<Any>.self)
+      #endif
       types.assertTypesAreEqual()
     }
   }
@@ -559,6 +579,7 @@ do {
     return c
   }
   let c: any Collection<Int>
+  // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   let result = f(c)
   do {
     var types = SwiftTypePair(typeOf: result, type2: SwiftType<any Collection<Int>>.self)
@@ -602,7 +623,17 @@ do {
       return
     }
 
-    // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+    // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
     test(env: env)
   }
+}
+
+/// Test with a self-conforming existential.
+do {
+  func foo<E: Error>(_: E) {}
+
+  let x: any Error
+  // SWIFT-5-NOT: open_existential_expr {{.*}} location={{.*}}:[[@LINE+2]]:{{[0-9]+}} range=
+  // SWIFT-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  foo(x)
 }
