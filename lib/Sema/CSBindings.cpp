@@ -1113,84 +1113,228 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
 std::optional<bool>
 BindingSet::subsumeBinding(PotentialBinding &binding,
                            const PotentialBinding &existing) {
-  if (binding.BindingType->isEqual(existing.BindingType)) {
-    if (binding.Kind == existing.Kind) {
+  // (Exact, Exact)
+  if (existing.Kind == AllowedBindingKind::Exact &&
+      binding.Kind == AllowedBindingKind::Exact) {
+    if (binding.BindingType->isEqual(existing.BindingType))
       return false;
-    } else if (binding.Kind == AllowedBindingKind::Subtypes &&
-               existing.Kind == AllowedBindingKind::Supertypes) {
-      binding.Kind = AllowedBindingKind::Subtypes;
-      return true;
-    } else if (binding.Kind == AllowedBindingKind::Supertypes &&
-               existing.Kind == AllowedBindingKind::Subtypes) {
-      binding.Kind = AllowedBindingKind::Subtypes;
-      return true;
-    } else if (binding.Kind == AllowedBindingKind::Exact) {
-      return true;
-    } else if (existing.Kind == AllowedBindingKind::Exact) {
-      return false;
-    } else if (existing.Kind == AllowedBindingKind::Fallback) {
-      return true;
-    } else if (binding.Kind == AllowedBindingKind::Fallback) {
-      return false;
-    }
-  }
 
-  auto existingType = existing.BindingType;
-  auto result = isLikelyExactMatch(binding.BindingType, existingType);
-  if (result.has_value() && *result) {
-    // A binding can subsume another binding. Suppose we have two
-    // constraints:
-    // - X conv $T0
-    // - $T0 conv Y
-    //
-    // This gives us two potential bindings:
-    // - (subtypes of) X
-    // - (supertypes of) Y
-    //
-    // If X and Y are a match except that X has type variables and
-    // Y does not, we replace the subtype binding type with Y, and
-    // drop the supertype binding:
-    // - (subtypes of) Y
-    //
-    // Two more combinations are supported. Suppose as above that
-    // X is concrete and Y has type variables.
-    //
-    // Then:
-    // - (exact / subtypes of / supertypes of) X
-    // - (exact) Y
-    // becomes:
-    // - (exact) Y
-    //
-    // And finally:
-    // - (supertypes of) X
-    // - (supertypes of) Y
-    // becomes:
-    // - (supertypes of) Y
-    //
-    // This is unsound, but without it we get ambiguous solutions
-    // and performance problems in a couple of instances where we
-    // end up considering bindings like Int? vs $T0?, where $T0
-    // is subsequently bound to Int.
-    if (binding.Kind == AllowedBindingKind::Exact ||
-        existing.Kind == AllowedBindingKind::Supertypes) {
-      // If new type has a type variable it shouldn't
-      // be considered viable.
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
         return false;
 
-      // If new type doesn't have any type variables
-      // but the existing binding does, let's replace existing
-      // binding with new one.
-      if (existingType->hasTypeVariable())
-        return true;
-
-      // If new binding is exact, always replace the existing
-      // binding.
-      if (binding.Kind == AllowedBindingKind::Exact)
-        return true;
+      return true;
     }
   }
 
+  // (Exact, Supertypes)
+  if (existing.Kind == AllowedBindingKind::Exact &&
+      binding.Kind == AllowedBindingKind::Supertypes) {
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+  }
+
+  // (Exact, Subtypes)
+  if (existing.Kind == AllowedBindingKind::Exact &&
+      binding.Kind == AllowedBindingKind::Subtypes) {
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+  }
+
+  // (Exact, Fallback)
+  if (existing.Kind == AllowedBindingKind::Exact &&
+      binding.Kind == AllowedBindingKind::Fallback) {
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+  }
+
+  // (Supertypes, Exact)
+  if (existing.Kind == AllowedBindingKind::Supertypes &&
+      binding.Kind == AllowedBindingKind::Exact) {
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && *result) {
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      return true;
+    }
+  }
+
+  // (Supertypes, Supertypes)
+  if (existing.Kind == AllowedBindingKind::Supertypes &&
+      binding.Kind == AllowedBindingKind::Supertypes) {
+    // Drop duplicate supertype bindings.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+
+    // FIXME: This is unsound. We need Type::join() to handle type variables
+    // instead.
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && *result) {
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      ASSERT(existing.BindingType->hasTypeVariable());
+      return true;
+    }
+
+    // If this is a non-defaulted supertype binding,
+    // check whether we can combine it with another
+    // supertype binding by computing the 'join' of the types.
+    if (binding.isViableForJoin()) {
+      if (existing.isViableForJoin()) {
+        auto isAcceptableJoin = [](Type type) {
+          return !type->isAny() && (!type->getOptionalObjectType() ||
+                                    !type->getOptionalObjectType()->isAny());
+        };
+
+        auto joinType =
+            Type::join(existing.BindingType, binding.BindingType);
+
+        if (joinType && isAcceptableJoin(*joinType)) {
+          // Result of the join has to use new binding because it refers
+          // to the constraint that triggered the join that replaced the
+          // existing binding.
+          //
+          // For "join" to be transitive, both bindings have to be as
+          // well, otherwise we consider it a refinement of a direct
+          // binding.
+          auto *originator =
+              binding.isTransitive() && existing.isTransitive()
+                  ? binding.Originator
+                  : nullptr;
+
+          binding = PotentialBinding(*joinType, binding.Kind,
+                                     binding.BindingSource,
+                                     originator);
+          return true;
+        }
+      }
+    }
+  }
+
+  // (Supertypes, Subtypes)
+  if (existing.Kind == AllowedBindingKind::Supertypes &&
+      binding.Kind == AllowedBindingKind::Subtypes) {
+    // FIXME: Dubious.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && *result) {
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      ASSERT(existing.BindingType->hasTypeVariable());
+      return true;
+    }
+  }
+
+  // (Supertypes, Fallback)
+  if (existing.Kind == AllowedBindingKind::Supertypes &&
+      binding.Kind == AllowedBindingKind::Fallback) {
+    // If both have the same type, prefer the supertype binding.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && *result) {
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      ASSERT(existing.BindingType->hasTypeVariable());
+      return true;
+    }
+  }
+
+  // (Subtypes, Exact)
+  if (existing.Kind == AllowedBindingKind::Subtypes &&
+      binding.Kind == AllowedBindingKind::Exact) {
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && *result) {
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      return true;
+    }
+  }
+
+  // (Subtypes, Supertypes)
+  if (existing.Kind == AllowedBindingKind::Subtypes &&
+      binding.Kind == AllowedBindingKind::Supertypes) {
+    // FIXME: Dubious.
+    if (binding.BindingType->isEqual(existing.BindingType)) {
+      binding.Kind = AllowedBindingKind::Subtypes;
+      return true;
+    }
+  }
+
+  // (Subtypes, Subtypes)
+  if (existing.Kind == AllowedBindingKind::Subtypes &&
+      binding.Kind == AllowedBindingKind::Subtypes) {
+    // Drop duplicate subtype bindings.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+
+    // FIXME: Implement meet of two types
+  }
+
+  // (Subtypes, Fallback)
+  if (existing.Kind == AllowedBindingKind::Subtypes &&
+      binding.Kind == AllowedBindingKind::Fallback) {
+    // If both have the same type, prefer the subtype binding.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+  }
+
+  // (Fallback, Exact)
+  if (existing.Kind == AllowedBindingKind::Fallback &&
+      binding.Kind == AllowedBindingKind::Exact) {
+    // If both have the same type, prefer the exact binding.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && *result) {
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      return true;
+    }
+  }
+
+  // (Fallback, Supertypes)
+  if (existing.Kind == AllowedBindingKind::Fallback &&
+      binding.Kind == AllowedBindingKind::Supertypes) {
+    // If both have the same type, prefer the supertype binding.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+  }
+
+  // (Fallback, Subtypes)
+  if (existing.Kind == AllowedBindingKind::Fallback &&
+      binding.Kind == AllowedBindingKind::Subtypes) {
+    // If both have the same type, prefer the subtype binding.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+  }
+
+  // (Fallback, Fallback)
+  if (existing.Kind == AllowedBindingKind::Fallback &&
+      binding.Kind == AllowedBindingKind::Fallback) {
+    // Drop duplicate Fallback bindings.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+  }
+
+  // FIXME: Refactor or remove this
   if (!TypeVar->getImpl().isClosureParameterType()) {
     // Since Double and CGFloat are effectively the same type due to an
     // implicit conversion between them, always prefer Double over CGFloat
@@ -1204,40 +1348,6 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
 
     if (binding.BindingType->isDouble() && existing.BindingType->isCGFloat())
       return true;
-  }
-
-  // If this is a non-defaulted supertype binding,
-  // check whether we can combine it with another
-  // supertype binding by computing the 'join' of the types.
-  if (binding.isViableForJoin()) {
-    if (existing.isViableForJoin()) {
-      auto isAcceptableJoin = [](Type type) {
-        return !type->isAny() && (!type->getOptionalObjectType() ||
-                                  !type->getOptionalObjectType()->isAny());
-      };
-
-      auto joinType =
-          Type::join(existing.BindingType, binding.BindingType);
-
-      if (joinType && isAcceptableJoin(*joinType)) {
-        // Result of the join has to use new binding because it refers
-        // to the constraint that triggered the join that replaced the
-        // existing binding.
-        //
-        // For "join" to be transitive, both bindings have to be as
-        // well, otherwise we consider it a refinement of a direct
-        // binding.
-        auto *originator =
-            binding.isTransitive() && existing.isTransitive()
-                ? binding.Originator
-                : nullptr;
-
-        binding = PotentialBinding(*joinType, binding.Kind,
-                                   binding.BindingSource,
-                                   originator);
-        return true;
-      }
-    }
   }
 
   return std::nullopt;
