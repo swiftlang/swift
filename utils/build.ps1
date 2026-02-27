@@ -120,7 +120,7 @@ Skip building the MSI installers and packaging. Useful for development builds.
 
 .PARAMETER SmokeTest
 Smoke test the installer. Mutually exclusive with `-SkipPackaging`.
-Requires Docker installation with Windows container support and Hyper-V isolation.
+Requires Docker installation with Windows container support.
 
 .PARAMETER Test
 An array of names of projects to run tests for. Use '*' to run all tests.
@@ -4212,7 +4212,6 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
 # Ensure:
 # - Docker is installed
 # - Docker is configured for Windows containers
-# - Docker supports Hyper-V isolation
 # If all conditions are not met, exit with an error.
 function Check-DockerRequirements() {
   try {
@@ -4224,13 +4223,6 @@ function Check-DockerRequirements() {
     $dockerInfo = docker info 2>$null
     if ($dockerInfo -notmatch "OSType:\s*windows") {
       throw "Docker is not configured for Windows containers."
-    }
-
-    if ($dockerInfo -notmatch "Isolation:\s*hyperv") {
-      $hyperVSupport = $dockerInfo -match "hyperv"
-      if (-not $hyperVSupport) {
-        throw "Docker does not support Hyper-V isolation."
-      }
     }
   } catch {
     Write-Host -ForegroundColor Red "Docker requirements check failed: $_"
@@ -4255,7 +4247,11 @@ function Run-SmokeTests([Hashtable] $Platform) {
   try {
     Record-OperationTiming $Platform "SmokeTests-DockerBuild" {
       Write-Host "Building Docker image with installer"
-      docker build --build-arg SWIFT_INSTALLER_PATH=$InstallerFileName --isolation=hyperv -t swift-smoke-test .
+      docker build `
+          --file "$SourceCache\swift-docker\swift-ci\main\windows\smoketest\ltsc2022\Dockerfile" `
+          --build-arg SWIFT_INSTALLER_PATH=$InstallerFileName `
+          --build-arg ENTRY_POINT=smoke_test.ps1 `
+          -t swift-smoke-test .
       if ($LASTEXITCODE -ne 0) {
         throw "Docker build failed"
       }
@@ -4263,7 +4259,7 @@ function Run-SmokeTests([Hashtable] $Platform) {
 
     Record-OperationTiming $Platform "SmokeTest-DockerRun" {
       Write-Host "Running smoke test container"
-      docker run --rm --isolation=hyperv swift-smoke-test
+      docker run --rm swift-smoke-test
       if ($LASTEXITCODE -ne 0) {
         throw "Smoke test failed"
       }
