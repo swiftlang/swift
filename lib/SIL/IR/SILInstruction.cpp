@@ -1317,10 +1317,10 @@ bool SILInstruction::isAllocatingStack() const {
   }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
-    // FIXME: BuiltinValueKind::StartAsyncLetWithLocalBuffer
     if (auto BK = BI->getBuiltinKind();
         BK && (*BK == BuiltinValueKind::StackAlloc ||
-               *BK == BuiltinValueKind::UnprotectedStackAlloc)) {
+               *BK == BuiltinValueKind::UnprotectedStackAlloc ||
+               *BK == BuiltinValueKind::StartAsyncLetWithLocalBuffer)) {
       return true;
     }
   }
@@ -1343,10 +1343,34 @@ StackAllocationIsNested_t SILInstruction::isStackAllocationNested() const {
   assert(isAllocatingStack());
   if (auto ASI = dyn_cast<AllocStackInst>(this)) {
     return ASI->isStackAllocationNested();
-  } else {
-    // TODO: implement for all remaining allocations
-    return StackAllocationIsNested;
   }
+
+  // StartAsyncLetWithLocalBuffer allocates stack memory that is deallocated
+  // by FinishAsyncLet (an async operation / suspension point). Mark as
+  // non-nested so that StackNesting does not attempt to move or create
+  // deallocations for it, preserving the LIFO ordering of async let teardown.
+  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
+    if (auto BK = BI->getBuiltinKind();
+        BK && *BK == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
+      return StackAllocationIsNotNested;
+    }
+  }
+
+  // All remaining stack-allocating instructions return StackAllocationIsNested,
+  // which lets StackNesting track and fix their ordering. This is correct
+  // because each of them:
+  //   (a) follows LIFO discipline, and
+  //   (b) has its deallocation within the same non-suspended region
+  //       (i.e., deallocation does not cross suspension points).
+  //
+  // The remaining types are:
+  //   - AllocPackInst
+  //   - AllocPackMetadataInst
+  //   - On-stack AllocRefInstBase
+  //   - On-stack PartialApplyInst
+  //   - Callee-allocated BeginApplyInst
+  //   - StackAlloc / UnprotectedStackAlloc builtins
+  return StackAllocationIsNested;
 }
 
 void SILInstruction::setStackAllocationIsNested(
@@ -1373,9 +1397,9 @@ bool SILInstruction::isDeallocatingStack() const {
     return true;
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
-    // FIXME: BuiltinValueKind::FinishAsyncLet
     if (auto BK = BI->getBuiltinKind();
-        BK && (*BK == BuiltinValueKind::StackDealloc)) {
+        BK && (*BK == BuiltinValueKind::StackDealloc ||
+               *BK == BuiltinValueKind::FinishAsyncLet)) {
       return true;
     }
   }
