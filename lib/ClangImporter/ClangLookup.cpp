@@ -165,6 +165,20 @@ ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
   if (auto *spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
     return lookupInClassTemplateSpecialization(ctx, spec, desc.name);
 
+  auto foundEntryIsMember =
+      [clangDecl](SwiftLookupTable::SingleEntry entry) -> bool {
+    auto *foundDecl = entry.dyn_cast<clang::NamedDecl *>();
+    if (!foundDecl)
+      return false;
+
+    auto *foundCtx = foundDecl->getDeclContext();
+
+    if (auto *foundCtxAsDecl = dyn_cast<clang::Decl>(foundCtx))
+      return isDirectLookupMemberContext(foundDecl, foundCtxAsDecl, clangDecl);
+
+    return foundCtx == cast<clang::DeclContext>(clangDecl);
+  };
+
   SwiftLookupTable *lookupTable;
   if (isa<clang::NamespaceDecl>(clangDecl)) {
     // DeclContext of a namespace imported into Swift is the __ObjC module.
@@ -175,26 +189,38 @@ ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
     lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
   }
 
-  auto foundDecls = lookupTable->lookup(
+  SmallVector<SwiftLookupTable::SingleEntry, 4> filteredDecls;
+
+  auto foundEntries = lookupTable->lookup(
       SerializedSwiftName(desc.name.getBaseName()), EffectiveClangContext());
   // Make sure that `clangDecl` is the parent of all the members we found.
-  SmallVector<SwiftLookupTable::SingleEntry, 4> filteredDecls;
-  llvm::copy_if(foundDecls, std::back_inserter(filteredDecls),
-                [clangDecl](SwiftLookupTable::SingleEntry decl) {
-                  auto *foundClangDecl = decl.dyn_cast<clang::NamedDecl *>();
-                  if (!foundClangDecl)
-                    return false;
-                  auto *first = foundClangDecl->getDeclContext();
-                  auto *second = cast<clang::DeclContext>(clangDecl);
-                  if (auto *firstDecl = dyn_cast<clang::Decl>(first)) {
-                    if (auto *secondDecl = dyn_cast<clang::Decl>(second)) {
-                      return isDirectLookupMemberContext(foundClangDecl,
-                                                         firstDecl, secondDecl);
-                    }
-                    return false;
-                  }
-                  return first == second;
-                });
+  for (auto entry : foundEntries) {
+    if (foundEntryIsMember(entry))
+      filteredDecls.push_back(entry);
+  }
+
+  if (isa<clang::CXXRecordDecl>(clangDecl) && !desc.name.isSpecial()) {
+    auto id = desc.name.getBaseIdentifier().str();
+    if (id.starts_with("__") && id.ends_with("Unsafe") && id != "__Unsafe") {
+      // It's possible that there are entries in the lookup table that end up
+      // getting mangled as unsafe, but were not added to the look up table as
+      // such. This can happen when, e.g., their unsafety depends on the
+      // definition of a template class that was not yet instantiated when the
+      // lookup table was being populated, but will get instantiated when that
+      // decl is imported.
+      //
+      // If we are looking up "__{{name}}Unsafe", also look up "{{name}}" in
+      // case we find members like this.
+      auto unUnsafeId = id.drop_front(2).drop_back(6);
+      auto unUnsafeName = DeclBaseName(ctx.getIdentifier(unUnsafeId));
+      auto unUnsafeFoundEntries = lookupTable->lookup(
+          SerializedSwiftName(unUnsafeName), EffectiveClangContext());
+      for (auto entry : unUnsafeFoundEntries) {
+        if (foundEntryIsMember(entry))
+          filteredDecls.push_back(entry);
+      }
+    }
+  }
   return filteredDecls;
 }
 

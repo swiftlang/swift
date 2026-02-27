@@ -116,19 +116,29 @@ The `inout` parameter default rule is:
 
 - Default to `@_lifetime(self: copy self)` on `mutating` methods where `self` is `~Escapable`.
 
-Lifetime dependencies on `inout` parameters generally handle the incoming value like a normal parameter and the outgoing value as a normal function result. From this perspective, the `inout` rule would follow from the same-type default rule above. It is helpful, however, to define these as separate rules. First, the default behvior of `~Escpabale` `inout` parameters is important enough to be explicitly defined. Furthermore, the two rules do not interact as if the incoming and outgoing `inout` values were a distinct parameter and result. For example, if an `inout` parameter has the same type as another parameter, no default dependency is created between them:
+Unlike other default rules, the `inout` default rule applies even if an explicit `@_lifetime` attribute already specifies the same `inout` parameter as a target.
 
 ```swift
-struct NE: ~Escapable {...}
-
-/* DEFAULT: @_lifetime(a: copy a) */
-/* NO DEFAULT: @_lifetime(a: copy b) */
-func foo(a: inout NE, b: NE) -> ()
+@lifetime(span: copy another)
+func mayReassign(span: inout Span<Int>, to another: Span<Int>) {
+  span = (...) ? span : another // ✅ `span` depends on its incoming value and `another`
+}
 ```
 
-Separating `inout` and same-type defaults is consistent with the fact that Swift APIs typically use `inout` for mutation of the parameter rather than its reassignment. If reassignment is expected, then it is helpful see an explicit `@_lifetime` annotation.
+With the `inout` default rule, the annotation `@lifetime(span: copy another)` above is equivalent to `@lifetime(span: copy span, copy another)`.
 
-#### `inout` default examples
+A copied `inout` dependency can only be suppressed with an explicit immortal dependency: `@lifetime(inoutArg: immortal)`. A consequence of this rule is that full reassignment can be expressed by combining an immortal dependency with an additive dependency on another parameter:
+
+```swift
+@lifetime(span: immortal, copy another)
+func reinitialize(span: inout Span<Int>, to another: Span<Int>) {
+  span = another // ✅ `span` depends on `another`
+}
+```
+
+This full reassignment syntax is a side-effect of the implementation rather then a deliberate syntax feature, but it is useful for fully expressing the model in the absence of a more approachable syntax.
+
+#### Examples
 
 ```swift
 struct A: Escapable {

@@ -721,7 +721,8 @@ public:
 
   /// Perform lifetime dependence checks for a function declaration.
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkFuncDecl() {
-    assert(nullptr != afd && (isa<FuncDecl>(afd) || isa<ConstructorDecl>(afd)));
+    assert(isLifetimeForDecl()
+           && (isa<FuncDecl>(afd) || isa<ConstructorDecl>(afd)));
     assert(depBuilder.empty());
 
     // Handle Builtins first because, even though Builtins require
@@ -747,8 +748,12 @@ public:
       inferMutatingSelf();
       inferInoutParams();
 
-      diagnoseMissingResultDependencies(
-        diag::lifetime_dependence_feature_required_return.ID);
+      // TODO: Once we infer dependence on the closure context, enable
+      // diagnostics for missing functino type result dependencies.
+      if (isLifetimeForDecl()) {
+        diagnoseMissingResultDependencies(
+          diag::lifetime_dependence_feature_required_return.ID);
+      }
       diagnoseMissingSelfDependencies(
         diag::lifetime_dependence_feature_required_mutating.ID);
       diagnoseMissingInoutDependencies(
@@ -773,8 +778,10 @@ public:
     // If precise diagnostics were already issued, bypass
     // diagnoseMissingDependencies to avoid redundant diagnostics.
     if (!performedDiagnostics) {
-      diagnoseMissingResultDependencies(
-        diag::lifetime_dependence_cannot_infer_return.ID);
+      if (isLifetimeForDecl()) {
+        diagnoseMissingResultDependencies(
+          diag::lifetime_dependence_cannot_infer_return.ID);
+      }
       diagnoseMissingSelfDependencies(
         diag::lifetime_dependence_cannot_infer_mutating.ID);
       diagnoseMissingInoutDependencies(
@@ -827,6 +834,12 @@ protected:
     typename detail::PassArgument<ArgTypes>::type... Args) {
     performedDiagnostics = true;
     return ctx.Diags.diagnose(Loc, ID, std::move(Args)...);
+  }
+
+  // Is this lifetime information for an abstact function declaration (function,
+  // constructor, or destructor) as opposed to a function type?
+  bool isLifetimeForDecl() const {
+    return afd != nullptr;
   }
 
   // For initializers, the implicit self parameter is ignored and instead shows
@@ -1335,7 +1348,7 @@ protected:
     auto const ownership = param.getValueOwnership();
     if (ownership != ValueOwnership::Default)
       return ownership;
-    if (nullptr != afd && isa<ConstructorDecl>(afd)) {
+    if (isLifetimeForDecl() && isa<ConstructorDecl>(afd)) {
       return ValueOwnership::Owned;
     }
     if (auto *ad = dyn_cast_or_null<AccessorDecl>(afd)) {
@@ -1476,7 +1489,7 @@ protected:
           // Methods that return a non-Escapable value - single parameter
           // default rule.
           inferNonEscapableResultOnSelf();
-        } else {
+        } else if (isLifetimeForDecl()) {
           // Regular functions and initializers that return a non-Escapable
           // value - single parameter default rule.
           inferNonEscapableResultOnParam();
@@ -1758,8 +1771,8 @@ protected:
     // Methods with parameters only apply to lazy inference. This does not
     // include accessors because a subscript's index is assumed not to be the
     // source of the result's dependency.
-    if (!(nullptr != afd && isa<AccessorDecl>(afd)) && !useLazyInference() &&
-        parameterInfos.size() > 0) {
+    if (!(isLifetimeForDecl() && isa<AccessorDecl>(afd))
+        && !useLazyInference() && parameterInfos.size() > 0) {
       return;
     }
     if (!useLazyInference() && !isImplicitOrSIL()) {

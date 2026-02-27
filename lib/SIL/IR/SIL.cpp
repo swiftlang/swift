@@ -41,6 +41,9 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
           !D->getObjCImplementationDecl())
     return FormalLinkage::PublicNonUnique;
 
+  if (SILDeclRef::declHasNonUniqueDefinition(D))
+    return FormalLinkage::PublicUnique;
+
   switch (D->getEffectiveAccess()) {
   case AccessLevel::Package:
     return FormalLinkage::PackageUnique;

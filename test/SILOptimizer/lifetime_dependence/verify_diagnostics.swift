@@ -45,6 +45,14 @@ public struct NEImmortal: ~Escapable {
   public init() {}
 }
 
+struct CNE<T: ~Escapable>: ~Escapable {
+    let ne: T
+    @_lifetime(copy ne)
+    init(ne: T) {
+        self.ne = ne
+    }
+}
+
 class C {}
 
 struct Holder {
@@ -407,6 +415,10 @@ func test(inline: InlineInt) {
 
 // =============================================================================
 // Closures
+//
+// TODO: Add more diagnostic tests when implementing closure context
+// dependencies, including SILOptimizer diagnostic tests such as the one this
+// originated as.
 // =============================================================================
 
 func takesEscapingClosure(_: @escaping ()->()) {}
@@ -438,6 +450,21 @@ func testMutableCapture(arg: consuming NCE, action: @escaping (inout NCE) -> ())
   }
 }
 
+// Implicit dependence on a nonescaping closure context.
+//
+// TODO: remove the _overrideLifetime when context dependencies are tracked.
+@_lifetime(borrow value)
+func testBasicClosureDependency(value: AnyObject, body: () -> NE) -> NE {
+  return _overrideLifetime(body(), borrowing: value)
+}
+
+// Implicit dependence on a nonescaping closure context. The result is escaping in the current generic context, so
+// should not be diagnosed as an escape.
+//
+// TODO: remove the _overrideLifetime when context dependencies are tracked.
+func testIndirectClosureResult<T>(f: () -> CNE<T>) -> CNE<T> {
+  return _overrideLifetime(f(), copying: ())
+}
 
 // =============================================================================
 // Local variable analysis - address uses

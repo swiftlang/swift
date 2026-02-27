@@ -1,15 +1,30 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults) \
 // RUN:      | %FileCheck --check-prefix=EXEC %s
 
+// RUN: %target-run-simple-swift(-enable-experimental-feature SuppressedAssociatedTypes) \
+// RUN:      | %FileCheck --check-prefix=EXEC %s
+
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
 
-protocol P {
-    func p()
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
+protocol BothC {
+    func bothC()
 }
 
-protocol Q {
-    func q()
+protocol PrimaryC {
+    func primaryC()
+}
+
+protocol SecondC {
+    func secondC()
+}
+
+protocol NeitherC {
+    func neitherC()
 }
 
 protocol Style<Primary> {
@@ -19,16 +34,32 @@ protocol Style<Primary> {
 
 struct Hat<S: Style> where S.Primary: ~Copyable {}
 
-extension Hat: P /*<implied> where S.Primary: Copyable */ {
-    func p() {
-        print("\(self) : P")
+// Require both to be Copyable
+extension Hat: BothC where S.Primary: Copyable, S.Secondary: Copyable {
+    func bothC() {
+        print("\(self) : BothC")
     }
 }
 
-extension Hat: Q where S.Primary: ~Copyable, S.Secondary: Copyable {
-    func q() {
-        print("\(self) : Q")
+// Require only Primary to be Copyable
+extension Hat: PrimaryC where S.Primary: Copyable, S.Secondary: ~Copyable {
+    func primaryC() {
+        print("\(self) : PrimaryC")
     }
+}
+
+// Require only Secondary to be Copyable
+extension Hat: SecondC where S.Primary: ~Copyable, S.Secondary: Copyable {
+    func secondC() {
+        print("\(self) : SecondC")
+    }
+}
+
+// Require neither to be Copyable
+extension Hat: NeitherC where S.Primary: ~Copyable, S.Secondary: ~Copyable {
+  func neitherC() {
+    print("\(self) : NeitherC")
+  }
 }
 
 struct NC: ~Copyable {}
@@ -55,25 +86,42 @@ struct NCBoth: Style {
 
 
 @inline(never)
-func castP<T>(value: T) -> (any P)? {
-    return value as? any P
+func castBothC<T>(_: T.Type) where T: Style, T.Primary: ~Copyable {
+  let value = Hat<T>()
+  if let x = value as? any BothC {
+    x.bothC()
+  } else {
+    print("\(value) is not a BothC")
+  }
 }
 
 @inline(never)
-func castQ<T>(value: T) -> (any Q)? {
-    return value as? any Q
+func castPrimaryC<T>(_: T.Type) where T: Style, T.Primary: ~Copyable {
+  let value = Hat<T>()
+  if let x = value as? any PrimaryC {
+    x.primaryC()
+  } else {
+    print("\(value) is not a PrimaryC")
+  }
 }
 
-func test<T>(_ t: T) {
-  if let p = castP(value: t) {
-    p.p()
+@inline(never)
+func castSecondC<T>(_: T.Type) where T: Style, T.Primary: ~Copyable {
+  let value = Hat<T>()
+  if let x = value as? any SecondC {
+    x.secondC()
   } else {
-    print("\(t) is not a P")
+    print("\(value) is not a SecondC")
   }
-  if let q = castQ(value: t) {
-    q.q()
+}
+
+@inline(never)
+func castNeitherC<T>(_: T.Type) where T: Style, T.Primary: ~Copyable {
+  let value = Hat<T>()
+  if let x = value as? any NeitherC {
+    x.neitherC()
   } else {
-    print("\(t) is not a Q")
+    print("\(value) is not a NeitherC")
   }
 }
 
@@ -81,21 +129,41 @@ func main() {
     // EXEC: going to test
     print("going to test")
 
-    // EXEC-NEXT: Hat<AllCopyable>() : P
-    // EXEC-NEXT: Hat<AllCopyable>() : Q
-    test(Hat<AllCopyable>())
+    // EXEC-NEXT: Hat<AllCopyable>() : BothC
+    // EXEC-NEXT: Hat<AllCopyable>() : PrimaryC
+    // EXEC-NEXT: Hat<AllCopyable>() : SecondC
+    // EXEC-NEXT: Hat<AllCopyable>() : NeitherC
+    castBothC(AllCopyable.self)
+    castPrimaryC(AllCopyable.self)
+    castSecondC(AllCopyable.self)
+    castNeitherC(AllCopyable.self)
 
-    // EXEC-NEXT: Hat<NCPrimary>() is not a P
-    // EXEC-NEXT: Hat<NCPrimary>() : Q
-    test(Hat<NCPrimary>())
+    // EXEC-NEXT: Hat<NCPrimary>() is not a BothC
+    // EXEC-NEXT: Hat<NCPrimary>() is not a PrimaryC
+    // EXEC-NEXT: Hat<NCPrimary>() : SecondC
+    // EXEC-NEXT: Hat<NCPrimary>() : NeitherC
+    castBothC(NCPrimary.self)
+    castPrimaryC(NCPrimary.self)
+    castSecondC(NCPrimary.self)
+    castNeitherC(NCPrimary.self)
 
-    // EXEC-NEXT: Hat<NCSecondary>() : P
-    // EXEC-NEXT: Hat<NCSecondary>() is not a Q
-    test(Hat<NCSecondary>())
+    // EXEC-NEXT: Hat<NCSecondary>() is not a BothC
+    // EXEC-NEXT: Hat<NCSecondary>() : PrimaryC
+    // EXEC-NEXT: Hat<NCSecondary>() is not a SecondC
+    // EXEC-NEXT: Hat<NCSecondary>() : NeitherC
+    castBothC(NCSecondary.self)
+    castPrimaryC(NCSecondary.self)
+    castSecondC(NCSecondary.self)
+    castNeitherC(NCSecondary.self)
 
-    // EXEC-NEXT: Hat<NCBoth>() is not a P
-    // EXEC-NEXT: Hat<NCBoth>() is not a Q
-    test(Hat<NCBoth>())
+    // EXEC-NEXT: Hat<NCBoth>() is not a BothC
+    // EXEC-NEXT: Hat<NCBoth>() is not a PrimaryC
+    // EXEC-NEXT: Hat<NCBoth>() is not a SecondC
+    // EXEC-NEXT: Hat<NCBoth>() : NeitherC
+    castBothC(NCBoth.self)
+    castPrimaryC(NCBoth.self)
+    castSecondC(NCBoth.self)
+    castNeitherC(NCBoth.self)
 
     // EXEC-NEXT: done testing
     print("done testing")

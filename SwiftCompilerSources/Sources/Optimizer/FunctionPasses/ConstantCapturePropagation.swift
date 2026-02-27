@@ -184,23 +184,32 @@ private func cloneArgument(_ argumentOp: Operand,
                            to targetFunction: Function,
                            _ context: FunctionPassContext
 ) {
-  var argCloner = Cloner(cloneBefore: targetFunction.entryBlock.instructions.first!, context)
+  let firstInst = targetFunction.entryBlock.instructions.first!
+  var argCloner = Cloner(cloneBefore: firstInst, context)
   defer { argCloner.deinitialize() }
 
   let clonedArg = argCloner.cloneRecursively(value: argumentOp.value)
   let calleeArgIdx = partialApply.calleeArgumentIndex(of: argumentOp)!
   let calleeArg = targetFunction.arguments[calleeArgIdx]
-  calleeArg.uses.replaceAll(with: clonedArg, context)
 
-  if partialApply.calleeArgumentConventions[calleeArgIdx].isGuaranteed {
+  if partialApply.calleeArgumentConventions[calleeArgIdx].isGuaranteed,
+     clonedArg.ownership == .owned
+  {
+    let builder = Builder(before: firstInst, context)
+    let borrowedClonedArg = builder.createBeginBorrow(of: clonedArg)
+    calleeArg.uses.replaceAll(with: borrowedClonedArg, context)
+
     // If the original argument was passed as guaranteed, i.e. is _not_ destroyed in the closure, we have
     // to destroy the cloned argument at function exits.
     Builder.insertCleanupAtFunctionExits(of: targetFunction, context) { builder in
+      builder.createEndBorrow(of: borrowedClonedArg)
       builder.emitDestroy(of: clonedArg)
     }
+    completeLifetime(of: borrowedClonedArg, context)
     completeLifetime(of: clonedArg, context)
+  } else {
+    calleeArg.uses.replaceAll(with: clonedArg, context)
   }
-
 }
 
 private func addCompensatingDestroys(for constantArguments: [Operand], _ context: FunctionPassContext) {

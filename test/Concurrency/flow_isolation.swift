@@ -1,5 +1,12 @@
 // RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s
 
+@globalActor
+actor CustomActor {
+  static let shared = CustomActor()
+}
+
+@CustomActor func requiresCustomActor() -> NonSendableType { NonSendableType() }
+@MainActor func requiresMainActor() -> NonSendableType { NonSendableType() }
 
 func randomBool() -> Bool { return false }
 func logTransaction(_ i: Int) {}
@@ -10,12 +17,12 @@ enum Color: Error {
   case blue
 }
 
-func takeNonSendable(_ ns: NonSendableType) {}
+func takeNonSendable<T>(_ ns: T) {}
 
 @available(SwiftStdlib 5.1, *)
-func takeSendable(_ s: SendableType) {}
+func takeSendable<T : Sendable>(_ s: T) {}
 
-class NonSendableType { // expected-note *{{class 'NonSendableType' does not conform to the 'Sendable' protocol}}
+class NonSendableType { // expected-note 8{{class 'NonSendableType' does not conform to the 'Sendable' protocol}}
   var x: Int = 0
   func f() {}
 }
@@ -44,28 +51,28 @@ actor Bob {
 
   init(v0 initial: Int) {
     self.x = 0
-    speak()    // expected-note {{after calling instance method 'speak()', only nonisolated properties of 'self' can be accessed from this init}}
+    speak() // expected-note {{after calling instance method 'speak()', only nonisolated properties of 'self' can be accessed from this init}}
     speak()
-    self.x = 1 // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    self.x = 1 // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     speak()
   }
 
   init(v1 _: Void) {
     self.x = 0
-    _ = cherry  // expected-note {{after accessing property 'cherry', only nonisolated properties of 'self' can be accessed from this init}}
-    self.x = 1  // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    _ = cherry // expected-note {{after accessing property 'cherry', only nonisolated properties of 'self' can be accessed from this init}}
+    self.x = 1 // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 
   init(v2 callBack: (Bob) -> Void) {
     self.x = 0
-    callBack(self)  // expected-note {{after a call involving 'self', only nonisolated properties of 'self' can be accessed from this init}}
-    self.x = 1      // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    callBack(self) // expected-note {{after a call involving 'self', only nonisolated properties of 'self' can be accessed from this init}}
+    self.x = 1 // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 
   init(v3 _: Void) {
     self.x = 1
-    takeBob(self)   // expected-note {{after calling global function 'takeBob', only nonisolated properties of 'self' can be accessed from this init}}
-    self.x = 1  // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    takeBob(self) // expected-note {{after calling global function 'takeBob', only nonisolated properties of 'self' can be accessed from this init}}
+    self.x = 1 // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 
 
@@ -94,7 +101,7 @@ actor Casey {
 
   init() {
     money = Money(dollars: 100)
-    defer { logTransaction(money.euros) } // expected-warning {{cannot access property 'money' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    defer { logTransaction(money.euros) } // expected-warning {{cannot access property 'money' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     self.speak("Yay, I have $\(money.dollars)!") // expected-note {{after calling instance method 'speak', only nonisolated properties of 'self' can be accessed from this init}}
   }
 
@@ -102,17 +109,15 @@ actor Casey {
     money = Money(dollars: start)
 
     if (money.dollars < 0) {
-      self.speak("Oh no, I'm in debt!") // expected-note 3 {{after calling instance method 'speak', only nonisolated properties of 'self' can be accessed from this init}}
+      self.speak("Oh no, I'm in debt!") // expected-note 3{{after calling instance method 'speak', only nonisolated properties of 'self' can be accessed from this init}}
     }
-    logTransaction(money.euros) // expected-warning {{cannot access property 'money' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    logTransaction(money.euros) // expected-warning {{cannot access property 'money' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
 
-    // expected-warning@+1 2 {{cannot access property 'money' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
-    money.dollars = money.dollars + 1
+    money.dollars = money.dollars + 1 // expected-warning 2{{cannot access property 'money' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
 
     if randomBool() {
-      // expected-note@+2 {{after calling instance method 'cashUnderMattress()', only nonisolated properties of 'self' can be accessed from this init}}
-      // expected-warning@+1 {{cannot access property 'money' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
-      money.dollars += cashUnderMattress()
+      money.dollars += cashUnderMattress() // expected-warning {{cannot access property 'money' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+      // expected-note @-1 {{after calling instance method 'cashUnderMattress()', only nonisolated properties of 'self' can be accessed from this init}}
     }
   }
 }
@@ -147,11 +152,11 @@ actor ExampleFromProposal {
     _ = self.nonSendable        // ok
     _ = self.unsafeNonSendable
 
-    f() // expected-note 2 {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from this init}}
+    f() // expected-note 2{{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from this init}}
 
     _ = self.immutableSendable  // ok
-    _ = self.mutableSendable    // expected-warning {{cannot access property 'mutableSendable' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
-    _ = self.nonSendable        // expected-warning {{cannot access property 'nonSendable' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    _ = self.mutableSendable // expected-warning {{cannot access property 'mutableSendable' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.nonSendable // expected-warning {{cannot access property 'nonSendable' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     _ = self.unsafeNonSendable // ok
   }
 
@@ -159,13 +164,13 @@ actor ExampleFromProposal {
   deinit {
     _ = self.immutableSendable  // ok
     _ = self.mutableSendable    // ok
-    _ = self.nonSendable        // expected-warning {{cannot access property 'nonSendable' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    _ = self.nonSendable // expected-warning {{cannot access property 'nonSendable' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
 
     f() // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from a deinit}}
 
     _ = self.immutableSendable  // ok
-    _ = self.mutableSendable    // expected-warning {{cannot access property 'mutableSendable' here in deinitializer; this is an error in the Swift 6 language mode}}
-    _ = self.nonSendable        // expected-warning {{cannot access property 'nonSendable' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    _ = self.mutableSendable // expected-warning {{cannot access property 'mutableSendable' here in deinitializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.nonSendable // expected-warning {{cannot access property 'nonSendable' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
   }
 
   nonisolated func f() {}
@@ -193,13 +198,13 @@ class CheckGAIT1 {
       }
       break
     } while true
-    silly += 2 // expected-warning {{cannot access property 'silly' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    silly += 2 // expected-warning {{cannot access property 'silly' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 
   deinit {
     _ = ns // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
-    f()     // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from a deinit}}
-    _ = silly // expected-warning {{cannot access property 'silly' here in deinitializer; this is an error in the Swift 6 language mode}}
+    f() // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from a deinit}}
+    _ = silly // expected-warning {{cannot access property 'silly' here in deinitializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
 
   }
 }
@@ -213,8 +218,8 @@ actor ControlFlowTester {
   nonisolated func noniso() {}
 
   init(v1: Void) {
-    noniso()                 // expected-note {{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
-    takeNonSendable(self.ns) // expected-warning {{cannot access property 'ns' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    noniso() // expected-note {{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
+    takeNonSendable(self.ns) // expected-warning {{cannot access property 'ns' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     takeSendable(self.s)
   }
 
@@ -231,7 +236,7 @@ actor ControlFlowTester {
 
   init(v3 c: Color) {
     do {
-      defer { noniso() } // expected-note 3 {{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
+      defer { noniso() } // expected-note 3{{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
       switch c {
       case .red:
         throw Color.red
@@ -242,17 +247,17 @@ actor ControlFlowTester {
         throw Color.yellow
       }
     } catch Color.blue {
-      count += 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+      count += 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     } catch {
-      count += 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+      count += 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     }
-    count = 42 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    count = 42 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 
 
   init(v4 c: Color) {
-    defer { count += 1 } // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
-    noniso() // expected-note 1 {{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
+    defer { count += 1 } // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    noniso() // expected-note {{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
   }
 
   init?(v5 c: Color) throws {
@@ -261,35 +266,35 @@ actor ControlFlowTester {
       return nil
     }
     count += 1
-    noniso()  // expected-note {{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
+    noniso() // expected-note {{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
     if c == .blue {
       throw c
     }
-    count += 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    count += 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 
   init(v5 c: Color?) {
     if let c = c {
       switch c {
       case .red:
-        defer { noniso() } // expected-note 5 {{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
+        defer { noniso() } // expected-note 5{{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
         count = 0 // OK
         fallthrough
       case .blue:
-        count = 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+        count = 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
         fallthrough
       case .yellow:
-        count = 2 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+        count = 2 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
         break
       }
     }
     switch c {
     case .some(.red):
-      count += 1  // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+      count += 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     case .some(.blue):
-      count += 2  // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+      count += 2 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     case .some(.yellow):
-      count += 3  // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+      count += 3 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     case .none:
       break
     }
@@ -409,30 +414,27 @@ actor MyActor {
         _ = self.x
         self.y = self.x
 
-        Task { self } // expected-note 2 {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
+        Task { self } // expected-note 2{{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
 
-        self.x = randomInt()  // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+        self.x = randomInt() // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
 
-        callMethod(self) // expected-note 5 {{after calling global function 'callMethod', only nonisolated properties of 'self' can be accessed from this init}}
+        callMethod(self) // expected-note 5{{after calling global function 'callMethod', only nonisolated properties of 'self' can be accessed from this init}}
 
-        passInout(&self.x) // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+        passInout(&self.x) // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
 
         if c {
-          // expected-warning@+2 {{cannot access property 'y' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
-          // expected-warning@+1 {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
-          self.x = self.y
+          self.x = self.y // expected-warning {{cannot access property 'y' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+          // expected-warning @-1 {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
         }
 
-        // expected-warning@+2 {{cannot access property 'y' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
-        // expected-warning@+1 {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
-        (_, _) = (self.x, self.y)
-        _ = self.x == 0 // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+        (_, _) = (self.x, self.y) // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+        // expected-warning @-1 {{cannot access property 'y' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+        _ = self.x == 0 // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
 
         while c {
-          // expected-warning@+2 {{cannot access property 'hax' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
-          // expected-note@+1 2 {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
-          self.hax = self
-          _ = self.hax  // expected-warning {{cannot access property 'hax' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+          self.hax = self // expected-warning {{cannot access property 'hax' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+          // expected-note @-1 2{{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
+          _ = self.hax // expected-warning {{cannot access property 'hax' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
         }
 
         Task {
@@ -452,7 +454,7 @@ actor MyActor {
 
         callMethod(self)
 
-        passInout(&self.x) // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+        passInout(&self.x) // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     }
 
     init(i3 c:  Bool) async {
@@ -490,7 +492,7 @@ actor MyActor {
 
       callMethod(self)
 
-      passInout(&self.x) // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+      passInout(&self.x) // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     }
 }
 
@@ -503,7 +505,7 @@ actor X {
         self.counter = start
         Task { await self.setCounter(start + 1) } // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
 
-        if self.counter != start { // expected-warning {{cannot access property 'counter' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+        if self.counter != start { // expected-warning {{cannot access property 'counter' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
             fatalError("where's my protection?")
         }
     }
@@ -520,9 +522,9 @@ struct CardboardBox<T> {
 
 @available(SwiftStdlib 5.1, *)
 var globalVar: EscapeArtist? // expected-warning {{var 'globalVar' is not concurrency-safe because it is nonisolated global shared mutable state; this is an error in the Swift 6 language mode}}
-// expected-note@-1 {{add '@MainActor' to make var 'globalVar' part of global actor 'MainActor'}}
-// expected-note@-2 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
-// expected-note@-3 {{convert 'globalVar' to a 'let' constant to make 'Sendable' shared state immutable}}
+// expected-note @-1 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
+// expected-note @-2 {{convert 'globalVar' to a 'let' constant to make 'Sendable' shared state immutable}}
+// expected-note @-3 {{add '@MainActor' to make var 'globalVar' part of global actor 'MainActor'}}
 
 @available(SwiftStdlib 5.1, *)
 actor EscapeArtist {
@@ -531,12 +533,11 @@ actor EscapeArtist {
     init(attempt1: Bool) {
         self.x = 0
 
-        // expected-note@+1 {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
-        globalVar = self
+        globalVar = self // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
 
         Task { await globalVar!.isolatedMethod() }
 
-        if self.x == 0 {  // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+        if self.x == 0 { // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
             fatalError("race detected.")
         }
     }
@@ -544,11 +545,11 @@ actor EscapeArtist {
     init(attempt2: Bool) {
         self.x = 0
 
-        let wrapped: EscapeArtist? = .some(self)    // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
+        let wrapped: EscapeArtist? = .some(self) // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
         let selfUnchained = wrapped!
 
         Task { await selfUnchained.isolatedMethod() }
-        if self.x == 0 {  // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+        if self.x == 0 { // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
             fatalError("race detected.")
         }
     }
@@ -599,33 +600,32 @@ actor Ahmad {
   init(v1: Void) {
     Task.detached { self.f() } // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
     f()
-    prop += 1 // expected-warning {{cannot access property 'prop' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    prop += 1 // expected-warning {{cannot access property 'prop' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 
   nonisolated init(v2: Void) async {
     Task.detached { self.f() } // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
     f()
-    prop += 1 // expected-warning {{cannot access property 'prop' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    prop += 1 // expected-warning {{cannot access property 'prop' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 
   nonisolated init(v3: Void) async {
     prop = 10
-    f()       // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from this init}}
-    prop += 1 // expected-warning {{cannot access property 'prop' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    f() // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from this init}}
+    prop += 1 // expected-warning {{cannot access property 'prop' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 
   @MainActor init(v4: Void) async {
     prop = 10
-    f()       // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from this init}}
-    prop += 1 // expected-warning {{cannot access property 'prop' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    f() // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from this init}}
+    prop += 1 // expected-warning {{cannot access property 'prop' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 
   deinit {
-    // expected-warning@+2 {{actor-isolated property 'computedProp' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
-    // expected-note@+1 {{after accessing property 'computedProp', only nonisolated properties of 'self' can be accessed from a deinit}}
-    let x = computedProp
+    let x = computedProp // expected-warning {{actor-isolated property 'computedProp' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-note @-1 {{after accessing property 'computedProp', only nonisolated properties of 'self' can be accessed from a deinit}}
 
-    prop = x // expected-warning {{cannot access property 'prop' here in deinitializer; this is an error in the Swift 6 language mode}}
+    prop = x // expected-warning {{cannot access property 'prop' here in deinitializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 }
 
@@ -637,7 +637,7 @@ actor Rain {
   init(_ hollerBack: (Rain) -> () -> Void) {
     defer { self.f() }
 
-    defer { _ = self.x }  // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    defer { _ = self.x } // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
 
     defer { Task { self.f() } }
 
@@ -668,11 +668,10 @@ actor NonIsolatedDeinitExceptionForSwift5 {
   }
 
   deinit {
-    // expected-warning@+2 {{actor-isolated instance method 'cleanup()' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
-    // expected-note@+1 {{after calling instance method 'cleanup()', only nonisolated properties of 'self' can be accessed from a deinit}}
-    cleanup()
+    cleanup() // expected-warning {{actor-isolated instance method 'cleanup()' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-note @-1 {{after calling instance method 'cleanup()', only nonisolated properties of 'self' can be accessed from a deinit}}
 
-    x = 1 // expected-warning {{cannot access property 'x' here in deinitializer; this is an error in the Swift 6 language mode}}
+    x = 1 // expected-warning {{cannot access property 'x' here in deinitializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 }
 
@@ -711,7 +710,7 @@ actor OhBrother {
 
     _ = giver(self) // expected-note {{after a call involving 'self', only nonisolated properties of 'self' can be accessed from this init}}
 
-    whatever = 1 // expected-warning {{cannot access property 'whatever' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    whatever = 1 // expected-warning {{cannot access property 'whatever' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 
   init(v3: Void) {
@@ -720,7 +719,7 @@ actor OhBrother {
 
     _ = blah(self) // expected-note {{after a call involving 'self', only nonisolated properties of 'self' can be accessed from this init}}
 
-    whatever = 2 // expected-warning {{cannot access property 'whatever' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+    whatever = 2 // expected-warning {{cannot access property 'whatever' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 }
 
@@ -775,8 +774,7 @@ func testActorWithInitAccessorInit() {
 
       escapingSelf(self)
 
-      self.radians = 0
-      // expected-warning@-1 {{actor-isolated property 'radians' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+      self.radians = 0 // expected-warning {{actor-isolated property 'radians' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     }
   }
 
@@ -798,10 +796,9 @@ func testActorWithInitAccessorInit() {
       let escapingSelf: (EscapeBeforeFullInit) -> Void = { _ in }
 
       escapingSelf(self) // expected-error {{'self' used before all stored properties are initialized}}
-      // expected-note@-1 {{after a call involving 'self', only nonisolated properties of 'self' can be accessed from this init}}
+      // expected-note @-1 {{after a call involving 'self', only nonisolated properties of 'self' can be accessed from this init}}
 
-      self.a = v
-      // expected-warning@-1 {{cannot access property '_a' here in nonisolated initializer; this is an error in the Swift 6 language mode}}
+      self.a = v // expected-warning {{cannot access property '_a' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     }
   }
 
@@ -844,3 +841,500 @@ actor OtherActor {
     self.parent = parent
   }
 }
+
+////////////////////////////
+// MARK: Mixed Isolations //
+////////////////////////////
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+struct MainActorStructWithMixedFields {
+  nonisolated let nonisoField: SendableType
+  @CustomActor var customField: NonSendableType // expected-note 4{{mutation of this property is only permitted within the actor}}
+  var mainField: NonSendableType // expected-note 4{{mutation of this property is only permitted within the actor}}
+
+  nonisolated func trigger() {}
+
+  nonisolated init(v1: Void) {
+    self.nonisoField = SendableType()
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+
+    trigger()
+
+    _ = self.nonisoField  // OK - explicitly nonisolated
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+  }
+
+  @MainActor init(v2: Void) {
+    self.nonisoField = SendableType()
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType()
+
+    trigger()
+
+    _ = self.nonisoField  // OK - explicitly nonisolated
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType()
+  }
+
+  @CustomActor init(v3: Void) {
+    self.nonisoField = SendableType()
+    self.customField = NonSendableType()
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+
+    trigger()
+
+    _ = self.nonisoField  // OK - explicitly nonisolated
+    self.customField = NonSendableType()
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+class MainActorClassWithMixedFields {
+  nonisolated let nonisoField: SendableType
+  @CustomActor var customField: NonSendableType // expected-note 4{{mutation of this property is only permitted within the actor}}
+  var mainField: NonSendableType // expected-note 4{{mutation of this property is only permitted within the actor}}
+
+  nonisolated func trigger() {}
+
+  nonisolated init(v1: Void) {
+    self.nonisoField = SendableType()
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-note 2{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.nonisoField  // OK - explicitly nonisolated
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{cannot access property 'customField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{cannot access property 'mainField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  @MainActor init(v2: Void) {
+    self.nonisoField = SendableType()
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType()
+
+    trigger()
+
+    _ = self.nonisoField  // OK - explicitly nonisolated
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType()
+  }
+
+  @CustomActor init(v3: Void) {
+    self.nonisoField = SendableType()
+    self.customField = NonSendableType()
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-note 2{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.nonisoField  // OK - explicitly nonisolated
+    self.customField = NonSendableType() // expected-warning {{cannot access property 'customField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{cannot access property 'mainField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor ActorWithMixedIsolationFields {
+  @MainActor var mainField: NonSendableType // expected-note 2{{mutation of this property is only permitted within the actor}}
+  @CustomActor var customField: NonSendableType // expected-note 4{{mutation of this property is only permitted within the actor}}
+  nonisolated let nonisoField: SendableType
+  var actorField: NonSendableType // expected-note 2{{mutation of this property is only permitted within the actor}}
+
+  nonisolated func trigger() {}
+
+  init(v1: Void) {
+    // Before decay: can assign all fields
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.nonisoField = SendableType()
+    self.actorField = NonSendableType()
+
+    trigger() // expected-note 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    // After decay: nonisolated field is accessible, others are not
+    _ = self.nonisoField // OK
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{cannot access property 'mainField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{cannot access property 'customField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.actorField = NonSendableType() // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  @MainActor init(v2: Void) {
+    // Before decay: can assign all fields
+    self.mainField = NonSendableType()
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.nonisoField = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-note 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    // After decay: nonisolated field is accessible, others are not
+    _ = self.nonisoField // OK
+    self.mainField = NonSendableType() // expected-warning {{cannot access property 'mainField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{cannot access property 'customField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+}
+
+// MARK: Mixed Default Requirements with Different Default Value Initialization
+// Isolation
+
+// This test has fields that have an explicitly isolated initializer (e.x.:
+// requiresMainActor).
+@available(SwiftStdlib 5.5, *)
+@MainActor
+struct GADTStructWithMixedDefaultRequirements {
+  var mainDefault: NonSendableType = requiresMainActor() // expected-note 7{{main actor-isolated default value of 'self.mainDefault' cannot be used in a global actor 'CustomActor'-isolated initializer}}
+  // expected-note @-1 6{{property declared here}}
+  // expected-note @-2 3{{mutation of this property is only permitted within the actor}}
+  nonisolated let nonisoNoDefault: SendableType
+  @CustomActor var customDefault: NonSendableType = requiresCustomActor() // expected-note 4{{property declared here}}
+  // expected-note @-1 3{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a main actor-isolated initializer}}
+  // expected-note @-2 3{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a nonisolated initializer}}
+  // expected-note @-3 2{{mutation of this property is only permitted within the actor}}
+
+  nonisolated func trigger() {}
+
+  // We do not completely initialize since we cannot run the default init of
+  // customDefault its initializer actually requires us to be on CustomActor.
+  @MainActor init(v1: NonSendableType) {
+    self.nonisoNoDefault = SendableType()
+    _ = self.mainDefault
+
+    trigger() // expected-error {{'self' used before all stored properties are initialized}}
+
+    _ = self.nonisoNoDefault
+    _ = self.mainDefault
+    _ = self.customDefault // expected-error {{'self' used before all stored properties are initialized}}
+    // expected-warning @-1 {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  // We do completely initialize. With future changes, we should be able to do
+  // this.
+  @MainActor init(v1a: NonSendableType) {
+    self.nonisoNoDefault = SendableType()
+    _ = self.mainDefault
+    self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+
+    trigger()
+
+    _ = self.nonisoNoDefault
+    _ = self.mainDefault
+    _ = self.customDefault // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+  }
+
+  // We do not completely initialize since we cannot run the default init of
+  // mainDefault its initializer actually requires us to be on MainDefault.
+  @CustomActor init(v1b: NonSendableType) {
+    self.nonisoNoDefault = SendableType()
+    _ = self.customDefault
+
+    trigger() // expected-error {{'self' used before all stored properties are initialized}}
+
+    _ = self.nonisoNoDefault
+    _ = self.mainDefault // expected-error {{'self' used before all stored properties are initialized}}
+    // expected-warning @-1 {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.customDefault
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  // We do not completely initialize since we cannot run the default init of
+  // mainDefault its initializer actually requires us to be on MainDefault.
+  @CustomActor init(v1bb: NonSendableType) {
+    self.nonisoNoDefault = SendableType()
+    _ = self.customDefault
+    _ = self.mainDefault // expected-error {{'self' used before all stored properties are initialized}}
+    // expected-warning @-1 {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-error {{'self' used before all stored properties are initialized}}
+
+    _ = self.nonisoNoDefault
+    _ = self.mainDefault // expected-error {{'self' used before all stored properties are initialized}}
+    // expected-warning @-1 {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.customDefault
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  // We do completely initialize. With future changes, we should be able to do
+  // this.
+  @CustomActor init(v1c: NonSendableType) {
+    self.nonisoNoDefault = SendableType()
+    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.customDefault
+
+    trigger()
+
+    _ = self.nonisoNoDefault
+    _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.customDefault
+  }
+
+  nonisolated init(v2: Void) {
+    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.nonisoNoDefault = SendableType()
+
+    trigger() // expected-error {{'self' used before all stored properties are initialized}}
+
+    _ = self.nonisoNoDefault
+    _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    _ = self.customDefault // expected-error {{'self' used before all stored properties are initialized}}
+    // expected-warning @-1 {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  nonisolated init(v3: Void) {
+    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.nonisoNoDefault = SendableType()
+
+    trigger()
+
+    _ = self.nonisoNoDefault
+    _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    _ = self.customDefault // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+@MainActor
+struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits {
+  var mainDefault = NonSendableType() // expected-note 5{{property declared here}}
+  // expected-note @-1 2{{mutation of this property is only permitted within the actor}}
+  nonisolated let nonisoNoDefault: SendableType
+  @CustomActor var customDefault = NonSendableType() // expected-note 4{{property declared here}}
+  // expected-note @-1 {{mutation of this property is only permitted within the actor}}
+
+  nonisolated func trigger() {}
+
+  @MainActor init(v1: Void) {
+    self.nonisoNoDefault = SendableType()
+    _ = self.mainDefault
+    _ = self.customDefault // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+
+    trigger()
+
+    _ = self.nonisoNoDefault
+    _ = self.mainDefault
+    _ = self.customDefault // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+  }
+
+  // OK: explicitly initializes all fields
+  @CustomActor init(v1a: Void) {
+    self.nonisoNoDefault = SendableType()
+    _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.customDefault
+
+    trigger()
+
+    _ = self.nonisoNoDefault
+    _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.customDefault
+  }
+
+  @CustomActor init(v1b: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    self.customDefault = NonSendableType()
+
+    trigger()
+
+    _ = self.nonisoNoDefault
+    _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.customDefault
+  }
+
+  nonisolated init(v2: Void) {
+    self.nonisoNoDefault = SendableType()
+
+    trigger()
+
+    _ = self.nonisoNoDefault
+    _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    _ = self.customDefault // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+  }
+
+  nonisolated init(v2a: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+
+    trigger()
+
+    _ = self.nonisoNoDefault
+    _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    _ = self.customDefault // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+actor ActorWithMixedDefaultRequirements {
+  @MainActor var mainDefault: NonSendableType = requiresMainActor() // expected-note 2{{main actor-isolated default value of 'self.mainDefault' cannot be used in a nonisolated initializer}}
+  // expected-note @-1 6{{property declared here}}
+  // expected-note @-2 4{{mutation of this property is only permitted within the actor}}
+  // expected-note @-3 2{{main actor-isolated default value of 'self.mainDefault' cannot be used in a global actor 'CustomActor'-isolated initializer}}
+  var actorField: NonSendableType // expected-note 6{{property declared here}}
+  // expected-note @-1 6{{mutation of this property is only permitted within the actor}}
+  nonisolated let nonisoNoDefault: SendableType
+  @CustomActor var customDefault: NonSendableType = requiresCustomActor() // expected-note 4{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a nonisolated initializer}}
+  // expected-note @-1 4{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a main actor-isolated initializer}}
+  // expected-note @-2 2{{mutation of this property is only permitted within the actor}}
+  // expected-note @-3 6{{property declared here}}
+
+  nonisolated func trigger() {}
+
+  init(v1: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType()
+
+    trigger() // expected-error {{'self' used in method call 'trigger' before all stored properties are initialized}}
+    // expected-note @-1 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-error {{variable 'self.mainDefault' used before being initialized}}
+    // expected-warning @-1 {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-2 {{main actor-isolated property 'mainDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-error {{variable 'self.customDefault' used before being initialized}}
+    // expected-warning @-1 {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-2 {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  init(v1a: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType()
+    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-error {{'self' used in method call 'trigger' before all stored properties are initialized}}
+    // expected-note @-1 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{main actor-isolated property 'mainDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-error {{variable 'self.customDefault' used before being initialized}}
+    // expected-warning @-1 {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-2 {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  init(v1b: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType()
+    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-note 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{main actor-isolated property 'mainDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-warning {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+  }
+
+  @MainActor init(v2: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-error {{'self' used in method call 'trigger' before all stored properties are initialized}}
+    // expected-note @-1 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{actor-isolated property 'actorField' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-error {{variable 'self.customDefault' used before being initialized}}
+    // expected-warning @-1 {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-2 {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  @MainActor init(v2a: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.mainDefault = NonSendableType()
+
+    trigger() // expected-error {{'self' used in method call 'trigger' before all stored properties are initialized}}
+    // expected-note @-1 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{actor-isolated property 'actorField' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-error {{variable 'self.customDefault' used before being initialized}}
+    // expected-warning @-1 {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-2 {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  @MainActor init(v2b: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.mainDefault = NonSendableType()
+    self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-note 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{actor-isolated property 'actorField' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-warning {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+  }
+
+  @CustomActor init(v3: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-error {{'self' used in method call 'trigger' before all stored properties are initialized}}
+    // expected-note @-1 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-error {{variable 'self.mainDefault' used before being initialized}}
+    // expected-warning @-1 {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-2 {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{actor-isolated property 'actorField' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-warning {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  @CustomActor init(v3a: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-note 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{actor-isolated property 'actorField' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-warning {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  @CustomActor init(v3b: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    self.customDefault = NonSendableType()
+
+    trigger() // expected-note 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{actor-isolated property 'actorField' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-warning {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+}
+
