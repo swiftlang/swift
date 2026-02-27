@@ -1478,3 +1478,18 @@ bb5(%16 : @reborrow $FakeOptional<Klass>, %17 : @reborrow $FakeOptional<Klass>):
   return %23
 }
 
+struct NCWithoutDeinit: ~Copyable {
+  var a: Bool
+  var b: Int
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_non_copyable_destructure
+// CHECK:         (%1, %2) = destructure_struct %0
+// CHECK:       } // end sil function 'dont_remove_non_copyable_destructure'
+sil [ossa] @dont_remove_non_copyable_destructure : $@convention(thin) (@owned NCWithoutDeinit) -> () {
+bb0(%0 : @owned $NCWithoutDeinit):
+  (%1, %2) = destructure_struct %0
+  %r = tuple ()
+  return %r
+}
+
