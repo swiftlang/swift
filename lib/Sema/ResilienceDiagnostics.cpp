@@ -297,6 +297,7 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
   case ExportabilityReason::ResultBuilder:
   case ExportabilityReason::PropertyWrapper:
   case ExportabilityReason::ImplicitlyPublicVarDecl:
+  case ExportabilityReason::ImplicitlyPublicVarDeclOpenClass:
   case ExportabilityReason::ImplicitlyPublicAssociatedValue:
     return isInternalBridgingHeader &&
            where.getExportedLevel() == ExportedLevel::ImplicitlyExported;

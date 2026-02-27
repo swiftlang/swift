@@ -673,31 +673,31 @@ open class OpenClassUser: ProtocolFromDirect {
   public init() { fatalError() }
 
   private var ta: TA
-  // expected-opt-in-error @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
-  // expected-not-opt-in-warning @-2 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
+  // expected-opt-in-error @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of an open class because 'directs' has been imported as implementation-only}}
+  // expected-not-opt-in-warning @-2 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of an open class because 'directs' has been imported as implementation-only}}
 
   public var publicField: StructFromDirect
   // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
 
   private var privateField: StructFromDirect
-  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
-  // expected-not-opt-in-warning @-2 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
+  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of an open class; 'directs' has been imported as implementation-only}}
+  // expected-not-opt-in-warning @-2 {{cannot use struct 'StructFromDirect' in a property declaration member of an open class; 'directs' has been imported as implementation-only}}
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of an open class; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
-  // expected-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of an open class; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
   private var j: HiddenProtocol
-  // expected-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of an open class; 'HiddenProtocol' is marked '@_implementationOnly'}}
 
   @export(interface)
   private func privateFunc(h: HiddenLayout) {}
