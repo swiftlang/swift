@@ -623,6 +623,9 @@ EXPERIMENTAL_FEATURE(UnderscoreOwned, true)
 /// Allows the standard library `Borrow` and `Inout` types to be used.
 EXPERIMENTAL_FEATURE(BorrowInout, true)
 
+/// Allow access to the BorrowingSequence protocols/types outside the stdlib.
+EXPERIMENTAL_FEATURE(BorrowingSequence, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
