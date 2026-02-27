@@ -292,6 +292,7 @@ UID_REQUESTS = [
     REQUEST('FindLocalRenameRanges',
             'source.request.find-local-rename-ranges'),
     REQUEST('SemanticRefactoring', 'source.request.semantic.refactoring'),
+    REQUEST('GetObjCSelector', 'source.request.objc.selector'),
     REQUEST('EnableCompileNotifications',
             'source.request.enable-compile-notifications'),
     REQUEST('TestNotification', 'source.request.test_notification'),

@@ -2888,6 +2888,87 @@ void SwiftLangSupport::semanticRefactoring(
                                    llvm::vfs::createPhysicalFileSystem());
 }
 
+void SwiftLangSupport::getObjCSelector(
+    StringRef PrimaryFilePath, StringRef InputBufferName,
+    unsigned Offset, ArrayRef<const char *> Args,
+    SourceKitCancellationToken CancellationToken,
+    std::function<void(const RequestResult<std::string> &)> Receiver) {
+  std::string Error;
+  SwiftInvocationRef Invok =
+      ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, Error);
+  if (!Invok) {
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
+    Receiver(RequestResult<std::string>::fromError(Error));
+    return;
+  }
+
+  class ObjCSelectorConsumer : public SwiftASTConsumer {
+    std::string InputBufferName;
+    unsigned Offset;
+    std::function<void(const RequestResult<std::string> &)> Receiver;
+
+  public:
+    ObjCSelectorConsumer(StringRef InputBufferName, unsigned Offset,
+                         std::function<void(const RequestResult<std::string> &)> Receiver)
+        : InputBufferName(InputBufferName.str()), Offset(Offset),
+          Receiver(std::move(Receiver)) {}
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto &CompIns = AstUnit->getCompilerInstance();
+      auto &SM = CompIns.getSourceMgr();
+
+      SourceFile *SF = retrieveInputFile(InputBufferName, CompIns);
+      if (!SF) {
+        Receiver(RequestResult<std::string>::fromError("Unable to find input file"));
+        return;
+      }
+
+      unsigned BufferID = SF->getBufferID();
+      SourceLoc Loc = SM.getLocForOffset(BufferID, Offset);
+
+      auto CursorInfo = evaluateOrDefault(
+          SF->getASTContext().evaluator,
+          CursorInfoRequest{CursorInfoOwner(SF, Loc)},
+          new ResolvedCursorInfo());
+
+      if (!CursorInfo || CursorInfo->isInvalid()) {
+        Receiver(RequestResult<std::string>::fromError("Invalid cursor position"));
+        return;
+      }
+
+      if (auto *ValueRefInfo = dyn_cast<ResolvedValueRefCursorInfo>(CursorInfo.get())) {
+        if (auto *VD = ValueRefInfo->getValueD()) {
+          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+            if (AFD->isObjC()) {
+              auto selector = AFD->getObjCSelector();
+              SmallString<64> scratch;
+              std::string selectorString = selector.getString(scratch).str();
+              Receiver(RequestResult<std::string>::fromResult(selectorString));
+              return;
+            }
+          }
+        }
+      }
+
+      Receiver(RequestResult<std::string>::fromError(
+          "Cursor is not on an Objective-C method"));
+    }
+
+    void cancelled() override {
+      Receiver(RequestResult<std::string>::cancelled());
+    }
+
+    void failed(StringRef Error) override {
+      Receiver(RequestResult<std::string>::fromError(Error));
+    }
+  };
+
+  auto Consumer = std::make_shared<ObjCSelectorConsumer>(InputBufferName, Offset, Receiver);
+  getASTManager()->processASTAsync(Invok, std::move(Consumer), nullptr,
+                                   CancellationToken,
+                                   llvm::vfs::getRealFileSystem());
+}
+
 void SwiftLangSupport::collectExpressionTypes(
     StringRef PrimaryFilePath, StringRef InputBufferName,
     ArrayRef<const char *> Args, ArrayRef<const char *> ExpectedProtocols,

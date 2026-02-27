@@ -155,6 +155,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("compile.close", SourceKitRequest::CompileClose)
         .Case("syntactic-expandmacro", SourceKitRequest::SyntacticMacroExpansion)
         .Case("index-to-store", SourceKitRequest::IndexToStore)
+        .Case("objc-selector", SourceKitRequest::ObjCSelector)
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) .Case("refactoring." #ID, SourceKitRequest::KIND)
 #include "swift/Refactoring/RefactoringKinds.def"
         .Default(SourceKitRequest::None);
@@ -207,6 +208,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                      << "- dependency-updated\n"
                      << "- syntactic-expandmacro\n"
                      << "- index-to-store\n"
+                     << "- objc-selector\n"
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) << "- refactoring." #ID "\n"
 #include "swift/Refactoring/RefactoringKinds.def"
                         "\n";
