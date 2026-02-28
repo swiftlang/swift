@@ -293,41 +293,23 @@ StepResult ComponentStep::take(bool prevFailed) {
   auto disjunction = CS.selectDisjunction();
   auto *conjunction = CS.selectConjunction();
 
-  enum class StepKind { Binding, Disjunction, Conjunction };
-
-  auto chooseStep = [&]() -> std::optional<StepKind> {
-    // Bindings usually happen first, but sometimes we want to prioritize a
-    // disjunction or conjunction.
-    if (bestBindings) {
-      if (disjunction &&
-          !bestBindings->favoredOverDisjunction(disjunction->first))
-        return StepKind::Disjunction;
-
-      if (conjunction && !bestBindings->favoredOverConjunction(conjunction))
-        return StepKind::Conjunction;
-
-      return StepKind::Binding;
-    }
-    if (disjunction)
-      return StepKind::Disjunction;
-
-    if (conjunction)
-      return StepKind::Conjunction;
-
-    return std::nullopt;
-  };
-
-  if (auto step = chooseStep()) {
-    switch (*step) {
-    case StepKind::Binding:
-      return attemptBinding(*bestBindings);
-    case StepKind::Disjunction:
+  // Bindings usually happen first, but sometimes we want to prioritize a
+  // disjunction or conjunction.
+  if (bestBindings) {
+    if (disjunction &&
+        !bestBindings->favoredOverDisjunction(disjunction->first))
       return attemptDisjunction(*disjunction);
-    case StepKind::Conjunction:
+
+    if (conjunction && !bestBindings->favoredOverConjunction(conjunction))
       return attemptConjunction(conjunction);
-    }
-    llvm_unreachable("Unhandled case in switch!");
+
+    return attemptBinding(*bestBindings);
   }
+  if (disjunction)
+    return attemptDisjunction(*disjunction);
+
+  if (conjunction)
+    return attemptConjunction(conjunction);
 
   if (!CS.solverState->allowsFreeTypeVariables() && CS.hasFreeTypeVariables()) {
     // If there are no disjunctions or type variables to bind
