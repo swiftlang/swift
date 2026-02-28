@@ -290,26 +290,33 @@ StepResult ComponentStep::take(bool prevFailed) {
   };
 
   const auto *bestBindings = CS.determineBestBindings();
-  auto disjunction = CS.selectDisjunction();
-  auto *conjunction = CS.selectConjunction();
-
-  // Bindings usually happen first, but sometimes we want to prioritize a
-  // disjunction or conjunction.
-  if (bestBindings) {
-    if (disjunction &&
-        !bestBindings->favoredOverDisjunction(disjunction->first))
-      return attemptDisjunction(*disjunction);
-
-    if (conjunction && !bestBindings->favoredOverConjunction(conjunction))
-      return attemptConjunction(conjunction);
-
-    return attemptBinding(*bestBindings);
+  if (!CS.shouldAttemptFixes()) {
+    // If we have a binding set ready to go, attempt it first.
+    if (bestBindings && bestBindings->getNumExactBindings() == 1) {
+      return attemptBinding(*bestBindings);
+    }
   }
-  if (disjunction)
-    return attemptDisjunction(*disjunction);
 
-  if (conjunction)
+  // FIXME: Remove favoredOverDisjunction() and favoredOverConjunction().
+
+  // Check if we have a disjunction that is better than our binding set.
+  auto disjunction = CS.selectDisjunction();
+  if (disjunction &&
+      (!bestBindings ||
+       !bestBindings->favoredOverDisjunction(disjunction->first))) {
+    return attemptDisjunction(*disjunction);
+  }
+
+  // Check if we have a conjunction that is better than our binding set.
+  auto *conjunction = CS.selectConjunction();
+  if (conjunction &&
+      (!bestBindings ||
+       !bestBindings->favoredOverConjunction(conjunction))) {
     return attemptConjunction(conjunction);
+  }
+
+  if (bestBindings)
+    return attemptBinding(*bestBindings);
 
   if (!CS.solverState->allowsFreeTypeVariables() && CS.hasFreeTypeVariables()) {
     // If there are no disjunctions or type variables to bind
