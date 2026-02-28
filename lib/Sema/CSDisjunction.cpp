@@ -845,14 +845,6 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
         return;
       }
 
-      // This is important for SIMD operators in particular because
-      // a lot of their overloads have same-type requires to a concrete
-      // type:  `<Scalar == (U)Int*>(_: SIMD*<Scalar>, ...) -> ...`.
-      if (genericSig) {
-        overloadType = overloadType->getReducedType(genericSig)
-                           ->castTo<FunctionType>();
-      }
-
       ConflictReason reason;
       for (unsigned paramIdx = 0, n = overloadType->getNumParams();
            paramIdx != n; ++paramIdx) {
