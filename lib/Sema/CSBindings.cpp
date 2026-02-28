@@ -1884,6 +1884,11 @@ bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
       return false;
   }
 
+  if (!CS.shouldAttemptFixes()) {
+    if (getNumExactBindings() == 1)
+      return true;
+  }
+
   auto *locator = conjunction->getLocator();
   if (locator->directlyAt<ClosureExpr>()) {
     auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
