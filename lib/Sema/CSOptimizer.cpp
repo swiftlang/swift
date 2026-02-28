@@ -584,7 +584,7 @@ void forEachDisjunctionChoice(
 
     Type overloadType = cs.getEffectiveOverloadType(
         disjunction->getLocator(), constraint->getOverloadChoice(),
-        /*allowMembers=*/true, constraint->getDeclContext());
+        constraint->getDeclContext());
 
     if (!overloadType || !overloadType->is<FunctionType>())
       continue;
