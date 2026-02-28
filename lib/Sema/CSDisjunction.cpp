@@ -1,4 +1,4 @@
-//===--- CSLookahead.cpp - Experimental Optimization ----------------------===//
+//===--- CSDisjunction.cpp - Disjunction pruning --------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements FOO.
+// This file implements optimizations which disable disjunction choices, ruling
+// them out from further consideration by the solver. There are two main
+// optimizations here:
+//
+// - When an applicable function constraint is first associated with a
+//   disjunction, we filter choices by considering argument labels and
+//   arity. This rules out choices which will never match, regardless
+//   of type.
+//
+// - Every time the simplified type of an applicable function constraint
+//   changes, we perform a further filtering step to disable choices
+//   whose parameter and result types can never match the types at the
+//   call site.
 //
 //===----------------------------------------------------------------------===//
 
@@ -85,6 +97,8 @@ static void forEachDisjunctionChoice(
 
 static const bool verifyIncrementalDisjunctionPruning = false;
 
+/// Lazily prune a disjunction if the argument and result types at the call site
+/// changed since last time.
 void SolverDisjunction::pruneDisjunctionIfNeeded(ConstraintSystem &cs,
                                                  Constraint *applicableFn) {
   if (!cs.getASTContext().TypeCheckerOpts.SolverPruneDisjunctions)
@@ -128,6 +142,8 @@ void SolverDisjunction::pruneDisjunctionIfNeeded(ConstraintSystem &cs,
   pruneDisjunction(cs, applicableFn, /*verify=*/false);
 }
 
+/// Prune a disjunction by considering the argument and result types at the
+/// call site.
 void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
                                          Constraint *applicableFn,
                                          bool verify) {
