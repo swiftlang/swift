@@ -2166,7 +2166,6 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
                                                 const OverloadChoice &overload,
-                                                bool allowMembers,
                                                 DeclContext *useDC) {
   switch (overload.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -2223,23 +2222,17 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   // If this declaration is within a type context, we might not be able
   // to handle it.
   if (decl->getDeclContext()->isTypeContext()) {
-    if (!allowMembers)
-      return Type();
-
-    auto getBaseObjectType = [&] () -> Type {
-      return overload.getBaseType()
+    auto withDynamicSelfResultReplaced = [&](Type type) {
+      auto baseObjectType = overload.getBaseType()
           ->getRValueType()
           ->getMetatypeInstanceType()
           ->lookThroughAllOptionalTypes();
-    };
 
-    auto withDynamicSelfResultReplaced = [&](Type type) {
       return type->replaceDynamicSelfType(
         getDynamicSelfReplacementType(
-          getBaseObjectType(), decl, locator));
+          baseObjectType, decl, locator));
     };
 
-    SmallVector<OpenedType, 4> emptyReplacements;
     if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
       auto elementTy = subscript->getElementInterfaceType();
 
@@ -2287,16 +2280,19 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           return Type();
       }
 
+      // Insert a dynamic 'Self' if this is a class constructor, to work around
+      // the fact that the interface type doesn't have one, which sadly is a
+      // difficult assumption to unwind right now.
       if (isa<ConstructorDecl>(decl) &&
           decl->getDeclContext()->getSelfClassDecl()) {
         type = type->withCovariantResultType();
       }
 
-      // Cope with 'Self' returns.
+      // Replace any occurrences of dynamic 'Self' with the actual base type
+      // for the call. This handles constructors too, as per the above.
       if (type->hasDynamicSelfType()) {
         if (!overload.getBaseType())
           return Type();
-
         type = withDynamicSelfResultReplaced(type);
       }
 

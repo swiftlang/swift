@@ -517,7 +517,7 @@ retry_after_fail:
 
         // Determine the type that this choice will have.
         Type choiceType = getEffectiveOverloadType(
-            constraint->getLocator(), choice, /*allowMembers=*/true,
+            constraint->getLocator(), choice,
             constraint->getDeclContext());
         if (!choiceType) {
           hasUnhandledConstraints = true;
@@ -719,7 +719,7 @@ static void forEachDisjunctionChoice(
 
     Type overloadType = cs.getEffectiveOverloadType(
         disjunction->getLocator(), choice,
-        /*allowMembers=*/true, constraint->getDeclContext());
+        constraint->getDeclContext());
 
     if (!overloadType || !overloadType->is<FunctionType>())
       continue;
