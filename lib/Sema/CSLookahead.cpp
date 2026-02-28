@@ -256,29 +256,8 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
           choice->print(llvm::errs(),
                         &cs.getASTContext().SourceMgr,
                         cs.solverState->getCurrentIndent());
-          llvm::errs() << " because";
-          if (reason.contains(ConflictFlag::Category))
-            llvm::errs() << " category";
-          if (reason.contains(ConflictFlag::Exact))
-            llvm::errs() << " exact";
-          if (reason.contains(ConflictFlag::Class))
-            llvm::errs() << " class";
-          if (reason.contains(ConflictFlag::Structural))
-            llvm::errs() << " structural";
-          if (reason.contains(ConflictFlag::Array))
-            llvm::errs() << " array";
-          if (reason.contains(ConflictFlag::DictionaryKey))
-            llvm::errs() << " dictionary_key";
-          if (reason.contains(ConflictFlag::DictionaryValue))
-            llvm::errs() << " dictionary_value";
-          if (reason.contains(ConflictFlag::Set))
-            llvm::errs() << " set";
-          if (reason.contains(ConflictFlag::Optional))
-            llvm::errs() << " optional";
-          if (reason.contains(ConflictFlag::Structural))
-            llvm::errs() << " structural";
-          if (reason.contains(ConflictFlag::Conformance))
-            llvm::errs() << " conformance";
+          llvm::errs() << " because ";
+          simple_display(llvm::errs(), reason);
           llvm::errs() << ")\n";
         }
         ASSERT(!verify);
