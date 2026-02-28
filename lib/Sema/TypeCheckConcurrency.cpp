@@ -6307,6 +6307,16 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       };
   }
 
+  // If this declaration is lazy storage, it has the same isolation as the
+  // original variable. Use the evaluator to cache and avoid running
+  // addAttributesForActorIsolation on the original variable a second time,
+  // duplicating attributes.
+  if (auto var = dyn_cast<VarDecl>(value))
+    if (var->isLazyStorageProperty())
+      if (auto originalVar = var->getOriginalVarForBackingStorage())
+        return evaluateOrDefault(evaluator, ActorIsolationRequest{originalVar},
+                                 InferredActorIsolation::forUnspecified());
+
   auto isolationFromAttr = getIsolationFromAttributes(value);
   ASTContext &ctx = value->getASTContext();
 
@@ -7142,7 +7152,10 @@ static bool checkSendableInstanceStorage(
           if (behavior != DiagnosticBehavior::Ignore) {
             property
                 ->diagnose(diag::concurrent_value_class_mutable_property,
-                           property->getName(), nominal)
+                           property->isLazyStorageProperty()
+                               ? property->getOriginalVarForBackingStorage()
+                               : property,
+                           nominal)
                 .limitBehaviorWithPreconcurrency(behavior, preconcurrency);
           }
           invalid = invalid || (behavior == DiagnosticBehavior::Unspecified);
