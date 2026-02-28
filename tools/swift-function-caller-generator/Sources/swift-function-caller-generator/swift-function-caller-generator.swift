@@ -91,7 +91,12 @@ class SwiftMacroTestGen: SyntaxVisitor {
         .with(
           \.modifiers,
           res.modifiers.filter { modifier in
-            modifier.name.tokenKind != .keyword(.mutating)
+            switch modifier.name.tokenKind {
+              case .keyword(.mutating), .keyword(.open):
+                false
+              default:
+                true
+            }
           }
         )
     }

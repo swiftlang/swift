@@ -10,8 +10,7 @@
 // RUN: %swift-function-caller-generator Test %t/Test.swiftinterface > %t/out.swift
 // RUN: %diff %t/out.swift %t/out.expected
 
-// FIXME: top level function cannot be open
-// RUN: not %target-swift-frontend-verify -typecheck -strict-memory-safety %t/out.swift -I %t -enable-experimental-feature Lifetimes -enable-experimental-feature LifetimeDependence
+// RUN: %target-swift-frontend-verify -typecheck -strict-memory-safety %t/out.swift -I %t -enable-experimental-feature Lifetimes -enable-experimental-feature LifetimeDependence
 
 //--- in.swift
 public func foo(x: Int) -> Int {
@@ -101,7 +100,6 @@ public func call_qux(_ func: inout Swift::MutableSpan<Swift::CInt>) {
   public func call_pub(_ self: C, _ x: Swift::Int) -> Swift::Int {
   return self.pub(x)
 }
-
-  open func call_ope(_ self: C, _ x: Swift::Int) -> Swift::Int {
+func call_ope(_ self: C, _ x: Swift::Int) -> Swift::Int {
   return self.ope(x)
 }
