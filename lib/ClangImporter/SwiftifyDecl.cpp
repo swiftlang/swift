@@ -471,6 +471,20 @@ static size_t getNumParams(const clang::ObjCMethodDecl* D) {
 static size_t getNumParams(const clang::FunctionDecl* D) {
     return D->getNumParams();
 }
+
+static bool shouldSkipModule(ModuleDecl *M) {
+  if (M->getName().str() == CLANG_HEADER_MODULE_NAME) {
+    DLOG("is from bridging header (or C++ namespace)\n");
+    return false;
+  }
+
+  if (M->getImplicitImportInfo().StdlibKind != ImplicitStdlibKind::Stdlib) {
+    DLOG("module " << M->getNameStr() << " does not import stdlib\n");
+    return true;
+  }
+
+  return false;
+}
 } // namespace
 
 template<typename T>
@@ -488,6 +502,16 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
         return false;
       }
     }
+  }
+
+  if (shouldSkipModule(MappedDecl->getParentModule()))
+    return false;
+
+  {
+    UnaliasedInstantiationVisitor visitor;
+    visitor.TraverseType(ClangDecl->getType());
+    if (visitor.hasUnaliasedInstantiation)
+      return false;
   }
 
   // FIXME: for private macro generated functions we do not serialize the
@@ -685,65 +709,6 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
   return attachMacro;
 }
 
-class SwiftifyProtocolInfoPrinter : public SwiftifyInfoPrinter {
-private:
-  ClangImporter::Implementation &ImporterImpl;
-
-public:
-  SwiftifyProtocolInfoPrinter(ClangImporter::Implementation &ImporterImpl,
-                              clang::ASTContext &ctx, ASTContext &SwiftContext,
-                              llvm::raw_svector_ostream &out,
-                              MacroDecl &SwiftifyImportDecl,
-                              llvm::StringMap<std::string> &typeMapping)
-      : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl, typeMapping),
-        ImporterImpl(ImporterImpl) {}
-
-  bool printMethod(const FuncDecl *Method) {
-    auto ClangDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(Method->getClangDecl());
-    if (!ClangDecl)
-      return false;
-
-    llvm::SmallString<128> paramInfoString;
-    llvm::raw_svector_ostream tmpOut(paramInfoString);
-
-    SwiftifyInfoFunctionPrinter methodPrinter(ctx, SwiftContext, tmpOut,
-                                              SwiftifyImportDecl, typeMapping);
-    bool hadAttributes = swiftifyImpl(ImporterImpl, methodPrinter, Method, ClangDecl);
-    if (hadAttributes) {
-      printSeparator();
-      out << ".method(signature: \"";
-      printMethodSignature(Method);
-      out << "\", paramInfo: [" << paramInfoString << "])";
-    }
-    return hadAttributes;
-  }
-
-private:
-  void printMethodSignature(const FuncDecl *Method) {
-    auto options =
-        PrintOptions::printForDiagnostics(AccessLevel::Private, true);
-    for (const auto *attr : Method->getAttrs()) {
-      options.ExcludeAttrList.push_back(attr->getKind());
-    }
-    StreamPrinter printer(out);
-    Method->print(printer, options);
-  }
-};
-
-static bool shouldSkipModule(ModuleDecl *M) {
-  if (M->getName().str() == CLANG_HEADER_MODULE_NAME) {
-    DLOG("is from bridging header (or C++ namespace)\n");
-    return false;
-  }
-
-  if (M->getImplicitImportInfo().StdlibKind != ImplicitStdlibKind::Stdlib) {
-    DLOG("module " << M->getNameStr() << " does not import stdlib\n");
-    return true;
-  }
-
-  return false;
-}
-
 static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
                                        StringRef MacroName,
                                        Decl *MappedDecl) {
@@ -773,21 +738,6 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   auto ClangDecl = dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
   if (!ClangDecl)
     return;
-
-  DLOG_SCOPE(
-      "Checking '" << *ClangDecl << "' (imported as '"
-                   << MappedDecl->getName().getBaseName().userFacingName()
-                   << "')\n");
-
-  if (shouldSkipModule(MappedDecl->getParentModule()))
-    return;
-
-  {
-    UnaliasedInstantiationVisitor visitor;
-    visitor.TraverseType(ClangDecl->getType());
-    if (visitor.hasUnaliasedInstantiation)
-      return;
-  }
 
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
   if (!SwiftifyImportDecl) {
