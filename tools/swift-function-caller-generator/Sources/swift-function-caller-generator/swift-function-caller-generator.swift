@@ -68,6 +68,9 @@ class SwiftMacroTestGen: SyntaxVisitor {
       return .skipChildren
     }
     let surroundingType = getParentType(res)
+    let isMutating = res.modifiers.contains(where: {
+      $0.name.tokenKind == .keyword(.mutating)
+    })
     let selfParam = surroundingType.map { _ in TokenSyntax("self") }
     res = createFunctionSignature(res)
     res =
@@ -81,9 +84,16 @@ class SwiftMacroTestGen: SyntaxVisitor {
         .with(
           \.signature.parameterClause.parameters,
           addSelfParam(
-            res.signature.parameterClause.parameters, surroundingType, selfParam!)
+            res.signature.parameterClause.parameters, surroundingType, selfParam!,
+            isMutating: isMutating)
         )
         .with(\.leadingTrivia, "\n")
+        .with(
+          \.modifiers,
+          res.modifiers.filter { modifier in
+            modifier.name.tokenKind != .keyword(.mutating)
+          }
+        )
     }
     print(res)
     return .skipChildren
@@ -134,8 +144,11 @@ class TypeAliasReplacer: SyntaxRewriter {
 
 func createBody(_ f: FunctionDeclSyntax, selfParam: TokenSyntax?) -> CodeBlockSyntax {
   var call = createCall(f)
+  let unsafeKw = hasUnsafeType(f) ? "unsafe " : ""
   if let selfParam {
-    call = "\(selfParam).\(call)"
+    call = "\(raw: unsafeKw)\(selfParam).\(call)"
+  } else {
+    call = "\(raw: unsafeKw)\(call)"
   }
   return
     """
@@ -167,8 +180,7 @@ func createCall(_ f: FunctionDeclSyntax) -> ExprSyntax {
     return LabeledExprSyntax(
       label: label?.withoutBackticks, colon: colon, expression: arg, trailingComma: comma)
   }
-  let unsafeKw = hasUnsafeType(f) ? "unsafe " : ""
-  return ExprSyntax("\(raw: unsafeKw)\(f.name)(\(LabeledExprListSyntax(labeledArgs)))")
+  return ExprSyntax("\(f.name)(\(LabeledExprListSyntax(labeledArgs)))")
 }
 
 func hasUnsafeType(_ f: FunctionDeclSyntax) -> Bool {
@@ -213,10 +225,13 @@ extension String {
   }
 }
 
-func addSelfParam(_ params: FunctionParameterListSyntax, _ type: TokenSyntax, _ name: TokenSyntax)
-  -> FunctionParameterListSyntax
-{
-  return [FunctionParameterSyntax("_ \(name): \(type.trimmed), ")] + params
+func addSelfParam(
+  _ params: FunctionParameterListSyntax, _ type: TokenSyntax, _ name: TokenSyntax,
+  isMutating: Bool = false
+) -> FunctionParameterListSyntax {
+  let typeStr = isMutating ? "inout \(type.trimmed)" : "\(type.trimmed)"
+  let comma = params.isEmpty ? "" : ", "
+  return [FunctionParameterSyntax("_ \(name): \(raw: typeStr)\(raw: comma)")] + params
 }
 
 func getParentType(_ node: some SyntaxProtocol) -> TokenSyntax? {
