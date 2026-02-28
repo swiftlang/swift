@@ -2,14 +2,17 @@
 // REQUIRES: swift_feature_Lifetimes
 
 // RUN: %empty-directory(%t)
+// RUN: split-file %s %t
 
-// RUN: %target-build-swift -emit-module %s -enable-experimental-feature Lifetimes -enable-experimental-feature LifetimeDependence -o %t/%target-library-name(Test) -module-name Test -emit-library
+// RUN: %target-build-swift -emit-module %t/in.swift -enable-experimental-feature Lifetimes -enable-experimental-feature LifetimeDependence -o %t/%target-library-name(Test) -module-name Test -emit-library
 
-// RUN: %target-swift-emit-module-interface(%t/Test.swiftinterface) %s -enable-experimental-feature Lifetimes -enable-experimental-feature LifetimeDependence
+// RUN: %target-swift-emit-module-interface(%t/Test.swiftinterface) %t/in.swift -enable-experimental-feature Lifetimes -enable-experimental-feature LifetimeDependence
 // RUN: %swift-function-caller-generator Test %t/Test.swiftinterface > %t/out.swift
+// RUN: %diff %t/out.swift %t/out.expected
 
 // RUN: %target-swift-frontend-verify -typecheck -strict-memory-safety %t/out.swift -I %t
 
+//--- in.swift
 func foo(x: Int) -> Int {
   return x
 }
@@ -47,3 +50,7 @@ class C {
     return x
   }
 }
+
+//--- out.expected
+import Test
+
