@@ -34,6 +34,19 @@ struct StorageTrampolineMacro: PeerMacro {
   }
 }
 
+struct WrappedPeerMacro: PeerMacro {
+  static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    ["""
+    @Flag
+    var peerWrapped: Bool = false
+    """]
+  }
+}
+
 //--- main.swift
 
 @freestanding(declaration, names: arbitrary)
@@ -41,6 +54,14 @@ macro _Property() = #externalMacro(module: "MacroDefinition", type: "StorageMacr
 
 @attached(peer, names: prefixed(_))
 macro PropertyWrap() = #externalMacro(module: "MacroDefinition", type: "StorageTrampolineMacro")
+
+@propertyWrapper
+struct Flag {
+  var wrappedValue: Bool
+}
+
+@attached(peer, names: arbitrary)
+macro AddWrappedPeer() = #externalMacro(module: "MacroDefinition", type: "WrappedPeerMacro")
 
 // Make sure we can lower this without crashing.
 public struct S1<T> {
@@ -73,6 +94,18 @@ public class C<T> {
 // SIL-NEXT:   #C._property!getter: <T> (C<T>) -> () -> T : @$s4main1CC9_propertyxvg
 // SIL-NEXT:   #C._property!setter: <T> (C<T>) -> (T) -> () : @$s4main1CC9_propertyxvs
 // SIL-NEXT:   #C._property!modify: <T> (C<T>) -> () -> () : @$s4main1CC9_propertyxvM
+
+// Make sure peer-expanded wrapped properties are lowered before stored
+// property enumeration.
+// PRINT-LABEL: struct WrappedByPeer
+// PRINT: var peerWrapped: Bool { get set }
+public struct WrappedByPeer {
+  @AddWrappedPeer var feature: Bool = false
+
+  public init() {
+    peerWrapped = true
+  }
+}
 
 // PRINT-LABEL: struct TestMemberwise1<T>
 struct TestMemberwise1<T> {

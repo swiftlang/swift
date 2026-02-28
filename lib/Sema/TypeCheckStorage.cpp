@@ -43,6 +43,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
 
 /// Set each bound variable in the pattern to have an error type.
@@ -128,10 +129,18 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
                           ExpandSynthesizedMemberMacroRequest{decl},
                           false);
 
-  // Just walk over the members of the type, forcing backing storage
+  // Walk over members and their auxiliary decls, forcing backing storage
   // for lazy properties and property wrappers to be synthesized.
-  implDecl->loadStorageMembers();
-  for (auto *member : implDecl->getCurrentMembersWithoutLoading()) {
+  //
+  // This is necessary for peer macro expansions that introduce wrapped
+  // properties: if we only lower direct members here, stored property
+  // enumeration can run before wrapper backing vars are synthesized.
+  llvm::SmallPtrSet<Decl *, 8> visited;
+  std::function<void(Decl *)> visitMember;
+  visitMember = [&](Decl *member) {
+    if (!visited.insert(member).second)
+      return;
+
     // Expand peer macros.
     (void)evaluateOrDefault(
         ctx.evaluator,
@@ -139,19 +148,22 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
         {});
 
     auto *var = dyn_cast<VarDecl>(member);
-    if (!var || var->isStatic())
-      continue;
-
-    if (reason == LoweredPropertiesReason::Stored) {
+    if (var && !var->isStatic() && reason == LoweredPropertiesReason::Stored) {
       if (var->getAttrs().hasAttribute<LazyAttr>())
-        (void) var->getLazyStorageProperty();
+        (void)var->getLazyStorageProperty();
 
       if (var->hasAttachedPropertyWrapper()) {
-        (void) var->getPropertyWrapperAuxiliaryVariables();
-        (void) var->getPropertyWrapperInitializerInfo();
+        (void)var->getPropertyWrapperAuxiliaryVariables();
+        (void)var->getPropertyWrapperInitializerInfo();
       }
     }
-  }
+
+    member->visitAuxiliaryDecls(visitMember);
+  };
+
+  implDecl->loadStorageMembers();
+  for (auto *member : implDecl->getCurrentMembersWithoutLoading())
+    visitMember(member);
 
   if (reason != LoweredPropertiesReason::Stored)
     return;
