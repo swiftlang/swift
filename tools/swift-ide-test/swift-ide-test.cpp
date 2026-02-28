@@ -557,6 +557,11 @@ Typecheck("typecheck",
           llvm::cl::cat(Category),
           llvm::cl::init(false));
 
+static llvm::cl::opt<std::string>
+LibraryLevel("library-level",
+          llvm::cl::desc("Library distribution level 'api', 'spi' or 'other'"),
+          llvm::cl::cat(Category));
+
 static llvm::cl::opt<bool>
 Playground("playground",
            llvm::cl::desc("Whether coloring in playground"),
@@ -4784,7 +4789,19 @@ int main(int argc, char *argv[]) {
   }
 
   InitInvok.computeAArch64TBIOptions();
-
+  if (options::LibraryLevel == "api") {
+    InitInvok.getLangOptions().LibraryLevel = LibraryLevel::API;
+  } else if (options::LibraryLevel == "spi") {
+    InitInvok.getLangOptions().LibraryLevel = LibraryLevel::SPI;
+  } else if (options::LibraryLevel == "ipi") {
+    InitInvok.getLangOptions().LibraryLevel = LibraryLevel::IPI;
+  } else if (options::LibraryLevel == "other") {
+    InitInvok.getLangOptions().LibraryLevel = LibraryLevel::Other;
+  } else if (options::LibraryLevel != "") {
+    llvm::errs() << "invalid library-level: " << options::LibraryLevel << '\n';
+    return 1;
+  }
+  
   if (!options::InProcessPluginServerPath.empty()) {
     InitInvok.getSearchPathOptions().InProcessPluginServerPath =
         options::InProcessPluginServerPath;
