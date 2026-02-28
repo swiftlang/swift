@@ -941,6 +941,17 @@ struct RefCountedPtrRequestResult {
 
 RefCountedPtrRequestResult
 getClangRefCountedSmartPointer(NominalTypeDecl *decl);
+
+/// Iterator categories, based on the std iterator tags
+enum class CxxIteratorCategory {
+  // Output,
+  Input = 1,
+  // Forward,
+  // Bidirectional,
+  RandomAccess,
+  Contiguous,
+};
+
 } // namespace importer
 
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
