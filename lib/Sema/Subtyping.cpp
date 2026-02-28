@@ -618,7 +618,9 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
 
   // FIXME: Move this into isLikelyExactMatch()
   if (sig) {
-    if (rhs->isTypeParameter()) {
+    // Skip this if lhs is a type variable, because then lookupConformance()
+    // always returns an abstract conformance for that type.
+    if (rhs->isTypeParameter() && !lhs->isTypeVariableOrMember()) {
       bool failed = llvm::any_of(
           sig->getRequiredProtocols(rhs),
           [&](ProtocolDecl *proto) {
@@ -628,7 +630,7 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
         return ConflictFlag::Conformance;
     }
 
-    if (lhs->isTypeParameter()) {
+    if (lhs->isTypeParameter() && !rhs->isTypeVariableOrMember()) {
       bool failed = llvm::any_of(
           sig->getRequiredProtocols(lhs),
           [&](ProtocolDecl *proto) {
