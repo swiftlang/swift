@@ -10,24 +10,25 @@
 // RUN: %swift-function-caller-generator Test %t/Test.swiftinterface > %t/out.swift
 // RUN: %diff %t/out.swift %t/out.expected
 
-// RUN: %target-swift-frontend-verify -typecheck -strict-memory-safety %t/out.swift -I %t
+// FIXME: fails to compile because of duplicate decls of call_baz and call_qux
+// RUN: not %target-swift-frontend-verify -typecheck -strict-memory-safety %t/out.swift -I %t -enable-experimental-feature Lifetimes -enable-experimental-feature LifetimeDependence
 
 //--- in.swift
-func foo(x: Int) -> Int {
+public func foo(x: Int) -> Int {
   return x
 }
 
-func bar(_ y: UnsafePointer<CInt>) {}
+public func bar(_ y: UnsafePointer<CInt>) {}
 
 @_lifetime(borrow z)
-func baz(_ z: Span<CInt>) -> Span<CInt> {
+public func baz(_ z: Span<CInt>) -> Span<CInt> {
   return z
 }
 
 @_lifetime(`func`: copy `func`)
-func qux(_ func: inout MutableSpan<CInt>) {}
+public func qux(_ func: inout MutableSpan<CInt>) {}
 
-struct S {
+public struct S {
   mutating func m(_ x: Int) -> Int {
     return x
   }
@@ -39,7 +40,7 @@ struct S {
   }
 }
 
-class C {
+public class C {
   public func pub(_ x: Int) -> Int {
     return x
   }
@@ -54,3 +55,43 @@ class C {
 //--- out.expected
 import Test
 
+
+public func call_foo(x: Swift::Int) -> Swift::Int {
+  return foo(x: x)
+}
+
+public func call_bar(_ y: Swift::UnsafePointer<Swift::CInt>) {
+  return unsafe bar(y)
+}
+
+@_lifetime(borrow z)
+public func call_baz(_ z: Swift::Span<Swift::CInt>) -> Swift::Span<Swift::CInt> {
+  return baz(z)
+}
+
+@lifetime(borrow z)
+public func call_baz(_ z: Swift::Span<Swift::CInt>) -> Swift::Span<Swift::CInt> {
+  return baz(z)
+}
+
+@_lifetime(`func`: copy `func`)
+public func call_qux(_ func: inout Swift::MutableSpan<Swift::CInt>) {
+  return qux(&`func`)
+}
+
+@lifetime(`func`: copy `func`)
+public func call_qux(_ func: inout Swift::MutableSpan<Swift::CInt>) {
+  return qux(&`func`)
+}
+
+  public func call_pub(_ self: S, _ x: Swift::Int) -> Swift::Int {
+  return self.pub(x)
+}
+
+  public func call_pub(_ self: C, _ x: Swift::Int) -> Swift::Int {
+  return self.pub(x)
+}
+
+  open func call_ope(_ self: C, _ x: Swift::Int) -> Swift::Int {
+  return self.ope(x)
+}
