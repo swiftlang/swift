@@ -99,6 +99,22 @@ class SwiftMacroTestGen: SyntaxVisitor {
     return .skipChildren
   }
 
+  override func visit(_ node: IfConfigDeclSyntax) -> SyntaxVisitorContinueKind {
+    for clause in node.clauses {
+      walk(clause)
+    }
+    print(node.poundEndif, terminator: "")
+    return .skipChildren
+  }
+
+  override func visit(_ node: IfConfigClauseSyntax) -> SyntaxVisitorContinueKind {
+    print(node.with(\.elements, nil), terminator: "")
+    if let elements = node.elements {
+      walk(elements)
+    }
+    return .skipChildren
+  }
+
   func createFunctionSignature(_ f: FunctionDeclSyntax) -> FunctionDeclSyntax {
     let params = f.signature.parameterClause.parameters
     let funcName = f.name.withoutBackticks.trimmed.text

@@ -10,7 +10,7 @@
 // RUN: %swift-function-caller-generator Test %t/Test.swiftinterface > %t/out.swift
 // RUN: %diff %t/out.swift %t/out.expected
 
-// FIXME: fails to compile because of duplicate decls of call_baz and call_qux
+// FIXME: top level function cannot be open
 // RUN: not %target-swift-frontend-verify -typecheck -strict-memory-safety %t/out.swift -I %t -enable-experimental-feature Lifetimes -enable-experimental-feature LifetimeDependence
 
 //--- in.swift
@@ -64,26 +64,36 @@ public func call_bar(_ y: Swift::UnsafePointer<Swift::CInt>) {
   return unsafe bar(y)
 }
 
+#if compiler(>=5.3) && $LifetimeDependence
+#if compiler(>=5.3) && $Lifetimes
 @_lifetime(borrow z)
 public func call_baz(_ z: Swift::Span<Swift::CInt>) -> Swift::Span<Swift::CInt> {
   return baz(z)
 }
 
+#else
 @lifetime(borrow z)
 public func call_baz(_ z: Swift::Span<Swift::CInt>) -> Swift::Span<Swift::CInt> {
   return baz(z)
 }
 
+#endif
+#endif
+#if compiler(>=5.3) && $LifetimeDependence
+#if compiler(>=5.3) && $Lifetimes
 @_lifetime(`func`: copy `func`)
 public func call_qux(_ func: inout Swift::MutableSpan<Swift::CInt>) {
   return qux(&`func`)
 }
 
+#else
 @lifetime(`func`: copy `func`)
 public func call_qux(_ func: inout Swift::MutableSpan<Swift::CInt>) {
   return qux(&`func`)
 }
 
+#endif
+#endif
   public func call_pub(_ self: S, _ x: Swift::Int) -> Swift::Int {
   return self.pub(x)
 }
