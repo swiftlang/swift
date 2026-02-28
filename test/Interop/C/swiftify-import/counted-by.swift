@@ -2,13 +2,14 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -strict-memory-safety -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast \
-// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -suppress-notes
+// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -suppress-notes -Rclang-importer
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __counted_by parameters.
 
 //--- test.h
 #define __counted_by(x) __attribute__((__counted_by__(x)))
 
+// expected-remark@+8{{added safe interop wrapper}}
 // expected-expansion@+7:47{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func simple(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -18,6 +19,7 @@
 // }}
 void simple(int len, int * __counted_by(len) p);
 
+// expected-remark@+8{{added safe interop wrapper}}
 // expected-expansion@+7:54{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func simpleFlipped(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -27,6 +29,7 @@ void simple(int len, int * __counted_by(len) p);
 // }}
 void simpleFlipped(int * __counted_by(len) p, int len);
 
+// expected-remark@+8{{did not add safe interop wrapper}}
 // expected-expansion@+7:31{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func swiftAttr(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -37,6 +40,7 @@ void simpleFlipped(int * __counted_by(len) p, int len);
 void swiftAttr(int len, int *p) __attribute__((
     swift_attr("@_SwiftifyImport(.countedBy(pointer: .param(2), count: \"len\"))")));
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:76{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ p1: UnsafeMutableBufferPointer<Int32>, _ p2: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -49,6 +53,7 @@ void swiftAttr(int len, int *p) __attribute__((
 // }}
 void shared(int len, int * __counted_by(len) p1, int * __counted_by(len) p2);
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:73{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -61,6 +66,7 @@ void shared(int len, int * __counted_by(len) p1, int * __counted_by(len) p2);
 // }}
 void complexExpr(int len, int offset, int * __counted_by(len - offset) p);
 
+// expected-remark@+8{{added safe interop wrapper}}
 // expected-expansion@+7:74{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullUnspecified(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -70,6 +76,7 @@ void complexExpr(int len, int offset, int * __counted_by(len - offset) p);
 // }}
 void nullUnspecified(int len, int * __counted_by(len) _Null_unspecified p);
 
+// expected-remark@+8{{added safe interop wrapper}}
 // expected-expansion@+7:57{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nonnull(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -79,6 +86,7 @@ void nullUnspecified(int len, int * __counted_by(len) _Null_unspecified p);
 // }}
 void nonnull(int len, int * __counted_by(len) _Nonnull p);
 
+// expected-remark@+8{{added safe interop wrapper}}
 // expected-expansion@+7:59{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ p: UnsafeMutableBufferPointer<Int32>?) {|}}
@@ -88,6 +96,7 @@ void nonnull(int len, int * __counted_by(len) _Nonnull p);
 // }}
 void nullable(int len, int * __counted_by(len) _Nullable p);
 
+// expected-remark@+7{{added safe interop wrapper}}
 // expected-expansion@+6:46{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int32) -> UnsafeMutableBufferPointer<Int32> {|}}
@@ -96,6 +105,7 @@ void nullable(int len, int * __counted_by(len) _Nullable p);
 // }}
 int * __counted_by(len) returnPointer(int len);
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:53{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func offByOne(_ len: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -108,6 +118,7 @@ int * __counted_by(len) returnPointer(int len);
 // }}
 void offByOne(int len, int * __counted_by(len + 1) p);
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:77{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func offBySome(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -120,6 +131,7 @@ void offByOne(int len, int * __counted_by(len + 1) p);
 // }}
 void offBySome(int len, int offset, int * __counted_by(len + (1 + offset)) p);
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:54{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func scalar(_ m: Int32, _ n: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -132,6 +144,7 @@ void offBySome(int len, int offset, int * __counted_by(len + (1 + offset)) p);
 // }}
 void scalar(int m, int n, int * __counted_by(m * n) p);
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:67{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bitwise(_ m: Int32, _ n: Int32, _ o: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -144,6 +157,7 @@ void scalar(int m, int n, int * __counted_by(m * n) p);
 // }}
 void bitwise(int m, int n, int o, int * __counted_by(m & n | ~o) p);
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:71{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bitshift(_ m: Int32, _ n: Int32, _ o: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -156,6 +170,7 @@ void bitwise(int m, int n, int o, int * __counted_by(m & n | ~o) p);
 // }}
 void bitshift(int m, int n, int o, int * __counted_by(m << (n >> o)) p);
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:44{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func constInt(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -168,6 +183,7 @@ void bitshift(int m, int n, int o, int * __counted_by(m << (n >> o)) p);
 // }}
 void constInt(int * __counted_by(42 * 10) p);
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:66{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func constFloatCastedToInt(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -180,28 +196,40 @@ void constInt(int * __counted_by(42 * 10) p);
 // }}
 void constFloatCastedToInt(int * __counted_by((int) (4.2 / 12)) p);
 
+// expected-remark@+1{{did not add safe interop wrapper}}
 void sizeofType(int * __counted_by(sizeof(int *)) p);
 
+// expected-remark@+1{{did not add safe interop wrapper}}
 void sizeofParam(int * __counted_by(sizeof(p)) p);
 
+// expected-remark@+1{{did not add safe interop wrapper}}
 void derefLen(int * len, int * __counted_by(*len) p);
 
+// expected-remark@+1{{did not add safe interop wrapper}}
 void lNot(int len, int * __counted_by(!len) p);
 
+// expected-remark@+1{{did not add safe interop wrapper}}
 void lAnd(int len, int * __counted_by(len && len) p);
 
+// expected-remark@+1{{did not add safe interop wrapper}}
 void lOr(int len, int * __counted_by(len || len) p);
 
+// expected-remark@+1{{did not add safe interop wrapper}}
 void floatCastToInt(float meters, int * __counted_by((int) meters) p);
 
+// expected-remark@+1{{did not add safe interop wrapper}}
 void pointerCastToInt(int *square, int * __counted_by((int) square) p);
 
+// expected-remark@+1{{did not add safe interop wrapper}}
 void nanAsInt(int * __counted_by((int) (0 / 0)) p);
 
+// expected-remark@+1{{did not add safe interop wrapper}}
 void unsignedLiteral(int * __counted_by(2u) p);
 
+// expected-remark@+1{{did not add safe interop wrapper}}
 void longLiteral(int * __counted_by(2l) p);
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:43{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func hexLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -214,6 +242,7 @@ void longLiteral(int * __counted_by(2l) p);
 // }}
 void hexLiteral(int * __counted_by(0xfa) p);
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:46{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func binaryLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -226,6 +255,7 @@ void hexLiteral(int * __counted_by(0xfa) p);
 // }}
 void binaryLiteral(int * __counted_by(0b10) p);
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:45{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func octalLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {|}}

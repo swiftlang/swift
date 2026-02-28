@@ -731,16 +731,21 @@ static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
 }
 
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
+  auto emitRemark = [this,MappedDecl]() {
+    if (SwiftContext.LangOpts.RemarkClangImporter)
+      diagnose(MappedDecl->getNameLoc(), diag::no_safe_wrapper);
+  };
+
   if (SwiftContext.LangOpts.DisableSafeInteropWrappers)
-    return;
+    return emitRemark();
   auto ClangDecl = dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
   if (!ClangDecl)
-    return;
+    return emitRemark();
 
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
   if (!SwiftifyImportDecl) {
     DLOG("_SwiftifyImport macro not found\n");
-    return;
+    return emitRemark();
   }
 
   llvm::SmallString<128> MacroString;
@@ -753,7 +758,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
                                         *SwiftifyImportDecl, typeMapping);
     if (!swiftifyImpl(*this, printer, MappedDecl, ClangDecl)) {
       DLOG("No relevant bounds or lifetime info found\n");
-      return;
+      return emitRemark();
     }
     printer.printAvailability();
     printer.printTypeMapping();
@@ -761,9 +766,11 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   }
 
   if (diagnoseMissingMacroPlugin(SwiftContext, "_SwiftifyImport", MappedDecl))
-    return;
+    return emitRemark();
 
   DLOG("Attaching safe interop macro: " << MacroString << "\n");
+  if (SwiftContext.LangOpts.RemarkClangImporter)
+    diagnose(MappedDecl->getNameLoc(), diag::yes_safe_wrapper);
   if (clang::RawComment *raw =
           getClangASTContext().getRawCommentForDeclNoCache(ClangDecl)) {
     // swift::RawDocCommentAttr doesn't contain its text directly, but instead

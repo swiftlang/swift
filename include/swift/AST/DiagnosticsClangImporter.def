@@ -437,5 +437,13 @@ ERROR(repeating_swift_attrs, none, "multiple %0 annotations found on %1",
 
 NOTE(annotation_here, none, "%0 annotation found here", (StringRef))
 
+//------------------------------------------------------------------------------
+// MARK: ClangImporter remark diagnostics
+//------------------------------------------------------------------------------
+
+REMARK(yes_safe_wrapper, none, "added safe interop wrapper", ())
+
+REMARK(no_safe_wrapper, none, "did not add safe interop wrapper", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
