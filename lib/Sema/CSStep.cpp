@@ -265,6 +265,30 @@ StepResult ComponentStep::take(bool prevFailed) {
   // Setup active scope, only if previous component didn't fail.
   setupScope();
 
+  auto attemptBinding = [&](const inference::BindingSet &bindingSet) {
+    if (bindingSet.getNumExactBindings() == 1)
+      ++NumEarlyBindingAttempts;
+    else
+      ++NumLateBindingAttempts;
+
+    return suspend(
+        std::make_unique<TypeVariableStep>(CS, bindingSet.getTypeVariable(),
+                                           bindingSet, Solutions));
+  };
+
+  auto attemptDisjunction = [&](std::pair<Constraint *,
+                                          llvm::TinyPtrVector<Constraint *>> disjunction) {
+    CS.retireConstraint(disjunction.first);
+    return suspend(
+        std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+  };
+
+  auto attemptConjunction = [&](Constraint *conjunction) {
+    CS.retireConstraint(conjunction);
+      return suspend(
+          std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
+  };
+
   const auto *bestBindings = CS.determineBestBindings();
   auto disjunction = CS.selectDisjunction();
   auto *conjunction = CS.selectConjunction();
@@ -296,24 +320,11 @@ StepResult ComponentStep::take(bool prevFailed) {
   if (auto step = chooseStep()) {
     switch (*step) {
     case StepKind::Binding:
-      if (disjunction)
-        ++NumEarlyBindingAttempts;
-      else
-        ++NumLateBindingAttempts;
-
-      return suspend(
-          std::make_unique<TypeVariableStep>(CS, bestBindings->getTypeVariable(),
-                                             *bestBindings, Solutions));
-    case StepKind::Disjunction: {
-      CS.retireConstraint(disjunction->first);
-      return suspend(
-          std::make_unique<DisjunctionStep>(CS, *disjunction, Solutions));
-    }
-    case StepKind::Conjunction: {
-      CS.retireConstraint(conjunction);
-      return suspend(
-          std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
-    }
+      return attemptBinding(*bestBindings);
+    case StepKind::Disjunction:
+      return attemptDisjunction(*disjunction);
+    case StepKind::Conjunction:
+      return attemptConjunction(conjunction);
     }
     llvm_unreachable("Unhandled case in switch!");
   }
