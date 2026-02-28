@@ -1159,14 +1159,6 @@ bool ConstraintSystem::solveForCodeCompletion(
   return true;
 }
 
-void ConstraintSystem::collectDisjunctions(
-    SmallVectorImpl<Constraint *> &disjunctions) {
-  for (auto &constraint : InactiveConstraints) {
-    if (constraint.getKind() == ConstraintKind::Disjunction)
-      disjunctions.push_back(&constraint);
-  }
-}
-
 std::optional<std::pair<Constraint *, unsigned>>
 ConstraintSystem::findConstraintThroughOptionals(
     TypeVariableType *typeVar, OptionalWrappingDirection optionalDirection,

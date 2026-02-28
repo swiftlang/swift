@@ -3800,9 +3800,6 @@ private:
                                       Type second,
                                       ConstraintLocatorBuilder locator);
 
-  /// Collect the current inactive disjunction constraints.
-  void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
-
   /// Record a particular disjunction choice and add a change to the trail.
   void recordDisjunctionChoice(ConstraintLocator *locator, unsigned index);
 
