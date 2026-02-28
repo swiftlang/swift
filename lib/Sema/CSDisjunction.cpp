@@ -122,6 +122,29 @@ ConstraintSystem::findConstraintThroughOptionals(
   return std::nullopt;
 }
 
+Constraint *
+ConstraintSystem::getApplicableFnConstraint(Constraint *disjunction) {
+  auto *boundVar = disjunction->getNestedConstraints()[0]
+                       ->getFirstType()
+                       ->getAs<TypeVariableType>();
+  if (!boundVar)
+    return nullptr;
+
+  auto constraints =
+      CG.gatherNearbyConstraints(boundVar, [](Constraint *constraint) {
+        return constraint->getKind() == ConstraintKind::ApplicableFunction;
+      });
+
+  if (constraints.size() != 1)
+    return nullptr;
+
+  auto *applicableFn = constraints.front();
+  // Unapplied disjunction could appear as a argument to applicable function,
+  // we are not interested in that.
+  return applicableFn->getSecondType()->isEqual(boundVar) ? applicableFn
+                                                          : nullptr;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::filterDisjunction(
     Constraint *disjunction, bool restoreOnFail,

@@ -3807,6 +3807,9 @@ private:
   void recordAppliedDisjunction(ConstraintLocator *locator,
                                 FunctionType *type);
 
+  /// Get the applicable function constraint for a disjunction, if there is one.
+  Constraint *getApplicableFnConstraint(Constraint *disjunction);
+
   /// Filter the set of disjunction terms, keeping only those where the
   /// predicate returns \c true.
   ///
