@@ -2313,6 +2313,16 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       !isa<SubscriptDecl>(decl))
     type = OptionalType::get(type->getRValueType());
 
+  GenericSignature genericSig;
+  if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
+    genericSig = GF->getGenericSignature();
+  } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+    genericSig = SD->getGenericSignature();
+  }
+
+  if (genericSig)
+    type = type->getReducedType(genericSig);
+
   return type;
 }
 

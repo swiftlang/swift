@@ -1565,12 +1565,10 @@ static DisjunctionInfo computeDisjunctionInfo(
       cs, disjunction,
       [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
         GenericSignature genericSig;
-        {
-          if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
-            genericSig = GF->getGenericSignature();
-          } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
-            genericSig = SD->getGenericSignature();
-          }
+        if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
+          genericSig = GF->getGenericSignature();
+        } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+          genericSig = SD->getGenericSignature();
         }
 
         auto matchings =
@@ -1585,13 +1583,6 @@ static DisjunctionInfo computeDisjunctionInfo(
             onlySpeculativeArgumentCandidates &&
             (!canUseContextualResultTypes || resultTypes.empty());
 
-        // This is important for SIMD operators in particular because
-        // a lot of their overloads have same-type requires to a concrete
-        // type:  `<Scalar == (U)Int*>(_: SIMD*<Scalar>, ...) -> ...`.
-        if (genericSig) {
-          overloadType = overloadType->getReducedType(genericSig)
-                             ->castTo<FunctionType>();
-        }
 
         unsigned score = 0;
         unsigned numDefaulted = 0;
