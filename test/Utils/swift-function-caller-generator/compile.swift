@@ -51,6 +51,14 @@ public class C {
   }
 }
 
+@available(*, unavailable)
+public func unavailable(x: Int) -> Int { return x }
+
+@available(*, unavailable)
+public struct Sunavailable {
+  public func munavailable(x: Int) -> Int { return x }
+}
+
 //--- out.expected
 import Test
 
