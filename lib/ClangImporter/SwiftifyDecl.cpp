@@ -465,9 +465,6 @@ static bool getImplicitObjectParamAnnotation(const clang::ObjCMethodDecl* D) {
     return false; // Only C++ methods have implicit params
 }
 
-static size_t getNumParams(const clang::ObjCMethodDecl* D) {
-    return D->param_size();
-}
 static size_t getNumParams(const clang::FunctionDecl* D) {
     return D->getNumParams();
 }
