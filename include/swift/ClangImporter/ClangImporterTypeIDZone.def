@@ -31,7 +31,7 @@ SWIFT_REQUEST(ClangImporter, ObjCInterfaceAndImplementationRequest,
               ObjCInterfaceAndImplementation(Decl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, CxxRecordSemantics,
-              CxxRecordSemanticsKind(const clang::CXXRecordDecl *), Cached,
+              CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, CxxRecordAsSwiftType,
               ValueDecl *(CxxRecordSemanticsDescriptor), Cached,
