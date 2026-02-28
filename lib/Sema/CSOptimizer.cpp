@@ -582,10 +582,7 @@ void forEachDisjunctionChoice(
     if (!decl)
       continue;
 
-    Type overloadType = cs.getEffectiveOverloadType(
-        disjunction->getLocator(), constraint->getOverloadChoice(),
-        constraint->getDeclContext());
-
+    Type overloadType = constraint->getEffectiveOverloadType();
     if (!overloadType || !overloadType->is<FunctionType>())
       continue;
 
