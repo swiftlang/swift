@@ -977,6 +977,10 @@ public:
   /// existential types.
   bool isExistentialType();
 
+  /// isOpaqueType - Determines whether this type is an opaque
+  /// type declared with 'some P'.
+  bool isOpaqueType();
+
   /// isAnyExistentialType - Determines whether this type is any kind of
   /// existential type: a protocol type, a protocol composition type, or
   /// an existential metatype.
@@ -8381,6 +8385,10 @@ inline bool TypeBase::isExistentialType() {
   return getCanonicalType().isExistentialType();
 }
 
+inline bool TypeBase::isOpaqueType() {
+  return getCanonicalType().isOpaqueType();
+}
+
 inline bool TypeBase::isAnyExistentialType() {
   return getCanonicalType().isAnyExistentialType();
 }
@@ -8390,6 +8398,19 @@ inline bool CanType::isExistentialTypeImpl(CanType type) {
          isa<ProtocolCompositionType>(type) ||
          isa<ExistentialType>(type) ||
          isa<ParameterizedProtocolType>(type);
+}
+
+inline bool CanType::isOpaqueTypeImpl(CanType type) {
+  if (isa<OpaqueTypeArchetypeType>(type)) {
+    return true;
+  }
+  if (auto *archetype = type->getAs<PrimaryArchetypeType>()) {
+    if (auto *param =
+            archetype->getInterfaceType()->getAs<GenericTypeParamType>()) {
+      return param->getName().empty();
+    }
+  }
+  return false;
 }
 
 inline bool CanType::isAnyExistentialTypeImpl(CanType type) {
