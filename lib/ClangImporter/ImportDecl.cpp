@@ -60,7 +60,6 @@
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/ParseDeclName.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -69,11 +68,10 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/AST/DeclVisitor.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/PrettyPrinter.h"
 #include "clang/AST/RecordLayout.h"
-#include "clang/AST/RecursiveASTVisitor.h"
-#include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/OperatorKinds.h"
 #include "clang/Basic/Specifiers.h"
@@ -123,10 +121,6 @@ struct AccessorInfo {
 };
 
 } // end anonymous namespace
-
-static bool isInSystemModule(const DeclContext *D) {
-  return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
-}
 
 static FuncDecl *
 createFuncOrAccessor(ClangImporter::Implementation &impl, SourceLoc funcLoc,
@@ -489,9 +483,7 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
     return false;
   if (isa<clang::ObjCProtocolDecl>(MD->getDeclContext()))
     return false;
-  if (MD->getClassInterface()->getName() != "NSDictionary")
-    return false;
-  return true;
+  return MD->getClassInterface()->getName() == "NSDictionary";
 }
 
 void ClangImporter::Implementation::addSynthesizedTypealias(
@@ -911,9 +903,7 @@ static bool isPrintLikeMethod(DeclName name, const DeclContext *dc) {
     return false;
   if (!dc->isTypeContext())
     return false;
-  if (name.getArgumentNames().size() > 1)
-    return false;
-  return true;
+  return name.getArgumentNames().size() <= 1;
 }
 
 using MirroredMethodEntry =
@@ -1164,7 +1154,7 @@ namespace {
     std::pair<ImportedName, std::optional<ImportedName>>
     importFullName(const clang::NamedDecl *D) {
       ImportNameVersion canonicalVersion = getActiveSwiftVersion();
-      if (isa<clang::TypeDecl>(D) || isa<clang::ObjCContainerDecl>(D)) {
+      if (isa<clang::TypeDecl, clang::ObjCContainerDecl>(D)) {
         canonicalVersion = ImportNameVersion::forTypes();
       }
 
@@ -3111,19 +3101,18 @@ namespace {
         return RetainReleaseOperationKind::valid;
       };
 
+      HeaderLoc loc(decl->getLocation());
+
       if (retainOperation.kind ==
           CustomRefCountingOperationResult::noAttribute) {
-        HeaderLoc loc(decl->getLocation());
         Impl.diagnose(loc, diag::reference_type_must_have_retain_release_attr,
                       false, decl->getNameAsString());
       } else if (retainOperation.kind ==
                  CustomRefCountingOperationResult::tooManyAttributes) {
-        HeaderLoc loc(decl->getLocation());
         Impl.diagnose(loc, diag::too_many_reference_type_retain_release_attr,
                       false, decl->getNameAsString());
       } else if (retainOperation.kind ==
                  CustomRefCountingOperationResult::notFound) {
-        HeaderLoc loc(decl->getLocation());
         Impl.diagnose(loc,
                       diag::foreign_reference_types_cannot_find_retain_release,
                       false, retainOperation.name, decl->getNameAsString());
@@ -3134,16 +3123,13 @@ namespace {
         }
       } else if (retainOperation.kind ==
                  CustomRefCountingOperationResult::tooManyFound) {
-        HeaderLoc loc(decl->getLocation());
         Impl.diagnose(loc,
                       diag::too_many_reference_type_retain_release_operations,
                       false, retainOperation.name, decl->getNameAsString());
       } else if (retainOperation.kind ==
                  CustomRefCountingOperationResult::foundOperation) {
-        RetainReleaseOperationKind operationKind =
-            getOperationValidity(retainOperation.operation,
-                                 CustomRefCountingOperationKind::retain);
-        HeaderLoc loc(decl->getLocation());
+        RetainReleaseOperationKind operationKind = getOperationValidity(
+            retainOperation.operation, CustomRefCountingOperationKind::retain);
         switch (operationKind) {
         case RetainReleaseOperationKind::notAfunction:
           Impl.diagnose(
@@ -3179,17 +3165,14 @@ namespace {
 
       if (releaseOperation.kind ==
           CustomRefCountingOperationResult::noAttribute) {
-        HeaderLoc loc(decl->getLocation());
         Impl.diagnose(loc, diag::reference_type_must_have_retain_release_attr,
                       true, decl->getNameAsString());
       } else if (releaseOperation.kind ==
-          CustomRefCountingOperationResult::tooManyAttributes) {
-        HeaderLoc loc(decl->getLocation());
+                 CustomRefCountingOperationResult::tooManyAttributes) {
         Impl.diagnose(loc, diag::too_many_reference_type_retain_release_attr,
                       true, decl->getNameAsString());
       } else if (releaseOperation.kind ==
                  CustomRefCountingOperationResult::notFound) {
-        HeaderLoc loc(decl->getLocation());
         Impl.diagnose(loc,
                       diag::foreign_reference_types_cannot_find_retain_release,
                       true, releaseOperation.name, decl->getNameAsString());
@@ -3200,7 +3183,6 @@ namespace {
         }
       } else if (releaseOperation.kind ==
                  CustomRefCountingOperationResult::tooManyFound) {
-        HeaderLoc loc(decl->getLocation());
         Impl.diagnose(loc,
                       diag::too_many_reference_type_retain_release_operations,
                       true, releaseOperation.name, decl->getNameAsString());
@@ -3209,7 +3191,6 @@ namespace {
         RetainReleaseOperationKind operationKind =
             getOperationValidity(releaseOperation.operation,
                                  CustomRefCountingOperationKind::release);
-        HeaderLoc loc(decl->getLocation());
         switch (operationKind) {
         case RetainReleaseOperationKind::notAfunction:
           Impl.diagnose(
@@ -3701,10 +3682,10 @@ namespace {
       }
 
       SmallVector<const clang::ParmVarDecl *, 4> nonSelfParams;
-      for (unsigned i = 0; i < decl->getNumParams(); ++i) {
+      for (auto [i, param] : llvm::enumerate(decl->parameters())) {
         if (selfIdx && i == *selfIdx)
           continue;
-        nonSelfParams.push_back(decl->getParamDecl(i));
+        nonSelfParams.push_back(param);
       }
       return Impl.importFunctionParameterList(
           dc, decl, nonSelfParams, decl->isVariadic(), allowNSUIntegerAsInt,
@@ -4714,10 +4695,9 @@ namespace {
 
             if (result) {
               return result;
-            } else {
-              Impl.markUnavailable(
-                  funcDecl, "virtual function is not available in Swift");
             }
+            Impl.markUnavailable(funcDecl,
+                                 "virtual function is not available in Swift");
           }
         }
       }
@@ -4906,9 +4886,7 @@ namespace {
 
       // If we've imported this variable as a member, it's a static
       // member.
-      bool isStatic = false;
-      if (dc->isTypeContext())
-        isStatic = true;
+      bool isStatic = dc->isTypeContext();
 
       // For now we don't import static constexpr. TODO: Lift this restriction.
       if (isStatic && !isClangNamespace(dc) && decl->isConstexpr())
@@ -7503,9 +7481,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
     return nullptr;
 
   // Is this a static property?
-  bool isStatic = false;
-  if (dc->isTypeContext() && !getterName.getSelfIndex())
-    isStatic = true;
+  bool isStatic = dc->isTypeContext() && !getterName.getSelfIndex();
 
   ImportedType importedType = importer::findOptionSetEnum(propertyType, Impl);
 
@@ -7719,11 +7695,8 @@ bool SwiftDeclConverter::existingConstructorIsWorse(
 
   // The "introduced" versions are the same. Prefer Convenience over
   // ConvenienceFactory, but otherwise prefer leaving things as they are.
-  if (kind == CtorInitializerKind::Convenience &&
-      existingKind == CtorInitializerKind::ConvenienceFactory)
-    return true;
-
-  return false;
+  return kind == CtorInitializerKind::Convenience &&
+         existingKind == CtorInitializerKind::ConvenienceFactory;
 }
 
 /// Given an imported method, try to import it as a constructor.
@@ -8395,10 +8368,9 @@ void SwiftDeclConverter::importObjCProtocols(
     knownProtocols.insert(protocols.begin(), protocols.end());
   }
 
-  for (auto cp = clangProtocols.begin(), cpEnd = clangProtocols.end();
-       cp != cpEnd; ++cp) {
+  for (auto *cp : clangProtocols) {
     if (auto proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
-            Impl.importDecl(*cp, getActiveSwiftVersion()))) {
+            Impl.importDecl(cp, getActiveSwiftVersion()))) {
       addProtocols(proto, protocols, knownProtocols);
       inheritedTypes.push_back(
           InheritedEntry(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
@@ -9541,10 +9513,7 @@ static void filterUsableVersionedAttrs(
   auto haveBetterAttr = [swiftVersionedAttributes, applicableVersion](
                             clang::VersionTuple attrVersion,
                             clang::attr::Kind attrKind) -> bool {
-    for (auto VAI = swiftVersionedAttributes.begin(),
-              VAE = swiftVersionedAttributes.end();
-         VAI != VAE; ++VAI) {
-      auto otherVersionedAttr = *VAI;
+    for (auto otherVersionedAttr : swiftVersionedAttributes) {
       auto otherAttrKind = otherVersionedAttr->getAdditionalAttr()->getKind();
       auto otherAttrVersion = otherVersionedAttr->getVersion();
       // Same exact attribute, ignore
@@ -9569,18 +9538,15 @@ static void filterUsableVersionedAttrs(
     return false;
   };
 
-  for (auto VAI = swiftVersionedAttributes.begin(),
-            VAE = swiftVersionedAttributes.end();
-       VAI != VAE; ++VAI) {
-    auto versionedAttr = *VAI;
+  for (auto versionedAttr : swiftVersionedAttributes) {
     auto attrKind = versionedAttr->getAdditionalAttr()->getKind();
     auto attrVersion = versionedAttr->getVersion();
     if (!applicableVersion(attrVersion))
       continue;
-    else if (haveBetterAttr(attrVersion, attrKind))
+    if (haveBetterAttr(attrVersion, attrKind))
       continue;
-    else
-      applicableVersionedAttrSet.insert(versionedAttr);
+
+    applicableVersionedAttrSet.insert(versionedAttr);
   }
 }
 
@@ -10526,8 +10492,7 @@ ClangImporter::Implementation::importDeclContextOf(
     if (dc->isTranslationUnit()) {
       if (auto *module = getClangModuleForDecl(decl, allowForwardDeclaration))
         return module;
-      else
-        return nullptr;
+      return nullptr;
     }
 
     // Import the DeclContext.
@@ -11031,7 +10996,7 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
                                     Instance->getSourceManager(),
                                     "loading members for");
 
-  assert(isa<ExtensionDecl>(D) || isa<NominalTypeDecl>(D));
+  assert((isa<ExtensionDecl, NominalTypeDecl>(D)));
   if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
     // If the extended type is also imported from Clang, load its members first.
     loadMembersOfBaseImportedFromClang(ext);

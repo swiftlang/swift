@@ -47,11 +47,7 @@ using namespace llvm::support;
 /// Determine whether the new declarations matches an existing declaration.
 static bool matchesExistingDecl(clang::Decl *decl, clang::Decl *existingDecl) {
   // If the canonical declarations are equivalent, we have a match.
-  if (decl->getCanonicalDecl() == existingDecl->getCanonicalDecl()) {
-    return true;
-  }
-
-  return false;
+  return decl->getCanonicalDecl() == existingDecl->getCanonicalDecl();
 }
 
 template <typename value_type, typename CharT>
@@ -570,8 +566,6 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
         // We have entries for this context.
         (void)addLocalEntry(newEntry, entry.DeclsOrMacros);
         return;
-      } else {
-        (void)newEntry;
       }
     }
 
@@ -1084,10 +1078,7 @@ void SwiftLookupTable::dump(raw_ostream &os) const {
 // ---------------------------------------------------------------------------
 // Serialization
 // ---------------------------------------------------------------------------
-using llvm::BCArray;
 using llvm::BCBlob;
-using llvm::BCFixed;
-using llvm::BCGenericRecordLayout;
 using llvm::BCRecordLayout;
 using llvm::BCVBR;
 
@@ -1615,8 +1606,7 @@ SwiftLookupTable::mapStoredMacro(StoredSingleEntry &entry, bool assumeModule) {
   if (entry.isASTNodeEntry()) {
     if (assumeModule || (Reader && !isPCH(*Reader)))
       return static_cast<clang::ModuleMacro *>(entry.getASTNode());
-    else
-      return static_cast<clang::MacroInfo *>(entry.getASTNode());
+    return static_cast<clang::MacroInfo *>(entry.getASTNode());
   }
 
   // Otherwise, resolve the macro.
@@ -2002,9 +1992,8 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   }
 
   // Walk the members of any context that can have nested members.
-  if (isa<clang::TagDecl>(named) || isa<clang::ObjCInterfaceDecl>(named) ||
-      isa<clang::ObjCProtocolDecl>(named) ||
-      isa<clang::ObjCCategoryDecl>(named)) {
+  if (isa<clang::TagDecl, clang::ObjCInterfaceDecl,
+          clang::ObjCProtocolDecl, clang::ObjCCategoryDecl>(named)) {
     clang::DeclContext *dc = cast<clang::DeclContext>(named);
     for (auto member : dc->decls()) {
       if (auto friendDecl = dyn_cast<clang::FriendDecl>(member))

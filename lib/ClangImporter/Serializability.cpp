@@ -343,7 +343,7 @@ namespace {
       llvm_unreachable("SpirvOperand shouldn't be reached from swift");
     }
   };
-}
+  } // namespace
 
 ClangModuleLoader::SerializableInfo
 ClangImporter::isSerializable(const clang::Type *type,

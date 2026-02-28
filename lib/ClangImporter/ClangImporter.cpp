@@ -2991,8 +2991,8 @@ bool ClangImporter::Implementation::DiagnosticWalker::
     Impl.emitDiagnosticsForTarget(decl);
   }
   // Diagnose any protocols the pointed to type conforms to.
-  for (auto cp = T->qual_begin(), cpEnd = T->qual_end(); cp != cpEnd; ++cp) {
-    Impl.emitDiagnosticsForTarget(*cp);
+  for (auto *cp : T->quals()) {
+    Impl.emitDiagnosticsForTarget(cp);
   }
   return true;
 }
@@ -3480,8 +3480,8 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
 
   // Handle redeclarable Clang decls by checking each redeclaration.
   bool IsTagDecl = isa<clang::TagDecl>(D);
-  if (!(IsTagDecl || isa<clang::FunctionDecl>(D) || isa<clang::VarDecl>(D) ||
-        isa<clang::TypedefNameDecl>(D) || isa<clang::NamespaceDecl>(D))) {
+  if (!(IsTagDecl || isa<clang::FunctionDecl, clang::VarDecl,
+                         clang::TypedefNameDecl, clang::NamespaceDecl>(D))) {
     return false;
   }
 
@@ -4020,13 +4020,7 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
   }
   std::reverse(importPath.begin(), importPath.end());
 
-  bool IsExported = false;
-  for (auto *ExportedMod : Exported) {
-    if (ImportedMod == ExportedMod) {
-      IsExported = true;
-      break;
-    }
-  }
+  bool IsExported = llvm::is_contained(Exported, ImportedMod);
 
   auto *ID = ImportDecl::create(Ctx, DC, SourceLoc(),
                                 ImportKind::Module, SourceLoc(),
@@ -4413,8 +4407,7 @@ StringRef ClangModuleUnit::getFilename() const {
     StringRef SinglePCH = owner.getSinglePCHImport();
     if (SinglePCH.empty())
       return "<imports>";
-    else
-      return SinglePCH;
+    return SinglePCH;
   }
   if (auto F = clangModule->getASTFile())
     return F->getName();
@@ -5293,11 +5286,12 @@ ClangImporter::Implementation::importDiagnosticTargetFromLookupTableEntry(
     SwiftLookupTable::SingleEntry entry) {
   if (clang::NamedDecl *decl = entry.dyn_cast<clang::NamedDecl *>()) {
     return decl;
-  } else if (const clang::MacroInfo *macro =
-                 entry.dyn_cast<clang::MacroInfo *>()) {
+  }
+  if (const clang::MacroInfo *macro = entry.dyn_cast<clang::MacroInfo *>()) {
     return macro;
-  } else if (const clang::ModuleMacro *macro =
-                 entry.dyn_cast<clang::ModuleMacro *>()) {
+  }
+  if (const clang::ModuleMacro *macro =
+          entry.dyn_cast<clang::ModuleMacro *>()) {
     return macro->getMacroInfo();
   }
   llvm_unreachable("SwiftLookupTable::Single entry must be a NamedDecl, "
@@ -5314,16 +5308,15 @@ static void diagnoseForeignReferenceTypeFixit(ClangImporter::Implementation &Imp
 
 bool ClangImporter::Implementation::emitDiagnosticsForTarget(
     ImportDiagnosticTarget target, clang::SourceLocation fallbackLoc) {
-  for (auto it = ImportDiagnostics[target].rbegin();
-       it != ImportDiagnostics[target].rend(); ++it) {
-    clang::SourceLocation loc = it->loc.isValid() ? it->loc : fallbackLoc;
+  for (const auto &entry : llvm::reverse(ImportDiagnostics[target])) {
+    clang::SourceLocation loc = entry.loc.isValid() ? entry.loc : fallbackLoc;
     HeaderLoc hdrLoc(loc);
     if (const auto *declTarget = target.dyn_cast<const clang::Decl *>()) {
       if (const auto *func = llvm::dyn_cast<clang::FunctionDecl>(declTarget)) {
         if (func->isTemplateInstantiation()) {
           if (const auto *pattern = func->getTemplateInstantiationPattern()) {
             std::pair<const clang::FunctionDecl *, DiagID> key = {
-                pattern, it->diag.getID()};
+                pattern, entry.diag.getID()};
             if (!DiagnosedTemplateDiagnostics.insert(key).second)
               continue;
             hdrLoc = HeaderLoc(pattern->getLocation());
@@ -5332,10 +5325,10 @@ bool ClangImporter::Implementation::emitDiagnosticsForTarget(
       }
     }
 
-    if (it->diag.getID() == diag::record_not_automatically_importable.ID) {
-      diagnoseForeignReferenceTypeFixit(*this, hdrLoc, it->diag);
+    if (entry.diag.getID() == diag::record_not_automatically_importable.ID) {
+      diagnoseForeignReferenceTypeFixit(*this, hdrLoc, entry.diag);
     } else {
-      diagnose(hdrLoc, it->diag);
+      diagnose(hdrLoc, entry.diag);
     }
   }
   return ImportDiagnostics[target].size();
@@ -6502,7 +6495,7 @@ struct OrderDecls {
     return lhsFile->getFilename() < rhsFile->getFilename();
   }
 };
-}
+} // namespace
 
 static ObjCInterfaceAndImplementation
 constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
@@ -6688,10 +6681,10 @@ evaluate(Evaluator &evaluator, Decl *decl) const {
   // (Also directing nulls here, where they'll early-return.)
   if (auto ty = dyn_cast_or_null<NominalTypeDecl>(decl))
     return findContextInterfaceAndImplementation(ty);
-  else if (auto ext = dyn_cast<ExtensionDecl>(decl))
+  if (auto ext = dyn_cast<ExtensionDecl>(decl))
     return findContextInterfaceAndImplementation(ext);
   // Abstract functions have to be matched through their @_cdecl attributes.
-  else if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
     return findFunctionInterfaceAndImplementation(func);
 
   return {};
@@ -7095,10 +7088,9 @@ importName(const clang::NamedDecl *D,
 std::optional<Type>
 ClangImporter::importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                                         DeclContext *dc) {
-  bool isInSystemModule =
-      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
+  bool isSystemModule = isInSystemModule(dc);
   bool allowNSUIntegerAsInt =
-      Impl.shouldAllowNSUIntegerAsInt(isInSystemModule, clangDecl);
+      Impl.shouldAllowNSUIntegerAsInt(isSystemModule, clangDecl);
   if (auto imported =
           Impl.importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt)
               .getType())
@@ -7126,18 +7118,15 @@ Type ClangImporter::importVarDeclType(
                                             Impl.CurrentVersion))
       declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
 
-  bool isInSystemModule =
-      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
+  bool inSystemModule = isInSystemModule(dc);
 
   // Note that we deliberately don't bridge most globals because we want to
   // preserve pointer identity.
-  auto importedType =
-      Impl.importType(declType,
-                      (isAudited ? ImportTypeKind::AuditedVariable
-                                 : ImportTypeKind::Variable),
-                      ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-                      isInSystemModule, Bridgeability::None,
-                      getImportTypeAttrs(decl));
+  auto importedType = Impl.importType(
+      declType,
+      (isAudited ? ImportTypeKind::AuditedVariable : ImportTypeKind::Variable),
+      ImportDiagnosticAdder(Impl, decl, decl->getLocation()), inSystemModule,
+      Bridgeability::None, getImportTypeAttrs(decl));
 
   if (!importedType)
     return ErrorType::get(Impl.SwiftContext);

@@ -36,7 +36,7 @@
 
 namespace llvm {
 class BitstreamWriter;
-}
+} // namespace llvm
 
 namespace clang {
 class NamedDecl;
@@ -45,7 +45,7 @@ class MacroInfo;
 class ModuleMacro;
 class ObjCCategoryDecl;
 class TypedefNameDecl;
-}
+} // namespace clang
 
 namespace swift {
 
@@ -665,8 +665,8 @@ void addMacrosToLookupTable(SwiftLookupTable &table, NameImporter &);
 /// and emitting diagnostics if necessary.
 void finalizeLookupTable(SwiftLookupTable &table, NameImporter &,
                          ClangSourceBufferImporter &buffersForDiagnostics);
-}
-}
+} // namespace importer
+} // namespace swift
 
 namespace llvm {
 
@@ -686,6 +686,6 @@ template <> struct DenseMapInfo<swift::SwiftLookupTable::ContextKind> {
   }
 };
 
-}
+} // namespace llvm
 
 #endif // SWIFT_CLANGIMPORTER_SWIFTLOOKUPTABLE_H

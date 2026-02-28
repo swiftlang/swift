@@ -193,7 +193,7 @@ Pattern *SwiftDeclSynthesizer::createTypedNamedPattern(VarDecl *decl) {
 namespace {
 using ConstantGetterBodyContextData =
     llvm::PointerIntPair<Expr *, 2, ConstantConvertKind>;
-}
+} // namespace
 
 Type SwiftDeclSynthesizer::getConstantLiteralType(
     Type type, ConstantConvertKind convertKind) {
@@ -214,34 +214,20 @@ Type SwiftDeclSynthesizer::getConstantLiteralType(
 // RawTypes together.
 bool SwiftDeclSynthesizer::isCGFloat(Type type) {
   auto found = ImporterImpl.RawTypes.find(type->getAnyNominal());
-  if (found == ImporterImpl.RawTypes.end()) {
-    return false;
-  }
-  
-  Type importTy = found->second;
-  return importTy->isCGFloat();
+  return found != ImporterImpl.RawTypes.end() && found->second->isCGFloat();
 }
 
 // This method is exposed on SwiftDeclSynthesizer to keep code that accesses
 // RawTypes together.
 bool SwiftDeclSynthesizer::isObjCBool(Type type) {
   auto found = ImporterImpl.RawTypes.find(type->getAnyNominal());
-  if (found == ImporterImpl.RawTypes.end()) {
-    return false;
-  }
-  
-  Type importTy = found->second;
-  return importTy->isObjCBool();
+  return found != ImporterImpl.RawTypes.end() && found->second->isObjCBool();
 }
 
 bool SwiftDeclSynthesizer::isUnicodeScalar(Type type) {
   auto found = ImporterImpl.RawTypes.find(type->getAnyNominal());
-  if (found == ImporterImpl.RawTypes.end()) {
-    return false;
-  }
-
-  Type importTy = found->second;
-  return importTy->isUnicodeScalar();
+  return found != ImporterImpl.RawTypes.end() &&
+         found->second->isUnicodeScalar();
 }
 
 ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
@@ -582,8 +568,7 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
   for (unsigned pass = 0; pass < 2; ++pass) {
     unsigned paramPos = 0;
 
-    for (unsigned i = 0, e = members.size(); i < e; ++i) {
-      auto var = members[i];
+    for (auto var : members) {
 
       if (isa_and_nonnull<clang::IndirectFieldDecl>(var->getClangDecl()))
         continue;
@@ -2170,9 +2155,7 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
 
   // We start from +1 since the first param is our lhs. All other params are
   // forwarded
-  for (auto itr = funcDecl->getParameters()->begin() + 1;
-       itr != funcDecl->getParameters()->end(); itr++) {
-    auto param = *itr;
+  for (auto *param : llvm::drop_begin(funcDecl->getParameters()->getArray())) {
     auto isInOut = param->isInOut();
     auto paramTy = param->getTypeInContext();
     Expr *paramRefExpr =
@@ -2375,12 +2358,11 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     newMethod->addAttr(swiftNameAttr->clone(clangCtx));
 
   llvm::SmallVector<clang::ParmVarDecl *, 4> params;
-  for (size_t i = 0; i < method->getNumParams(); ++i) {
-    const auto &param = *method->getParamDecl(i);
+  for (auto *param : method->parameters()) {
     params.push_back(clang::ParmVarDecl::Create(
-        clangCtx, newMethod, param.getSourceRange().getBegin(),
-        param.getLocation(), param.getIdentifier(), param.getType(),
-        param.getTypeSourceInfo(), param.getStorageClass(),
+        clangCtx, newMethod, param->getSourceRange().getBegin(),
+        param->getLocation(), param->getIdentifier(), param->getType(),
+        param->getTypeSourceInfo(), param->getStorageClass(),
         /*DefExpr=*/nullptr));
   }
   newMethod->setParams(params);
@@ -2426,8 +2408,7 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
       /*HadMultipleCandidates=*/false, method->getNameInfo(),
       memberExprTy, clang::VK_PRValue, clang::OK_Ordinary);
   llvm::SmallVector<clang::Expr *, 4> args;
-  for (size_t i = 0; i < newMethod->getNumParams(); ++i) {
-    auto *param = newMethod->getParamDecl(i);
+  for (auto *param : newMethod->parameters()) {
     auto type = param->getType();
     clang::Expr *argExpr = new (clangCtx) clang::DeclRefExpr(
         clangCtx, param, false, type.getNonReferenceType(),
@@ -3212,11 +3193,7 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     std::string swiftInitStr = "init(";
     for (unsigned i = 0; i < ctorParamCount; ++i) {
       auto paramType = selectedCtorDecl->getParamDecl(i)->getType();
-      if (paramType->isRValueReferenceType()) {
-        swiftInitStr += "consuming:";
-      } else {
-        swiftInitStr += "_:";
-      }
+      swiftInitStr += paramType->isRValueReferenceType() ? "consuming:" : "_:";
     }
     swiftInitStr += ")";
     synthCxxMethodDecl->addAttr(

@@ -187,9 +187,7 @@ static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
       return false;
     auto lhsNominal = lhsTy->getAnyNominal();
     auto rhsNominal = rhsTy->getAnyNominal();
-    if (lhsNominal != rhsNominal || lhsNominal != decl)
-      return false;
-    return true;
+    return lhsNominal == rhsNominal && lhsNominal == decl;
   };
 
   return lookupOperator(decl, decl->getASTContext().Id_EqualsOperator, isValid);
@@ -219,9 +217,7 @@ static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
     if (lhsNominal != rhsNominal || lhsNominal != decl)
       return false;
     auto returnTy = minus->getResultInterfaceType();
-    if (!checkConformance(returnTy, binaryIntegerProto))
-      return false;
-    return true;
+    return static_cast<bool>(checkConformance(returnTy, binaryIntegerProto));
   };
 
   ValueDecl *result =
@@ -251,9 +247,7 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
     if (lhsNominal != decl)
       return false;
     auto returnTy = plusEqual->getResultInterfaceType();
-    if (!returnTy->isVoid())
-      return false;
-    return true;
+    return returnTy->isVoid();
   };
 
   ValueDecl *result =
@@ -270,9 +264,7 @@ static FuncDecl *getNonMutatingDereferenceOperator(NominalTypeDecl *decl) {
     if (params->size() != 0)
       return false;
     auto returnTy = starOp->getResultInterfaceType();
-    if (!returnTy->getAnyPointerElementType())
-      return false;
-    return true;
+    return static_cast<bool>(returnTy->getAnyPointerElementType());
   };
 
   ValueDecl *result = lookupOperator(

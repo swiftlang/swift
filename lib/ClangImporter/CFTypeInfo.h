@@ -23,7 +23,7 @@
 namespace clang {
   class RecordDecl;
   class TypedefNameDecl;
-}
+} // namespace clang
 
 namespace swift {
 namespace importer {
@@ -108,7 +108,7 @@ public:
     return cast<const clang::TypedefNameDecl *>(Decl);
   }
 };
-}
-}
+} // namespace importer
+} // namespace swift
 
 #endif // SWIFT_IMPORTER_CFTYPEINFO_H

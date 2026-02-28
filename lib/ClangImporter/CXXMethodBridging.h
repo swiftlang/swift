@@ -1,7 +1,6 @@
 #ifndef SWIFT_CXXMETHODBRIDGING_H
 #define SWIFT_CXXMETHODBRIDGING_H
 
-#include "swift/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>

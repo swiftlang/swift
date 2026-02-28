@@ -39,7 +39,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Parse/Token.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
@@ -584,11 +583,10 @@ namespace {
       }
       if (auto wrapped = pointeeType->wrapInPointer(pointerKind)) {
         return {wrapped, ImportHint::OtherPointer};
-      } else {
-        addImportDiagnostic(Diagnostic(diag::bridged_pointer_type_not_found,
-                                       pointerKind));
-        return Type();
       }
+      addImportDiagnostic(
+          Diagnostic(diag::bridged_pointer_type_not_found, pointerKind));
+      return Type();
     }
 
     ImportResult VisitBlockPointerType(const clang::BlockPointerType *type) {
@@ -1129,12 +1127,11 @@ namespace {
       Type importedType = Impl.SwiftContext.getAnyObjectType();
 
       if (!type->qual_empty()) {
-        for (auto cp = type->qual_begin(), end = type->qual_end(); cp != end;
-             ++cp) {
-          if (!(*cp)->hasDefinition())
-            Impl.addImportDiagnostic(
-                type, Diagnostic(diag::incomplete_protocol, *cp),
-                clang::SourceLocation());
+        for (auto *cp : type->quals()) {
+          if (!cp->hasDefinition())
+            Impl.addImportDiagnostic(type,
+                                     Diagnostic(diag::incomplete_protocol, cp),
+                                     clang::SourceLocation());
         }
       }
 
@@ -1326,10 +1323,9 @@ namespace {
         if (!importedType->isAnyObject())
           members.push_back(importedType);
 
-        for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
-             cp != cpEnd; ++cp) {
+        for (auto *cp : type->quals()) {
           auto proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
-            Impl.importDecl(*cp, Impl.CurrentVersion));
+              Impl.importDecl(cp, Impl.CurrentVersion));
           if (!proto)
             return Type();
 
@@ -1914,10 +1910,7 @@ bool ClangImporter::Implementation::shouldImportGlobalAsLet(
     return true;
   }
   // Globals of type NSString * should be imported as 'let'.
-  if (isNSString(type))
-    return true;
-
-  return false;
+  return isNSString(type);
 }
 
 /// Returns true if \p name contains the substring "Unsigned" or "unsigned".
@@ -2044,7 +2037,7 @@ private:
     // If we started from a protocol or a composition we should already
     // be in an existential context. Otherwise we'd have to wrap a new
     // composition into an existential.
-    if (isa<ProtocolType>(ty) || isa<ProtocolCompositionType>(ty))
+    if (isa<ProtocolType, ProtocolCompositionType>(ty))
       return {composition, true};
 
     return {ExistentialType::get(composition), true};
@@ -2727,8 +2720,8 @@ bool ClangImporter::Implementation::isDefaultArgSafeToImport(
   // If the default expression can't be instantiated, bail.
   if (!defaultArgExprResult.isUsable())
     return false;
-  else
-    defaultArgExpr = cast<clang::CXXDefaultArgExpr>(defaultArgExprResult.get());
+
+  defaultArgExpr = cast<clang::CXXDefaultArgExpr>(defaultArgExprResult.get());
 
   // If the type of this parameter is a view type, do not import the
   // default expression, since we cannot guarantee the lifetime of the

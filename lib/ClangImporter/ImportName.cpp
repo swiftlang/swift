@@ -17,7 +17,6 @@
 
 #include "CFTypeInfo.h"
 #include "ClangClassTemplateNamePrinter.h"
-#include "ClangDiagnosticConsumer.h"
 #include "ImportEnumInfo.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
@@ -43,10 +42,10 @@
 #include "clang/Basic/Module.h"
 #include "clang/Basic/OperatorKinds.h"
 #include "clang/Lex/Preprocessor.h"
-#include "clang/Parse/Parser.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <memory>
@@ -779,14 +778,13 @@ getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,
   if (auto customNameAttr = findSwiftNameAttr(method, version)) {
     if (customNameAttr->name.starts_with("init("))
       return FactoryAsInitKind::AsInitializer;
-    else
-      return FactoryAsInitKind::AsClassMethod;
+    return FactoryAsInitKind::AsClassMethod;
   }
 
   return FactoryAsInitKind::Infer;
 }
 
-std::optional<CtorInitializerKind>
+static std::optional<CtorInitializerKind>
 determineCtorInitializerKind(const clang::ObjCMethodDecl *method) {
   const clang::ObjCInterfaceDecl *interface = method->getClassInterface();
 
@@ -1056,7 +1054,7 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
   if (clangSema.LookupName(lookupResult, /*scope=*/clangSema.TUScope,
                            /*AllowBuiltinCreation=*/false,
                            /*ForceNoCPlusPlus=*/!clangSema.TUScope)) {
-    if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
+    if (llvm::any_of(lookupResult, conflicts))
       return true;
   }
 
@@ -1066,7 +1064,7 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
           .isCPlusPlus()) {
     lookupResult.clear(clang::Sema::LookupTagName);
     if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
-      if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
+      if (llvm::any_of(lookupResult, conflicts))
         return true;
     }
   }
@@ -1193,13 +1191,12 @@ NameImporter::considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
       // If there was a conflict on the first argument, and this was
       // the first argument and we're not stripping error suffixes, just
       // give up completely on error import.
-      if (index == 0 && suffixToStrip.empty()) {
+      if (index == 0 && suffixToStrip.empty())
         return std::nullopt;
-
-        // If there was a conflict stripping an error suffix, adjust the
-        // name but don't change the base name.  This avoids creating a
-        // spurious _: () argument.
-      } else if (index == 0 && !suffixToStrip.empty()) {
+      // If there was a conflict stripping an error suffix, adjust the
+      // name but don't change the base name.  This avoids creating a
+      // spurious _: () argument.
+      if (index == 0 && !suffixToStrip.empty()) {
         suffixToStrip = {};
         baseName = origBaseName;
 
@@ -1488,8 +1485,8 @@ static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
 static void
 addDefaultArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
                                    SmallVectorImpl<StringRef> &argumentNames) {
-  for (size_t i = 0; i < funcDecl->param_size(); ++i) {
-    if (funcDecl->getParamDecl(i)->getType()->isRValueReferenceType())
+  for (auto *param : funcDecl->parameters()) {
+    if (param->getType()->isRValueReferenceType())
       argumentNames.push_back("consuming");
     else
       argumentNames.push_back(StringRef());
@@ -1793,7 +1790,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   if (auto field = dyn_cast<clang::FieldDecl>(D)) {
     static_assert((clang::Decl::lastField - clang::Decl::firstField) == 2,
                   "update logic for new FieldDecl subclasses");
-    if (isa<clang::ObjCIvarDecl>(D) || isa<clang::ObjCAtDefsFieldDecl>(D))
+    if (isa<clang::ObjCIvarDecl, clang::ObjCAtDefsFieldDecl>(D))
       // These are not ordinary fields and are not imported into Swift.
       return result;
 
@@ -2508,15 +2505,10 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro,
     return true;
 
   // Consult the list of macros to suppress.
-  auto suppressMacro = llvm::StringSwitch<bool>(name)
+  return llvm::StringSwitch<bool>(name)
 #define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
 #include "MacroTable.def"
                            .Default(false);
-
-  if (suppressMacro)
-    return true;
-
-  return false;
 }
 
 bool ClangImporter::shouldIgnoreMacro(StringRef Name,

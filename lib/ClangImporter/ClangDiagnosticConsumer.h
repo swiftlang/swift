@@ -16,7 +16,6 @@
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
-#include "llvm/Support/MemoryBuffer.h"
 
 namespace swift {
 

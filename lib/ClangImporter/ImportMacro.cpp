@@ -50,11 +50,6 @@ parseNumericLiteral(ClangImporter::Implementation &impl,
   return nullptr;
 }
 
-// FIXME: Duplicated from ImportDecl.cpp.
-static bool isInSystemModule(DeclContext *D) {
-  return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
-}
-
 static std::optional<StringRef>
 getTokenSpelling(ClangImporter::Implementation &impl, const clang::Token &tok) {
   bool tokenInvalid = false;

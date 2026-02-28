@@ -38,7 +38,6 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
-#include "clang/AST/DeclVisitor.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Specifiers.h"
@@ -47,28 +46,18 @@
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ModuleFileExtension.h"
-#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Path.h"
 #include <functional>
-#include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-namespace llvm {
-
-class SmallBitVector;
-
-}
 
 namespace clang {
 class APValue;
@@ -97,6 +86,11 @@ class Identifier;
 class Pattern;
 class SubscriptDecl;
 class ValueDecl;
+
+/// Check whether the given declaration context is from a system module.
+inline bool isInSystemModule(const DeclContext *D) {
+  return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
+}
 
 /// Describes the kind of conversion to apply to a constant value.
 enum class ConstantConvertKind {
@@ -362,7 +356,7 @@ private:
   PlatformAvailability(const PlatformAvailability&) = delete;
   PlatformAvailability &operator=(const PlatformAvailability &) = delete;
 };
-}
+} // namespace importer
 
 using LookupTableMap =
     llvm::DenseMap<StringRef, std::unique_ptr<SwiftLookupTable>>;
