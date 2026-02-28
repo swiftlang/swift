@@ -222,7 +222,7 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
   *getTrailingObjects<DeclContext *>() = useDC;
 }
 
-Constraint::Constraint(Type type, OverloadChoice choice,
+Constraint::Constraint(Type type, OverloadChoice choice, Type effectiveOverloadType,
                        DeclContext *useDC,
                        ConstraintFix *fix, ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
@@ -230,7 +230,8 @@ Constraint::Constraint(Type type, OverloadChoice choice,
       HasFix(fix != nullptr), HasDeclContext(true), HasRestriction(false),
       IsActive(false), IsDisabled(bool(fix)), IsDisabledForPerformance(false),
       RememberChoice(false), IsFavored(false), IsIsolated(false),
-      Overload{type, /*preparedOverload=*/nullptr}, Locator(locator) {
+      Overload{type, effectiveOverloadType, /*preparedOverload=*/nullptr},
+      Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
   if (fix)
     *getTrailingObjects<ConstraintFix *>() = fix;
@@ -842,6 +843,9 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
     baseType->getTypeVariables(typeVars);
   }
 
+  // Compute effective overload type, for disjunction selection and pruning.
+  auto effectiveOverloadType = cs.getEffectiveOverloadType(locator, choice, useDC);
+
   // Create the constraint.
   auto size =
     totalSizeToAlloc<TypeVariableType *, ConstraintFix *, DeclContext *,
@@ -849,7 +853,7 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
       typeVars.size(), fix ? 1 : 0, /*hasDeclContext=*/1,
       /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/1);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(type, choice, useDC,
+  return new (mem) Constraint(type, choice, effectiveOverloadType, useDC,
                               fix, locator, typeVars);
 }
 
