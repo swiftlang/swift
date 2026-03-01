@@ -7236,6 +7236,9 @@ NOTE(availability_guard_with_version_check, none,
 NOTE(availability_add_attribute, none,
      "add '@available' attribute to enclosing %kindonly0", (const Decl *))
 
+NOTE(availability_update_attribute, none,
+     "update '@available' attribute on enclosing %kindonly0", (const Decl *))
+
 ERROR(availability_inout_accessor_only_in, none,
       "cannot pass as inout because %0 is only available in %1"
       "%select{| %3 or newer}2",

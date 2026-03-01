@@ -673,14 +673,6 @@ static void fixAvailabilityForDecl(
   if (TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D).has_value())
     return;
 
-  // Don't suggest adding an @available attribute to a declaration that already
-  // has one that is active for the given domain.
-  // FIXME: Emit a fix-it to adjust the existing attribute instead.
-  if (D->hasAnyMatchingActiveAvailableAttr([&](SemanticAvailableAttr attr) {
-        return attr.getDomain().isRelated(Domain);
-      }))
-    return;
-
   // For some declarations (variables, enum elements), the location in concrete
   // syntax to suggest the Fix-It may differ from the declaration to which
   // we attach availability attributes in the abstract syntax tree during
@@ -693,6 +685,30 @@ static void fixAvailabilityForDecl(
   if (isa<PatternBindingDecl>(DeclForDiagnostic)) {
     DeclForDiagnostic = D;
   }
+
+  // If there is already an active @available attribute for this domain,
+  // suggest updating the existing introduced version when it is less strict
+  // than the required availability.
+  bool hasRelatedActiveAvailabilityAttr = false;
+  for (auto attr : D->getSemanticAvailableAttrs()) {
+    if (!attr.isActive(Context) || !attr.getDomain().isRelated(Domain))
+      continue;
+    hasRelatedActiveAvailabilityAttr = true;
+
+    auto existingAvailability = attr.getIntroducedRange(Context);
+    auto existingVersionRange = attr.getIntroducedSourceRange();
+
+    if (Domain.isVersioned() && RequiredAvailability.hasMinimumVersion() &&
+        existingAvailability && existingVersionRange.isValid() &&
+        existingAvailability->isSupersetOf(RequiredAvailability)) {
+      D->diagnose(diag::availability_update_attribute, DeclForDiagnostic)
+          .fixItReplace(existingVersionRange,
+                        RequiredAvailability.getVersionString());
+      return;
+    }
+  }
+  if (hasRelatedActiveAvailabilityAttr)
+    return;
 
   SourceLoc InsertLoc =
       ConcDecl->getAttributeInsertionLoc(/*forModifier=*/false);
