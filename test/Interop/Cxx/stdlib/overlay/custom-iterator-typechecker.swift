@@ -1,10 +1,14 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default -Xcc -std=c++20 -DCPP20 -verify-additional-prefix cpp20-
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default
-
 // Check whether each of the custom iterator types in Inputs/custom-iterator.h
 // conform to the various iterator protocols from the C++ overlay.
 //
 // Note that we only detect contiguous iterator when C++'20 is enabled.
+// This is disabled for some distributions that are known to lack support for
+// contiguous iterators.
+//
+// RUN: %if !(LinuxDistribution=ubuntu-20.04 || LinuxDistribution=amzn-2) %{ \
+// RUN:   %target-typecheck-verify-swift -verify-ignore-unrelated -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default -Xcc -std=c++20 -DCPP20 -verify-additional-prefix cpp20- \
+// RUN: %}
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default
 
 import CustomIterator
 
