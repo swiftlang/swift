@@ -512,18 +512,22 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       // Toll-free bridging CF -> ObjC.
       if (lhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
           rhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
-        if (auto *lhsBridged = getBridgedObjCClass(lhsDecl))
-          lhsDecl = lhsBridged;
+        if (auto *lhsBridged = getBridgedObjCClass(lhsDecl)) {
+          lhs = lhsBridged->getDeclaredInterfaceType();
+          ASSERT(!lhs->hasTypeParameter());
+        }
 
       // Toll-free bridging ObjC -> CF.
       } else if (lhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
                  rhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-        if (auto *rhsBridged = getBridgedObjCClass(rhsDecl))
-          rhsDecl = rhsBridged;
+        if (auto *rhsBridged = getBridgedObjCClass(rhsDecl)) {
+          rhs = rhsBridged->getDeclaredInterfaceType();
+          ASSERT(!rhs->hasTypeParameter());
+        }
       }
 
       // Check for a subclassing relationship.
-      if (!rhsDecl->isSuperclassOf(lhsDecl))
+      if (!isSubclassOf(lhs, rhs))
         return ConflictFlag::Class;
 
       break;
