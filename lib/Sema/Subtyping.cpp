@@ -32,25 +32,27 @@
 using namespace swift;
 using namespace constraints;
 
-/// Determine whether the candidate type is a subclass of the superclass
-/// type. This check is approximate, because it disregards generic
-/// arguments.
+/// Determine whether the candidate type is a subclass of the superclass type.
 bool swift::constraints::isSubclassOf(Type candidateType, Type superclassType) {
-  auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
-  if (!superclassDecl)
+  if (!superclassType->getClassOrBoundGenericClass())
     return false;
 
-  auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
-  if (!subclassDecl) {
+  if (!candidateType->getClassOrBoundGenericClass()) {
     candidateType = candidateType->getSuperclass();
     if (!candidateType)
       return false;
-    subclassDecl = candidateType->getClassOrBoundGenericClass();
-    if (!subclassDecl)
-      return false;
   }
 
-  return superclassDecl->isSuperclassOf(subclassDecl);
+  do {
+    auto result = isLikelyExactMatch(candidateType, superclassType);
+    ASSERT(result);
+    if (*result)
+      return true;
+
+    candidateType = candidateType->getSuperclass();
+  } while (candidateType);
+
+  return false;
 }
 
 /// Determine whether the candidate type can be erased to the given
