@@ -689,15 +689,6 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
              lhsKind != ConversionBehavior::InOut) {
     switch (rhsKind) {
     case ConversionBehavior::Class: {
-      // Archetypes can convert to classes.
-      if (lhs->is<ArchetypeType>()) {
-        auto superclassType = lhs->getSuperclass();
-        if (!superclassType)
-          return ConflictFlag::Class;
-
-        return canPossiblyConvertTo(cs, superclassType, rhs, sig);
-      }
-
       // Protocol metatypes can convert to instances of the Protocol class
       // on Objective-C interop platforms.
       //
@@ -705,14 +696,9 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       if (lhsKind == ConversionBehavior::Metatype)
         break;
 
-      // An existential with a superclass bound can convert to a class.
-      if (lhsKind == ConversionBehavior::Existential) {
-        auto superclassType = lhs->getSuperclass();
-        if (!superclassType)
-          return ConflictFlag::Class;
-
-        return canPossiblyConvertTo(cs, superclassType, rhs, sig);
-      }
+      // Archetypes and existentials can convert to classes.
+      if (isSubclassOf(lhs, rhs))
+        break;
 
       // Nothing else converts to a class.
       return ConflictFlag::Category;
