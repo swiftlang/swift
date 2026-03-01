@@ -173,6 +173,7 @@ bool ConstraintSystem::isConformanceTransitiveForSupertype(
     addMutablePointers();
     break;
 
+  case ConversionBehavior::Existential:
   case ConversionBehavior::Unknown:
     // Can't say anything in this case.
     result = false;
@@ -301,7 +302,9 @@ bool ConstraintSystem::isConformanceTransitiveForSubtype(
     // FIXME: Metatypes and functions.
     return false;
 
+  case ConversionBehavior::Existential:
   case ConversionBehavior::Unknown:
+    // Can't say anything in this case.
     return false;
   }
 }
@@ -409,6 +412,9 @@ swift::constraints::getConversionBehavior(Type type) {
     return ConversionBehavior::Function;
   }
 
+  if (type->is<ExistentialType>())
+    return ConversionBehavior::Existential;
+
   return ConversionBehavior::Unknown;
 }
 
@@ -437,6 +443,7 @@ bool swift::constraints::hasProperSubtypes(Type type) {
   case ConversionBehavior::Function:
   case ConversionBehavior::Metatype:
   case ConversionBehavior::Tuple:
+  case ConversionBehavior::Existential:
   case ConversionBehavior::Unknown:
     return true;
   }
@@ -476,6 +483,7 @@ bool swift::constraints::hasProperSupertypes(Type type) {
   case ConversionBehavior::Function:
   case ConversionBehavior::Metatype:
   case ConversionBehavior::Tuple:
+  case ConversionBehavior::Existential:
   case ConversionBehavior::Unknown:
     return true;
   }
@@ -631,6 +639,7 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       break;
     }
     case ConversionBehavior::Function:
+      // FIXME: Implement.
       break;
     case ConversionBehavior::InOut:
     case ConversionBehavior::LValue: {
@@ -660,6 +669,12 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
 
       break;
     }
+    case ConversionBehavior::Existential:
+      // Existential-to-existential conversions.
+      if (!isSubtypeOfExistentialType(lhs, rhs))
+        return ConflictFlag::Existential;
+
+      break;
     case ConversionBehavior::Unknown:
       break;
     }
@@ -697,11 +712,21 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
 
       // Protocol metatypes can convert to instances of the Protocol class
       // on Objective-C interop platforms.
-      if (lhs->is<MetatypeType>())
+      //
+      // FIXME: Make this less conservative.
+      if (lhsKind == ConversionBehavior::Metatype)
         break;
 
-      // Nothing else converts to a class except for existentials
-      // (which are 'ConversionBehavior::Unknown').
+      // An existential with a superclass bound can convert to a class.
+      if (lhsKind == ConversionBehavior::Existential) {
+        auto superclassType = lhs->getSuperclass();
+        if (!superclassType)
+          return ConflictFlag::Class;
+
+        return canPossiblyConvertTo(cs, superclassType, rhs, sig);
+      }
+
+      // Nothing else converts to a class.
       return ConflictFlag::Category;
     }
 
@@ -742,6 +767,13 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     case ConversionBehavior::Metatype:
     case ConversionBehavior::Tuple:
       return ConflictFlag::Category;
+
+    case ConversionBehavior::Existential:
+      // Concrete-to-existential conversions.
+      if (!isSubtypeOfExistentialType(lhs, rhs))
+        return ConflictFlag::Existential;
+
+      break;
 
     case ConversionBehavior::Unknown:
       break;
@@ -829,4 +861,6 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " tuple_arity";
   if (reason.contains(ConflictFlag::TupleElement))
     out << " tuple_element";
+  if (reason.contains(ConflictFlag::Existential))
+    out << " existential";
 }
