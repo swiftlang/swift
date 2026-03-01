@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -disable-type-layout %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize --check-prefix=CHECK-%target-cpu
+// UNSUPPORTED: CPU=wasm32
 
 import Builtin
 

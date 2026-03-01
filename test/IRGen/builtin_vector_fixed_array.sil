@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -emit-irgen -disable-availability-checking -enable-experimental-feature BuiltinModule %s | %FileCheck %s
 
 // REQUIRES: swift_feature_BuiltinModule
+// UNSUPPORTED: CPU=wasm32
 
 import Builtin
 import Swift

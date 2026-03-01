@@ -130,7 +130,7 @@ class UFIKlass {
   var varNonUfi: String?
 
   // variable initialization expression of Core.UFIKlass.varUfi
-  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc {{.*}} @"$s4Core8UFIKlassC6varUfiSSSgvpfi"()
+  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc {{.*}} @"$s4Core8UFIKlassC6varUfiSSSgvpfi"
 
   // key path getter for Core.UFIKlass.varUfi
   // CHECK-COMMON-DAG: define linkonce_odr hidden swiftcc void @"$s4Core8UFIKlassC6varUfiSSSgvpACTK"

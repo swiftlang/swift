@@ -4,6 +4,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck -check-prefix=CHECKIR %s
 // REQUIRES: executable_test
+// UNSUPPORTED: CPU=wasm32
 
 protocol Proto {
 }

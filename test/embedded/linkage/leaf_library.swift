@@ -40,7 +40,7 @@ private func throughPrivate() -> [Int] {
   [5, 6, 7]
 }
 
-// LIBRARY-IR: define linkonce_odr hidden swiftcc { ptr, ptr } @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
+// LIBRARY-IR: define linkonce_odr hidden swiftcc {{{ ptr, ptr }|void}} @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
 
 // LIBRARY-IR: define {{(protected |dllexport )?}}swiftcc i64 @"$e7Library11unnecessarys5Int64VyF"()
 public func unnecessary() -> Int64 { 5 }

@@ -8,6 +8,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
 // RUN: %target-swift-frontend -disable-type-layout -module-name enum_resilience -I %t -emit-ir -enable-library-evolution %s | %FileCheck %t/enum_resilience.swift -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-cpu
 // RUN: %target-swift-frontend -module-name enum_resilience -I %t -emit-ir -enable-library-evolution -O %s
+// UNSUPPORTED: CPU=wasm32
 
 import resilient_enum
 import resilient_struct
