@@ -71,8 +71,12 @@ enum class ConversionBehavior : unsigned {
   /// as a supertype.
   Optional,
 
-  /// Function types and metatypes.
-  Structural,
+  /// Function types support contravariant conversion in parameter position and
+  /// covariant conversion in result position.
+  Function,
+
+  /// Metatypes allow some conversions between instance types.
+  Metatype,
 
   /// Tuples.
   Tuple,
@@ -116,7 +120,7 @@ enum ConflictFlag : unsigned {
   Category = 1 << 0,
   Exact = 1 << 1,
   Class = 1 << 2,
-  Structural = 1 << 3,
+  Metatype = 1 << 3,
   Array = 1 << 4,
   DictionaryKey = 1 << 5,
   DictionaryValue = 1 << 6,

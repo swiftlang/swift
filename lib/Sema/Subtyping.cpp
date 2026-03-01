@@ -109,7 +109,8 @@ bool ConstraintSystem::isConformanceTransitiveForSupertype(
       declsToCheck.push_back(cgFloatDecl);
     break;
 
-  case ConversionBehavior::Structural:
+  case ConversionBehavior::Function:
+  case ConversionBehavior::Metatype:
     // FIXME: Metatypes and functions.
     result = false;
     break;
@@ -246,7 +247,8 @@ bool ConstraintSystem::isConformanceTransitiveForSubtype(
     // FIXME: Check pointer types.
     return false;
 
-  case ConversionBehavior::Structural:
+  case ConversionBehavior::Function:
+  case ConversionBehavior::Metatype:
     // FIXME: Metatypes and functions.
     return false;
 
@@ -328,8 +330,8 @@ swift::constraints::getConversionBehavior(Type type) {
       type->is<BuiltinType>() || type->is<ArchetypeType>())
     return ConversionBehavior::None;
 
-  if (type->is<FunctionType>() || type->is<MetatypeType>())
-    return ConversionBehavior::Structural;
+  if (type->is<MetatypeType>())
+    return ConversionBehavior::Metatype;
 
   if (type->is<InOutType>())
     return ConversionBehavior::InOut;
@@ -340,8 +342,9 @@ swift::constraints::getConversionBehavior(Type type) {
   if (type->isVoid())
     return ConversionBehavior::None;
 
-  // Only tuples with a known length are supported for now.
-  if (type->is<TupleType>()) {
+  // We only support tuples and function parameter lists with a known length
+  // for now.
+  if (type->is<TupleType>() || type->is<FunctionType>()) {
     if (type->hasParameterPack())
       return ConversionBehavior::Unknown;
 
@@ -352,7 +355,9 @@ swift::constraints::getConversionBehavior(Type type) {
         return ConversionBehavior::Unknown;
     }
 
-    return ConversionBehavior::Tuple;
+    if (type->is<TupleType>())
+      return ConversionBehavior::Tuple;
+    return ConversionBehavior::Function;
   }
 
   return ConversionBehavior::Unknown;
@@ -380,7 +385,8 @@ bool swift::constraints::hasProperSubtypes(Type type) {
   case ConversionBehavior::Double:
   case ConversionBehavior::Pointer:
   case ConversionBehavior::Optional:
-  case ConversionBehavior::Structural:
+  case ConversionBehavior::Function:
+  case ConversionBehavior::Metatype:
   case ConversionBehavior::Tuple:
   case ConversionBehavior::Unknown:
     return true;
@@ -418,7 +424,8 @@ bool swift::constraints::hasProperSupertypes(Type type) {
   case ConversionBehavior::Double:
   case ConversionBehavior::Pointer:
   case ConversionBehavior::Optional:
-  case ConversionBehavior::Structural:
+  case ConversionBehavior::Function:
+  case ConversionBehavior::Metatype:
   case ConversionBehavior::Tuple:
   case ConversionBehavior::Unknown:
     return true;
@@ -546,10 +553,19 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
         return optionalToOptional | ConflictFlag::Optional;
       break;
     }
-    case ConversionBehavior::Structural:
-      if (lhs->getCanonicalType()->getKind()
-          != rhs->getCanonicalType()->getKind())
-        return ConflictFlag::Structural;
+    case ConversionBehavior::Metatype: {
+      // FIXME: Inaccurate, because not all conversions are allowed in
+      // instance type position.
+      auto argInstanceType = lhs->getMetatypeInstanceType();
+      auto instanceType = rhs->getMetatypeInstanceType();
+      auto instanceConversion = canPossiblyConvertTo(
+          cs, argInstanceType, instanceType, sig);
+
+      if (instanceConversion)
+        return instanceConversion | ConflictFlag::Metatype;
+      break;
+    }
+    case ConversionBehavior::Function:
       break;
     case ConversionBehavior::InOut:
     case ConversionBehavior::LValue: {
@@ -657,7 +673,8 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     case ConversionBehavior::Array:
     case ConversionBehavior::Dictionary:
     case ConversionBehavior::Set:
-    case ConversionBehavior::Structural:
+    case ConversionBehavior::Function:
+    case ConversionBehavior::Metatype:
     case ConversionBehavior::Tuple:
       return ConflictFlag::Category;
 
@@ -710,8 +727,8 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " exact";
   if (reason.contains(ConflictFlag::Class))
     out << " class";
-  if (reason.contains(ConflictFlag::Structural))
-    out << " structural";
+  if (reason.contains(ConflictFlag::Metatype))
+    out << " metatype";
   if (reason.contains(ConflictFlag::Array))
     out << " array";
   if (reason.contains(ConflictFlag::DictionaryKey))
@@ -722,8 +739,6 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " set";
   if (reason.contains(ConflictFlag::Optional))
     out << " optional";
-  if (reason.contains(ConflictFlag::Structural))
-    out << " structural";
   if (reason.contains(ConflictFlag::Conformance))
     out << " conformance";
   if (reason.contains(ConflictFlag::TupleArity))
