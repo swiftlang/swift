@@ -19,7 +19,6 @@
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/Basic/Defer.h"
@@ -27,6 +26,7 @@
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSDisjunction.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
@@ -801,57 +801,6 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 }
 
 } // end anonymous namespace
-
-/// Determine whether the candidate type is a subclass of the superclass
-/// type. This check is approximate, because it disregards generic
-/// arguments.
-///
-/// FIXME: This should be a common utility somewhere instead of being
-/// re-implemented in several places in the compiler.
-static bool isSubclassOf(Type candidateType, Type superclassType) {
-  auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
-  if (!superclassDecl)
-    return false;
-
-  auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
-  if (!subclassDecl) {
-    candidateType = candidateType->getSuperclass();
-    if (!candidateType)
-      return false;
-    subclassDecl = candidateType->getClassOrBoundGenericClass();
-    if (!subclassDecl)
-      return false;
-  }
-
-  return superclassDecl->isSuperclassOf(subclassDecl);
-}
-
-/// Determine whether the candidate type can be erased to the given
-/// existential type. This check is approximate, because it disregards
-/// conditional conformance and parameterized protocol types.
-///
-/// FIXME: This should be a common utility somewhere instead of being
-/// re-implemented in several places in the compiler.
-static bool isSubtypeOfExistentialType(Type candidateType, Type existentialType) {
-  auto layout = existentialType->getExistentialLayout();
-
-  if (auto layoutConstraint = layout.getLayoutConstraint()) {
-    if (layoutConstraint->isClass() &&
-        !(candidateType->isClassExistentialType() ||
-          candidateType->mayHaveSuperclass()))
-      return false;
-  }
-
-  if (layout.explicitSuperclass &&
-      !isSubclassOf(candidateType, layout.explicitSuperclass))
-    return false;
-
-  return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
-    auto result = TypeChecker::containsProtocol(candidateType, P,
-                                                /*allowMissing=*/false);
-    return result.first || result.second;
-  });
-}
 
 enum class MatchFlag {
   OnParam = 0x01,

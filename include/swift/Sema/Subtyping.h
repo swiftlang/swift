@@ -38,6 +38,11 @@ class ConstraintSystem;
 /// - std::nullopt if unknown.
 std::optional<bool> isLikelyExactMatch(Type first, Type second);
 
+bool isSubclassOf(Type candidateType, Type superclassType);
+
+bool isSubtypeOfExistentialType(Type candidateType,
+                                Type existentialType);
+
 enum class ConversionBehavior : unsigned {
   /// Most nominal types, archetypes, empty tuple.
   None,
