@@ -86,6 +86,11 @@ enum class ConversionBehavior : unsigned {
   /// Tuples.
   Tuple,
 
+  /// Existential types and conforming types as subtypes, and other existential
+  /// types as supertypes. A class-bound existential type also has its superclass
+  /// type as its supertype.
+  Existential,
+
   /// InOut types have Pointer types as supertypes.
   InOut,
 
@@ -134,7 +139,8 @@ enum ConflictFlag : unsigned {
   Double = 1 << 9,
   Conformance = 1 << 10,
   TupleArity = 1 << 11,
-  TupleElement = 1 << 11
+  TupleElement = 1 << 12,
+  Existential = 1 << 13
 };
 using ConflictReason = OptionSet<ConflictFlag>;
 
