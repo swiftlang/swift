@@ -1,33 +1,26 @@
 // RUN: %empty-directory(%t)
 
+// DEFINE: %{availability} = \
+// DEFINE:   -define-availability '_iOS53Aligned:macOS 50.0, iOS 53.0' \
+// DEFINE:   -define-availability '_iOS54Aligned:macOS 51.0, iOS 54.0' \
+// DEFINE:   -define-availability '_iOS54:iOS 54.0' \
+// DEFINE:   -define-availability '_macOS51_0:macOS 51.0' \
+// DEFINE:   -define-availability '_myProject 1.0:macOS 51.0' \
+// DEFINE:   -define-availability '_myProject 2.5:macOS 52.5'
+
 // RUN: %target-swift-frontend-dump-parse \
-// RUN:   -define-availability '_iOS53Aligned:macOS 50.0, iOS 53.0' \
-// RUN:   -define-availability '_iOS54Aligned:macOS 51.0, iOS 54.0' \
-// RUN:   -define-availability '_iOS54:iOS 54.0' \
-// RUN:   -define-availability '_macOS51_0:macOS 51.0' \
-// RUN:   -define-availability '_myProject 1.0:macOS 51.0' \
-// RUN:   -define-availability '_myProject 2.5:macOS 52.5' \
+// RUN:   %{availability} \
 // RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   | %sanitize-address > %t/astgen.ast
 
 // RUN: %target-swift-frontend-dump-parse \
-// RUN:   -define-availability '_iOS53Aligned:macOS 50.0, iOS 53.0' \
-// RUN:   -define-availability '_iOS54Aligned:macOS 51.0, iOS 54.0' \
-// RUN:   -define-availability '_iOS54:iOS 54.0' \
-// RUN:   -define-availability '_macOS51_0:macOS 51.0' \
-// RUN:   -define-availability '_myProject 1.0:macOS 51.0' \
-// RUN:   -define-availability '_myProject 2.5:macOS 52.5' \
+// RUN:   %{availability} \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
 // RUN: %target-typecheck-verify-swift \
-// RUN:   -define-availability '_iOS53Aligned:macOS 50.0, iOS 53.0' \
-// RUN:   -define-availability '_iOS54Aligned:macOS 51.0, iOS 54.0' \
-// RUN:   -define-availability '_iOS54:iOS 54.0' \
-// RUN:   -define-availability '_macOS51_0:macOS 51.0' \
-// RUN:   -define-availability '_myProject 1.0:macOS 51.0' \
-// RUN:   -define-availability '_myProject 2.5:macOS 52.5' \
+// RUN:   %{availability} \
 // RUN:   -enable-experimental-feature ParserASTGen
 
 // REQUIRES: swift_feature_ParserASTGen
