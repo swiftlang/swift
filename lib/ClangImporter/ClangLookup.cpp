@@ -263,7 +263,6 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   ClangInheritanceInfo inheritance = desc.inheritance;
 
   auto &ctx = recordDecl->getASTContext();
-  auto &Importer = *static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
   // Whether to skip non-public members. Feature::ImportNonPublicCxxMembers says
   // to import all non-public members by default; if that is disabled, we only
@@ -411,11 +410,12 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   }
 
   if (result.empty() && !inheritance) {
+    auto &Importer = *static_cast<ClangImporter *>(ctx.getClangModuleLoader());
     if (name.isSimpleName("pointee")) {
       if (auto *pointee = Importer.Impl.lookupAndImportPointee(inheritingDecl))
         result.push_back(pointee);
     } else if (name.getBaseName() == "successor" &&
-               name.getArgumentNames().size() == 0) {
+               name.getArgumentNames().empty()) {
       if (auto *succ = Importer.Impl.lookupAndImportSuccessor(inheritingDecl))
         result.push_back(succ);
     }

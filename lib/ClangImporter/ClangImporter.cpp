@@ -130,8 +130,8 @@ namespace {
   class HeaderImportCallbacks : public clang::PPCallbacks {
     ClangImporter::Implementation &Impl;
   public:
-    HeaderImportCallbacks(ClangImporter::Implementation &impl)
-      : Impl(impl) {}
+    explicit HeaderImportCallbacks(ClangImporter::Implementation &impl)
+        : Impl(impl) {}
 
     void handleImport(const clang::Module *imported) {
       if (!imported)
@@ -181,7 +181,7 @@ namespace {
       DeclGroups.push_back(decls);
     }
 
-    ArrayRef<clang::DeclGroupRef> getAdditionalParsedDecls() {
+    ArrayRef<clang::DeclGroupRef> getAdditionalParsedDecls() const {
       return DeclGroups;
     }
 
@@ -203,9 +203,9 @@ namespace {
     explicit ParsingAction(ClangImporter &importer,
                            ClangImporter::Implementation &impl,
                            const ClangImporterOptions &importerOpts,
-                           std::string swiftPCHHash)
-      : Importer(importer), Impl(impl), ImporterOpts(importerOpts),
-        SwiftPCHHash(swiftPCHHash) {}
+                           StringRef swiftPCHHash)
+        : Importer(importer), Impl(impl), ImporterOpts(importerOpts),
+          SwiftPCHHash(swiftPCHHash) {}
     std::unique_ptr<clang::ASTConsumer>
     CreateASTConsumer(clang::CompilerInstance &CI, StringRef InFile) override {
       return std::make_unique<HeaderParsingASTConsumer>(Impl);
@@ -287,8 +287,8 @@ class BridgingPPTracker : public clang::PPCallbacks {
   ClangImporter::Implementation &Impl;
 
 public:
-  BridgingPPTracker(ClangImporter::Implementation &Impl)
-    : Impl(Impl) {}
+  explicit BridgingPPTracker(ClangImporter::Implementation &Impl)
+      : Impl(Impl) {}
 
 private:
   static unsigned getNumModuleIdentifiers(const clang::Module *Mod) {
@@ -367,7 +367,7 @@ public:
     ExcludedPaths.insert(filename);
   }
 
-  bool isClangImporterSpecialName(StringRef Filename) {
+  bool isClangImporterSpecialName(StringRef Filename) const {
     using ImporterImpl = ClangImporter::Implementation;
     return (Filename == ImporterImpl::moduleImportBufferName
             || Filename == ImporterImpl::bridgingHeaderBufferName);
@@ -962,7 +962,7 @@ void importer::addCommonInvocationArguments(
     invocationArgStrs.push_back("-fbuild-session-file=" + importerOpts.BuildSessionFilePath);
   }
 
-  for (auto extraArg : importerOpts.ExtraArgs) {
+  for (const auto &extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
 
@@ -1357,7 +1357,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
   auto TempVFS = clang::createVFSFromCompilerInvocation(*CI, *clangDiags, VFS);
 
   std::vector<std::string> FilteredModuleMapFiles;
-  for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
+  for (const auto &ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
     if (ctx.CASOpts.HasImmutableFileSystem) {
       // There is no need to add any module map file here. Issue a warning and
       // drop the option.
@@ -3046,7 +3046,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
                               this](const clang::Module *M,
                                     bool guaranteedUnique) {
       const bool cannotBeImported =
-          llvm::any_of(M->Requirements, [cxx](auto &Req) {
+          llvm::any_of(M->Requirements, [cxx](const auto &Req) {
             if (Req.FeatureName == "swift")
               return !Req.RequiredState;
             if (Req.FeatureName == "cplusplus")
@@ -3474,9 +3474,9 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
   }
 
   // Friends from class templates don't have an owning module. Just return true.
-  if (isa<clang::FunctionDecl>(D) &&
-      cast<clang::FunctionDecl>(D)->isThisDeclarationInstantiatedFromAFriendDefinition())
-    return true;
+  if (const auto *FD = dyn_cast<clang::FunctionDecl>(D))
+    if (FD->isThisDeclarationInstantiatedFromAFriendDefinition())
+      return true;
 
   // Handle redeclarable Clang decls by checking each redeclaration.
   bool IsTagDecl = isa<clang::TagDecl>(D);
@@ -4395,7 +4395,7 @@ void ClangModuleUnit::collectLinkLibraries(
   if (clangModule->UseExportAsModuleLinkName)
     return;
 
-  for (auto clangLinkLib : clangModule->LinkLibraries)
+  for (const auto &clangLinkLib : clangModule->LinkLibraries)
     callback(LinkLibrary{clangLinkLib.Library,
                          clangLinkLib.IsFramework ? LibraryKind::Framework
                                                   : LibraryKind::Library,
@@ -4554,7 +4554,7 @@ void ClangImporter::verifyAllModules() {
   // more decls to be imported and modify the map while we are iterating it.
   size_t verifiedCounter = Impl.ImportedDecls.size();
   SmallVector<Decl *, 8> Decls;
-  for (auto &I : Impl.ImportedDecls)
+  for (const auto &I : Impl.ImportedDecls)
     if (I.first.second == Impl.CurrentVersion)
       if (Decl *D = I.second)
         Decls.push_back(D);
@@ -5387,16 +5387,15 @@ static bool checkConditionalParams(
     if (hasInjectedSTLAnnotation) {
       auto params = templateDecl->getTemplateParameters();
       for (auto idx : STLParams)
-        argumentsToCheck.push_back(
-            std::make_pair(idx, params->getParam(idx)->getName()));
+        argumentsToCheck.emplace_back(idx, params->getParam(idx)->getName());
     } else {
       for (auto [idx, param] :
            llvm::enumerate(*templateDecl->getTemplateParameters())) {
         if (conditionalParams.erase(param->getName()))
-          argumentsToCheck.push_back(std::make_pair(idx, param->getName()));
+          argumentsToCheck.emplace_back(idx, param->getName());
       }
     }
-    auto &argList = specDecl->getTemplateArgs();
+    const auto &argList = specDecl->getTemplateArgs();
     for (auto argToCheck : argumentsToCheck) {
       auto arg = argList[argToCheck.first];
       llvm::SmallVector<clang::TemplateArgument, 1> nonPackArgs;
@@ -6900,9 +6899,9 @@ ClangImporter::Implementation::loadNamedMembers(
   if (CD) {
     for (auto entry : table->lookup(SerializedSwiftName(N),
                                     effectiveClangContext)) {
-      if (!isa<clang::NamedDecl *>(entry))
+      auto *member = dyn_cast<clang::NamedDecl *>(entry);
+      if (!member)
         continue;
-      auto member = cast<clang::NamedDecl *>(entry);
       if (!isVisibleClangEntry(member)) continue;
 
       // Skip Decls from different clang::DeclContexts
@@ -6934,9 +6933,9 @@ ClangImporter::Implementation::loadNamedMembers(
 
   for (auto entry : table->lookupGlobalsAsMembers(SerializedSwiftName(N),
                                                   effectiveClangContext)) {
-    if (!isa<clang::NamedDecl *>(entry))
+    auto *member = dyn_cast<clang::NamedDecl *>(entry);
+    if (!member)
       continue;
-    auto member = cast<clang::NamedDecl *>(entry);
     if (!isVisibleClangEntry(member)) continue;
 
     // Skip Decls from different clang::DeclContexts. We don't do this for
@@ -7870,8 +7869,8 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
   if (known == clonedBaseMembers.end()) {
     ValueDecl *cloned = cloneBaseMemberDecl(decl, newContext, inheritance);
     handleAmbiguousSwiftName(cloned);
-    known = clonedBaseMembers.insert({key, cloned}).first;
-    clonedMembers.insert(std::make_pair(cloned, decl));
+    known = clonedBaseMembers.try_emplace(key, cloned).first;
+    clonedMembers.try_emplace(cloned, decl);
   }
 
   return known->second;
@@ -8039,11 +8038,10 @@ getRefParentDecls(const clang::RecordDecl *decl, ASTContext &ctx,
       return matchingDecls;
     if (hasDiamondInheritanceRefType(cxxRecordDecl)) {
       if (importerImpl) {
-        if (!importerImpl->DiagnosedCxxRefDecls.count(decl)) {
+        if (importerImpl->DiagnosedCxxRefDecls.insert(decl).second) {
           HeaderLoc loc(decl->getLocation());
           importerImpl->diagnose(loc, diag::cant_infer_frt_in_cxx_inheritance,
                                  decl);
-          importerImpl->DiagnosedCxxRefDecls.insert(decl);
         }
       }
       return matchingDecls;
@@ -8135,11 +8133,10 @@ importer::getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
   // function are found.
   if (uniqueRetainDecls.size() != 1 || uniqueReleaseDecls.size() != 1) {
     if (importerImpl) {
-      if (!importerImpl->DiagnosedCxxRefDecls.count(decl)) {
+      if (importerImpl->DiagnosedCxxRefDecls.insert(decl).second) {
         HeaderLoc loc(decl->getLocation());
         importerImpl->diagnose(loc, diag::cant_infer_frt_in_cxx_inheritance,
                                decl);
-        importerImpl->DiagnosedCxxRefDecls.insert(decl);
       }
     }
     return nullptr;

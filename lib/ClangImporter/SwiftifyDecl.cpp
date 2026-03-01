@@ -121,7 +121,7 @@ public:
     printAvailabilityOfType("Span");
   }
 private:
-  bool hasMacroParameter(StringRef ParamName) {
+  bool hasMacroParameter(StringRef ParamName) const {
     for (auto *Param : *SwiftifyImportDecl.parameterList)
       if (Param->getArgumentName().str() == ParamName)
         return true;
@@ -200,8 +200,8 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
   bool registerStdSpanTypeMapping(Type swiftType, const clang::QualType clangType) {
     const auto *decl = clangType->getAsTagDecl();
     if (decl && decl->isInStdNamespace() && decl->getName() == "span") {
-      typeMapping.insert(std::make_pair(
-          swiftType->getString(), swiftType->getDesugaredType()->getString()));
+      typeMapping.try_emplace(swiftType->getString(),
+                              swiftType->getDesugaredType()->getString());
       return true;
     }
     return false;
@@ -378,7 +378,8 @@ struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
   bool hasForwardDeclaredConcreteType = false;
   const clang::Module *Owner;
 
-  ForwardDeclaredConcreteTypeVisitor(const clang::Module *Owner) : Owner(Owner) {};
+  explicit ForwardDeclaredConcreteTypeVisitor(const clang::Module *Owner)
+      : Owner(Owner){};
 
   Action walkToTypePre(Type ty) override {
     DLOG("Walking type:\n");

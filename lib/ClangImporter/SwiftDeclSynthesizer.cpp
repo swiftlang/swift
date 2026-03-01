@@ -236,8 +236,6 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
                                                 ConstantConvertKind convertKind,
                                                 bool isStatic, ClangNode ClangN,
                                                 AccessLevel access) {
-  auto &context = ImporterImpl.SwiftContext;
-
   // Create the integer literal value.
   Expr *expr = nullptr;
   switch (value.getKind()) {
@@ -257,6 +255,7 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
 
   case clang::APValue::Float:
   case clang::APValue::Int: {
+    auto &context = ImporterImpl.SwiftContext;
     // Print the value.
     llvm::SmallString<16> printedValueBuf;
     if (value.getKind() == clang::APValue::Int) {
@@ -1171,8 +1170,8 @@ static VarDecl *findAnonymousInnerFieldDecl(VarDecl *importedFieldDecl,
 
   for (auto decl :
        anonymousFieldTypeDecl->lookupDirect(importedFieldDecl->getName())) {
-    if (isa<VarDecl>(decl)) {
-      return cast<VarDecl>(decl);
+    if (auto *VD = dyn_cast<VarDecl>(decl)) {
+      return VD;
     }
   }
 
@@ -1392,7 +1391,7 @@ synthesizeEnumRawValueConstructorBody(AbstractFunctionDecl *afd,
       auto *litPat = ExprPattern::createImplicit(ctx, litExpr, ctorDecl);
 
       // Add to the list of valid case labels
-      validCaseLabels.push_back(CaseLabelItem(litPat));
+      validCaseLabels.emplace_back(litPat);
     }
 
     // Create a single case statement with all valid raw values
@@ -2493,11 +2492,8 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
 
   auto oldArgNames = operatorMethod->getName().getArgumentNames();
   SmallVector<Identifier, 4> newArgNames;
-  newArgNames.push_back(Identifier());
-
-  for (auto id : oldArgNames) {
-    newArgNames.push_back(id);
-  }
+  newArgNames.emplace_back();
+  newArgNames.append(oldArgNames.begin(), oldArgNames.end());
 
   auto opDeclName =
       DeclName(ctx, opId, {newArgNames.begin(), newArgNames.end()});

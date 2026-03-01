@@ -535,11 +535,11 @@ bool SwiftLookupTable::addLocalEntry(
 
   // Add an entry to this context.
   if (decl)
-    entries.push_back(StoredSingleEntry(decl));
+    entries.emplace_back(decl);
   else if (macro)
-    entries.push_back(StoredSingleEntry(macro));
+    entries.emplace_back(macro);
   else
-    entries.push_back(StoredSingleEntry(moduleMacro));
+    entries.emplace_back(moduleMacro);
   return true;
 }
 
@@ -552,8 +552,7 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   if (!contextOpt) {
     // We might be able to resolve this later.
     if (isa<clang::NamedDecl *>(newEntry)) {
-      UnresolvedEntries.push_back(
-        std::make_tuple(name, newEntry, effectiveContext));
+      UnresolvedEntries.emplace_back(name, newEntry, effectiveContext);
     }
 
     return;
@@ -577,11 +576,11 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
      FullTableEntry entry;
     entry.Context = context;
     if (decl)
-      entry.DeclsOrMacros.push_back(StoredSingleEntry(decl));
+      entry.DeclsOrMacros.emplace_back(decl);
     else if (macro)
-      entry.DeclsOrMacros.push_back(StoredSingleEntry(macro));
+      entry.DeclsOrMacros.emplace_back(macro);
     else
-      entry.DeclsOrMacros.push_back(StoredSingleEntry(moduleMacro));
+      entry.DeclsOrMacros.emplace_back(moduleMacro);
 
      entries.push_back(entry);
   };
@@ -631,7 +630,7 @@ SwiftLookupTable::findOrCreate(TableType &Table,
   create(results, *Reader, baseName);
 
   // Add an entry to the table so we don't look again.
-  known = Table.insert({ std::move(baseName), std::move(results) }).first;
+  known = Table.try_emplace(std::move(baseName), std::move(results)).first;
 
   return known;
 }
@@ -710,8 +709,8 @@ SwiftLookupTable::allGlobalsAsMembersInContext(StoredContext context) {
     (void)Reader->lookupGlobalsAsMembersInContext(context, results);
 
     // Add an entry to the table so we don't look again.
-    known = GlobalsAsMembersIndex.insert({ std::move(context),
-                                           std::move(results) }).first;
+    known = GlobalsAsMembersIndex.try_emplace(std::move(context),
+                                              std::move(results)).first;
   }
 
   // Map each of the results.
@@ -968,22 +967,21 @@ static void printStoredEntry(const SwiftLookupTable *table,
                              llvm::raw_ostream &out) {
   if (entry.isSerializationIDEntry()) {
     if (entry.isDeclEntry()) {
-      llvm::errs() << "decl ID #" << entry.getSerializationID();
+      out << "decl ID #" << entry.getSerializationID();
     } else {
       auto moduleID = entry.getModuleID();
       if (moduleID == 0) {
-        llvm::errs() << "macro ID #" << entry.getSerializationID();
+        out << "macro ID #" << entry.getSerializationID();
       } else {
-        llvm::errs() << "macro with name ID #"
-                     << entry.getSerializationID() << "in submodule #"
-                     << moduleID;
+        out << "macro with name ID #" << entry.getSerializationID()
+            << "in submodule #" << moduleID;
       }
     }
   } else if (entry.isMacroEntry()) {
-    llvm::errs() << "Macro";
+    out << "Macro";
   } else {
     auto decl = const_cast<SwiftLookupTable *>(table)->mapStoredDecl(entry);
-    printName(decl, llvm::errs());
+    printName(decl, out);
   }
 }
 
@@ -1167,7 +1165,7 @@ namespace {
     {
     }
 
-    hash_value_type ComputeHash(key_type_ref key) {
+    static hash_value_type ComputeHash(key_type_ref key) {
       return static_cast<hash_value_type>(key.Kind) + llvm::djbHash(key.Name);
     }
 
@@ -1261,7 +1259,7 @@ namespace {
     {
     }
 
-    hash_value_type ComputeHash(key_type_ref key) {
+    static hash_value_type ComputeHash(key_type_ref key) {
       return static_cast<hash_value_type>(key.first) +
              llvm::djbHash(key.second);
     }
@@ -1440,15 +1438,15 @@ namespace {
     using hash_value_type = uint32_t;
     using offset_type = unsigned;
 
-    internal_key_type GetInternalKey(external_key_type key) {
+    static internal_key_type GetInternalKey(external_key_type key) {
       return key;
     }
 
-    external_key_type GetExternalKey(internal_key_type key) {
+    static external_key_type GetExternalKey(internal_key_type key) {
       return key;
     }
 
-    hash_value_type ComputeHash(internal_key_type key) {
+    static hash_value_type ComputeHash(internal_key_type key) {
       return static_cast<hash_value_type>(key.Kind) + llvm::djbHash(key.Name);
     }
 
@@ -1525,15 +1523,15 @@ namespace {
     using hash_value_type = uint32_t;
     using offset_type = unsigned;
 
-    internal_key_type GetInternalKey(external_key_type key) {
+    static internal_key_type GetInternalKey(external_key_type key) {
       return key;
     }
 
-    external_key_type GetExternalKey(internal_key_type key) {
+    static external_key_type GetExternalKey(internal_key_type key) {
       return key;
     }
 
-    hash_value_type ComputeHash(internal_key_type key) {
+    static hash_value_type ComputeHash(internal_key_type key) {
       return static_cast<hash_value_type>(key.first) + llvm::djbHash(key.second);
     }
 
@@ -2109,7 +2107,7 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
         // Also visit overridden macros that are in a different explicit
         // submodule. This isn't a perfect way to tell if these two macros are
         // supposed to be independent, but it's close enough in practice.
-        clang::Module *owningModule = moduleMacro->getOwningModule();
+        const clang::Module *owningModule = moduleMacro->getOwningModule();
         auto *explicitParent = getExplicitParentModule(owningModule);
         llvm::copy_if(moduleMacro->overrides(), std::back_inserter(worklist),
                       [&](const clang::ModuleMacro *next) -> bool {
@@ -2258,5 +2256,5 @@ SwiftNameLookupExtension::createExtensionReader(
   target->reset(new SwiftLookupTable(tableReader.get()));
 
   // Return the new reader.
-  return std::move(tableReader);
+  return tableReader;
 }

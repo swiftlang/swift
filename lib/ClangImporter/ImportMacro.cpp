@@ -469,8 +469,8 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
   }
 
   swift::AccessorDecl *S = nullptr;
-  if (isa<clang::VarDecl>(D) &&
-      !cast<clang::VarDecl>(D)->getType().isConstQualified()) {
+  if (const auto *Var = dyn_cast<clang::VarDecl>(D);
+      Var && !Var->getType().isConstQualified()) {
     S = AccessorDecl::createImplicit(Ctx, AccessorKind::Set, V, false, false,
                                      TypeLoc(), Ctx.TheEmptyTupleType, DC);
     S->setAccess(swift::AccessLevel::Public);

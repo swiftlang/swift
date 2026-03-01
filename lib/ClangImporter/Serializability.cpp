@@ -38,7 +38,8 @@ namespace {
 class SerializationPathFinder {
   ClangImporter::Implementation &Impl;
 public:
-  SerializationPathFinder(ClangImporter::Implementation &impl) : Impl(impl) {}
+  explicit SerializationPathFinder(ClangImporter::Implementation &impl)
+      : Impl(impl) {}
 
   StableSerializationPath find(const clang::Decl *decl) {
     // We can't do anything with non-NamedDecl declarations.
@@ -296,10 +297,10 @@ namespace {
     bool IsSerializable = true;
     bool HasSwiftDecl = false;
 
-    ClangTypeSerializationChecker(ClangImporter::Implementation &impl)
-      : DataStreamBasicWriter<ClangTypeSerializationChecker>(
-          impl.getClangASTContext()),
-        Impl(impl) {}
+    explicit ClangTypeSerializationChecker(ClangImporter::Implementation &impl)
+        : DataStreamBasicWriter<ClangTypeSerializationChecker>(
+              impl.getClangASTContext()),
+          Impl(impl) {}
 
     void writeUInt64(uint64_t value) {}
     void writeIdentifier(const clang::IdentifierInfo *ident) {}

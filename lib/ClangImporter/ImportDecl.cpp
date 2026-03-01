@@ -1246,7 +1246,7 @@ namespace {
       return {ImportedName(), std::nullopt};
     }
 
-    bool isFactoryInit(ImportedName &name) {
+    bool isFactoryInit(const ImportedName &name) {
       return name && name.getDeclName().getBaseName().isConstructor() &&
              (name.getInitKind() == CtorInitializerKind::Factory ||
               name.getInitKind() == CtorInitializerKind::ConvenienceFactory);
@@ -2016,7 +2016,7 @@ namespace {
         for (auto constant : decl->enumerators()) {
           if (Impl.isUnavailableInSwift(constant))
             continue;
-          canonicalEnumConstants.insert({constant->getInitVal(), constant});
+          canonicalEnumConstants.try_emplace(constant->getInitVal(), constant);
         }
       }
 
@@ -2334,8 +2334,8 @@ namespace {
       auto inheritedTypes = D->getInherited();
       SmallVector<InheritedEntry> entries(inheritedTypes.getEntries());
       auto proto = Impl.SwiftContext.getProtocol(kind);
-      entries.push_back(InheritedEntry(
-          TypeLoc::withoutLoc(proto->getDeclaredInterfaceType())));
+      entries.emplace_back(
+          TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
       entries.back().setSuppressed();
       D->setInherited(Impl.SwiftContext.AllocateCopy(entries));
     }
@@ -2634,8 +2634,8 @@ namespace {
         if (isa<TypeDecl>(member)) {
           // TODO: we have a problem lazily looking up unnamed members, so we
           // add them here.
-          if (isa<clang::RecordDecl>(nd) &&
-              !cast<clang::RecordDecl>(nd)->hasNameForLinkage())
+          if (auto *RD = dyn_cast<clang::RecordDecl>(nd);
+              RD && !RD->hasNameForLinkage())
             result->addMemberToLookupTable(member);
           continue;
         }
@@ -2897,7 +2897,7 @@ namespace {
         }
 
         auto gettersAndSetters = Impl.GetterSetterMap[result];
-        for (auto &getterAndSetter : gettersAndSetters) {
+        for (const auto &getterAndSetter : gettersAndSetters) {
           auto getter = getterAndSetter.second.first;
           auto setter = getterAndSetter.second.second;
           // We cannot make a computed property without a getter.
@@ -2927,7 +2927,7 @@ namespace {
 
         auto it = Impl.cxxSubscripts.find(result);
         if (it != Impl.cxxSubscripts.end()) {
-          for (auto &subscriptInfo : it->second) {
+          for (const auto &subscriptInfo : it->second) {
             auto getterAndSetter = subscriptInfo.second;
             auto subscript = synthesizer.makeSubscript(getterAndSetter.first,
                                                        getterAndSetter.second);
@@ -3868,7 +3868,7 @@ namespace {
         SmallVector<TypeBase *> params;
         for (auto parameter : *(func->getParameters())) {
           auto parameterType = parameter->getTypeInContext();
-          if (!typeDecl || !parameterType)
+          if (!parameterType)
             return false;
           if (parameter->isInOut())
             // Subscripts with inout parameters are not allowed in Swift.
@@ -4353,10 +4353,10 @@ namespace {
         SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
         SmallBitVector dependenciesOfRet(returnIdx);
         dependenciesOfRet[result->getSelfIndex()] = true;
-        lifetimeDependencies.push_back(LifetimeDependenceInfo(
+        lifetimeDependencies.emplace_back(
             nullptr, IndexSubset::get(Impl.SwiftContext, dependenciesOfRet),
             returnIdx,
-            /*isImmortal*/ false, /*isFromAnnotation*/ true));
+            /*isImmortal*/ false, /*isFromAnnotation*/ true);
         Impl.SwiftContext.evaluator.cacheOutput(
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
@@ -4514,16 +4514,16 @@ namespace {
             cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());
 
       for (auto& [idx, inheritedDepVec]: inheritedArgDependences) {
-        lifetimeDependencies.push_back(LifetimeDependenceInfo(
+        lifetimeDependencies.emplace_back(
             inheritedDepVec.any()
                 ? IndexSubset::get(Impl.SwiftContext, inheritedDepVec)
                 : nullptr,
-            nullptr, idx, /*isImmortal=*/false, /*isFromAnnotation=*/true));
+            nullptr, idx, /*isImmortal=*/false, /*isFromAnnotation=*/true);
       }
 
       if (inheritLifetimeParamIndicesForReturn.any() ||
           scopedLifetimeParamIndicesForReturn.any())
-        lifetimeDependencies.push_back(LifetimeDependenceInfo(
+        lifetimeDependencies.emplace_back(
             inheritLifetimeParamIndicesForReturn.any()
                 ? IndexSubset::get(Impl.SwiftContext,
                                    inheritLifetimeParamIndicesForReturn)
@@ -4533,7 +4533,7 @@ namespace {
                                    scopedLifetimeParamIndicesForReturn)
                 : nullptr,
             returnIdx,
-            /*isImmortal*/ false, /*isFromAnnotation*/ true));
+            /*isImmortal*/ false, /*isFromAnnotation*/ true);
       else if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl)) {
         // Assume default constructed view types have no dependencies.
         if (ctordecl->isDefaultConstructor() &&
@@ -5175,9 +5175,8 @@ namespace {
     ///
     /// The importer should use this rather than adding the attribute directly.
     void addObjCAttribute(Decl *decl, std::optional<ObjCSelector> name) {
-      auto &ctx = Impl.SwiftContext;
       if (name) {
-        decl->addAttribute(ObjCAttr::create(ctx, name,
+        decl->addAttribute(ObjCAttr::create(Impl.SwiftContext, name,
                                             /*implicitName=*/true));
       }
       if (auto VD = dyn_cast<ValueDecl>(decl)) {
@@ -6043,9 +6042,9 @@ namespace {
                                             *correctSwiftName);
 
       Identifier name = importedName.getBaseIdentifier(Impl.SwiftContext);
-      bool hasKnownSwiftName = importedName.hasCustomName();
 
       if (!decl->hasDefinition()) {
+        bool hasKnownSwiftName = importedName.hasCustomName();
         // Check if this protocol is implemented in its overlay.
         if (auto clangModule = Impl.getClangModuleForDecl(decl, true))
           if (auto native = resolveSwiftDecl<ProtocolDecl>(decl, name,
@@ -6864,9 +6863,9 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
   // Only consider extensions from the original module...or from an overlay
   // or the Swift half of a mixed-source framework.
   const DeclContext *containingFile = nominal->getModuleScopeContext();
-  ModuleDecl *originalModule = containingFile->getParentModule();
+  const ModuleDecl *originalModule = containingFile->getParentModule();
 
-  ModuleDecl *overlayModule = nullptr;
+  const ModuleDecl *overlayModule = nullptr;
   if (auto *clangUnit = dyn_cast<ClangModuleUnit>(containingFile))
     overlayModule = clangUnit->getOverlayModule();
 
@@ -8572,7 +8571,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
 
       // For now, just remember that we saw this method.
       methodsByName[objcMethod->getSelector()]
-        .push_back(std::make_tuple(objcMethod, proto, afd->hasAsync()));
+        .emplace_back(objcMethod, proto, afd->hasAsync());
     };
 
     if (name) {
@@ -9736,7 +9735,7 @@ void ClangImporter::Implementation::importAttributes(
       llvm::SmallVector<AvailabilityDomain, 4> results;
       declContext->lookupAvailabilityDomains(domainIdentifier, results);
 
-      if (results.size() > 0) {
+      if (!results.empty()) {
         // FIXME: [availability] Diagnose ambiguous availability domain name?
         auto AttrKind = avail->getUnavailable()
                             ? AvailableAttr::Kind::Unavailable
@@ -9968,9 +9967,9 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
     // If we couldn't import this Objective-C entity, determine
     // whether it was a required member of a protocol, or a designated
     // initializer of a class.
-    bool hasMissingRequiredMember = false;
     if (auto clangProto
           = dyn_cast<clang::ObjCProtocolDecl>(ClangDecl->getDeclContext())) {
+      bool hasMissingRequiredMember = false;
       if (auto method = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
         if (method->getImplementationControl() ==
             clang::ObjCImplementationControl::Required)

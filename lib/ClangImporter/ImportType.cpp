@@ -473,7 +473,7 @@ namespace {
       // Special case for NSZone*, which has its own Swift wrapper.
       if (const clang::RecordType *pointee =
             pointeeQualType->getAsStructureType()) {
-        if (pointee && !pointee->getDecl()->isCompleteDefinition() &&
+        if (!pointee->getDecl()->isCompleteDefinition() &&
             pointee->getDecl()->getName() == "_NSZone") {
           Identifier Id_ObjectiveC = Impl.SwiftContext.Id_ObjectiveC;
           ModuleDecl *objCModule = Impl.SwiftContext.getLoadedModule(Id_ObjectiveC);
@@ -542,7 +542,7 @@ namespace {
       }
 
       // FIXME: this is a workaround for rdar://128013193
-      if (pointeeType && pointeeType->getAnyNominal() &&
+      if (pointeeType->getAnyNominal() &&
           pointeeType->getAnyNominal()
               ->getAttrs()
               .hasAttribute<MoveOnlyAttr>() &&
@@ -1199,7 +1199,7 @@ namespace {
             // Input is malformed
             return {};
           }
-          if (nsObjectTy && importedType->isEqual(nsObjectTy)) {
+          if (importedType->isEqual(nsObjectTy)) {
             // Skip if there is no NSObject protocol.
             auto nsObjectProtoType =
                 Impl.getNSObjectProtocolType();
@@ -1977,7 +1977,7 @@ class GetSendableType :
   ASTContext &ctx;
 
 public:
-  GetSendableType(ASTContext &ctx) : ctx(ctx) {}
+  explicit GetSendableType(ASTContext &ctx) : ctx(ctx) {}
 
   /// The result of a conversion. Contains the converted type and a \c bool that
   /// is \c true if the operation found something to change, or \c false

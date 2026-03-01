@@ -417,7 +417,7 @@ namespace {
                             SmallVectorImpl<std::pair<const DeclType *,
                                                       ImportedName>>
                               &overriddenNames) {
-    typedef std::pair<const DeclType *, ImportedName> OverriddenName;
+    using OverriddenName = std::pair<const DeclType *, ImportedName>;
     llvm::SmallPtrSet<DeclName, 4> known;
     (void)known.insert(DeclName());
     overriddenNames.erase(
@@ -1489,10 +1489,10 @@ addDefaultArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
     if (param->getType()->isRValueReferenceType())
       argumentNames.push_back("consuming");
     else
-      argumentNames.push_back(StringRef());
+      argumentNames.emplace_back();
   }
   if (funcDecl->isVariadic())
-    argumentNames.push_back(StringRef());
+    argumentNames.emplace_back();
 }
 
 static StringRef renameUnsafeMethod(ASTContext &ctx,
@@ -2130,7 +2130,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     for (unsigned index = 0; index != numArgs; ++index) {
       if (index == 0) {
-        argumentNames.push_back(StringRef());
+        argumentNames.emplace_back();
       } else {
         StringRef argName = selector.getNameForSlot(index);
         argumentNames.push_back(argName);
