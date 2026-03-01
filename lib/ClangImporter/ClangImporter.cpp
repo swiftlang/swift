@@ -361,13 +361,13 @@ public:
   ClangImporterDependencyCollector(
       IntermoduleDepTrackingMode Mode,
       std::shared_ptr<llvm::FileCollectorBase> FileCollector)
-      : FileCollector(FileCollector), Mode(Mode) {}
+      : FileCollector(std::move(FileCollector)), Mode(Mode) {}
 
   void excludePath(StringRef filename) {
     ExcludedPaths.insert(filename);
   }
 
-  bool isClangImporterSpecialName(StringRef Filename) const {
+  static bool isClangImporterSpecialName(StringRef Filename) {
     using ImporterImpl = ClangImporter::Implementation;
     return (Filename == ImporterImpl::moduleImportBufferName
             || Filename == ImporterImpl::bridgingHeaderBufferName);
@@ -1097,7 +1097,7 @@ std::string ClangImporter::getOriginalSourceFile(StringRef PCHFilename) {
 
 std::optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
-                              StringRef SwiftPCHHash, bool &isExplicit) {
+                              StringRef SwiftPCHHash, bool &isExplicit) const {
   auto bridgingPCH = ImporterOptions.getPCHInputPath();
   if (!bridgingPCH.empty()) {
     isExplicit = true;
@@ -1417,7 +1417,7 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
 
 std::unique_ptr<ClangImporter>
 ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
-                      std::string swiftPCHHash, DependencyTracker *tracker,
+                      StringRef swiftPCHHash, DependencyTracker *tracker,
                       bool ignoreFileMapping) {
   std::unique_ptr<ClangImporter> importer{new ClangImporter(ctx, tracker)};
   auto &importerOpts = ctx.ClangImporterOpts;
@@ -3179,11 +3179,8 @@ ClangImporter::Implementation::exportName(Identifier name) {
   return ident;
 }
 
-Identifier
-ClangImporter::Implementation::importIdentifier(
-  const clang::IdentifierInfo *identifier,
-  StringRef removePrefix)
-{
+Identifier ClangImporter::Implementation::importIdentifier(
+    const clang::IdentifierInfo *identifier, StringRef removePrefix) const {
   if (!identifier) return Identifier();
 
   StringRef name = identifier->getName();
@@ -3268,12 +3265,10 @@ isPotentiallyConflictingSetter(const clang::ObjCProtocolDecl *proto,
   if (!setterID || !setterID->getName().starts_with("set"))
     return false;
 
-  for (auto *prop : proto->properties()) {
-    if (prop->getSetterName() == sel)
-      return true;
-  }
-
-  return false;
+  return llvm::any_of(proto->properties(),
+                      [sel](clang::ObjCPropertyDecl *prop) {
+                        return prop->getSetterName() == sel;
+                      });
 }
 
 bool importer::shouldSuppressDeclImport(const clang::Decl *decl) {
@@ -3723,7 +3718,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
     unsigned Length = ClangSM.getFileIDSize(FID);
     ClangCtx.getExternalSource()->FindFileRegionDecls(FID, 0, Length, Decls);
     for (auto *ClangD : Decls) {
-      if (Impl.shouldIgnoreBridgeHeaderTopLevelDecl(ClangD))
+      if (Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(ClangD))
         continue;
       if (filter(ClangD)) {
         if (auto *ND = dyn_cast<clang::NamedDecl>(ClangD)) {
@@ -4081,21 +4076,19 @@ void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
 }
 
 bool ClangImporter::Implementation::isVisibleClangEntry(
-    const clang::NamedDecl *clangDecl) {
+    const clang::NamedDecl *clangDecl) const {
   // For a declaration, check whether the declaration is hidden.
   clang::Sema &clangSema = getClangSema();
   if (clangSema.isVisible(clangDecl)) return true;
 
   // Is any redeclaration visible?
-  for (auto redecl : clangDecl->redecls()) {
-    if (clangSema.isVisible(cast<clang::NamedDecl>(redecl))) return true;
-  }
-
-  return false;
+  return llvm::any_of(clangDecl->redecls(), [&clangSema](clang::Decl *d) {
+    return clangSema.isVisible(cast<clang::NamedDecl>(d));
+  });
 }
 
 bool ClangImporter::Implementation::isVisibleClangEntry(
-  SwiftLookupTable::SingleEntry entry) {
+    SwiftLookupTable::SingleEntry entry) const {
   if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
     return isVisibleClangEntry(clangDecl);
   }
@@ -4624,11 +4617,8 @@ ClangModuleUnit::getASTSourceDescriptor() const {
 }
 
 bool ClangModuleUnit::hasClangModule(ModuleDecl *M) {
-  for (auto F : M->getFiles()) {
-    if (isa<ClangModuleUnit>(F))
-      return true;
-  }
-  return false;
+  return llvm::any_of(M->getFiles(),
+                      [](auto F) { return isa<ClangModuleUnit>(F); });
 }
 
 bool ClangModuleUnit::isTopLevel() const {
@@ -4888,7 +4878,7 @@ void ClangImporter::getMangledName(raw_ostream &os,
   if (!Impl.Mangler)
     Impl.Mangler.reset(getClangASTContext().createMangleContext());
 
-  return Impl.getMangledName(Impl.Mangler.get(), clangDecl, os);
+  return Implementation::getMangledName(Impl.Mangler.get(), clangDecl, os);
 }
 
 void ClangImporter::Implementation::getMangledName(
@@ -4938,7 +4928,7 @@ void ClangImporter::Implementation::configureOptionsForCodeGen(
 clang::CodeGenOptions &
 ClangImporter::Implementation::getCodeGenOptions() const {
   if (CodeGenOpts) {
-    return *CodeGenOpts.get();
+    return *CodeGenOpts;
   }
 
   return Invocation->getCodeGenOpts();
@@ -5002,11 +4992,9 @@ bool ClangImporter::Implementation::forEachLookupTable(
   llvm::array_pod_sort(moduleNames.begin(), moduleNames.end());
 
   // Visit the lookup tables.
-  for (auto moduleName : moduleNames) {
-    if (fn(*LookupTables[moduleName])) return true;
-  }
-
-  return false;
+  return llvm::any_of(moduleNames, [&](StringRef moduleName) {
+    return fn(*LookupTables[moduleName]);
+  });
 }
 
 bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
@@ -7089,7 +7077,7 @@ ClangImporter::importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                                         DeclContext *dc) {
   bool isSystemModule = isInSystemModule(dc);
   bool allowNSUIntegerAsInt =
-      Impl.shouldAllowNSUIntegerAsInt(isSystemModule, clangDecl);
+      Implementation::shouldAllowNSUIntegerAsInt(isSystemModule, clangDecl);
   if (auto imported =
           Impl.importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt)
               .getType())
@@ -7666,7 +7654,7 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
     std::string mangledNewFn;
     llvm::raw_string_ostream mangleRawStream(mangledNewFn);
     mangleRawStream << "__swift_specializedThunk_";
-    Impl.getItaniumMangledName(newFn, mangleRawStream);
+    Implementation::getItaniumMangledName(newFn, mangleRawStream);
     newFn->addAttr(clang::SwiftNameAttr::CreateImplicit(newFn->getASTContext(),
                                                         mangledNewFn));
   }
@@ -7774,11 +7762,11 @@ ClangImporter::getDefaultArgGenerator(const clang::ParmVarDecl *param) {
 
 bool ClangImporter::needsClosureConstructor(
     const clang::CXXRecordDecl *recordDecl) const {
-  return Impl.needsClosureConstructor(recordDecl);
+  return Implementation::needsClosureConstructor(recordDecl);
 }
 
 bool ClangImporter::Implementation::needsClosureConstructor(
-    const clang::CXXRecordDecl *recordDecl) const {
+    const clang::CXXRecordDecl *recordDecl) {
   // In the future, this should probably be configurable via a Clang attribute.
   return recordDecl->isInStdNamespace() && recordDecl->getIdentifier() &&
          recordDecl->getName() == "function";
@@ -7786,11 +7774,11 @@ bool ClangImporter::Implementation::needsClosureConstructor(
 
 bool ClangImporter::isSwiftFunctionWrapper(
     const clang::RecordDecl *decl) const {
-  return Impl.isSwiftFunctionWrapper(decl);
+  return Implementation::isSwiftFunctionWrapper(decl);
 }
 
 bool ClangImporter::Implementation::isSwiftFunctionWrapper(
-    const clang::RecordDecl *decl) const {
+    const clang::RecordDecl *decl) {
   return decl->getIdentifier() && decl->getName() == "__SwiftFunctionWrapper";
 }
 
@@ -8245,12 +8233,8 @@ static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
       return true;
   }
 
-  for (auto base : decl->bases()) {
-    if (checkType(base.getType()))
-      return true;
-  }
-
-  return false;
+  return llvm::any_of(decl->bases(),
+                      [&](auto base) { return checkType(base.getType()); });
 }
 
 bool importer::isViewType(const clang::CXXRecordDecl *decl) {
@@ -8585,12 +8569,8 @@ static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
       return true;
   }
 
-  for (auto base : decl->bases()) {
-    if (checkType(base.getType()))
-      return true;
-  }
-
-  return false;
+  return llvm::any_of(decl->bases(),
+                      [&](auto base) { return checkType(base.getType()); });
 }
 
 bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
@@ -8778,9 +8758,9 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
       if (pointeeType->isFunctionType())
         return false; // Function pointers are not unsafe
       auto *recordDecl = pointeeType->getAsRecordDecl();
-      if (recordDecl && hasImportAsRefAttr(recordDecl))
-        return false; // Pointers are ok if imported as foreign reference types
-      return true; // All other pointers are considered unsafe.
+      // Pointers are ok if imported as foreign reference types,
+      // all other pointers are considered unsafe.
+      return !(recordDecl && hasImportAsRefAttr(recordDecl));
     }
     if (auto *decl = type->getAsTagDecl()) {
       // We need to check the safety of the TagDecl corresponding to this type
@@ -9037,15 +9017,13 @@ bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
     return true;
   // In libc++ versions 17-19 the module is split into multiple top-level
   // modules (std_vector, std_utility, etc).
-  if (IsSystem && moduleName.starts_with("std_")) {
-    if (moduleName == "std_errno_h")
-      return false;
-    return true;
-  }
+  if (IsSystem && moduleName.starts_with("std_"))
+    return moduleName != "std_errno_h";
   return false;
 }
 
-ImportPath::Builder ClangImporter::Implementation::getSwiftModulePath(const clang::Module *M) {
+ImportPath::Builder ClangImporter::Implementation::getSwiftModulePath(
+    const clang::Module *M) const {
   ImportPath::Builder builder;
   while (M) {
     if (!M->isSubModule() && M->Name == "std")

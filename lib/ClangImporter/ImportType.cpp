@@ -61,7 +61,7 @@ using namespace importer;
 namespace clang {
 class DynamicRangePointerType;
 class ValueTerminatedType;
-}
+} // namespace clang
 
 /// Given that a type is the result of a special typedef import, was
 /// it originally a CF pointer?
@@ -70,12 +70,13 @@ static bool isImportedCFPointer(clang::QualType clangType, Type type) {
           (type->is<ClassType>() || type->isClassExistentialType()));
 }
 
-bool ClangImporter::Implementation::isOverAligned(const clang::TypeDecl *decl) {
+bool ClangImporter::Implementation::isOverAligned(
+    const clang::TypeDecl *decl) const {
   auto type = getClangASTContext().getTypeDeclType(decl);
   return isOverAligned(type);
 }
 
-bool ClangImporter::Implementation::isOverAligned(clang::QualType type) {
+bool ClangImporter::Implementation::isOverAligned(clang::QualType type) const {
   auto align = getClangASTContext().getTypeAlignInChars(type);
   return align > clang::CharUnits::fromQuantity(MaximumAlignment);
 }
@@ -1997,9 +1998,9 @@ private:
   /// \param members The types to include in the composition.
   /// \return \c true if the composition should include \c AnyObject, \c false
   ///         otherwise.
-  bool getAsComposition(ProtocolCompositionType *ty,
-                        SmallVectorImpl<Type> &members,
-                        InvertibleProtocolSet &inverses) {
+  static bool getAsComposition(ProtocolCompositionType *ty,
+                               SmallVectorImpl<Type> &members,
+                               InvertibleProtocolSet &inverses) {
     llvm::append_range(members, ty->getMembers());
     inverses.insertAll(ty->getInverses());
     return ty->hasExplicitAnyObject();
@@ -2012,9 +2013,8 @@ private:
   /// \param members The types to include in the composition.
   /// \return \c true if the composition should include \c AnyObject, \c false
   ///         otherwise.
-  bool getAsComposition(TypeBase *ty,
-                        SmallVectorImpl<Type> &members,
-                        InvertibleProtocolSet &inverses) {
+  static bool getAsComposition(TypeBase *ty, SmallVectorImpl<Type> &members,
+                               InvertibleProtocolSet &inverses) {
     members.push_back(ty);
     return false;
   }
@@ -2063,9 +2063,7 @@ private:
 
   /// Visitor action: Ignore this type; do not modify it and do not recurse into
   /// it to find other types to modify.
-  Result pass(Type ty, bool found = false) {
-    return { ty, found };
-  }
+  static Result pass(Type ty, bool found = false) { return {ty, found}; }
 
   // Macros to define visitors based on these actions.
 #define VISIT(CLASS, ACT)  Result visit##CLASS(CLASS *ty) { return ACT(ty); }
@@ -2796,7 +2794,8 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
                              : (isBorrowing ? ParamSpecifier::Borrowing
                                             : ParamSpecifier::Default)));
   paramInfo->setInterfaceType(swiftParamTy);
-  impl->recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
+  ClangImporter::Implementation::recordImplicitUnwrapForDecl(
+      paramInfo, isParamTypeImplicitlyUnwrapped);
 
   // Import the default expression for this parameter if possible.
   // Swift doesn't support default values of inout parameters.

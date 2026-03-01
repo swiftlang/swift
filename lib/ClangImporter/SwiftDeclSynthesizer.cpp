@@ -465,7 +465,7 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
   var->addAttribute(NonisolatedAttr::createImplicit(C));
 
   // Set the function up as the getter.
-  ImporterImpl.makeComputed(var, func, nullptr);
+  ClangImporter::Implementation::makeComputed(var, func, nullptr);
 
   return var;
 }
@@ -642,7 +642,7 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
                                 var->getName(), structDecl);
     param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(var->getInterfaceType());
-    ImporterImpl.recordImplicitUnwrapForDecl(
+    ClangImporter::Implementation::recordImplicitUnwrapForDecl(
         param, var->isImplicitlyUnwrappedOptional());
 
     // Don't allow the parameter to accept temporary pointer conversions.
@@ -791,7 +791,7 @@ VarDecl *SwiftDeclSynthesizer::createSmartPtrBridgingProperty(
   getterDecl->setBodySynthesizer(synthesizeAsReferenceBody, bridgingFunction);
   getterDecl->setSelfAccessKind(SelfAccessKind::NonMutating);
   result->setIsGetterMutating(false);
-  ImporterImpl.makeComputed(result, getterDecl, nullptr);
+  ClangImporter::Implementation::makeComputed(result, getterDecl, nullptr);
   return result;
 }
 
@@ -826,7 +826,8 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
   // Create the getter for the computed value variable.
   auto computedVarGetter =
       makeStructRawValueGetter(structDecl, computedVar, storedVar);
-  ImporterImpl.makeComputed(computedVar, computedVarGetter, nullptr);
+  ClangImporter::Implementation::makeComputed(computedVar, computedVarGetter,
+                                              nullptr);
 
   // Create a pattern binding to describe the variable.
   Pattern *computedBindingPattern = createTypedNamedPattern(computedVar);
@@ -853,8 +854,8 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
   structDecl->addMember(computedPatternBinding);
   structDecl->addMember(computedVar);
 
-  ImporterImpl.addSynthesizedTypealias(structDecl, ctx.Id_RawValue,
-                                       bridgedType);
+  ClangImporter::Implementation::addSynthesizedTypealias(
+      structDecl, ctx.Id_RawValue, bridgedType);
   ImporterImpl.RawTypes[structDecl] = bridgedType;
 }
 
@@ -894,8 +895,8 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
 
-  ImporterImpl.addSynthesizedTypealias(structDecl, ctx.Id_RawValue,
-                                       underlyingType);
+  ClangImporter::Implementation::addSynthesizedTypealias(
+      structDecl, ctx.Id_RawValue, underlyingType);
   ImporterImpl.RawTypes[structDecl] = underlyingType;
 }
 
@@ -1027,7 +1028,8 @@ SwiftDeclSynthesizer::makeUnionFieldAccessors(
                                  importedFieldDecl);
   setterDecl->addAttribute(new (C) TransparentAttr(/*implicit*/ true));
 
-  ImporterImpl.makeComputed(importedFieldDecl, getterDecl, setterDecl);
+  ClangImporter::Implementation::makeComputed(importedFieldDecl, getterDecl,
+                                              setterDecl);
   return {getterDecl, setterDecl};
 }
 
@@ -1092,7 +1094,8 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   auto setterDecl = makeFieldSetterDecl(ImporterImpl, importedStructDecl,
                                         importedFieldDecl, cSetterDecl);
 
-  ImporterImpl.makeComputed(importedFieldDecl, getterDecl, setterDecl);
+  ClangImporter::Implementation::makeComputed(importedFieldDecl, getterDecl,
+                                              setterDecl);
 
   // Synthesize the getter body
   {
@@ -1261,7 +1264,8 @@ SwiftDeclSynthesizer::makeIndirectFieldAccessors(
       makeFieldSetterDecl(ImporterImpl, importedStructDecl, importedFieldDecl);
   setterDecl->addAttribute(new (C) TransparentAttr(/*implicit*/ true));
 
-  ImporterImpl.makeComputed(importedFieldDecl, getterDecl, setterDecl);
+  ClangImporter::Implementation::makeComputed(importedFieldDecl, getterDecl,
+                                              setterDecl);
 
   auto containingField = indirectField->chain().front();
   VarDecl *anonymousFieldDecl = nullptr;
@@ -1537,7 +1541,8 @@ void SwiftDeclSynthesizer::makeEnumRawValueGetter(EnumDecl *enumDecl,
 
   getterDecl->copyFormalAccessFrom(enumDecl);
   getterDecl->setBodySynthesizer(synthesizeEnumRawValueGetterBody, enumDecl);
-  ImporterImpl.makeComputed(rawValueDecl, getterDecl, nullptr);
+  ClangImporter::Implementation::makeComputed(rawValueDecl, getterDecl,
+                                              nullptr);
 }
 
 // MARK: Struct RawValue getters
@@ -1943,10 +1948,11 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
     }
   }
 
-  ImporterImpl.makeComputed(subscript, getterDecl, setterDecl);
+  ClangImporter::Implementation::makeComputed(subscript, getterDecl,
+                                              setterDecl);
 
   // Implicitly unwrap Optional types for T *operator[].
-  ImporterImpl.recordImplicitUnwrapForDecl(
+  ClangImporter::Implementation::recordImplicitUnwrapForDecl(
       subscript, getterImpl->isImplicitlyUnwrappedOptional());
 
   return subscript;
@@ -2050,7 +2056,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
     }
   }
 
-  ImporterImpl.makeComputed(result, getterDecl, setterDecl);
+  ClangImporter::Implementation::makeComputed(result, getterDecl, setterDecl);
   return result;
 }
 
@@ -2683,7 +2689,7 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
     }
   }
 
-  ImporterImpl.makeComputed(result, getterDecl, setterDecl);
+  ClangImporter::Implementation::makeComputed(result, getterDecl, setterDecl);
 
   return result;
 }
@@ -2770,7 +2776,7 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
   std::string s;
   llvm::raw_string_ostream os(s);
   os << "__defaultArg_" << param->getFunctionScopeIndex() << "_";
-  ImporterImpl.getItaniumMangledName(clangFunc, os);
+  ClangImporter::Implementation::getItaniumMangledName(clangFunc, os);
 
   // Synthesize `func __defaultArg_XYZ() -> ParamTy { ... }`.
   DeclName funcName(ctx, DeclBaseName(ctx.getIdentifier(s)),
@@ -3397,12 +3403,8 @@ static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
       return false;
   }
 
-  for (auto base : decl->bases()) {
-    if (!checkType(base.getType()))
-      return false;
-  }
-
-  return true;
+  return llvm::none_of(decl->bases(),
+                       [&](auto base) { return checkType(base.getType()); });
 }
 
 /// Find an explicitly-provided "destroy" operation specified for the

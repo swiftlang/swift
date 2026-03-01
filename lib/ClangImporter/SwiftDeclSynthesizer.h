@@ -343,7 +343,7 @@ public:
 
   /// Synthesizes a constructor for a functional type imported from C++, which
   /// takes a Swift closure as a single parameter.
-  ConstructorDecl *makeClosureConstructor(NominalTypeDecl *decl);
+  static ConstructorDecl *makeClosureConstructor(NominalTypeDecl *decl);
 
   /// Synthesize a static factory method for a C++ foreign reference type,
   /// returning a `CXXMethodDecl*` or `nullptr` if the required constructor or

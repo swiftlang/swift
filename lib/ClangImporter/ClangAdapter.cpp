@@ -24,6 +24,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using namespace importer;
@@ -640,11 +641,9 @@ static bool isAccessibilityConformingContext(const clang::DeclContext *ctx) {
   else
     return false;
 
-  for (auto pi : *protocols) {
-    if (pi->getName() == "NSAccessibility")
-      return true;
-  }
-  return false;
+  return llvm::any_of(*protocols, [](clang::ObjCProtocolDecl *p) {
+    return p->getName() == "NSAccessibility";
+  });
 }
 
 bool
