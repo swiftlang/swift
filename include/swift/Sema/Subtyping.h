@@ -168,6 +168,61 @@ ConflictReason canPossiblyConvertTo(
     Type lhs, Type rhs,
     GenericSignature sig);
 
+/// Computes the join between two types.
+///
+/// The join of two types X and Y is the type T with the property
+/// that:
+/// 1) X conv T
+/// 2) Y conv T
+/// 3) for any other U such that X conv U, Y conv U, we have T conv U.
+///
+/// For example, given a simple class hierarchy as follows:
+///
+/// \code
+/// class A { }
+/// class B: A { }
+/// class C: A { }
+/// class D { }
+/// \endcode
+///
+/// The join of B and C is A, the join of A and B is A.
+///
+/// \param existentialUpperBound If set, the upper bound was not
+/// precise, and contains at least one occurrence of the Any type
+/// to represent some unknown existential upper bound. Note that
+/// even if the original types were noncopyable, the result of
+/// Any is used for now. The type should not be used if
+/// existentialUpperBound is true, because the real supertype
+/// might actually be a more constrained existential than Any.
+
+/// \returns the join of the two types.
+Type subtypeJoin(Type lhs, Type rhs, bool *existentialUpperBound);
+
+/// Computes the meet between two types.
+///
+/// The meet of two types X and Y is the type T with the property
+/// that:
+/// 1) T conv X
+/// 2) T conv Y
+/// 3) for any other U such that U conv U, U conv Y, we have U conv T.
+///
+/// For example, given a simple class hierarchy as follows:
+///
+/// \code
+/// class A { }
+/// class B: A { }
+/// class C: A { }
+/// \endcode
+///
+/// The meet of A and B is B, and the meet of B and C is uninhabited.
+///
+/// \param uninhabited If set, the two types have no subtypes in
+/// common. The resulting type will contain occurrences of the Never
+/// type in failed positions.
+
+/// \returns the meet of the two types.
+Type subtypeMeet(Type lhs, Type rhs, bool *uninhabited);
+
 }  // end namespace constraints
 
 }  // end namespace swift

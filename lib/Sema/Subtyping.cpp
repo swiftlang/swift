@@ -856,6 +856,479 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
   return std::nullopt;
 }
 
+namespace {
+enum class Operation { Join, Meet };
+}
+
+static void decomposeConstraintType(Type t,
+                                    llvm::SmallSetVector<ProtocolDecl *, 4> &protos,
+                                    Type &superclass, bool &anyObject,
+                                    InvertibleProtocolSet &invertible) {
+  if (auto *protoTy = t->getAs<ProtocolType>()) {
+    protos.insert(protoTy->getDecl());
+  } else if (auto *paramTy = t->getAs<ParameterizedProtocolType>()) {
+    // FIXME: Do something smart with the generic arguments here.
+    protos.insert(paramTy->getBaseType()->getDecl());
+  } else if (auto *compositionTy = t->getAs<ProtocolCompositionType>()) {
+    for (auto memberTy : compositionTy->getMembers()) {
+      decomposeConstraintType(memberTy, protos, superclass,
+                              anyObject, invertible);
+    }
+
+    anyObject |= compositionTy->hasExplicitAnyObject();
+    invertible |= compositionTy->getInverses();
+  } else if (t->getClassOrBoundGenericClass()) {
+    superclass = t;
+  } else {
+    ABORT([&](auto &out) {
+      out << "Unknown constraint type:\n";
+      t->dump(out);
+    });
+  }
+}
+
+static Type existentialConstraintJoinMeetImpl(
+    Operation op, Type lhs, Type rhs) {
+  auto &ctx = lhs->getASTContext();
+
+  llvm::SmallSetVector<ProtocolDecl *, 4> lhsProtos;
+  Type lhsSuperclass;
+  bool lhsAnyObject = false;
+  InvertibleProtocolSet lhsInverses;
+  decomposeConstraintType(lhs, lhsProtos, lhsSuperclass, lhsAnyObject, lhsInverses);
+
+  llvm::SmallSetVector<ProtocolDecl *, 4> rhsProtos;
+  Type rhsSuperclass;
+  bool rhsAnyObject = false;
+  InvertibleProtocolSet rhsInverses;
+  decomposeConstraintType(rhs, rhsProtos, rhsSuperclass, rhsAnyObject, rhsInverses);
+
+  SmallVector<Type, 4> members;
+  Type superclass;
+  bool anyObject = false;
+  InvertibleProtocolSet inverses = lhsInverses;
+  if (op == Operation::Join) {
+    // Intersect all inherited protocols.
+    for (unsigned i = 0, e = lhsProtos.size(); i < e; ++i) {
+      for (auto *inherited : lhsProtos[i]->getAllInheritedProtocols()) {
+        lhsProtos.insert(inherited);
+      }
+    }
+
+    for (unsigned i = 0, e = rhsProtos.size(); i < e; ++i) {
+      for (auto *inherited : rhsProtos[i]->getAllInheritedProtocols()) {
+        rhsProtos.insert(inherited);
+      }
+    }
+
+    for (auto *proto : lhsProtos) {
+      if (proto->getInvertibleProtocolKind())
+        continue;
+      if (rhsProtos.count(proto))
+        members.push_back(proto->getDeclaredInterfaceType());
+    }
+
+    // Join the superclass bound.
+    if (lhsSuperclass && rhsSuperclass) {
+      bool existentialUpperBound = false;
+      superclass = subtypeJoin(lhsSuperclass, rhsSuperclass,
+                               &existentialUpperBound);
+
+      if (existentialUpperBound)
+        superclass = Type();
+    } else {
+      // Drop the superclass bound.
+    }
+
+    anyObject = lhsAnyObject && rhsAnyObject;
+    inverses.insertAll(rhsInverses);
+  } else {
+    // Take the union of all protocols.
+    for (auto *proto : lhsProtos) {
+      if (proto->getInvertibleProtocolKind())
+        continue;
+      members.push_back(proto->getDeclaredInterfaceType());
+    }
+    for (auto *proto : rhsProtos) {
+      if (proto->getInvertibleProtocolKind())
+        continue;
+      if (lhsProtos.count(proto) == 0)
+        members.push_back(proto->getDeclaredInterfaceType());
+    }
+
+    // Compute the meet of the superclass bound.
+    if (lhsSuperclass && rhsSuperclass) {
+      bool uninhabited = false;
+      superclass = subtypeMeet(lhsSuperclass, rhsSuperclass,
+                               &uninhabited);
+      if (uninhabited)
+        return Type();
+    } else if (lhsSuperclass) {
+      superclass = lhsSuperclass;
+    } else {
+      superclass = rhsSuperclass;
+    }
+
+    anyObject = lhsAnyObject || rhsAnyObject;
+    inverses.intersect(rhsInverses);
+
+    // FIXME: Check for conflicts
+  }
+
+  if (superclass)
+    members.push_back(superclass);
+
+  if (members.empty() && inverses.empty() && !anyObject)
+    return Type();
+
+  return ProtocolCompositionType::get(ctx, members, inverses, anyObject);
+}
+
+static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
+                                bool *failed) {
+  if (lhs->isEqual(rhs))
+    return lhs;
+
+  auto fail = [&]() -> Type {
+    *failed = true;
+    auto &ctx = lhs->getASTContext();
+    if (op == Operation::Join)
+      return ctx.getAnyExistentialType();
+    return ctx.getNeverType();
+  };
+
+  auto rec = [&](Type lhs, Type rhs) -> Type {
+    return subtypeJoinMeetImpl(op, lhs, rhs, failed);
+  };
+
+  auto lhsKind = getConversionBehavior(lhs);
+  auto rhsKind = getConversionBehavior(rhs);
+
+  if (lhsKind == ConversionBehavior::Unknown ||
+      rhsKind == ConversionBehavior::Unknown)
+    return fail();
+
+  if (lhsKind == rhsKind) {
+    switch (lhsKind) {
+    case ConversionBehavior::String:
+    case ConversionBehavior::AnyHashable:
+      ASSERT(false && "Already handled above");
+      break;
+
+    case ConversionBehavior::None:
+    case ConversionBehavior::LValue:
+    case ConversionBehavior::InOut:
+      // These are either singleton types, or they're invariant.
+      //
+      // FIXME: Handle type variables here.
+      return fail();
+
+    case ConversionBehavior::Class: {
+      // FIXME: CF toll-free bridging
+
+      if (op == Operation::Join) {
+        // Try to find a common superclass.
+        SmallVector<Type, 2> lhsSuper;
+
+        auto lhsClass = lhs;
+        while (lhsClass) {
+          lhsSuper.push_back(lhsClass);
+          lhsClass = lhsClass->getSuperclass();
+        }
+
+        SmallVector<Type, 2> rhsSuper;
+        auto rhsClass = rhs;
+        while (rhsClass) {
+          rhsSuper.push_back(rhsClass);
+          rhsClass = rhsClass->getSuperclass();
+        }
+
+        std::reverse(lhsSuper.begin(), lhsSuper.end());
+        std::reverse(rhsSuper.begin(), rhsSuper.end());
+
+        unsigned i = std::min(lhsSuper.size(), rhsSuper.size());
+        while (i > 0) {
+          --i;
+          if (lhsSuper[i]->isEqual(rhsSuper[i]))
+            return lhsSuper[i];
+        }
+      } else {
+        // Check if one is a subclass of the other.
+        if (isSubclassOf(lhs, rhs))
+          return lhs;
+        else if (isSubclassOf(rhs, lhs))
+          return rhs;
+      }
+
+      return fail();
+    }
+
+    case ConversionBehavior::Array: {
+      auto result = rec(lhs->getArrayElementType(),
+                        rhs->getArrayElementType());
+      return ArraySliceType::get(result);
+    }
+
+    case ConversionBehavior::Dictionary: {
+      auto lhsPair = ConstraintSystem::isDictionaryType(lhs);
+      auto rhsPair = ConstraintSystem::isDictionaryType(rhs);
+
+      auto keyResult = rec(lhsPair->first, rhsPair->first);
+      auto valueResult = rec(lhsPair->second, rhsPair->second);
+
+      return DictionaryType::get(keyResult, valueResult);
+    }
+
+    case ConversionBehavior::Set: {
+      auto lhsElt = *ConstraintSystem::isSetType(lhs);
+      auto rhsElt = *ConstraintSystem::isSetType(rhs);
+
+      auto result = rec(lhsElt, rhsElt);
+
+      auto &ctx = lhs->getASTContext();
+      return BoundGenericType::get(ctx.getSetDecl(), Type(), result);
+    }
+
+    case ConversionBehavior::Double:
+      // Double join CGFloat = Double meet CGFloat = Double.
+      if (lhs->isDouble())
+        return lhs;
+      ASSERT(lhs->isCGFloat() && rhs->isDouble());
+      return rhs;
+
+    case ConversionBehavior::Pointer:
+      // FIXME
+      return fail();
+
+    case ConversionBehavior::Optional: {
+      auto result = rec(lhs->getOptionalObjectType(),
+                        rhs->getOptionalObjectType());
+      return OptionalType::get(result);
+    }
+
+    case ConversionBehavior::Function: {
+      auto *lhsFunc = lhs->castTo<FunctionType>();
+      auto *rhsFunc = rhs->castTo<FunctionType>();
+
+      auto result = rec(lhsFunc->getResult(), rhsFunc->getResult());
+
+      SmallVector<AnyFunctionType::Param, 4> params;
+
+      // Note: getConversionBehavior() guarantees the function types don't
+      // contain any parameter packs, so we may assume their lengths are
+      // known.
+      if (lhsFunc->getNumParams() != rhsFunc->getNumParams())
+        return fail();
+
+      for (unsigned i : indices(lhsFunc->getParams())) {
+        auto lhsParam = lhsFunc->getParams()[i];
+        auto rhsParam = rhsFunc->getParams()[i];
+
+        if (lhsParam.getParameterFlags() != rhsParam.getParameterFlags())
+          return fail();
+
+        Type paramType;
+        if (lhsParam.isInOut() || lhsParam.isVariadic()) {
+          ASSERT(rhsParam.isInOut());
+          auto result = isLikelyExactMatch(lhsParam.getPlainType(),
+                                           rhsParam.getPlainType());
+          if (!result)
+            return fail();
+          if (!*result)
+            return fail();
+
+          paramType = lhsParam.getPlainType();
+        } else if (op == Operation::Join) {
+          bool uninhabited = false;
+          paramType = subtypeMeet(lhsParam.getPlainType(),
+                                  rhsParam.getPlainType(),
+                                  &uninhabited);
+          if (uninhabited)
+            return fail();
+        } else {
+          bool existentialUpperBound = false;
+          paramType = subtypeJoin(lhsParam.getPlainType(),
+                                  rhsParam.getPlainType(),
+                                  &existentialUpperBound);
+          if (existentialUpperBound)
+            return fail();
+        }
+
+        params.push_back(lhsParam.withType(paramType));
+      }
+
+      // FIXME: What about the rest of ExtInfo?
+      auto extInfo = lhsFunc->getExtInfo();
+
+      // An escaping function type can be converted into a noescape
+      // function type but not vice versa, so the join is noescape
+      // in this case.
+      if (lhsFunc->isNoEscape() || rhsFunc->isNoEscape())
+        extInfo = extInfo.intoBuilder().withNoEscape().build();
+
+      return FunctionType::get(params, result, extInfo);
+    }
+
+    case ConversionBehavior::Metatype: {
+      // FIXME: Inaccurate, because not all conversions are allowed in
+      // instance type position.
+      auto result = rec(lhs->getMetatypeInstanceType(),
+                        rhs->getMetatypeInstanceType());
+      if (auto *existentialTy = result->getAs<ExistentialType>())
+        return ExistentialMetatypeType::get(existentialTy->getConstraintType());
+      return MetatypeType::get(result);
+    }
+
+    case ConversionBehavior::Tuple: {
+      auto *lhsTuple = lhs->castTo<TupleType>();
+      auto *rhsTuple = rhs->castTo<TupleType>();
+
+      // Note: getConversionBehavior() guarantees the tuples don't contain
+      // any parameter packs, so we may assume their lengths are known.
+      if (lhsTuple->getNumElements() != rhsTuple->getNumElements())
+        return fail();
+
+      bool lhsLabels = llvm::any_of(lhsTuple->getElements(),
+                                    [&](TupleTypeElt elt) -> bool {
+                                      return elt.hasName();
+                                    });
+
+      SmallVector<TupleTypeElt, 2> elts;
+      for (unsigned i : indices(lhsTuple->getElements())) {
+        auto &lhsElt = lhsTuple->getElement(i);
+        auto &rhsElt = rhsTuple->getElement(i);
+        auto result = rec(lhsElt.getType(), rhsElt.getType());
+        if (lhsLabels)
+          elts.emplace_back(result, lhsElt.getName());
+        else
+          elts.emplace_back(result, rhsElt.getName());
+      }
+
+      return TupleType::get(elts, lhs->getASTContext());
+    }
+
+    case ConversionBehavior::Existential: {
+      Type lhsConstraint = lhs->castTo<ExistentialType>()->getConstraintType();
+      Type rhsConstraint = rhs->castTo<ExistentialType>()->getConstraintType();
+      auto result = existentialConstraintJoinMeetImpl(
+          op, lhsConstraint, rhsConstraint);
+      if (!result)
+        return fail();
+      if (result->getClassOrBoundGenericClass())
+        return result;
+      ASSERT(!result->is<ExistentialType>());
+      return ExistentialType::get(result);
+    }
+
+    case ConversionBehavior::ExistentialMetatype: {
+      Type lhsConstraint = lhs->castTo<ExistentialMetatypeType>()->getInstanceType();
+      Type rhsConstraint = rhs->castTo<ExistentialMetatypeType>()->getInstanceType();
+      auto result = existentialConstraintJoinMeetImpl(
+          op, lhsConstraint, rhsConstraint);
+      if (!result)
+        return fail();
+      if (result->getClassOrBoundGenericClass())
+        return MetatypeType::get(result);
+      ASSERT(!result->is<ExistentialType>());
+      return ExistentialMetatypeType::get(result);
+    }
+
+    case ConversionBehavior::Unknown:
+      ASSERT(false && "Handled above");
+    }
+  }
+
+  // The join and meet operations are symmetric.
+  auto either = [&](ConversionBehavior kind) {
+    if (rhsKind == kind) {
+      std::swap(lhs, rhs);
+      std::swap(lhsKind, rhsKind);
+      return true;
+    } else if (lhsKind == kind) {
+      return true;
+    } else {
+      return false;
+    }
+  };
+
+  if (either(ConversionBehavior::Optional)) {
+    // Optional<T> join U = Optional<T join U>
+    // Optional<T> meet U = T meet U
+    auto joined = rec(lhs->getOptionalObjectType(), rhs);
+    if (op == Operation::Join)
+      return OptionalType::get(joined);
+    return joined;
+  }
+
+  if (either(ConversionBehavior::AnyHashable)) {
+    // If T conforms to Hashable:
+    //
+    // AnyHashable join T = AnyHashable
+    // AnyHashable meet T = T
+    auto &ctx = lhs->getASTContext();
+    auto *hashableProto = ctx.getProtocol(KnownProtocolKind::Hashable);
+    if (!hashableProto)
+      return fail();
+    if (!lookupConformance(rhs, hashableProto))
+      return fail();
+    if (op == Operation::Join)
+      return lhs;
+    return rhs;
+  }
+
+  if (either(ConversionBehavior::Existential)) {
+    if (op == Operation::Join) {
+      // Incomplete implementation.
+      //
+      // FIXME: Delete requirements concrete type doesn't satisfy, and form new
+      // existential.
+      if (isSubtypeOfExistentialType(rhs, lhs))
+        return lhs;
+
+      if (auto superclassTy = lhs->getSuperclass())
+        return rec(superclassTy, rhs);
+    } else {
+      if (isSubtypeOfExistentialType(rhs, lhs))
+        return rhs;
+    }
+  }
+
+  if (either(ConversionBehavior::ExistentialMetatype)) {
+    auto lhsInstance = lhs->getMetatypeInstanceType();
+    auto rhsInstance = rhs->getMetatypeInstanceType();
+
+    if (op == Operation::Join) {
+      // Incomplete implementation.
+      //
+      // FIXME: Delete requirements concrete type doesn't satisfy, and form new
+      // existential.
+      if (isSubtypeOfExistentialType(rhsInstance, lhsInstance))
+        return lhs;
+
+      if (auto superclassTy = lhsInstance->getSuperclass()) {
+        return rec(MetatypeType::get(superclassTy), rhs);
+      }
+    } else {
+      if (isSubtypeOfExistentialType(rhsInstance, lhsInstance))
+        return rhs;
+    }
+  }
+
+  return fail();
+}
+
+Type swift::constraints::subtypeJoin(Type lhs, Type rhs,
+                                     bool *existentialUpperBound) {
+  return subtypeJoinMeetImpl(Operation::Join, lhs, rhs,
+                             existentialUpperBound);
+}
+
+Type swift::constraints::subtypeMeet(Type lhs, Type rhs,
+                                     bool *uninhabited) {
+  return subtypeJoinMeetImpl(Operation::Meet, lhs, rhs,
+                             uninhabited);
+}
+
 void swift::constraints::simple_display(llvm::raw_ostream &out,
                                         ConflictReason reason) {
   if (!reason)
