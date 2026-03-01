@@ -6972,7 +6972,7 @@ static ClosureExpr *buildClosureElementConversion(
 
   auto closureParam = AnyFunctionType::Param(srcType);
   auto extInfo =
-      FunctionType::ExtInfo().withNoEscape().withSendable().withoutIsolation();
+      FunctionType::ExtInfo().withNoEscape().withSendable(false).withoutIsolation();
   auto *fnTy = FunctionType::get(ArrayRef(closureParam), destType, extInfo);
   closure->setType(fnTy);
 
