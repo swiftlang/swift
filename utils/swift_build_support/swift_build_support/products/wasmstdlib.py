@@ -219,6 +219,8 @@ class WasmStdlib(cmake_product.CMakeProduct):
 
     def add_extra_cmake_options(self):
         self.cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
+        self.cmake_options.define('SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS:STRING',
+                                  '-Xfrontend;-internalize-at-link;')
 
     def test(self, host_target):
         self._test(host_target, 'wasm32-wasip1')
@@ -306,6 +308,7 @@ class WasmThreadsStdlib(WasmStdlib):
                                   '-mthread-model;posix;-pthread;'
                                   '-ftls-model=local-exec')
         self.cmake_options.define('SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS:STRING',
+                                  '-Xfrontend;-internalize-at-link;'
                                   '-Xcc;-matomics;-Xcc;-mbulk-memory;'
                                   '-Xcc;-mthread-model;-Xcc;posix;'
                                   '-Xcc;-pthread;-Xcc;-ftls-model=local-exec')
