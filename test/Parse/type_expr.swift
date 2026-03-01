@@ -356,7 +356,11 @@ func testInvalidArrowWithClosure() {
 func compositionType() {
   _ = P1 & P2 // expected-error {{expected member name or initializer call after type name}} expected-note{{use '.self'}} {{7-7=(}} {{14-14=).self}}
   _ = any P1 & P1 // expected-error {{expected member name or initializer call after type name}} expected-note{{use '.self'}} {{7-7=(}} {{18-18=).self}}
-  _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type '(any P1).Type' and '(any P2).Type'}}
+  _ = P1 & P2.self
+  // expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
+  // expected-note@-2 {{required by referencing operator function '&' on 'BinaryInteger' where 'Self' = '(any P1).Type'}}
+  // expected-error@-3 {{cannot convert value of type '(any P2).Type' to expected argument type '(any P1).Type'}}
+  // expected-error@-4 {{type '(any P1).Type' cannot conform to 'BinaryInteger'}}
   _ = (P1 & P2).self // Ok.
   _ = (P1 & (P2)).self // Ok.
   _ = (P1 & (P2, P3)).self // expected-error {{non-protocol, non-class type '(any P2, any P3)' cannot be used within a protocol-constrained type}}

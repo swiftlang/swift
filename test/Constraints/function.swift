@@ -176,7 +176,7 @@ func returnsTakesEscapingFn() -> (@escaping () -> Int) -> Void { takesEscapingFn
 prefix operator ^^^
 prefix func ^^^(_ x: Int) -> (@escaping () -> Int) -> Void { takesEscapingFn }
 
-func testWeirdFnExprs<T>(_ fn: () -> Int, _ cond: Bool, _ any: Any, genericArg: T) { // expected-note 12{{parameter 'fn' is implicitly non-escaping}}
+func testWeirdFnExprs<T>(_ fn: () -> Int, _ cond: Bool, _ any: Any, genericArg: T) { // expected-note 11{{parameter 'fn' is implicitly non-escaping}}
   (any as! (@escaping () -> Int) -> Void)(fn)
   // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
 
@@ -209,7 +209,7 @@ func testWeirdFnExprs<T>(_ fn: () -> Int, _ cond: Bool, _ any: Any, genericArg: 
   }
 
   _ = { x in (x({ 0 }), x(fn)) }(takesGeneric)
-  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
+  // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
 
   _ = { (a: (@escaping () -> Int), b) in () }(fn, genericArg)
   // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}

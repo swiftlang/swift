@@ -1250,37 +1250,32 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
       return true;
     }
 
-    // If this is a non-defaulted supertype binding,
-    // check whether we can combine it with another
-    // supertype binding by computing the 'join' of the types.
-    if (binding.isViableForJoin()) {
-      if (existing.isViableForJoin()) {
-        auto isAcceptableJoin = [](Type type) {
-          return !type->isAny() && (!type->getOptionalObjectType() ||
-                                    !type->getOptionalObjectType()->isAny());
-        };
+    // Compute the join of non-defaulted supertype bindings without
+    // type variables.
+    if (binding.isViableForJoin() &&
+        existing.isViableForJoin()) {
+      bool existentialUpperBound = false;
+      auto joinType =
+          subtypeJoin(existing.BindingType, binding.BindingType,
+                      &existentialUpperBound);
 
-        auto joinType =
-            Type::join(existing.BindingType, binding.BindingType);
+      if (!existentialUpperBound) {
+        // Result of the join has to use new binding because it refers
+        // to the constraint that triggered the join that replaced the
+        // existing binding.
+        //
+        // For "join" to be transitive, both bindings have to be as
+        // well, otherwise we consider it a refinement of a direct
+        // binding.
+        auto *originator =
+            binding.isTransitive() && existing.isTransitive()
+                ? binding.Originator
+                : nullptr;
 
-        if (joinType && isAcceptableJoin(*joinType)) {
-          // Result of the join has to use new binding because it refers
-          // to the constraint that triggered the join that replaced the
-          // existing binding.
-          //
-          // For "join" to be transitive, both bindings have to be as
-          // well, otherwise we consider it a refinement of a direct
-          // binding.
-          auto *originator =
-              binding.isTransitive() && existing.isTransitive()
-                  ? binding.Originator
-                  : nullptr;
-
-          binding = PotentialBinding(*joinType, binding.Kind,
-                                     binding.BindingSource,
-                                     originator);
-          return true;
-        }
+        binding = PotentialBinding(joinType, binding.Kind,
+                                   binding.BindingSource,
+                                   originator);
+        return true;
       }
     }
   }
