@@ -41,10 +41,10 @@ struct Struct {
 
 extension Klass {
   var i: Int {
-    borrow { // expected-error{{a 'borrow' accessor is supported only on a struct}}
+    borrow { // expected-error{{a 'borrow' accessor is unsupported here}}
       return 0
     }
-    mutate { // expected-error{{a 'mutate' accessor is supported only on a struct}}
+    mutate { // expected-error{{a 'mutate' accessor is unsupported here}}
       return &_i
     }
   }
@@ -61,26 +61,24 @@ extension Struct {
   }
 }
 
+let global_klass = Klass()
+
+enum E {
+
+}
+
+extension E {
+  var global_k: Klass {
+    borrow {
+      return global_klass
+    }
+  }
+}
+
 protocol P {
   var name: String { borrow }
   var phone: String { borrow mutate }
   var address: String { mutate } // expected-error{{variable with a 'mutate' accessor must also have a 'borrow' accessor}}
-}
-
-enum OrderStatus: ~Copyable {
-  case processing(trackingNumber: String)
-  case cancelled(reason: String)
-  
-  var description: String {
-    borrow { // expected-error{{a 'borrow' accessor is supported only on a struct}}
-      switch self {
-        case .processing(let trackingNumber):
-          return trackingNumber
-        case .cancelled(let reason):
-          return reason
-      }
-    }
-  }
 }
 
 public protocol Q {

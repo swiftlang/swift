@@ -1022,3 +1022,38 @@ public struct SafeContainer<Element: ~Copyable >: ~Copyable {
   }
 }
 
+public enum E<T> {
+  case none
+  case some(T)
+
+  var global_int_prop: Int {
+    borrow {
+      return global_int
+    }
+  }
+
+  var global_k1: Klass {
+    borrow {
+      return global_klass
+    }
+  }
+
+  var global_k2: Klass {
+    borrow {
+      return global_wrapper._k
+    }
+  }
+
+  var global_k3: Klass {
+    borrow {
+      return global_wrapper.k
+    }
+  }
+
+  var global_k4: AnyObject {
+    borrow {
+      return global_generic
+    }
+  }
+}
+
