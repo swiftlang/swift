@@ -1551,6 +1551,30 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
     break;
   }
   case AllowedBindingKind::Supertypes: {
+    // If we have 'any C & P conv $T0' and '$T0 conforms Q', and C conforms to Q,
+    // we can relax our binding type from `any C & P` to `C`.
+    SmallVector<Type, 2> optionals;
+    auto unwrappedType = binding.BindingType
+        ->lookThroughAllOptionalTypes(optionals);
+    if (unwrappedType->is<ExistentialType>()) {
+      auto layout = unwrappedType->getExistentialLayout();
+      if (layout.containsNonMarkerProtocols()) {
+        if (auto superclassTy = layout.explicitSuperclass) {
+          bool condition = llvm::any_of(Protocols,
+              [&](ProtocolDecl *proto) {
+            return (!proto->existentialConformsToSelf() &&
+                    CS.lookupConformance(superclassTy, proto));
+          });
+
+          if (condition) {
+            for (unsigned i = 0; i < optionals.size(); ++i)
+              superclassTy = OptionalType::get(superclassTy);
+            binding.BindingType = superclassTy;
+          }
+        }
+      }
+    }
+
     // If we have X conv $T0, $T0 conforms P, we can check if X itself
     // or any of its proper supertypes conform to P, by performing the
     // supertype transitive conformance check. If the answer is negative,
