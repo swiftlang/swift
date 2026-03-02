@@ -58,7 +58,7 @@
 // --       metadata positive size in words (not used):
 // CHECK-SAME:   i32 0,
 // --       num immediate members:
-// CHECK-SAME:   i32 4,
+// CHECK-SAME:   i32 5,
 // --       num fields:
 // CHECK-SAME:   i32 1,
 // --       field offset vector offset:

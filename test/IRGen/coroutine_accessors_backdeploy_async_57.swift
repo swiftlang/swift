@@ -118,7 +118,7 @@ public var i: Int {
 // CHECK:         [[FRAME:%[^,]+]] = call swiftcc ptr @swift_task_alloc([[INT]] [[SIZE]])
 // CHECK:         call void @llvm.lifetime.start.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s7backdep1SV1iSivx")
-// CHECK:         [[RETVAL:%[^,]+]] = call swiftcc { ptr, ptr } [[RAMP]](
+// CHECK:         [[RETVAL:%[^,]+]] = call swift{{(coro)?}}cc { ptr, ptr } [[RAMP]](
 // CHECK-SAME:         [[FRAME]]
 // CHECK-SAME:         _swift_coro_async_allocator
 // CHECK-SAME:         %1
@@ -128,7 +128,7 @@ public var i: Int {
 
 //                increment_async([[YIELD]])
 
-// CHECK:         call swiftcc void [[CONTINUATION]](
+// CHECK:         call swift{{(coro)?}}cc void [[CONTINUATION]](
 // CHECK-SAME:        [[FRAME]],
 // CHECK-SAME:        _swift_coro_async_allocator
 // CHECK-SAME:    )
