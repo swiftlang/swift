@@ -334,15 +334,19 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
             return std::make_shared<EnumValue>(baseIdentifierName, parameters);
           }
 
-          case DeclKind::Func: {
-            auto identifier = declRefExpr->getDecl()
-                                  ->getName()
-                                  .getBaseIdentifier()
-                                  .str()
-                                  .str();
+            case DeclKind::Func: {
+              auto identifier = declRefExpr->getDecl()
+                                    ->getName()
+                                    .getBaseIdentifier()
+                                    .str()
+                                    .str();
 
-            return std::make_shared<StaticFunctionCallValue>(
-                identifier, callExpr->getType(), parameters);
+              if (auto funcDecl = dyn_cast<FuncDecl>(declRef.getDecl())) {
+                if (funcDecl->isStatic()) {
+                  return std::make_shared<StaticFunctionCallValue>(identifier, callExpr->getType(), parameters);
+                }
+              }
+              return std::make_shared<MemberFunctionCallValue>(identifier, extractCompileTimeValue(dotSyntaxCallExpr->getBase(), declContext), parameters);
           }
 
           default: {
@@ -920,6 +924,27 @@ void writeValue(llvm::json::OStream &JSON,
       JSON.attribute("memberLabel", staticFunctionCallValue->getLabel());
       JSON.attributeArray("arguments", [&] {
         for (auto FP : staticFunctionCallValue->getParameters()) {
+          JSON.object([&] {
+            JSON.attribute("label", FP.Label);
+            JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
+            writeValue(JSON, FP.Value);
+          });
+        }
+      });
+    });
+    break;
+  }
+
+  case CompileTimeValue::ValueKind::MemberFunctionCall: {
+    auto memberFunctionCallValue = cast<MemberFunctionCallValue>(value);
+    JSON.attribute("valueKind", "MemberFunctionCall");
+    JSON.attributeObject("value", [&]() {
+      JSON.attributeObject("baseValue", [&] {
+        writeValue(JSON, memberFunctionCallValue->getBaseValue());
+      });
+      JSON.attribute("memberLabel", memberFunctionCallValue->getLabel());
+      JSON.attributeArray("arguments", [&] {
+        for (auto FP : memberFunctionCallValue->getParameters()) {
           JSON.object([&] {
             JSON.attribute("label", FP.Label);
             JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
