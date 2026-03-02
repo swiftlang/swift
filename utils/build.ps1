@@ -4245,7 +4245,7 @@ function Run-SmokeTests([Hashtable] $Platform) {
 
   Push-Location $SmokeTestDir
   try {
-    Record-OperationTiming $Platform "SmokeTests-DockerBuild" {
+    Record-OperationTime $Platform "SmokeTests-DockerBuild" {
       Write-Host "Building Docker image with installer"
       docker build `
           --file "$SourceCache\swift-docker\swift-ci\main\windows\smoketest\ltsc2022\Dockerfile" `
@@ -4257,7 +4257,7 @@ function Run-SmokeTests([Hashtable] $Platform) {
       }
     }
 
-    Record-OperationTiming $Platform "SmokeTest-DockerRun" {
+    Record-OperationTime $Platform "SmokeTest-DockerRun" {
       Write-Host "Running smoke test container"
       docker run --rm swift-smoke-test
       if ($LASTEXITCODE -ne 0) {
