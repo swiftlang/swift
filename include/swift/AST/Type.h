@@ -357,33 +357,6 @@ public:
   getStringAsComponent(const PrintOptions &PO = PrintOptions(),
                        NonRecursivePrintOptions OPO = std::nullopt) const;
 
-  /// Computes the join between two types.
-  ///
-  /// The join of two types is the most specific type that is a supertype of
-  /// both \c type1 and \c type2, e.g., the least upper bound in the type
-  /// lattice. For example, given a simple class hierarchy as follows:
-  ///
-  /// \code
-  /// class A { }
-  /// class B : A { }
-  /// class C : A { }
-  /// class D { }
-  /// \endcode
-  ///
-  /// The join of B and C is A, the join of A and B is A.
-  ///
-  /// The Any type is considered the common supertype by default when no
-  /// closer common supertype exists.
-  ///
-  /// In unsupported cases where we cannot yet compute an accurate join,
-  /// we return None.
-  ///
-  /// \returns the join of the two types, if there is a concrete type
-  /// that can express the join, or Any if the only join would be a
-  /// more-general existential type, or None if we cannot yet compute a
-  /// correct join but one better than Any may exist.
-  static std::optional<Type> join(Type first, Type second);
-
   friend llvm::hash_code hash_value(Type T) {
     return llvm::hash_value(T.getPointer());
   }
