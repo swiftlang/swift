@@ -208,7 +208,7 @@ public func deployedUseNoAvailable( // expected-note 5 {{add '@available' attrib
 
 @available(macOS 10.9, *)
 public func deployedUseBeforeInliningTarget(
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing global function}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -238,7 +238,7 @@ public func deployedUseBeforeInliningTarget(
 
 @available(macOS 10.10, *)
 public func deployedUseAtInliningTarget(
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing global function}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -268,7 +268,7 @@ public func deployedUseAtInliningTarget(
 
 @available(macOS 10.14.5, *)
 public func deployedUseBetweenTargets(
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing global function}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -298,7 +298,7 @@ public func deployedUseBetweenTargets(
 
 @available(macOS 10.15, *)
 public func deployedUseAtDeploymentTarget(
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing global function}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -639,7 +639,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
 
 @available(macOS 10.9, *)
 @inlinable public func inlinedUseBeforeInliningTarget(
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing global function}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -677,7 +677,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
 
 @available(macOS 10.10, *)
 @inlinable public func inlinedUseAtInliningTarget(
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing global function}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -715,7 +715,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
 
 @available(macOS 10.14.5, *)
 @inlinable public func inlinedUseBetweenTargets(
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing global function}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -749,7 +749,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
 
 @available(macOS 10.15, *)
 @inlinable public func inlinedUseAtDeploymentTarget(
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing global function}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -897,7 +897,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
 
 @available(macOS 10.15, *)
 @inlinable public var inlinedAtDeploymentTargetGlobal: Any {
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing var}}
   _ = NoAvailable()
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
@@ -1048,7 +1048,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
 @available(macOS 10.10, *)
 @backDeployed(before: macOS 999.0)
 public func backDeployedToInliningTarget(
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing global function}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -1329,7 +1329,7 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
 
   @available(macOS 10.14, *)
   public internal(set) var internalSetter: Void {
-  // expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+  // expected-note@-1 {{update '@available' attribute on enclosing property}}
     @inlinable get {
       // Public inlinable getter acts like @inlinable
       _ = NoAvailable()
@@ -1615,7 +1615,7 @@ extension BetweenTargets { // expected-note 2 {{add '@available' attribute to en
 
 @available(macOS 10.15, *)
 extension BetweenTargets {
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing extension}}
   public func publicFuncInExtensionWithExplicitAvailability( // expected-note {{add '@available' attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
@@ -1630,7 +1630,7 @@ extension BetweenTargets {
 extension BetweenTargets { // expected-note {{add '@available' attribute to enclosing extension}}
   @available(macOS 10.15, *)
   public func publicFuncWithExplicitAvailabilityInExtension(
-  // expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+  // expected-note@-1 {{update '@available' attribute on enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1683,7 +1683,7 @@ extension BetweenTargets {
 
 @available(macOS 10.10, *)
 extension BetweenTargets { // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing extension}}
   public func publicFuncInExcessivelyAvailableExtension() {}
 }
 
@@ -1836,7 +1836,7 @@ public protocol NoAvailableProtoWithAssoc { // expected-note 3 {{add '@available
 
 @available(macOS 10.9, *)
 public protocol BeforeInliningTargetProtoWithAssoc {
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing protocol}}
   associatedtype A: NoAvailableProto
   associatedtype B: BeforeInliningTargetProto
   associatedtype C: AtInliningTargetProto
@@ -1851,7 +1851,7 @@ public protocol BeforeInliningTargetProtoWithAssoc {
 
 @available(macOS 10.10, *)
 public protocol AtInliningTargetProtoWithAssoc {
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing protocol}}
   associatedtype A: NoAvailableProto
   associatedtype B: BeforeInliningTargetProto
   associatedtype C: AtInliningTargetProto
@@ -1866,7 +1866,7 @@ public protocol AtInliningTargetProtoWithAssoc {
 
 @available(macOS 10.14.5, *)
 public protocol BetweenTargetsProtoWithAssoc {
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing protocol}}
   associatedtype A: NoAvailableProto
   associatedtype B: BeforeInliningTargetProto
   associatedtype C: AtInliningTargetProto
@@ -1880,7 +1880,7 @@ public protocol BetweenTargetsProtoWithAssoc {
 
 @available(macOS 10.15, *)
 public protocol AtDeploymentTargetProtoWithAssoc {
-// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
+// expected-note@-1 {{update '@available' attribute on enclosing protocol}}
   associatedtype A: NoAvailableProto
   associatedtype B: BeforeInliningTargetProto
   associatedtype C: AtInliningTargetProto
