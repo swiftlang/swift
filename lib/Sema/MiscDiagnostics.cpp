@@ -6550,8 +6550,7 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
         for (const auto &component : KPE->getComponents()) {
           if (component.hasDeclRef())
-            checkDecl(component.getDeclRef().getDecl(), component.getLoc(),
-                      /*downgradeToWarning=*/true);
+            checkDecl(component.getDeclRef().getDecl(), component.getLoc());
         }
       }
 
