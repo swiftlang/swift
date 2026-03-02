@@ -1009,7 +1009,7 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
       return oldPriority;
     }
 
-    if (oldStatus.isRunning() || oldStatus.isEnqueued()) {
+    if (oldStatus.isRunning()) {
       // Regardless of whether status record is locked or not, update the
       // priority and RO bit on the task status
       newStatus = oldStatus.withEscalatedPriority(newPriority);
@@ -1018,7 +1018,7 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
       SWIFT_TASK_DEBUG_LOG("Escalated a task %p which had completed, do nothing", task);
       return oldStatus.getStoredPriority();
     } else {
-      // Task is suspended.
+      // Task is suspended or enqueued.
       newStatus = oldStatus.withNewPriority(newPriority);
     }
 
@@ -1046,24 +1046,21 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     swift_dispatch_lock_override_start_with_debounce(
         executionLock, newStatus.currentExecutionLockOwner(), (qos_class_t) newPriority);
 #endif
-  } else if (newStatus.isEnqueued()) {
-    //  Task is not running, it's enqueued somewhere waiting to be run
+  } else {
+    //  Task is not running, it's either enqueued waiting to run or suspended
     //
-    // TODO (rokhinip): Add a stealer to escalate the thread request for
-    //  the task. Still mark the task has having been escalated so that the
-    //  thread will self override when it starts draining the task
-    //
-    // TODO (rokhinip): Add a signpost to flag that this is a potential
-    //  priority inversion
-    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is enqueued", task);
-
+    // When tasks are enqueued on any executor, they will have an
+    // EnqueuedOnExecutor TaskDependencyStatusRecord which will have
+    // performEscalationAction called on it below. This will call
+    // swift_executor_escalate which will enqueue a stealer if needed.
+    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which isn't running", task);
   }
 
   if (newStatus.getInnermostRecord() == NULL) {
     return newStatus.getStoredPriority();
   }
 
-  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended from %#x to %#x",
+  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which has status records from %#x to %#x",
                        task, oldPriority, newPriority);
   // We must have at least one record - the task dependency one.
   assert(newStatus.getInnermostRecord() != NULL);

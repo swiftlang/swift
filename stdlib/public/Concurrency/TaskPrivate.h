@@ -458,17 +458,14 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// whether or not it is running.
     IsRunning = 0x800,
 #endif
-    /// Task is intrusively enqueued somewhere - either in the default executor
-    /// pool, or in an actor. Currently, due to lack of task stealers, this bit
-    /// is cleared when a task starts running on a thread, suspends or is
-    /// completed.
+    /// Task is intrusively enqueued somewhere - either
+    /// in the default executor pool, or in an actor.
     ///
-    /// TODO (rokhinip): Once we have task stealers, this bit refers to the
-    /// enqueued-ness on the specific queue that the task is linked into and
-    /// therefore, can only be cleared when the intrusively linkage is cleaned
-    /// up. The enqueued-ness then becomes orthogonal to the other states of
-    /// running/suspended/completed.
-    IsEnqueued = 0x1000,
+    /// This bit refers to the enqueued-ness on the specific queue that
+    /// the task is linked into and therefore, can only be cleared when
+    /// the intrusively linkage is cleaned up. The enqueued-ness is
+    /// orthogonal to the other states of running/suspended/completed.
+    IsIntrusivelyLinked = 0x1000,
     /// Task has been completed.  This is purely used to enable an assertion
     /// that the task is completed when we destroy it.
     IsComplete = 0x2000,
@@ -567,19 +564,19 @@ public:
 #endif
   }
 
-  bool isEnqueued() const { return Flags & IsEnqueued; }
-  ActiveTaskStatus withEnqueued() const {
+  bool isIntrusivelyLinked() const { return Flags & IsIntrusivelyLinked; }
+  ActiveTaskStatus withIntrusivelyLinked() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags | IsEnqueued, ExecutionLock);
+    return ActiveTaskStatus(Record, Flags | IsIntrusivelyLinked, ExecutionLock);
 #else
-    return ActiveTaskStatus(Record, Flags | IsEnqueued);
+    return ActiveTaskStatus(Record, Flags | IsIntrusivelyLinked);
 #endif
   }
-  ActiveTaskStatus withoutEnqueued() const {
+  ActiveTaskStatus withoutIntrusivelyLinked() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags & ~IsEnqueued, ExecutionLock);
+    return ActiveTaskStatus(Record, Flags & ~IsIntrusivelyLinked, ExecutionLock);
 #else
-    return ActiveTaskStatus(Record, Flags & ~IsEnqueued);
+    return ActiveTaskStatus(Record, Flags & ~IsIntrusivelyLinked);
 #endif
   }
 
@@ -705,7 +702,6 @@ public:
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     assert(ExecutionLock == DLOCK_OWNER_NULL);
 #endif
-    assert(!isEnqueued());
     return ActiveTaskStatus(Record,
                             (Flags & ~PriorityMask) | uintptr_t(priority));
   }
@@ -754,8 +750,19 @@ public:
   void traceStatusChanged(AsyncTask *task, bool isStarting, bool wasRunning) {
     concurrency::trace::task_status_changed(
         task, static_cast<uint8_t>(getStoredPriority()), isCancelled(),
-        isStoredPriorityEscalated(), isStarting, isRunning(), isEnqueued(),
+        isStoredPriorityEscalated(), isStarting, isRunning(), isIntrusivelyLinked(),
         wasRunning);
+  }
+
+  static void atomicRemoveIntrusivelyLinked(char *storage) {
+    // To do an atomic AND, we have to use the underlying storage and
+    // cast it. This cast could be done in a simpler way since Flags
+    // should always be at the start and should always be a uint32_t.
+    // But to be more resilient, I get the offsets and types correctly
+    auto *flags = reinterpret_cast<std::atomic<decltype(ActiveTaskStatus::Flags)>*>(storage + offsetof(ActiveTaskStatus, Flags));
+    // Release memory ordering so that other threads can not decide to reuse this
+    // Task's intrusive linkage before all of our earlier uses have completed
+    flags->fetch_and(~IsIntrusivelyLinked, std::memory_order_release);
   }
 };
 
@@ -894,7 +901,6 @@ struct AsyncTask::PrivateStorage {
       // Remove drainer, enqueued and override bit if any
       auto newStatus = oldStatus.withRunning(false);
       newStatus = newStatus.withoutStoredPriorityEscalation();
-      newStatus = newStatus.withoutEnqueued();
       newStatus = newStatus.withComplete();
 
       // This can fail since the task can still get concurrently cancelled or
@@ -992,7 +998,14 @@ inline bool AsyncTask::isCancelled(bool ignoreShield = false) const {
                           .isCancelled(ignoreShield);
 }
 
-inline uint32_t AsyncTask::flagAsRunning() {
+/// Remove the enqueued bit in the ActiveTaskStatus atomically. This must be
+/// done when a Task's intrusive link is dequeued but after reading the local
+/// stealer exclusion value. This should not be called from any other context.
+static inline void taskRemoveEnqueued(AsyncTask *task) {
+  // In theory, we could do plumbing so that this happens as a part of a later
+  // CAS when possible (and prevents a single forced CAS fail in some cases).
+  ActiveTaskStatus::atomicRemoveIntrusivelyLinked(task->_private().StatusStorage);
+}
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   dispatch_thread_override_info_s threadOverrideInfo;
@@ -1155,7 +1168,7 @@ swift_task_enqueueSelfOrStealer(AsyncTask *task, SerialExecutorRef newExecutor,
     }
 
     if (!oldStatus.isIntrusivelyLinked()) {
-      newStatus = newStatus.withEnqueued();
+      newStatus = newStatus.withIntrusivelyLinked();
       needsStealer = false;
     } else {
       needsStealer = true;
@@ -1229,7 +1242,6 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
   assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
   auto oldStatus = _private()._status().load(std::memory_order_relaxed);
-  assert(!oldStatus.isEnqueued());
 
   if (!oldStatus.isRunning() && oldStatus.hasTaskDependency()) {
     // Task went from suspended --> enqueued and has a previous
@@ -1252,7 +1264,9 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
 
       // Remove escalation bits + set enqueued bit
       newStatus = newStatus.withoutStoredPriorityEscalation();
-      newStatus = newStatus.withEnqueued();
+#if !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+      newStatus = newStatus.withIntrusivelyLinked();
+#endif
       assert(newStatus.hasTaskDependency());
     });
   } else {
@@ -1274,8 +1288,10 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
 
       newStatus = newStatus.withRunning(false);
       newStatus = newStatus.withoutStoredPriorityEscalation();
-      newStatus = newStatus.withEnqueued();
       newStatus = newStatus.withTaskDependency();
+#if !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+      newStatus = newStatus.withIntrusivelyLinked();
+#endif
 
       return true;
     });
@@ -1317,7 +1333,7 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
   auto oldStatus = _private()._status().load(std::memory_order_relaxed);
   // We can only be suspended if we were previously running. See state
   // transitions listed out in Task.h
-  assert(oldStatus.isRunning() && !oldStatus.isEnqueued());
+  assert(oldStatus.isRunning());
 
   addStatusRecord(this, dependencyStatusRecord, oldStatus, [&](ActiveTaskStatus unused,
                   ActiveTaskStatus &newStatus) {
