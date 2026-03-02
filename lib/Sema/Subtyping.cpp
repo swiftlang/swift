@@ -381,7 +381,9 @@ swift::constraints::getConversionBehavior(Type type) {
     return ConversionBehavior::None;
   }
 
-  if (type->is<ClassType>() || type->is<BoundGenericClassType>())
+  if (type->is<ClassType>() ||
+      type->is<BoundGenericClassType>() ||
+      type->is<DynamicSelfType>())
     return ConversionBehavior::Class;
 
   if (type->is<EnumType>() ||
@@ -473,6 +475,9 @@ bool swift::constraints::hasProperSupertypes(Type type) {
     // Strings convert to pointers.
     return true;
   case ConversionBehavior::Class: {
+    if (type->is<DynamicSelfType>())
+      return true;
+
     auto *classDecl = type->getClassOrBoundGenericClass();
     return classDecl->getSuperclassDecl();
   }
@@ -528,6 +533,30 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     }
 
     case ConversionBehavior::Class: {
+      // Unwrap DynamicSelfType.
+      bool lhsWasSelf = false;
+      if (auto *lhsSelf = lhs->getAs<DynamicSelfType>()) {
+        lhsWasSelf = true;
+        lhs = lhsSelf->getSelfType();
+      }
+
+      bool rhsWasSelf = false;
+      if (auto *rhsSelf = rhs->getAs<DynamicSelfType>()) {
+        rhsWasSelf = true;
+        rhs = rhsSelf->getSelfType();
+      }
+
+      // DynamicSelfType-to-DynamicSelfType conversions are exact.
+      if (lhsWasSelf && rhsWasSelf) {
+        auto result = isLikelyExactMatch(lhs, rhs);
+        if (result.has_value() && !*result)
+          return ConflictFlag::Class;
+      }
+
+      // No conversions to DynamicSelfType.
+      if (rhsWasSelf)
+        return ConflictFlag::Class;
+
       auto *lhsDecl = lhs->getClassOrBoundGenericClass();
       auto *rhsDecl = rhs->getClassOrBoundGenericClass();
 
@@ -718,7 +747,11 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       if (lhsKind == ConversionBehavior::Metatype)
         break;
 
-      // Archetypes and existentials can convert to classes.
+      // No conversions to DynamicSelfType.
+      if (rhs->is<DynamicSelfType>())
+        return ConflictFlag::Category;
+
+      // Archetypes, existentials, and dynamic Self can convert to classes.
       if (isSubclassOf(lhs, rhs))
         break;
 
