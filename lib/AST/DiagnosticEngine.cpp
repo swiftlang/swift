@@ -1541,17 +1541,17 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
   }
 
   auto groupID = diagnostic.getGroupID();
-  StringRef Category;
+  StringRef CategoryName;
   if (auto wrapped = diagnostic.getWrappedDiagnostic())
-    Category = wrapped.value()->Category;
+    CategoryName = wrapped.value()->getCategoryName();
   else if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
-    Category = "api-digester-breaking-change";
+    CategoryName = "api-digester-breaking-change";
   else if (isNoUsageDiagnostic(diagnostic.getID()))
-    Category = "no-usage";
+    CategoryName = "no-usage";
   else if (groupID != DiagGroupID::no_group)
-    Category = getDiagGroupInfoByID(groupID).name;
+    CategoryName = getDiagGroupInfoByID(groupID).name;
   else if (isDeprecationDiagnostic(diagnostic.getID()))
-    Category = "deprecation";
+    CategoryName = "deprecation";
 
   auto fixIts = diagnostic.getFixIts();
   if (loc.isValid()) {
@@ -1580,7 +1580,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
       getFormatStringForDiagnostic(diagnostic, includeDiagnosticName);
 
   return DiagnosticInfo(diagnostic.getID(), loc, toDiagnosticKind(behavior),
-                        formatString, diagnostic.getArgs(), Category,
+                        formatString, diagnostic.getArgs(), CategoryName,
                         getDefaultDiagnosticLoc(),
                         /*child note info*/ {}, diagnostic.getRanges(), fixIts,
                         diagnostic.isChildNote());
@@ -1728,16 +1728,34 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     info->ChildDiagnosticInfo = childInfoPtrs;
 
     // Capture information about the diagnostic group and its documentation
-    // URL.
+    // URL. Build the full category chain (leaf + parents).
     auto groupID = diagnostic.getGroupID();
     if (groupID != DiagGroupID::no_group) {
       const auto &diagGroup = getDiagGroupInfoByID(groupID);
-      
+
+      // Set the leaf category's documentation URL.
       std::string docURL(getDiagnosticDocumentationPath());
       if (!docURL.empty() && docURL.back() != '/')
         docURL += "/";
       docURL += diagGroup.documentationFile;
-      info->CategoryDocumentationURL = std::move(docURL);
+      info->setCategoryDocumentationURL(std::move(docURL));
+
+      // Append parent groups by walking up supergroups.
+      auto currentID = groupID;
+      while (true) {
+        const auto &current = getDiagGroupInfoByID(currentID);
+        if (current.supergroups.empty())
+          break;
+        auto parentID = current.supergroups[0];
+        const auto &parent = getDiagGroupInfoByID(parentID);
+        std::string parentDocURL(getDiagnosticDocumentationPath());
+        if (!parentDocURL.empty() && parentDocURL.back() != '/')
+          parentDocURL += "/";
+        parentDocURL += parent.documentationFile;
+        info->CategoryChain.push_back(
+            {StringRef(parent.name), std::move(parentDocURL)});
+        currentID = parentID;
+      }
     }
 
     for (auto &consumer : Consumers) {

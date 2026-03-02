@@ -38,7 +38,12 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
                                            info.FormatArgs);
   }
 
-  StringRef documentationPath = info.CategoryDocumentationURL;
+  SmallVector<BridgedDiagnosticCategoryEntry, 4> bridgedDiagGroupChain;
+  for (const auto &entry : info.CategoryChain) {
+    bridgedDiagGroupChain.push_back(
+        {BridgedStringRef(entry.Name),
+         BridgedStringRef(StringRef(entry.DocumentationURL))});
+  }
 
   SmallVector<BridgedFixIt, 2> fixIts;
   for (const auto &fixIt : info.FixIts) {
@@ -49,8 +54,7 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
       queuedDiagnostics, perFrontendState,
       text.str(),
       info.Kind, info.Loc,
-      info.Category,
-      documentationPath,
+      bridgedDiagGroupChain.data(), bridgedDiagGroupChain.size(),
       info.Ranges.data(), info.Ranges.size(),
       llvm::ArrayRef<BridgedFixIt>(fixIts));
 
@@ -78,10 +82,18 @@ void DiagnosticBridge::emitDiagnosticWithoutLocation(
                                            info.FormatArgs);
   }
 
+  SmallVector<BridgedDiagnosticCategoryEntry, 4> bridgedDiagGroupChain;
+  for (const auto &entry : info.CategoryChain) {
+    bridgedDiagGroupChain.push_back(
+        {BridgedStringRef(entry.Name),
+         BridgedStringRef(StringRef(entry.DocumentationURL))});
+  }
+
   BridgedStringRef bridgedRenderedString{nullptr, 0};
   swift_ASTGen_renderSingleDiagnostic(
-      perFrontendState, text.str(), info.Kind, info.Category,
-      llvm::StringRef(info.CategoryDocumentationURL), forceColors ? 1 : 0,
+      perFrontendState, text.str(), info.Kind,
+      bridgedDiagGroupChain.data(), bridgedDiagGroupChain.size(),
+      forceColors ? 1 : 0,
       &bridgedRenderedString);
 
   auto renderedString = bridgedRenderedString.unbridged();

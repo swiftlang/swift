@@ -513,6 +513,12 @@ public:
   BridgedStringRef replacementText;
 };
 
+class BridgedDiagnosticCategoryEntry {
+public:
+  BridgedStringRef name;
+  BridgedStringRef documentationPath;
+};
+
 class BridgedDiagnosticFixIt {
 public:
   int64_t storage[7];

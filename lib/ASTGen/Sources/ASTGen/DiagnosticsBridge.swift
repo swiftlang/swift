@@ -172,6 +172,9 @@ fileprivate struct SimpleDiagnostic: DiagnosticMessage {
 
   let category: DiagnosticCategory?
 
+  /// Full category chain (leaf-first).
+  let categoryChain: [DiagnosticCategory]
+
   var diagnosticID: MessageID {
     .init(domain: "SwiftCompiler", id: "SimpleDiagnostic")
   }
@@ -243,6 +246,25 @@ private struct BridgedFixItMessage: FixItMessage {
   }
 }
 
+/// Convert a bridged category chain array to [DiagnosticCategory].
+private func convertCategoryChain(
+  _ ptr: UnsafePointer<BridgedDiagnosticCategoryEntry>?,
+  count: Int
+) -> [DiagnosticCategory] {
+  guard count > 0, let ptr = ptr else { return [] }
+  return (0..<count).map { i in
+    let entry = ptr[i]
+    let name = String(bridged: entry.name)
+    let docPath = String(bridged: entry.documentationPath)
+    let url: String? = if !docPath.isEmpty {
+        docPath.looksLikeURL ? docPath : "file://\(docPath)"
+      } else {
+        nil
+      }
+    return DiagnosticCategory(name: name, documentationURL: url)
+  }
+}
+
 /// Add a new diagnostic to the queue.
 @_cdecl("swift_ASTGen_addQueuedDiagnostic")
 public func addQueuedDiagnostic(
@@ -251,8 +273,8 @@ public func addQueuedDiagnostic(
   text: BridgedStringRef,
   severity: swift.DiagnosticKind,
   loc: SourceLoc,
-  categoryName: BridgedStringRef,
-  documentationPath: BridgedStringRef,
+  categoryChainPtr: UnsafePointer<BridgedDiagnosticCategoryEntry>?,
+  numCategoryChainEntries: Int,
   highlightRangesPtr: UnsafePointer<CharSourceRange>?,
   numHighlightRanges: Int,
   fixItsUntyped: BridgedArrayRef
@@ -354,29 +376,12 @@ public func addQueuedDiagnostic(
     }
   }
 
-  let documentationPath = String(bridged: documentationPath)
-  let documentationURL: String? = if !documentationPath.isEmpty {
-      // If this looks doesn't look like a URL, prepend file://.
-      documentationPath.looksLikeURL ? documentationPath : "file://\(documentationPath)"
-    } else {
-      nil
-    }
+  // Convert the category chain from bridged data.
+  let categoryChain = convertCategoryChain(categoryChainPtr, count: numCategoryChainEntries)
+  let category: DiagnosticCategory? = categoryChain.first
 
-  let categoryName = String(bridged: categoryName)
-  // If the data comes from serialized diagnostics, it's possible that
-  // the category name is empty because StringRef() is serialized into
-  // an empty string.
-  let category: DiagnosticCategory? = if !categoryName.isEmpty {
-      DiagnosticCategory(
-        name: categoryName,
-        documentationURL: documentationURL
-      )
-    } else {
-      nil
-    }
-
-  // Note that we referenced this category.
-  if let category {
+  // Register all groups for footnote generation.
+  for category in categoryChain {
     diagnosticState.pointee.referencedCategories.insert(category)
   }
 
@@ -411,7 +416,8 @@ public func addQueuedDiagnostic(
     message: SimpleDiagnostic(
       message: String(bridged: text),
       severity: severity.asSeverity,
-      category: category
+      category: category,
+      categoryChain: categoryChain
     ),
     highlights: highlights,
     fixIts: fixIts
@@ -426,8 +432,8 @@ public func renderSingleDiagnostic(
   perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
   text: BridgedStringRef,
   severity: swift.DiagnosticKind,
-  categoryName: BridgedStringRef,
-  documentationPath: BridgedStringRef,
+  categoryChainPtr: UnsafePointer<BridgedDiagnosticCategoryEntry>?,
+  numCategoryChainEntries: Int,
   colorize: Int,
   renderedStringOutPtr: UnsafeMutablePointer<BridgedStringRef>
 ) {
@@ -435,29 +441,12 @@ public func renderSingleDiagnostic(
     to: PerFrontendDiagnosticState.self
   )
 
-  let documentationPath = String(bridged: documentationPath)
-  let documentationURL: String? = if !documentationPath.isEmpty {
-      // If this looks doesn't look like a URL, prepend file://.
-      documentationPath.looksLikeURL ? documentationPath : "file://\(documentationPath)"
-    } else {
-      nil
-    }
+  // Convert the category chain from bridged data.
+  let categoryChain = convertCategoryChain(categoryChainPtr, count: numCategoryChainEntries)
+  let category: DiagnosticCategory? = categoryChain.first
 
-  let categoryName = String(bridged: categoryName)
-  // If the data comes from serialized diagnostics, it's possible that
-  // the category name is empty because StringRef() is serialized into
-  // an empty string.
-  let category: DiagnosticCategory? = if !categoryName.isEmpty {
-      DiagnosticCategory(
-        name: categoryName,
-        documentationURL: documentationURL
-      )
-    } else {
-      nil
-    }
-
-  // Note that we referenced this category.
-  if let category {
+  // Register all groups for footnote generation.
+  for category in categoryChain {
     diagnosticState.pointee.referencedCategories.insert(category)
   }
 
@@ -467,7 +456,8 @@ public func renderSingleDiagnostic(
     SimpleDiagnostic(
       message: String(bridged: text),
       severity: severity.asSeverity,
-      category: category
+      category: category,
+      categoryChain: categoryChain
     )
   )
 
