@@ -33,6 +33,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
@@ -3661,13 +3662,11 @@ namespace {
 
       auto &ctx = CS.getASTContext();
 
+      bool existentialUpperBound = false;
       auto join =
-          Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
-
-      if (!join)
-        return ErrorType::get(ctx);
-
-      return MetatypeType::get(*join, ctx)->getCanonicalType();
+          subtypeJoin(lhsMeta->getInstanceType(), rhsMeta->getInstanceType(),
+                      &existentialUpperBound);
+      return MetatypeType::get(join, ctx);
     }
 
     /// Assuming that we are solving for code completion, assign \p expr a fresh
