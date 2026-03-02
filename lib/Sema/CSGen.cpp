@@ -4466,8 +4466,12 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     return getTypeMatchSuccess();
   };
 
+  auto isProjectedValueArg = argLabel.hasDollarPrefix() &&
+      (!param || param->getArgumentName() != argLabel ||
+       param->hasImplicitPropertyWrapper());
+
   // Incorrect use of projected value argument
-  if (argLabel.hasDollarPrefix() &&
+  if (isProjectedValueArg &&
       (!param || !param->hasExternalPropertyWrapper())) {
     auto *loc = getConstraintLocator(locator);
     auto *fix =
@@ -4485,7 +4489,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     return recordPropertyWrapperFix(fix);
   }
 
-  if (argLabel.hasDollarPrefix()) {
+  if (isProjectedValueArg) {
     Type projectionType = computeProjectedValueType(param, wrapperType);
     addConstraint(matchKind, paramType, projectionType, locator,
                   /*isFavored=*/false,

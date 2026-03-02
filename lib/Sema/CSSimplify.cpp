@@ -1852,12 +1852,17 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       // the parameter label given. Otherwise look at the argument label.
       auto wrapperArgLabel = compoundParamLabel.empty() ? argument.getLabel()
                                                         : compoundParamLabel;
+      auto *paramDecl = getParameterAt(callee, paramIdx);
+      assert(paramDecl);
+
+      auto isProjectedValueArg = wrapperArgLabel.hasDollarPrefix() &&
+          (paramDecl->getArgumentName() != wrapperArgLabel ||
+           paramDecl->hasImplicitPropertyWrapper());
+
       if (paramInfo.hasExternalPropertyWrapper(paramIdx) ||
-          wrapperArgLabel.hasDollarPrefix()) {
-        auto *param = getParameterAt(callee, paramIdx);
-        assert(param);
+          isProjectedValueArg) {
         if (cs.applyPropertyWrapperToParameter(paramTy, argTy,
-                                               const_cast<ParamDecl *>(param),
+                                               const_cast<ParamDecl *>(paramDecl),
                                                wrapperArgLabel, subKind,
                                                cs.getConstraintLocator(loc),
                                                calleeLocator)
