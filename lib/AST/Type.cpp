@@ -1684,8 +1684,7 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
 Type TypeBase::getMetatypeInstanceType() {
   if (auto existentialMetaType = getAs<ExistentialMetatypeType>())
     return existentialMetaType->getExistentialInstanceType();
-
-  if (auto metaTy = getAs<AnyMetatypeType>())
+  else if (auto metaTy = getAs<MetatypeType>())
     return metaTy->getInstanceType();
 
   return this;
