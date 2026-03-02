@@ -13022,16 +13022,25 @@ ConstraintSystem::simplifyKeyPathConstraint(
     if (contextualTy->isPlaceholder())
       return true;
 
+    if (contextualTy->is<ArchetypeType>()) {
+      contextualTy = contextualTy->getSuperclass();
+      if (!contextualTy)
+        return true;
+    }
+
     // Situations like `any KeyPath<...> & Sendable`.
     if (contextualTy->isExistentialType()) {
-      contextualTy = contextualTy->getExistentialLayout().explicitSuperclass;
-      assert(contextualTy);
+      contextualTy = contextualTy->getSuperclass();
+      if (!contextualTy)
+        return true;
     }
 
     if (auto bgt = contextualTy->getAs<BoundGenericType>()) {
       // We can get root and value from a concrete key path type.
-      assert(bgt->isKeyPath() || bgt->isWritableKeyPath() ||
-             bgt->isReferenceWritableKeyPath());
+      if (!(bgt->isKeyPath() || bgt->isWritableKeyPath() ||
+            bgt->isReferenceWritableKeyPath())) {
+        return true;
+      }
 
       contextualRootTy = bgt->getGenericArgs()[0];
       contextualValueTy = bgt->getGenericArgs()[1];
@@ -13169,6 +13178,17 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   // key path application.
   if (locator.endsWith<LocatorPathElt::KeyPathDynamicMember>())
     return SolutionKind::Error;
+
+  if (keyPathTy->is<ArchetypeType>()) {
+    if (auto superclassTy = keyPathTy->getSuperclass())
+      keyPathTy = superclassTy;
+  }
+
+  // Situations like `any KeyPath<...> & Sendable`.
+  if (keyPathTy->isExistentialType()) {
+    if (auto superclassTy = keyPathTy->getSuperclass())
+      keyPathTy = superclassTy;
+  }
 
   if (keyPathTy->isAnyKeyPath()) {
     // Read-only keypath, whose projected value is upcast to `Any?`.
