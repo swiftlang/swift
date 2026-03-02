@@ -935,7 +935,8 @@ static void swift_task_cancelImpl(AsyncTask *task) {
 /**************************************************************************/
 
 /// Perform any escalation actions required by the given record.
-static void performEscalationAction(TaskStatusRecord *record,
+static void performEscalationAction(AsyncTask *task,
+                                    TaskStatusRecord *record,
                                     JobPriority oldPriority,
                                     JobPriority newPriority) {
   switch (record->getKind()) {
@@ -967,7 +968,7 @@ static void performEscalationAction(TaskStatusRecord *record,
     auto dependencyRecord = cast<TaskDependencyStatusRecord>(record);
     SWIFT_TASK_DEBUG_LOG("[Dependency] Escalating a task dependency record %p from %#x to %#x",
                     record, oldPriority, newPriority);
-    dependencyRecord->performEscalationAction(oldPriority, newPriority);
+    dependencyRecord->performEscalationAction(task, oldPriority, newPriority);
     return;
   }
 
@@ -1071,7 +1072,7 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     // We know that none of the escalation actions will recursively
     // modify the task status record list by adding or removing task records
     for (auto cur: status.records()) {
-      performEscalationAction(cur, oldPriority, newPriority);
+      performEscalationAction(task, cur, oldPriority, newPriority);
     }
   });
 
@@ -1079,7 +1080,7 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
 }
 
 void TaskDependencyStatusRecord::performEscalationAction(
-    JobPriority oldPriority, JobPriority newPriority) {
+    AsyncTask *task, JobPriority oldPriority, JobPriority newPriority) {
   switch (this->DependencyKind) {
     case WaitingOnTask:
       SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent task %p noted in %p record",
@@ -1106,6 +1107,11 @@ void TaskDependencyStatusRecord::performEscalationAction(
       swift_executor_escalate(this->DependentOn.Executor, this->WaitingTask, newPriority);
       break;
   }
+}
+
+AsyncTask *&TaskDependencyStatusRecord::getNextWaitingTask() {
+  assert(this->DependencyKind == WaitingOnTask);
+  return this->NextWaitingTask;
 }
 
 #define OVERRIDE_TASK_STATUS COMPATIBILITY_OVERRIDE

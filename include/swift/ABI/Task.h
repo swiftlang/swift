@@ -77,9 +77,6 @@ class alignas(2 * alignof(void*)) Job :
 public:
   // Indices into SchedulerPrivate, for use by the runtime.
   enum {
-    /// The next waiting task link, an AsyncTask that is waiting on a future.
-    NextWaitingTaskIndex = 0,
-
     // The Dispatch object header is one pointer and two ints, which is
     // equivalent to three pointers on 32-bit and two pointers 64-bit. Set the
     // indexes accordingly so that DispatchLinkageIndex points to where Dispatch
@@ -94,7 +91,9 @@ public:
     DispatchQueueIndex = DispatchHasLongObjectHeader ? 0 : 1,
   };
 
-  // Reserved for the use of the scheduler.
+  // Reserved for the use of the scheduler. Since Task stealers
+  // allow a Task to be intrusively enqueued at any point of its
+  // lifecycle, this data must never be used by the runtime.
   void *SchedulerPrivate[2];
 
   /// WARNING: DO NOT MOVE.
@@ -811,12 +810,10 @@ public:
   }
 
 private:
-  /// Access the next waiting task, which establishes a singly linked list of
-  /// tasks that are waiting on a future.
-  AsyncTask *&getNextWaitingTask() {
-    return reinterpret_cast<AsyncTask *&>(
-        SchedulerPrivate[NextWaitingTaskIndex]);
-  }
+  /// Access the next waiting task, which establishes a singly linked
+  /// list of tasks that are waiting on a future. This function
+  /// assumes that this Task is suspended waiting on a another Task.
+  AsyncTask *&getNextWaitingTask();
 };
 
 // The compiler will eventually assume these.
