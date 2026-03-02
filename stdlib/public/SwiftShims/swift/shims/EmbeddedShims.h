@@ -220,6 +220,40 @@ _swift_embedded_existential_init_with_copy(void *dst, void *srcExist) {
   }
 }
 
+// Helpers for value-witness operations used by the embedded error runtime.
+static inline void
+_swift_embedded_metadata_initialize_with_copy(void *metadata, void *dst, void *src) {
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  fullmeta->vwt->initializeWithCopyFn(dst, src, metadata);
+}
+
+static inline void
+_swift_embedded_metadata_initialize_with_take(void *metadata, void *dst, void *src) {
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  fullmeta->vwt->initializeWithTakeFn(dst, src, metadata);
+}
+
+static inline void
+_swift_embedded_metadata_destroy(void *metadata, void *value) {
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  fullmeta->vwt->destroyFn(value, metadata);
+}
+
+// Swift implementation of error box destroy logic (defined in EmbeddedRuntime.swift).
+extern void _swift_embedded_error_destroy_impl(void * _Nonnull object);
+
+// Calling convention wrapper: swiftcc + swiftself, matching HeapObjectDestroyer.
+// Weak linkage ensures linker deduplication across TUs.
+SWIFT_CC_swift __attribute__((weak)) void
+_swift_embedded_error_destroy(SWIFT_CONTEXT void * _Nonnull object) {
+  _swift_embedded_error_destroy_impl(object);
+}
+
+// Returns the address of the wrapper for metadata storage initialization.
+static inline void * _Nonnull _swift_embedded_error_destroy_ptr(void) {
+  return (void *)_swift_embedded_error_destroy;
+}
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
