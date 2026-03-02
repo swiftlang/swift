@@ -4,20 +4,18 @@
 // in various ways.
 
 protocol LikeSetAlgebra {
-    func onion(_ other: Self) -> Self // expected-note {{protocol requires function 'onion' with type '(X) -> X'}}
-    func indifference(_ other: Self) -> Self // expected-note {{protocol requires function 'indifference' with type '(X) -> X'}}
-
+    func onion(_ other: Self) -> Self
+    func indifference(_ other: Self) -> Self
 }
 protocol LikeOptionSet : LikeSetAlgebra, RawRepresentable {}
 extension LikeOptionSet where RawValue : FixedWidthInteger {
-    func onion(_ other: Self) -> Self { return self } // expected-note {{candidate would match if 'X.RawValue' conformed to 'FixedWidthInteger'}}
-    func indifference(_ other: Self) -> Self { return self } // expected-note {{candidate would match if 'X.RawValue' conformed to 'FixedWidthInteger'}}
+    func onion(_ other: Self) -> Self { return self }
+    func indifference(_ other: Self) -> Self { return self }
 }
 
 struct X : LikeOptionSet {}
-// expected-error@-1 {{type 'X' does not conform to protocol 'LikeSetAlgebra'}}
-// expected-error@-2 {{type 'X' does not conform to protocol 'RawRepresentable'}}
-// expected-note@-3 {{add stubs for conformance}}
+// expected-error@-1 {{type 'X' does not conform to protocol 'RawRepresentable'}}
+// expected-note@-2 {{add stubs for conformance}}
 
 protocol IterProtocol {}
 protocol LikeSequence {

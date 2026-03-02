@@ -1345,6 +1345,9 @@ public:
   /// Retrieve the fixed score of this solution
   Score &getFixedScore() { return FixedScore; }
 
+  /// Whether the solution has any holes.
+  bool hasHoles() const { return FixedScore.Data[SK_Hole] > 0; }
+
   /// Check whether this solution has a fixed binding for the given type
   /// variable.
   bool hasFixedType(TypeVariableType *typeVar) const;

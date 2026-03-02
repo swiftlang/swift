@@ -993,13 +993,11 @@ do {
   func foo<T, U>(_: T, _: U) where T: Sequence, U: Sequence, T.Element == U.Element {}
   // expected-note@-1 {{required by local function 'foo' where 'T' = 'Set<Int>.Type'}}
   // expected-note@-2 {{required by local function 'foo' where 'U' = 'Array<String>.Type'}}
-  // expected-note@-3 {{where 'T.Element' = 'Set<Int>.Type.Element', 'U.Element' = 'Array<String>.Type.Element'}}
 
   foo(Set<Int>, Array<String>)
   // expected-error@-1 {{type 'Set<Int>.Type' cannot conform to 'Sequence'}}
   // expected-error@-2 {{type 'Array<String>.Type' cannot conform to 'Sequence'}}
-  // expected-error@-3 {{local function 'foo' requires the types 'Set<Int>.Type.Element' and 'Array<String>.Type.Element' be equivalent}}
-  // expected-note@-4 2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+  // expected-note@-3 2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 }
 
 // https://github.com/apple/swift/issues/56173

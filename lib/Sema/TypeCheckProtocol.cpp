@@ -1353,7 +1353,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
                      .Data[SK_MissingSynthesizableConformance] > 0;
     }();
 
-    if (!solution || !solution->Fixes.empty()) {
+    if (!solution || !solution->Fixes.empty() || solution->hasHoles()) {
       if (!requiresNonSendable)
         return RequirementMatch(witness, MatchKind::TypeConflict,
                                 witnessType);

@@ -748,8 +748,8 @@ func invalidDictionaryLiteral() {
 
 
 [4].joined(separator: [1])
-// expected-error@-1 {{no exact matches in call to instance method 'joined'}}
-// There is one more note here - candidate requires that 'Int' conform to 'Sequence' (requirement specified as 'Self.Element' : 'Sequence') pointing to Sequence extension
+// expected-error@-1:2 {{cannot convert value of type 'Int' to expected element type 'String'}}
+// expected-error@-2:23 {{cannot convert value of type '[Int]' to expected argument type 'String'}}
 
 [4].joined(separator: [[[1]]])
 // expected-error@-1 {{cannot convert value of type 'Int' to expected element type 'String'}}
