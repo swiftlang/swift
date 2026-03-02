@@ -13176,9 +13176,9 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     /// Solve for an lvalue base.
     auto solveLValue = [&]() -> ConstraintSystem::SolutionKind {
       return matchTypes(LValueType::get(kpValueTy), valueTy,
-                        ConstraintKind::Bind, subflags, locator);
+                        ConstraintKind::Conversion, subflags, locator);
     };
-  
+
     if (bgt->isKeyPath()) {
       // Read-only keypath.
       if (!matchRoot(ConstraintKind::Conversion))
