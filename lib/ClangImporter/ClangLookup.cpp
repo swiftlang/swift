@@ -33,7 +33,6 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
@@ -121,7 +120,7 @@ lookupInClassTemplateSpecialization(
 
     // Use the base names here because *sometimes* our input name won't have
     // any arguments.
-    if (name.getBaseName().compare(memberName.getBaseName()) == 0)
+    if (name.getBaseName() == memberName.getBaseName())
       found.push_back(namedDecl);
   }
 
@@ -264,7 +263,6 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   ClangInheritanceInfo inheritance = desc.inheritance;
 
   auto &ctx = recordDecl->getASTContext();
-  auto &Importer = *static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
   // Whether to skip non-public members. Feature::ImportNonPublicCxxMembers says
   // to import all non-public members by default; if that is disabled, we only
@@ -412,11 +410,12 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   }
 
   if (result.empty() && !inheritance) {
+    auto &Importer = *static_cast<ClangImporter *>(ctx.getClangModuleLoader());
     if (name.isSimpleName("pointee")) {
       if (auto *pointee = Importer.Impl.lookupAndImportPointee(inheritingDecl))
         result.push_back(pointee);
     } else if (name.getBaseName() == "successor" &&
-               name.getArgumentNames().size() == 0) {
+               name.getArgumentNames().empty()) {
       if (auto *succ = Importer.Impl.lookupAndImportSuccessor(inheritingDecl))
         result.push_back(succ);
     }

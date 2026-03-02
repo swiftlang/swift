@@ -416,6 +416,13 @@ public:
     }
   }
 
+  void inferImmortalResult() {
+    auto targetDeps = getInferredTargetDeps(resultIndex);
+    if (!targetDeps)
+      return;
+    targetDeps->hasImmortalSpecifier = true;
+  }
+
   // Allocate LifetimeDependenceInfo in the ASTContext. Initialize it by
   // copying heap-allocated TargetDeps fields into ASTContext allocations
   // (e.g. convert SmallBitVector to IndexSubset).
@@ -1569,7 +1576,8 @@ protected:
   // Any accessors not handled here will be handled like a normal method.
   void inferAccessor(AccessorDecl *accessor) {
     if (!hasImplicitSelfParam()) {
-      // global accessors have no 'self'.
+      // Global accessors have no 'self'. Their result must be immortal.
+      depBuilder.inferImmortalResult();
       return;
     }
     bool nonEscapableSelf =

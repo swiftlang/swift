@@ -20,7 +20,6 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/Frontend/DiagnosticRenderer.h"
 #include "clang/Frontend/FrontendDiagnostic.h"
-#include "clang/Lex/LexDiagnostic.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace swift;

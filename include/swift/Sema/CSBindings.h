@@ -57,7 +57,10 @@ enum class AllowedBindingKind : uint8_t {
   /// Supertypes of the specified type.
   Supertypes,
   /// Subtypes of the specified type.
-  Subtypes
+  Subtypes,
+  /// Special hack for `extension P where Self == S { ... }` members
+  /// and keypaths.
+  Fallback,
 };
 
 /// The kind of literal binding found.
@@ -93,7 +96,8 @@ struct PotentialBinding {
                    PointerUnion<Constraint *, ConstraintLocator *> source,
                    TypeVariableType *originator)
       : BindingType(type), Kind(kind), BindingSource(source),
-        Originator(originator) {}
+        Originator(originator) {
+  }
 
   PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
       : PotentialBinding(
@@ -131,14 +135,17 @@ struct PotentialBinding {
   Constraint *getSource() const { return cast<Constraint *>(BindingSource); }
 
   PotentialBinding withType(Type type) const {
+    ASSERT(Kind != AllowedBindingKind::Fallback);
     return {type, Kind, BindingSource, Originator};
   }
 
   PotentialBinding withSameSource(Type type, AllowedBindingKind kind) const {
+    ASSERT(kind != AllowedBindingKind::Fallback);
     return {type, kind, BindingSource, Originator};
   }
 
   PotentialBinding asTransitiveFrom(TypeVariableType *originator) const {
+    ASSERT(Kind != AllowedBindingKind::Fallback);
     ASSERT(originator);
     return {BindingType, Kind, BindingSource, originator};
   }
@@ -259,6 +266,11 @@ struct PotentialBindings {
   /// The set of constraints which delay attempting this type variable.
   llvm::TinyPtrVector<Constraint *> DelayedBy;
 
+  /// The set of LValueObject constraints having this type variable on the
+  /// left-hand side. If this is non-empty, we know that the type variable
+  /// must be bound to an lvalue.
+  llvm::TinyPtrVector<Constraint *> LValueOf;
+
   /// The set of type variables adjacent to the current one.
   ///
   /// Type variables contained here are either related through the
@@ -362,6 +374,9 @@ struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
   }
 
   static bool isEqual(const Binding &LHS, const Binding &RHS) {
+    if (LHS.Kind != RHS.Kind)
+      return false;
+
     auto lhsTy = LHS.BindingType.getPointer();
     auto rhsTy = RHS.BindingType.getPointer();
 
@@ -397,6 +412,16 @@ private:
 namespace swift {
 namespace constraints {
 namespace inference {
+
+enum class KnownLValueKind: uint8_t {
+  /// Insufficient information to determine yet.
+  Unknown,
+  /// Definitely not an lvalue.
+  RValue,
+  /// Definitely an lvalue.
+  LValue
+};
+
 class BindingSet {
   using BindingScore =
       std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
@@ -414,6 +439,8 @@ class BindingSet {
   bool IsDirty = false;
   /// Generation number of PotentialBindings.
   unsigned GenerationNumber = 0;
+  /// Computed early by computeLValueState().
+  KnownLValueKind LValueState = KnownLValueKind::Unknown;
 
 public:
   swift::SmallSetVector<PotentialBinding, 4> Bindings;
@@ -464,6 +491,10 @@ public:
   /// Check if this binding set is known to be up to date.
   bool isUpToDate() const {
     return (GenerationNumber == Info.GenerationNumber && !IsDirty);
+  }
+
+  KnownLValueKind getLValueState() const {
+    return LValueState;
   }
 
   /// Whether this type variable is subject to a ExpressibleByNilLiteral
@@ -534,14 +565,6 @@ public:
     });
   }
 
-  /// Check if this binding is viable for inclusion in the set.
-  ///
-  /// \param binding The binding to validate.
-  /// \param isTransitive Indicates whether this binding has been
-  /// acquired through transitive inference and requires extra
-  /// checking.
-  bool isViable(PotentialBinding &binding);
-
   /// Determine whether this set has any "viable" (or non-hole) bindings.
   ///
   /// A viable binding could be - a direct or transitive binding
@@ -591,6 +614,12 @@ public:
 
     assert(numDefaultable >= unviable);
     return numDefaultable - unviable;
+  }
+
+  unsigned getNumExactBindings() const {
+    return llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
+      return binding.Kind == AllowedBindingKind::Exact;
+    });
   }
 
   ASTNode getAssociatedCodeCompletionToken() const {
@@ -677,6 +706,8 @@ public:
   }
 
 private:
+  void computeLValueState();
+
   void markDirty() {
     IsDirty = true;
   }

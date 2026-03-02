@@ -24,3 +24,26 @@ func baz(_ z: Span<CInt>) -> Span<CInt> {
 @_lifetime(`func`: copy `func`)
 func qux(_ func: inout MutableSpan<CInt>) {}
 
+struct S {
+  mutating func m(_ x: Int) -> Int {
+    return x
+  }
+  public func pub(_ x: Int) -> Int {
+    return x
+  }
+  private func priv(_ x: Int) -> Int {
+    return x
+  }
+}
+
+class C {
+  public func pub(_ x: Int) -> Int {
+    return x
+  }
+  private func priv(_ x: Int) -> Int {
+    return x
+  }
+  open func ope(_ x: Int) -> Int {
+    return x
+  }
+}

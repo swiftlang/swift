@@ -975,7 +975,7 @@ actor SomeActorWithInits {
     _ = mutableState  // will be caught by flow-isolation
   }
 
-  deinit {
+  deinit { // expected-note 3 {{add 'isolated' to run isolated to 'SomeActorWithInits', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
     let _ = self.nonSendable // OK only through typechecking, not SIL.
 
     defer {
@@ -1013,7 +1013,7 @@ class SomeClassWithInits {
     self.isolated()
   }
 
-  deinit {
+  deinit { // expected-note 2{{add 'isolated' to run isolated to 'MainActor', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
     print(mutableState) // Okay, we're actor-isolated
     print(SomeClassWithInits.shared) // expected-error{{main actor-isolated static property 'shared' can not be referenced from a nonisolated context}}
     beets_ma() //expected-error{{call to main actor-isolated global function 'beets_ma()' in a synchronous nonisolated context}}
@@ -1435,7 +1435,7 @@ actor SelfParamIsolationNonMethod {
     acceptAsyncSendableClosure { self.f() }
   }
 
-  deinit {
+  deinit { // expected-note {{add 'isolated' to run isolated to 'SelfParamIsolationNonMethod', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
     // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{44-44=await }}
     acceptAsyncSendableClosureInheriting { self.f() }
 
@@ -1475,11 +1475,35 @@ actor DunkTracker {
   private var lebron: Int?
   private var curry: Int? // expected-note {{property declared here}}
 
-  deinit {
+  deinit { // expected-note {{add 'isolated' to run isolated to 'DunkTracker', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
     // expected-warning@+1 {{actor-isolated property 'curry' can not be referenced from a nonisolated autoclosure; this is an error in the Swift 6 language mode}}
     if lebron != nil || curry != nil {
-      
+
     }
+  }
+}
+
+// Verify that 'mark deinitializer as isolated' is not suggested when
+// 'isolated' would not resolve the diagnostic.
+actor DeinitKeyPath {
+  var x: Int = 0
+
+  deinit {
+    let _ = \DeinitKeyPath.x // expected-error {{cannot form key path to actor-isolated property 'x'}}
+  }
+}
+
+struct MutatingAsyncStruct {
+  var x: Int = 0
+  mutating func doWork() async { x += 1 }
+}
+
+actor DeinitMutatingAsync {
+  var s: MutatingAsyncStruct = MutatingAsyncStruct()
+
+  deinit {
+    s.doWork() // expected-error {{cannot call mutating async function 'doWork()' on actor-isolated property 's'}}
+    // expected-error@-1 {{'async' call in a function that does not support concurrency}}
   }
 }
 

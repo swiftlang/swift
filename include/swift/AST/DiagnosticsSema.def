@@ -5835,6 +5835,12 @@ GROUPED_ERROR(actor_isolated_call,ActorIsolatedCall,none,
 GROUPED_ERROR(actor_isolated_call_decl,ActorIsolatedCall,none,
       "call to %0 %kind1 in a synchronous %2 context",
       (ActorIsolation, const ValueDecl *, ActorIsolation))
+NOTE(mark_deinit_isolated_to_access,none,
+      "add 'isolated' to run isolated to %0, which may be later than 'nonisolated deinit'",
+      (Identifier))
+NOTE(marked_nonisolated_here,none,
+      "marked as 'nonisolated' here",
+      ())
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %kind0 can not be partially applied",
         (const ValueDecl *))
@@ -7696,6 +7702,11 @@ GROUPED_ERROR(property_wrapper_type_requirement_not_accessible,PropertyWrappers,
 GROUPED_ERROR(property_wrapper_ambiguous_enclosing_self_subscript,PropertyWrappers,none,
       "property wrapper type %0 has multiple enclosing-self subscripts %1",
       (Type, DeclName))
+GROUPED_ERROR(property_wrapper_enclosing_self_subscript_keypath_type,PropertyWrappers,none,
+      "parameter %0 of enclosing-self subscript should have either "
+      "'WritableKeyPath<...>' or 'ReferenceWritableKeyPath<...>' type "
+      "(got %1)",
+      (Identifier, Type))
 GROUPED_ERROR(property_wrapper_dynamic_self_type,PropertyWrappers,none,
       "property wrapper %select{wrapped value|projected value}0 cannot have "
       "dynamic Self type", (bool))

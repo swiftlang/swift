@@ -509,3 +509,20 @@ struct SuperWrapper<T: BitwiseCopyable>: ~Escapable {
   }
 }
 
+// =============================================================================
+// Static accessors
+// =============================================================================
+
+@available(Span 0.1, *)
+struct TestStaticProperty {
+  static let staticArray = [0, 1]
+
+  static let staticSpan = staticArray.span
+}
+
+@available(Span 0.1, *)
+class TestStaticClassProperty {
+  static let staticArray = [0, 1]
+
+  static let staticSpan = staticArray.span
+}

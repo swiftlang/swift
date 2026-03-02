@@ -36,7 +36,7 @@
 
 namespace llvm {
 class BitstreamWriter;
-}
+} // namespace llvm
 
 namespace clang {
 class NamedDecl;
@@ -45,7 +45,7 @@ class MacroInfo;
 class ModuleMacro;
 class ObjCCategoryDecl;
 class TypedefNameDecl;
-}
+} // namespace clang
 
 namespace swift {
 
@@ -129,9 +129,8 @@ template<> struct DenseMapInfo<SerializedSwiftName> {
   static unsigned getHashValue(SerializedSwiftName Val) {
     if (Val.Kind == swift::DeclBaseName::Kind::Normal) {
       return DenseMapInfo<StringRef>::getHashValue(Val.Name);
-    } else {
-      return (unsigned)Val.Kind;
     }
+    return (unsigned)Val.Kind;
   }
   static bool isEqual(SerializedSwiftName LHS, SerializedSwiftName RHS) {
     if (LHS.Kind != RHS.Kind)
@@ -140,9 +139,8 @@ template<> struct DenseMapInfo<SerializedSwiftName> {
     if (LHS.Kind == swift::DeclBaseName::Kind::Normal) {
       assert(RHS.Kind == swift::DeclBaseName::Kind::Normal);
       return DenseMapInfo<StringRef>::isEqual(LHS.Name, RHS.Name);
-    } else {
-      return LHS.Kind == RHS.Kind;
     }
+    return true;
   }
 };
 
@@ -317,13 +315,12 @@ public:
   static bool contextRequiresName(ContextKind kind);
 
   /// A single entry referencing either a named declaration or a macro.
-  typedef llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
-                             clang::ModuleMacro *>
-    SingleEntry;
+  using SingleEntry = llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
+                                         clang::ModuleMacro *>;
 
   /// A stored version of the context of an entity, which is Clang
   /// ASTContext-independent.
-  typedef std::pair<ContextKind, StringRef> StoredContext;
+  using StoredContext = std::pair<ContextKind, StringRef>;
 
   /// Much like \c SingleEntry , this type references either a named
   /// declaration or a macro. However, it may reference it by either a direct
@@ -665,13 +662,13 @@ void addMacrosToLookupTable(SwiftLookupTable &table, NameImporter &);
 /// and emitting diagnostics if necessary.
 void finalizeLookupTable(SwiftLookupTable &table, NameImporter &,
                          ClangSourceBufferImporter &buffersForDiagnostics);
-}
-}
+} // namespace importer
+} // namespace swift
 
 namespace llvm {
 
 template <> struct DenseMapInfo<swift::SwiftLookupTable::ContextKind> {
-  typedef swift::SwiftLookupTable::ContextKind ContextKind;
+  using ContextKind = swift::SwiftLookupTable::ContextKind;
   static ContextKind getEmptyKey() {
     return static_cast<ContextKind>(0);
   }
@@ -686,6 +683,6 @@ template <> struct DenseMapInfo<swift::SwiftLookupTable::ContextKind> {
   }
 };
 
-}
+} // namespace llvm
 
 #endif // SWIFT_CLANGIMPORTER_SWIFTLOOKUPTABLE_H

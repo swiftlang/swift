@@ -1300,4 +1300,171 @@ private:
       : ProtectedIteratorImpl<HasInheritedProtectedCopyConstructor>(other) {}
 };
 
+// A simple wrapper around a char * with all the operator members required of
+// a full-strength iterator.
+//
+// The template parameter U is only used to generate fresh type instances,
+// and just has to be any unique number. This helps us avoid re-defining this
+// same type repeatedly, while we create different explicit specializations of
+// std::iterator_traits<NewPtr<U>> to test.
+template <unsigned U>
+struct NewPtr {
+private:
+  char *ptr;
+  NewPtr(char *ptr) : ptr{ptr} {}
+
+public:
+  const char &operator*() const { return *ptr; }
+  char &operator*() { return *ptr; }
+  NewPtr &operator++() {
+    ++ptr;
+    return *this;
+  }
+  bool operator==(const NewPtr &other) const { return ptr == other.ptr; }
+  bool operator!=(const NewPtr &other) const { return ptr != other.ptr; }
+  bool operator<(const NewPtr &other) const { return ptr < other.ptr; }
+  NewPtr operator+(int v) const { return NewPtr{ptr + v}; }
+  int operator-(const NewPtr &other) const { return ptr - other.ptr; }
+  NewPtr operator-(int v) const { return NewPtr{ptr - v}; }
+  void operator+=(int v) { ptr += v; }
+  void operator-=(int v) { ptr -= v; }
+};
+
+struct NewPtrTraits {
+  // Everything except for iterator_category and iterator_concept
+  using difference_type = std::ptrdiff_t;
+  using value_type = char;
+  using pointer = char *;
+  using reference = char &;
+};
+
+using TaglessNewPtr = NewPtr<__LINE__>;
+
+using InputCategoryNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<InputCategoryNewPtr> : NewPtrTraits {
+  using iterator_category = std::input_iterator_tag;
+};
+
+using ForwardCategoryNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<ForwardCategoryNewPtr> : NewPtrTraits {
+  using iterator_category = std::forward_iterator_tag;
+};
+
+using RandomAccessCategoryNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<RandomAccessCategoryNewPtr> : NewPtrTraits {
+  using iterator_category = std::random_access_iterator_tag;
+};
+
+#if __cplusplus >= 202002L
+
+using ContiguousCategoryNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<ContiguousCategoryNewPtr> : NewPtrTraits {
+  using iterator_category = std::random_access_iterator_tag;
+  using iterator_concept = std::contiguous_iterator_tag;
+};
+
+using InputConceptNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<InputConceptNewPtr> : NewPtrTraits {
+  using iterator_concept = std::input_iterator_tag;
+};
+
+using ForwardConceptNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<ForwardConceptNewPtr> : NewPtrTraits {
+  using iterator_concept = std::forward_iterator_tag;
+};
+
+using RandomAccessConceptNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<RandomAccessConceptNewPtr> : NewPtrTraits {
+  using iterator_concept = std::random_access_iterator_tag;
+};
+
+using ContiguousConceptNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<ContiguousConceptNewPtr> : NewPtrTraits {
+  using iterator_concept = std::contiguous_iterator_tag;
+};
+
+using InvalidContiguousCategoryNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<InvalidContiguousCategoryNewPtr> : NewPtrTraits {
+  // You can't have a contiguous tag as the iterator_category (it has to be
+  // iterator_concept), but std::contiguous_iterator_tag inherits from
+  // std::random_access_iterator_tag, so this is treated as such.
+  using iterator_category = std::contiguous_iterator_tag;
+};
+#endif // __cplusplus >= 202002L
+
+using IteratorTagOfMemberTypedef = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<IteratorTagOfMemberTypedef> : NewPtrTraits {
+  using the_category = std::input_iterator_tag;
+  using iterator_category = the_category;
+};
+
+using non_member_input_iterator_tag = std::input_iterator_tag;
+using IteratorTagOfNonMemberTypedef = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<IteratorTagOfNonMemberTypedef> : NewPtrTraits {
+  using iterator_category = non_member_input_iterator_tag;
+};
+
+
+// A simple wrapper around a char * with all the operator members required of
+// a full-strength iterator, plus a std::random_access_iterator_tag.
+//
+// The template parameter U is only used to generate fresh type instances,
+// and just has to be any unique number. This helps us avoid re-defining this
+// same type repeatedly, while we create different explicit specializations of
+// std::iterator_traits<LegacyPtr<U>> to test.
+template <unsigned U>
+struct LegacyPtr {
+  private:
+  char *ptr;
+  LegacyPtr(char *ptr) : ptr{ptr} {}
+
+public:
+  const char &operator*() const { return *ptr; }
+  char &operator*() { return *ptr; }
+  LegacyPtr &operator++() {
+    ++ptr;
+    return *this;
+  }
+  bool operator==(const LegacyPtr &other) const { return ptr == other.ptr; }
+  bool operator!=(const LegacyPtr &other) const { return ptr != other.ptr; }
+  bool operator<(const LegacyPtr &other) const { return ptr < other.ptr; }
+  LegacyPtr operator+(int v) const { return LegacyPtr{ptr + v}; }
+  int operator-(const LegacyPtr &other) const { return ptr - other.ptr; }
+  LegacyPtr operator-(int v) const { return LegacyPtr{ptr - v}; }
+  void operator+=(int v) { ptr += v; }
+  void operator-=(int v) { ptr -= v; }
+
+  using iterator_category = std::random_access_iterator_tag;
+};
+
+using BasicLegacyPtr = LegacyPtr<__LINE__>;
+
+using NotALegacyPtr = LegacyPtr<__LINE__>;
+template <> struct std::iterator_traits<NotALegacyPtr> : NewPtrTraits {};
+
+using InputCategoryLegacyPtr = LegacyPtr<__LINE__>;
+template <> struct std::iterator_traits<InputCategoryLegacyPtr> : NewPtrTraits {
+  using iterator_category = std::input_iterator_tag;
+};
+
+#if __cplusplus >= 202002L
+
+using InputConceptLegacyPtr = LegacyPtr<__LINE__>;
+template <> struct std::iterator_traits<InputConceptLegacyPtr> : NewPtrTraits {
+  using iterator_concept = std::input_iterator_tag;
+};
+
+using ContiguousConceptLegacyPtr = LegacyPtr<__LINE__>;
+template <> struct std::iterator_traits<ContiguousConceptLegacyPtr> : NewPtrTraits {
+  using iterator_concept = std::contiguous_iterator_tag;
+};
+
+using InputCategoryContiguousConceptLegacyPtr = LegacyPtr<__LINE__>;
+template <> struct std::iterator_traits<InputCategoryContiguousConceptLegacyPtr> : NewPtrTraits {
+  using iterator_category = std::input_iterator_tag;
+  using iterator_concept = std::contiguous_iterator_tag;
+};
+
+#endif // __cplusplus >= 202002L
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_ITERATOR_H

@@ -1257,6 +1257,9 @@ Added: _$sSlss17BorrowingSequenceRzrlE19underestimatedCountSivg
 Added: _$sSlss17BorrowingSequenceRzrlE19underestimatedCountSivpMV
 Added: _$sSlss17BorrowingSequenceRzrlE31_customContainsEquatableElementySbSg0F0STQzF
 
+// Necessary for Distributed to compute distributed remote reference object size
+Added: __ZN5swift26getResilientMetadataBoundsEPKNS_21TargetClassDescriptorINS_9InProcessEEE
+
 // Borrow
 Added: _$ss6BorrowVMa
 Added: _$ss6BorrowVMn
