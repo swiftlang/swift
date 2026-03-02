@@ -312,6 +312,90 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
   }
 }
 
+// For when we are trying to remove a record but can only do
+// so if a certain condition of the active task status is true
+SWIFT_CC(swift)
+bool swift::removeStatusRecordIf(AsyncTask *task, TaskStatusRecord *record,
+    ActiveTaskStatus &oldStatus,
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus &)> fn,
+    llvm::function_ref<bool(ActiveTaskStatus)> condition) {
+
+  SWIFT_TASK_DEBUG_LOG("remove status record = %p, from task = %p",
+                       record, task);
+
+  bool didRemove = false;
+  while (true) {
+    // If the record is locked, then either we wait for the lock or we own the
+    // lock. Either way, acquire the status record lock and perform the removal.
+    // If the record to be removed is not the innermost record, then we need to
+    // acquire the lock to safely remove it.
+    if (oldStatus.isStatusRecordLocked() ||
+        oldStatus.getInnermostRecord() != record) {
+      withStatusRecordLock(
+          task, oldStatus,
+          [&](ActiveTaskStatus lockedStatus) {
+            // Now that we have locked the status, evaluate the condition
+            if (!condition(lockedStatus)) {
+              return;
+            }
+            didRemove = true;
+            // If the record is the innermost (always was, or became that way
+            // while we waited) then we have to remove it in the status change
+            // function, since changing the head of the list requires changing
+            // the status. If it's not the innermost then we can remove it here.
+            if (lockedStatus.getInnermostRecord() != record) {
+              removeNonInnermostStatusRecordLocked(lockedStatus, record);
+            }
+          },
+          [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+            // If the condition allows us to remove
+            // the record, update the ActiveTaskStatus
+            if (didRemove) {
+              // If this record is the innermost record,
+              // set a new status with the record removed.
+              if (newStatus.getInnermostRecord() == record)
+                newStatus = newStatus.withInnermostRecord(record->getParent());
+
+              // Requested status updates
+              if (fn) {
+                fn(oldStatus, newStatus);
+              }
+            }
+          });
+      // Taking the lock never requires a retry
+      break;
+    }
+
+    // Nobody holds the lock, and the record is the
+    // innermost record. Attempt to remove it locklessly.
+    if (!condition(oldStatus)) {
+      // Condition has decided we no longer want to attempt removal
+      break;
+    }
+
+    // Remove the record
+    auto newStatus = oldStatus.withInnermostRecord(record->getParent());
+
+    // Requested status updates
+    if (fn) {
+      fn(oldStatus, newStatus);
+    }
+
+    if (task->_private()._status().compare_exchange_weak(
+            oldStatus, newStatus,
+            /*success*/ std::memory_order_relaxed,
+            /*failure*/ std::memory_order_relaxed)) {
+      newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
+      didRemove = true;
+      break;
+    }
+
+    // We failed to remove the record locklessly. Go back to the top and retry
+    // removing it.
+  }
+  return didRemove;
+}
+
 // For when we are trying to remove a record and also optionally trying to
 // modify some flags in the ActiveTaskStatus at the same time.
 SWIFT_CC(swift)

@@ -221,6 +221,16 @@ SWIFT_CC(swift)
 void removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
 
+/// Similar to the above functions, attempt to remove record from
+/// task. If condition returns false, record is considered invalid
+/// and won't be attempted to be removed. It may be called multiple
+/// times to ensure it is checked atomically with the removal.
+SWIFT_CC(swift)
+bool removeStatusRecordIf(AsyncTask *task, TaskStatusRecord *record,
+                          ActiveTaskStatus &status,
+                          llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus &)> fn,
+                          llvm::function_ref<bool(ActiveTaskStatus)> condition);
+
 /// Update the status record by scanning through all records and removing
 /// those which match the condition. This can also be used to inspect
 /// "remaining" records.
