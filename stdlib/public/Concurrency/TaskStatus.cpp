@@ -1102,7 +1102,7 @@ void TaskDependencyStatusRecord::performEscalationAction(
       break;
     case EnqueuedOnExecutor:
       SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent executor %p noted in %p record from %#x to %#x",
-        this->DependentOn.Executor, this, oldPriority, newPriority);
+        (void*)this->DependentOn.Executor.getIdentity(), (void*)this, oldPriority, newPriority);
       swift_executor_escalate(this->DependentOn.Executor, this->WaitingTask, newPriority);
       break;
   }

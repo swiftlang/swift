@@ -189,7 +189,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
 #else
     // Put the waiting task at the beginning of the wait queue.
     // NOTE: this acquire-release synchronizes with `completeFuture`.
-    waitingTask->getNextWaitingTask() = queueHead.getTask();
+    auto nextWaitingTask = queueHead.getTask();
+    waitingTask->getNextWaitingTask() = nextWaitingTask;
     auto newQueueHead = WaitQueueItem::get(Status::Executing, waitingTask);
     if (fragment->waitQueue.compare_exchange_weak(
             queueHead, newQueueHead,
@@ -197,6 +198,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
             /*failure*/ std::memory_order_acquire)) {
 
       _swift_task_clearCurrent();
+      SWIFT_TASK_DEBUG_LOG("Task %p added to wait queue of Task %p. Next Task in the queue is %p", waitingTask, this, nextWaitingTask);
       return FutureFragment::Status::Executing;
     }
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
