@@ -1204,6 +1204,9 @@ Added: _$ss4SpanVsRi_zrlE22_makeBorrowingIteratorAByxGyF
 Added: _$ss4SpanVyxGs18_BorrowingSequencesRi_zrlMc
 Added: _$ss4SpanVyxGs26_BorrowingIteratorProtocolsRi_zrlMc
 
+// Necessary for Distributed to compute distributed remote reference object size
+Added: __ZN5swift26getResilientMetadataBoundsEPKNS_21TargetClassDescriptorINS_9InProcessEEE
+
 // Borrow
 Added: _$ss6BorrowVMa
 Added: _$ss6BorrowVMn
