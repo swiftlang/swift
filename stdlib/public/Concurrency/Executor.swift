@@ -500,14 +500,17 @@ extension Executor {
   // Delegation goes like this:
   // Unowned Job -> Executor Job -> Job -> ---||---
 
+  @inlinable
   public func enqueue(_ job: UnownedJob) {
     self.enqueue(ExecutorJob(job))
   }
 
+  @inlinable
   public func enqueue(_ job: consuming ExecutorJob) {
     self.enqueue(Job(job))
   }
 
+  @inlinable
   public func enqueue(_ job: consuming Job) {
     self.enqueue(UnownedJob(job))
   }
