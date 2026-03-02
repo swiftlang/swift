@@ -1990,6 +1990,13 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
     return;
   }
 
+  // DiagnosticVerifier hasn't run yet. Freeing the AST context will free the
+  // source buffers.
+  if (Instance.getInvocation().getDiagnosticOptions().VerifyMode !=
+      DiagnosticOptions::NoVerify) {
+    return;
+  }
+
   // Make sure to perform the end of pipeline actions now, because they need
   // access to the ASTContext.
   performEndOfPipelineActions(Instance);
