@@ -26,6 +26,8 @@ public struct ArchetypalConformance<T>: MyProto {
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "bar",
 // CHECK-NEXT:              "type": "Any",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractArchetype.swift",
+// CHECK-NEXT:              "line": 14,
 // CHECK-NEXT:              "valueKind": "Type",
 // CHECK-NEXT:              "value": {
 // CHECK-NEXT:                "type": "T",
