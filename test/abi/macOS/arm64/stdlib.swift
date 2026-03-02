@@ -1141,6 +1141,10 @@ Added: _$ss7UnicodeO27_RandomAccessWordRecognizerVN
 Removed: _$sSS17_nearestWordIndex9atOrBelowSS0C0VAD_tF
 Removed: _$sSS10_wordIndex6beforeSS0B0VAD_tF
 
+// Dictionary "insert if key is absent" functions
+Added: _$sSD6_index6forKey7defaultSD5IndexVyxq__Gx_q_yXKtF
+Added: _$sSD9_addValue_6forKeySbq__xtF
+
 // Internal info exposed for swift-inspect.
 Added: __swift_debug_allocationPoolSize
 Added: __swift_debug_metadataAllocatorPageSize
