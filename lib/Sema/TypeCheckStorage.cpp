@@ -43,7 +43,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
-#include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
 
 /// Set each bound variable in the pattern to have an error type.
@@ -135,18 +134,8 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
   // This is necessary for peer macro expansions that introduce wrapped
   // properties: if we only lower direct members here, stored property
   // enumeration can run before wrapper backing vars are synthesized.
-  llvm::SmallPtrSet<Decl *, 8> visited;
   std::function<void(Decl *)> visitMember;
   visitMember = [&](Decl *member) {
-    if (!visited.insert(member).second)
-      return;
-
-    // Expand peer macros.
-    (void)evaluateOrDefault(
-        ctx.evaluator,
-        ExpandPeerMacroRequest{member},
-        {});
-
     auto *var = dyn_cast<VarDecl>(member);
     if (var && !var->isStatic() && reason == LoweredPropertiesReason::Stored) {
       if (var->getAttrs().hasAttribute<LazyAttr>())
