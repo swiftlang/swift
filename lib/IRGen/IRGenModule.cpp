@@ -231,6 +231,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   PtrTy = llvm::PointerType::getUnqual(getLLVMContext());
+  // respect program address space in llvm data layout
+  // for function pointers
+  FunctionPtrTy = llvm::PointerType::get(getLLVMContext(),
+    DataLayout.getProgramAddressSpace());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
   Int16Ty = llvm::Type::getInt16Ty(getLLVMContext());
