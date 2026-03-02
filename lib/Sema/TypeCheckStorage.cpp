@@ -137,7 +137,7 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
   std::function<void(Decl *)> visitMember;
   visitMember = [&](Decl *member) {
     auto *var = dyn_cast<VarDecl>(member);
-    if (var && !var->isStatic() && reason == LoweredPropertiesReason::Stored) {
+    if (var && !var->isStatic()) {
       if (var->getAttrs().hasAttribute<LazyAttr>())
         (void)var->getLazyStorageProperty();
 
