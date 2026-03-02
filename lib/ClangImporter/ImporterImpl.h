@@ -2174,6 +2174,7 @@ Identifier getOperatorName(ASTContext &ctx, clang::OverloadedOperatorKind op);
 /// correspond to an overloaded C++ operator.
 Identifier getOperatorName(ASTContext &ctx, Identifier op);
 
+bool hasSwiftAttribute(const clang::Decl *decl, StringRef attr);
 bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
 bool hasIteratorAPIAttr(const clang::Decl *decl);
