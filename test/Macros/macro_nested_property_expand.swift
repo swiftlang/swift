@@ -107,6 +107,13 @@ public struct WrappedByPeer {
   }
 }
 
+// Also exercise the memberwise/default-init path with a peer-generated wrapped
+// property to ensure lowering is complete before SILGen.
+public struct WrappedByPeerMemberwise {
+  @AddWrappedPeer var feature: Bool = false
+}
+let _ = WrappedByPeerMemberwise()
+
 // PRINT-LABEL: struct TestMemberwise1<T>
 struct TestMemberwise1<T> {
   @PropertyWrap var property: T
