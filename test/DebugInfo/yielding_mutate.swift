@@ -19,10 +19,10 @@ struct S {
 var state = S()
 
 // CHECK: %[[coro:.*]] = call ptr @llvm.coro.prepare.retcon
-// CHECK: %[[call_result:.*]] = call swiftcc { ptr, ptr } %[[coro]]
+// CHECK: %[[call_result:.*]] = call swift{{.*}}cc { ptr, ptr } %[[coro]]
 // CHECK: %[[continuation_ptr:.*]] = extractvalue  { ptr, ptr } %[[call_result]]
 // CHECK: call {{.*}} @{{.*}}USE{{.*}}, !dbg ![[DBG:.*]]
-// CHECK: call swiftcc void %[[continuation_ptr]]{{.*}}, !dbg ![[DBG]]
+// CHECK: call swift{{.*}}cc void %[[continuation_ptr]]{{.*}}, !dbg ![[DBG]]
 USE(&state.computed_property)
 FINISH()
 // CHECK: call swiftcc void @"{{.*}}FINISH

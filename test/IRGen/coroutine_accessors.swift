@@ -75,13 +75,13 @@
 // CHECK-arm64e-SAME:    i64 23464 },
 // CHECK-arm64e-SAME:  section "llvm.ptrauth",
 // CHECK-arm64e-SAME:  align 8
-// CHECK-LABEL: _swift_coro_malloc_allocator = linkonce_odr hidden constant %swift.coro_allocator {
-// CHECK-SAME:       i32 258,
-// CHECK-SAME:       _swift_coro_malloc
+// CHECK-LABEL: _swift_coro_typed_malloc_allocator = linkonce_odr hidden constant %swift.coro_allocator {
+// CHECK-SAME:       i32 259,
+// CHECK-SAME:       _swift_coro_typed_malloc
 // CHECK-ar64e-SAME:     .ptrauth
 // CHECK-SAME:       _swift_coro_free
 // CHECK-ar64e-SAME:     .ptrauth
-// CHECK-SAME:       _swift_coro_malloc
+// CHECK-SAME:       _swift_coro_typed_malloc
 // CHECK-ar64e-SAME:     .ptrauth.{{.*}}
 // CHECK-SAME:       _swift_coro_free
 // CHECK-ar64e-SAME:     .ptrauth.{{.*}}
@@ -211,7 +211,7 @@ public var o: any AnyObject
 public var _i: Int = 0
 
 public var irm: Int {
-// CHECK-LABEL: declare{{.*}} swiftcc void @"$s19coroutine_accessors1SVSiIetMIlYl_TC"(ptr noalias, ptr swiftcoro)
+// CHECK-LABEL: declare{{.*}} swift{{(coro)?}}cc void @"$s19coroutine_accessors1SVSiIetMIlYl_TC"(ptr noalias, ptr swiftcoro)
 
 // CHECK-LABEL:     define{{.*}} { ptr, {{i64|i32}} } @"$s19coroutine_accessors1SV3irmSivy"(
 // CHECK-SAME:          ptr noalias [[FRAME:%[^,]+]],
@@ -307,18 +307,18 @@ public var irm: Int {
 // CHECK-32:      [[FRAME:%[^,]+]] = alloca i8, [[INT]] {{%[^,]+}}
 // CHECK:         call void @llvm.lifetime.start.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s19coroutine_accessors1SV3irmSivx")
-// CHECK:         [[RETVAL:%[^,]+]] = call swiftcc { ptr, ptr } [[RAMP]](
+// CHECK:         [[RETVAL:%[^,]+]] = call swift{{(coro)?}}cc { ptr, ptr } [[RAMP]](
 // CHECK-SAME:         [[FRAME]],
-// CHECK-SAME:         _swift_coro_malloc_allocator
+// CHECK-SAME:         null
 // CHECK-SAME:    )
 // CHECK:         [[CONTINUATION:%[^,]+]] = extractvalue { ptr, ptr } [[RETVAL]], 0
 // CHECK:         [[YIELD:%[^,]+]] = extractvalue { ptr, ptr } [[RETVAL]], 1
 // CHECK:         call swiftcc void @"$s19coroutine_accessors9incrementyySizF"(
 // CHECK-SAME:        [[YIELD]]
 // CHECK-SAME:    )
-// CHECK:         call swiftcc void [[CONTINUATION]](
+// CHECK:         call swift{{(coro)?}}cc void [[CONTINUATION]](
 // CHECK-SAME:        [[FRAME]],
-// CHECK-SAME:        _swift_coro_malloc_allocator
+// CHECK-SAME:        null
 // CHECK-SAME:    )
 // CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
 // CHECK:       }
@@ -345,7 +345,7 @@ public mutating func increment_irm() {
 // CHECK:         [[FRAME:%[^,]+]] = call swiftcc ptr @swift_task_alloc([[INT]] [[SIZE]])
 // CHECK:         call void @llvm.lifetime.start.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s19coroutine_accessors1SV3irmSivx")
-// CHECK:         [[RETVAL:%[^,]+]] = call swiftcc { ptr, ptr } [[RAMP]](
+// CHECK:         [[RETVAL:%[^,]+]] = call swift{{(coro)?}}cc { ptr, ptr } [[RAMP]](
 // CHECK-SAME:         [[FRAME]],
 // CHECK-SAME:         _swift_coro_async_allocator
 // CHECK-SAME:    )
@@ -354,7 +354,7 @@ public mutating func increment_irm() {
 
 //                increment_async([[YIELD]])
 
-// CHECK:         call swiftcc void [[CONTINUATION]](
+// CHECK:         call swift{{(coro)?}}cc void [[CONTINUATION]](
 // CHECK-SAME:        [[FRAME]],
 // CHECK-SAME:        _swift_coro_async_allocator
 // CHECK-SAME:    )
@@ -389,7 +389,7 @@ public var force_yield_once_convention : () {
 // CHECK:         [[FRAME:%[^,]+]] = call ptr @llvm.coro.alloca.get(token [[ALLOCATION]])
 // CHECK:         call void @llvm.lifetime.start.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s19coroutine_accessors1SV3irmSivx")
-// CHECK:         [[RETVAL:%[^,]+]] = call swiftcc { ptr, ptr } [[RAMP]](
+// CHECK:         [[RETVAL:%[^,]+]] = call swift{{(coro)?}}cc { ptr, ptr } [[RAMP]](
 // CHECK-SAME:         [[FRAME]],
 // CHECK-apple-SAME:         _swift_coro_typed_malloc_allocator
 // CHECK-SAME:    )
@@ -398,7 +398,7 @@ public var force_yield_once_convention : () {
 // CHECK:         call swiftcc void @"$s19coroutine_accessors9incrementyySizF"(
 // CHECK-SAME:        [[YIELD]]
 // CHECK-SAME:    )
-// CHECK:         call swiftcc void [[CONTINUATION]](
+// CHECK:         call swift{{(coro)?}}cc void [[CONTINUATION]](
 // CHECK-SAME:        [[FRAME]],
 // CHECK-apple-SAME:        _swift_coro_typed_malloc_allocator
 // CHECK-SAME:    )
@@ -439,7 +439,7 @@ public var force_yield_once_2_convention : () {
 // CHECK:         [[FRAME:%[^,]+]] = call ptr @llvm.coro.alloca.get(token [[ALLOCATION]])
 // CHECK:         call void @llvm.lifetime.start.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s19coroutine_accessors1SV3irmSivx")
-// CHECK:         [[RETVAL:%[^,]+]] = call swiftcc { ptr, ptr } [[RAMP]](
+// CHECK:         [[RETVAL:%[^,]+]] = call swift{{(coro)?}}cc { ptr, ptr } [[RAMP]](
 // CHECK-SAME:         [[FRAME]],
 // CHECK-SAME:         [[ALLOCATOR]]
 // CHECK-SAME:    )
@@ -448,7 +448,7 @@ public var force_yield_once_2_convention : () {
 // CHECK:         call swiftcc void @"$s19coroutine_accessors9incrementyySizF"(
 // CHECK-SAME:        [[YIELD]]
 // CHECK-SAME:    )
-// CHECK:         call swiftcc void [[CONTINUATION]](
+// CHECK:         call swift{{(coro)?}}cc void [[CONTINUATION]](
 // CHECK-SAME:        [[FRAME]],
 // CHECK-SAME:        [[ALLOCATOR]]
 // CHECK-SAME:    )
