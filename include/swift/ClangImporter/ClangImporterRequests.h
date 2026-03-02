@@ -28,6 +28,7 @@
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -343,6 +344,120 @@ private:
    bool isCached() const { return true; }
    std::optional<ObjCInterfaceAndImplementation> getCachedResult() const;
    void cacheResult(ObjCInterfaceAndImplementation value) const;
+};
+
+/// Information describing a possible foreign reference type, produced by the
+/// analysis performed by a ForeignReferenceTypeInfoRequest.
+///
+/// This information incorporates several independent dimensions for "foreign
+/// reference typedness," including the notion of an "invalid" foreign reference
+/// type that can result from, say, a derived type inheriting from multiple FRT
+/// bases (invalid due to ambiguous retain/release functions).
+///
+/// For valid shared reference types, this info also tracks the "canonical"
+/// FRT base which signifies which retain/release functions are to be used.
+class ForeignReferenceTypeInfo {
+  enum Flag {
+    /// This type has (or inherits) valid reference type attributes, if any
+    FlagIsValid = 1 << 0,
+    /// This type is a foreign reference type
+    FlagIsRef = 1 << 1,
+  };
+
+  llvm::PointerIntPair<const clang::RecordDecl *, 2> BaseAndFlags;
+
+  ForeignReferenceTypeInfo(const clang::RecordDecl *decl, bool isValid,
+                           bool isRef)
+      : BaseAndFlags{decl} {
+    unsigned int flags = 0;
+    flags |= isValid ? FlagIsValid : 0;
+    flags |= isRef ? FlagIsRef : 0;
+    BaseAndFlags.setInt(flags);
+  }
+
+public:
+  /// Not a reference type, not valid
+  ForeignReferenceTypeInfo() : BaseAndFlags{nullptr, 0} {}
+
+  /// Not a reference type
+  static ForeignReferenceTypeInfo Value(bool isValid = true) {
+    return {nullptr, isValid, /*isRef=*/false};
+  }
+
+  /// A shared reference type using the retain/release functions from \a decl.
+  static ForeignReferenceTypeInfo Shared(const clang::RecordDecl *decl,
+                                         bool isValid = true) {
+    ASSERT(decl && "shared reference must have a non-null base decl");
+    return {decl, isValid, /*isRef=*/true};
+  }
+
+  /// The base decl that is annotated with the retain/release functions that
+  /// this reference type uses.
+  ///
+  /// If this is an invalid reference type, this returns an arbitrary FRT base
+  /// (there may be multiple FRT bases that cause this to be invalid due to
+  /// ambiguity about which retain/release values to use).
+  ///
+  /// Returns \c nullptr for non-shared references.
+  const clang::RecordDecl *getDecl() const { return BaseAndFlags.getPointer(); }
+
+  /// All of its (and its bases') foreign reference type attributes (if any)
+  /// are valid.
+  ///
+  /// This is independent of whether this foreign type should be actually be
+  /// imported with reference semantics.
+  bool isValid() const { return BaseAndFlags.getInt() & FlagIsValid; }
+
+  /// Whether this type or its bases have attributes that ask for it to be
+  /// imported as a reference type.
+  ///
+  /// This is independent of whether those attributes are actually valid.
+  bool isReference() const { return BaseAndFlags.getInt() & FlagIsRef; }
+};
+
+struct ForeignReferenceTypeInfoDescriptor {
+  const clang::RecordDecl *decl;
+
+  ForeignReferenceTypeInfoDescriptor(const clang::RecordDecl *decl)
+      : decl{decl} {}
+
+  friend llvm::hash_code
+  hash_value(const ForeignReferenceTypeInfoDescriptor &desc) {
+    return llvm::hash_combine(desc.decl);
+  }
+
+  friend bool operator==(const ForeignReferenceTypeInfoDescriptor &lhs,
+                         const ForeignReferenceTypeInfoDescriptor &rhs) {
+    return lhs.decl == rhs.decl;
+  }
+
+  friend bool operator!=(const ForeignReferenceTypeInfoDescriptor &lhs,
+                         const ForeignReferenceTypeInfoDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const ForeignReferenceTypeInfoDescriptor &desc);
+SourceLoc
+extractNearestSourceLoc(const ForeignReferenceTypeInfoDescriptor &desc);
+
+class ForeignReferenceTypeInfoRequest
+    : public SimpleRequest<ForeignReferenceTypeInfoRequest,
+                           ForeignReferenceTypeInfo(
+                               ForeignReferenceTypeInfoDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+  bool isCached() const { return true; }
+
+private:
+  friend SimpleRequest;
+
+  ForeignReferenceTypeInfo evaluate(Evaluator &evaluator,
+                                    ForeignReferenceTypeInfoDescriptor) const;
 };
 
 enum class CxxRecordSemanticsKind {

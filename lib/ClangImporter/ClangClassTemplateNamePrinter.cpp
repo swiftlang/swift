@@ -13,6 +13,7 @@
 #include "ClangClassTemplateNamePrinter.h"
 #include "ImporterImpl.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "clang/AST/TemplateArgumentVisitor.h"
 #include "clang/AST/Type.h"
 #include "clang/AST/TypeVisitor.h"
@@ -133,10 +134,11 @@ struct TemplateInstantiationNamePrinter
     // it in Unsafe(Mutable)?Pointer, since it will be imported as a class
     // in Swift.
     bool isReferenceType = false;
-    if (auto tagDecl = pointee->getAsTagDecl()) {
-      if (auto *rd = dyn_cast<clang::RecordDecl>(tagDecl))
-        isReferenceType = recordHasReferenceSemantics(rd, importerImpl);
-    }
+    if (auto *rd = pointee->getAsRecordDecl())
+      isReferenceType =
+          evaluateOrDefault(swiftCtx.evaluator,
+                            ForeignReferenceTypeInfoRequest({rd}), {})
+              .isReference();
 
     llvm::SmallString<128> storage;
     llvm::raw_svector_ostream buffer(storage);

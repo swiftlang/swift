@@ -1987,12 +1987,6 @@ public:
 };
 
 namespace importer {
-
-/// Returns true if the given C/C++ record should be imported as a reference
-/// type into Swift.
-bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
-                                 ClangImporter::Implementation *importerImpl);
-
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
@@ -2246,11 +2240,11 @@ getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
   return nullptr;
 }
 
-/// Find a unique base class that is annotated as SHARED_REFERENCE if any.
-const clang::RecordDecl *
-getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
-                   ClangImporter::Implementation *importerImpl);
-
+/// Emit diagnostics related to foreign reference types for \a decl.
+///
+/// This operation is idempotent.
+bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
+                                  ClangImporter::Implementation &Impl);
 
 /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
 /// have a valid owning module.
