@@ -624,7 +624,7 @@ EXPERIMENTAL_FEATURE(UnderscoreOwned, true)
 EXPERIMENTAL_FEATURE(BorrowInout, true)
 
 /// Allow access to the BorrowingSequence protocols/types outside the stdlib.
-EXPERIMENTAL_FEATURE(BorrowingSequence, false)
+EXPERIMENTAL_FEATURE(BorrowingSequence, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
