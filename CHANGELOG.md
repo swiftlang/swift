@@ -5,6 +5,17 @@
 
 ## Swift (next)
 
+* [SE-0494][]:
+  Introduced new `isTriviallyIdentical(to:)` instance methods to concrete types
+  for quickly determining if two instances must be equal by-value. These methods
+  complement methods to determine value equality. The crucial difference is that
+  value equality on collection types can return in linear time: `O(n)`. The
+  `isTriviallyIdentical(to:)` methods will return in constant time: `O(1)`.
+
+  These methods are advanced performance hooks. Engineers should profile and
+  measure their existing algorithms built on value equality checks to confirm if
+  there is a performance bottleneck.
+
 * [SE-0504][]:
   Introduced Task Cancellation Shields which temporarily prevent the observation of task
   cancellation in a given scope. This functionality is intended for use with cleanup actions which
@@ -11006,6 +11017,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0471]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
+[SE-0494]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0494-add-is-identical-methods.md
 [SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
