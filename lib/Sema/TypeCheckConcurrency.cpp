@@ -6014,6 +6014,11 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
       if (isa<TypeAliasDecl>(value))
         return {};
 
+      // Associated types cannot have custom isolation, they are tied to
+      // their protocol declaration.
+      if (isa<AssociatedTypeDecl>(value))
+        return {};
+
       // Members and nested types must check the isolation of the enclosing
       // nominal type.
       auto *dc = value->getInnermostDeclContext();
