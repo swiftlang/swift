@@ -1509,6 +1509,9 @@ TaskExecutorRef TaskExecutorRef::fromTaskExecutorPreference(Job *job) {
   if (auto task = dyn_cast<AsyncTask>(job)) {
     return task->getPreferredTaskExecutor();
   }
+  if (auto stealer = dyn_cast<AsyncTaskStealer>(job)) {
+    return stealer->Task->getPreferredTaskExecutor();
+  }
   return TaskExecutorRef::undefined();
 }
 
@@ -1866,10 +1869,8 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
         break;
       }
     } else {
-      if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-        auto taskExecutor = task->getPreferredTaskExecutor();
-        trackingInfo.setTaskExecutor(taskExecutor);
-      }
+      auto taskExecutor = TaskExecutorRef::fromTaskExecutorPreference(job);
+      trackingInfo.setTaskExecutor(taskExecutor);
 
       // This thread is now going to follow the task on this actor.
       // It may hop off the actor
@@ -2698,10 +2699,8 @@ extern "C" SWIFT_CC(swift) void _swift_task_makeAnyTaskExecutor(
 SWIFT_CC(swift)
 static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef) {
 #ifndef NDEBUG
-  auto _taskExecutorRef = TaskExecutorRef::undefined();
-  if (auto task = dyn_cast<AsyncTask>(job)) {
-    _taskExecutorRef = task->getPreferredTaskExecutor();
-  }
+  [[maybe_unused]]
+  auto _taskExecutorRef = TaskExecutorRef::fromTaskExecutorPreference(job);
   SWIFT_TASK_DEBUG_LOG("enqueue job %p on serial serialExecutor %p, taskExecutor = %p", job,
                        serialExecutorRef.getIdentity(),
                        _taskExecutorRef.getIdentity());
@@ -2714,22 +2713,20 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
   _swift_tsan_release(job);
 
   if (serialExecutorRef.isGeneric()) {
-    if (auto task = dyn_cast<AsyncTask>(job)) {
-      auto taskExecutorRef = task->getPreferredTaskExecutor();
-      if (taskExecutorRef.isDefined()) {
+    auto taskExecutorRef = TaskExecutorRef::fromTaskExecutorPreference(job);
+    if (taskExecutorRef.isDefined()) {
 #if SWIFT_CONCURRENCY_EMBEDDED
-        swift_unreachable("task executors not supported in embedded Swift");
+      swift_unreachable("task executors not supported in embedded Swift");
 #else
-        auto taskExecutorIdentity = taskExecutorRef.getIdentity();
-        auto taskExecutorType = swift_getObjectType(taskExecutorIdentity);
-        auto taskExecutorWtable = taskExecutorRef.getTaskExecutorWitnessTable();
+      auto taskExecutorIdentity = taskExecutorRef.getIdentity();
+      auto taskExecutorType = swift_getObjectType(taskExecutorIdentity);
+      auto taskExecutorWtable = taskExecutorRef.getTaskExecutorWitnessTable();
 
-        return _swift_task_enqueueOnTaskExecutor(
-            job,
-            taskExecutorIdentity, taskExecutorType, taskExecutorWtable);
+      return _swift_task_enqueueOnTaskExecutor(
+          job,
+          taskExecutorIdentity, taskExecutorType, taskExecutorWtable);
 #endif // SWIFT_CONCURRENCY_EMBEDDED
-      } // else, fall-through to the default global enqueue
-    }
+    } // else, fall-through to the default global enqueue
     return swift_task_enqueueGlobal(job);
   }
 

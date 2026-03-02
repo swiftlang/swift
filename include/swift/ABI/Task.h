@@ -182,6 +182,10 @@ public:
   void runSimpleInFullyEstablishedContext() {
     return RunJob(this); // 'return' forces tail call
   }
+
+  /// Gets the 32-bit Job ID from the job or the 64-bit
+  /// Task ID if this is an AsyncTask or AsyncTaskStealer
+  uint64_t getJobTaskId() const;
 };
 
 // The compiler will eventually assume these.
@@ -385,7 +389,7 @@ public:
 
   /// Set the task's ID field to the next task ID.
   void setTaskId();
-  uint64_t getTaskId();
+  uint64_t getTaskId() const;
 
   /// Get the task's resume function, for logging purposes only. This will
   /// attempt to see through the various adapters that are sometimes used, and

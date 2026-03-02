@@ -355,10 +355,25 @@ void AsyncTask::setTaskId() {
   _private().Id = (Fetched >> 32) & 0xffffffff;
 }
 
-uint64_t AsyncTask::getTaskId() {
+uint64_t AsyncTask::getTaskId() const {
   // Reconstitute a full 64-bit task ID from the 32-bit job ID and the upper
   // 32 bits held in _private().
   return ((uint64_t)_private().Id << 32) | (uint64_t)Id;
+}
+
+/// Gets the 32-bit Job ID from the job or the 64-bit
+/// Task ID if this is an AsyncTask or AsyncTaskStealer
+uint64_t Job::getJobTaskId() const {
+  if (auto task = dyn_cast<AsyncTask>(this)) {
+    // TaskID is actually:
+    //   32bits of Job's Id
+    // + 32bits stored in the AsyncTask
+    return task->getTaskId();
+  } else if (auto stealer = dyn_cast<AsyncTaskStealer>(this)) {
+    return stealer->Task->getTaskId();
+  } else {
+    return this->getJobId();
+  }
 }
 
 SWIFT_CC(swift)
