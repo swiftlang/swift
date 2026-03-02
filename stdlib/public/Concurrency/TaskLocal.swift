@@ -208,13 +208,13 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   // ABI Note: @abi needed because the mangling otherwise conflicts with the
   // legacy @_unsafeInheritExecutor declaration.
   @abi(
-    nonisolated(nonsending) func withValueNonisolatedNonsending<R, E: Error>(
+    nonisolated(nonsending) func withValueNonisolatedNonsending<R: ~Copyable, E: Error>(
       _ valueDuringOperation: Value,
       operation: nonisolated(nonsending) () async throws(E) -> R,
       file: String, line: UInt
     ) async throws(E) -> R
   )
-  public nonisolated(nonsending) func withValue<R, E: Error>(
+  public nonisolated(nonsending) func withValue<R: ~Copyable, E: Error>(
     _ valueDuringOperation: Value,
     operation: nonisolated(nonsending) () async throws(E) -> R,
     file: String = #fileID, line: UInt = #line
@@ -290,7 +290,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @_alwaysEmitIntoClient
   @discardableResult
   @available(SwiftStdlib 5.1, *)
-  internal nonisolated(nonsending) func withValueImpl<R, E: Error>(
+  internal nonisolated(nonsending) func withValueImpl<R: ~Copyable, E: Error>(
     _ valueDuringOperation: __owned Value,
     operation: nonisolated(nonsending) () async throws(E) -> R,
     file: String = #fileID, line: UInt = #line
