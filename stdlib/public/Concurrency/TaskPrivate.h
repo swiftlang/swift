@@ -485,6 +485,18 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     HasTaskExecutorPreference = 0x8000,
 
     HasActiveTaskCancellationShield = 0x10000,
+
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    /// The Task's intrusive link or a Stealer may only run if its exclusion
+    /// value is equal to this value. This number increases only when escalating
+    /// a Task while it is dependent on the Dispatch default global executor.
+    ///
+    /// There are only 5 values of JobPriority and this value can only
+    /// increase at most once for each priority transition so this
+    /// could just use 3 bits (along with PriorityMask) if needed.
+    StealerExclusionShift = 20,
+    StealerExclusionMask = 0xF00000,
+#endif
   };
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
@@ -717,6 +729,24 @@ public:
 #endif
   }
 
+  uint8_t getStealerExclusionValue() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return (Flags & StealerExclusionMask) >> StealerExclusionShift;
+#else
+    return 0;
+#endif
+  }
+
+  ActiveTaskStatus withStealerExclusionValue(uint8_t value) const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    auto NewFlags = Flags & ~StealerExclusionMask;
+    NewFlags |= (value << StealerExclusionShift);
+    return ActiveTaskStatus(Record, NewFlags, ExecutionLock);
+#else
+    return *this;
+#endif
+  }
+
   ActiveTaskStatus withoutStoredPriorityEscalation() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     return ActiveTaskStatus(Record, Flags & ~IsEscalated, ExecutionLock);
@@ -843,7 +873,10 @@ struct AsyncTask::PrivateStorage {
   /// The top 32 bits of the task ID. The bottom 32 bits are in Job::Id.
   uint32_t Id;
 
-  // Another four bytes of padding here too (on 64-bit)
+#if __SIZEOF_POINTER__ == 8
+  uint8_t LocalStealerExclusionValue = {0};
+#endif
+  // Three bytes of padding (on 64-bit)
 
   /// Base priority of Task - set only at creation time of task.
   /// Current max priority of task is ActiveTaskStatus.
@@ -859,6 +892,11 @@ struct AsyncTask::PrivateStorage {
 
   // The lock used to protect more complicated operations on the task status.
   RecursiveMutex statusLock;
+
+#if __SIZEOF_POINTER__ == 4
+  uint8_t LocalStealerExclusionValue = {0};
+#endif
+  // On 32-bit, there are 7 bytes remaining
 
   // Always create an async task with max priority in ActiveTaskStatus = base
   // priority. It will be updated later if needed.
