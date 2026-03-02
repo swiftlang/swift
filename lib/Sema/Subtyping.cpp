@@ -160,6 +160,7 @@ bool ConstraintSystem::isConformanceTransitiveForSupertype(
 
   case ConversionBehavior::Function:
   case ConversionBehavior::Metatype:
+  case ConversionBehavior::ExistentialMetatype:
     // FIXME: Metatypes and functions.
     result = false;
     break;
@@ -174,6 +175,10 @@ bool ConstraintSystem::isConformanceTransitiveForSupertype(
     break;
 
   case ConversionBehavior::Existential:
+    // FIXME: Implement this.
+    result = false;
+    break;
+
   case ConversionBehavior::Unknown:
     // Can't say anything in this case.
     result = false;
@@ -299,6 +304,7 @@ bool ConstraintSystem::isConformanceTransitiveForSubtype(
 
   case ConversionBehavior::Function:
   case ConversionBehavior::Metatype:
+  case ConversionBehavior::ExistentialMetatype:
     // FIXME: Metatypes and functions.
     return false;
 
@@ -415,6 +421,9 @@ swift::constraints::getConversionBehavior(Type type) {
   if (type->is<ExistentialType>())
     return ConversionBehavior::Existential;
 
+  if (type->is<ExistentialMetatypeType>())
+    return ConversionBehavior::ExistentialMetatype;
+
   return ConversionBehavior::Unknown;
 }
 
@@ -444,6 +453,7 @@ bool swift::constraints::hasProperSubtypes(Type type) {
   case ConversionBehavior::Metatype:
   case ConversionBehavior::Tuple:
   case ConversionBehavior::Existential:
+  case ConversionBehavior::ExistentialMetatype:
   case ConversionBehavior::Unknown:
     return true;
   }
@@ -484,6 +494,7 @@ bool swift::constraints::hasProperSupertypes(Type type) {
   case ConversionBehavior::Metatype:
   case ConversionBehavior::Tuple:
   case ConversionBehavior::Existential:
+  case ConversionBehavior::ExistentialMetatype:
   case ConversionBehavior::Unknown:
     return true;
   }
@@ -663,6 +674,14 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
         return ConflictFlag::Existential;
 
       break;
+    case ConversionBehavior::ExistentialMetatype:
+      // Existential metatype-to-existential metatype conversions.
+      if (!isSubtypeOfExistentialType(lhs->getMetatypeInstanceType(),
+                                      rhs->getMetatypeInstanceType())) {
+        return ConflictFlag::Existential;
+      }
+
+      break;
     case ConversionBehavior::Unknown:
       break;
     }
@@ -746,6 +765,19 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       // Concrete-to-existential conversions.
       if (!isSubtypeOfExistentialType(lhs, rhs))
         return ConflictFlag::Existential;
+
+      break;
+
+    case ConversionBehavior::ExistentialMetatype:
+      if (lhsKind != ConversionBehavior::Metatype) {
+        return ConflictFlag::Category;
+      }
+
+      // Concrete metatype-to-existential metatype conversions.
+      if (!isSubtypeOfExistentialType(lhs->getMetatypeInstanceType(),
+                                      rhs->getMetatypeInstanceType())) {
+        return ConflictFlag::Existential;
+      }
 
       break;
 

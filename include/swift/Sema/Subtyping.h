@@ -86,10 +86,14 @@ enum class ConversionBehavior : unsigned {
   /// Tuples.
   Tuple,
 
-  /// Existential types and conforming types as subtypes, and other existential
-  /// types as supertypes. A class-bound existential type also has its superclass
-  /// type as its supertype.
+  /// Existential types are supertypes of their conforming types, and subtypes of
+  /// less constrained existential types as supertypes. A class-bound existential
+  /// type is also a subtype of its superclass bound.
   Existential,
+
+  /// Existential metatypes are supertypes of their conforming metatypes, and
+  /// subtypes of less constrained existential metatypes.
+  ExistentialMetatype,
 
   /// InOut types have Pointer types as supertypes.
   InOut,
