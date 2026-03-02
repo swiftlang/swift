@@ -46,6 +46,16 @@
 
 #include <stdlib.h>
 
+#if !defined(__APPLE__)
+#warning For testing only
+#define SWIFT_USE_STD_RANDOM_DEVICE 1
+#endif
+
+#if defined(SWIFT_USE_STD_RANDOM_DEVICE)
+#include <cstring>
+#include <random>
+#endif
+
 #include "swift/shims/Random.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Threading/Mutex.h"
@@ -54,7 +64,30 @@
 
 using namespace swift;
 
-#if defined(__APPLE__)
+#if defined(SWIFT_USE_STD_RANDOM_DEVICE)
+SWIFT_RUNTIME_STDLIB_API
+void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
+  auto buffer = reinterpret_cast<char *>(buf); // for arithmetic
+  std::random_device rd;
+
+  // We must assign each generated value to a temporary local integer because we
+  // do not know if the buffer is well-aligned or not.
+  constexpr size_t byteCountPerWord = sizeof(std::random_device::result_type);
+  if (nbytes >= byteCountPerWord) {
+    for (size_t i = 0; i < nbytes; i += byteCountPerWord) {
+      auto value = rd();
+      std::memcpy(buffer + i, &value, byteCountPerWord);
+    }
+  }
+
+  auto trailingCount = (nbytes % byteCountPerWord);
+  if (trailingCount > 0) {
+    auto value = rd();
+    std::memcpy(buffer + (nbytes - trailingCount), &value, trailingCount);
+  }
+}
+
+#elif defined(__APPLE__)
 
 SWIFT_RUNTIME_STDLIB_API
 void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
