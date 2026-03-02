@@ -288,6 +288,15 @@ protocol GettableTitle {
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function '$s19coroutine_accessors17OverridableReaderC5titleSSvg'
 
+// CHECK-LABEL:      sil_vtable C {
+// CHECK-NEXT:   #C.init!allocator
+// CHECK-NEXT:   #C.deinit!deallocator
+// CHECK-NEXT: }
+
+public class C {
+  final public var i: Int = 0
+}
+
 // CHECK-LABEL: sil_witness_table{{.*}} OverridableReader: GettableTitle {{.*}} {
 // CHECK-NEXT:    method #GettableTitle.title!getter
 // CHECK-SAME:        @$s19coroutine_accessors17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW
