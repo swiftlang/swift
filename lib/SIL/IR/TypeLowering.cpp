@@ -799,8 +799,14 @@ namespace {
               type, getReferenceSILTypeProperties(isSensitive));
         }
       }
-      return asImpl().handleAddressOnly(
-          type, getOpaqueSILTypeProperties(isSensitive));
+      auto props = getOpaqueSILTypeProperties(isSensitive);
+      if (ProtocolDecl *bitwiseCopyable =
+          TC.Context.getProtocol(KnownProtocolKind::BitwiseCopyable)) {
+        // Archetypes only have unconditional conformance.
+        if (lookupConformance(type, bitwiseCopyable))
+          props.setTrivial();
+      }
+      return asImpl().handleAddressOnly(type, props);
     }
 
     RetTy visitExistentialType(CanType type,
