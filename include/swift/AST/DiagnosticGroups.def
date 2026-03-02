@@ -88,6 +88,7 @@ GROUP(StringInterpolationConformance,none,"string-interpolation-conformance")
 GROUP(TemporaryPointers,none,"temporary-pointers")
 GROUP(TrailingClosureMatching,none,"trailing-closure-matching")
 GROUP(UnknownWarningGroup,none,"unknown-warning-group")
+GROUP(NoUseUnstructuredThrowingTask,none,"no-use-throwing-unstructured-task")
 GROUP(WeakMutability,none,"weak-mutability")
 
 GROUP_LINK(PerformanceHints,ExistentialType)
