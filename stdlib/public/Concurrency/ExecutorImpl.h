@@ -100,8 +100,6 @@ typedef struct {
 
 /// Indexes in the schedulerPrivate array
 enum {
-  SwiftJobNextWaitingTaskIndex = 0,
-
   // These are only relevant for the Dispatch executor
   SwiftJobDispatchHasLongObjectHeader = sizeof(void *) == sizeof(int),
   SwiftJobDispatchLinkageIndex = SwiftJobDispatchHasLongObjectHeader ? 1 : 0,

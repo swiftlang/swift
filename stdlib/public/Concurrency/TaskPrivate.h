@@ -1309,7 +1309,7 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
     // TODO: do we need to do tracking for task executors...? I guess no since
     // they can't escalate.
     void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-    TaskDependencyStatusRecord *dependencyRecord = _private().dependencyRecord = ::new (allocation) TaskDependencyStatusRecord(this, newExecutor);
+    TaskDependencyStatusRecord *dependencyRecord = _private().dependencyRecord = ::new (allocation) TaskDependencyStatusRecord(newExecutor);
     SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsAndEnqueueOnExecutor() with dependencyRecord %p", this,
       dependencyRecord);
 
@@ -1381,6 +1381,7 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
     // published it in the ActiveTaskStatus since someone else could
     // concurrently made us runnable.
     dependencyStatusRecord->performEscalationAction(
+        this,
         oldStatus.getStoredPriority(),
         newStatus.getStoredPriority());
 
@@ -1410,13 +1411,23 @@ inline void AsyncTask::destroyTaskDependency(TaskDependencyStatusRecord *depende
   _private().dependencyRecord = nullptr;
 }
 
+inline AsyncTask *&AsyncTask::getNextWaitingTask() {
+#ifndef NDEBUG
+  auto status = _private()._status().load(std::memory_order_relaxed);
+  assert(status.hasTaskDependency());
+#endif
+  auto *dependency = _private().dependencyRecord;
+  assert(dependency != nullptr);
+  return dependency->getNextWaitingTask();
+}
+
 // this -> task which is suspending
 // Input task -> task we are waiting on
 inline void AsyncTask::flagAsSuspendedOnTask(AsyncTask *task) {
   assert(_private().dependencyRecord == nullptr);
 
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-  auto record = ::new (allocation) TaskDependencyStatusRecord(this, task);
+  auto record = ::new (allocation) TaskDependencyStatusRecord(task);
   SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on task %p", allocation, task);
   _private().dependencyRecord = record;
 
@@ -1427,7 +1438,7 @@ inline void AsyncTask::flagAsSuspendedOnContinuation(ContinuationAsyncContext *c
   assert(_private().dependencyRecord == nullptr);
 
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-  auto record = ::new (allocation) TaskDependencyStatusRecord(this, context);
+  auto record = ::new (allocation) TaskDependencyStatusRecord(context);
   SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on continuation %p", allocation, context);
   _private().dependencyRecord = record;
 
@@ -1438,7 +1449,7 @@ inline void AsyncTask::flagAsSuspendedOnTaskGroup(TaskGroup *taskGroup) {
   assert(_private().dependencyRecord == nullptr);
 
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-  auto record = ::new (allocation) TaskDependencyStatusRecord(this, taskGroup);
+  auto record = ::new (allocation) TaskDependencyStatusRecord(taskGroup);
   SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on taskGroup %p", allocation, taskGroup);
   _private().dependencyRecord = record;
 
