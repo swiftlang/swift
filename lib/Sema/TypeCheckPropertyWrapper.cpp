@@ -329,6 +329,31 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
   return subscript;
 }
 
+/// Validate key path parameter types for an enclosing-self subscript.
+static bool validateEnclosingSelfSubscript(SubscriptDecl *subscript) {
+  auto *indices = subscript->getIndices();
+  if (!indices || indices->size() != 3)
+    return false;
+
+  auto checkKeyPathParam = [&](unsigned index) -> bool {
+    auto *param = indices->get(index);
+    auto paramTy = param->getInterfaceType();
+    if (paramTy->hasError())
+      return true;
+
+    if (!paramTy->isWritableKeyPath() && !paramTy->isReferenceWritableKeyPath()) {
+      param->diagnose(diag::property_wrapper_enclosing_self_subscript_keypath_type,
+                      param->getArgumentName(), paramTy);
+      return false;
+    }
+    return true;
+  };
+
+  bool wrappedOrProjectedOK = checkKeyPathParam(/*wrapped/projected*/ 1);
+  bool storageOK = checkKeyPathParam(/*storage*/ 2);
+  return wrappedOrProjectedOK && storageOK;
+}
+
 PropertyWrapperTypeInfo
 PropertyWrapperTypeInfoRequest::evaluate(
     Evaluator &eval, NominalTypeDecl *nominal) const {
@@ -392,9 +417,20 @@ PropertyWrapperTypeInfoRequest::evaluate(
   }
 
   result.enclosingInstanceWrappedSubscript =
-    findEnclosingSelfSubscript(ctx, nominal, ctx.Id_wrapped);
+      findEnclosingSelfSubscript(ctx, nominal, ctx.Id_wrapped);
+  if (result.enclosingInstanceWrappedSubscript &&
+      !validateEnclosingSelfSubscript(
+          result.enclosingInstanceWrappedSubscript)) {
+    result.enclosingInstanceWrappedSubscript = nullptr;
+  }
+
   result.enclosingInstanceProjectedSubscript =
-    findEnclosingSelfSubscript(ctx, nominal, ctx.Id_projected);
+      findEnclosingSelfSubscript(ctx, nominal, ctx.Id_projected);
+  if (result.enclosingInstanceProjectedSubscript &&
+      !validateEnclosingSelfSubscript(
+          result.enclosingInstanceProjectedSubscript)) {
+    result.enclosingInstanceProjectedSubscript = nullptr;
+  }
 
   // If there was no projectedValue property, but there is a wrapperValue,
   // property, use that and warn.
