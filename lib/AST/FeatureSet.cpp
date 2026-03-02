@@ -598,7 +598,6 @@ static bool usesFeatureReparenting(Decl *decl) {
   return false;
 }
 
-UNINTERESTING_FEATURE(AnyAppleOSAvailability)
 UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowInout)
 

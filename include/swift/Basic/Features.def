@@ -286,6 +286,8 @@ LANGUAGE_FEATURE(BuiltinMarkDependence, 0, "markDependence Builtin")
 // suppression of @c in Swift interfaces as a temporary measure.
 SUPPRESSIBLE_LANGUAGE_FEATURE(CAttribute, 495, "@c attribute")
 
+BASELINE_LANGUAGE_FEATURE(AnyAppleOSAvailability, 0, "Support `anyAppleOS` availability")
+
 //===----------------------------------------------------------------------===//
 // MARK: - Swift 6 features
 //===----------------------------------------------------------------------===//
@@ -597,9 +599,6 @@ EXPERIMENTAL_FEATURE(EmbeddedExistentials, true)
 
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
-
-/// Allow use of the 'anyAppleOS' availability domain.
-EXPERIMENTAL_FEATURE(AnyAppleOSAvailability, true)
 
 /// Check @_implementationOnly imports in non-library-evolution mode.
 EXPERIMENTAL_FEATURE(CheckImplementationOnly, true)
