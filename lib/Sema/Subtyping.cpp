@@ -510,6 +510,9 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     ConstraintSystem &cs,
     Type lhs, Type rhs,
     GenericSignature sig) {
+  if (lhs->isEqual(rhs))
+    return std::nullopt;
+
   auto lhsKind = getConversionBehavior(lhs);
   auto rhsKind = getConversionBehavior(rhs);
 
