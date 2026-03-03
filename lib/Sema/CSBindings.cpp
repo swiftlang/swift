@@ -684,10 +684,28 @@ static AllowedBindingKind flipBindingKind(AllowedBindingKind kind) {
   }
 }
 
+/// Infers bindings for a key path root type from the bindings of
+/// the key path type.
+///
+/// The setup is this. Suppose we have:
+///
+///   $T0 keypath $T1 -> $T2
+///   KeyPath<X, Y> conv $T0
+///
+/// where $T0 is the keypath type, $T1 is the root type and $T2 is
+/// the value type, and further suppose we're currently computing
+/// bindings for $T1.
+///
+/// In this situation, we can infer a potential binding of $T1 to X.
+///
+/// A generalization is when the root type X is actually another
+/// type variable $T3:
+///
+///   $T0 keypath $T1 -> $T2
+///   KeyPath<$T3, Y> conv $T0
+///
+/// In this case, we copy bindings from $T3 to $T1.
 void BindingSet::inferTransitiveKeyPathBindings() {
-  // If the current type variable represents a key path root type
-  // let's try to transitively infer its type through bindings of
-  // a key path type.
   if (TypeVar->getImpl().isKeyPathRoot()) {
     auto *locator = TypeVar->getImpl().getLocator();
     if (auto *keyPathTy =
