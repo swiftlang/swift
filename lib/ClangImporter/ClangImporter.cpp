@@ -5472,6 +5472,36 @@ getConditionalCopyableAttrParams(const clang::RecordDecl *decl) {
   return getConditionalAttrParams(decl, "copyable_if:");
 }
 
+// For certain types when the special member functions just forward to the
+// members' special member functions we can derive escapability from the
+// constituents.
+static bool canDeriveEscapabilityFromMembers(const clang::CXXRecordDecl *decl) {
+  // Do not do any inference for polymoprhic types as we might not know the
+  // semantics of the derived types that can be used through base pointers.
+  if (decl->isPolymorphic())
+    return false;
+
+  for (auto *ctor : decl->ctors()) {
+    if ((ctor->isCopyConstructor() || ctor->isMoveConstructor()) &&
+        ctor->isUserProvided())
+      return false;
+  }
+
+  if (auto *dtor = decl->getDestructor()) {
+    if (dtor->isUserProvided())
+      return false;
+  }
+
+  for (auto *method : decl->methods()) {
+    if ((method->isMoveAssignmentOperator() ||
+         method->isCopyAssignmentOperator()) &&
+        method->isUserProvided())
+      return false;
+  }
+
+  return true;
+}
+
 CxxEscapability
 ClangTypeEscapability::evaluate(Evaluator &evaluator,
                                 EscapabilityLookupDescriptor desc) const {
@@ -5484,10 +5514,10 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
   // as such
   // - a record type is escapable if it is annotated with SWIFT_ESCAPABLE_IF()
   // and none of the annotation arguments are non-escapable
-  // - an aggregate or non-cxx record is escapable if none of their fields or
-  // bases are non-escapable (as long as they have a definition)
-  //   * we only infer escapability for simple types, with no user-declared
-  //   constructors, virtual bases or virtual member functions
+  // - a non-cxx record, or a CxxRecordDecl where the special member functions
+  // are forwarding to the fields' special member functions, is escapable if
+  // none of their fields or bases are non-escapable (as long as they have a
+  // definition)
   //   * for more complex CxxRecordDecls, we rely solely on escapability
   //   annotations
   // - in all other cases, the record has unknown escapability (e.g. no
@@ -5514,6 +5544,8 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         return CxxEscapability::NonEscapable;
       if (hasEscapableAttr(recordDecl))
         continue;
+      if (hasSwiftAttribute(recordDecl, "unsafe"))
+        return CxxEscapability::Unknown;
       SmallVector<int> STLParams;
       if (recordDecl->isInStdNamespace()) {
         STLParams = STLConditionalParams.lookup(recordDecl->getName());
@@ -5533,7 +5565,7 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
       // escapability annotations
       auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
       if (recordDecl->getDefinition() &&
-          (!cxxRecordDecl || cxxRecordDecl->isAggregate())) {
+          (!cxxRecordDecl || canDeriveEscapabilityFromMembers(cxxRecordDecl))) {
         if (cxxRecordDecl) {
           for (auto base : cxxRecordDecl->bases())
             maybePushToStack(base.getType()->getUnqualifiedDesugaredType());
@@ -8163,7 +8195,7 @@ static bool isForeignReferenceType(const clang::QualType type,
   return semanticsKind == CxxRecordSemanticsKind::Reference;
 }
 
-static bool hasSwiftAttribute(const clang::Decl *decl, StringRef attr) {
+bool importer::hasSwiftAttribute(const clang::Decl *decl, StringRef attr) {
   if (decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [&](auto *A) {
         if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(A))
           return swiftAttr->getAttribute() == attr;
