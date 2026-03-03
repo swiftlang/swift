@@ -524,6 +524,15 @@ void GetWindowsFileMappings(
     if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
                                                AuxiliaryFile);
+
+    llvm::sys::path::remove_filename(WinSDKInjection);
+    llvm::sys::path::remove_filename(WinSDKInjection);
+    llvm::sys::path::append(WinSDKInjection, "winrt", "module.modulemap");
+    AuxiliaryFile =
+        GetPlatformAuxiliaryFile("windows", "WinRT.modulemap", SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
+                                               AuxiliaryFile);
   }
 
   struct {

@@ -184,6 +184,7 @@ copy_files(public/Platform Overlay/Windows/clang
     ucrt.modulemap
     winsdk_um.modulemap
     winsdk_shared.modulemap
+    WinRT.modulemap
     vcruntime.modulemap
     vcruntime.apinotes)
 
