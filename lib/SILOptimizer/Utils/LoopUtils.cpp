@@ -22,6 +22,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/StackAllocation.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/Support/Debug.h"
 
@@ -245,7 +246,7 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
   // The deallocation of a stack allocation must be in the loop, otherwise the
   // deallocation will be fed by a phi node of two allocations.
   if (auto allocation = I->getStackAllocation()) {
-    for (auto *UI : allocation->getUses()) {
+    for (auto *UI : allocation->getValue()->getUses()) {
       if (UI->getUser()->isDeallocatingStack()) {
         if (!L->contains(UI->getUser()->getParent()))
           return false;
@@ -253,19 +254,9 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
     }
     return true;
   }
-  if (I->isDeallocatingStack()) {
-    SILInstruction *alloc = nullptr;
-    if (auto *dealloc = dyn_cast<DeallocStackInst>(I)) {
-      SILValue address = dealloc->getOperand();
-      if (isa<AllocStackInst>(address) || isa<PartialApplyInst>(address))
-        alloc = cast<SingleValueInstruction>(address);
-      else if (isaResultOf<BeginApplyInst>(address))
-        alloc = cast<MultipleValueInstructionResult>(address)->getParent();
-    }
-    if (auto *dealloc = dyn_cast<DeallocStackRefInst>(I))
-      alloc = dealloc->getAllocRef();
-
-    return alloc && L->contains(alloc);
+  if (auto deallocation = I->getStackDeallocation()) {
+    SILInstruction *alloc = deallocation->getAllocation().getInstruction();
+    return L->contains(alloc);
   }
   // In OSSA, partial_apply is not considered stack allocating. Nonetheless,
   // prevent it from being cloned so OSSA lowering can directly convert it to a
