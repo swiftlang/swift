@@ -369,7 +369,17 @@ internal func _Float16ToASCII(
     nextDigit &+= 8
 
     // Skip leading zeros
-    firstDigit &+= text.trailingZeroBitCount / 8
+    if intPart < 10 {
+      firstDigit &+= 7
+    } else if intPart < 100 {
+      firstDigit &+= 6
+    } else if intPart < 1000 {
+      firstDigit &+= 5
+    } else if intPart < 10000 {
+      firstDigit &+= 4
+    } else {
+      firstDigit &+= 3
+    }
 
     // After the integer part comes a period...
     unsafe buffer.storeBytes(
