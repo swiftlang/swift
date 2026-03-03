@@ -4,8 +4,9 @@
 
 // UNSUPPORTED: OS=linux-gnu
 
-// rdar://170773776
-// XFAIL: OS=freebsd
+// FIXME: this test is flaky (expression too complex to typecheck) on FreeBSD
+//        (very infrequent failure) rdar://170773776
+// ALLOW_RETRIES: 1
 
 let a: [Double] = []
 _ = a.map { $0 - 1.0 }
