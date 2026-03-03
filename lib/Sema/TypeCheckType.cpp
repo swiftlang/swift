@@ -1848,6 +1848,9 @@ static void diagnoseBorrowInoutType(TypeDecl *typeDecl, SourceLoc loc,
 /// an experimental feature to use.
 static void diagnoseBorrowingSequenceType(TypeDecl *typeDecl, SourceLoc loc,
                              const DeclContext *dc) {
+  // FIXME: Undo this (disabled since the reparenting conformance seems to count as "use")
+  return;
+  
   if (loc.isInvalid())
     return;
 
