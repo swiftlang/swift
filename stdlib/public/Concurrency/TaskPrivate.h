@@ -1086,6 +1086,30 @@ inline uint32_t AsyncTask::flagAsRunning() {
         (char *)&_private().ExclusivityAccessSet[0]);
   }
   return dispatchOpaquePriority;
+
+/// A Job that acts as a proxy for a Task when the Task itself can't be
+/// enqueued. Holds a reference to the Task and an exclusion value that causes
+/// this Job to do nothing if it doesn't match what's in the Task's Status.
+class AsyncTaskStealer : public Job {
+public:
+  AsyncTask *Task;
+  uint8_t ExclusionValue;
+
+  AsyncTaskStealer(AsyncTask *task, JobPriority priority, uint8_t exclusionValue)
+      : Job({JobKind::TaskStealer, priority}, &process),
+        Task(task),
+        ExclusionValue{exclusionValue} {
+    swift_retain(Task);
+  }
+
+  // Implemented in Actor.cpp to make use of taskInvokeWithExclusionValue
+  SWIFT_CC(swiftasync)
+  static void process(Job *job);
+
+  static bool classof(const Job *job) {
+    return job->Flags.getKind() == JobKind::TaskStealer;
+  }
+};
 }
 
 /// TODO (rokhinip): We need the handoff of the thread to the next executor to
