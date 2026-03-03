@@ -2108,39 +2108,6 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
   return bestBindings;
 }
 
-/// Find the set of type variables that are inferable from the given type.
-///
-/// \param type The type to search.
-/// \param typeVars Collects the type variables that are inferable from the
-/// given type. This set is not cleared, so that multiple types can be explored
-/// and introduce their results into the same set.
-static void
-findInferableTypeVars(Type type,
-                      SmallPtrSetImpl<TypeVariableType *> &typeVars) {
-  type = type->getCanonicalType();
-  if (!type->hasTypeVariable())
-    return;
-
-  class Walker : public TypeWalker {
-    SmallPtrSetImpl<TypeVariableType *> &typeVars;
-
-  public:
-    explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVars)
-        : typeVars(typeVars) {}
-
-    Action walkToTypePre(Type ty) override {
-      if (ty->is<DependentMemberType>())
-        return Action::SkipNode;
-
-      if (auto typeVar = ty->getAs<TypeVariableType>())
-        typeVars.insert(typeVar);
-      return Action::Continue;
-    }
-  };
-
-  type.walk(Walker(typeVars));
-}
-
 void BindingSet::addDefault(Constraint *constraint) {
   if (CONDITIONAL_ASSERT_enabled()) {
     for (auto *other : Defaults) {
@@ -2534,21 +2501,43 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     //
     // $T1 conv [$T0]
     // $T1.A conv [$T0]
+    //
+    // Note that if we have this, where we're looking at $T0, we do not
+    // record anything, because binding $T1 does not generate new bindings
+    // for $T0:
+    //
+    // $T1 conv [$T0.A]
     if (firstTypeVar) {
-      SmallPtrSet<TypeVariableType *, 2> typeVars;
-      findInferableTypeVars(second, typeVars);
-      if (typeVars.erase(TypeVar))
+      llvm::SmallPtrSet<TypeVariableType *, 2> covariant;
+      llvm::SmallPtrSet<TypeVariableType *, 2> contravariant;
+      llvm::SmallPtrSet<TypeVariableType *, 2> invariant;
+
+      getTypeVariablesWithVariance(second, TypePosition::Contravariant,
+                                   covariant, contravariant, invariant);
+      if (invariant.count(TypeVar))
         recordAdjacentVar(firstTypeVar, constraint);
+      if (covariant.count(TypeVar))
+        recordSubtypeDelay(firstTypeVar, constraint);
+      if (contravariant.count(TypeVar))
+        recordSupertypeDelay(firstTypeVar, constraint);
 
     // The other direction:
     //
     // [$T0] conv $T1
     // [$T0] conv $T1.A
     } else if (secondTypeVar) {
-      SmallPtrSet<TypeVariableType *, 2> typeVars;
-      findInferableTypeVars(first, typeVars);
-      if (typeVars.erase(TypeVar))
+      llvm::SmallPtrSet<TypeVariableType *, 2> covariant;
+      llvm::SmallPtrSet<TypeVariableType *, 2> contravariant;
+      llvm::SmallPtrSet<TypeVariableType *, 2> invariant;
+
+      getTypeVariablesWithVariance(first, TypePosition::Covariant,
+                                   covariant, contravariant, invariant);
+      if (invariant.count(TypeVar))
         recordAdjacentVar(secondTypeVar, constraint);
+      if (covariant.count(TypeVar))
+        recordSubtypeDelay(secondTypeVar, constraint);
+      if (contravariant.count(TypeVar))
+        recordSupertypeDelay(secondTypeVar, constraint);
     }
 
     return std::nullopt;
@@ -2743,7 +2732,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
         recordSupertypeOf(bindingTypeVar, constraint);
       }
 
-      recordAdjacentVar(bindingTypeVar, constraint);
       break;
     }
 
@@ -2884,8 +2872,8 @@ void PotentialBindings::infer(Constraint *constraint) {
     // first, which can allow us to discover additional bindings for the result
     // type.
     SmallPtrSet<TypeVariableType *, 4> typeVars;
-    findInferableTypeVars(CS.simplifyType(constraint->getThirdType()),
-                          typeVars);
+    auto third = CS.simplifyType(constraint->getThirdType());
+    third->getTypeVariables(typeVars, /*skipDependentMemberTypes=*/true);
     if (typeVars.count(TypeVar)) {
       recordDelayedBy(constraint);
     }
