@@ -45,7 +45,9 @@ public class DefaultSymbolLocator: SymbolLocator {
   public typealias Image = SymbolLocator.Image
   public typealias ImageFormat = SymbolLocator.ImageFormat
 
-  public static let shared = DefaultSymbolLocator()
+  public static var shared: DefaultSymbolLocator {
+    return BacktracerThreadLocals.threadLocal.defaultSymbolLocator
+  }
 
   enum CacheKey: Equatable, Hashable {
     case path(String)
