@@ -70,11 +70,38 @@ import Swift
 /// - SeeAlso: ``TaskGroup``
 /// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:body:)``
 @available(SwiftStdlib 5.9, *)
+@_alwaysEmitIntoClient
+public nonisolated(nonsending) func withDiscardingTaskGroup<GroupResult>(
+  returning returnType: GroupResult.Type = GroupResult.self,
+  body: nonisolated(nonsending) (inout DiscardingTaskGroup) async -> GroupResult
+) async -> GroupResult {
+  let flags = taskGroupCreateFlags(
+    discardResults: true
+  )
+
+  let _group = Builtin.createTaskGroupWithFlags(flags, Void.self)
+  var group = DiscardingTaskGroup(group: _group)
+  defer { Builtin.destroyTaskGroup(_group) }
+
+  let result = await body(&group)
+
+  try! await group.awaitAllRemainingTasks() // try!-safe, cannot throw since this is a non throwing group
+
+  return result
+}
+
+// Overload with isolated parameter for ABI compatibility.
+@available(SwiftStdlib 5.9, *)
 #if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
 @inlinable
-public func withDiscardingTaskGroup<GroupResult>(
+@abi(func withDiscardingTaskGroup<GroupResult>(
+  returning returnType: GroupResult.Type,
+  isolation: isolated (any Actor)?,
+  body: (inout DiscardingTaskGroup) async -> GroupResult
+) async -> GroupResult)
+func _isolatedParameter_withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
   isolation: isolated (any Actor)? = #isolation,
   body: (inout DiscardingTaskGroup) async -> GroupResult
@@ -345,14 +372,50 @@ extension DiscardingTaskGroup: Sendable { }
 /// }
 /// ```
 @available(SwiftStdlib 5.9, *)
+@_alwaysEmitIntoClient
+public nonisolated(nonsending) func withThrowingDiscardingTaskGroup<GroupResult>(
+  returning returnType: GroupResult.Type = GroupResult.self,
+  body: nonisolated(nonsending) (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
+) async throws -> GroupResult {
+  let flags = taskGroupCreateFlags(
+      discardResults: true
+  )
+
+  let _group = Builtin.createTaskGroupWithFlags(flags, Void.self)
+  var group = ThrowingDiscardingTaskGroup<Error>(group: _group)
+  defer { Builtin.destroyTaskGroup(_group) }
+
+  let result: GroupResult
+  do {
+    result = try await body(&group)
+  } catch {
+    group.cancelAll()
+
+    try await group.awaitAllRemainingTasks(bodyError: error)
+
+    throw error
+  }
+
+  try await group.awaitAllRemainingTasks(bodyError: nil)
+
+  return result
+}
+
+// Overload with isolated parameter for ABI compatibility.
+@available(SwiftStdlib 5.9, *)
 #if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
 @inlinable
-public func withThrowingDiscardingTaskGroup<GroupResult>(
-    returning returnType: GroupResult.Type = GroupResult.self,
-    isolation: isolated (any Actor)? = #isolation,
-    body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
+@abi(func withThrowingDiscardingTaskGroup<GroupResult>(
+  returning returnType: GroupResult.Type,
+  isolation: isolated (any Actor)?,
+  body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
+) async throws -> GroupResult)
+public func _isolatedParam_withThrowingDiscardingTaskGroup<GroupResult>(
+  returning returnType: GroupResult.Type = GroupResult.self,
+  isolation: isolated (any Actor)? = #isolation,
+  body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
 ) async throws -> GroupResult {
   let flags = taskGroupCreateFlags(
       discardResults: true
