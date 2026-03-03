@@ -207,8 +207,7 @@ static bool isGenericParameter(TypeVariableType *TypeVar) {
 }
 
 bool PotentialBinding::isViableForJoin() const {
-  return Kind == AllowedBindingKind::Supertypes &&
-         !BindingType->hasLValueType() &&
+  return !BindingType->hasLValueType() &&
          !BindingType->hasTypeVariable() &&
          !BindingType->hasPlaceholder() &&
          !BindingType->hasUnboundGenericType() &&
@@ -1379,7 +1378,36 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
     if (binding.BindingType->isEqual(existing.BindingType))
       return false;
 
-    // FIXME: Implement meet of two types
+    // Compute the meet of subtype bindings without type variables.
+    if ((binding.isViableForJoin() &&
+        existing.isViableForJoin())) {
+      bool uninhabited = false;
+      auto meetType =
+          subtypeMeet(existing.BindingType, binding.BindingType,
+                      &uninhabited);
+
+      if (uninhabited) {
+        binding.Kind = AllowedBindingKind::Exact;
+        markConflicting();
+      }
+
+      // Result of the meet has to use new binding because it refers
+      // to the constraint that triggered the meet that replaced the
+      // existing binding.
+      //
+      // For "meet" to be transitive, both bindings have to be as
+      // well, otherwise we consider it a refinement of a direct
+      // binding.
+      auto *originator =
+          binding.isTransitive() && existing.isTransitive()
+              ? binding.Originator
+              : nullptr;
+
+      binding = PotentialBinding(meetType, binding.Kind,
+                                 binding.BindingSource,
+                                 originator);
+      return true;
+    }
   }
 
   // (Subtypes, Fallback)
