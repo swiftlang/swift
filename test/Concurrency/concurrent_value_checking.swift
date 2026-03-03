@@ -332,6 +332,10 @@ final class C1: Sendable {
   let i: Int = 0
 }
 
+final class C1Lazy: Sendable {
+  lazy var a: Int = 0 // expected-warning{{stored property 'a' of 'Sendable'-conforming class 'C1Lazy' is mutable}}
+}
+
 final class C2: Sendable {
   let x: Int = 0
 }
