@@ -13,7 +13,7 @@ func getNumber(_ x: borrowing NonCopyable) -> Int32 {
 }
 
 StdListTestSuite.test("ListOfInt conforms to CxxBorrowingSequence") {
-    guard #available(SwiftStdlib 6.3, *) else { return }
+    guard #available(SwiftStdlib 6.4, *) else { return }
     let arr : [Int32] = [1, 2, 3]
     let lst = makeListInt()
     expectEqual(lst.size(), 3)
@@ -33,7 +33,7 @@ StdListTestSuite.test("ListOfInt conforms to CxxBorrowingSequence") {
 }
 
 StdListTestSuite.test("ListOfNonCopyable conforms to CxxBorrowingSequence") {
-    guard #available(SwiftStdlib 6.3, *) else { return }
+    guard #available(SwiftStdlib 6.4, *) else { return }
     let arr : [Int32] = [1, 2, 3]
     var lst = makeListOfNonCopyable()
     expectEqual(lst.size(), 3)
