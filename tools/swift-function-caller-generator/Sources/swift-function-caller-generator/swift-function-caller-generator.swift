@@ -67,6 +67,9 @@ class SwiftMacroTestGen: SyntaxVisitor {
       // don't try to call the old name of a renamed function
       return .skipChildren
     }
+    if res.attributes.contains(where: { $0.isUnavailable }) {
+      return .skipChildren
+    }
     let surroundingType = getParentType(res)
     let isMutating = res.modifiers.contains(where: {
       $0.name.tokenKind == .keyword(.mutating)
@@ -91,12 +94,46 @@ class SwiftMacroTestGen: SyntaxVisitor {
         .with(
           \.modifiers,
           res.modifiers.filter { modifier in
-            modifier.name.tokenKind != .keyword(.mutating)
+            switch modifier.name.tokenKind {
+              case .keyword(.mutating), .keyword(.open):
+                false
+              default:
+                true
+            }
           }
         )
     }
     print(res)
     return .skipChildren
+  }
+
+  override func visit(_ node: IfConfigDeclSyntax) -> SyntaxVisitorContinueKind {
+    for clause in node.clauses {
+      walk(clause)
+    }
+    print(node.poundEndif, terminator: "")
+    return .skipChildren
+  }
+
+  override func visit(_ node: IfConfigClauseSyntax) -> SyntaxVisitorContinueKind {
+    print(node.with(\.elements, nil), terminator: "")
+    if let elements = node.elements {
+      walk(elements)
+    }
+    return .skipChildren
+  }
+
+  override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+    if node.attributes.contains(where: { $0.isUnavailable }) {
+      return .skipChildren
+    }
+    return .visitChildren
+  }
+  override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
+    if node.attributes.contains(where: { $0.isUnavailable }) {
+      return .skipChildren
+    }
+    return .visitChildren
   }
 
   func createFunctionSignature(_ f: FunctionDeclSyntax) -> FunctionDeclSyntax {
@@ -311,11 +348,33 @@ extension AttributeSyntax {
     default: false
     }
   }
+
+  var isUnavailable: Bool {
+    guard self.attributeName.trimmed.description == "available" else {
+      return false
+    }
+    guard let args = self.arguments else {
+      return false
+    }
+    return switch args {
+    case .availability(let list):
+      list.contains(where: {
+        $0.argument.as(TokenSyntax.self)?.trimmed.text == "unavailable"
+      })
+    default: false
+    }
+  }
 }
 extension AttributeListSyntax.Element {
   var isObsolete: Bool {
     switch self {
     case .attribute(let a): return a.isObsolete
+    case .ifConfigDecl: return false
+    }
+  }
+  var isUnavailable: Bool {
+    switch self {
+    case .attribute(let a): return a.isUnavailable
     case .ifConfigDecl: return false
     }
   }
