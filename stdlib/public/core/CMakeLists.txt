@@ -52,6 +52,7 @@ split_embedded_sources(
     NORMAL BridgingBuffer.swift
   EMBEDDED Builtin.swift
   EMBEDDED BuiltinMath.swift
+  EMBEDDED ByteOrder.swift
   EMBEDDED CString.swift
   EMBEDDED CTypes.swift
   EMBEDDED Character.swift
@@ -93,6 +94,7 @@ split_embedded_sources(
   EMBEDDED Flatten.swift
   EMBEDDED FloatingPoint.swift
   EMBEDDED FloatingPointRandom.swift
+  EMBEDDED FullyInhabited.swift
   EMBEDDED HashTable.swift
   EMBEDDED Hashable.swift
   EMBEDDED Hasher.swift
