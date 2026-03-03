@@ -4698,7 +4698,8 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
     ResilienceExpansion expansion, unsigned &baseOperand,
     bool &needsGenericContext, SubstitutionMap subs, ValueDecl *decl,
     ArrayRef<ProtocolConformanceRef> indexHashables, CanType baseTy,
-    DeclContext *useDC, bool forPropertyDescriptor, bool isApplied) {
+    DeclContext *useDC, bool forPropertyDescriptor, bool isApplied,
+    Type resolvedComponentType) {
   if (auto *storage = dyn_cast<AbstractFunctionDecl>(decl)) {
     // ABI-compatible overrides do not have property descriptors, so we need
     // to reference the overridden declaration instead.
@@ -4895,12 +4896,19 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
 
     if (auto var = dyn_cast<VarDecl>(storage)) {
       CanType componentTy;
-      if (!var->getDeclContext()->isTypeContext()) {
+      if (resolvedComponentType) {
+        componentTy = resolvedComponentType->getRValueType()
+            ->mapTypeOutOfEnvironment()
+            ->getCanonicalType();
+      } else if (!var->getDeclContext()->isTypeContext()) {
         componentTy = var->getInterfaceType()->getCanonicalType();
       } else if (var->getDeclContext()->getSelfProtocolDecl() &&
                  baseTy->isExistentialType()) {
-        componentTy = var->getValueInterfaceType()->getCanonicalType();
-        ASSERT(!componentTy->hasTypeParameter());
+        componentTy =
+            var->getValueInterfaceType()
+                .subst(baseTy->getContextSubstitutionMap(var->getDeclContext()))
+                ->mapTypeOutOfEnvironment()
+                ->getCanonicalType();
       } else {
         // The mapTypeIntoEnvironment() / mapTypeOutOfEnvironment() dance is there
         // to handle the case where baseTy being a type parameter subject
@@ -4916,7 +4924,7 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
 
       // The component type for an @objc optional requirement needs to be
       // wrapped in an optional.
-      if (var->getAttrs().hasAttribute<OptionalAttr>()) {
+      if (!resolvedComponentType && var->getAttrs().hasAttribute<OptionalAttr>()) {
         componentTy = OptionalType::get(componentTy)->getCanonicalType();
       }
 
@@ -5048,7 +5056,8 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
           SGF.F.getResilienceExpansion(), numOperands, needsGenericContext,
           component.getDeclRef().getSubstitutions(), decl,
           argComponent.getIndexHashableConformances(), baseTy, SGF.FunctionDC,
-          /*for descriptor*/ false, /*is applied func*/ isApplied));
+          /*for descriptor*/ false, /*is applied func*/ isApplied,
+          component.getComponentType()));
       baseTy = loweredComponents.back().getComponentType();
       if ((kind == KeyPathExpr::Component::Kind::Member &&
            !dyn_cast<FuncDecl>(decl) && !dyn_cast<ConstructorDecl>(decl)) ||
