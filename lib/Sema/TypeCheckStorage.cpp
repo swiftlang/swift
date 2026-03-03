@@ -333,8 +333,6 @@ InitializablePropertiesRequest::evaluate(Evaluator &evaluator,
     return ArrayRef<VarDecl *>();
 
   SmallVector<VarDecl *, 4> results;
-  if (isInSourceFile(implDecl))
-    computeLoweredStoredProperties(decl, implDecl);
   computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Memberwise);
 
   auto maybeAddProperty = [&](VarDecl *var) {
