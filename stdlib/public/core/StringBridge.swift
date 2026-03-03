@@ -65,6 +65,13 @@ internal typealias _CocoaString = AnyObject
   
   @objc(isNSString__)
   func getIsNSString() -> Int8
+  
+  @objc(_isEqualToBytes:count:encoding:)
+  func isEqualToBytes(
+    _ bytes: UnsafeRawPointer,
+    count: Int,
+    encoding: UInt
+  ) -> Int8
 }
 
 /*
@@ -117,6 +124,31 @@ internal func _stdlib_binary_CFStringGetLength(
 @_effects(readonly)
 internal func _isNSString(_ str:AnyObject) -> Bool {
   return isNSStringImpl(_objc(str))
+}
+
+@_effects(readonly)
+private func _NSStringIsEqualToBytesImpl(
+  _ str: _CocoaString,
+  _ bytes: UnsafeRawPointer,
+  _ count: Int,
+  _ encoding: UInt
+) -> Int8 {
+  return unsafe str.isEqualToBytes(bytes, count: count, encoding: encoding)
+}
+
+@_effects(readonly)
+internal func _NSStringIsEqualToBytes(
+  _ str: AnyObject,
+  bytes: UnsafeRawPointer,
+  count: Int,
+  encoding: UInt
+) -> Int8 {
+  return unsafe _NSStringIsEqualToBytesImpl(
+    _objc(str),
+    bytes,
+    count,
+    encoding
+  )
 }
 
 @_effects(readonly)
@@ -180,23 +212,35 @@ internal func _cocoaStringSubscript(
 private func _NSStringCopyBytes(
   _ o: _StringSelectorHolder,
   encoding: UInt,
-  into bufPtr: UnsafeMutableRawBufferPointer
+  into bufPtr: UnsafeMutableRawBufferPointer,
+  options: UInt,
+  UTF16Range: Range<Int>? = nil,
+  remainingRange: UnsafeMutablePointer<_SwiftNSRange>? = nil
 ) -> Int? {
   let ptr = unsafe bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-  let len = o.length
-  var remainingRange = _SwiftNSRange(location: 0, length: 0)
+  var tmpRemainingRange = _SwiftNSRange(location: 0, length: 0)
   var usedLen = 0
+  let range = if let UTF16Range {
+    _SwiftNSRange(location: UTF16Range.lowerBound, length: UTF16Range.count)
+  } else {
+    _SwiftNSRange(location: 0, length: o.length)
+  }
   let success = unsafe 0 != o.getBytes(
     ptr,
     maxLength: bufPtr.count,
     usedLength: &usedLen,
     encoding: encoding,
-    options: 0,
-    range: _SwiftNSRange(location: 0, length: len),
-    remaining: &remainingRange
+    options: options,
+    range: range,
+    remaining: &tmpRemainingRange
   )
-  if success && remainingRange.length == 0 {
-    return usedLen
+  if success {
+    if let remainingRange = unsafe remainingRange {
+      unsafe remainingRange.pointee = tmpRemainingRange
+      return usedLen
+    } else if tmpRemainingRange.length == 0 {
+      return usedLen
+    }
   }
   return nil
 }
@@ -204,25 +248,56 @@ private func _NSStringCopyBytes(
 @_effects(releasenone)
 internal func _cocoaStringCopyUTF8(
   _ target: _CocoaString,
-  into bufPtr: UnsafeMutableRawBufferPointer
+  into bufPtr: UnsafeMutableRawBufferPointer,
+  options: UInt = 0
 ) -> Int? {
   return unsafe _NSStringCopyBytes(
     _objc(target),
     encoding: _cocoaUTF8Encoding,
-    into: bufPtr
+    into: bufPtr,
+    options: options
   )
 }
 
 @_effects(releasenone)
 internal func _cocoaStringCopyASCII(
   _ target: _CocoaString,
-  into bufPtr: UnsafeMutableRawBufferPointer
+  into bufPtr: UnsafeMutableRawBufferPointer,
+  options: UInt = 0
 ) -> Int? {
   return unsafe _NSStringCopyBytes(
     _objc(target),
     encoding: _cocoaASCIIEncoding,
-    into: bufPtr
+    into: bufPtr,
+    options: options
   )
+}
+
+@_effects(releasenone)
+internal func _cocoaStringCopyBytes(
+  _ target: _CocoaString,
+  encoding: UInt,
+  into bufPtr: UnsafeMutableRawBufferPointer,
+  options: UInt = 0,
+  UTF16Range: Range<Int>,
+  remainingRange: inout Range<Int>
+) -> Int? {
+  var cocoaRemainingRange = _SwiftNSRange(location: 0, length: 0)
+  defer {
+    remainingRange = cocoaRemainingRange.location ..< cocoaRemainingRange.location + cocoaRemainingRange.length
+  }
+  return unsafe withUnsafeMutablePointer(
+    to: &cocoaRemainingRange
+  ) { remainingPtr in
+    return unsafe _NSStringCopyBytes(
+      _objc(target),
+      encoding: encoding,
+      into: bufPtr,
+      options: options,
+      UTF16Range: UTF16Range,
+      remainingRange: remainingPtr
+    )
+  }
 }
 
 @_effects(readonly)
@@ -427,7 +502,8 @@ private func _withCocoaASCIIPointer<R>(
   return nil
 }
 
-@_effects(readonly) // @opaque
+// Inline to make sure the optimizer can see through the closure
+@_effects(readonly) @inline(__always)
 private func _withCocoaUTF8Pointer<R>(
   _ str: _CocoaString,
   requireStableAddress: Bool,
@@ -452,7 +528,7 @@ private func _withCocoaUTF8Pointer<R>(
   return nil
 }
 
-@_effects(readonly) // @opaque
+@_effects(readonly)
 internal func withCocoaASCIIPointer<R>(
   _ str: _CocoaString,
   work: (UnsafePointer<UInt8>) -> R?
@@ -460,7 +536,7 @@ internal func withCocoaASCIIPointer<R>(
   return unsafe _withCocoaASCIIPointer(str, requireStableAddress: false, work: work)
 }
 
-@_effects(readonly) // @opaque
+@_effects(readonly)
 internal func withCocoaUTF8Pointer<R>(
   _ str: _CocoaString,
   work: (UnsafePointer<UInt8>) -> R?

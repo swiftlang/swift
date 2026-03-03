@@ -1217,3 +1217,5 @@ Added: _$ss5InoutVMa
 Added: _$ss5InoutVMn
 Added: _$ss5InoutVsRi_zrlE7pointerSpyxGvg
 
+// Cross-encoding strcmp for Foundation
+Added: __swift_unicodeBuffersEqual_nonNormalizing
