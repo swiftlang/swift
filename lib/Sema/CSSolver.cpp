@@ -401,7 +401,7 @@ void ConstraintSystem::replaySolution(const Solution &solution,
   auto sites = ArrayRef(solution.potentialThrowSites);
   ASSERT(sites.size() >= potentialThrowSites.size());
   for (const auto &site : sites.slice(potentialThrowSites.size())) {
-    potentialThrowSites.push_back(site);
+    recordPotentialThrowSite(site.first, site.second);
   }
 
   for (auto param : solution.isolatedParams) {
