@@ -263,9 +263,9 @@ _swift_embedded_error_destroy(SWIFT_CONTEXT void *object);
 // This is static per-TU; only swift_allocError (in EmbeddedRuntime.swift) ever stores it in
 // error boxes, so metadata-pointer identity is never compared across TUs.
 static void * _Nullable _swift_embedded_error_metadata_storage[3] = {
-  NULL,
+  (void *)0,
   (void *)_swift_embedded_error_destroy,
-  NULL,
+  (void *)0,
 };
 
 // Returns a pointer to the error-box metadata (passed to swift_allocError).
