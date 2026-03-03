@@ -158,19 +158,19 @@ open class DefaultSymbolLocator: SymbolLocator {
           debugAltLink = elfImage.getDebugAltLink()?.link
       }
 
-      let tryLink = { (_ link: String) -> (any SymbolSource)? in
+      let tryLink = { [self] (_ link: String) -> (any SymbolSource)? in
         let path1 = "\(imageDir)\(sep)\(link)"
-        if let result = self.loadElfImage(path: path1, uuid: image.uuid) {
+        if let result = loadElfImage(path: path1, uuid: image.uuid) {
           return toSymbolSource(result)
         }
 
         let path2 = "\(imageDir)\(sep).debug\(sep)\(link)"
-        if let result = self.loadElfImage(path: path2, uuid: image.uuid) {
+        if let result = loadElfImage(path: path2, uuid: image.uuid) {
           return toSymbolSource(result)
         }
 
         let path3 = "\(elfSymbolPath)\(sep)\(imageDir)\(sep)\(link)"
-        if let result = self.loadElfImage(path: path3, uuid: image.uuid) {
+        if let result = loadElfImage(path: path3, uuid: image.uuid) {
           return toSymbolSource(result)
         }
 
