@@ -143,6 +143,11 @@ private:
   std::optional<AvailabilityDomain>
   getRemappedDomainOrNull(const ASTContext &ctx) const;
 
+  AvailabilityRange getRemappedRange(AvailabilityDomain toDomain,
+                                     const llvm::VersionTuple &version,
+                                     AvailabilityVersionKind versionKind,
+                                     const ASTContext &ctx) const;
+
 public:
   AvailabilityDomain() {}
 
