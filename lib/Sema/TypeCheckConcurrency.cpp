@@ -2989,10 +2989,7 @@ namespace {
             // If the generic signature of the environment prohibits this
             // type to have an isolated conformance, there is nothing to
             // diagnose.
-            Type interfaceType = archetype->getInterfaceType();
-            auto genericEnv = archetype->getGenericEnvironment();
-            auto genericSig = genericEnv->getGenericSignature();
-            if (genericSig->prohibitsIsolatedConformance(interfaceType))
+            if (!archetype->mayHaveIsolatedConformance())
               continue;
           } else {
             continue;

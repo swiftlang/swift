@@ -2888,8 +2888,8 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionSendability(
 
   // Sendability is given by either the sendability of the dependent type if
   // present, otherwise it's given by the function itself.
-  auto func1Sendable = dep1 ? dep1->isSendableType() : func1->isSendable();
-  auto func2Sendable = dep2 ? dep2->isSendableType() : func2->isSendable();
+  auto func1Sendable = dep1 ? isSendableCapture(dep1) : func1->isSendable();
+  auto func2Sendable = dep2 ? isSendableCapture(dep2) : func2->isSendable();
 
   if (func1Sendable != func2Sendable) {
     // A @Sendable function can be a subtype of a non-@Sendable function.
