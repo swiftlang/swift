@@ -597,13 +597,13 @@ internal func _Float32ToASCII(
                      &- (binaryExponent &+ powerOfTenExponent))
   // Conditionally round the final result up
   let ubias = umask & ((1 &<< extraBits) &- 1)
-  let u = (u2 &+ ubias) >> extraBits
+  let u = (u2 &+ ubias) &>> extraBits
 
   // Compute the width of the scaled rounding interval
   // In the regular non-power-of-two case, the un-scaled rounding interval
   // has width 1, so we just need to align the powerOfTen estimate
   let deltaShift = extraBits &+ significandBitCount
-  var delta = powerOfTenRoundedDown >> deltaShift
+  var delta = powerOfTenRoundedDown &>> deltaShift
   // In the power-of-two case, we need to account for the asymmetric interval
   if f.significandBitPattern == 0 {
     delta &-= delta >> 2
@@ -879,10 +879,10 @@ internal func _Float64ToASCII(
   let extraBits = ((integerBits &- significandBitCount)
                      &- (binaryExponent &+ powerOfTenExponent))
   let ubias = umask & ((1 &<< extraBits) &- 1)
-  let u = (u2 &+ ubias) >> extraBits
+  let u = (u2 &+ ubias) &>> extraBits
 
   // Compute the width of the scaled rounding interval
-  var delta = powerOfTenRoundedDown >> (extraBits &+ significandBitCount)
+  var delta = powerOfTenRoundedDown &>> (extraBits &+ significandBitCount)
   if d.significandBitPattern == 0 {
     delta &-= delta >> 2
   }
