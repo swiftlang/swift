@@ -36,8 +36,8 @@ TEST_F(SemaTest, DumpConstraintSystemBasic) {
   std::string expectedOutput =
       R"(Score: <default 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>
 Type Variables:
-  $T0 [can bind to: lvalue] [adjacent to: $T2] [potential bindings: <none>] @ locator@ []
-  $T1 [adjacent to: $T2] [potential bindings: <none>] @ locator@ []
+  $T0 [can bind to: lvalue] [supertype delayed by: $T2] [potential bindings: <none>] @ locator@ []
+  $T1 [supertype delayed by: $T2] [potential bindings: <none>] @ locator@ []
   $T2 [can bind to: hole, pack] [potential bindings: <none>] @ locator@ [ → generic argument #0]
 Inactive Constraints:
   $T2 bind ($T0, $T1) @ locator@ []
