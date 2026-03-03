@@ -8075,21 +8075,16 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
 }
 
 /// Is this a pointer or a reference to a foreign reference type.
-static bool isForeignReferenceType(const clang::QualType type,
-                                   ASTContext &ctx) {
+static bool clangTypeIsForeignReference(const clang::QualType type,
+                                        ASTContext &ctx) {
   if (!type->isPointerOrReferenceType())
     return false;
-
-  auto pointeeType =
-      dyn_cast<clang::RecordType>(type->getPointeeType().getCanonicalType());
-  if (pointeeType == nullptr)
+  auto *pointee = type->getPointeeType().getCanonicalType()->getAsRecordDecl();
+  if (!pointee)
     return false;
-  auto pointeeDecl = pointeeType->getAsRecordDecl();
-
-  auto semanticsKind = evaluateOrDefault(
-      ctx.evaluator,
-      CxxRecordSemantics({pointeeDecl, ctx, /*importerImpl=*/nullptr}), {});
-  return semanticsKind == CxxRecordSemanticsKind::Reference;
+  auto info = evaluateOrDefault(ctx.evaluator,
+                                ForeignReferenceTypeInfoRequest({pointee}), {});
+  return info.isReference();
 }
 
 bool importer::hasSwiftAttribute(const clang::Decl *decl, StringRef attr) {
@@ -8537,7 +8532,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
         isa<clang::CXXConstructorDecl>(decl))
       return true;
 
-    if (isForeignReferenceType(method->getReturnType(), desc.ctx))
+    if (clangTypeIsForeignReference(method->getReturnType(), desc.ctx))
       return true;
 
     // begin and end methods likely return an interator, so they're unsafe. This
@@ -8550,7 +8545,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
       ->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
 
     bool parentIsSelfContained =
-        !isForeignReferenceType(parentQualType, desc.ctx) &&
+        !clangTypeIsForeignReference(parentQualType, desc.ctx) &&
         anySubobjectsSelfContained(method->getParent());
 
     // If it returns a pointer or reference from an owned parent, that's a
