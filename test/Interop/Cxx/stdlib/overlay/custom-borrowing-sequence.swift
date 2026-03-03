@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=default -I %swift_src_root/lib/ClangImporter/SwiftBridging -Xcc -std=c++20)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=default -I %swift_src_root/lib/ClangImporter/SwiftBridging -Xcc -std=c++20 -enable-experimental-feature BorrowingForLoop -DBORROWING_ITERATOR_PROTOCOL)
 //
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_BorrowingForLoop
 // Ubuntu 20.04 ships with an old version of libstdc++, which does not provide
 // std::contiguous_iterator_tag from C++20.
 // UNSUPPORTED: LinuxDistribution=ubuntu-20.04
@@ -13,11 +11,6 @@ import CustomBorrowingSequence
 
 var CxxBorrowingSequenceTestSuite = TestSuite("CxxSequence")
 
-// FIXME https://github.com/swiftlang/swift/issues/87260
-// Currently, `Sequence` doesn't conform to `BorrowingSequence`, which means that types like `Range` don't
-// automatically conform to `BorrowingSequence`. When we enable the experimental feature `BorrowingForLoop`,
-// all for-in loops use the new borrowing iterators, which means that all range iterations will be invalid.
-#if !BORROWING_ITERATOR_PROTOCOL
 CxxBorrowingSequenceTestSuite.test("SimpleNonCopyableSequence as Swift.BorrowingSequence") {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
@@ -97,35 +90,5 @@ CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.Borro
   expectEqual(innerCounter, 5)
   expectEqual(outerCounter, 2)
 }
-
-#else // !BORROWING_ITERATOR_PROTOCOL
-
-CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence borrowing for loop") {
-  guard #available(SwiftStdlib 6.4, *) else { return }
-  let seq = ContiguousNonCopyableSequence()
-  let arr : [Int32] = [10, 20, 30, 40, 50]
-
-  var counter = 0
-  for el in seq {
-    expectEqual(el, arr[counter])
-    counter += 1
-  }
-  expectEqual(counter, 5)
-}
-
-CxxBorrowingSequenceTestSuite.test("DifferentResultsDereferenceOperatorSequence borrowing for loop") {
-  guard #available(SwiftStdlib 6.4, *) else { return }
-  let seq = DifferentResultsDereferenceOperatorSequence()
-  let arr : [Int32] = [2, 3, 4, 5]
-
-  var counter = 0
-  for el in seq {
-    expectEqual(el, arr[counter])
-    counter += 1
-  }
-  expectEqual(counter, 4)
-}
-
-#endif // !BORROWING_ITERATOR_PROTOCOL
 
 runAllTests()

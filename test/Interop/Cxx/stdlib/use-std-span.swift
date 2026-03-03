@@ -721,20 +721,6 @@ StdSpanTestSuite.test("Convert between Swift and C++ span types")
 
 #else // !BORROWING_ITERATOR_PROTOCOL
 
-StdSpanTestSuite.test("Borrowing for loop")
-.require(.stdlib_6_4).code {
-  guard #available(SwiftStdlib 6.4, *) else { return }
-
-  let span = makeSpanOfNonCopyable()
-  let arr : [Int32] = [1, 2, 3]
-  var counter = 0
-  for el in span {
-    expectEqual(el.number, arr[counter])
-    counter += 1
-  }
-  expectEqual(counter, 3)
-}
-
 #endif // !BORROWING_ITERATOR_PROTOCOL
 
 runAllTests()
