@@ -747,6 +747,9 @@ internal class __SwiftNativeNSString {
 
 // Special-case Index <-> Offset converters for bridging and use in accelerating
 // the UTF16View in general.
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension StringProtocol {
   @_specialize(where Self == String)
   @_specialize(where Self == Substring)
@@ -796,6 +799,9 @@ extension StringProtocol {
 }
 
 extension String {
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public // @testable / @benchmarkable
   func _copyUTF16CodeUnits(
     into buffer: UnsafeMutableBufferPointer<UInt16>,

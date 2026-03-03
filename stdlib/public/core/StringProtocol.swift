@@ -10,6 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(Embedded)
+public typealias UnicodeStringProtocol = StringProtocol & Hashable & Comparable
+public typealias StringProtocolMixin = Any
+#else
+public typealias UnicodeStringProtocol = StringProtocol
+public typealias StringProtocolMixin = Hashable & Comparable
+#endif
+
 /// A type that can represent a string as a collection of characters.
 ///
 /// Do not declare new conformances to `StringProtocol`. Only the `String` and
@@ -18,7 +26,7 @@ public protocol StringProtocol
   : BidirectionalCollection,
   TextOutputStream, TextOutputStreamable,
   LosslessStringConvertible, ExpressibleByStringInterpolation,
-  Hashable, Comparable
+  StringProtocolMixin
   where Iterator.Element == Character,
         Index == String.Index,
         SubSequence: StringProtocol,
@@ -42,10 +50,24 @@ public protocol StringProtocol
   var utf16: UTF16View { get }
   var unicodeScalars: UnicodeScalarView { get }
 
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   func hasPrefix(_ prefix: String) -> Bool
+
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   func hasSuffix(_ suffix: String) -> Bool
 
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   func lowercased() -> String
+
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   func uppercased() -> String
 
   /// Creates a string from the given Unicode code units in the specified
