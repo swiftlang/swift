@@ -1,8 +1,11 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
+// RUN: %target-swift-frontend -emit-ir -oslog-string-section-name __TEXT,__logit %s | %FileCheck -check-prefix OTHER-SECTION %s
+
 // REQUIRES: OS=macosx || OS=ios || OS=watchos
 
 // CHECK: [[U8_0:@.*]] = private unnamed_addr constant [8 x i8] c"help\09me\00", section "__TEXT,__oslogstring,cstring_literals"
+// OTHER-SECTION: [[U8_0:@.*]] = private unnamed_addr constant [8 x i8] c"help\09me\00", section "__TEXT,__logit"
 
 sil_stage canonical
 

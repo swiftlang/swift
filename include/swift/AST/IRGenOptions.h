@@ -644,6 +644,9 @@ public:
   /// Generate verbose assembly output with comments.
   bool VerboseAsm = true;
 
+  /// Which section to emit OSLog strings into.
+  std::string OSLogStringSectionName = "__TEXT,__oslogstring,cstring_literals";
+
   IRGenOptions()
       : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
         Verify(true), VerifyEach(false), OptMode(OptimizationMode::NotSet),

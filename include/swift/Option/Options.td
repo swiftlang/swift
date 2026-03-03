@@ -2457,4 +2457,11 @@ def enable_deterministic_check :
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, CacheInvariant]>,
   HelpText<"Check compiler output determinism by running it twice">;
 
+def oslog_string_section_name:
+  Separate<["-"], "oslog-string-section-name">,
+  Flags<[FrontendOption]>,
+  HelpText<"Section name to use for OSLog string literals. "
+           "Defaults to '__TEXT,__oslogstring',cstring_literals">,
+  MetaVarName<"<section-name>">;
+
 include "FrontendOptions.td"
