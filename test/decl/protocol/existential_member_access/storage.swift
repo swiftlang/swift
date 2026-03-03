@@ -29,13 +29,17 @@ do {
     // expected-error@+1 {{cannot assign through subscript: 'rvalueP' is a 'let' constant}}
     rvalueP[getOnlySubscript: ()] = p
 
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = rvalueP.setOnlyProp
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     rvalueP.setOnlyProp = pClosure
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = rvalueP[setOnlySubscript: ()]
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     rvalueP[setOnlySubscript: ()] = pClosure
   }
 
@@ -55,13 +59,17 @@ do {
     // expected-error@+1 {{cannot pass immutable value as inout argument: 'lvalueP' is immutable}}
     takesInout(&lvalueP[getOnlySubscript: ()])
 
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = lvalueP.setOnlyProp
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     lvalueP.setOnlyProp = pClosure
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = lvalueP[setOnlySubscript: ()]
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     lvalueP[setOnlySubscript: ()] = pClosure
   }
 }
@@ -92,13 +100,17 @@ do {
     // expected-error@+1 {{cannot assign through subscript: 'rvalueP' is a 'let' constant}}
     rvalueP[getOnlySubscript: ()] = p
 
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P.Type'}}
     let _ = rvalueP.setOnlyProp
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P.Type'}}
     rvalueP.setOnlyProp = pClosure
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P.Type'}}
     let _ = rvalueP[setOnlySubscript: ()]
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P.Type'}}
     rvalueP[setOnlySubscript: ()] = pClosure
   }
 
@@ -118,13 +130,17 @@ do {
     // expected-error@+1 {{cannot pass immutable value as inout argument: 'lvalueP' is immutable}}
     takesInout(&lvalueP[getOnlySubscript: ()])
 
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P.Type'}}
     let _ = lvalueP.setOnlyProp
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P.Type'}}
     lvalueP.setOnlyProp = pClosure
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P.Type'}}
     let _ = lvalueP[setOnlySubscript: ()]
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P.Type'}}
     lvalueP[setOnlySubscript: ()] = pClosure
   }
 }
@@ -157,13 +173,17 @@ do {
     // expected-error@+1 {{cannot assign through subscript: 'rvalueP' is a 'let' constant}}
     rvalueP[getOnlySubscript: ()] = p
 
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = rvalueP.setOnlyProp
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     rvalueP.setOnlyProp = pClosure
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = rvalueP[setOnlySubscript: ()]
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     rvalueP[setOnlySubscript: ()] = pClosure
   }
 
@@ -183,13 +203,17 @@ do {
     // expected-error@+1 {{cannot pass immutable value as inout argument: 'lvalueP' is immutable}}
     takesInout(&lvalueP[getOnlySubscript: ()])
 
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = lvalueP.setOnlyProp
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     lvalueP.setOnlyProp = pClosure
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = lvalueP[setOnlySubscript: ()]
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     lvalueP[setOnlySubscript: ()] = pClosure
   }
 }
@@ -220,13 +244,17 @@ do {
     // expected-error@+1 {{cannot assign through subscript: 'rvalueP' is a 'let' constant}}
     rvalueP[getOnlySubscript: ()] = p
 
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = rvalueP.setOnlyProp
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     rvalueP.setOnlyProp = pClosure
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = rvalueP[setOnlySubscript: ()]
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     rvalueP[setOnlySubscript: ()] = pClosure
   }
 
@@ -246,13 +274,17 @@ do {
     // expected-error@+1 {{cannot pass immutable value as inout argument: 'lvalueP' is immutable}}
     takesInout(&lvalueP[getOnlySubscript: ()])
 
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = lvalueP.setOnlyProp
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     lvalueP.setOnlyProp = pClosure
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = lvalueP[setOnlySubscript: ()]
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     lvalueP[setOnlySubscript: ()] = pClosure
   }
 }
@@ -285,13 +317,17 @@ do {
     // expected-error@+1 {{cannot assign through subscript: 'rvalueP' is a 'let' constant}}
     rvalueP[getOnlySubscript: ()] = p
 
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = rvalueP.setOnlyProp
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     rvalueP.setOnlyProp = pClosure
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = rvalueP[setOnlySubscript: ()]
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     rvalueP[setOnlySubscript: ()] = pClosure
   }
 
@@ -311,13 +347,41 @@ do {
     // expected-error@+1 {{cannot pass immutable value as inout argument: 'lvalueP' is immutable}}
     takesInout(&lvalueP[getOnlySubscript: ()])
 
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = lvalueP.setOnlyProp
-    // expected-error@+1 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'setOnlyProp' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'setOnlyProp' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     lvalueP.setOnlyProp = pClosure
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     let _ = lvalueP[setOnlySubscript: ()]
-    // expected-error@+1 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-error@+2 {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+    // expected-note@+1 {{member 'subscript' refrences 'Self.A', which cannot be resolved on type 'any P'}}
     lvalueP[setOnlySubscript: ()] = pClosure
   }
+}
+
+// https://github.com/swiftlang/swift/issues/76320
+do {
+  protocol P {
+    associatedtype A: Hashable
+    associatedtype B: Hashable
+  }
+  
+  protocol Q: P {
+    func take(id: Self.A, and: Self.B)
+  }
+  
+  struct K {
+    let q: any Q
+    
+    func test() {
+      // expected-error@+3 {{member 'take' cannot be used on value of type 'any Q'; consider using a generic constraint instead}}
+      // expected-note@+2 {{member 'take' refrences 'Self.B', which cannot be resolved on type 'any Q'}}
+      // expected-note@+1 {{member 'take' refrences 'Self.A', which cannot be resolved on type 'any Q'}}
+      q.take(id: 12, and: 13)
+    }
+  }
+
 }
