@@ -276,21 +276,35 @@ struct PotentialBindings {
   /// must be bound to an lvalue.
   llvm::TinyPtrVector<Constraint *> LValueOf;
 
-  /// The set of type variables adjacent to the current one.
+  /// Both $T0 and $T1 appear in each other's EquivalentTo:
   ///
-  /// Type variables contained here are either related through the
-  /// bindings (contained in the binding type e.g. `Foo<$T0>`), or
-  /// reachable through subtype/conversion  relationship e.g.
-  /// `$T0 subtype of $T1` or `$T0 arg conversion $T1`.
+  /// $T0 equiv $T1
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
+
+  /// $T0's AdjacentVars contains $T1:
+  ///
+  /// G<$T1> conv $T0
   llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 2> AdjacentVars;
 
-  /// A set of all not-yet-resolved type variables this type variable
-  /// is a subtype of, supertype of or is equivalent to. This is used
-  /// to determine ordering inside of a chain of subtypes to help infer
-  /// transitive bindings  and protocol requirements.
+  /// $T0's SubtypeOf contains $T1:
+  ///
+  /// $T0 conv $T1
   llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> SubtypeOf;
+
+  /// $T0's SubtypeDelay contains $T1:
+  ///
+  /// [$T0] conv $T1
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 2> SubtypeDelay;
+
+  /// $T1's SupertypeOf contains $T0:
+  ///
+  /// $T0 conv $T1
   llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> SupertypeOf;
-  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
+
+  /// $T1's SupertypeDelay contains $T0:
+  ///
+  /// $T0 conv [$T1]
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 2> SupertypeDelay;
 
   /// The set of protocol conformance requirements imposed on this type variable.
   llvm::SmallVector<Constraint *, 4> Protocols;

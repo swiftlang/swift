@@ -117,8 +117,14 @@ BINDING_RELATION_RETRACTION(AdjacentVar, AdjacentVars)
 BINDING_RELATION_ADDITION(SubtypeOf, SubtypeOf)
 BINDING_RELATION_RETRACTION(SubtypeOf, SubtypeOf)
 
+BINDING_RELATION_ADDITION(SubtypeDelay, SubtypeDelay)
+BINDING_RELATION_RETRACTION(SubtypeDelay, SubtypeDelay)
+
 BINDING_RELATION_ADDITION(SupertypeOf, SupertypeOf)
 BINDING_RELATION_RETRACTION(SupertypeOf, SupertypeOf)
+
+BINDING_RELATION_ADDITION(SupertypeDelay, SupertypeDelay)
+BINDING_RELATION_RETRACTION(SupertypeDelay, SupertypeDelay)
 
 BINDING_RELATION_ADDITION(EquivalentTo, EquivalentTo)
 BINDING_RELATION_RETRACTION(EquivalentTo, EquivalentTo)
