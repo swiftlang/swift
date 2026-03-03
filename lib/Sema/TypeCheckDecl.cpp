@@ -878,6 +878,8 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
           case AccessorKind::Read:
           case AccessorKind::Modify:
+          case AccessorKind::YieldingBorrow:
+          case AccessorKind::YieldingMutate:
           case AccessorKind::Get:
           case AccessorKind::DistributedGet:
           case AccessorKind::Set:

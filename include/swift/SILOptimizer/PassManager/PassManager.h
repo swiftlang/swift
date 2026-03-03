@@ -134,8 +134,8 @@ public:
   /// This is useful if a pass needs an updated analysis after invalidating the SIL of a function.
   void updateAnalysis();
 
-  void beginVerifyFunction(SILFunction *function);
-  void endVerifyFunction();
+  SILFunction *beginVerifyFunction(SILFunction *function);
+  void endVerifyFunction(SILFunction *prevFunction);
 
   void setNeedFixStackNesting(bool newValue) { needFixStackNesting = newValue; }
   bool getNeedFixStackNesting() const { return needFixStackNesting; }

@@ -94,7 +94,6 @@ public nonisolated(nonsending) func withDiscardingTaskGroup<GroupResult>(
 @available(SwiftStdlib 5.9, *)
 #if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
-#endif
 @inlinable
 @abi(func withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type,
@@ -216,7 +215,7 @@ public struct DiscardingTaskGroup {
 
   /// A Boolean value that indicates whether the group has any remaining tasks.
   ///
-  /// At the start of the body of a `withDiscardingTaskGroup(of:returning:body:)` call,
+  /// At the start of the body of a `withDiscardingTaskGroup(returning:body:)` call,
   /// the task group is always empty.
   ///
   /// It's guaranteed to be empty when returning from that body
@@ -293,7 +292,7 @@ extension DiscardingTaskGroup: Sendable { }
 /// before returning from this function:
 ///
 /// ```
-/// try await withThrowingDiscardingTaskGroup(of: Void.self) { group in
+/// try await withThrowingDiscardingTaskGroup { group in
 ///   group.addTask { /* slow-task */ }
 ///   // slow-task executes...
 /// }
@@ -405,7 +404,6 @@ public nonisolated(nonsending) func withThrowingDiscardingTaskGroup<GroupResult>
 @available(SwiftStdlib 5.9, *)
 #if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
-#endif
 @inlinable
 @abi(func withThrowingDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type,

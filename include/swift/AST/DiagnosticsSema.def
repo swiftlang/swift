@@ -207,22 +207,6 @@ ERROR(value_type_comparison_with_nil_illegal,none,
       "type %0 is not optional, value can never be nil",
       (Type))
 
-ERROR(cannot_match_expr_pattern_with_value,none,
-      "expression pattern of type %0 cannot match values of type %1",
-      (Type, Type))
-ERROR(cannot_match_expr_tuple_pattern_with_nontuple_value,none,
-      "tuple pattern cannot match values of non-tuple type %0",
-      (Type))
-ERROR(cannot_match_unresolved_expr_pattern_with_value,none,
-      "pattern cannot match values of type %0",
-      (Type))
-ERROR(cannot_match_value_with_pattern,none,
-      "pattern of type %1 cannot match %0",
-      (Type, Type))
-ERROR(pattern_does_not_conform_to_match,none,
-      "pattern of type %0 does not conform to expected match type %1",
-      (Type, Type))
-
 ERROR(cannot_reference_compare_types,none,
       "cannot check reference equality of functions; operands here have types "
       "%1 and %2",
@@ -5520,6 +5504,21 @@ ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,
       "%select{|; remove extra parentheses to change tuple into separate arguments}3",
       (const ValueDecl *, bool, unsigned, bool))
 
+ERROR(cannot_match_expr_pattern_with_value,none,
+      "expression pattern of type %0 cannot match values of type %1",
+      (Type, Type))
+ERROR(cannot_match_expr_tuple_pattern_with_nontuple_value,none,
+      "tuple pattern cannot match values of non-tuple type %0",
+      (Type))
+ERROR(cannot_match_unresolved_expr_pattern_with_value,none,
+      "pattern cannot match values of type %0",
+      (Type))
+ERROR(cannot_match_value_with_pattern,none,
+      "pattern of type %1 cannot match %0",
+      (Type, Type))
+ERROR(pattern_does_not_conform_to_match,none,
+      "pattern of type %0 does not conform to expected match type %1",
+      (Type, Type))
 ERROR(enum_element_pattern_assoc_values_mismatch,none,
       "pattern with associated values does not match enum case %0",
       (DeclNameRef))
@@ -5532,7 +5531,8 @@ ERROR(tuple_pattern_label_mismatch,none,
 ERROR(enum_element_pattern_member_not_found,none,
       "enum case %0 not found in type %1", (DeclNameRef, Type))
 ERROR(optional_element_pattern_not_valid_type,none,
-      "'?' pattern cannot match values of type %0", (Type))
+      "optional pattern '?' cannot match value of non-optional type %0",
+      (Type))
 ERROR(condition_optional_element_pattern_not_valid_type,none,
       "initializer for conditional binding must have Optional type, not %0",
       (Type))
@@ -5835,6 +5835,12 @@ GROUPED_ERROR(actor_isolated_call,ActorIsolatedCall,none,
 GROUPED_ERROR(actor_isolated_call_decl,ActorIsolatedCall,none,
       "call to %0 %kind1 in a synchronous %2 context",
       (ActorIsolation, const ValueDecl *, ActorIsolation))
+NOTE(mark_deinit_isolated_to_access,none,
+      "add 'isolated' to run isolated to %0, which may be later than 'nonisolated deinit'",
+      (Identifier))
+NOTE(marked_nonisolated_here,none,
+      "marked as 'nonisolated' here",
+      ())
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %kind0 can not be partially applied",
         (const ValueDecl *))
@@ -6230,6 +6236,8 @@ ERROR(no_concurrency_module,none,
 ERROR(multiple_global_actors,none,
       "declaration can not have multiple global actor attributes (%0 and %1)",
       (Identifier, Identifier))
+NOTE(multiple_global_actors_note,none,
+      "%0 attribute previously declared here", (const Decl *))
 ERROR(global_actor_disallowed,none,
       "%kindonly0 cannot have a global actor", (const Decl *))
 ERROR(global_actor_on_actor_class,none,
@@ -7694,6 +7702,11 @@ GROUPED_ERROR(property_wrapper_type_requirement_not_accessible,PropertyWrappers,
 GROUPED_ERROR(property_wrapper_ambiguous_enclosing_self_subscript,PropertyWrappers,none,
       "property wrapper type %0 has multiple enclosing-self subscripts %1",
       (Type, DeclName))
+GROUPED_ERROR(property_wrapper_enclosing_self_subscript_keypath_type,PropertyWrappers,none,
+      "parameter %0 of enclosing-self subscript should have either "
+      "'WritableKeyPath<...>' or 'ReferenceWritableKeyPath<...>' type "
+      "(got %1)",
+      (Identifier, Type))
 GROUPED_ERROR(property_wrapper_dynamic_self_type,PropertyWrappers,none,
       "property wrapper %select{wrapped value|projected value}0 cannot have "
       "dynamic Self type", (bool))
@@ -8422,6 +8435,10 @@ ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
 ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
+
+ERROR(borrowingsequence_experimental,none,
+      "'%0' requires -enable-experimental-feature BorrowingSequence",
+      (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Init accessors

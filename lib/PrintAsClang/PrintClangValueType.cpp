@@ -634,8 +634,9 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   if (const auto nd =
           dyn_cast_or_null<clang::NamedDecl>(typeDecl->getClangDecl()))
     isOSObject = !DeclAndTypePrinter::maybeGetOSObjectBaseName(nd).empty();
-  bool addPointer = (typeDecl->isObjC() && !isOSObject) ||
-                    (classDecl && classDecl->isForeignReferenceType());
+  bool addPointer =
+      (typeDecl->isObjC() && !isOSObject && !isa<EnumDecl>(typeDecl)) ||
+      (classDecl && classDecl->isForeignReferenceType());
 
   if (objCxxOnly)
     os << "#if defined(__OBJC__)\n";

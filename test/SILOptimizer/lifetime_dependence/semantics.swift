@@ -17,6 +17,8 @@ import Builtin
 
 struct NotEscapable: ~Escapable {}
 
+public struct NE: ~Escapable {}
+
 // Lifetime dependence semantics by example.
 public struct Span<T>: ~Escapable {
   private var base: UnsafePointer<T>?
@@ -216,8 +218,6 @@ func inheritSpan<T>(_ arg: Span<T>) -> Span<T> { arg }
 
 @_lifetime(copy arg)
 func inheritGeneric<T: ~Escapable>(_ arg: consuming T) -> T { arg }
-
-public struct NE: ~Escapable {}
 
 @_lifetime(&ne)
 func borrowNE<T: ~Escapable>(ne: inout T) -> T {
@@ -773,3 +773,15 @@ func testBorrowedAddressableIntReturn(arg: Holder) -> Span<Int> {
   // expected-error @-1{{lifetime-dependent value escapes its scope}}
   // expected-note  @-2{{it depends on the lifetime of this parent value}}
 } // expected-note  {{this use causes the lifetime-dependent value to escape}}
+
+// =============================================================================
+// Closures
+// =============================================================================
+
+// Implicit dependence on a nonescaping closure context.
+//
+// TODO: remove the _overrideLifetime
+@_lifetime(borrow value)
+func testBasicClosureDependency(value: AnyObject, body: () -> NE) -> NE {
+    return _overrideLifetime(body(), borrowing: value)
+}

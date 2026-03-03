@@ -95,6 +95,7 @@ import DropLast
 import DropWhile
 import ErrorHandling
 import Exclusivity
+import ExecutorEnqueue
 import ExistentialPerformance
 import Fibonacci
 import FindStringNaive
@@ -302,6 +303,7 @@ register(DropLast.benchmarks)
 register(DropWhile.benchmarks)
 register(ErrorHandling.benchmarks)
 register(Exclusivity.benchmarks)
+register(ExecutorEnqueue.benchmarks)
 register(ExistentialPerformance.benchmarks)
 register(Fibonacci.benchmarks)
 register(FindStringNaive.benchmarks)

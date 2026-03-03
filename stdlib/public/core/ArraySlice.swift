@@ -236,7 +236,7 @@ extension ArraySlice {
   @inlinable
   @_semantics("array.get_element_address")
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
-    return unsafe _buffer.subscriptBaseAddress + index
+    return unsafe _buffer.getSubscriptBaseAddress() + index
   }
 }
 
@@ -555,7 +555,7 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
     _modify {
       _makeMutableAndUnique() // makes the array native, too
       _checkSubscript_native(index)
-      let address = unsafe _buffer.subscriptBaseAddress + index
+      let address = unsafe _buffer.getSubscriptBaseAddress() + index
       defer { _endMutation() }
       yield unsafe &address.pointee
     }

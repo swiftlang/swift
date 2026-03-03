@@ -37,6 +37,7 @@ set(backtracing_sources
   Backtrace+Codable.swift
   BacktraceFormatter.swift
   BacktraceJSONFormatter.swift
+  BacktracerThreadLocals.swift
   Base64.swift
   ByteSwapping.swift
   CachingMemoryReader.swift

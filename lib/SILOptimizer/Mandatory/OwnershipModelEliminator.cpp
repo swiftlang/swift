@@ -44,11 +44,6 @@
 
 using namespace swift;
 
-// Utility command line argument to dump the module before we eliminate
-// ownership from it.
-static llvm::cl::opt<std::string>
-DumpBefore("sil-dump-before-ome-to-path", llvm::cl::Hidden);
-
 //===----------------------------------------------------------------------===//
 //                               Implementation
 //===----------------------------------------------------------------------===//
@@ -909,55 +904,55 @@ static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *f) {
 
 namespace {
 
-struct OwnershipModelEliminator : SILFunctionTransform {
+// The OwnershipModelEliminator must be a module pass because it installs a
+// deserialization handler, which affects all functions in the module.
+// If it would be a function pass, the deserialization handler eliminates
+// ownership in de-serialized functions which might be used by other
+// functions (than the currently optimized) which still require OSSA.
+struct OwnershipModelEliminator : SILModuleTransform {
   OwnershipModelEliminator() {}
 
   void run() override {
-    if (DumpBefore.size()) {
-      getFunction()->dump(DumpBefore.c_str());
-    }
+    for (SILFunction &f : *getModule()) {
+      if (!f.hasOwnership())
+        continue;
 
-    auto *f = getFunction();
-    auto &mod = getFunction()->getModule();
+      // Verify here to make sure ownership is correct before we strip.
+      {
+        // Add a pretty stack trace entry to tell users who see a verification
+        // failure triggered by this verification check that they need to re-run
+        // with -sil-verify-all to actually find the pass that introduced the
+        // verification error.
+        //
+        // DISCUSSION: This occurs due to the crash from the verification
+        // failure happening in the pass itself. This causes us to dump the
+        // SILFunction and emit a msg that this pass (OME) is the culprit. This
+        // is generally correct for most passes, but not for OME since we are
+        // verifying before we have even modified the function to ensure that
+        // all ownership invariants have been respected before we lower
+        // ownership from the function.
+        llvm::PrettyStackTraceString silVerifyAllMsgOnFailure(
+            "Found verification error when verifying before lowering "
+            "ownership. Please re-run with -sil-verify-all to identify the "
+            "actual pass that introduced the verification error.");
+        f.verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
+        getPassManager()->runSwiftFunctionVerification(&f);
+      }
 
-    if (!f->hasOwnership())
-      return;
-
-    // Verify here to make sure ownership is correct before we strip.
-    {
-      // Add a pretty stack trace entry to tell users who see a verification
-      // failure triggered by this verification check that they need to re-run
-      // with -sil-verify-all to actually find the pass that introduced the
-      // verification error.
-      //
-      // DISCUSSION: This occurs due to the crash from the verification
-      // failure happening in the pass itself. This causes us to dump the
-      // SILFunction and emit a msg that this pass (OME) is the culprit. This
-      // is generally correct for most passes, but not for OME since we are
-      // verifying before we have even modified the function to ensure that
-      // all ownership invariants have been respected before we lower
-      // ownership from the function.
-      llvm::PrettyStackTraceString silVerifyAllMsgOnFailure(
-          "Found verification error when verifying before lowering "
-          "ownership. Please re-run with -sil-verify-all to identify the "
-          "actual pass that introduced the verification error.");
-      f->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
-      getPassManager()->runSwiftFunctionVerification(f);
-    }
-
-    if (stripOwnership(*f)) {
-      auto InvalidKind = SILAnalysis::InvalidationKind::BranchesAndInstructions;
-      invalidateAnalysis(InvalidKind);
+      if (stripOwnership(f)) {
+        auto InvalidKind = SILAnalysis::InvalidationKind::BranchesAndInstructions;
+        invalidateAnalysis(&f, InvalidKind);
+      }
     }
 
     // Register a handler so that all future things we deserialize have ownership stripped.
     using NotificationHandlerTy =
         FunctionBodyDeserializationNotificationHandler;
     std::unique_ptr<DeserializationNotificationHandler> ptr;
-    if (!mod.hasRegisteredDeserializationNotificationHandlerForAllFuncOME()) {
+    if (!getModule()->hasRegisteredDeserializationNotificationHandlerForAllFuncOME()) {
       ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
-      mod.registerDeserializationNotificationHandler(std::move(ptr));
-      mod.setRegisteredDeserializationNotificationHandlerForAllFuncOME();
+      getModule()->registerDeserializationNotificationHandler(std::move(ptr));
+      getModule()->setRegisteredDeserializationNotificationHandlerForAllFuncOME();
     }
   }
 };

@@ -3,6 +3,11 @@
 
 import StdSpan
 
+func takesSequence<T: Sequence>(_ _: T) {}
+// expected-note@-1 {{where 'T' = 'SpanOfNonCopyable'}}
+
+func takesSpan<S: CxxMutableSpan>(_ _: S) {}
+
 let arr: [Int32] = [1, 2, 3]
 arr.withUnsafeBufferPointer { ubpointer in
     let _ = ConstSpanOfInt(ubpointer) // okay
@@ -15,3 +20,15 @@ arr.withUnsafeBufferPointer { ubpointer in
     let _ = ConstSpanOfInt(ubpointer.baseAddress, ubpointer.count)
     // expected-warning@-1 {{'init(_:_:)' is deprecated: use 'init(_:)' instead.}}
 }
+
+let s1 = initSpan()
+for _ in s1 {}
+takesSequence(s1)
+takesSpan(s1)
+
+let s2 = makeSpanOfNonCopyable()
+for _ in s2 {}
+// expected-error@-1 {{for-in loop requires 'SpanOfNonCopyable'}} to conform to 'Sequence'
+takesSequence(s2)
+// expected-error@-1 {{global function 'takesSequence' requires that 'SpanOfNonCopyable'}} conform to 'Sequence'
+takesSpan(s2)

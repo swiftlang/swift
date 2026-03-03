@@ -17,16 +17,6 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-internal import Darwin
-#elseif os(Windows)
-internal import WinSDK
-#elseif canImport(Glibc)
-internal import Glibc
-#elseif canImport(Musl)
-internal import Musl
-#endif
-
 /// Provides a per-thread image cache for PE-COFF image processing.  This means
 /// if you take multiple backtraces from a thread, you won't load the same
 /// image multiple times.
@@ -52,48 +42,7 @@ final class PeImageCache {
     return nil
   }
 
-  #if os(Windows)
-  private static var dwTlsIndex: DWORD = {
-    let dwNdx = TlsAlloc()
-    if dwNdx == TLS_OUT_OF_INDEXES {
-      fatalError("Unable to allocate TSD for PeImageCache")
-    }
-    return dwNdx
-  }()
-  #else
-  private static var key: pthread_key_t = {
-    var theKey = pthread_key_t()
-    let err = pthread_key_create(
-      &theKey,
-      { rawPtr in
-        let ptr = Unmanaged<PeImageCache>.fromOpaque(
-          notMutable(notOptional(rawPtr))
-        )
-        ptr.release()
-      }
-    )
-    if err != 0 {
-      fatalError("Unable to create TSD key for PeImageCache")
-    }
-    return theKey
-  }()
-  #endif
-
   static var threadLocal: PeImageCache {
-    #if os(Windows)
-    guard let rawPtr = TlsGetValue(dwTlsIndex) else {
-      let cache = Unmanaged<PeImageCache>.passRetained(PeImageCache())
-      TlsSetValue(dwTlsIndex, cache.toOpaque())
-      return cache.takeUnretainedValue()
-    }
-    #else
-    guard let rawPtr = pthread_getspecific(key) else {
-      let cache = Unmanaged<PeImageCache>.passRetained(PeImageCache())
-      pthread_setspecific(key, cache.toOpaque())
-      return cache.takeUnretainedValue()
-    }
-    #endif
-    let cache = Unmanaged<PeImageCache>.fromOpaque(rawPtr)
-    return cache.takeUnretainedValue()
+    return BacktracerThreadLocals.threadLocal.peImageCache
   }
 }

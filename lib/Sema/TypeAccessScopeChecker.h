@@ -29,19 +29,23 @@ class SourceFile;
 class TypeAccessScopeChecker {
   const SourceFile *File;
   bool TreatUsableFromInlineAsPublic;
+  bool IgnoreImportAccessLevel;
 
   std::optional<AccessScope> Scope = AccessScope::getPublic();
 
   TypeAccessScopeChecker(const DeclContext *useDC,
-                         bool treatUsableFromInlineAsPublic)
+                         bool treatUsableFromInlineAsPublic,
+                         bool ignoreImportAccessLevel)
       : File(useDC->getParentSourceFile()),
-  TreatUsableFromInlineAsPublic(treatUsableFromInlineAsPublic) {}
+  TreatUsableFromInlineAsPublic(treatUsableFromInlineAsPublic),
+  IgnoreImportAccessLevel(ignoreImportAccessLevel) {}
 
   bool visitDecl(const ValueDecl *VD) {
     if (isa<GenericTypeParamDecl>(VD))
       return true;
 
-    auto AS = VD->getFormalAccessScope(File, TreatUsableFromInlineAsPublic);
+    auto AS = VD->getFormalAccessScope(File, TreatUsableFromInlineAsPublic,
+                                       IgnoreImportAccessLevel);
     Scope = Scope->intersectWith(AS);
     return Scope.has_value();
   }
@@ -49,8 +53,10 @@ class TypeAccessScopeChecker {
 public:
   static std::optional<AccessScope>
   getAccessScope(TypeRepr *TR, const DeclContext *useDC,
-                 bool treatUsableFromInlineAsPublic = false) {
-    TypeAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic);
+                 bool treatUsableFromInlineAsPublic = false,
+                 bool ignoreImportAccessLevel = false) {
+    TypeAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic,
+                                   ignoreImportAccessLevel);
     TR->walk(DeclRefTypeReprFinder([&](const DeclRefTypeRepr *typeRepr) {
       return checker.visitDecl(typeRepr->getBoundDecl());
     }));
@@ -59,8 +65,10 @@ public:
 
   static std::optional<AccessScope>
   getAccessScope(Type T, const DeclContext *useDC,
-                 bool treatUsableFromInlineAsPublic = false) {
-    TypeAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic);
+                 bool treatUsableFromInlineAsPublic = false,
+                 bool ignoreImportAccessLevel = false) {
+    TypeAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic,
+                                   ignoreImportAccessLevel);
     T.walk(SimpleTypeDeclFinder([&](const ValueDecl *VD) {
       if (checker.visitDecl(VD))
         return TypeWalker::Action::Continue;

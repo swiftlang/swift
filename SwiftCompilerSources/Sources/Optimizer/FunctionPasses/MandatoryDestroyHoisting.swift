@@ -218,7 +218,7 @@ private struct Liverange {
     prunedLiverange.insert(contentsOf: nonDestroyingUsers)
 
     self.fullLiverange = InstructionRange(for: value, context)
-    fullLiverange.insert(contentsOf: value.users)
+    fullLiverange.insert(contentsOf: value.uses.ignoreTypeDependence.users)
 
     self.context = context
   }

@@ -322,6 +322,9 @@ swift::constraints::getConversionBehavior(Type type) {
   if (type->is<LValueType>())
     return ConversionBehavior::LValue;
 
+  if (type->isVoid())
+    return ConversionBehavior::None;
+
   return ConversionBehavior::Unknown;
 }
 
@@ -640,4 +643,35 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
              lhs->dump(llvm::dbgs());
              rhs->dump(llvm::dbgs()));
   return std::nullopt;
+}
+
+void swift::constraints::simple_display(llvm::raw_ostream &out,
+                                        ConflictReason reason) {
+  if (!reason)
+    return;
+
+  out << "conflict:";
+
+  if (reason.contains(ConflictFlag::Category))
+    out << " category";
+  if (reason.contains(ConflictFlag::Exact))
+    out << " exact";
+  if (reason.contains(ConflictFlag::Class))
+    out << " class";
+  if (reason.contains(ConflictFlag::Structural))
+    out << " structural";
+  if (reason.contains(ConflictFlag::Array))
+    out << " array";
+  if (reason.contains(ConflictFlag::DictionaryKey))
+    out << " dictionary_key";
+  if (reason.contains(ConflictFlag::DictionaryValue))
+    out << " dictionary_value";
+  if (reason.contains(ConflictFlag::Set))
+    out << " set";
+  if (reason.contains(ConflictFlag::Optional))
+    out << " optional";
+  if (reason.contains(ConflictFlag::Structural))
+    out << " structural";
+  if (reason.contains(ConflictFlag::Conformance))
+    out << " conformance";
 }

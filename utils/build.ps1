@@ -1671,6 +1671,8 @@ function Build-CMakeProject {
 
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
+          # Skip compiler ID detection: avoids compiling+scanning a multi-MB test binary on every configure.
+          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_ID "Apple"
 
           [string[]] $SwiftFlags = @();
 
@@ -1787,6 +1789,8 @@ function Build-CMakeProject {
           }
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
+          # Skip compiler ID detection: avoids compiling+scanning a multi-MB test binary on every configure.
+          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_ID "Apple"
 
           [string[]] $SwiftFlags = @()
 
@@ -2518,7 +2522,8 @@ function Build-Brotli([Hashtable] $Platform) {
     -Src $SourceCache\brotli `
     -Bin "$(Get-ProjectBinaryCache $Platform brotli)" `
     -Platform $Platform `
-    -UseMSVCCompilers C `
+    -UseMSVCCompilers $(if ($UseHostToolchain) { @("C") } else { @("") }) `
+    -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("C") }) `
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
@@ -2890,6 +2895,10 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
         dispatch_DIR = (Get-ProjectCMakeModules $Platform CDispatch);
 
+        # FIXME(hjyamauchi) Should dynamic to libdispatch https://github.com/swiftlang/swift/issues/87548
+        CMAKE_CXX_FLAGS = $(if ($Static) { @("-Ddispatch_STATIC") } else { @() });
+        CMAKE_Swift_FLAGS = $(if ($Static) { @("-Xcc", "-static-libclosure") } else { @() });
+
         # FIXME(compnerd) remove this once the default option is flipped to `ON`.
         SwiftCore_ENABLE_BACKTRACING = "YES";
         # FIXME(compnerd) remove this once the default option is flipped to `ON`.
@@ -3259,6 +3268,7 @@ function Build-XCTest([Hashtable] $Platform) {
       CMAKE_Swift_FLAGS = $SwiftFlags;
       ENABLE_TESTING = "NO";
       XCTest_INSTALL_NESTED_SUBDIR = "YES";
+      SwiftTesting_DIR = (Get-ProjectCMakeModules $Platform Testing);
     }
 }
 
@@ -3282,7 +3292,7 @@ function Test-XCTest {
       Get-ProjectBinaryCache $BuildPlatform DynamicFoundation
     }
 
-    $env:Path = "$(Get-ProjectBinaryCache $BuildPlatform XCTest);${FoundationBinaryCache}\bin;${DispatchBinaryCache};${SwiftRuntime}\usr\bin;${env:Path};$UnixToolsBinDir"
+    $env:Path = "$(Get-ProjectBinaryCache $BuildPlatform XCTest);$(Get-ProjectBinaryCache $BuildPlatform Testing)\bin;${FoundationBinaryCache}\bin;${DispatchBinaryCache};${SwiftRuntime}\usr\bin;${env:Path};$UnixToolsBinDir"
     $env:SDKROOT = Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK
 
     Build-CMakeProject `
@@ -3635,6 +3645,7 @@ function Build-LLBuild([Hashtable] $Platform) {
     -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
+      BUILD_TESTING = "NO";
       LLBUILD_SUPPORT_BINDINGS = "Swift";
       SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
       SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib";
@@ -4357,8 +4368,8 @@ if (-not $SkipBuild) {
     }
 
     foreach ($Build in $WindowsSDKBuilds) {
-      Invoke-BuildStep Build-XCTest $Build
       Invoke-BuildStep Build-Testing $Build
+      Invoke-BuildStep Build-XCTest $Build
     }
 
     Write-PlatformInfoPlist Windows
@@ -4431,8 +4442,8 @@ if (-not $SkipBuild) {
     }
 
     foreach ($Build in $AndroidSDKBuilds) {
-      Invoke-BuildStep Build-XCTest $Build
       Invoke-BuildStep Build-Testing $Build
+      Invoke-BuildStep Build-XCTest $Build
     }
 
     Write-PlatformInfoPlist Android

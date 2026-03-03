@@ -89,6 +89,11 @@ public:
     return Potential;
   }
 
+  const inference::PotentialBindings &getPotentialBindings() const {
+    DEBUG_ASSERT(forRepresentativeVar());
+    return Potential;
+  }
+
   void initBindingSet();
 
   inference::BindingSet &getBindingSet() {

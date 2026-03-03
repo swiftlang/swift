@@ -25,10 +25,14 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Concurrency.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticGroups.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -42,6 +46,8 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 
 using namespace swift;
@@ -340,6 +346,10 @@ swift::checkGlobalActorAttributes(SourceLoc loc, ArrayRef<CustomAttr *> attrs) {
       ctx.Diags.diagnose(
           loc, diag::multiple_global_actors, globalActorNominal->getName(),
           nominal->getName());
+
+      ctx.Diags.diagnose(attr->getLocation(), diag::multiple_global_actors_note,
+                         nominal);
+
       continue;
     }
 
@@ -1883,6 +1893,69 @@ maybeNoteMutatingMethodSuggestion(ASTContext &C,
   }
 }
 
+/// Add a note and Fix-It to the outer destructor decl if it exists and would
+/// have the same isolation domain to use 'isolated' to access actor isolated
+/// state. If the destructor has an explicit 'nonisolated' attribute, note it's
+/// location instead.
+static void maybeAddIsolatedDeinitFixIt(const DeclContext *decl,
+                                        ActorIsolation isolation) {
+  if (!decl || !isolation)
+    return;
+
+  const DeclContext *outermostFunc = decl->getOutermostFunctionContext();
+  if (!outermostFunc)
+    return;
+
+  const Decl *outermostFuncDecl = outermostFunc->getAsDecl();
+  if (!outermostFuncDecl)
+    return;
+
+  auto deinit = dyn_cast<DestructorDecl>(outermostFuncDecl);
+  if (!deinit)
+    return;
+
+  // We should never emit the note if the isolated attribute is already
+  // present, or if a global actor has been specified.
+  if (deinit->getAttrs().hasAttribute<IsolatedAttr>() ||
+      deinit->getGlobalActorAttr().has_value())
+    return;
+
+  // The actor we would have if this deinit was isolated.
+  NominalTypeDecl *potentialDeinitActor = ([&] {
+    NominalTypeDecl *deinitSelf =
+        deinit->getDeclContext()->getSelfNominalTypeDecl();
+    // If self is a class, we need to find the appropriate actor.
+    // Otherwise self will be an actor that we can compare directly against.
+    auto theClass = dyn_cast<ClassDecl>(deinitSelf);
+    // Walk up the superclass relationship until we find a global actor that we
+    // can resolve to an actor type. The class may have a custom attribute that
+    // is a global actor, but not have the type resolved.
+    while (theClass) {
+      auto globalActor = theClass->getGlobalActorAttr();
+      if (globalActor.has_value())
+        return globalActor.value().second;
+      theClass = theClass->getSuperclassDecl();
+    }
+    return deinitSelf;
+  })();
+
+  // If our potential actor doesn't match, adding isolated won't allow accessing
+  // it in this deinitializer.
+  if (!potentialDeinitActor || potentialDeinitActor != isolation.getActor())
+    return;
+
+  if (auto nonisolated = deinit->getAttrs().getAttribute<NonisolatedAttr>()) {
+    ASTContext &ctx = decl->getASTContext();
+    ctx.Diags.diagnose(nonisolated->getLocation(),
+                       diag::marked_nonisolated_here);
+    return;
+  }
+  auto note = deinit->diagnose(diag::mark_deinit_isolated_to_access,
+                               potentialDeinitActor->getName());
+  auto fixItLoc = deinit->getStartLoc();
+  note.fixItInsert(fixItLoc, "isolated ");
+}
+
 /// Note that the given actor member is isolated.
 static void noteIsolatedActorMember(ValueDecl const *decl,
                                     std::optional<VarRefUseEnv> useKind) {
@@ -2916,10 +2989,7 @@ namespace {
             // If the generic signature of the environment prohibits this
             // type to have an isolated conformance, there is nothing to
             // diagnose.
-            Type interfaceType = archetype->getInterfaceType();
-            auto genericEnv = archetype->getGenericEnvironment();
-            auto genericSig = genericEnv->getGenericSignature();
-            if (genericSig->prohibitsIsolatedConformance(interfaceType))
+            if (!archetype->mayHaveIsolatedConformance())
               continue;
           } else {
             continue;
@@ -4062,6 +4132,11 @@ namespace {
 
         if (calleeDecl) {
           auto calleeIsolation = getInferredActorIsolation(calleeDecl);
+          // If this is happening inside a destructor, suggest adding
+          // `isolated`.
+          maybeAddIsolatedDeinitFixIt(getDeclContext(),
+                                      calleeIsolation.isolation);
+
           calleeDecl->diagnose(diag::actor_isolated_sync_func, calleeDecl);
           if (calleeIsolation.source.isInferred()) {
             calleeDecl->diagnose(diag::actor_isolation_source,
@@ -4631,6 +4706,8 @@ namespace {
         maybeNoteMutatingMethodSuggestion(
             ctx, decl, loc, getDeclContext(), result.isolation,
             kindOfUsage(decl, context).value_or(VarRefUseEnv::Read));
+
+        maybeAddIsolatedDeinitFixIt(getDeclContext(), result.isolation);
 
         if (derivedConformanceType) {
           auto *decl = dyn_cast<ValueDecl>(getDeclContext()->getAsDecl());
@@ -8298,6 +8375,7 @@ bool ActorReferenceResult::Builder::memberAccessHasSpecialPermissionInSwift5(
     noteIsolatedActorMember(member, useKind);
     maybeNoteMutatingMethodSuggestion(C, member, memberLoc, refCxt, isolation,
                                       useKind);
+    maybeAddIsolatedDeinitFixIt(refCxt, isolation);
     return true;
   }
 
@@ -8510,9 +8588,15 @@ ActorReferenceResult ActorReferenceResult::forReference(
 
 bool swift::diagnoseNonSendableFromDeinit(
     SourceLoc refLoc, VarDecl *var, DeclContext *dc) {
-  return diagnoseIfAnyNonSendableTypes(
+  bool diagnosed = diagnoseIfAnyNonSendableTypes(
       var->getTypeInContext(), SendableCheckContext(dc), Type(), SourceLoc(),
       refLoc, diag::non_sendable_from_deinit, var);
+
+  // Add a note suggesting isolated deinit if a non sendable type was used.
+  if (diagnosed)
+    maybeAddIsolatedDeinitFixIt(dc, getActorIsolation(var));
+
+  return diagnosed;
 }
 
 std::optional<ActorIsolation> ProtocolConformance::getRawIsolation() const {

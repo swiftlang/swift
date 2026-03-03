@@ -429,8 +429,8 @@ void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
         B.createIntegerLiteral(loc, wordTy, 0);
 
     // Schedule isolated execution
-    B.createApply(loc, swiftDeinitOnExecutorFunc,
-                  getForwardingSubstitutionMap(),
+    // _deinitOnExecutor is not generic, even when the enclosing destructor is.
+    B.createApply(loc, swiftDeinitOnExecutorFunc, SubstitutionMap(),
                   {castedSelf, castedDeallocator, executor, flagsInst});
   });
 }

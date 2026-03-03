@@ -87,6 +87,9 @@ public protocol Clock<Duration>: Sendable {
 extension Clock {
   // The default implementation works by creating a trampoline and calling
   // the run() method.
+  #if !os(Windows)
+  @_weakLinked
+  #endif
   @available(StdlibDeploymentTarget 6.3, *)
   public func enqueue(_ job: consuming ExecutorJob,
                       on executor: some Executor,
@@ -97,6 +100,9 @@ extension Clock {
 
   // Clocks that do not implement run will fatalError() if you try to use
   // them with an executor that does not understand them.
+  #if !os(Windows)
+  @_weakLinked
+  #endif
   @available(StdlibDeploymentTarget 6.3, *)
   public func run(_ job: consuming ExecutorJob,
                   at instant: Instant, tolerance: Duration?) {
@@ -129,6 +135,18 @@ extension Clock {
   ///       }
   @available(StdlibDeploymentTarget 5.7, *)
   @_alwaysEmitIntoClient
+  public nonisolated(nonsending) func measure<Failure>(
+    _ work: nonisolated(nonsending) () async throws(Failure) -> Void
+  ) async throws(Failure) -> Instant.Duration {
+    let start = now
+    try await work()
+    let end = now
+    return start.duration(to: end)
+  }
+
+  @available(StdlibDeploymentTarget 5.7, *)
+  @_alwaysEmitIntoClient
+  @_disfavoredOverload
   public func measure(
     isolation: isolated (any Actor)? = #isolation,
     _ work: () async throws -> Void
