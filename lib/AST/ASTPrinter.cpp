@@ -532,7 +532,7 @@ getLifetimeDependenceSpecifier(unsigned index,
   case LifetimeDependenceKind::Inherit:
     return "copy ";
   case LifetimeDependenceKind::Scope:
-    if (params[index].isInOut()) {
+    if (index < params.size() && params[index].isInOut()) {
       return "&";
     }
     return "borrow ";
@@ -7078,7 +7078,7 @@ public:
     }
 
     // Print lifetime dependencies using Swift syntax.
-    if (!Options.PrintInSILBody && fnType->hasLifetimeDependencies()) {
+    if (fnType->hasLifetimeDependencies()) {
       ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
 
       for (const auto &lifetimeDependence : info.getLifetimeDependencies()) {
@@ -7324,10 +7324,6 @@ public:
         Printer << ": ";
       }
 
-      if (Options.PrintInSILBody) {
-        Printer.printLifetimeDependenceAt(lifetimeDependencies, i);
-      }
-
       auto type = Param.getPlainType();
       if (Param.isVariadic()) {
         visit(type);
@@ -7387,11 +7383,6 @@ public:
       Printer.printKeyword("sending ", Options);
     }
 
-    if (Options.PrintInSILBody) {
-      Printer.printLifetimeDependenceAt(T->getLifetimeDependencies(),
-                                        T->getParams().size());
-    }
-
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
@@ -7448,11 +7439,6 @@ public:
    }
 
     Printer << " -> ";
-
-    if (Options.PrintInSILBody) {
-      Printer.printLifetimeDependenceAt(T->getLifetimeDependencies(),
-                                        T->getParams().size());
-    }
 
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
