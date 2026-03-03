@@ -2166,6 +2166,20 @@ private:
       assert(!isIndirectFormalParameter(convention));
     }
 
+    // ObjC methods deliver arguments at +0. When a `sending` parameter 
+    // promotes ownership to Owned, the thunk would receive `@owned` butt the 
+    // caller (objc_msgSend) passes +0, causing a double-free.
+    //
+    // Override to Direct_Unowned so the thunk emits a copy_value before
+    // forwarding to the Swift body.
+    if (origFlags.isSending() &&
+        ownership == ValueOwnership::Owned &&
+        convention == ParameterConvention::Direct_Owned &&
+        (Convs.getKind() == ConventionsKind::ObjCSelectorFamily ||
+         Convs.getKind() == ConventionsKind::ObjCMethod)) {
+      convention = ParameterConvention::Direct_Unowned;
+    }
+
     addParameter(formalParamIndex, loweredType, convention, origFlags);
   }
 
