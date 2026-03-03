@@ -212,6 +212,53 @@ ExecutorTrackingInfo::ActiveInfoInThread;
 
 } // end anonymous namespace
 
+/// This function establishes the Task's context and attempts to invoke
+/// it. The invocation may fail and the Task may not be run if the
+/// passed in exclusion value is not what is in the ActiveTaskStatus
+/// during the cas loop to mark the Task as running. If Task
+/// priority escalation is not enabled, this will always succeed.
+SWIFT_ALWAYS_INLINE
+static inline
+void taskInvokeWithExclusionValue(AsyncTask *task,
+                                  SerialExecutorRef serialExecutor,
+                                  TaskExecutorRef taskExecutor
+                                  uint8_t allowedStealerExclusionValue,
+                                  AsyncTask:: InvokeFlags invokeFlags) {
+  // Update the task status to say that it's running on the current
+  // thread.  If the task suspends somewhere, it should update the
+  // task status appropriately; we don't need to update it afterwards.
+  [[maybe_unused]]
+  auto [mayRun, dispatchOpaquePriority] = task->flagAsRunningFromEnqueued(allowedStealerExclusionValue, invokeFlags);
+  if (mayRun) {
+    // Update the active task in the current thread.
+    auto oldTask = ActiveTask::swap(task);
+
+    auto traceHandle =
+        concurrency::trace::job_run_begin(task, serialExecutor, taskExecutor);
+    task->runInFullyEstablishedContext();
+    concurrency::trace::job_run_end(traceHandle);
+
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    swift_dispatch_thread_reset_override_self(dispatchOpaquePriority);
+#endif
+
+    assert(ActiveTask::get() == nullptr &&
+           "active task wasn't cleared before suspending?");
+    if (oldTask) ActiveTask::set(oldTask);
+  } else {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    // This balances with the retain in swift_task_enqueueSelfOrStealer which happens
+    // when adding the first stealer after a direct enqueue. That is, when that
+    // function causes flagAsRunningFromEnqueued to return false for the direct
+    // enqueue, it does a retain in case that direct enqueue lives for a long
+    // time. This is where we release that retain as it is no longer needed.
+    if (!(invokeFlags & AsyncTask::InvokeFlags::InvokedFromStealer)) {
+      swift_release(task);
+    }
+#endif
+  }
+}
+
 void swift::runJobInEstablishedExecutorContext(Job *job,
                                                SerialExecutorRef serialExecutor,
                                                TaskExecutorRef taskExecutor) {
@@ -223,28 +270,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job,
 #endif
 
   if (auto task = dyn_cast<AsyncTask>(job)) {
-    // Update the active task in the current thread.
-    auto oldTask = ActiveTask::swap(task);
-
-    // Update the task status to say that it's running on the
-    // current thread.  If the task suspends somewhere, it should
-    // update the task status appropriately; we don't need to update
-    // it afterwards.
-    [[maybe_unused]]
-    uint32_t dispatchOpaquePriority = task->flagAsRunning();
-
-    auto traceHandle =
-        concurrency::trace::job_run_begin(job, serialExecutor, taskExecutor);
-    task->runInFullyEstablishedContext();
-    concurrency::trace::job_run_end(traceHandle);
-
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    swift_dispatch_thread_reset_override_self(dispatchOpaquePriority);
-#endif
-
-    assert(ActiveTask::get() == nullptr &&
-           "active task wasn't cleared before suspending?");
-    if (oldTask) ActiveTask::set(oldTask);
+    taskInvokeWithExclusionValue(task, serialExecutor, taskExecutor, task->_private().LocalStealerExclusionValue, 0);
   } else {
     // There's no extra bookkeeping to do for simple jobs besides swapping in
     // the voucher.
@@ -265,7 +291,7 @@ AsyncTaskStealer::process(Job *_job) {
   auto *stealer = cast<AsyncTaskStealer>(_job);
   SWIFT_TASK_DEBUG_LOG("Running stealer %p for Task %p", _job, stealer->Task);
 
-  taskInvokeWithExclusionValue(stealer->Task, stealer->ExclusionValue, false);
+  taskInvokeWithExclusionValue(stealer->Task, stealer->ExclusionValue, AsyncTask::InvokeFlags::InvokedFromStealer);
 
   swift_release(stealer->Task);
 
