@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
 // RUN:     -g -Xllvm -sil-print-debuginfo-verbose \
 // RUN:     -enable-experimental-feature BorrowingForLoop \
-// RUN:     -disable-availability-checking \
 // RUN:     %s | %FileCheck %s
 
 // REQUIRES: swift_feature_BorrowingForLoop
@@ -16,7 +15,8 @@ extension NoncopyableInt: Equatable {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing32testNonCopyableBorrowingSequence3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
+// CHECK-LABEL: sil hidden [available {{.*}}] [ossa] @$s17foreach_borrowing32testNonCopyableBorrowingSequence3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
+@available(SwiftStdlib 6.4, *)
 func testNonCopyableBorrowingSequence(seq: borrowing Span<NoncopyableInt>) {
   // With borrowing feature enabled, we expect makeBorrowingIterator and nextSpan to be called
   // CHECK: = function_ref @$ss4SpanVsRi_zrlE22_makeBorrowingIteratorAByxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @owned Span<τ_0_0>
@@ -37,7 +37,8 @@ func testNonCopyableBorrowingSequence(seq: borrowing Span<NoncopyableInt>) {
 }
 
 
-// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing29testCopyableBorrowingSequence3seqys4SpanVySiG_tF : $@convention(thin) (@guaranteed Span<Int>) -> () {
+// CHECK-LABEL: sil hidden [available {{.*}}] [ossa] @$s17foreach_borrowing29testCopyableBorrowingSequence3seqys4SpanVySiG_tF : $@convention(thin) (@guaranteed Span<Int>) -> () {
+@available(SwiftStdlib 6.4, *)
 func testCopyableBorrowingSequence(seq: borrowing Span<Int>) {
   // With borrowing feature enabled, we expect makeBorrowingIterator and nextSpan to be called
   // CHECK: = function_ref @$ss4SpanVsRi_zrlE22_makeBorrowingIteratorAByxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @owned Span<τ_0_0>
@@ -57,7 +58,8 @@ func testCopyableBorrowingSequence(seq: borrowing Span<Int>) {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing35testContinueTargetBorrowingSequenceyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [available {{.*}}] [ossa] @$s17foreach_borrowing35testContinueTargetBorrowingSequenceyyF : $@convention(thin) () -> () {
+@available(SwiftStdlib 6.4, *)
 func testContinueTargetBorrowingSequence() {
   let arr = [0, 1, 2, 3]
   let seq = arr.span
@@ -87,7 +89,8 @@ func testContinueTargetBorrowingSequence() {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing32testBreakTargetBorrowingSequenceyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [available {{.*}}] [ossa] @$s17foreach_borrowing32testBreakTargetBorrowingSequenceyyF : $@convention(thin) () -> () {
+@available(SwiftStdlib 6.4, *)
 func testBreakTargetBorrowingSequence() {
   let arr = [0, 1, 2, 3]
   let seq = arr.span
@@ -118,7 +121,8 @@ func testBreakTargetBorrowingSequence() {
 }
 
 
-// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing20testForEachLocations3seq3valys4SpanVySiG_SitF : $@convention(thin) (@guaranteed Span<Int>, Int) -> () {
+// CHECK-LABEL: sil hidden [available {{.*}}] [ossa] @$s17foreach_borrowing20testForEachLocations3seq3valys4SpanVySiG_SitF : $@convention(thin) (@guaranteed Span<Int>, Int) -> () {
+@available(SwiftStdlib 6.4, *)
 func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
   // Test that synthesized code has correct source locations for the borrowing foreach loop.
   // The borrowing foreach desugars to:
@@ -172,7 +176,8 @@ func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing34testForEachNonCopyableSILDebugInfo3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
+// CHECK-LABEL: sil hidden [available {{.*}}] [ossa] @$s17foreach_borrowing34testForEachNonCopyableSILDebugInfo3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
+@available(SwiftStdlib 6.4, *)
 func testForEachNonCopyableSILDebugInfo(seq: borrowing Span<NoncopyableInt>){
   // CHECK: debug_value {{.*}} : $*NoncopyableInt, let, name "element", expr op_deref, loc "{{.*}}":[[@LINE+1]]:7 isImplicit: false
   for element in seq {

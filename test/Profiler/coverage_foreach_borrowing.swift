@@ -1,9 +1,10 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -suppress-warnings -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_foreach_borrowing -enable-experimental-feature BorrowingForLoop -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -suppress-warnings -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_foreach_borrowing -enable-experimental-feature BorrowingForLoop %s | %FileCheck %s
 // RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir -enable-experimental-feature BorrowingForLoop -disable-availability-checking %s
 
 // REQUIRES: swift_feature_BorrowingForLoop
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_foreach_borrowing.forEachBasic
+@available(SwiftStdlib 6.4, *)
 func forEachBasic(seq: borrowing Span<Int>) -> Int {
   var sum: Int = 0
 
@@ -28,6 +29,7 @@ func forEachBasic(seq: borrowing Span<Int>) -> Int {
 }
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_foreach_borrowing.nestedForEach
+@available(SwiftStdlib 6.4, *)
 func nestedForEach(seq1: borrowing Span<Int>, seq2: borrowing Span<Int>) -> Int {
   var sum: Int = 0
 
@@ -43,6 +45,7 @@ func nestedForEach(seq1: borrowing Span<Int>, seq2: borrowing Span<Int>) -> Int 
 }
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_foreach_borrowing.forEachWithBreak
+@available(SwiftStdlib 6.4, *)
 func forEachWithBreak(seq: borrowing Span<Int>) -> Int {
   var sum: Int = 0
 
@@ -56,6 +59,7 @@ func forEachWithBreak(seq: borrowing Span<Int>) -> Int {
 }
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_foreach_borrowing.forEachWithWhere
+@available(SwiftStdlib 6.4, *)
 func forEachWithWhere(seq: borrowing Span<Int>) -> Int {
   var sum: Int = 0
 
@@ -74,6 +78,7 @@ func forEachWithWhere(seq: borrowing Span<Int>) -> Int {
 }
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_foreach_borrowing.forEachWithReturn
+@available(SwiftStdlib 6.4, *)
 func forEachWithReturn(seq: borrowing Span<Int>) -> Int {
   var sum: Int = 0
 
@@ -89,6 +94,7 @@ func forEachWithReturn(seq: borrowing Span<Int>) -> Int {
 }
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_foreach_borrowing.forEachWithContinue
+@available(SwiftStdlib 6.4, *)
 func forEachWithContinue(seq: borrowing Span<Int>) -> Int {
   var sum: Int = 0
 
@@ -104,6 +110,7 @@ func forEachWithContinue(seq: borrowing Span<Int>) -> Int {
 }
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_foreach_borrowing.forEachMultipleConditions
+@available(SwiftStdlib 6.4, *)
 func forEachMultipleConditions(seq: borrowing Span<Int>) -> Int {
   var sum: Int = 0
 
