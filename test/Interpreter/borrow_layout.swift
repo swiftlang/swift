@@ -2,7 +2,6 @@
 //
 // RUN: %target-build-swift -enable-experimental-feature BuiltinModule \
 // RUN:   -enable-experimental-feature Lifetimes \
-// RUN:   -enable-experimental-feature AnyAppleOSAvailability \
 // RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanPointer \
 // RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanPointer \
 // RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanPointer \
@@ -41,7 +40,6 @@
 //
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_BuiltinModule
-// REQUIRES: swift_feature_AnyAppleOSAvailability
 
 // CHECK-NOT: Type verification
 
