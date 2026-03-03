@@ -3136,6 +3136,49 @@ void PotentialBindings::reset() {
   AssociatedCodeCompletionToken = ASTNode();
 }
 
+void PotentialBindings::printVars(llvm::raw_ostream &out, unsigned indent,
+                                  bool showVia) const {
+  auto printVars = [&](ArrayRef<std::pair<TypeVariableType *, Constraint *>> pairs) {
+    interleave(
+        pairs,
+        [&](std::pair<TypeVariableType *, Constraint *> pair) {
+          out << pair.first->getString(PrintOptions::forDebugging());
+          if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
+            out << " (fixed)";
+          if (showVia) {
+            out << " via ";
+            pair.second->print(out, &CS.getASTContext().SourceMgr, indent,
+                               /*skipLocator=*/true);
+          }
+        },
+        [&out]() { out << ", "; });
+  };
+
+  if (!AdjacentVars.empty()) {
+    out << "[adjacent to: ";
+    printVars(AdjacentVars);
+    out << "] ";
+  }
+
+  if (!SupertypeOf.empty()) {
+    out << "[supertype of: ";
+    printVars(SupertypeOf);
+    out << "] ";
+  }
+
+  if (!SubtypeOf.empty()) {
+    out << "[subtype of: ";
+    printVars(SubtypeOf);
+    out << "] ";
+  }
+
+  if (!EquivalentTo.empty()) {
+    out << "[equivalent to: ";
+    printVars(SubtypeOf);
+    out << "] ";
+  }
+}
+
 void PotentialBindings::dump(llvm::raw_ostream &out, unsigned indent) const {
   if (TypeVar) {
     out << "Potential bindings for ";
@@ -3157,27 +3200,7 @@ void PotentialBindings::dump(llvm::raw_ostream &out, unsigned indent) const {
       [&out]() { out << ", "; });
   out << "] ";
 
-  if (!AdjacentVars.empty()) {
-    out << "[adjacent to: ";
-    SmallVector<std::pair<TypeVariableType *, Constraint *>> adjacentVars(
-        AdjacentVars.begin(), AdjacentVars.end());
-    llvm::sort(adjacentVars,
-               [](auto lhs, auto rhs) {
-                   return lhs.first->getID() < rhs.first->getID();
-               });
-    interleave(
-        adjacentVars,
-        [&](std::pair<TypeVariableType *, Constraint *> pair) {
-          out << pair.first->getString(PrintOptions::forDebugging());
-          if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
-            out << " (fixed)";
-          out << " via ";
-          pair.second->print(out, &CS.getASTContext().SourceMgr, indent,
-                             /*skipLocator=*/true);
-        },
-        [&out]() { out << ", "; });
-    out << "] ";
-  }
+  printVars(out, indent, /*skipVia=*/false);
 }
 
 void BindingSet::forEachLiteralRequirement(

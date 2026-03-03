@@ -349,6 +349,8 @@ struct PotentialBindings {
   void reset();
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
+
+  void printVars(llvm::raw_ostream &out, unsigned indent, bool showVia) const;
 };
 
 
