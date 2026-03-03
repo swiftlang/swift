@@ -110,6 +110,14 @@ enum class ConversionBehavior : unsigned {
 /// Classify the possible conversions having this type as result type.
 ConversionBehavior getConversionBehavior(Type type);
 
+void getTypeVariablesWithVariance(
+    Type type, TypePosition pos,
+    SmallPtrSetImpl<TypeVariableType *> &covariant,
+    SmallPtrSetImpl<TypeVariableType *> &contravariant,
+    SmallPtrSetImpl<TypeVariableType *> &invariant,
+    bool funcResultIsInvariant=false,
+    bool skipDependentMemberTypes=true);
+
 /// Suppose we are given a type T and a protocol P, and T conv U for
 /// some type U; if U conforms to P, does it follow that T conforms to P?
 bool checkTransitiveSupertypeConformance(ConstraintSystem &cs,
