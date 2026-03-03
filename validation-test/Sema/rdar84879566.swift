@@ -20,6 +20,6 @@ struct TupleBuilder {
 
 struct MyApp: Tupled {
   var tuple: some Any {
-    MyView() // expected-error {{ambiguous use of 'init()'}}
+    MyView() // expected-error {{ambiguous use of 'MyView'}}
   }
 }

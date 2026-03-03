@@ -24,6 +24,7 @@
 #include "FormalEvaluation.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
+#include "swift/Basic/Assertions.h"
 
 namespace swift {
 namespace Lowering {
@@ -106,6 +107,7 @@ public:
     ValueKind,                  // random base pointer as an lvalue
     PhysicalKeyPathApplicationKind, // applying a key path
     BorrowValueKind,            // load_borrow the base rvalue for a projection
+    BorrowMutateKind,           // borrow and mutate accessor
 
     // Logical LValue kinds
     GetterSetterKind,           // property or subscript getter/setter

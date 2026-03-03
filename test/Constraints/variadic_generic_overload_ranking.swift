@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -verify -swift-version 5 -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -target %target-swift-5.9-abi-triple -verify -swift-version 5 | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s33variadic_generic_overload_ranking05test_d15_concrete_over_A0yyF
 func test_ranking_concrete_over_variadic() {
@@ -84,4 +84,14 @@ func test_ranking_with_multiple_expansions() {
   // CHECK: // function_ref static build<each A>(_:) in Builder #1 in test_ranking_with_multiple_expansions()
   // CHECK-NEXT: {{.*}} = function_ref @$s33variadic_generic_overload_ranking05test_D25_with_multiple_expansionsyyF7BuilderL_V5buildyAaByyF5TupleL_VyxxQp_tGxxQpRvzAA1PRzlFZ : $@convention(method) <each τ_0_0 where repeat each τ_0_0 : P> (@pack_guaranteed Pack{repeat each τ_0_0}, @thin Builder.Type) -> Tuple<(repeat each τ_0_0)>
   _ = Builder.build(Empty(), Tuple<(Int, String)>((42, "")))
+}
+protocol Q: P {}
+
+func test_ranking_with_protocol_refinement() {
+  func f<each T: Q>(_ a: repeat each T) {}
+  func f<each T: P>(_ a: repeat each T) {}
+  struct S: Q {}
+  // CHECK: // function_ref f #1 <each A>(_:) in test_ranking_with_protocol_refinement()
+  // CHECK-NEXT: {{.*}} = function_ref @$s33variadic_generic_overload_ranking05test_D25_with_protocol_refinementyyF1fL_yyxxQpRvzAA1QRzlF : $@convention(thin) <each τ_0_0 where repeat each τ_0_0 : Q> (@pack_guaranteed Pack{repeat each τ_0_0}) -> ()
+  f(S())
 }

@@ -1,6 +1,7 @@
 // RUN: %target-run-stdlib-swift(-O -enable-experimental-feature MoveOnly)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_MoveOnly
 
 import Swift
 import StdlibUnittest
@@ -74,7 +75,9 @@ extension Class {
         }
         switch (x)[userHandle] {
         case .foo:
-            expectTrue(self.array._buffer.isUniquelyReferenced())
+          // The array buffer is not unique because the lexical lifetime of x spans
+          // over the switch statement.
+          expectFalse(self.array._buffer.isUniquelyReferenced())
         }
     }
 }

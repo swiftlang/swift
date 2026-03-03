@@ -178,45 +178,45 @@ prefix func ^^^(_ x: Int) -> (@escaping () -> Int) -> Void { takesEscapingFn }
 
 func testWeirdFnExprs<T>(_ fn: () -> Int, _ cond: Bool, _ any: Any, genericArg: T) { // expected-note 12{{parameter 'fn' is implicitly non-escaping}}
   (any as! (@escaping () -> Int) -> Void)(fn)
-  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
 
   let wrapped = Wrapper<(@escaping () -> Int) -> Void>({ x in })
   (wrapped[keyPath: \.value] as (@escaping () -> Int) -> Void)(fn)
-  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
 
   (cond ? returnsTakesEscapingFn() : returnsTakesEscapingFn())(fn)
-  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
 
   (^^^5)(fn)
-  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
 
   (try! takesEscapingFn)(fn)
-  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
 
   var optFn: Optional = takesEscapingFn
   optFn?(fn)
-  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
 
   [takesEscapingFn][0](fn)
-  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
 
   (takesEscapingFn, "").0(fn)
-  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
 
   with({ (x: @escaping () -> Int) in }) { y in
     Wrapper(y).value(fn)
-    // expected-error @-1{{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+    // expected-error @-1{{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
   }
 
   _ = { x in (x({ 0 }), x(fn)) }(takesGeneric)
-  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
 
   _ = { (a: (@escaping () -> Int), b) in () }(fn, genericArg)
-  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
 
   func returnsVeryCurried() -> () throws -> (@escaping () -> Int) -> Void { { { x in } } }
   (try? returnsVeryCurried()())?(fn)
-  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
 }
 
 // rdar://problem/59066040 - Confusing error message about argument mismatch where the problem is escapiness
@@ -227,7 +227,7 @@ func test_passing_nonescaping_to_escaping_function() {
   func bar(_ handler: Handler?) {}
 
   func foo(_ handler: Handler) { // expected-note {{parameter 'handler' is implicitly non-escaping}}
-    bar(handler) // expected-error {{passing non-escaping parameter 'handler' to function expecting an @escaping closure}}
+    bar(handler) // expected-error {{passing non-escaping parameter 'handler' to function expecting an '@escaping' closure}}
   }
 }
 

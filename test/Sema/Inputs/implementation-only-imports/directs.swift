@@ -29,3 +29,10 @@ extension StructFromIndirect {
     set {}
   }
 }
+
+public struct RawTypeFromDirect : Equatable, ExpressibleByIntegerLiteral {
+  public typealias IntegerLiteralType = Int
+  public init(integerLiteral: Int) {}
+}
+
+public protocol ProtocolFromDirect { }

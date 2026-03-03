@@ -1,4 +1,4 @@
-# Using Protocol Members with References to `Self` or `Self`-rooted Associated Types
+# Using protocol members with references to `Self` or `Self`-rooted associated types (ExistentialMemberAccess)
 
 Protocol requirements and protocol extension members may be accessed via a conformance constraint on a generic parameter, an opaque result type, or via the protocol type itself:
 
@@ -51,4 +51,16 @@ func duplicateShape(_ shape: Shape) -> Shape {
 }
 ```
 
-Most use cases involving usage of protocol members that fall under the above restriction can instead be supported by constrained generics, opaque result types, or manual type-erasing wrappers. To learn more, see the sections on [protocols](https://docs.swift.org/swift-book/LanguageGuide/Protocols.html), [generics](https://docs.swift.org/swift-book/LanguageGuide/Generics.html), and [opaque types](https://docs.swift.org/swift-book/LanguageGuide/OpaqueTypes.html) in the Language Guide. For a better understanding of existential types in particular, and an in-depth exploration of the relationships among these built-in abstraction models, we recommend reading the [design document for improving the UI of the generics model](https://forums.swift.org/t/improving-the-ui-of-generics/22814).
+Most use cases involving usage of protocol members that fall under the above restriction can instead be supported by constrained generics, opaque result types, or manual type-erasing wrappers. To learn more, see the sections on [protocols], [generics], and [opaque types][opaque-types] in the Language Guide. For a better understanding of existential types in particular, and an in-depth exploration of the relationships among these built-in abstraction models, we recommend reading [design document for improving the UI of the generics model][improving-generics-ui].
+
+## See Also
+
+- [Generics][generics]
+- [Improving the UI of generics][improving-generics-ui]
+- [Opaque Types][opaque-types]
+- [Protocols][protocols]
+
+[generics]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/generics
+[improving-generics-ui]: https://forums.swift.org/t/improving-the-ui-of-generics/22814
+[opaque-types]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/opaquetypes
+[protocols]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/protocols

@@ -1,8 +1,8 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift
 
 var global: Int = 5
 func testGlobal() {
-    let _ = consume global
+    let _ = consume global // expected-warning {{'consume' applied to bitwise-copyable type 'Int' has no effect}}
 }
 
 func testLet() {
@@ -69,7 +69,7 @@ struct FooWrapper<T> {
 
 struct Foo {
     @FooWrapper var wrapperTest: String
-    
+
     func consumeSelf() {
         _ = consume self
     }

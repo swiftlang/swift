@@ -27,8 +27,7 @@ bool initCompilerInvocation(
     StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     const std::string &swiftExecutablePath,
-    const std::string &runtimeResourcePath,
-    const std::string &diagnosticDocumentationPath, time_t sessionTimestamp,
+    const std::string &runtimeResourcePath, time_t sessionTimestamp,
     std::string &Error);
 
 bool initInvocationByClangArguments(ArrayRef<const char *> ArgList,

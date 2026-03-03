@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine -sil-print-generic-specialization-info | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -sil-combine -sil-print-generic-specialization-info | %FileCheck %s
 // RUN: %target-swift-frontend -O %s -emit-ir
 
 // REQUIRES: swift_in_compiler
@@ -660,12 +660,11 @@ extension MyObject : SubscriptionViewControllerDelegate { }
 
 sil @callee2 : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControllerDelegate> (@in τ_0_0, @thick SubscriptionViewControllerBuilder.Type) -> @owned SubscriptionViewControllerBuilder
 
-// CHECK: sil @test_opend_archetype_concrete_conformance_substitution : $@convention(method) (@guaranteed any ResourceKitProtocol, @guaranteed ViewController) -> () {
+// CHECK: sil @test_opened_archetype_concrete_conformance_substitution : $@convention(method) (@guaranteed any ResourceKitProtocol, @guaranteed ViewController) -> () {
 // CHECK: bb0([[ARG:%.*]] : $any ResourceKitProtocol, [[ARG2:%.*]] : $ViewController):
 // CHECK:   [[T1:%.*]] = metatype $@thick SubscriptionViewControllerBuilder.Type
 // CHECK:   [[T2:%.*]] = open_existential_ref [[ARG]] : $any ResourceKitProtocol to $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
-// CHECK:   [[T3:%.*]] = alloc_stack $any SubscriptionViewControllerDelegate
-// CHECK:   [[T4:%.*]] = init_existential_addr [[T3]] : $*any SubscriptionViewControllerDelegate, $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
+// CHECK:   [[T4:%.*]] = alloc_stack $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122"
 // CHECK:   store [[T2]] to [[T4]] : $*@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
 // CHECK:   [[T5:%.*]] = function_ref @callee2 : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControllerDelegate> (@in τ_0_0, @thick SubscriptionViewControllerBuilder.Type) -> @owned SubscriptionViewControllerBuilder
 // CHECK:   [[T6:%.*]] = alloc_stack $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
@@ -674,7 +673,7 @@ sil @callee2 : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControl
 // CHECK:  (normal_conformance type="MyObject" protocol="SubscriptionViewControllerDelegate"
 // CHECK:   apply [[T5]]<@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self>([[T6]], [[T1]])
 
-sil @test_opend_archetype_concrete_conformance_substitution : $@convention(method) (@guaranteed ResourceKitProtocol, @guaranteed ViewController) -> () {
+sil @test_opened_archetype_concrete_conformance_substitution : $@convention(method) (@guaranteed ResourceKitProtocol, @guaranteed ViewController) -> () {
 bb0(%0 : $ResourceKitProtocol, %1 : $ViewController):
   %4 = metatype $@thick SubscriptionViewControllerBuilder.Type
   %5 = open_existential_ref %0 : $ResourceKitProtocol to $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", ResourceKitProtocol) Self
@@ -785,6 +784,39 @@ bb0(%0 : $S):
   dealloc_stack %1 : $*PPP
   %20 = tuple ()
   return %20 : $()
+}
+
+protocol Q2 {
+  func f()
+}
+
+struct S2 : Q2 {
+  func f()
+}
+
+// CHECK-LABEL: sil [ossa] @overridden_enum_in_alloc_stack :
+// CHECK:         witness_method $@opened
+// CHECK-LABEL: } // end sil function 'overridden_enum_in_alloc_stack'
+sil [ossa] @overridden_enum_in_alloc_stack : $@convention(thin) (S2, @in_guaranteed Optional<any Q2>) -> () {
+bb0(%0 : $S2, %1 : $*Optional<any Q2>):
+  %2 = alloc_stack $Optional<any Q2>
+  %3 = init_enum_data_addr %2, #Optional.some!enumelt
+  %4 = init_existential_addr %3, $S2
+  store %0 to [trivial] %4
+  inject_enum_addr %2, #Optional.some!enumelt
+  copy_addr %1 to %2
+  %8 = unchecked_take_enum_data_addr %2, #Optional.some!enumelt
+  %9 = alloc_stack $any Q2
+  copy_addr %8 to [init] %9
+  %11 = open_existential_addr immutable_access %9 to $*@opened("9EED66EA-C9C5-11F0-85FF-0EA13E3AABB2", any Q2) Self
+  %12 = witness_method $@opened("9EED66EA-C9C5-11F0-85FF-0EA13E3AABB2", any Q2) Self, #Q2.f : <Self where Self : Q2> (Self) -> () -> (), %11 : $*@opened("9EED66EA-C9C5-11F0-85FF-0EA13E3AABB2", any Q2) Self : $@convention(witness_method: Q2) <τ_0_0 where τ_0_0 : Q2> (@in_guaranteed τ_0_0) -> ()
+  %13 = apply %12<@opened("9EED66EA-C9C5-11F0-85FF-0EA13E3AABB2", any Q2) Self>(%11) : $@convention(witness_method: Q2) <τ_0_0 where τ_0_0 : Q2> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %9
+  dealloc_stack %9
+  destroy_addr %2
+  dealloc_stack %2
+  %18 = tuple ()
+  return %18
 }
 
 sil_vtable SubscriptionViewControllerBuilder {}

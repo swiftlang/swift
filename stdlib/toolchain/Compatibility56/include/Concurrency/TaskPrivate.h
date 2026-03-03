@@ -25,7 +25,7 @@
 #include "swift/Runtime/Error.h"
 
 #define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
-#include "public/runtime/StackAllocator.h"
+#include "Runtime/StackAllocator.h"
 
 namespace swift {
 

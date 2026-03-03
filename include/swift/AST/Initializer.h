@@ -22,6 +22,10 @@
 
 #include "swift/AST/DeclContext.h"
 
+namespace llvm {
+class raw_ostream;
+}
+
 namespace swift {
 class ParamDecl;
 class PatternBindingDecl;
@@ -36,6 +40,9 @@ enum class InitializerKind : uint8_t {
 
   /// A property wrapper initialization expression.
   PropertyWrapper,
+
+  /// An expression within a custom attribute.
+  CustomAttribute,
 };
 
 /// An Initializer is a kind of DeclContext used for expressions that
@@ -119,10 +126,16 @@ public:
 /// A default argument expression.  The parent context is the function
 /// (possibly a closure) for which this is a default argument.
 class DefaultArgumentInitializer : public Initializer {
-public:
   explicit DefaultArgumentInitializer(DeclContext *parent, unsigned index)
       : Initializer(InitializerKind::DefaultArgument, parent) {
     SpareBits = index;
+  }
+
+public:
+  static DefaultArgumentInitializer *create(DeclContext *parent,
+                                            unsigned index) {
+    return new (parent->getASTContext())
+        DefaultArgumentInitializer(parent, index);
   }
 
   unsigned getIndex() const { return SpareBits; }
@@ -130,7 +143,7 @@ public:
   /// Change the parent of this context.  This is necessary because
   /// the function signature is parsed before the function
   /// declaration/expression itself is built.
-  void changeFunction(DeclContext *parent, ParameterList *paramLists);
+  void changeFunction(DeclContext *parent);
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))
@@ -175,6 +188,34 @@ public:
     return I->getInitializerKind() == InitializerKind::PropertyWrapper;
   }
 };
+
+/// An expression within a custom attribute. The parent context is the
+/// context in which the attributed declaration occurs.
+class CustomAttributeInitializer : public Initializer {
+public:
+  explicit CustomAttributeInitializer(DeclContext *parent)
+      : Initializer(InitializerKind::CustomAttribute, parent) {}
+
+  static CustomAttributeInitializer *create(DeclContext *parent) {
+    return new (parent->getASTContext()) CustomAttributeInitializer(parent);
+  }
+
+  void setEnclosingInitializer(Initializer *newParent) {
+    setParent(newParent);
+  }
+
+  static bool classof(const DeclContext *DC) {
+    if (auto init = dyn_cast<Initializer>(DC))
+      return classof(init);
+    return false;
+  }
+
+  static bool classof(const Initializer *I) {
+    return I->getInitializerKind() == InitializerKind::CustomAttribute;
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, Initializer *init);
 
 } // end namespace swift
 

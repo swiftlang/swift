@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -disable-availability-checking -parse-as-library %s | %FileCheck %s
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-swift-emit-silgen -target %target-swift-5.7-abi-triple -parse-as-library %s | %FileCheck %s
+// RUN: %target-run-simple-swift( -target %target-swift-5.7-abi-triple -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

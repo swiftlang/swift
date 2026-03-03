@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name Swift -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name Swift -parse-stdlib %s | %FileCheck %s
 
 @_semantics("typechecker.type(of:)")
 public func type<T, Metatype>(of value: T) -> Metatype {}

@@ -87,3 +87,30 @@ do {
     }
   }
 }
+
+_ = { x in // expected-error {{cannot infer type of closure parameter 'x' without a type annotation}}
+  let _: Undefined = Swift.type(of: x)
+  // expected-error@-1 {{cannot find type 'Undefined' in scope}}
+}
+_ = {
+  func foo<T>() -> T {}
+  let _: Undefined = Swift.type(of: foo())
+  // expected-error@-1 {{cannot find type 'Undefined' in scope}}
+}
+_ = {
+  let _: Undefined = Swift.type(of: .foo)
+  // expected-error@-1 {{cannot find type 'Undefined' in scope}}
+}
+let _: Int = Swift.type(of: .foo)
+// expected-error@-1 {{cannot convert 'type(of:)' metatype to non-metatype 'Int'}}
+
+let _ = Swift.type(of: .foo)
+// expected-error@-1 {{cannot infer contextual base in reference to member 'foo'}}
+
+// FIXME: Ideally we'd include the type of the argument in the diagnostic, currently
+// we bind it to a hole before we open the closure.
+let _: Int = Swift.type(of: { (); return 0 }())
+// expected-error@-1 {{cannot convert 'type(of:)' metatype to non-metatype 'Int'}}
+
+let _: Undefined = Swift.type(of: { (); return 0 }())
+// expected-error@-1 {{cannot find type 'Undefined' in scope}}

@@ -1,0 +1,5 @@
+@PACKAGE_INIT@
+include(CMakeFindDependencyMacro)
+find_dependency(SwiftOverlay)
+find_dependency(SwiftCxxOverlay)
+include("${CMAKE_CURRENT_LIST_DIR}/SwiftRuntimeTargets.cmake")

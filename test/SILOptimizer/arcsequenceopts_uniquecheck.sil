@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -109,7 +109,7 @@ bb0(%0 : $*C, %1 : $*C):
 }
 
 // Similarly, do not remove a retain/release pair that spans an
-// is_escaping_closure instruction. This would fail to catch closures
+// destroy_not_escaped_closure instruction. This would fail to catch closures
 // that are returned from the function.
 // <rdar://problem/52803634>
 
@@ -126,8 +126,7 @@ bb0(%0 : $@noescape @callee_guaranteed () -> ()):
   %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   %3 = mark_dependence %2 : $@callee_guaranteed () -> () on %0 : $@noescape @callee_guaranteed () -> ()
   strong_retain %3 : $@callee_guaranteed () -> ()
-  %5 = is_escaping_closure %3 : $@callee_guaranteed () -> ()
-  strong_release %3 : $@callee_guaranteed () -> ()
+  %5 = destroy_not_escaped_closure %3 : $@callee_guaranteed () -> ()
   cond_fail %5 : $Builtin.Int1
   return %3 : $@callee_guaranteed () -> ()
 }

@@ -36,6 +36,7 @@ namespace {
 struct DiagnosticDeadFunctionEliminator : SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
+    auto &mod = fn->getModule();
 
     // If an earlier pass asked us to eliminate the function body if it's
     // unused, and the function is in fact unused, do that now.
@@ -67,6 +68,10 @@ struct DiagnosticDeadFunctionEliminator : SILFunctionTransform {
       b.createUnreachable(loc);
     }
 
+    // Drop differentiability witnesses, if any
+    if (!mod.lookUpDifferentiabilityWitnessesForFunction(fn->getName()).empty())
+      mod.eraseAllDifferentiabilityWitnesses(fn);
+
     // If the function has shared linkage, reduce this version to private
     // linkage, because we don't want the deleted-body form to win in any
     // ODR shootouts.
@@ -76,6 +81,12 @@ struct DiagnosticDeadFunctionEliminator : SILFunctionTransform {
     }
 
     invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+    // We know that this pass does not create infinite loops even if it
+    // deletes basic blocks.
+    fn->setNeedBreakInfiniteLoops(false);
+    // Replacing the whole function with an `unreachable` does not create
+    // incomplete lifetimes.
+    fn->setNeedCompleteLifetimes(false);
   }
 };
 

@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -Xfrontend -disable-availability-checking) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -Xfrontend -disable-availability-checking) | %FileCheck %s
 
 // REQUIRES: executable_test
 
@@ -136,7 +136,7 @@ enum Maybe<Wrapped: ~Copyable>: ~Copyable {
   case just(Wrapped)
   case nothing
 }
-extension Maybe: Copyable {}
+extension Maybe: Copyable where Wrapped: Copyable {}
 extension Maybe: CustomDebugStringConvertible {
   var debugDescription: String {
     "cast succeeded"

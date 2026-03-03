@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 
@@ -11,7 +11,7 @@ func foo() -> String {}
 var string = ""
 
 @objc protocol P {
-  @_borrowed // expected-error {{property cannot be '@_borrowed' if it is an @objc protocol requirement}}
+  @_borrowed // expected-error {{property cannot be '@_borrowed' if it is an '@objc' protocol requirement}}
   var title: String { get }
 }
 
@@ -27,4 +27,19 @@ public class Holder {
   @_borrowed var two: String {
     get throws { "" } // expected-error {{getter cannot be '@_borrowed' if it is 'async' or 'throws'}}
   }
+
+  @_borrowed @_owned var three: String { // expected-error {{property cannot be '@_borrowed' and '@_owned' at the same time}}
+    get { "" }
+  }
+  @_owned var four: String { // expected-error {{property must define a 'get' to support '@_owned'}}
+    _read {
+      let x = ""
+      yield x
+    }
+  }
 }
+
+#if hasAttribute(_owned)
+#else
+#error("hasAttribute should be true!")
+#endif

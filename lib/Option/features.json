@@ -47,6 +47,15 @@
     },
     {
        "name": "experimental-package-interface-load"
+    },
+    {
+       "name": "Isystem"
+    },
+    {
+       "name": "internal-import-bridging-header"
+    },
+    {
+       "name": "api-digester-Xcc"
     }
   ]
 }

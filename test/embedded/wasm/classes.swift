@@ -7,6 +7,8 @@
 // RUN: %target-run %t/check.wasm
 // REQUIRES: executable_test
 // REQUIRES: CPU=wasm32
+// REQUIRES: embedded_stdlib_cross_compiling
+// REQUIRES: swift_feature_Embedded
 
 //--- rt.c
 

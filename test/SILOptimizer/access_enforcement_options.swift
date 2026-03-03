@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -Onone -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=NONE
-// RUN: %target-swift-frontend -Osize -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=OPT
-// RUN: %target-swift-frontend -O -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=OPT
-// RUN: %target-swift-frontend -Ounchecked -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=UNCHECKED
+// RUN: %target-swift-frontend -Onone -Xllvm -sil-print-types -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=NONE
+// RUN: %target-swift-frontend -Osize -Xllvm -sil-print-types -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=OPT
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=OPT
+// RUN: %target-swift-frontend -Ounchecked -Xllvm -sil-print-types -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=UNCHECKED
 
 @inline(never)
 func takesInoutAndEscaping(_: inout Int, _ f: @escaping () -> ()) {

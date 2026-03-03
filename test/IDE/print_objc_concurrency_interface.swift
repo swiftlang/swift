@@ -7,7 +7,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendableCompletionHandlers
 import _Concurrency
 
 // CHECK-LABEL: class SlowServer : NSObject, ServiceProvider {

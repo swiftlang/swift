@@ -11,7 +11,6 @@
 # ----------------------------------------------------------------------------
 
 import os
-import platform
 
 from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
 
@@ -19,7 +18,6 @@ from . import cmark
 from . import foundation
 from . import libcxx
 from . import libdispatch
-from . import libicu
 from . import llbuild
 from . import llvm
 from . import product
@@ -120,8 +118,6 @@ class SwiftSyntax(product.Product):
                 "verify-source-code",
                 ['--toolchain', self.install_toolchain_path(host_target)]
             )
-            if platform.system() == 'Darwin':
-                self.run_swift_syntax_dev_utils(host_target, "verify-documentation", [])
 
         self.run_swiftsyntax_build_script(target=host_target,
                                           command='build')
@@ -150,7 +146,6 @@ class SwiftSyntax(product.Product):
         return [cmark.CMark,
                 llvm.LLVM,
                 libcxx.LibCXX,
-                libicu.LibICU,
                 swift.Swift,
                 libdispatch.LibDispatch,
                 foundation.Foundation,

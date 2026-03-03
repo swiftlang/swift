@@ -1,15 +1,13 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name main
-// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.sil -module-name main
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name main
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o %t/tmp.sil -module-name main
 
 // https://github.com/apple/swift/issues/54526
 // Workaround because import declarations are not preserved in .sib files.
-// RUN: sed -e 's/import Swift$/import Swift; import _Differentiation/' %t/tmp.sil > %t/tmp_fixed.sil
-// RUN: %target-sil-opt %t/tmp_fixed.sil -module-name main -emit-sorted-sil | %FileCheck %s
+// RUN: echo "import _Differentiation" > %t/tmp_preamble
+// RUN: cat %t/tmp_preamble %t/tmp.sil > %t/tmp_fixed.sil
+// RUN: %target-sil-opt -sil-print-types %t/tmp_fixed.sil -module-name main -emit-sorted-sil | %FileCheck %s
 
-// `shell` is required only to run `sed` as a
-// https://github.com/apple/swift/issues/54526 workaround.
-// REQUIRES: shell
 
 sil_stage raw
 

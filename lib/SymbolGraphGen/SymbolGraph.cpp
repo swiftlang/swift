@@ -11,12 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/SymbolGraphGen/DocumentationCategory.h"
@@ -63,8 +65,9 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.PrintFunctionRepresentationAttrs =
     PrintOptions::FunctionRepresentationMode::None;
   Opts.PrintUserInaccessibleAttrs = false;
-  Opts.SkipPrivateStdlibDecls = !Walker.Options.PrintPrivateStdlibSymbols;
-  Opts.SkipUnderscoredStdlibProtocols = !Walker.Options.PrintPrivateStdlibSymbols;
+  Opts.SkipPrivateSystemDecls = !Walker.Options.PrintPrivateSystemSymbols;
+  Opts.SkipUnderscoredSystemProtocols =
+      !Walker.Options.PrintPrivateSystemSymbols;
   Opts.PrintGenericRequirements = true;
   Opts.PrintInherited = false;
   Opts.ExplodeEnumCaseDecls = true;
@@ -85,6 +88,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   ExcludeAttrs.erase("TypeAttrKind::NoEscape");
   ExcludeAttrs.erase("TypeAttrKind::Escaping");
   ExcludeAttrs.erase("TypeAttrKind::Inout");
+  ExcludeAttrs.erase("TypeAttrKind::Sendable");
 
   // Don't allow the following decl attributes:
   // These can be large and are already included elsewhere in
@@ -138,7 +142,7 @@ SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
   Options.PrintOverrideKeyword = false;
   Options.PrintGenericRequirements = false;
 
-#define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE)                              \
+#define DECL_ATTR(SPELLING, CLASS, ...)                                        \
   Options.ExcludeAttrList.push_back(DeclAttrKind::CLASS);
 #define TYPE_ATTR(X, C) Options.ExcludeAttrList.push_back(TypeAttrKind::C);
 #include "swift/AST/DeclAttr.def"
@@ -230,6 +234,18 @@ void SymbolGraph::recordEdge(Symbol Source,
 
 void SymbolGraph::recordMemberRelationship(Symbol S) {
   const auto *DC = S.getLocalSymbolDecl()->getDeclContext();
+  const ValueDecl *ParentDecl = DC->getSelfNominalTypeDecl();
+  if (!ParentDecl) {
+    // If we couldn't look up the type the member is declared on (e.g.
+    // because the member is declared in an extension whose extended type
+    // doesn't exist), don't record a memberOf relationship.
+    return;
+  }
+  if (const auto *PublicDecl = Walker.PublicPrivateTypeAliases.lookup(ParentDecl)) {
+    // If our member target is a private type that has a public type alias,
+    // point the membership to that type alias instead.
+    ParentDecl = PublicDecl;
+  }
   switch (DC->getContextKind()) {
     case DeclContextKind::GenericTypeDecl:
     case DeclContextKind::ExtensionDecl:
@@ -248,13 +264,6 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
         return;
       }
 
-      if (DC->getSelfNominalTypeDecl() == nullptr) {
-        // If we couldn't look up the type the member is declared on (e.g.
-        // because the member is declared in an extension whose extended type
-        // doesn't exist), don't record a memberOf relationship.
-        return;
-      }
-
       // If this is an extension to an external type, we use the extension
       // symbol itself as the target.
       if (auto const *Extension =
@@ -266,8 +275,7 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
         }
       }
 
-      return recordEdge(S,
-                        Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
+      return recordEdge(S, Symbol(this, ParentDecl, nullptr),
                         RelationshipKind::MemberOf());
     case swift::DeclContextKind::AbstractClosureExpr:
     case swift::DeclContextKind::SerializedAbstractClosure:
@@ -313,17 +321,29 @@ bool SymbolGraph::synthesizedMemberIsBestCandidate(const ValueDecl *VD,
 }
 
 void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
-  if (!Walker.Options.EmitSynthesizedMembers || Walker.Options.SkipProtocolImplementations) {
-    return;
+  // Even if we don't want to emit synthesized members or protocol
+  // implementations, we still want to emit synthesized members from hidden
+  // underscored protocols. Save this check so we can skip emitting members
+  // later if needed.
+  bool dropSynthesizedMembers = !Walker.Options.EmitSynthesizedMembers ||
+                                Walker.Options.SkipProtocolImplementations;
+
+  const auto *D = S.getLocalSymbolDecl();
+
+  // If this symbol is a public type alias to a private symbol, collect
+  // synthesized members for the underlying type.
+  if (const auto *TD = dyn_cast<TypeAliasDecl>(D)) {
+    const auto *NTD = TD->getUnderlyingType()->getAnyNominal();
+    if (NTD && Walker.PublicPrivateTypeAliases.lookup(NTD) == D)
+        D = NTD;
   }
-  const auto D = S.getLocalSymbolDecl();
+
   const NominalTypeDecl *OwningNominal = nullptr;
   if (const auto *ThisNominal = dyn_cast<NominalTypeDecl>(D)) {
     OwningNominal = ThisNominal;
   } else if (const auto *Extension = dyn_cast<ExtensionDecl>(D)) {
     if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
-      if (!ExtendedNominal->getModuleContext()->getNameStr()
-          .equals(M.getNameStr())) {
+      if (ExtendedNominal->getModuleContext()->getNameStr() != M.getNameStr()) {
         OwningNominal = ExtendedNominal;
       } else {
         return;
@@ -340,64 +360,113 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
       PrintOptions::printModuleInterface(
           OwningNominal->getASTContext().TypeCheckerOpts.PrintFullConvention));
   auto MergeGroupKind = SynthesizedExtensionAnalyzer::MergeGroupKind::All;
-  ExtensionAnalyzer.forEachExtensionMergeGroup(MergeGroupKind,
-      [&](ArrayRef<ExtensionInfo> ExtensionInfos){
-    for (const auto &Info : ExtensionInfos) {
-      if (!Info.IsSynthesized) {
-        continue;
-      }
+  ExtensionAnalyzer.forEachExtensionMergeGroup(
+      MergeGroupKind, [&](ArrayRef<ExtensionInfo> ExtensionInfos) {
+        const auto StdlibModule =
+            OwningNominal->getASTContext().getStdlibModule(
+                /*loadIfAbsent=*/true);
 
-      // We are only interested in synthesized members that come from an
-      // extension that we defined in our module.
-      if (Info.EnablingExt) {
-        const auto *ExtM = Info.EnablingExt->getModuleContext();
-        if (!Walker.isOurModule(ExtM))
-          continue;
-      }
-
-      // If D is not the OwningNominal, it is an ExtensionDecl. In that case
-      // we only want to get members that were enabled by this exact extension.
-      if (D != OwningNominal && Info.EnablingExt != D) {
-        continue;
-      }
-  
-      for (const auto ExtensionMember : Info.Ext->getMembers()) {
-        if (const auto SynthMember = dyn_cast<ValueDecl>(ExtensionMember)) {
-          if (SynthMember->isObjC()) {
+        for (const auto &Info : ExtensionInfos) {
+          if (!Info.IsSynthesized) {
             continue;
           }
 
-          const auto StdlibModule = OwningNominal->getASTContext()
-              .getStdlibModule(/*loadIfAbsent=*/true);
+          // We are only interested in synthesized members that come from an
+          // extension that we defined in our module.
+          if (Info.EnablingExt) {
+            const auto *ExtM = Info.EnablingExt->getModuleContext();
+            if (!Walker.isOurModule(ExtM))
+              continue;
+          }
 
-          // There can be synthesized members on effectively private protocols
-          // or things that conform to them. We don't want to include those.
-          if (isImplicitlyPrivate(SynthMember,
-              /*IgnoreContext =*/
-              SynthMember->getModuleContext() == StdlibModule)) {
+          // If D is not the OwningNominal, it is an ExtensionDecl. In that case
+          // we only want to get members that were enabled by this exact
+          // extension.
+          if (D != OwningNominal && Info.EnablingExt != D) {
             continue;
           }
 
-          if (!synthesizedMemberIsBestCandidate(SynthMember, OwningNominal)) {
+          // Extensions to protocols should generate synthesized members only if
+          // that protocol would otherwise be hidden.
+          if (auto *Nominal = Info.Ext->getExtendedNominal()) {
+            if (dropSynthesizedMembers &&
+                !isImplicitlyPrivate(Nominal, /*IgnoreContext =*/
+                                     [&](const Decl *P) {
+                                       return Nominal->getModuleContext() ==
+                                              StdlibModule;
+                                     }))
+              continue;
+          } else if (dropSynthesizedMembers) {
             continue;
           }
 
-          auto ExtendedSG = Walker.getModuleSymbolGraph(OwningNominal);
+          for (const auto ExtensionMember : Info.Ext->getMembers()) {
+            if (const auto SynthMember = dyn_cast<ValueDecl>(ExtensionMember)) {
+              if (SynthMember->isObjC()) {
+                continue;
+              }
 
-          Symbol Source(this, SynthMember, OwningNominal);
+              // There can be synthesized members on effectively private
+              // protocols or things that conform to them. We don't want to
+              // include those.
+              if (isImplicitlyPrivate(
+                      SynthMember,
+                      /*IgnoreContext =*/
+                      [&](const Decl *P) {
+                        return SynthMember->getModuleContext() == StdlibModule;
+                      })) {
+                continue;
+              }
 
-          ExtendedSG->Nodes.insert(Source);
+              if (!synthesizedMemberIsBestCandidate(SynthMember,
+                                                    OwningNominal)) {
+                continue;
+              }
 
-          ExtendedSG->recordEdge(Source, S, RelationshipKind::MemberOf());
-         }
-      }
-    }
-  });
+              const ValueDecl *BaseDecl = OwningNominal;
+              if (const auto *PublicDecl = Walker.PublicPrivateTypeAliases.lookup(BaseDecl))
+                BaseDecl = PublicDecl;
+
+              Symbol Source(this, SynthMember, BaseDecl);
+
+              if (auto *InheritedDecl = Source.getInheritedDecl()) {
+                if (auto *ParentDecl =
+                        InheritedDecl->getDeclContext()->getAsDecl()) {
+                  if (dropSynthesizedMembers &&
+                      !isImplicitlyPrivate(
+                          ParentDecl,
+                          /*IgnoreContext =*/
+                          [&](const Decl *P) {
+                            return ParentDecl->getModuleContext() ==
+                                   StdlibModule;
+                          })) {
+                    continue;
+                  }
+                }
+              }
+
+              auto ExtendedSG = Walker.getModuleSymbolGraph(BaseDecl);
+
+              ExtendedSG->Nodes.insert(Source);
+
+              ExtendedSG->recordEdge(Source, S, RelationshipKind::MemberOf());
+            }
+          }
+        }
+      });
 }
 
 void
 SymbolGraph::recordInheritanceRelationships(Symbol S) {
-  const auto D = S.getLocalSymbolDecl();
+  const auto *D = S.getLocalSymbolDecl();
+
+  // If this is a public type alias for a private symbol, gather inheritance
+  // for the underlying type instead.
+  if (const auto *TD = dyn_cast<TypeAliasDecl>(D)) {
+    const auto *NTD = TD->getUnderlyingType()->getAnyNominal();
+    if (NTD && Walker.PublicPrivateTypeAliases.lookup(NTD) == D)
+      D = NTD;
+  }
 
   ClassDecl *Super = nullptr;
   if (auto *CD = dyn_cast<ClassDecl>(D))
@@ -406,8 +475,7 @@ SymbolGraph::recordInheritanceRelationships(Symbol S) {
     Super = PD->getSuperclassDecl();
 
   if (Super) {
-    recordEdge(Symbol(this, cast<ValueDecl>(D), nullptr),
-               Symbol(this, Super, nullptr),
+    recordEdge(S, Symbol(this, Super, nullptr),
                RelationshipKind::InheritsFrom());
   }
 }
@@ -464,7 +532,8 @@ void
 SymbolGraph::recordRequirementRelationships(Symbol S) {
   const auto VD = S.getSymbolDecl();
   if (const auto *Protocol = dyn_cast<ProtocolDecl>(VD->getDeclContext())) {
-    if (VD->isProtocolRequirement()) {
+    if (VD->isProtocolRequirement() &&
+        !VD->getAttrs().hasAttribute<OptionalAttr>()) {
       recordEdge(Symbol(this, VD, nullptr),
                  Symbol(this, Protocol, nullptr),
                  RelationshipKind::RequirementOf());
@@ -485,7 +554,16 @@ void SymbolGraph::recordOptionalRequirementRelationships(Symbol S) {
 }
 
 void SymbolGraph::recordConformanceRelationships(Symbol S) {
-  const auto D = S.getLocalSymbolDecl();
+  const auto *D = S.getLocalSymbolDecl();
+
+  // If this is a public type alias for a private symbol, gather conformances
+  // for the underlying type instead.
+  if (const auto *TD = dyn_cast<TypeAliasDecl>(D)) {
+    const auto *NTD = TD->getUnderlyingType()->getAnyNominal();
+    if (NTD && Walker.PublicPrivateTypeAliases.lookup(NTD) == D)
+      D = NTD;
+  }
+
   if (const auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
     if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
       for (auto *inherited : PD->getAllInheritedProtocols()) {
@@ -548,14 +626,14 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
     OS.attributeObject("module", [&](){
       if (DeclaringModule) {
         // A cross-import overlay can be considered part of its declaring module
-        OS.attribute("name", (*DeclaringModule)->getNameStr());
+        OS.attribute("name", getFullModuleName(*DeclaringModule));
         std::vector<StringRef> B;
         for (auto BModule : BystanderModules) {
           B.push_back(BModule.str());
         }
         OS.attribute("bystanders", B);
       } else {
-        OS.attribute("name", M.getNameStr());
+        OS.attribute("name", getFullModuleName(&M));
       }
       AttributeRAII Platform("platform", OS);
 
@@ -572,21 +650,6 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
         S.serialize(OS);
       }
     });
-
-#ifndef NDEBUG
-    // FIXME (solver-based-verification-sorting): In assert builds sort the
-    // edges so we get consistent symbol graph output. This allows us to compare
-    // the string representation of the symbolgraph between the solver-based
-    // and AST-based result.
-    // This can be removed once the AST-based cursor info has been removed.
-    SmallVector<Edge> Edges(this->Edges.begin(), this->Edges.end());
-    std::sort(Edges.begin(), Edges.end(), [](const Edge &LHS, const Edge &RHS) {
-      SmallString<256> LHSTargetUSR, RHSTargetUSR;
-      LHS.Target.getUSR(LHSTargetUSR);
-      RHS.Target.getUSR(RHSTargetUSR);
-      return LHSTargetUSR < RHSTargetUSR;
-    });
-#endif
 
     OS.attributeArray("relationships", [&](){
       for (const auto &Relationship : Edges) {
@@ -663,10 +726,10 @@ const ValueDecl *getProtocolRequirement(const ValueDecl *VD) {
 
 }
 
-bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
-                                      bool IgnoreContext) const {
+bool SymbolGraph::isImplicitlyPrivate(
+    const Decl *D, llvm::function_ref<bool(const Decl *)> IgnoreContext) const {
   // Don't record unconditionally private declarations
-  if (D->isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic=*/false)) {
+  if (D->isPrivateSystemDecl(/*treatNonBuiltinProtocolsAsPublic=*/false)) {
     return true;
   }
 
@@ -725,11 +788,17 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     // Special cases below.
 
     // If we've been asked to skip protocol implementations, filter them out here.
-    if (Walker.Options.SkipProtocolImplementations && getProtocolRequirement(VD)) {
-      // Allow them to stay if they have their own doc comment
-      const auto *DocCommentProvidingDecl = getDocCommentProvidingDecl(VD);
-      if (DocCommentProvidingDecl != VD)
-        return true;
+    if (Walker.Options.SkipProtocolImplementations) {
+      if (const auto *ProtocolRequirement = getProtocolRequirement(VD)) {
+        if (const auto *Protocol = ProtocolRequirement->getDeclContext()->getSelfProtocolDecl()) {
+          if (!Protocol->hasUnderscoredNaming()) {
+            // Allow them to stay if they have their own doc comment
+            const auto *DocCommentProvidingDecl = VD->getDocCommentProvidingDecl();
+            if (DocCommentProvidingDecl != VD)
+              return true;
+          }
+        }
+      }
     }
 
     // Symbols from exported-imported modules should only be included if they
@@ -766,39 +835,63 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     if (IsGlobalSIMDType) {
       return true;
     }
-
-    if (IgnoreContext) {
-      return false;
-    }
   }
 
   // Check up the parent chain. Anything inside a privately named
   // thing is also private. We could be looking at the `B` of `_A.B`.
   if (const auto *DC = D->getDeclContext()) {
     if (const auto *Parent = DC->getAsDecl()) {
+      if (IgnoreContext && IgnoreContext(Parent))
+        return false;
+
+      // Exception: Children of underscored protocols should be considered
+      // public, even though the protocols themselves aren't. This way,
+      // synthesized copies of those symbols are correctly added to the public
+      // API of public types that conform to underscored protocols.
+      if (isa<ProtocolDecl>(Parent) && Parent->hasUnderscoredNaming()) {
+        return false;
+      }
+      if (const auto *ParentExtension = dyn_cast<ExtensionDecl>(Parent)) {
+        if (const auto *ParentNominal = ParentExtension->getExtendedNominal()) {
+          if (isa<ProtocolDecl>(ParentNominal) &&
+              ParentNominal->hasUnderscoredNaming()) {
+            return false;
+          }
+        }
+      }
       return isImplicitlyPrivate(Parent, IgnoreContext);
     }
   }
   return false;
 }
 
-/// FIXME: This should use AvailableAttr::isUnavailable() or similar.
+/// FIXME: [availability] This should use Decl::getUnavailableAttr() or similar.
 bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) const {
-  return llvm::any_of(D->getAttrs(), [](const auto *Attr) { 
-    if (const auto *AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-      return !AvAttr->hasPlatform()
-        && AvAttr->isUnconditionallyUnavailable();
-    }
+  for (auto Attr : D->getSemanticAvailableAttrs()) {
+    if (!Attr.isPlatformSpecific() && Attr.isUnconditionallyUnavailable())
+      return true;
+  }
 
-    return false;
-  });
+  return false;
 }
 
 /// Returns `true` if the symbol should be included as a node in the graph.
-bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
+bool SymbolGraph::canIncludeDeclAsNode(const Decl *D,
+                                       const Decl *PublicAncestorDecl) const {
+  if (PublicAncestorDecl && D == PublicAncestorDecl)
+    return true;
+
   // If this decl isn't in this module or module that this module imported with `@_exported`, don't record it,
   // as it will appear elsewhere in its module's symbol graph.
-  if (D->getModuleContext()->getName() != M.getName() && !Walker.isConsideredExportedImported(D)) {
+
+  // If a Clang decl was declared in a submodule, the Swift decl's context will still point to the
+  // top-level module. Instead, we need to probe the owning module on the Clang side, which will
+  // correctly point to the submodule.
+  auto RealModuleName = (std::string)D->getModuleContext()->getName();
+  if (auto *ClangDecl = D->getClangDecl())
+    if (auto *ClangModule = ClangDecl->getOwningModule())
+      RealModuleName = ClangModule->Name;
+  if (RealModuleName != (std::string)M.getName() && !Walker.isConsideredExportedImported(D)) {
     return false;
   }
 
@@ -809,6 +902,8 @@ bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
   } else {
     return false;
   }
-  return !isImplicitlyPrivate(cast<ValueDecl>(D)) 
-    && !isUnconditionallyUnavailableOnAllPlatforms(cast<ValueDecl>(D));
+  return !isImplicitlyPrivate(
+             cast<ValueDecl>(D), /*IgnoreContext=*/
+             [&](const Decl *P) { return P == PublicAncestorDecl; }) &&
+         !isUnconditionallyUnavailableOnAllPlatforms(cast<ValueDecl>(D));
 }

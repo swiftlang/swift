@@ -146,6 +146,8 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
       } else if (auto *ECM = dyn_cast<EndCOWMutationInst>(v)) {
         if (endCOWMutationsFound.insert(ECM))
           endCOWMutationInsts.push_back(ECM);
+      } else if (auto *urc = dyn_cast<UncheckedRefCastInst>(v)) {
+        workList.push_back(urc->getOperand());
       } else {
         return false;
       }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -target %target-swift-5.1-abi-triple | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: PTRSIZE=64

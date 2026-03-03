@@ -7,6 +7,12 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: threading_none
 
+// Bug in TSan on FreeBSD
+// Thread destruction interceptor marks the thread ignored and then checks that
+// the thread isn't being ignored.
+// rdar://158450231
+// XFAIL: OS=freebsd
+
 import Dispatch
 
 /// @returns true iff the expected answer is actually the case, i.e., correct.

@@ -17,6 +17,7 @@
 #include "GenIntegerLiteral.h"
 
 #include "swift/ABI/MetadataValues.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -43,7 +44,7 @@ public:
   IntegerLiteralTypeInfo(llvm::StructType *storageType,
                          Size size, Alignment align, SpareBitVector &&spareBits)
       : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
-                            IsTriviallyDestroyable, IsCopyable, IsFixedSize) {}
+                            IsTriviallyDestroyable, IsCopyable, IsFixedSize, IsABIAccessible) {}
 
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();
@@ -110,11 +111,9 @@ public:
 
 llvm::StructType *IRGenModule::getIntegerLiteralTy() {
   if (!IntegerLiteralTy) {
-    IntegerLiteralTy =
-      llvm::StructType::create(getLLVMContext(), {
-                                 SizeTy->getPointerTo(),
-                                 SizeTy
-                               }, "swift.int_literal");
+    IntegerLiteralTy = llvm::StructType::create(
+        getLLVMContext(), {PtrTy, SizeTy},
+        "swift.int_literal");
   }
   return IntegerLiteralTy;
 }

@@ -11,6 +11,6 @@ class Foo {
   }
 }
 
-// armv7: define internal void @makeOne(ptr noalias sret({{.*}}) align 4 %agg.result, float{{( noundef)?}} %f, float{{( noundef)?}} %s)
+// armv7: define internal void @makeOne(ptr{{( dead_on_unwind)?}} noalias{{( writable)?}} sret({{.*}}) align 4 %agg.result, float{{( noundef)?}} %f, float{{( noundef)?}} %s)
 // armv7s: define internal void @makeOne(ptr noalias sret({{.*}}) align 4 %agg.result, float %f, float %s)
 // armv7k: define internal %struct.One @makeOne(float {{.*}}%f, float {{.*}}%s)

@@ -14,7 +14,6 @@ target_sources(swiftSILOptimizer PRIVATE
   DefiniteInitialization.cpp
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
-  DiagnoseInfiniteRecursion.cpp
   DiagnoseInvalidEscapingCaptures.cpp
   DiagnoseLifetimeIssues.cpp
   DiagnoseStaticExclusivity.cpp
@@ -44,12 +43,14 @@ target_sources(swiftSILOptimizer PRIVATE
   PMOMemoryUseCollector.cpp
   RawSILInstLowering.cpp
   ReferenceBindingTransform.cpp
-  TransferNonSendable.cpp
+  ThunkLowering.cpp
+  SendNonSendable.cpp
   LowerTupleAddrConstructor.cpp
   SILGenCleanup.cpp
   YieldOnceCheck.cpp
   OSLogOptimization.cpp
   MoveOnlyWrappedTypeEliminator.cpp
+  MarkNeverWrittenMutableClosureBoxesAsImmutable.cpp
   RegionAnalysisInvalidationTransform.cpp
   DiagnosticDeadFunctionElimination.cpp
   OwnershipModelEliminator.cpp)

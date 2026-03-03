@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend -emit-module %t/TestFmSwift.swift -module-name TestFm -enable-experimental-cxx-interop -F %t -o %t/TestFm.swiftmodule -import-underlying-module
 
-// RUN: %sourcekitd-test -req=interface-gen -module TestFm -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck %s
+// RUN: %sourcekitd-test -req=interface-gen -module TestFm -- -cxx-interoperability-mode=default -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck %s
 
 //--- TestFm.framework/Headers/TestFm.h
 #pragma once

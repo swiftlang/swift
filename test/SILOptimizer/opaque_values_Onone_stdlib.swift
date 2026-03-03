@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only -parse-stdlib -module-name Swift -enable-sil-opaque-values -parse-as-library -emit-sil -Onone %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-move-only -parse-stdlib -module-name Swift -enable-sil-opaque-values -parse-as-library -Xllvm -sil-print-types -emit-sil -Onone %s | %FileCheck %s
 
 // Like opaque_values_Onone.swift but for code that needs to be compiled with 
 // -parse-stdlib.

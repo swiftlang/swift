@@ -55,6 +55,8 @@ class Baz: Foo {
 
 struct Qux {
   @Bar(wrappedValue: Baz()) private var baz: Baz
+  // Baz instance that is never accessed.
+  @Bar(wrappedValue: Baz()) private var baz2: Baz
 
     func f() {
         print(self.baz) // break here
@@ -64,3 +66,4 @@ let qux = Qux()
 qux.f()
 
 // CHECK: !DISubprogram(name: "baz.get"
+// CHECK: !DISubprogram(name: "baz2.get"

@@ -421,6 +421,9 @@ inline bool fixmeWitnessHasLinkageThatNeedsToBePublic(SILDeclRef witness,
          (!hasSharedVisibility(witnessLinkage) || !witness.isSerialized());
 }
 
+// Defined in SILPrinter
+StringRef getLinkageString(SILLinkage linkage);
+
 } // end swift namespace
 
 #endif

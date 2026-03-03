@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -445,6 +445,7 @@ public protocol Sequence<Element> {
   /// - Returns: The value returned from `body`, unless the sequence doesn't
   ///   support contiguous storage, in which case the method ignores `body` and
   ///   returns `nil`.
+  @safe
   func withContiguousStorageIfAvailable<R>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?
@@ -495,6 +496,7 @@ extension DropFirstSequence: Sequence {
   public typealias SubSequence = AnySequence<Element>
   
   @inlinable
+  @inline(__always)
   public __consuming func makeIterator() -> Iterator {
     var it = _base.makeIterator()
     var dropped = 0
@@ -703,9 +705,11 @@ extension Sequence {
     return Array(result)
   }
 
+#if !$Embedded
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   @_silgen_name("$sSTsE3mapySayqd__Gqd__7ElementQzKXEKlF")
   func __rethrows_map<T>(
@@ -713,6 +717,7 @@ extension Sequence {
   ) throws -> [T] {
     try map(transform)
   }
+#endif
 
   /// Returns an array containing, in order, the elements of the sequence
   /// that satisfy the given predicate.
@@ -731,17 +736,35 @@ extension Sequence {
   /// - Returns: An array of the elements that `isIncluded` allowed.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @inlinable
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  @_alwaysEmitIntoClient
+  public __consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
     return try _filter(isIncluded)
   }
 
-  @_transparent
-  public func _filter(
+#if !hasFeature(Embedded)
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_filter(
     _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  ) throws -> [Element] {
+    try filter(isIncluded)
+  }
+#endif // !hasFeature(Embedded)
+
+  @_alwaysEmitIntoClient  @_transparent
+  public func _filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
 
     var result = ContiguousArray<Element>()
 
@@ -755,6 +778,24 @@ extension Sequence {
 
     return Array(result)
   }
+
+#if !hasFeature(Embedded)
+  // ABI-only entrypoint for the rethrows version of _filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func _filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_underscore_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Element] {
+    try _filter(isIncluded)
+  }
+#endif // !hasFeature(Embedded)
 
   /// A value less than or equal to the number of elements in the sequence,
   /// calculated nondestructively.
@@ -1222,7 +1263,7 @@ extension Sequence {
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
-    return _copySequenceContents(initializing: buffer)
+    return unsafe _copySequenceContents(initializing: buffer)
   }
 
   @_alwaysEmitIntoClient
@@ -1235,13 +1276,14 @@ extension Sequence {
       guard let x = it.next() else {
         return (it, idx)
       }
-      ptr.initialize(to: x)
-      ptr += 1
+      unsafe ptr.initialize(to: x)
+      unsafe ptr += 1
     }
     return (it, buffer.endIndex)
   }
     
   @inlinable
+  @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1272,9 +1314,7 @@ public struct IteratorSequence<Base: IteratorProtocol> {
 
 extension IteratorSequence: IteratorProtocol, Sequence {
 
-  #if $NoncopyableGenerics
-    public typealias Element = Base.Element
-  #endif
+  public typealias Element = Base.Element
 
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.

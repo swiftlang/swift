@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -closure-lifetime-fixup -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-lifetime-fixup -emit-verbose-sil -sil-disable-copy-elimination-of-copyable-closure-capture=true %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -40,5 +40,8 @@ bb1(%result : $()):
   return %retval : $(), scope 2
 
 bb2(%83 : @owned $any Error):
+  destroy_value [dead_end] %83
+  destroy_value [dead_end] %noescape
+  destroy_value [dead_end] %converted
   unreachable , scope 2
 }

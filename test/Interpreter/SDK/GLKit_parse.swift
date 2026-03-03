@@ -1,4 +1,5 @@
-// RUN: %target-build-swift -typecheck %s -Xfrontend -verify
+// RUN: %empty-directory(%t/cache)
+// RUN: %target-build-swift -typecheck %s -Xfrontend -verify -module-cache-path %t/cache
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -module-name objc_bridging_peephole %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -module-name objc_bridging_peephole %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -586,7 +586,7 @@ func testBlockToOptionalAnyObjectBridge(block: @escaping @convention(block) () -
   // CHECK-NEXT: [[OPTREF:%.*]] = enum $Optional<AnyObject>, #Optional.some!enumelt, [[REF]] : $AnyObject
   // CHECK-NEXT: end_borrow [[T0]]
   // CHECK-NEXT: // function_ref
-  // CHECK-NEXT: [[FN:%.*]] = function_ref @takeNullableId : $@convention(c) (Optional<AnyObject>) -> ()
+  // CHECK-NEXT: [[FN:%.*]] = function_ref @$sSo14takeNullableIdyyypSgFTo : $@convention(c) (Optional<AnyObject>) -> ()
   // CHECK-NEXT: apply [[FN]]([[OPTREF]])
   // CHECK-NEXT: destroy_value [[OPTREF]]
   takeNullableId(block as Any)

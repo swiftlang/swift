@@ -9,6 +9,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// TODO: This pass is about to be removed because TypeLowering's CustomDeinit
+// property is superior.
+//===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SIL/SILInstruction.h"
@@ -43,6 +47,13 @@ bool DestructorAnalysis::cacheResult(CanType Type, bool Result) {
   return Result;
 }
 
+static bool isKnownSafeStdlibContainerType(CanType Ty) {
+  return Ty->isArray() ||
+    Ty->is_ArrayBuffer() ||
+    Ty->is_ContiguousArrayBuffer() ||
+    Ty->isDictionary();
+}
+
 bool DestructorAnalysis::isSafeType(CanType Ty) {
   // Don't visit types twice.
   auto CachedRes = Cached.find(Ty);
@@ -68,9 +79,16 @@ bool DestructorAnalysis::isSafeType(CanType Ty) {
   //   * or all stored properties are safe types.
   if (auto *Struct = Ty->getStructOrBoundGenericStruct()) {
 
-    if (implementsDestructorSafeContainerProtocol(Struct) &&
+    if ((implementsDestructorSafeContainerProtocol(Struct) ||
+         isKnownSafeStdlibContainerType(Ty)) &&
         areTypeParametersSafe(Ty))
       return cacheResult(Ty, true);
+
+    // Not allowed to look at stored properties of resilient types.
+    if (Struct->isResilient(Mod->getSwiftModule(),
+                            ResilienceExpansion::Maximal)) {
+      return cacheResult(Ty, false);
+    }
 
     // Check the stored properties.
     for (auto SP : Struct->getStoredProperties()) {
@@ -89,6 +107,8 @@ bool DestructorAnalysis::isSafeType(CanType Ty) {
   }
 
   // TODO: enum types.
+  // TODO: Don't forget to check resilience of enum decl, like
+  // we do for structs above.
 
   return cacheResult(Ty, false);
 }

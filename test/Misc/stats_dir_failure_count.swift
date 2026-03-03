@@ -1,7 +1,7 @@
 // Check that a failed process-tree emits nonzero failure counters
 // RUN: %empty-directory(%t)
 // RUN: echo zzz >%t/other.swift
-// RUN: not %target-swiftc_driver -continue-building-after-errors -D BROKEN -j 2 -typecheck -stats-output-dir %t %s %t/other.swift
+// RUN: not env SWIFT_USE_OLD_DRIVER=1 %target-swiftc_driver -continue-building-after-errors -D BROKEN -j 2 -typecheck -stats-output-dir %t %s %t/other.swift
 // RUN: %{python} %utils/process-stats-dir.py --set-csv-baseline %t/stats.csv %t
 // RUN: %FileCheck -input-file %t/stats.csv -check-prefix=FAILURE %s
 // FAILURE: {{"Driver.NumProcessFailures"	1$}}

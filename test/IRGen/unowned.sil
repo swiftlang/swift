@@ -49,8 +49,8 @@ bb0(%0 : $@sil_unowned P):
 
 //   initializeBufferWithCopyOfBuffer
 // CHECK:    define internal ptr @"$s7unowned1AVwCP"(ptr noalias [[DESTBUF:%.*]], ptr noalias [[SRCBUF:%.*]], ptr
-// CHECK: [[T0:%.*]] = getelementptr inbounds [[A]], ptr [[DESTBUF]], i32 0, i32 0
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], ptr [[SRCBUF]], i32 0, i32 0
+// CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[DESTBUF]], i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[SRCBUF]], i32 0, i32 0
 // CHECK-NEXT: [[T2:%.*]] = load ptr, ptr [[T1]], align 8
 // CHECK-NEXT: call ptr @swift_unownedRetain(ptr returned [[T2]])
 // CHECK-NEXT: store ptr [[T2]], ptr [[T0]], align 8
@@ -58,15 +58,15 @@ bb0(%0 : $@sil_unowned P):
 
 //   destroy
 // CHECK:    define internal void @"$s7unowned1AVwxx"(ptr noalias [[ARG:%.*]], ptr
-// CHECK: [[T1:%.*]] = getelementptr inbounds [[A]], ptr [[ARG]], i32 0, i32 0
+// CHECK: [[T1:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[ARG]], i32 0, i32 0
 // CHECK-NEXT: [[T2:%.*]] = load ptr, ptr [[T1]], align 8
 // CHECK-NEXT: call void @swift_unownedRelease(ptr [[T2]])
 // CHECK-NEXT: ret void
 
 //   initializeWithCopy
 // CHECK:    define internal ptr @"$s7unowned1AVwcp"(ptr noalias [[DEST_OPQ:%.*]], ptr noalias [[SRC_OPQ:%.*]], ptr
-// CHECK: [[T0:%.*]] = getelementptr inbounds [[A]], ptr [[DEST_OPQ]], i32 0, i32 0
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], ptr [[SRC_OPQ]], i32 0, i32 0
+// CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[DEST_OPQ]], i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[SRC_OPQ]], i32 0, i32 0
 // CHECK-NEXT: [[T2:%.*]] = load ptr, ptr [[T1]], align 8
 // CHECK-NEXT: call ptr @swift_unownedRetain(ptr returned [[T2]])
 // CHECK-NEXT: store ptr [[T2]], ptr [[T0]], align 8
@@ -74,8 +74,8 @@ bb0(%0 : $@sil_unowned P):
 
 //   assignWithCopy
 // CHECK:    define internal ptr @"$s7unowned1AVwca"(ptr [[DEST_OPQ:%.*]], ptr [[SRC_OPQ:%.*]], ptr
-// CHECK: [[DEST_X:%.*]] = getelementptr inbounds [[A]], ptr [[DEST_OPQ]], i32 0, i32 0
-// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds [[A]], ptr [[SRC_OPQ]], i32 0, i32 0
+// CHECK: [[DEST_X:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[DEST_OPQ]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[SRC_OPQ]], i32 0, i32 0
 // CHECK-NEXT: [[NEW:%.*]] = load ptr, ptr [[SRC_X]], align 8
 // CHECK-NEXT: call ptr @swift_unownedRetain(ptr returned [[NEW]])
 // CHECK-NEXT: [[OLD:%.*]] = load ptr, ptr [[DEST_X]], align 8
@@ -85,8 +85,8 @@ bb0(%0 : $@sil_unowned P):
 
 //   assignWithTake
 // CHECK:    define internal ptr @"$s7unowned1AVwta"(ptr noalias [[DEST_OPQ:%.*]], ptr noalias [[SRC_OPQ:%.*]], ptr
-// CHECK: [[DEST_X:%.*]] = getelementptr inbounds [[A]], ptr [[DEST_OPQ]], i32 0, i32 0
-// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds [[A]], ptr [[SRC_OPQ]], i32 0, i32 0
+// CHECK: [[DEST_X:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[DEST_OPQ]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[SRC_OPQ]], i32 0, i32 0
 // CHECK-NEXT: [[NEW:%.*]] = load ptr, ptr [[SRC_X]], align 8
 // CHECK-NEXT: [[OLD:%.*]] = load ptr, ptr [[DEST_X]], align 8
 // CHECK-NEXT: store ptr [[NEW]], ptr [[DEST_X]], align 8

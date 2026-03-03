@@ -1,0 +1,96 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-promotion | %FileCheck %s
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct S {
+  init()
+}
+
+func bug<Success>(_ rez: Success) where Success : Sendable
+
+func doit<Success, Failure>(op: @escaping () throws(Failure) -> Success) where Failure : Error
+
+sil hidden_external [ossa] @$s30capture_promotion_typed_throws1SVACycfC : $@convention(method) (@thin S.Type) -> S
+
+sil hidden [ossa] @$s30capture_promotion_typed_throws3bugyyxs8SendableRzlF : $@convention(thin) <Success where Success : Sendable> (@in_guaranteed Success) -> () {
+bb0(%0 : $*Success):
+  %2 = alloc_box ${ var S }, var, name "s"
+  %3 = begin_borrow [var_decl] %2
+  %4 = project_box %3, 0
+  %5 = metatype $@thin S.Type
+  %6 = function_ref @$s30capture_promotion_typed_throws1SVACycfC : $@convention(method) (@thin S.Type) -> S
+  %7 = apply %6(%5) : $@convention(method) (@thin S.Type) -> S
+  store %7 to [trivial] %4
+  %9 = function_ref @$s30capture_promotion_typed_throws3bugyyxs8SendableRzlFxycfU_ : $@convention(thin) <τ_0_0 where τ_0_0 : Sendable> (@guaranteed { var S }, @in_guaranteed τ_0_0) -> (@out τ_0_0, @error_indirect Never)
+  %10 = copy_value %3
+  %11 = alloc_stack $Success
+  copy_addr %0 to [init] %11
+  mark_function_escape %4
+  %14 = partial_apply [callee_guaranteed] %9<Success>(%10, %11) : $@convention(thin) <τ_0_0 where τ_0_0 : Sendable> (@guaranteed { var S }, @in_guaranteed τ_0_0) -> (@out τ_0_0, @error_indirect Never)
+  %15 = convert_function %14 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, Success>
+  dealloc_stack %11
+  %17 = function_ref @$s30capture_promotion_typed_throws4doit2opyxyq_YKc_ts5ErrorR_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> 
+() -> (@out τ_0_1, @error_indirect τ_0_0) for <τ_0_1, τ_0_0>) -> ()
+  %18 = apply %17<Success, Never>(%15) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <τ_0_1, τ_0_0>) -> ()
+  destroy_value %15
+  %20 = function_ref @$s30capture_promotion_typed_throws3bugyyxs8SendableRzlFxycfU0_ : $@convention(thin) <τ_0_0 where τ_0_0 : Sendable> (@guaranteed { var S }, @in_guaranteed τ_0_0) -> (@out τ_0_0, @error_indirect Never)
+  %21 = copy_value %3
+  %22 = alloc_stack $Success
+  copy_addr %0 to [init] %22
+  mark_function_escape %4
+  %25 = partial_apply [callee_guaranteed] %20<Success>(%21, %22) : $@convention(thin) <τ_0_0 where τ_0_0 : Sendable> (@guaranteed { var S }, @in_guaranteed τ_0_0) -> (@out τ_0_0, @error_indirect Never)
+  %26 = convert_function %25 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, Success>
+  dealloc_stack %22
+  %28 = function_ref @$s30capture_promotion_typed_throws4doit2opyxyq_YKc_ts5ErrorR_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <τ_0_1, τ_0_0>) -> ()
+  %29 = apply %28<Success, Never>(%26) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <τ_0_1, τ_0_0>) -> ()
+  destroy_value %26
+  end_borrow %3
+  destroy_value %2
+  %33 = tuple ()
+  return %33
+}
+
+// CHECK-LABEL: sil private [ossa] @$s30capture_promotion_typed_throws3bugyyxs8SendableRzlFxycfU_Tf2nnin_n : $@convention(thin) <Success where Success : Sendable> (S, @in_guaranteed Success) -> (@out Success, @error_indirect Never) {
+// CHECK: bb0(%0 : $*Success, %1 : $*Never, %2 : @closureCapture $S, %3 : @closureCapture $*Success):
+
+sil private [ossa] @$s30capture_promotion_typed_throws3bugyyxs8SendableRzlFxycfU_ : $@convention(thin) <Success where Success : Sendable> (@guaranteed { var S }, @in_guaranteed Success) -> (@out Success, @error_indirect Never) {
+bb0(%0 : $*Success, %1 : $*Never, %2 : @closureCapture @guaranteed ${ var S }, %3 : @closureCapture $*Success):
+  %4 = project_box %2, 0
+  %7 = begin_access [read] [unknown] %4
+  %8 = load [trivial] %7
+  end_access %7
+  ignored_use %8
+  copy_addr %3 to [init] %0
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK-LABEL: sil private [ossa] @$s30capture_promotion_typed_throws3bugyyxs8SendableRzlFxycfU0_Tf2nnin_n : $@convention(thin) <Success where Success : Sendable> (S, @in_guaranteed Success) -> (@out Success, @error_indirect Never) {
+// CHECK: bb0(%0 : $*Success, %1 : $*Never, %2 : @closureCapture $S, %3 : @closureCapture $*Success):
+
+sil private [ossa] @$s30capture_promotion_typed_throws3bugyyxs8SendableRzlFxycfU0_ : $@convention(thin) <Success where Success : Sendable> (@guaranteed { var S }, @in_guaranteed Success) -> (@out Success, @error_indirect Never) {
+bb0(%0 : $*Success, %1 : $*Never, %2 : @closureCapture @guaranteed ${ var S }, %3 : @closureCapture $*Success):
+  %4 = project_box %2, 0
+  %7 = begin_access [read] [unknown] %4
+  %8 = load [trivial] %7
+  end_access %7
+  %10 = alloc_stack $S
+  store %8 to [trivial] %10
+  %12 = function_ref @$s30capture_promotion_typed_throws3useyyxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %13 = apply %12<S>(%10) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %10
+  copy_addr %3 to [init] %0
+  %16 = tuple ()
+  return %16
+}
+
+sil hidden [Onone] [ossa] @$s30capture_promotion_typed_throws3useyyxlF : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %2 = tuple ()
+  return %2
+}
+
+sil hidden_external [ossa] @$s30capture_promotion_typed_throws4doit2opyxyq_YKc_ts5ErrorR_r0_lF : $@convention(thin) <Success, Failure where Failure : Error> (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <Failure, Success>) -> ()

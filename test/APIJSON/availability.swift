@@ -1,14 +1,21 @@
 // REQUIRES: objc_interop, OS=macosx
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/ModuleCache)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -swift-version 5 -emit-api-descriptor-path %t/api.json -target arm64-apple-macos12
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -swift-version 5 -emit-api-descriptor-path %t/api.json -target arm64-apple-macos12 -library-level api
 // RUN: %validate-json %t/api.json | %FileCheck %s
 
 @available(iOS 13.0, *)
 @available(macOS 10.10, *)
 @available(tvOS, unavailable)
 @available(watchOS 10.0, *)
-public class A {}
+public class A {
+  public func noAvailablilityAttr() {}
+}
+
+@available(macOS, unavailable)
+public class UnavailableClass {
+  public func noAvailablilityAttr() {}
+}
 
 @available(*, unavailable)
 public func callUnavailable() {}
@@ -39,11 +46,95 @@ extension A {
 // CHECK-NEXT:             "unavailable": true
 // CHECK-NEXT:         },
 // CHECK-NEXT:         {
+// CHECK-NEXT:             "name": "_$s8MyModule16UnavailableClassC19noAvailablilityAttryyFTj",
+// CHECK-NEXT:             "access": "public",
+// CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "unavailable": true
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:             "name": "_$s8MyModule16UnavailableClassC19noAvailablilityAttryyFTq",
+// CHECK-NEXT:             "access": "public",
+// CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "unavailable": true
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:             "name": "_$s8MyModule16UnavailableClassCMa",
+// CHECK-NEXT:             "access": "public",
+// CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "unavailable": true
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:             "name": "_$s8MyModule16UnavailableClassCMm",
+// CHECK-NEXT:             "access": "public",
+// CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "unavailable": true
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:             "name": "_$s8MyModule16UnavailableClassCMn",
+// CHECK-NEXT:             "access": "public",
+// CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "unavailable": true
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:             "name": "_$s8MyModule16UnavailableClassCMo",
+// CHECK-NEXT:             "access": "public",
+// CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "unavailable": true
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:             "name": "_$s8MyModule16UnavailableClassCMu",
+// CHECK-NEXT:             "access": "public",
+// CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "unavailable": true
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:             "name": "_$s8MyModule16UnavailableClassCN",
+// CHECK-NEXT:             "access": "public",
+// CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "unavailable": true
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:             "name": "_$s8MyModule16UnavailableClassCfD",
+// CHECK-NEXT:             "access": "public",
+// CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "unavailable": true
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:             "name": "_$s8MyModule16UnavailableClassCfd",
+// CHECK-NEXT:             "access": "public",
+// CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "unavailable": true
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
 // CHECK-NEXT:             "name": "_$s8MyModule1AC15getUnavailableAyyF",
 // CHECK-NEXT:             "access": "public",
 // CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
 // CHECK-NEXT:             "linkage": "exported",
 // CHECK-NEXT:             "unavailable": true
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:             "name": "_$s8MyModule1AC19noAvailablilityAttryyFTj",
+// CHECK-NEXT:             "access": "public",
+// CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "introduced": "10.10"
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:             "name": "_$s8MyModule1AC19noAvailablilityAttryyFTq",
+// CHECK-NEXT:             "access": "public",
+// CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "introduced": "10.10"
 // CHECK-NEXT:         },
 // CHECK-NEXT:         {
 // CHECK-NEXT:             "name": "_$s8MyModule1AC4getAyyF",
@@ -98,13 +189,15 @@ extension A {
 // CHECK-NEXT:             "name": "_$s8MyModule1ACfD",
 // CHECK-NEXT:             "access": "public",
 // CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
-// CHECK-NEXT:             "linkage": "exported"
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "introduced": "10.10"
 // CHECK-NEXT:         },
 // CHECK-NEXT:         {
 // CHECK-NEXT:             "name": "_$s8MyModule1ACfd",
 // CHECK-NEXT:             "access": "public",
 // CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
-// CHECK-NEXT:             "linkage": "exported"
+// CHECK-NEXT:             "linkage": "exported",
+// CHECK-NEXT:             "introduced": "10.10"
 // CHECK-NEXT:         },
 // CHECK-NEXT:         {
 // CHECK-NEXT:             "name": "_$s8MyModule23availableOnlyOnActiveOSyyF",

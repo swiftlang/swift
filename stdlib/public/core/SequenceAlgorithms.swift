@@ -332,6 +332,7 @@ extension Sequence {
       case (nil, nil):           return true
       }
     }
+    fatalError()
   }
 }
 
@@ -425,6 +426,7 @@ extension Sequence {
         return false
       }
     }
+    fatalError()
   }
 }
 

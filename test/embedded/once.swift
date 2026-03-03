@@ -5,13 +5,14 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // UNSUPPORTED: linker_overridden
 
 // For LTO, the linker dlopen()'s the libLTO library, which is a scenario that
 // ASan cannot work in ("Interceptors are not working, AddressSanitizer is
 // loaded too late").
 // REQUIRES: no_asan
+// REQUIRES: swift_feature_Embedded
 
 public struct MyStruct {
   static var singleton = MyStruct()

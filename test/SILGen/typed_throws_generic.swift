@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-silgen %s -enable-experimental-feature FullTypedThrows | %FileCheck %s
+// RUN: %target-swift-emit-silgen -swift-version 5 -Xllvm -sil-print-types %s -enable-experimental-feature FullTypedThrows | %FileCheck %s
+
+// REQUIRES: swift_feature_FullTypedThrows
 
 public func genericThrow<E>(e: E) throws(E) {
   throw e
@@ -259,9 +261,14 @@ func forcedMap<T, U>(_ source: [T]) -> [U] {
 }
 
 // Witness thunks
+struct WrappedError<E: Error>: Error {
+  let wrapped: E
+}
+
 protocol P {
   associatedtype E: Error
   func f() throws(E)
+  func g() throws(WrappedError<E>)
 }
 
 struct Res<Success, Failure: Error>: P {
@@ -278,6 +285,9 @@ struct Res<Success, Failure: Error>: P {
   // CHECK: [[ERROR_BB]]:
   // CHECK: throw_addr
   func f() throws(Failure) { }
+
+  // CHECK: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic3ResVyxq_GAA1PA2aEP1gyyAA12WrappedErrorVy1EQzGYKFTW : $@convention(witness_method: P) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@in_guaranteed Res<τ_0_0, τ_0_1>) -> @error_indirect WrappedError<τ_0_1>
+  func g() throws(WrappedError<Failure>) { }
 }
 
 struct TypedRes<Success>: P {
@@ -294,6 +304,9 @@ struct TypedRes<Success>: P {
   // CHECK-NEXT: store [[ERROR]] to [trivial] %0 : $*MyError
   // CHECK-NEXT: throw_addr
   func f() throws(MyError) { }
+
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic8TypedResVyxGAA1PA2aEP1gyyAA12WrappedErrorVy1EQzGYKFTW : $@convention(witness_method: P) <τ_0_0> (@in_guaranteed TypedRes<τ_0_0>) -> @error_indirect WrappedError<MyError>
+  func g() throws(WrappedError<MyError>) { }
 }
 
 struct UntypedRes<Success>: P {
@@ -310,6 +323,9 @@ struct UntypedRes<Success>: P {
   // CHECK-NEXT: store [[ERROR]] to [init] %0 : $*any Error
   // CHECK-NEXT: throw_addr
   func f() throws { }
+
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic10UntypedResVyxGAA1PA2aEP1gyyAA12WrappedErrorVy1EQzGYKFTW : $@convention(witness_method: P) <τ_0_0> (@in_guaranteed UntypedRes<τ_0_0>) -> @error_indirect WrappedError<any Error> {
+  func g() throws(WrappedError<any Error>) { }
 }
 
 struct InfallibleRes<Success>: P {
@@ -319,6 +335,9 @@ struct InfallibleRes<Success>: P {
   // CHECK: [[WITNESS:%.*]] = function_ref @$s20typed_throws_generic13InfallibleResV1fyyF : $@convention(method) <τ_0_0> (InfallibleRes<τ_0_0>) -> ()
   // CHECK: = apply [[WITNESS]]<τ_0_0>([[SELF]]) : $@convention(method) <τ_0_0> (InfallibleRes<τ_0_0>)
   func f() { }
+
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic13InfallibleResVyxGAA1PA2aEP1gyyAA12WrappedErrorVy1EQzGYKFTW : $@convention(witness_method: P) <τ_0_0> (@in_guaranteed InfallibleRes<τ_0_0>) -> @error_indirect WrappedError<Never> {
+  func g() throws(WrappedError<Never>) { }
 }
 
 // Protocol with a default implementation of its function with a
@@ -375,4 +394,42 @@ struct GSF2<F: Error, T>: P2 {
 // CHECK: bb0(%0 : $*any Error, %1 : $*GSA<τ_0_0>):
 struct GSA<T>: P2 {
   typealias Failure = any Error
+}
+
+struct ReducedError<T: Error> {}
+
+extension ReducedError where T == MyError {
+  // CHECK-LABEL: sil hidden [ossa] @$s20typed_throws_generic12ReducedErrorVA2A02MyE0ORszrlE05throwfE0yyAEYKF : $@convention(method) (ReducedError<MyError>) -> @error MyError {
+  func throwMyError() throws(T) {
+    throw MyError.fail
+  }
+}
+
+// https://github.com/swiftlang/swift/issues/74289
+struct LoadableGenericError<E>: Error {}
+
+func throwsLoadableGeneric<E>(_ b: Bool, _: E) throws(LoadableGenericError<E>) {
+  if b {
+    throw LoadableGenericError<E>()
+  }
+}
+
+// https://github.com/swiftlang/swift/issues/86347
+func asyncThrowsLoadableGeneric<E>(_ b: Bool, _: E) async throws(LoadableGenericError<E>) {
+  if b {
+    throw LoadableGenericError<E>()
+  }
+}
+
+// CHECK-LABEL: sil {{.*}} @$sSci20typed_throws_genericE5first7ElementQzSgyYaF
+// CHECK:         try_apply {{.*}} error [[ERROR_BB:bb[0-9]+]]
+//
+// CHECK:         [[ERROR_BB]]([[ERROR:%.*]] : @owned $any Error):
+// CHECK:           destroy_value [[ERROR]] : $any Error
+extension AsyncSequence {
+    func first() async -> Element? {
+        try? await self.first { _ in
+            return true
+        }
+    }
 }

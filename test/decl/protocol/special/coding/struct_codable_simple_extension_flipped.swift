@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -swift-version 4
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -swift-version 4
 
 // Simple structs where Codable conformance is added in extensions should derive
 // conformance, no matter which order the extension and type occur in.

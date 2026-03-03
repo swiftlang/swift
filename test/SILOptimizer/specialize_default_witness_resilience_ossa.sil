@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-library-evolution -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-library-evolution -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
 
 sil_stage canonical
 

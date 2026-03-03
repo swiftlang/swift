@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-builtin-module -O -emit-sil %s | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -enable-builtin-module -O -Xllvm -sil-print-types -emit-sil %s | %IRGenFileCheck %s
 
 import Builtin
 

@@ -38,6 +38,7 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/SILGenRequests.h"
 #include "swift/AST/TBDGenRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Immediate/SwiftMaterializationUnit.h"
 #include "swift/SIL/SILModule.h"
@@ -157,7 +158,7 @@ SwiftJIT::CreateLLJIT(CompilerInstance &CI) {
                   .setOptions(std::move(TargetOpt))
                   .setCPU(std::move(CPU))
                   .addFeatures(Features)
-                  .setCodeGenOptLevel(llvm::CodeGenOpt::Default);
+                  .setCodeGenOptLevel(llvm::CodeGenOptLevel::Default);
   auto J = llvm::orc::LLJITBuilder()
                .setJITTargetMachineBuilder(std::move(JTMB))
                .create();
@@ -196,11 +197,11 @@ renameFunctionBodies(llvm::orc::MaterializationResponsibility &MR,
       if (!Sym->hasName() || !Sym->isCallable())
         continue;
 
-      if (ToRename.count(Sym->getName())) {
-        // FIXME: Get rid of the temporary when Swift's llvm-project is
-        // updated to LLVM 17.
-        auto NewName = G.allocateCString(Twine(mangle(Sym->getName())));
-        Sym->setName({NewName.data(), NewName.size() - 1});
+      const StringRef Name = *Sym->getName();
+
+      if (ToRename.count(Name)) {
+        auto NewName = G.intern(mangle(Name));
+        Sym->setName(NewName);
       }
     }
   }
@@ -261,7 +262,9 @@ generateModule(const CompilerInstance &CI, std::unique_ptr<SILModule> SM) {
   // Lower the SIL module to LLVM IR
   auto GenModule = performIRGeneration(
       swiftModule, IRGenOpts, TBDOpts, std::move(SM),
-      swiftModule->getName().str(), PSPs, ArrayRef<std::string>());
+      swiftModule->getName().str(), PSPs, /*CAS=*/nullptr,
+      ArrayRef<std::string>(),
+      /*parallelIROutputFilenames*/ ArrayRef<std::string>());
 
   if (Context.hadError()) {
     return std::nullopt;

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -module-name mandatory_inlining -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -module-name mandatory_inlining -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
 
 import Builtin
 import Swift
@@ -249,6 +249,8 @@ bb0(%0 : $Float, %1 : $Float):
 
 bb1:
   %16 = load [trivial] %2a : $*Float
+  destroy_value [dead_end] %3
+  destroy_value [dead_end] %2
   unreachable
 
 bb2:

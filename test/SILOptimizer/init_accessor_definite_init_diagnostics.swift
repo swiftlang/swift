@@ -349,3 +349,27 @@ do {
     }
   }
 }
+
+struct Empty {}
+
+final class Wrapper {
+  var empty1 : Void?
+  var empty2 : Void
+  var empty3 : (Void, Void)
+  var empty4 : Empty
+  var empty5 : (Empty, Empty)
+  var storage: Bool {
+    @storageRestrictions(initializes: empty1, empty2, empty3, empty4, empty5)
+    init(initialValue) { // expected-error {{property 'empty1' not initialized by init accessor}} // expected-error {{property 'empty4' not initialized by init accessor}} // expected-error {{property 'empty5.0' not initialized by init accessor}}
+
+    }
+    get {return true}
+  }
+
+  init() {
+    empty1 = nil
+    empty4 = Empty()
+    empty5 = (Empty(), Empty())
+  }
+}
+

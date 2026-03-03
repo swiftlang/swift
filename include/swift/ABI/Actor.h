@@ -20,6 +20,12 @@
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/MetadataValues.h"
 
+// lldb knows about some of these internals. If you change things that lldb
+// knows about (or might know about in the future, as a future lldb might be
+// inspecting a process running an older Swift runtime), increment
+// _swift_concurrency_debug_internal_layout_version and add a comment describing
+// the new version.
+
 namespace swift {
 
 /// The default actor implementation.  This is the layout of both

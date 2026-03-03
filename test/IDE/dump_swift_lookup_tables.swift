@@ -41,19 +41,19 @@ import ImportAsMember
 // CHECK-NEXT:      TU: __swift
 // CHECK-NEXT:    adding:
 // CHECK-NEXT:      SNSomeStruct: SNAdding
-// CHECK-NEXT:    blue:
+// CHECK:         blue:
 // CHECK-NEXT:      SNColorChoice: SNColorBlue
 // CHECK-NEXT:    defaultValue:
 // CHECK-NEXT:      SNSomeStruct: SNSomeStructGetDefault, SNSomeStructSetDefault
-// CHECK-NEXT:    defaultX:
+// CHECK:         defaultX:
 // CHECK-NEXT:      SNSomeStruct: DefaultXValue
-// CHECK-NEXT:    foo:
+// CHECK:         foo:
 // CHECK-NEXT:      SNSomeStruct: SNSomeStructGetFoo, SNSomeStructSetFoo
-// CHECK-NEXT:    green:
+// CHECK:         green:
 // CHECK-NEXT:      SNColorChoice: SNColorGreen
 // CHECK-NEXT:    init:
 // CHECK-NEXT:      SNSomeStruct: SNCreate
-// CHECK-NEXT:    makeSomeStruct:
+// CHECK:         makeSomeStruct:
 // CHECK-NEXT:      TU: SNMakeSomeStruct, SNMakeSomeStructForX
 // CHECK-NEXT:    x:
 // CHECK-NEXT:      SNSomeStruct: X

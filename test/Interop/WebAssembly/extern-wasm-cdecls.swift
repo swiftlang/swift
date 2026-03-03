@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-ir -enable-experimental-feature Extern -module-name Extern | %FileCheck %s
 
+// REQUIRES: swift_feature_Extern
+
 // CHECK: declare void @import1() [[EA1:#[0-9]+]]
 @_extern(c)
 @_extern(wasm, module: "m0", name: "import1")

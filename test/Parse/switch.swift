@@ -73,7 +73,7 @@ default:
 // Multiple cases per case block
 switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 case 0: // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{8-8= break}}
-case 1:
+case 1, case 2: // expected-error {{extraneous 'case' keyword in pattern}} {{9-14=}}
   x = 0
 }
 
@@ -200,10 +200,10 @@ switch t {
 case (var a, 2), (1, _): // expected-error {{'a' must be bound in every pattern}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
   ()
 
-case (_, 2), (var a, _): // expected-error {{'a' must be bound in every pattern}}
+case (_, 2), (var a, _): // expected-error {{'a' must be bound in every pattern}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
   ()
 
-case (var a, 2), (1, var b): // expected-error {{'a' must be bound in every pattern}} expected-error {{'b' must be bound in every pattern}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+case (var a, 2), (1, var b): // expected-error {{'a' must be bound in every pattern}} expected-error {{'b' must be bound in every pattern}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
   ()
 
 case (var a, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{17-17= break}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
@@ -221,7 +221,7 @@ case (1, var b): // expected-warning {{variable 'b' was never used; consider rep
 case (1, let b): // let bindings expected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}}
   ()
 
-case (_, 2), (let a, _): // expected-error {{'a' must be bound in every pattern}} expected-warning {{case is already handled by previous patterns; consider removing it}}
+case (_, 2), (let a, _): // expected-error {{'a' must be bound in every pattern}} expected-warning {{case is already handled by previous patterns; consider removing it}} expected-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}}
   ()
 
 // OK

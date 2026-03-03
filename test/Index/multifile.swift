@@ -10,7 +10,7 @@
 
 //--- file1.swift
 
-typealias Bar = [Int] // CHECK: 2:11 | type-alias/Swift | Bar | [[Bar_USR:.*]] | Def | rel: 0
+typealias Bar = [Int] // CHECK: 2:11 | type-alias(internal)/Swift | Bar | [[Bar_USR:.*]] | Def | rel: 0
 
 //--- file2.swift
 

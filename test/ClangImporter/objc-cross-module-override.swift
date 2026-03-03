@@ -11,9 +11,9 @@
 import ImageInitializers
 
 final class MyImage : Image {
-  // CHECK: non-@objc initializer 'init(imageLiteralResourceName:)' is declared in extension of 'Image' and cannot be overridden
+  // CHECK: non-'@objc' initializer 'init(imageLiteralResourceName:)' is declared in extension of 'Image' and cannot be overridden
   // Make sure we aren't emitting a fixit into the extant module...
   // CHECK-NOT: add '@objc' to make this declaration overridable
-  // CHECK: ImageInitializers.Image:{{.*}}: note: overridden declaration is here
+  // CHECK: ImageInitializers.Image.init:{{.*}}: note: overridden declaration is here
   override required convenience init(imageLiteralResourceName name: String) { }
 }

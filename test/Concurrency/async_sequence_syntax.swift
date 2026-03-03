@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -34,8 +33,7 @@ func missingThrowingInBlock<T : AsyncSequence>(_ seq: T) {
 func missingTryInBlock<T : AsyncSequence>(_ seq: T) { 
   executeAsync { 
     for await _ in seq { } 
-    // expected-error@-1{{call can throw, but the error is not handled}}
-    // expected-error@-2{{errors thrown from here are not handled}}
+    // expected-error@-1{{call can throw, but it is not marked with 'try' and the error is not handled}}
   }
 }
 

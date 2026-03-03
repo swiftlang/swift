@@ -34,13 +34,13 @@ static CallExpr *findTrailingClosureTarget(SourceManager &SM,
 
   // If the innermost context is a statement (which will be a BraceStmt per
   // the filtering condition above), drop it.
-  if (contexts.back().is<Stmt *>()) {
+  if (isa<Stmt *>(contexts.back())) {
     contexts = contexts.drop_back();
   }
 
-  if (contexts.empty() || !contexts.back().is<Expr *>())
+  if (contexts.empty() || !isa<Expr *>(contexts.back()))
     return nullptr;
-  CallExpr *CE = cast<CallExpr>(contexts.back().get<Expr *>());
+  CallExpr *CE = cast<CallExpr>(cast<Expr *>(contexts.back()));
 
   // The last argument is a non-trailing closure?
   auto *Args = CE->getArgs();

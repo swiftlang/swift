@@ -33,3 +33,58 @@ public struct LazySequenceOf<SS : Sequence, A> : Sequence where SS.Iterator.Elem
     } 
   }
 }
+
+// rdar://problem/155465011
+
+// Due to a series of unfortunate coincidences, we would assign the same mangling
+// to the witness thunks for P1.f() in the S1: P1 and S2: P1 conformance.
+
+public protocol P1 {
+  func f<T: P2>(_: T) where T.A == Self
+}
+
+public protocol P2 {
+  associatedtype A: P1
+}
+
+struct N1: P2 {
+  typealias A = S1
+}
+
+struct N2: P2 {
+  typealias A = S2
+}
+
+struct S1: P1 {
+  func f<T: P2>(_: T) where T.A == Self {
+    print("Hello from S1")
+  }
+}
+
+struct S2: P1 {
+  func f<T: P2>(_: T) where T.A == Self {
+    print("Hello from S2")
+  }
+}
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17witness_same_type2S1VAA2P1A2aDP1fyyqd__1AQyd__RszAA2P2Rd__lFTW : $@convention(witness_method: P1) <τ_0_0 where τ_0_0 : P2, τ_0_0.A == S1> (@in_guaranteed τ_0_0, @in_guaranteed S1) -> () {
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17witness_same_type2S2VAA2P1A2aDP1fyyqd__1AQyd__RszAA2P2Rd__lFTW : $@convention(witness_method: P1) <τ_0_0 where τ_0_0 : P2, τ_0_0.A == S2> (@in_guaranteed τ_0_0, @in_guaranteed S2) -> () {
+
+// CHECK-LABEL: sil_witness_table hidden N1: P2 module witness_same_type {
+// CHECK-NEXT:    associated_conformance (A: P1): S1: P1 module witness_same_type
+// CHECK-NEXT:    associated_type A: S1
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_witness_table hidden N2: P2 module witness_same_type {
+// CHECK-NEXT:    associated_conformance (A: P1): S2: P1 module witness_same_type
+// CHECK-NEXT:    associated_type A: S2
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_witness_table hidden S1: P1 module witness_same_type {
+// CHECK-NEXT:    method #P1.f: <Self><T where Self == T.A, T : P2> (Self) -> (T) -> () : @$s17witness_same_type2S1VAA2P1A2aDP1fyyqd__1AQyd__RszAA2P2Rd__lFTW
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_witness_table hidden S2: P1 module witness_same_type {
+// CHECK-NEXT:    method #P1.f: <Self><T where Self == T.A, T : P2> (Self) -> (T) -> () : @$s17witness_same_type2S2VAA2P1A2aDP1fyyqd__1AQyd__RszAA2P2Rd__lFTW
+// CHECK-NEXT:  }

@@ -1,13 +1,14 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature MoveOnlyEnumDeinits -module-name test %s | %FileCheck %s --enable-var-scope
-// RUN: %target-swift-emit-sil -enable-experimental-feature MoveOnlyEnumDeinits -module-name test -sil-verify-all %s | %FileCheck %s --check-prefix CHECK-SIL --enable-var-scope
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits -module-name test %s | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits -module-name test -sil-verify-all %s | %FileCheck %s --check-prefix CHECK-SIL --enable-var-scope
 
 // Swift sources are require to remove struct_extract so this check-not line passes:
 // "CHECK-SIL-NOT: struct_extract"
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 func invokedDeinit() {}
 
-@_moveOnly enum MaybeFile {
+enum MaybeFile: ~Copyable {
   case some(File)
   case none
 
@@ -41,7 +42,7 @@ func invokedDeinit() {}
   // CHECK-SIL:    release_value [[FILE]] : $File
 }
 
-@_moveOnly struct File {
+struct File: ~Copyable {
   let fd: Int
   static var nextFD: Int = 0
 
@@ -71,7 +72,7 @@ func invokedDeinit() {}
   }
 }
 
-@_moveOnly struct PointerTree {
+struct PointerTree: ~Copyable {
   let left: UnsafePointer<UInt>?
   let file: Int = 0
   lazy var popularity: Int = 0
@@ -145,7 +146,7 @@ final class Wallet {
   var numCards = 0
 }
 
-@_moveOnly enum Ticket {
+enum Ticket: ~Copyable {
   case empty
   case within(Wallet)
 

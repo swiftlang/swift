@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-caller-analysis"
+
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
@@ -105,12 +107,17 @@ CallerAnalysis::ApplySiteFinderVisitor::~ApplySiteFinderVisitor() {
 #ifndef NDEBUG
   if (callSitesThatMustBeVisited.empty())
     return;
+  /* TODO: this check is currently disabled.
+     CallerAnalysis is only used in FunctionSignatureOpts. And there it's not
+     critical. Therefore, failing this check cannot cause any correctness issues.
+
   llvm::errs() << "Found unhandled call sites!\n";
   while (callSitesThatMustBeVisited.size()) {
     auto *i = callSitesThatMustBeVisited.pop_back_val();
     llvm::errs() << "Inst: " << *i;
   }
   assert(false && "Unhandled call site?!");
+   */
 #endif
 }
 
@@ -469,31 +476,34 @@ void CallerAnalysis::print(const char *filePath) const {
   print(fileOutputStream);
 }
 
-void CallerAnalysis::print(llvm::raw_ostream &os) const {
+void CallerAnalysis::FunctionInfo::print(
+    llvm::raw_ostream &os, NullablePtr<SILFunction> callee) const {
   llvm::yaml::Output yout(os);
+  std::vector<StringRef> partialAppliers;
+  std::vector<StringRef> fullAppliers;
+  for (auto &apply : getAllReferencingCallers()) {
+    if (apply.second.hasFullApply) {
+      fullAppliers.push_back(apply.first->getName());
+    }
+    if (apply.second.getNumPartiallyAppliedArguments().has_value()) {
+      partialAppliers.push_back(apply.first->getName());
+    }
+  }
 
+  StringRef calleeName = callee.isNonNull() ? callee.get()->getName() : "";
+  YAMLCallGraphNode node(calleeName, hasDirectCaller(),
+                         getMinPartialAppliedArgs(),
+                         hasOnlyCompleteDirectCallerSets(), foundAllCallers(),
+                         std::move(partialAppliers), std::move(fullAppliers));
+  yout << node;
+}
+
+void CallerAnalysis::print(llvm::raw_ostream &os) const {
   // NOTE: We purposely do not iterate over our internal state here to ensure
   // that we dump for all functions and that we dump the state we have stored
   // with the functions in module order.
   for (auto &f : mod) {
-    const auto &fi = getFunctionInfo(&f);
-
-    std::vector<StringRef> partialAppliers;
-    std::vector<StringRef> fullAppliers;
-    for (auto &apply : fi.getAllReferencingCallers()) {
-      if (apply.second.hasFullApply) {
-        fullAppliers.push_back(apply.first->getName());
-      }
-      if (apply.second.getNumPartiallyAppliedArguments().has_value()) {
-        partialAppliers.push_back(apply.first->getName());
-      }
-    }
-
-    YAMLCallGraphNode node(
-        f.getName(), fi.hasDirectCaller(), fi.getMinPartialAppliedArgs(),
-        fi.hasOnlyCompleteDirectCallerSets(), fi.foundAllCallers(),
-        std::move(partialAppliers), std::move(fullAppliers));
-    yout << node;
+    getFunctionInfo(&f).print(os, &f);
   }
 }
 

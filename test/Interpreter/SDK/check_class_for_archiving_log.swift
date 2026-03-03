@@ -1,8 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name=_Test -import-objc-header %S/Inputs/check_class_for_archiving.h -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | grep 'check-prefix' > %t/prefix-option
-// RUN: %target-run %t/a.out 2>&1 >/dev/null | %FileCheck `cat %t/prefix-option` %s
+// RUN: %target-run %t/a.out > %t/output.txt 2>%t/stderr.txt
+// RUN: ! grep -q "DONT-CHECK" %t/output.txt || %FileCheck %s --check-prefix=DONT-CHECK < %t/stderr.txt
+// RUN: grep -q "DONT-CHECK" %t/output.txt || %FileCheck %s < %t/stderr.txt
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop

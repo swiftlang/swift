@@ -37,7 +37,6 @@ func call() {
   func multipleSequences<each T, each U>(xs: repeat each T, ys: repeat each U) -> (repeat each T) {
     return (repeat each ys)
     // expected-error@-1 {{pack expansion requires that 'each U' and 'each T' have the same shape}}
-    // expected-error@-2 {{cannot convert return expression of type '(repeat each U)' to return type '(repeat each T)'}}
   }
 
   func multipleSequencesWithSameShape<each T, each U>(xs: repeat each T, ys: repeat each U) -> (repeat each T) where (repeat (each T, each U)): Any {
@@ -56,9 +55,9 @@ func contextualTyping() {
   }
 
   let (_, _): (Int?, String?) = firsts([42], [""]) // OK
-  let (_, _): (String?, String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '((Int)?, (String)?)' to specified type '(String?, String?)'}}
-  let (_, _): ([Int], String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '((Int)?, (String)?)' to specified type '([Int], String?)'}}
-  let (_, _, _): (String?, String?, Int) = firsts([42], [""]) // expected-error {{'((Int)?, (String)?)' is not convertible to '(String?, String?, Int)', tuples have a different number of elements}}
+  let (_, _): (String?, String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '(Int?, String?)' to specified type '(String?, String?)'}}
+  let (_, _): ([Int], String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '(Int?, String?)' to specified type '([Int], String?)'}}
+  let (_, _, _): (String?, String?, Int) = firsts([42], [""]) // expected-error {{'(Int?, String?)' is not convertible to '(String?, String?, Int)', tuples have a different number of elements}}
 
   func dependent<each T>(_ seqs: repeat Array<each T>) -> (repeat Array<each T>.Element?) {
     fatalError()

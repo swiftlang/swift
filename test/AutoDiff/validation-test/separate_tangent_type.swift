@@ -6,8 +6,12 @@ import StdlibUnittest
   import Darwin.C
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(Android)
+  import Android
 #elseif os(Windows)
   import CRT
+#elseif canImport(WASILibc)
+  import WASILibc
 #else
 #error("Unsupported platform")
 #endif

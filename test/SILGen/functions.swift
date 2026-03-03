@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library %s | %FileCheck %s
 
 import Swift // just for Optional
 
@@ -481,6 +481,7 @@ func testNoescape() {
 }
 
 // CHECK-LABEL: functions.testNoescape() -> ()
+// CHECK-NEXT: // Isolation:
 // CHECK-NEXT: sil hidden [ossa] @$s9functions12testNoescapeyyF : $@convention(thin) () -> ()
 // CHECK: function_ref closure #1 () -> () in functions.testNoescape() -> ()
 // CHECK-NEXT: function_ref @$s9functions12testNoescapeyyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> ()

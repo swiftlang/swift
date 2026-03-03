@@ -21,6 +21,7 @@
 #include "swift/IDE/ConformingMethodList.h"
 #include "swift/IDE/CursorInfo.h"
 #include "swift/IDE/ImportDepth.h"
+#include "swift/IDE/SignatureHelp.h"
 #include "swift/IDE/SwiftCompletionInfo.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "llvm/ADT/Hashing.h"
@@ -76,6 +77,14 @@ struct TypeContextInfoResult {
 struct ConformingMethodListResults {
   /// The actual results. If \c nullptr, no results were found.
   const ConformingMethodListResult *Result;
+  /// Whether an AST was reused to produce the results.
+  bool DidReuseAST;
+};
+
+/// The results returned from \c IDEInspectionInstance::signatures.
+struct SignatureHelpResults {
+  /// The actual results. If \c nullptr, no results were found.
+  const SignatureHelpResult *Result;
   /// Whether an AST was reused to produce the results.
   bool DidReuseAST;
 };
@@ -204,6 +213,15 @@ public:
       DiagnosticConsumer *DiagC, ArrayRef<const char *> ExpectedTypeNames,
       std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<ConformingMethodListResults>)>
+          Callback);
+
+  void signatureHelp(
+      swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
+      DiagnosticConsumer *DiagC,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
+      llvm::function_ref<void(CancellableResult<SignatureHelpResults>)>
           Callback);
 
   void cursorInfo(

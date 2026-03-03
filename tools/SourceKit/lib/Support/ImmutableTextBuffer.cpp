@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "SourceKit/Support/ImmutableTextBuffer.h"
-#include "clang/Rewrite/Core/RewriteRope.h"
+#include "llvm/ADT/RewriteRope.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 
 using namespace SourceKit;
 using namespace llvm;
-using clang::RewriteRope;
+using llvm::RewriteRope;
 
 void ImmutableTextUpdate::anchor() {}
 

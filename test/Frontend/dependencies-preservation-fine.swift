@@ -1,3 +1,5 @@
+// REQUIRES: asserts
+
 // This test verifies that copies of dependency files are preserved after a
 // compilation. For example, if the first compilation produces 'foo.swiftdeps',
 // a second compilation should move 'foo.swiftdeps' to 'foo.swiftdeps~', then

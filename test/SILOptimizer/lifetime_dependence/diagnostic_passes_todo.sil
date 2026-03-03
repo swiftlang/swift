@@ -1,0 +1,76 @@
+// RUN: %target-sil-opt -test-runner %s \
+// RUN:     -diagnostics -sil-verify-all \
+// RUN:     -enable-experimental-feature LifetimeDependence \
+// RUN:     2>&1 | %FileCheck %s
+
+// REQUIRES: swift_feature_LifetimeDependence
+
+// Test SIL expected from SILGen output. Run all diagnostic passes which includes lifetime dependence handling.
+// These tests are not fully implemented.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct Owner {}
+struct NE: ~Escapable {}
+struct OtherNE: ~Escapable {}
+
+sil @getNE : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased NE
+sil @copyNE : $@convention(c) (NE, @lifetime(copy 0) @inout NE) -> ()
+sil @makeOwner : $@convention(c) () -> Owner
+
+// TODO: Diagnostics should report that end of the 'owner' variable scope end before 'v1' is destroyed.
+//
+// CHECK-LABEL: sil [ossa] @testInoutReassign_fail : $@convention(thin) () -> () {
+sil [ossa] @testInoutReassign_fail : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @makeOwner : $@convention(c) () -> Owner // user: %1
+  %1 = apply %0() : $@convention(c) () -> Owner
+  %2 = move_value [var_decl] %1 : $Owner
+  debug_value %2 : $Owner, let, name "owner"
+
+  // Declare v1: NE
+  %8 = alloc_box ${ var NE }, var, name "v1"
+  %9 = begin_borrow [var_decl] %8 : ${ var NE }
+  %10 = project_box %9 : ${ var NE }, 0
+
+  // v1 = owner.ne
+  %11 = alloc_stack $Owner
+  store %2 to [trivial] %11 : $*Owner
+  %13 = function_ref @getNE : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased NE
+  %14 = apply %13(%11) : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased NE
+  dealloc_stack %11 : $*Owner
+  store %14 to [init] %10 : $*NE
+
+  // v2 = owner.ne
+  %17 = alloc_stack $Owner
+  store %2 to [trivial] %17 : $*Owner
+  %22 = apply %13(%17) : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased NE
+  dealloc_stack %17 : $*Owner
+  %25 = move_value [var_decl] %22 : $NE
+  debug_value %25 : $NE, let, name "v2"
+
+  // copyView(v2, &v1)
+  %81 = begin_borrow %25 : $NE
+  %82 = begin_access [modify] [unknown] %10 : $*NE
+  %83 = function_ref @copyNE : $@convention(c) (NE, @lifetime(copy 0) @inout NE) -> ()
+  %84 = apply %83(%81, %82) : $@convention(c) (NE, @lifetime(copy 0) @inout NE) -> ()
+  end_access %82 : $*NE
+  end_borrow %81 : $NE
+
+  // destroy v2
+  destroy_value %25 : $NE
+
+  // Owner does not cover v1.
+  extend_lifetime %2 : $Owner
+
+  // destroy v1
+  end_borrow %9 : ${ var NE }
+  destroy_value %8 : ${ var NE }
+
+  %93 = tuple ()
+  return %93 : $()
+}

@@ -6,7 +6,7 @@ import _Differentiation
 // Basic @differentiable(reverse) function types.
 //===----------------------------------------------------------------------===//
 
-// expected-error @+1 {{@differentiable attribute only applies to function types}}
+// expected-error @+1 {{'@differentiable' only applies to function types}}
 let _: @differentiable(reverse) Float
 
 let _: @differentiable(reverse) (Float) -> Float

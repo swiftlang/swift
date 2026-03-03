@@ -12,7 +12,7 @@ import UserA
 @_implementationOnly import UserB
 
 // Operator `+` is a non-member function.
-@_inlineable
+@inlinable
 public func addWrappers() {
   let wrapperA = MagicWrapper()
   let wrapperB = MagicWrapper()
@@ -20,7 +20,7 @@ public func addWrappers() {
 }
 
 // Operator `-` is a member function.
-@_inlineable
+@inlinable
 public func subtractWrappers() {
   var wrapperA = MagicWrapper()
   let wrapperB = MagicWrapper()

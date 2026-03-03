@@ -21,6 +21,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/TypeAlignments.h"
 
 namespace llvm {
@@ -44,9 +45,15 @@ namespace swift {
   enum class PatternKind : uint8_t;
   enum class StmtKind;
 
-  struct ASTNode
-      : public llvm::PointerUnion<Expr *, Stmt *, Decl *, Pattern *, TypeRepr *,
-                                  StmtConditionElement *, CaseLabelItem *> {
+  namespace detail {
+  using ASTNodeBase =
+      llvm::PointerUnion<Expr *, Stmt *, Decl *, Pattern *, TypeRepr *,
+                         StmtConditionElement *, CaseLabelItem *>;
+  } // end namespace detail
+
+  struct ASTNode : public detail::ASTNodeBase {
+    using Base = detail::ASTNodeBase;
+
     // Inherit the constructors from PointerUnion.
     using PointerUnion::PointerUnion;
 
@@ -98,10 +105,24 @@ namespace swift {
       return llvm::hash_value(N.getOpaqueValue());
     }
   };
+
+  /// Find the outermost range that \p range was originally generated from.
+  /// Returns an invalid source range if \p range wasn't generated from a macro.
+  SourceRange getUnexpandedMacroRange(const SourceManager &SM,
+                                      SourceRange range);
+
 } // namespace swift
 
 namespace llvm {
   using swift::ASTNode;
+
+  /// `isa`, `dyn_cast`, `cast` for `ASTNode`.
+  template <typename To>
+  struct CastInfo<To, ASTNode> : public CastInfo<To, ASTNode::Base> {};
+  template <typename To>
+  struct CastInfo<To, const ASTNode>
+      : public CastInfo<To, const ASTNode::Base> {};
+
   template <> struct DenseMapInfo<ASTNode> {
     static inline ASTNode getEmptyKey() {
       return DenseMapInfo<swift::Expr *>::getEmptyKey();

@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-sil -swift-version 4 -verify %s | %FileCheck %s
-// RUN: %target-swift-emit-sil -swift-version 5 -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -swift-version 4 -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -swift-version 5 -verify %s | %FileCheck %s
 
 // Integration test to ensure that `type(of: self)` keeps working in
 // class convenience initializers, even though they are now implemented as

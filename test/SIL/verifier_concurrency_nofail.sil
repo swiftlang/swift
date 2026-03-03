@@ -1,0 +1,26 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s
+
+// This file contains a collection of tests that ensure that the verifier does
+// not fail on specific segments of code. The idea is to ensure that changing
+// the verifier does not cause these to start asserting. When one adds a new
+// check to the verifier, add a test case to make sure normal cases do not
+// crash.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+import _Concurrency
+
+// REQUIRES: asserts
+// REQUIRES: concurrency
+
+sil [ossa] @test_implicitactor_to_opaqueisolation_on_unowned : $@convention(thin) () -> () {
+bb0:
+  %0 = enum $Optional<any Actor>, #Optional.none!enumelt
+  %1 = unchecked_value_cast %0 : $Optional<any Actor> to $Builtin.ImplicitActor
+  %2 = implicitactor_to_opaqueisolation_cast %1 : $Builtin.ImplicitActor
+  %3 = tuple()
+  return %3 : $()
+}

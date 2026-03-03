@@ -50,7 +50,7 @@ extension _Pointer {
   /// - Parameter from: The opaque pointer to convert to a typed pointer.
   @_transparent
   public init(_ from: OpaquePointer) {
-    self.init(from._rawValue)
+    unsafe self.init(from._rawValue)
   }
 
   /// Creates a new typed pointer from the given opaque pointer.
@@ -59,8 +59,8 @@ extension _Pointer {
   ///   `from` is `nil`, the result of this initializer is `nil`.
   @_transparent
   public init?(_ from: OpaquePointer?) {
-    guard let unwrapped = from else { return nil }
-    self.init(unwrapped)
+    guard let unwrapped = unsafe from else { return nil }
+    unsafe self.init(unwrapped)
   }
 
   /// Creates a new pointer from the given address, specified as a bit
@@ -304,12 +304,12 @@ extension _Pointer /*: Strideable*/ {
 
 extension _Pointer /*: Hashable */ {
   @inlinable
-  public func hash(into hasher: inout Hasher) {
+  @safe public func hash(into hasher: inout Hasher) {
     hasher.combine(UInt(bitPattern: self))
   }
 
   @inlinable
-  public func _rawHashValue(seed: Int) -> Int {
+  @safe public func _rawHashValue(seed: Int) -> Int {
     return Hasher._hash(seed: seed, UInt(bitPattern: self))
   }
 }
@@ -317,14 +317,14 @@ extension _Pointer /*: Hashable */ {
 @_unavailableInEmbedded
 extension _Pointer /*: CustomDebugStringConvertible */ {
   /// A textual representation of the pointer, suitable for debugging.
-  public var debugDescription: String {
+  @safe public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }
 }
 
 #if SWIFT_ENABLE_REFLECTION
 extension _Pointer /*: CustomReflectable */ {
-  public var customMirror: Mirror {
+  @safe public var customMirror: Mirror {
     let ptrValue = UInt64(
       bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return Mirror(self, children: ["pointerValue": ptrValue])
@@ -340,6 +340,7 @@ extension Int {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
+  @safe
   @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
     if let pointer = pointer {
@@ -358,6 +359,7 @@ extension UInt {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
+  @safe
   @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
     if let pointer = pointer {
@@ -420,104 +422,62 @@ func _convertInOutToPointerArgument<
   return ToPointer(from)
 }
 
+#if !$Embedded
+/// Type used for the result of _convertConstArrayToPointerArgument and friends,
+/// which is any object for non-Embedded and a native object for Embedded Swift.
+public typealias _ConvertedObject = AnyObject
+#else
+public typealias _ConvertedObject = Builtin.NativeObject
+#endif
 
 /// Derive a pointer argument from a value array parameter.
 ///
 /// This always produces a non-null pointer, even if the array doesn't have any
 /// storage.
-#if !$Embedded
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertConstArrayToPointerArgument<
   FromElement,
   ToPointer: _Pointer
->(_ arr: [FromElement]) -> (AnyObject?, ToPointer) {
-  let (owner, opaquePointer) = arr._cPointerArgs()
+>(_ arr: [FromElement]) -> (_ConvertedObject?, ToPointer) {
+  let (owner, opaquePointer) = unsafe arr._cPointerArgs()
 
   let validPointer: ToPointer
-  if let addr = opaquePointer {
+  if let addr = unsafe opaquePointer {
     validPointer = ToPointer(addr._rawValue)
   } else {
     let lastAlignedValue = ~(MemoryLayout<FromElement>.alignment - 1)
-    let lastAlignedPointer = UnsafeRawPointer(bitPattern: lastAlignedValue)!
+    let lastAlignedPointer = unsafe UnsafeRawPointer(bitPattern: lastAlignedValue)!
     validPointer = ToPointer(lastAlignedPointer._rawValue)
   }
   return (owner, validPointer)
 }
-#else
-@_transparent
-public // COMPILER_INTRINSIC
-func _convertConstArrayToPointerArgument<
-  FromElement,
-  ToPointer: _Pointer
->(_ arr: [FromElement]) -> (Builtin.NativeObject?, ToPointer) {
-  let (owner, opaquePointer) = arr._cPointerArgs()
-
-  let validPointer: ToPointer
-  if let addr = opaquePointer {
-    validPointer = ToPointer(addr._rawValue)
-  } else {
-    let lastAlignedValue = ~(MemoryLayout<FromElement>.alignment - 1)
-    let lastAlignedPointer = UnsafeRawPointer(bitPattern: lastAlignedValue)!
-    validPointer = ToPointer(lastAlignedPointer._rawValue)
-  }
-  return (owner, validPointer)
-}
-#endif
 
 /// Derive a pointer argument from an inout array parameter.
 ///
 /// This always produces a non-null pointer, even if the array's length is 0.
-#if !$Embedded
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<
   FromElement,
   ToPointer: _Pointer
->(_ a: inout [FromElement]) -> (AnyObject?, ToPointer) {
+>(_ a: inout [FromElement]) -> (_ConvertedObject?, ToPointer) {
   // TODO: Putting a canary at the end of the array in checked builds might
   // be a good idea
 
   // Call reserve to force contiguous storage.
   a.reserveCapacity(0)
-  _debugPrecondition(a._baseAddressIfContiguous != nil || a.isEmpty)
+  unsafe _debugPrecondition(a._baseAddressIfContiguous != nil || a.isEmpty)
 
   return _convertConstArrayToPointerArgument(a)
 }
-#else
-@_transparent
-public // COMPILER_INTRINSIC
-func _convertMutableArrayToPointerArgument<
-  FromElement,
-  ToPointer: _Pointer
->(_ a: inout [FromElement]) -> (Builtin.NativeObject?, ToPointer) {
-  // TODO: Putting a canary at the end of the array in checked builds might
-  // be a good idea
-
-  // Call reserve to force contiguous storage.
-  a.reserveCapacity(0)
-  _debugPrecondition(a._baseAddressIfContiguous != nil || a.isEmpty)
-
-  return _convertConstArrayToPointerArgument(a)
-}
-#endif
 
 /// Derive a UTF-8 pointer argument from a value string parameter.
-#if !$Embedded
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<
   ToPointer: _Pointer
->(_ str: String) -> (AnyObject?, ToPointer) {
+>(_ str: String) -> (_ConvertedObject?, ToPointer) {
   let utf8 = Array(str.utf8CString)
   return _convertConstArrayToPointerArgument(utf8)
 }
-#else
-@_transparent
-@_unavailableInEmbedded
-public
-func _convertConstStringToUTF8PointerArgument<ToPointer: _Pointer>(
-    _ str: String) -> (Builtin.NativeObject?, ToPointer) {
-  fatalError("unreachable in embedded Swift (marked as unavailable)")
-}
-#endif

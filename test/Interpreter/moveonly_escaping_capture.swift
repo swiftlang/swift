@@ -10,8 +10,7 @@ class C {
     deinit { print("C died \(value)") }
 }
 
-@_moveOnly
-struct Butt {
+struct Butt: ~Copyable {
     static var myButt: () -> () = {}
 
     init(value: Int) { self._value = C(value: value) }

@@ -19,8 +19,12 @@ TemplateNotInSignatureTestSuite.test("Function with defaulted template type para
 
 TemplateNotInSignatureTestSuite.test("Instantiate the same function template twice.") {
   // Intentionally test the same thing twice.
-  templateTypeParamNotUsedInSignature(T: Int.self)
-  templateTypeParamNotUsedInSignature(T: Int.self)
+  let res1 = templateTypeParamNotUsedInSignature(T: Int.self)
+  expectFalse(res1)
+  let res2 = templateTypeParamNotUsedInSignature(T: Int.self)
+  expectFalse(res2)
+  let res3 = templateTypeParamNotUsedInSignature(T: Bool.self)
+  expectTrue(res3)
 }
 
 TemplateNotInSignatureTestSuite.test("Pointer types") {

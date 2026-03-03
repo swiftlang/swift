@@ -65,13 +65,16 @@ bb0:
   %ex = builtin "int_expect_Int1"(undef : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
   cond_br %ex, bb1, bb2
 
+bb2:
+  br bb3
+
 bb1:
   %f = function_ref @callee : $@convention(thin) () -> ()
   // REMARKS_PASSED: {{.*}}inliner_coldblocks.sil:[[# @LINE + 1]]:8: remark: Pure call. Always profitable to inline "callee"
   %a = apply %f() : $@convention(thin) () -> ()
-  br bb2
+  br bb3
 
-bb2:
+bb3:
   %r = tuple ()
   return %r : $()
 }
@@ -89,9 +92,12 @@ bb0:
 bb1:
   %f = function_ref @callee : $@convention(thin) () -> ()
   %a = apply %f() : $@convention(thin) () -> ()
-  br bb2
+  br bb3
 
 bb2:
+  br bb3
+
+bb3:
   %r = tuple ()
   return %r : $()
 }
@@ -119,9 +125,12 @@ bb3(%c : $Builtin.Int1):
 bb4:
   %f = function_ref @callee : $@convention(thin) () -> ()
   %a = apply %f() : $@convention(thin) () -> ()
-  br bb5
+  br bb6
 
 bb5:
+  br bb6
+
+bb6:
   %r = tuple ()
   return %r : $()
 }
@@ -155,9 +164,12 @@ bb5(%c : $Builtin.Int1):
 bb6:
   %f = function_ref @callee : $@convention(thin) () -> ()
   %a = apply %f() : $@convention(thin) () -> ()
-  br bb7
+  br bb8
 
 bb7:
+  br bb8
+
+bb8:
   %r = tuple ()
   return %r : $()
 }

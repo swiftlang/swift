@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,9 +18,18 @@
 #ifndef SWIFT_STORAGEIMPL_H
 #define SWIFT_STORAGEIMPL_H
 
+#include "swift/AST/AccessorKind.h"
 #include "swift/Basic/Range.h"
+#include "llvm/ADT/StringRef.h"
+
+namespace llvm {
+class StringRef;
+class raw_ostream;
+} // namespace llvm
 
 namespace swift {
+
+class ASTContext;
 
 enum StorageIsMutable_t : bool {
   StorageIsNotMutable = false,
@@ -31,23 +40,121 @@ enum class OpaqueReadOwnership : uint8_t {
   /// An opaque read produces an owned value.
   Owned,
 
+  /// An opaque read produces a borrowed value with teardown.
+  YieldingBorrow,
+
   /// An opaque read produces a borrowed value.
-  Borrowed,
+  Borrow,
 
   /// An opaque read can be either owned or borrowed, depending on the
   /// preference of the caller.
   OwnedOrBorrowed
 };
 
-// Note that the values of these enums line up with %select values in
-// diagnostics.
-enum class AccessorKind {
-#define ACCESSOR(ID) ID,
-#define LAST_ACCESSOR(ID) Last = ID
-#include "swift/AST/AccessorKinds.def"
-#undef ACCESSOR
-#undef LAST_ACCESSOR
-};
+inline bool requiresFeatureCoroutineAccessors(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::YieldingBorrow:
+  case AccessorKind::YieldingMutate:
+    return true;
+  case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
+  case AccessorKind::Set:
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
+    return false;
+  }
+}
+
+inline bool requiresFeatureBorrowAndMutateAccessors(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
+    return true;
+  case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
+  case AccessorKind::Set:
+  case AccessorKind::Read:
+  case AccessorKind::YieldingBorrow:
+  case AccessorKind::Modify:
+  case AccessorKind::YieldingMutate:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Init:
+    return false;
+  }
+}
+
+inline bool isYieldingAccessor(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Read:
+  case AccessorKind::YieldingBorrow:
+  case AccessorKind::Modify:
+  case AccessorKind::YieldingMutate:
+    return true;
+  case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
+  case AccessorKind::Set:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
+    return false;
+  }
+}
+
+inline bool isYieldingImmutableAccessor(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Read:
+  case AccessorKind::YieldingBorrow:
+    return true;
+  case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
+  case AccessorKind::Set:
+  case AccessorKind::Modify:
+  case AccessorKind::YieldingMutate:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
+    return false;
+  }
+}
+
+inline bool isYieldingMutableAccessor(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Modify:
+  case AccessorKind::YieldingMutate:
+    return true;
+  case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
+  case AccessorKind::Set:
+  case AccessorKind::Read:
+  case AccessorKind::YieldingBorrow:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
+    return false;
+  }
+}
 
 const unsigned NumAccessorKinds = unsigned(AccessorKind::Last) + 1;
 
@@ -57,10 +164,10 @@ static inline IntRange<AccessorKind> allAccessorKinds() {
 }
 
 /// \returns a user-readable string name for the accessor kind
-static inline StringRef accessorKindName(AccessorKind ak) {
+static inline llvm::StringRef accessorKindName(AccessorKind ak) {
   switch(ak) {
 
-#define ACCESSOR(ID) ID
+#define ACCESSOR(ID, KEYWORD) ID
 #define SINGLETON_ACCESSOR(ID, KEYWORD)                                        \
   case AccessorKind::ID:                                                       \
     return #KEYWORD;
@@ -198,8 +305,14 @@ enum class ReadImplKind {
   /// There's an immutable addressor.
   Address,
 
-  /// There's a read coroutine.
+  /// There's a _read coroutine.
   Read,
+
+  /// There's a `yielding borrow` coroutine (originally called `read`).
+  YieldingBorrow,
+
+  /// There's a borrow accessor.
+  Borrow,
 };
 enum { NumReadImplKindBits = 4 };
 
@@ -224,8 +337,14 @@ enum class WriteImplKind {
   /// There's a mutable addressor.
   MutableAddress,
 
-  /// There's a modify coroutine.
+  /// There's a _modify coroutine.
   Modify,
+
+  /// There's a `yielding mutate` coroutine (originally called `modify`).
+  YieldingMutate,
+
+  /// There's a mutate accessor.
+  Mutate,
 };
 enum { NumWriteImplKindBits = 4 };
 
@@ -243,14 +362,20 @@ enum class ReadWriteImplKind {
   /// Do a read into a temporary and then a write back.
   MaterializeToTemporary,
 
-  /// There's a modify coroutine.
+  /// There's a _modify coroutine.
   Modify,
+
+  /// There's a modify coroutine.
+  YieldingMutate,
 
   /// We have a didSet, so we're either going to use
   /// MaterializeOrTemporary or the "simple didSet"
   // access pattern.
   StoredWithDidSet,
   InheritedWithDidSet,
+
+  /// There's a mutate accessor.
+  Mutate,
 };
 enum { NumReadWriteImplKindBits = 4 };
 
@@ -304,25 +429,44 @@ public:
       return;
 
     case WriteImplKind::Set:
-      assert(readImpl == ReadImplKind::Get ||
-             readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read);
+      assert(
+          readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::YieldingBorrow ||
+          readImpl == ReadImplKind::Borrow);
       assert(readWriteImpl == ReadWriteImplKind::MaterializeToTemporary ||
-             readWriteImpl == ReadWriteImplKind::Modify);
+             readWriteImpl == ReadWriteImplKind::Modify ||
+             readWriteImpl == ReadWriteImplKind::YieldingMutate);
       return;
 
     case WriteImplKind::Modify:
-      assert(readImpl == ReadImplKind::Get ||
-             readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read);
+      assert(
+          readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::YieldingBorrow ||
+          readImpl == ReadImplKind::Borrow);
       assert(readWriteImpl == ReadWriteImplKind::Modify);
       return;
 
+    case WriteImplKind::YieldingMutate:
+      assert(
+          readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::YieldingBorrow ||
+          readImpl == ReadImplKind::Borrow);
+      assert(readWriteImpl == ReadWriteImplKind::YieldingMutate);
+      return;
+
     case WriteImplKind::MutableAddress:
-      assert(readImpl == ReadImplKind::Get ||
-             readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read);
+      assert(
+          readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::YieldingBorrow ||
+          readImpl == ReadImplKind::Borrow);
       assert(readWriteImpl == ReadWriteImplKind::MutableAddress);
+      return;
+    case WriteImplKind::Mutate:
+      assert(
+          readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::YieldingBorrow ||
+          readImpl == ReadImplKind::Borrow);
+      assert(readWriteImpl == ReadWriteImplKind::Mutate);
       return;
     }
     llvm_unreachable("bad write impl kind");
@@ -338,21 +482,21 @@ public:
   }
 
   static StorageImplInfo getOpaque(StorageIsMutable_t isMutable,
-                                   OpaqueReadOwnership ownership) {
-    return (isMutable ? getMutableOpaque(ownership)
-                      : getImmutableOpaque(ownership));
+                                   OpaqueReadOwnership ownership,
+                                   const ASTContext &ctx) {
+    return (isMutable ? getMutableOpaque(ownership, ctx)
+                      : getImmutableOpaque(ownership, ctx));
   }
 
   /// Describe the implementation of a immutable property implemented opaquely.
-  static StorageImplInfo getImmutableOpaque(OpaqueReadOwnership ownership) {
-    return { getOpaqueReadImpl(ownership) };
+  static StorageImplInfo getImmutableOpaque(OpaqueReadOwnership ownership,
+                                            const ASTContext &ctx) {
+    return {getOpaqueReadImpl(ownership, ctx)};
   }
 
   /// Describe the implementation of a mutable property implemented opaquely.
-  static StorageImplInfo getMutableOpaque(OpaqueReadOwnership ownership) {
-    return { getOpaqueReadImpl(ownership), WriteImplKind::Set,
-             ReadWriteImplKind::Modify };
-  }
+  static StorageImplInfo getMutableOpaque(OpaqueReadOwnership ownership,
+                                          const ASTContext &ctx);
 
   static StorageImplInfo getComputed(StorageIsMutable_t isMutable) {
     return (isMutable ? getMutableComputed()
@@ -400,19 +544,11 @@ public:
   }
 
 private:
-  static ReadImplKind getOpaqueReadImpl(OpaqueReadOwnership ownership) {
-    switch (ownership) {
-    case OpaqueReadOwnership::Owned:
-      return ReadImplKind::Get;
-    case OpaqueReadOwnership::OwnedOrBorrowed:
-    case OpaqueReadOwnership::Borrowed:
-      return ReadImplKind::Read;
-    }
-    llvm_unreachable("bad read-ownership kind");
-  }
+  static ReadImplKind getOpaqueReadImpl(OpaqueReadOwnership ownership,
+                                        const ASTContext &ctx);
 };
 
-StringRef getAccessorLabel(AccessorKind kind);
+llvm::StringRef getAccessorLabel(AccessorKind kind);
 void simple_display(llvm::raw_ostream &out, AccessorKind kind);
 
 } // end namespace swift

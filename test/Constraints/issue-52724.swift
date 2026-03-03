@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 
-// REQUIRES: rdar65007946
-
 // https://github.com/apple/swift/issues/52724
 
 struct A {

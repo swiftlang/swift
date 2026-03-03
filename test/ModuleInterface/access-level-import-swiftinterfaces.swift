@@ -105,6 +105,8 @@
 // RUN: %FileCheck --check-prefixes=CHECK-7-MUL-PRV %s < %t/MultiFiles_Swift6.private.swiftinterface
 // RUN: %FileCheck --check-prefixes=CHECK-7-MUL-PKG %s < %t/MultiFiles_Swift6.package.swiftinterface
 
+// REQUIRES: swift_feature_InternalImportsByDefault
+
 //--- PublicLib.swift
 //--- PackageLib.swift
 //--- InternalLib.swift

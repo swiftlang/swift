@@ -139,11 +139,11 @@ public:
 
   using IRBuilderBase::CreateOr;
   llvm::Value *CreateOr(llvm::Value *LHS, llvm::Value *RHS,
-                        const Twine &Name = "") {
+                        const Twine &Name = "", bool IsDisjoint = false) {
     if (auto *RC = dyn_cast<llvm::Constant>(RHS))
       if (RC->isNullValue())
         return LHS;  // LHS | 0 -> LHS
-    return IRBuilderBase::CreateOr(LHS, RHS, Name);
+    return IRBuilderBase::CreateOr(LHS, RHS, Name, IsDisjoint);
   }
   llvm::Value *CreateOr(llvm::Value *LHS, const APInt &RHS,
                         const Twine &Name = "") {
@@ -257,10 +257,11 @@ public:
 
     // Otherwise, cast to a pointer to the correct type.
     auto origPtrType = address.getType();
-    return Address(
-        CreateBitCast(address.getAddress(),
-                      type->getPointerTo(origPtrType->getAddressSpace())),
-        type, address.getAlignment());
+
+    return Address(CreateBitCast(address.getAddress(),
+                                 llvm::PointerType::get(
+                                     Context, origPtrType->getAddressSpace())),
+                   type, address.getAlignment());
   }
 
   /// Insert the given basic block after the IP block and move the
@@ -310,8 +311,8 @@ public:
   // FunctionPointer.
 
   bool isTrapIntrinsic(llvm::Value *Callee) {
-    return Callee ==
-           llvm::Intrinsic::getDeclaration(getModule(), llvm::Intrinsic::trap);
+    return Callee == llvm::Intrinsic::getOrInsertDeclaration(
+                         getModule(), llvm::Intrinsic::trap);
   }
   bool isTrapIntrinsic(llvm::Intrinsic::ID intrinsicID) {
     return intrinsicID == llvm::Intrinsic::trap;
@@ -381,7 +382,7 @@ public:
                                       const Twine &name = "") {
     assert(!isTrapIntrinsic(intrinsicID) && "Use CreateNonMergeableTrap");
     auto intrinsicFn =
-      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID);
+        llvm::Intrinsic::getOrInsertDeclaration(getModule(), intrinsicID);
     return CreateCallWithoutDbgLoc(
         cast<llvm::FunctionType>(intrinsicFn->getValueType()), intrinsicFn,
         args, name);
@@ -393,8 +394,8 @@ public:
                                       ArrayRef<llvm::Value *> args,
                                       const Twine &name = "") {
     assert(!isTrapIntrinsic(intrinsicID) && "Use CreateNonMergeableTrap");
-    auto intrinsicFn =
-      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID, typeArgs);
+    auto intrinsicFn = llvm::Intrinsic::getOrInsertDeclaration(
+        getModule(), intrinsicID, typeArgs);
     return CreateCallWithoutDbgLoc(
         cast<llvm::FunctionType>(intrinsicFn->getValueType()), intrinsicFn,
         args, name);
@@ -409,6 +410,11 @@ public:
                                {value, expected},
                                name);
   }
+
+  // Creates an @llvm.expect.i1 call, where the value should be an i1 type.
+  llvm::CallInst *CreateExpectCond(IRGenModule &IGM,
+                                   llvm::Value *value,
+                                   bool expectedValue, const Twine &name = "");
 
   /// Call the trap intrinsic. If optimizations are enabled, an inline asm
   /// gadget is emitted before the trap. The gadget inhibits transforms which
@@ -497,10 +503,10 @@ public:
   ~SavedInsertionPointRAII() {
     if (savedInsertionPoint.isNull()) {
       builder.ClearInsertionPoint();
-    } else if (savedInsertionPoint.is<llvm::Instruction *>()) {
-      builder.SetInsertPoint(savedInsertionPoint.get<llvm::Instruction *>());
+    } else if (isa<llvm::Instruction *>(savedInsertionPoint)) {
+      builder.SetInsertPoint(cast<llvm::Instruction *>(savedInsertionPoint));
     } else {
-      builder.SetInsertPoint(savedInsertionPoint.get<llvm::BasicBlock *>());
+      builder.SetInsertPoint(cast<llvm::BasicBlock *>(savedInsertionPoint));
     }
   }
 };

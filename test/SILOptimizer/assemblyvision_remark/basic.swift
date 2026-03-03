@@ -304,3 +304,35 @@ func simpleInOut() -> Klass {
                              // expected-note @-5:9 {{of 'x.next'}}
     return x
 }
+
+
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.size.never")
+public func use<T>(_ t: inout T) { // expected-note @:22 {{from location 't'}}
+    print(t); // expected-remark @:11 {{heap allocated ref of type}}
+              // expected-remark @-1:11 {{Memory copy of value with type 'T'}}
+              // expected-remark @-2:12 {{release of type}}
+}
+
+@inline(never)
+@_assemblyVision
+public func genericFunc<T>(_ t: T) { // expected-note @:30 {{from location 't'}}
+    var temp: T = t // expected-note @:9 {{to location 'temp'}}
+                    // expected-remark @-1:9 {{Memory destroy of value with type 'T'}}
+                    // expected-note @-2:9 {{in memory location of 'temp'}}
+                    // expected-remark @-3:19 {{Memory copy of value with type 'T'}}
+    use(&temp)
+    use(&temp)
+}
+
+@_assemblyVision
+public func forEach<T>(_ elements: Array<T>, body: (borrowing T) -> Void) {
+  elements.withUnsafeBufferPointer { buffer in
+    for i in buffer.indices { // expected-remark @:5 {{Specialized function "Swift.IndexingIterator.next()" with type (@inout IndexingIterator<Range<Int>>) -> Optional<Int>}}
+                              // expected-remark @-1:14 {{Specialized function "Swift.Collection<>.makeIterator()" with type (Range<Int>) -> IndexingIterator<Range<Int>>}}
+      body(/* copy */ buffer[i]) // expected-remark @:29 {{Memory copy of value with type 'T'}}
+                                 // expected-remark @-1:32 {{Memory destroy of value with type 'T'}}
+      // destroy of T
+    }
+  }
+}

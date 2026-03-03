@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name objc_attr_NSManaged -sdk %S/Inputs %s -I %S/Inputs -enable-source-import | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name objc_attr_NSManaged -sdk %S/Inputs %s -I %S/Inputs -enable-source-import | %FileCheck %s
 
 // REQUIRES: objc_interop
 

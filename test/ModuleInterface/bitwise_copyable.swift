@@ -5,13 +5,12 @@
 
 
 @frozen
-@_moveOnly
-public struct S_Implicit_Noncopyable {}
+public struct S_Implicit_Noncopyable: ~Copyable {}
 
-// CHECK-NOT: extension Test.S_Implicit_Noncopyable : Swift.BitwiseCopyable {}
+// CHECK-NOT: extension Test::S_Implicit_Noncopyable : Swift::BitwiseCopyable {}
 
 // CHECK:      public protocol BitwiseCopyable {
 // CHECK-NEXT: }
-// CHECK-NEXT: public typealias _BitwiseCopyable = Test.BitwiseCopyable
+// CHECK-NEXT: public typealias _BitwiseCopyable = Test::BitwiseCopyable
 public protocol BitwiseCopyable {}
 public typealias _BitwiseCopyable = BitwiseCopyable

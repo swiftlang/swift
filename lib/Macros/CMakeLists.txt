@@ -29,7 +29,9 @@ function(add_swift_macro_library name)
   set(ASML_SOURCES ${ARGN})
 
   # Add the library.
-  add_pure_swift_host_library(${name} SHARED ${ASML_SOURCES})
+  add_pure_swift_host_library(${name} SHARED
+    PACKAGE_NAME Toolchain
+    ${ASML_SOURCES})
 
   # If we don't have the Swift swift parser, bail out, because the above
   # add_pure_swift_host_library did nothing.

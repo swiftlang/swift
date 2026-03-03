@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -I %S/Inputs/custom-modules -import-objc-header %S/Inputs/objc_async_tuple_88949633.h -disable-availability-checking %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -I %S/Inputs/custom-modules -import-objc-header %S/Inputs/objc_async_tuple_88949633.h -target %target-swift-5.1-abi-triple %s -verify
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 

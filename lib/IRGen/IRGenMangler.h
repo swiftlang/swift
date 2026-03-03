@@ -14,6 +14,7 @@
 #define SWIFT_IRGEN_IRGENMANGLER_H
 
 #include "IRGenModule.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ProtocolAssociations.h"
@@ -43,13 +44,15 @@ struct SymbolicMangling {
 /// The mangler for all kind of symbols produced in IRGen.
 class IRGenMangler : public Mangle::ASTMangler {
 public:
-  IRGenMangler() { }
+  IRGenMangler(ASTContext &Ctx) : ASTMangler(Ctx) { }
 
   std::string mangleDispatchThunk(const FuncDecl *func) {
     llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));
     beginMangling();
     appendEntity(func);
     appendOperator("Tj");
+    if (func->isDistributedThunk())
+      appendSymbolKind(SymbolKind::DistributedThunk);
     return finalize();
   }
 
@@ -85,6 +88,8 @@ public:
     beginMangling();
     appendEntity(func);
     appendOperator("Tq");
+    if (func->isDistributedThunk())
+      appendSymbolKind(SymbolKind::DistributedThunk);
     return finalize();
   }
 
@@ -377,8 +382,12 @@ public:
       const ProtocolDecl *requirement) {
     beginMangling();
     appendAnyGenericType(proto);
-    bool isFirstAssociatedTypeIdentifier = true;
-    appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    if (isa<GenericTypeParamType>(subject)) {
+      appendType(subject, nullptr);
+    } else {
+      bool isFirstAssociatedTypeIdentifier = true;
+      appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    }
     appendProtocolName(requirement);
     appendOperator("TN");
     return finalize();
@@ -434,10 +443,10 @@ public:
   }
 
   std::string
-  mangleAssociatedTypeAccessFunctionDiscriminator(AssociatedType association) {
+  mangleAssociatedTypeAccessFunctionDiscriminator(AssociatedTypeDecl *assocDecl) {
     beginMangling();
-    appendAnyGenericType(association.getSourceProtocol());
-    appendIdentifier(association.getAssociation()->getNameStr());
+    appendAnyGenericType(assocDecl->getProtocol());
+    appendIdentifier(assocDecl->getNameStr());
     return finalize();
   }
 
@@ -680,7 +689,8 @@ public:
   std::string mangleSymbolNameForMangledMetadataAccessorString(
                                            const char *kind,
                                            CanGenericSignature genericSig,
-                                           CanType type);
+                                           CanType type,
+                                           MangledTypeRefRole role);
 
   std::string mangleSymbolNameForMangledConformanceAccessorString(
                                            const char *kind,
@@ -706,9 +716,6 @@ protected:
                          llvm::function_ref<void ()> body);
 
   std::string mangleTypeSymbol(Type type, const char *Op) {
-    llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(AllowMarkerProtocols,
-                                                         false);
-
     beginMangling();
     appendType(type, nullptr);
     appendOperator(Op);

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 
 // Currently, we don't support having property wrappers that are effectful.
 // Eventually we'd like to add this.
@@ -10,7 +10,7 @@ struct Abstraction<T> {
     init(_ initial : T) { self.value = initial }
 
     var wrappedValue : T {
-        get throws { return value } // expected-error{{property wrappers currently cannot define an 'async' or 'throws' accessor}}
+        get throws { return value } // expected-error{{property wrapper's 'wrappedValue' property cannot define an 'async' or 'throws' getter}}
     }
 
     // its OK to have effectful props that are not `wrappedValue`

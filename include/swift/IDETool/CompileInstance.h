@@ -33,7 +33,6 @@ namespace ide {
 class CompileInstance {
   const std::string &SwiftExecutablePath;
   const std::string &RuntimeResourcePath;
-  const std::string &DiagnosticDocumentationPath;
   const std::shared_ptr<swift::PluginRegistry> Plugins;
 
   struct Options {
@@ -70,12 +69,10 @@ class CompileInstance {
 public:
   CompileInstance(const std::string &SwiftExecutablePath,
                   const std::string &RuntimeResourcePath,
-                  const std::string &DiagnosticDocumentationPath,
                   std::shared_ptr<swift::PluginRegistry> Plugins = nullptr)
       : SwiftExecutablePath(SwiftExecutablePath),
-        RuntimeResourcePath(RuntimeResourcePath),
-        DiagnosticDocumentationPath(DiagnosticDocumentationPath),
-        Plugins(Plugins), CachedCIInvalidated(false), CachedReuseCount(0) {}
+        RuntimeResourcePath(RuntimeResourcePath), Plugins(Plugins),
+        CachedCIInvalidated(false), CachedReuseCount(0) {}
 
   /// NOTE: \p Args is only used for checking the equaity of the invocation.
   /// Since this function assumes that it is already normalized, exact the same

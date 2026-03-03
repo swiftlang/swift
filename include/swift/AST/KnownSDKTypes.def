@@ -30,6 +30,7 @@ KNOWN_SDK_TYPE_DECL(Foundation, NSCopying, ProtocolDecl, 0)
 KNOWN_SDK_TYPE_DECL(Foundation, NSError, ClassDecl, 0)
 KNOWN_SDK_TYPE_DECL(Foundation, NSNumber, ClassDecl, 0)
 KNOWN_SDK_TYPE_DECL(Foundation, NSValue, ClassDecl, 0)
+KNOWN_SDK_TYPE_DECL(Foundation, CGFloat, StructDecl, 0)
 
 KNOWN_SDK_TYPE_DECL(ObjectiveC, NSObject, ClassDecl, 0)
 KNOWN_SDK_TYPE_DECL(ObjectiveC, Selector, StructDecl, 0)

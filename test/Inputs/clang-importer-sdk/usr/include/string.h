@@ -7,6 +7,12 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+
+typedef __SIZE_TYPE__ size_t;
+#endif
+
 void* memcpy(void* s1, const void* s2, size_t n);
 void* memmove(void* s1, const void* s2, size_t n);
 char* strcpy (char* s1, const char* s2);
@@ -29,5 +35,9 @@ char* strtok(char* s1, const char* s2);
 void* memset(void* s, int c, size_t n);
 char* strerror(int errnum);
 size_t strlen(const char* s);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SDK_STRING_H

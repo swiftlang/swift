@@ -1,6 +1,7 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -module-name Swift -enable-experimental-feature Embedded -wmo -target arm64e-apple-none | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 class MyClass {}
 
@@ -12,7 +13,7 @@ public func foo() -> Builtin.Int1 {
   return Builtin.ispod(MyStruct.self)
 }
 
-// CHECK:      define {{.*}}i1 @"$ss3fooBi1_yF"()
+// CHECK:      define {{.*}}i1 @"$es3fooBi1_yF"()
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   ret i1 false
 // CHECK-NEXT: }
@@ -28,7 +29,7 @@ public struct MyGenericStruct<T> {
   }
 }
 
-// CHECK:      define {{.*}}i1 @"$ss15MyGenericStructV3fooBi1_yFs0aC0V_Tg5"()
+// CHECK:      define {{.*}}i1 @"$es15MyGenericStructV3fooBi1_yFs0aC0V_Tg5"()
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   ret i1 false
 // CHECK-NEXT: }

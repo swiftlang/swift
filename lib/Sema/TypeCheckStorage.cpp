@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,16 +16,20 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
-#include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -35,8 +39,10 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/SourceFileExtras.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 using namespace swift;
 
 /// Set each bound variable in the pattern to have an error type.
@@ -124,7 +130,8 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
 
   // Just walk over the members of the type, forcing backing storage
   // for lazy properties and property wrappers to be synthesized.
-  for (auto *member : implDecl->getMembers()) {
+  implDecl->loadStorageMembers();
+  for (auto *member : implDecl->getCurrentMembersWithoutLoading()) {
     // Expand peer macros.
     (void)evaluateOrDefault(
         ctx.evaluator,
@@ -204,49 +211,28 @@ static void enumerateStoredPropertiesAndMissing(
         _addStoredProperty(var);
     }
   };
-
-  // If we have a distributed actor, find the id and actorSystem
-  // properties. We always want them first, and in a specific
-  // order.
-  if (decl->isDistributedActor()) {
-    VarDecl *distributedActorId = nullptr;
-    VarDecl *distributedActorSystem = nullptr;
-    ASTContext &ctx = decl->getASTContext();
-    for (auto *member : implDecl->getMembers()) {
-      if (auto *var = dyn_cast<VarDecl>(member)) {
-        if (!var->isStatic() && var->hasStorage()) {
-          if (var->getName() == ctx.Id_id) {
-            distributedActorId = var;
-          } else if (var->getName() == ctx.Id_actorSystem) {
-            distributedActorSystem = var;
-          }
-        }
-
-        if (distributedActorId && distributedActorSystem)
-          break;
-      }
-    }
-
-    if (distributedActorId)
-      addStoredProperty(distributedActorId);
-    if (distributedActorSystem)
-      addStoredProperty(distributedActorSystem);
-  }
-
-  for (auto *member : implDecl->getMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member)) {
+  std::function<void(Decl *)> visitMember;
+  visitMember = [&](Decl *member) {
+    if (auto *var = dyn_cast<VarDecl>(member))
       addStoredProperty(var);
-    }
 
-    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
-      if (auto auxVar = dyn_cast<VarDecl>(auxDecl))
-        addStoredProperty(auxVar);
-    });
+    member->visitAuxiliaryDecls(visitMember);
 
     if (auto missing = dyn_cast<MissingMemberDecl>(member))
       if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
         addMissing(missing);
-  }
+  };
+
+  // If we have a distributed actor, find the id and actorSystem
+  // properties. We always want them first, and in a specific
+  // order.
+  if (auto idVar = decl->getDistributedActorIDProperty())
+    visitMember(idVar);
+  if (auto actorSystemVar = decl->getDistributedActorSystemProperty())
+    visitMember(actorSystemVar);
+  implDecl->loadStorageMembers();
+  for (auto *member : implDecl->getCurrentMembersWithoutLoading())
+    visitMember(member);
 }
 
 static bool isInSourceFile(IterableDeclContext *idc) {
@@ -338,10 +324,52 @@ bool HasInitAccessorRequest::evaluate(Evaluator &evaluator,
 }
 
 ArrayRef<VarDecl *>
+InitializablePropertiesRequest::evaluate(Evaluator &evaluator,
+                                         NominalTypeDecl *decl) const {
+  IterableDeclContext *implDecl = decl->getImplementationContext();
+
+  if (!hasStoredProperties(decl, implDecl))
+    return ArrayRef<VarDecl *>();
+
+  SmallVector<VarDecl *, 4> results;
+  computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Memberwise);
+
+  auto maybeAddProperty = [&](VarDecl *var) {
+    if (!var->getDeclContext()->isTypeContext() || var->isStatic())
+      return;
+
+    if (var->getAttrs().hasAttribute<LazyAttr>() ||
+        var->hasAttachedPropertyWrapper() || var->hasStorage() ||
+        var->hasInitAccessor()) {
+      results.push_back(var);
+    }
+  };
+
+  std::function<void(Decl *)> visitMember;
+  visitMember = [&](Decl *member) {
+    if (auto *var = dyn_cast<VarDecl>(member))
+      maybeAddProperty(var);
+
+    member->visitAuxiliaryDecls(visitMember);
+  };
+
+  decl->loadStorageMembers();
+  for (auto *member : decl->getCurrentMembersWithoutLoading())
+    visitMember(member);
+
+  return decl->getASTContext().AllocateCopy(results);
+}
+
+ArrayRef<VarDecl *>
 InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
                                         NominalTypeDecl *decl) const {
+  auto initableVars =
+      evaluateOrDefault(evaluator, InitializablePropertiesRequest{decl}, {});
+  if (initableVars.empty())
+    return {};
+
   SmallVector<VarDecl *, 4> results;
-  for (auto var : decl->getMemberwiseInitProperties()) {
+  for (auto *var : initableVars) {
     if (var->hasInitAccessor())
       results.push_back(var);
   }
@@ -349,28 +377,19 @@ InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
   return decl->getASTContext().AllocateCopy(results);
 }
 
-ArrayRef<VarDecl *>
-MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
-                                        NominalTypeDecl *decl) const {
-  IterableDeclContext *implDecl = decl->getImplementationContext();
+static void getMemberwiseInitProperties(NominalTypeDecl *decl,
+                                        MemberwiseInitKind initKind,
+                                        std::optional<AccessLevel> minAccess,
+                                        SmallVectorImpl<VarDecl *> &results) {
+  auto &ctx = decl->getASTContext();
+  auto vars = evaluateOrDefault(ctx.evaluator,
+                                InitializablePropertiesRequest{decl}, {});
+  if (vars.empty())
+    return;
 
-  if (!hasStoredProperties(decl, implDecl))
-    return ArrayRef<VarDecl *>();
-
-  // Make sure we expand what we need to to get all of the properties.
-  computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Memberwise);
-
-  SmallVector<VarDecl *, 4> results;
   SmallPtrSet<VarDecl *, 4> subsumedViaInitAccessor;
 
-  auto maybeAddProperty = [&](VarDecl *var) {
-    // We only care about properties that are memberwise initialized.
-    if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
-      return;
-
-    // Add this property.
-    results.push_back(var);
-
+  for (auto *var : vars) {
     // If this property has an init accessor, it subsumes all of the stored properties
     // that the accessor initializes. Mark those stored properties as being subsumed; we'll
     // get back to them later.
@@ -379,16 +398,14 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
         subsumedViaInitAccessor.insert(subsumed);
       }
     }
-  };
 
-  for (auto *member : decl->getCurrentMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member))
-      maybeAddProperty(var);
-
-    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
-      if (auto auxVar = dyn_cast<VarDecl>(auxDecl))
-        maybeAddProperty(auxVar);
-    });
+    // We only care about properties that are memberwise initialized.
+    if (!var->isMemberwiseInitialized(initKind, /*preferDeclared=*/true,
+                                      minAccess)) {
+      continue;
+    }
+    // Add this property.
+    results.push_back(var);
   }
 
   // If any properties were subsumed via init accessors, drop them from the list.
@@ -398,8 +415,165 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
                   }),
                   results.end());
   }
+}
 
+ArrayRef<VarDecl *>
+MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
+                                          NominalTypeDecl *decl,
+                                          MemberwiseInitKind initKind) const {
+  SmallVector<VarDecl *, 4> results;
+  getMemberwiseInitProperties(decl, initKind, /*minAccess*/ std::nullopt,
+                              results);
   return decl->getASTContext().AllocateCopy(results);
+}
+
+AccessLevel
+MemberwiseInitMaxAccessLevel::evaluate(Evaluator &evaluator,
+                                       NominalTypeDecl *nominal) const {
+  // Gather the memberwise initializer properties and take the most accessible.
+  // We pass `private` as the minimum access level since we want everything. The
+  // initializer kind doesn't actually matter since `private` will ensure
+  // `isMemberwiseInitExcludedVar` is always `false` for non-property-wrappers.
+  SmallVector<VarDecl *, 4> props;
+  getMemberwiseInitProperties(nominal, MemberwiseInitKind::Regular,
+                              /*minAccess*/ AccessLevel::Private, props);
+
+  // The memberwise initializer is only ever internal at most, and is limited
+  // by the access of the enclosing nominal. The only case that matters here is
+  // if the nominal is private or fileprivate, the memberwise initializer is
+  // effectively at most fileprivate in both cases.
+  auto nominalAccess = nominal->getFormalAccessScope();
+  auto maxAccess = nominalAccess.isPrivate() || nominalAccess.isFileScope()
+                       ? AccessLevel::FilePrivate
+                       : AccessLevel::Internal;
+  if (props.empty())
+    return maxAccess;
+
+  auto result = AccessLevel::Private;
+  for (auto *prop : props)
+    result = std::max(result, prop->getFormalAccess());
+
+  return std::min(maxAccess, result);
+}
+
+void
+TypeChecker::diagnoseCompatMemberwiseInitIfNeeded(const ConstructorDecl *init,
+                                                  SourceLoc loc) {
+  using Kind = MemberwiseInitKind;
+  ASSERT(init->isMemberwiseInitializer() == Kind::Compatibility);
+
+  auto *SF = init->getParentSourceFile();
+  if (!SF)
+    return;
+
+  // We only diagnose for the first reference, and complain on the nominal
+  // to see if we've already diagnosed this initializer. Since the
+  // compatibility initializer can only ever be \c fileprivate at most, the
+  // diagnostic emitted will always be in the same file as the reference.
+  if (!SF->getExtras().DiagnosedCompatMemberwiseInits.insert(init).second)
+    return;
+
+  auto *NTD = cast<NominalTypeDecl>(init->getDeclContext());
+  auto &ctx = NTD->getASTContext();
+
+  // Check to see what variables are missing from the memberwise initializer.
+  SmallSetVector<VarDecl *, 4> excludedVars;
+  for (auto *VD : NTD->getMemberwiseInitProperties(Kind::Compatibility))
+    excludedVars.insert(VD);
+  for (auto *VD : NTD->getMemberwiseInitProperties(Kind::Regular))
+    excludedVars.remove(VD);
+
+  ASSERT(!excludedVars.empty() &&
+         "Shouldn't have synthesized a compatibility memberwise init");
+
+  SmallString<64> excludedVarStr;
+  {
+    llvm::raw_svector_ostream OS(excludedVarStr);
+    for (auto idx : indices(excludedVars)) {
+      auto *VD = excludedVars[idx];
+      OS << "'" << VD->getName() << "'";
+      if (idx == excludedVars.size() - 1)
+        continue;
+      if (excludedVars.size() > 2)
+        OS << ",";
+      if (excludedVars.size() > 1 && idx == excludedVars.size() - 2) {
+        OS << " and ";
+      } else {
+        OS << " ";
+      }
+    }
+  }
+
+  NTD->diagnose(diag::warn_use_of_compat_memberwise_init,
+                /*printVars*/ excludedVarStr.size() <= 60, excludedVarStr);
+
+  // Emit a fix-it that inserts the initializer.
+  if (auto braceRange = NTD->getBraces()) {
+    // Insert after the last VarDecl.
+    SourceLoc insertLoc;
+    for (auto *member : NTD->getParsedMembers()) {
+      if (isa<VarDecl>(member) || isa<PatternBindingDecl>(member))
+        continue;
+
+      auto loc = member->getSourceRangeIncludingAttrs().Start;
+      if (!loc)
+        continue;
+
+      insertLoc = loc;
+      break;
+    }
+    if (!insertLoc)
+      insertLoc = braceRange.End;
+
+    llvm::SmallString<64> insertText;
+    llvm::raw_svector_ostream out(insertText);
+    out << getAccessLevelSpelling(init->getFormalAccess()) << " ";
+    printMemberwiseInit(NTD, Kind::Compatibility, out);
+    out << "\n";
+
+    NTD->diagnose(diag::insert_compat_memberwise_init)
+        .fixItInsert(insertLoc, insertText);
+  }
+  if (loc)
+    ctx.Diags.diagnose(loc, diag::compat_memberwise_init_used_here);
+}
+
+static Type getLazyInterfaceTypeForSynthesizedVar(VarDecl *var) {
+  // For DistributedActor, the `id` and `actorSystem` properties have their
+  // types computed lazily.
+  if (auto distPropKind = var->isSpecialDistributedActorProperty()) {
+    auto *NTD = var->getDeclContext()->getSelfNominalTypeDecl();
+    ASSERT(NTD);
+    switch (distPropKind.value()) {
+    case SpecialDistributedActorProperty::Id:
+      return getDistributedActorIDType(NTD);
+    case SpecialDistributedActorProperty::ActorSystem:
+      return getDistributedActorSystemType(NTD);
+    }
+    llvm_unreachable("Unhandled case in switch!");
+  }
+  return Type();
+}
+
+static Pattern *
+getLazilySynthesizedPattern(PatternBindingDecl *PBD, Pattern *P) {
+  // Check to see if we have a pattern that binds a single synthesized var.
+  auto *NP = dyn_cast<NamedPattern>(P->getSemanticsProvidingPattern());
+  if (!NP)
+    return P;
+
+  auto *var = NP->getDecl();
+  if (!var->isSynthesized())
+    return P;
+
+  auto interfaceTy = getLazyInterfaceTypeForSynthesizedVar(var);
+  if (!interfaceTy)
+    return P;
+
+  auto *DC = var->getDeclContext();
+  auto &ctx = DC->getASTContext();
+  auto patternTy = DC->mapTypeIntoEnvironment(interfaceTy);
+  return TypedPattern::createImplicit(ctx, P, patternTy);
 }
 
 /// Validate the \c entryNumber'th entry in \c binding.
@@ -408,10 +582,14 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
   const auto &pbe = binding->getPatternList()[entryNumber];
   auto &Context = binding->getASTContext();
 
+  // Resolve a lazily synthesized pattern if necessary.
+  auto *pattern = binding->getPattern(entryNumber);
+  pattern = getLazilySynthesizedPattern(binding, pattern);
+  binding->setPattern(entryNumber, pattern);
+
   // Resolve the pattern.
-  auto *pattern = TypeChecker::resolvePattern(binding->getPattern(entryNumber),
-                                              binding->getDeclContext(),
-                                              /*isStmtCondition*/ true);
+  pattern = TypeChecker::resolvePattern(pattern, binding->getDeclContext(),
+                                        /*isStmtCondition*/ true);
   if (!pattern) {
     binding->setInvalid();
     binding->getPattern(entryNumber)->setType(ErrorType::get(Context));
@@ -447,12 +625,6 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
   auto contextualPattern =
       ContextualPattern::forPatternBindingDecl(binding, entryNumber);
   Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-  if (patternType->hasError()) {
-    swift::setBoundVarsTypeError(pattern, Context);
-    binding->setInvalid();
-    pattern->setType(ErrorType::get(Context));
-    return &pbe;
-  }
 
   llvm::SmallVector<VarDecl *, 2> vars;
   binding->getPattern(entryNumber)->collectVariables(vars);
@@ -463,49 +635,52 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     shouldRequireStatic = isa<NominalTypeDecl>(d);
   }
   for (auto *sv: vars) {
-    bool hasConst = sv->getAttrs().getAttribute<CompileTimeConstAttr>();
-    if (!hasConst)
+    bool hasUnderscoreConst = sv->getAttrs().getAttribute<CompileTimeLiteralAttr>();
+    if (!hasUnderscoreConst)
       continue;
     bool hasStatic = StaticSpelling != StaticSpellingKind::None;
     // only static _const let/var is supported
     if (shouldRequireStatic && !hasStatic) {
-      binding->diagnose(diag::require_static_for_const);
+      binding->diagnose(diag::require_static_for_literal);
       continue;
     }
     if (isReq) {
       continue;
     }
-    auto varSourceFile = binding->getDeclContext()->getParentSourceFile();
-    auto isVarInInterfaceFile =
-        varSourceFile && varSourceFile->Kind == SourceFileKind::Interface;
     // Don't diagnose too strictly for textual interfaces.
-    if (isVarInInterfaceFile) {
+    if (binding->getDeclContext()->isInSwiftinterface()) {
       continue;
     }
     // var is only allowed in a protocol.
     if (!sv->isLet()) {
-      binding->diagnose(diag::require_let_for_const);
+      binding->diagnose(diag::require_let_for_literal);
     }
     // Diagnose when an init isn't given and it's not a compile-time constant
     if (auto *init = binding->getInit(entryNumber)) {
       if (!init->isSemanticallyConstExpr()) {
-        binding->diagnose(diag::require_const_initializer_for_const);
+        binding->diagnose(diag::require_literal_initializer_for_literal);
       }
     } else {
-      binding->diagnose(diag::require_const_initializer_for_const);
+      binding->diagnose(diag::require_literal_initializer_for_literal);
     }
   }
 
-  auto isInitAccessorProperty = [](Pattern *pattern) {
-    auto *var = pattern->getSingleVar();
-    return var && var->getAccessor(AccessorKind::Init);
+  auto supportsInitialization = [&] {
+    bool anySupportsInitialization = false;
+    pattern->forEachVariable([&](VarDecl *var) {
+      if (var->supportsInitialization()) {
+        anySupportsInitialization = true;
+      }
+    });
+
+    return anySupportsInitialization;
   };
 
   // If we have a type but no initializer, check whether the type is
   // default-initializable. If so, do it.
   if (!pbe.isInitialized() &&
       binding->isDefaultInitializable(entryNumber) &&
-      (pattern->hasStorage() || isInitAccessorProperty(pattern))) {
+      supportsInitialization()) {
     if (auto defaultInit = TypeChecker::buildDefaultInitializer(patternType)) {
       // If we got a default initializer, install it and re-type-check it
       // to make sure it is properly coerced to the pattern type.
@@ -515,9 +690,7 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
 
   // If the pattern contains some form of unresolved type, we'll need to
   // check the initializer.
-  if (patternType->hasUnresolvedType() ||
-      patternType->hasPlaceholder() ||
-      patternType->hasUnboundGenericType()) {
+  if (patternType->hasPlaceholder() || patternType->hasUnboundGenericType()) {
     if (TypeChecker::typeCheckPatternBinding(binding, entryNumber,
                                              patternType)) {
       binding->setInvalid();
@@ -582,7 +755,16 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     Context.Diags.diagnose(binding->getPattern(entryNumber)->getLoc(),
                            diag::destructuring_let_struct_stored_property_unsupported);
   }
-  
+
+  // Extern declarations are not permitted to have initializers.
+  if (auto singleVar = binding->getSingleVar()) {
+    if (singleVar->getAttrs().hasAttribute<ExternAttr>() &&
+        pbe.isInitialized()) {
+      singleVar->diagnose(diag::extern_variable_initializer)
+          .highlight(pbe.getOriginalInitRange());
+    }
+  }
+
   return &pbe;
 }
 
@@ -590,17 +772,12 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
                                                     unsigned i) {
   // Force the entry to be checked.
   (void)binding->getCheckedPatternBindingEntry(i);
-  if (binding->isInvalid())
-    return;
 
   if (!binding->isInitialized(i))
     return;
 
   if (!binding->isInitializerChecked(i))
     TypeChecker::typeCheckPatternBinding(binding, i);
-
-  if (binding->isInvalid())
-    return;
 
   // If we entered an initializer context, contextualize any auto-closures we
   // might have created. Note that we don't contextualize the initializer for a
@@ -616,15 +793,42 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
 
   if (auto *initContext = binding->getInitContext(i)) {
     auto *init = binding->getInit(i);
-    TypeChecker::contextualizeInitializer(initContext, init);
-    TypeChecker::checkInitializerEffects(initContext, init);
+    TypeChecker::contextualizeExpr(init, initContext);
   }
+
+  // Compute captures in case diagnostics are emitted.
+  (void)binding->getCaptureInfo(i);
 }
 
 Expr *PatternBindingCheckedAndContextualizedInitRequest::evaluate(
     Evaluator &eval, PatternBindingDecl *binding, unsigned i) const {
   checkAndContextualizePatternBindingInit(binding, i);
   return binding->getInit(i);
+}
+
+static std::optional<AccessorKind>
+directAccessorKindForReadImpl(ReadImplKind reader) {
+  switch (reader) {
+  case ReadImplKind::Stored:
+  case ReadImplKind::Inherited:
+    return std::nullopt;
+
+  case ReadImplKind::Get:
+    return AccessorKind::Get;
+
+  case ReadImplKind::Address:
+    return AccessorKind::Address;
+
+  case ReadImplKind::Read:
+    return AccessorKind::Read;
+
+  case ReadImplKind::YieldingBorrow:
+    return AccessorKind::YieldingBorrow;
+
+  case ReadImplKind::Borrow:
+    return AccessorKind::Borrow;
+  }
+  llvm_unreachable("bad impl kind");
 }
 
 bool
@@ -663,22 +867,94 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
   if (isa<ProtocolDecl>(storageDC))
     return checkMutability(AccessorKind::Get);
 
-  switch (storage->getReadImpl()) {
-  case ReadImplKind::Stored:
-  case ReadImplKind::Inherited:
+  auto accessor = directAccessorKindForReadImpl(storage->getReadImpl());
+  if (!accessor)
     return false;
 
-  case ReadImplKind::Get:
-    return checkMutability(AccessorKind::Get);
+  return checkMutability(*accessor);
+}
 
-  case ReadImplKind::Address:
-    return checkMutability(AccessorKind::Address);
+/// As a special extra check, if the user also gave us a _modify or modify
+/// coroutine, check that it has the same mutatingness as the setter.
+/// TODO: arguably this should require the spelling to match even when it's
+/// the implied value.
+static void diagnoseReadWriteMutatingnessMismatch(
+    AbstractStorageDecl *storage, bool isWriterMutating, WriteImplKind write,
+    AccessorKind writerAccesor, ReadWriteImplKind readWrite,
+    AccessorKind readWriterAccessor) {
+  if (storage->getImplInfo().getReadWriteImpl() != readWrite)
+    return;
+  auto modifyAccessor = storage->getParsedAccessor(readWriterAccessor);
+  if (!modifyAccessor)
+    return;
 
-  case ReadImplKind::Read:
-    return checkMutability(AccessorKind::Read);
+  auto isModifierMutating = modifyAccessor->isMutating();
+  auto isReaderMutating = storage->isGetterMutating();
+  auto isReaderOrWriterMutating = isWriterMutating || isReaderMutating;
+  if (isReaderOrWriterMutating == isModifierMutating)
+    return;
+
+  auto disagreesWithReader = (isReaderMutating != isModifierMutating);
+  auto disagreesWithWriter = (isWriterMutating != isModifierMutating);
+  auto disagreesWithBoth = disagreesWithReader && disagreesWithWriter;
+
+  bool hasCoroutineAccessorFeature =
+      storage->getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors);
+
+  auto readerAccessor = directAccessorKindForReadImpl(storage->getReadImpl());
+  StringRef readerAccessorName =
+      readerAccessor.has_value()
+          ? getAccessorNameForDiagnostic(
+                *readerAccessor, /*article=*/false,
+                /*underscored=*/hasCoroutineAccessorFeature)
+          : "the inherited accessor";
+  StringRef writerAccessorName =
+      getAccessorNameForDiagnostic(writerAccesor, /*article=*/false,
+                                   /*underscored=*/hasCoroutineAccessorFeature);
+  unsigned diagnosticForm;
+  if (isModifierMutating) {
+    // modifier can't be mutating when both the setter is nonmutating and the
+    // getter isn't mutating
+    assert(disagreesWithBoth);
+    diagnosticForm = 0;
+  } else if (disagreesWithBoth) {
+    // modify can't be nonmutating when either the setter isn't nonmutating or
+    // the getter is mutating
+    diagnosticForm = 1;
+  } else if (disagreesWithWriter) {
+    // modify can't be nonmutating when the setter isn't nonmutating
+    diagnosticForm = 2;
+  } else {
+    // modify can't be nonmutating when the getter is mutating
+    assert(disagreesWithReader);
+    diagnosticForm = 3;
   }
 
-  llvm_unreachable("bad impl kind");
+  modifyAccessor->diagnose(
+      diag::readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,
+      getAccessorNameForDiagnostic(readWriterAccessor, /*article=*/false,
+                                   /*underscored=*/hasCoroutineAccessorFeature),
+      isModifierMutating ? SelfAccessKind::Mutating
+                         : SelfAccessKind::NonMutating,
+      diagnosticForm, writerAccessorName, SelfAccessKind::NonMutating,
+      readerAccessorName, SelfAccessKind::Mutating);
+  auto *writer = storage->getParsedAccessor(writerAccesor);
+  if (disagreesWithWriter && writer) {
+    writer->diagnose(diag::previous_accessor,
+                     getAccessorNameForDiagnostic(
+                         writerAccesor,
+                         /*article=*/false,
+                         /*underscored=*/hasCoroutineAccessorFeature),
+                     0);
+  }
+  AccessorDecl *reader = nullptr;
+  if (disagreesWithReader && readerAccessor.has_value() &&
+      (reader = storage->getParsedAccessor(*readerAccessor))) {
+    StringRef readerAccessorName =
+        getAccessorNameForDiagnostic(reader, /*article=*/false);
+    reader->diagnose(diag::previous_accessor, readerAccessorName, 0);
+  }
+  modifyAccessor->setInvalid();
 }
 
 bool
@@ -725,28 +1001,12 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
     if (setter)
       result = setter->isMutating();
 
-
-    // As a special extra check, if the user also gave us a modify
-    // coroutine, check that it has the same mutatingness as the setter.
-    // TODO: arguably this should require the spelling to match even when
-    // it's the implied value.
-    auto modifyAccessor = storage->getParsedAccessor(AccessorKind::Modify);
-
-    if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify &&
-        modifyAccessor != nullptr) {
-      auto modifyResult = modifyAccessor->isMutating();
-      if ((result || storage->isGetterMutating()) != modifyResult) {
-        modifyAccessor->diagnose(
-            diag::modify_mutatingness_differs_from_setter,
-            modifyResult ? SelfAccessKind::Mutating
-                         : SelfAccessKind::NonMutating,
-            modifyResult ? SelfAccessKind::NonMutating
-                         : SelfAccessKind::Mutating);
-        if (setter)
-          setter->diagnose(diag::previous_accessor, "setter", 0);
-        modifyAccessor->setInvalid();
-      }
-    }
+    diagnoseReadWriteMutatingnessMismatch(
+        storage, result, WriteImplKind::Set, AccessorKind::Set,
+        ReadWriteImplKind::Modify, AccessorKind::Modify);
+    diagnoseReadWriteMutatingnessMismatch(
+        storage, result, WriteImplKind::Set, AccessorKind::Set,
+        ReadWriteImplKind::YieldingMutate, AccessorKind::YieldingMutate);
 
     return result;
   }
@@ -758,6 +1018,12 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   case WriteImplKind::Modify:
     return storage->getParsedAccessor(AccessorKind::Modify)
       ->isMutating();
+
+  case WriteImplKind::YieldingMutate:
+    return storage->getParsedAccessor(AccessorKind::YieldingMutate)->isMutating();
+
+  case WriteImplKind::Mutate:
+    return storage->getParsedAccessor(AccessorKind::Mutate)->isMutating();
   }
   llvm_unreachable("bad storage kind");
 }
@@ -765,6 +1031,10 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
 OpaqueReadOwnership
 OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
                                      AbstractStorageDecl *storage) const {
+  auto abiRole = ABIRoleInfo(storage);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getOpaqueReadOwnership();
+
   enum class DiagKind {
     BorrowedAttr,
     NoncopyableType
@@ -775,22 +1045,41 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     if (auto *getter = storage->getEffectfulGetAccessor()) {
       switch (kind) {
       case DiagKind::NoncopyableType:
-        getter->diagnose(diag::noncopyable_effectful_getter,
-                         getter->getDescriptiveKind());
+        getter->diagnose(diag::noncopyable_effectful_getter, getter);
         break;
       case DiagKind::BorrowedAttr:
-        getter->diagnose(diag::borrowed_with_effect,
-                         getter->getDescriptiveKind());
+        getter->diagnose(diag::borrowed_with_effect, getter);
         break;
       }
     }
-    return OpaqueReadOwnership::Borrowed;
+    return OpaqueReadOwnership::YieldingBorrow;
   };
+
+  if (auto *accessorDecl = storage->getAccessor(AccessorKind::Read)) {
+    auto lifetimeDependencies = accessorDecl->getLifetimeDependencies();
+    if (lifetimeDependencies.has_value() && !lifetimeDependencies->empty()) {
+      for (auto &lifetimeDependenceInfo : *lifetimeDependencies) {
+        if (lifetimeDependenceInfo.hasScopeLifetimeParamIndices()) {
+          // A scoped lifetime dependence borrows its source.
+          return OpaqueReadOwnership::YieldingBorrow;
+        }
+      }
+    }
+  }
+
+  if (storage->getAccessor(AccessorKind::YieldingBorrow))
+    return OpaqueReadOwnership::YieldingBorrow;
+
+  if (storage->getAccessor(AccessorKind::Borrow))
+    return OpaqueReadOwnership::Borrow;
 
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
 
-  if (storage->getInnermostDeclContext()->mapTypeIntoContext(
+  if (storage->getAttrs().hasAttribute<OwnedAttr>())
+    return OpaqueReadOwnership::Owned;
+
+  if (storage->getInnermostDeclContext()->mapTypeIntoEnvironment(
         storage->getValueInterfaceType())->isNoncopyable())
     return usesBorrowed(DiagKind::NoncopyableType);
 
@@ -851,23 +1140,6 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
   elements.append(prefix.begin(), prefix.end());
   elements.append(indices->begin(), indices->end());
   return ParameterList::create(context, elements);
-}
-
-static bool doesAccessorHaveBody(AccessorDecl *accessor) {
-  // Protocol requirements don't have bodies.
-  //
-  // FIXME: Revisit this if we ever get 'real' default implementations.
-  if (isa<ProtocolDecl>(accessor->getDeclContext()))
-    return false;
-
-  auto *storage = accessor->getStorage();
-
-  // NSManaged getters and setters don't have bodies.
-  if (storage->getAttrs().hasAttribute<NSManagedAttr>(/*AllowInvalid=*/true))
-    if (accessor->isGetterOrSetter())
-      return false;
-
-  return true;
 }
 
 /// Build an argument list referencing the subscript parameters for this
@@ -979,7 +1251,7 @@ getPropertyWrapperLValueness(VarDecl *var) {
 ///     - Wrapped: \c self._member.wrappedValue
 ///     - Composition: \c self._member.wrappedValue.wrappedValue….wrappedValue
 ///     - Projected: \c self._member.projectedValue
-///     - Enclosed instance: \c Wrapper[_enclosedInstance: self, …]
+///     - Enclosed instance: \c Wrapper[_enclosingInstance: self, …]
 static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    TargetImpl target,
@@ -1001,7 +1273,6 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       auto subs = result->getType()
           ->getWithoutSpecifierType()
           ->getContextSubstitutionMap(
-            accessor->getParentModule(),
             underlyingVar->getDeclContext());
 
       ConcreteDeclRef memberRef(underlyingVar, subs);
@@ -1063,15 +1334,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       auto *baseClass = override->getDeclContext()->getSelfClassDecl();
       selfTypeForAccess = selfTypeForAccess->getSuperclassForDecl(baseClass);
 
-      // Error recovery path. We get an ErrorType here if getSuperclassForDecl()
-      // fails (because, for instance, a generic parameter of a generic nominal
-      // type cannot be resolved).
-      if (!selfTypeForAccess->is<ErrorType>()) {
-        subs =
-          selfTypeForAccess->getContextSubstitutionMap(
-            accessor->getParentModule(),
-            baseClass);
-      }
+      subs = selfTypeForAccess->getContextSubstitutionMap(baseClass);
 
       storage = override;
 
@@ -1130,14 +1393,11 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
         // Check for availability of wrappedValue.
         if (accessor->getAccessorKind() == AccessorKind::Get ||
-            accessor->getAccessorKind() == AccessorKind::Read) {
-          if (wrappedValue->getAttrs().getUnavailable(ctx)) {
-            ExportContext where = ExportContext::forDeclSignature(var);
-            diagnoseExplicitUnavailability(
-                wrappedValue,
-                var->getAttachedPropertyWrappers()[i]->getRangeWithAt(),
-                where, nullptr);
-          }
+            isYieldingImmutableAccessor(accessor->getAccessorKind())) {
+          diagnoseDeclAvailability(
+              wrappedValue,
+              var->getAttachedPropertyWrappers()[i]->getRangeWithAt(), nullptr,
+              ExportContext::forDeclSignature(accessor));
         }
 
         underlyingVars.push_back({ wrappedValue, isWrapperRefLValue });
@@ -1316,7 +1576,7 @@ static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var,
   auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
-    if (auto result = dc->getParentModule()->checkConformance(type, proto))
+    if (auto result = checkConformance(type, proto))
       return result;
   }
 
@@ -1360,7 +1620,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   //- (id)copyWithZone:(NSZone *)zone;
   DeclName copyWithZoneName(Ctx, Ctx.getIdentifier("copy"), { Ctx.Id_with });
   FuncDecl *copyMethod = nullptr;
-  for (auto member : conformance.getRequirement()->getMembers()) {
+  for (auto member : conformance.getProtocol()->getMembers()) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       if (func->getName() == copyWithZoneName) {
         copyMethod = func;
@@ -1539,76 +1799,25 @@ synthesizeAddressedGetterBody(AccessorDecl *getter, ASTContext &ctx) {
   return synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
 }
 
-/// Synthesize the body of a getter which just delegates to a read
+/// Synthesize the body of a getter which just delegates to a _read
 /// coroutine accessor.
 static std::pair<BraceStmt *, bool>
 synthesizeReadCoroutineGetterBody(AccessorDecl *getter, ASTContext &ctx) {
   assert(getter->getStorage()->getParsedAccessor(AccessorKind::Read));
 
-  // This should call the read coroutine.
+  // This should call the _read coroutine.
   return synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
 }
 
-namespace {
-  /// This ASTWalker explores an expression tree looking for expressions (which
-  /// are DeclContext's) and changes their parent DeclContext to NewDC.
-  /// TODO: We ought to consider merging this with
-  /// ContextualizeClosuresAndMacros, or better yet removing it in favor of
-  /// avoiding the recontextualization for lazy vars.
-  class RecontextualizeClosures : public ASTWalker {
-    DeclContext *NewDC;
-  public:
-    RecontextualizeClosures(DeclContext *NewDC) : NewDC(NewDC) {}
+/// Synthesize the body of a getter which just delegates to a read coroutine
+/// accessor.
+static std::pair<BraceStmt *, bool>
+synthesizeYieldingBorrowCoroutineGetterBody(AccessorDecl *getter, ASTContext &ctx) {
+  assert(getter->getStorage()->getParsedAccessor(AccessorKind::YieldingBorrow));
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::ArgumentsAndExpansion;
-    }
-
-    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      // If we find a closure, update its declcontext and do *not* walk into it.
-      if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
-        CE->setParent(NewDC);
-        return Action::SkipNode(E);
-      }
-
-      return Action::Continue(E);
-    }
-
-    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-      if (auto *EP = dyn_cast<ExprPattern>(P))
-        EP->setDeclContext(NewDC);
-      if (auto *EP = dyn_cast<EnumElementPattern>(P))
-        EP->setDeclContext(NewDC);
-
-      return Action::Continue(P);
-    }
-
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      // The ASTWalker doesn't walk the case body variables, contextualize them
-      // ourselves.
-      if (auto *CS = dyn_cast<CaseStmt>(S)) {
-        for (auto *CaseVar : CS->getCaseBodyVariablesOrEmptyArray())
-          CaseVar->setDeclContext(NewDC);
-      }
-      return Action::Continue(S);
-    }
-
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      D->setDeclContext(NewDC);
-
-      // Auxiliary decls need to have their contexts adjusted too.
-      if (auto *VD = dyn_cast<VarDecl>(D)) {
-        VD->visitAuxiliaryDecls([&](VarDecl *D) {
-          D->setDeclContext(NewDC);
-        });
-      }
-
-      // Skip walking the children of any Decls that are also DeclContexts,
-      // they will already have the right parent.
-      return Action::SkipNodeIf(isa<DeclContext>(D));
-    }
-  };
-} // end anonymous namespace
+  // This should call the read coroutine.
+  return synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
+}
 
 /// Synthesize the getter for a lazy property with the specified storage
 /// vardecl.
@@ -1681,12 +1890,13 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
     InitValue = new (Ctx) ErrorExpr(SourceRange(), Tmp2VD->getTypeInContext());
   }
 
-  // Recontextualize any closure declcontexts nested in the initializer to
-  // realize that they are in the getter function.
+  // We may have stolen the self decl from a PatternBindingInitializer,
+  // re-parent it here.
   if (Get->hasImplicitSelfDecl())
     Get->getImplicitSelfDecl()->setDeclContext(Get);
 
-  InitValue->walk(RecontextualizeClosures(Get));
+  // Also re-contextualize any nodes nested in the initializer.
+  TypeChecker::contextualizeExpr(InitValue, Get);
 
   // Wrap the initializer in a LazyInitializerExpr to avoid walking it twice.
   auto initType = InitValue->getType();
@@ -1778,6 +1988,12 @@ synthesizeGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 
   case ReadImplKind::Read:
     return synthesizeReadCoroutineGetterBody(getter, ctx);
+
+  case ReadImplKind::YieldingBorrow:
+    return synthesizeYieldingBorrowCoroutineGetterBody(getter, ctx);
+
+  case ReadImplKind::Borrow:
+    llvm_unreachable("borrow accessor is not yet implemented");
   }
   llvm_unreachable("bad ReadImplKind");
 }
@@ -1832,7 +2048,7 @@ synthesizeMutableAddressSetterBody(AccessorDecl *setter, ASTContext &ctx) {
                                                 setter->getStorage(), ctx);
 }
 
-/// Synthesize the body of a setter which just delegates to a modify
+/// Synthesize the body of a setter which just delegates to a _modify
 /// coroutine accessor.
 static std::pair<BraceStmt *, bool>
 synthesizeModifyCoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
@@ -1840,6 +2056,22 @@ synthesizeModifyCoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
   return synthesizeTrivialSetterBodyWithStorage(setter,
                                                 TargetImpl::Implementation,
                                                 setter->getStorage(), ctx);
+}
+
+/// Synthesize the body of a setter which just delegates to a modify
+/// coroutine accessor.
+static std::pair<BraceStmt *, bool>
+synthesizeYieldingMutateCoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
+  // This should call the modify coroutine.
+  return synthesizeTrivialSetterBodyWithStorage(
+      setter, TargetImpl::Implementation, setter->getStorage(), ctx);
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeMutateSetterBody(AccessorDecl *setter, ASTContext &ctx) {
+  // This should call the mutate accessor.
+  return synthesizeTrivialSetterBodyWithStorage(
+      setter, TargetImpl::Implementation, setter->getStorage(), ctx);
 }
 
 static Expr *maybeWrapInOutExpr(Expr *expr, ASTContext &ctx) {
@@ -1876,7 +2108,9 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
 
   auto callObserver = [&](AccessorDecl *observer, VarDecl *arg) {
     ConcreteDeclRef ref(observer, subs);
-    auto type = observer->getInterfaceType().subst(subs);
+    auto type = observer->getInterfaceType();
+    if (auto *genericFnType = type->getAs<GenericFunctionType>())
+      type = genericFnType->substGenericArgs(subs);
     Expr *Callee = new (Ctx) DeclRefExpr(ref, DeclNameLoc(), /*imp*/true);
     Callee->setType(type);
 
@@ -2031,6 +2265,12 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
 
   case WriteImplKind::Modify:
     return synthesizeModifyCoroutineSetterBody(setter, ctx);
+
+  case WriteImplKind::YieldingMutate:
+    return synthesizeYieldingMutateCoroutineSetterBody(setter, ctx);
+
+  case WriteImplKind::Mutate:
+    return synthesizeMutateSetterBody(setter, ctx);
   }
   llvm_unreachable("bad WriteImplKind");
 }
@@ -2064,7 +2304,9 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
 
   auto callDidSet = [&]() {
     ConcreteDeclRef ref(DidSet, subs);
-    auto type = DidSet->getInterfaceType().subst(subs);
+    auto type = DidSet->getInterfaceType();
+    if (auto *genericFnType = type->getAs<GenericFunctionType>())
+      type = genericFnType->substGenericArgs(subs);
     Expr *Callee = new (ctx) DeclRefExpr(ref, DeclNameLoc(), /*imp*/ true);
     Callee->setType(type);
 
@@ -2102,13 +2344,15 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
 
   auto storage = accessor->getStorage();
   auto storageReadWriteImpl = storage->getReadWriteImpl();
-  auto target = (accessor->hasForcedStaticDispatch()
-                   ? TargetImpl::Ordinary
-                   : TargetImpl::Implementation);
+  ProtocolDecl *proto = llvm::dyn_cast_if_present<ProtocolDecl>(
+      accessor->getStorage()->getDeclContext()->getAsDecl());
+  auto target = (accessor->hasForcedStaticDispatch() || proto
+                     ? TargetImpl::Ordinary
+                     : TargetImpl::Implementation);
 
   // If this is a variable with an attached property wrapper, then
   // the accessors need to yield the wrappedValue or projectedValue.
-  if (accessor->getAccessorKind() == AccessorKind::Read ||
+  if (isYieldingImmutableAccessor(accessor->getAccessorKind()) ||
       storageReadWriteImpl == ReadWriteImplKind::Modify) {
     if (auto var = dyn_cast<VarDecl>(storage)) {
       if (var->hasAttachedPropertyWrapper()) {
@@ -2122,10 +2366,11 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
     }
   }
 
-  SourceLoc loc = storage->getLoc();
+  SourceLoc loc =
+      accessor->getLoc().isValid() ? accessor->getLoc() : storage->getLoc();
   SmallVector<ASTNode, 1> body;
 
-  bool isModify = accessor->getAccessorKind() == AccessorKind::Modify;
+  bool isModify = isYieldingMutableAccessor(accessor->getAccessorKind());
 
   // Special-case for a modify coroutine of a simple stored property with
   // observers. We can yield a borrowed copy of the underlying storage
@@ -2159,14 +2404,22 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
            /*isTypeChecked=*/true };
 }
 
-/// Synthesize the body of a read coroutine.
+/// Synthesize the body of a _read coroutine.
 static std::pair<BraceStmt *, bool>
 synthesizeReadCoroutineBody(AccessorDecl *read, ASTContext &ctx) {
   assert(read->getStorage()->getReadImpl() != ReadImplKind::Read);
   return synthesizeCoroutineAccessorBody(read, ctx);
 }
 
-/// Synthesize the body of a modify coroutine.
+/// Synthesize the body of a read coroutine.
+static std::pair<BraceStmt *, bool>
+synthesizeYieldingBorrowCoroutineBody(AccessorDecl *read, ASTContext &ctx) {
+  assert(read->getStorage()->getReadImpl() != ReadImplKind::YieldingBorrow ||
+         isa<ProtocolDecl>(read->getStorage()->getDeclContext()->getAsDecl()));
+  return synthesizeCoroutineAccessorBody(read, ctx);
+}
+
+/// Synthesize the body of a _modify coroutine.
 static std::pair<BraceStmt *, bool>
 synthesizeModifyCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
 #ifndef NDEBUG
@@ -2178,6 +2431,63 @@ synthesizeModifyCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
          impl != ReadWriteImplKind::Immutable);
 #endif
   return synthesizeCoroutineAccessorBody(modify, ctx);
+}
+
+/// Synthesize the body of a modify coroutine.
+static std::pair<BraceStmt *, bool>
+synthesizeYieldingMutateCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
+#ifndef NDEBUG
+  auto storage = modify->getStorage();
+  auto impl = storage->getReadWriteImpl();
+  auto hasWrapper = isa<VarDecl>(storage) &&
+                    cast<VarDecl>(storage)->hasAttachedPropertyWrapper();
+  assert((hasWrapper || impl != ReadWriteImplKind::YieldingMutate ||
+          isa<ProtocolDecl>(storage->getDeclContext()->getAsDecl())) &&
+         impl != ReadWriteImplKind::Immutable);
+#endif
+  return synthesizeCoroutineAccessorBody(modify, ctx);
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeBorrowAndMutateAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
+  // TODO: Handle property wrappers, property observers
+  auto storage = accessor->getStorage();
+
+  ProtocolDecl *proto = llvm::dyn_cast_if_present<ProtocolDecl>(
+      accessor->getStorage()->getDeclContext()->getAsDecl());
+  auto target = proto ? TargetImpl::Ordinary : TargetImpl::Implementation;
+
+  // Build a reference to the storage.
+  Expr *ref = buildStorageReference(
+      accessor, storage, target,
+      /*isUsedForGetAccess=*/true,
+      /*isUsedForSetAccess=*/accessor->getAccessorKind() ==
+          AccessorKind::Mutate,
+      ctx);
+  if (ref != nullptr) {
+    // Wrap it with an `&` marker if this is a mutate.
+    ref = maybeWrapInOutExpr(ref, ctx);
+  }
+
+  SmallVector<ASTNode, 2> body;
+  if (ref != nullptr) {
+    body.push_back(ReturnStmt::createImplicit(ctx, ref));
+  }
+
+  SourceLoc loc =
+      accessor->getLoc().isValid() ? accessor->getLoc() : storage->getLoc();
+  return {BraceStmt::create(ctx, loc, body, loc, true),
+          /*isTypeChecked=*/true};
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeBorrowAccessorBody(AccessorDecl *borrow, ASTContext &ctx) {
+  return synthesizeBorrowAndMutateAccessorBody(borrow, ctx);
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeMutateAccessorBody(AccessorDecl *mutate, ASTContext &ctx) {
+  return synthesizeBorrowAndMutateAccessorBody(mutate, ctx);
 }
 
 static std::pair<BraceStmt *, bool>
@@ -2199,8 +2509,20 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   case AccessorKind::Read:
     return synthesizeReadCoroutineBody(accessor, ctx);
 
+  case AccessorKind::YieldingBorrow:
+    return synthesizeYieldingBorrowCoroutineBody(accessor, ctx);
+
   case AccessorKind::Modify:
     return synthesizeModifyCoroutineBody(accessor, ctx);
+
+  case AccessorKind::YieldingMutate:
+    return synthesizeYieldingMutateCoroutineBody(accessor, ctx);
+
+  case AccessorKind::Borrow:
+    return synthesizeBorrowAccessorBody(accessor, ctx);
+
+  case AccessorKind::Mutate:
+    return synthesizeMutateAccessorBody(accessor, ctx);
 
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
@@ -2221,7 +2543,7 @@ static void finishImplicitAccessor(AccessorDecl *accessor,
   if (ctx.Stats)
     ++ctx.Stats->getFrontendCounters().NumAccessorsSynthesized;
 
-  if (doesAccessorHaveBody(accessor))
+  if (accessor->doesAccessorHaveBody())
     accessor->setBodySynthesizer(&synthesizeAccessorBody);
 }
 
@@ -2350,14 +2672,18 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
       params, Type(), storage->getDeclContext());
   setter->setSynthesized();
 
+  if (!storage->requiresOpaqueAccessor(AccessorKind::Set))
+    setter->setForcedStaticDispatch(true);
+
   if (isMutating)
     setter->setSelfAccessKind(SelfAccessKind::Mutating);
   else
     setter->setSelfAccessKind(SelfAccessKind::NonMutating);
 
-  // All mutable storage requires a setter.
-  assert(storage->requiresOpaqueAccessor(AccessorKind::Set));
-  
+  // All mutable storage without a mutate accessor requires a setter.
+  assert(storage->requiresOpaqueAccessor(AccessorKind::Set) ||
+         storage->getAccessor(AccessorKind::Mutate));
+
   // Copy availability from the accessor we'll synthesize the setter from.
   SmallVector<const Decl *, 2> asAvailableAs;
 
@@ -2389,11 +2715,19 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
       asAvailableAs.push_back(mod);
     }
     break;
+  case WriteImplKind::YieldingMutate:
+    if (auto mod = storage->getOpaqueAccessor(AccessorKind::YieldingMutate)) {
+      asAvailableAs.push_back(mod);
+    }
+    break;
+  case WriteImplKind::Mutate:
+    if (auto mutate = storage->getOpaqueAccessor(AccessorKind::Mutate)) {
+      asAvailableAs.push_back(mutate);
+    }
   }
   
   if (!asAvailableAs.empty()) {
-    AvailabilityInference::applyInferredAvailableAttrs(
-        setter, asAvailableAs, ctx);
+    AvailabilityInference::applyInferredAvailableAttrs(setter, asAvailableAs);
   }
   
   finishImplicitAccessor(setter, ctx);
@@ -2405,12 +2739,12 @@ static AccessorDecl *
 createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
                                  AccessorKind kind,
                                 ASTContext &ctx) {
-  assert(kind == AccessorKind::Read || kind == AccessorKind::Modify);
+  assert(isYieldingAccessor(kind));
 
   SourceLoc loc = storage->getLoc();
 
   bool isMutating = storage->isGetterMutating();
-  if (kind == AccessorKind::Modify)
+  if (isYieldingMutableAccessor(kind))
     isMutating |= storage->isSetterMutating();
 
   auto dc = storage->getDeclContext();
@@ -2447,7 +2781,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   if (FuncDecl *getter = storage->getParsedAccessor(AccessorKind::Get)) {
     asAvailableAs.push_back(getter);
   }
-  if (kind == AccessorKind::Modify) {
+  if (isYieldingMutableAccessor(kind)) {
     if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set)) {
       asAvailableAs.push_back(setter);
     }
@@ -2457,14 +2791,59 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
     addPropertyWrapperAccessorAvailability(var, kind, asAvailableAs);
   }
 
-  AvailabilityInference::applyInferredAvailableAttrs(accessor,
-                                                     asAvailableAs, ctx);
+  AvailabilityInference::applyInferredAvailableAttrs(accessor, asAvailableAs);
 
   // A modify coroutine should have the same SPI visibility as the setter.
-  if (kind == AccessorKind::Modify) {
+  if (isYieldingMutableAccessor(kind)) {
     if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set))
       applyInferredSPIAccessControlAttr(accessor, setter, ctx);
   }
+
+  finishImplicitAccessor(accessor, ctx);
+
+  return accessor;
+}
+
+static AccessorDecl *
+createBorrowMutateAccessorPrototype(AbstractStorageDecl *storage,
+                                    AccessorKind kind, ASTContext &ctx) {
+  SourceLoc loc = storage->getLoc();
+
+  auto dc = storage->getDeclContext();
+
+  // The forwarding index parameters.
+  auto *params = buildIndexForwardingParamList(storage, {}, ctx);
+
+  auto *accessor = AccessorDecl::create(
+      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(), kind, storage,
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
+      params, Type(), dc);
+  accessor->setSynthesized();
+
+  if (kind == AccessorKind::Mutate) {
+    accessor->setSelfAccessKind(SelfAccessKind::Mutating);
+  } else {
+    accessor->setSelfAccessKind(SelfAccessKind::NonMutating);
+  }
+
+  if (!storage->requiresOpaqueAccessor(kind))
+    accessor->setForcedStaticDispatch(true);
+
+  // Make sure the borrow/mutate accessor is available enough to access
+  // the storage.
+  SmallVector<const Decl *, 2> asAvailableAs;
+  asAvailableAs.push_back(storage);
+
+  // Property wrappers should never appear during borrow/mutate synthesis.
+  // We only synthesize borrow/mutate accessors for stored properties when
+  // a protocol has borrow/mutate requirement. Since property wrappers are
+  // transformed into computed properties with get/set accessors, they cannot
+  // satisfy the protocol requirement.
+  ASSERT(!isa<VarDecl>(storage) ||
+         !cast<VarDecl>(storage)->hasAttachedPropertyWrapper());
+
+  AvailabilityInference::applyInferredAvailableAttrs(accessor, asAvailableAs);
 
   finishImplicitAccessor(accessor, ctx);
 
@@ -2477,10 +2856,32 @@ createReadCoroutinePrototype(AbstractStorageDecl *storage,
   return createCoroutineAccessorPrototype(storage, AccessorKind::Read, ctx);
 }
 
+static AccessorDecl *createYieldingBorrowCoroutinePrototype(AbstractStorageDecl *storage,
+                                                   ASTContext &ctx) {
+  return createCoroutineAccessorPrototype(storage, AccessorKind::YieldingBorrow, ctx);
+}
+
 static AccessorDecl *
 createModifyCoroutinePrototype(AbstractStorageDecl *storage,
                                ASTContext &ctx) {
   return createCoroutineAccessorPrototype(storage, AccessorKind::Modify, ctx);
+}
+
+static AccessorDecl *
+createYieldingMutateCoroutinePrototype(AbstractStorageDecl *storage, ASTContext &ctx) {
+  return createCoroutineAccessorPrototype(storage, AccessorKind::YieldingMutate, ctx);
+}
+
+static AccessorDecl *createBorrowAccessorPrototype(AbstractStorageDecl *storage,
+                                                   ASTContext &ctx) {
+  return createBorrowMutateAccessorPrototype(storage, AccessorKind::Borrow,
+                                             ctx);
+}
+
+static AccessorDecl *createMutateAccessorPrototype(AbstractStorageDecl *storage,
+                                                   ASTContext &ctx) {
+  return createBorrowMutateAccessorPrototype(storage, AccessorKind::Mutate,
+                                             ctx);
 }
 
 AccessorDecl *
@@ -2488,6 +2889,15 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
                                     AbstractStorageDecl *storage,
                                     AccessorKind kind) const {
   auto &ctx = storage->getASTContext();
+
+  if (auto *accessor = storage->getAccessor(kind)) {
+    if (!isa<ProtocolDecl>(storage->getDeclContext())) {
+      return accessor;
+    }
+    assert(accessor->doesAccessorHaveBody());
+    accessor->setBodySynthesizer(&synthesizeAccessorBody);
+    return accessor;
+  }
 
   switch (kind) {
   case AccessorKind::Get:
@@ -2500,12 +2910,23 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
   case AccessorKind::Read:
     return createReadCoroutinePrototype(storage, ctx);
 
+  case AccessorKind::YieldingBorrow:
+    return createYieldingBorrowCoroutinePrototype(storage, ctx);
+
   case AccessorKind::Modify:
     return createModifyCoroutinePrototype(storage, ctx);
 
+  case AccessorKind::YieldingMutate:
+    return createYieldingMutateCoroutinePrototype(storage, ctx);
+
+  case AccessorKind::Borrow:
+    return createBorrowAccessorPrototype(storage, ctx);
+
+  case AccessorKind::Mutate:
+    return createMutateAccessorPrototype(storage, ctx);
+
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-  case AccessorKind::ID:
+#define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
     llvm_unreachable("not an opaque accessor");
   }
@@ -2562,9 +2983,105 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-bool
-RequiresOpaqueModifyCoroutineRequest::evaluate(Evaluator &evaluator,
-                                               AbstractStorageDecl *storage) const {
+/// When the CoroutineAccessors feature is available, the coroutine accessor
+/// _could_ be required.  That non-underscored accessor would be preferred to
+/// its underscored counterpart accessor.
+///
+/// The underscored accessor could, however, still be required for ABI
+/// stability.
+static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+    AbstractStorageDecl const *storage, AccessorKind kind,
+    AccessorDecl const *decl, AbstractStorageDecl const *derived) {
+  auto &ctx = storage->getASTContext();
+  assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
+  assert(kind == AccessorKind::YieldingMutate || kind == AccessorKind::YieldingBorrow);
+
+  // If any overridden decl requires the underscored version, then this decl
+  // does too.  Otherwise dispatch to the underscored version on a value
+  // statically the super but dynamically this subtype would not dispatch to an
+  // override of the underscored version but rather (incorrectly) the
+  // supertype's implementation.
+  if (storage == derived) {
+    auto *current = storage;
+    while ((current = current->getOverriddenDecl())) {
+      auto *currentDecl = cast_or_null<AccessorDecl>(
+          decl ? decl->getOverriddenDecl() : nullptr);
+      if (requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+              current, kind, currentDecl, derived)) {
+        return true;
+      }
+    }
+  }
+
+  // Non-exported storage has no ABI to keep stable.
+  if (isExported(storage) == ExportedLevel::None)
+    return false;
+
+  // The non-underscored accessor is not present, the underscored accessor
+  // won't be either.
+  auto *accessor = decl ? decl : storage->getOpaqueAccessor(kind);
+  if (!accessor)
+    return false;
+
+  // Availability checks are only relevant on targets which support versioned
+  // availability.  Otherwise, since we're building with library evolution,
+  // conservatively assume that the binary must keep ABI compatibility with its
+  // prior versions, and emit the underscored variant.
+  if (!ctx.supportsVersionedAvailability())
+    return true;
+
+  AvailabilityContext accessorAvailability = [&] {
+    if (storage->getModuleContext()->isMainModule()) {
+      return AvailabilityContext::forDeclSignature(accessor);
+    }
+    // Calculate the availability of the imported declaration ourselves starting
+    // from always available and constraining by walking the enclosing decl
+    // contexts.
+    auto retval = AvailabilityContext::forAlwaysAvailable(ctx);
+    auto declContext = storage->getInnermostDeclContext();
+    while (declContext) {
+      const Decl *decl = declContext->getInnermostDeclarationDeclContext();
+      if (!decl)
+        break;
+
+      retval.constrainWithDecl(decl);
+      declContext = decl->getDeclContext();
+    }
+    return retval;
+  }();
+  auto featureAvailability = ctx.getCoroutineAccessorsAvailability();
+  // If accessor was introduced only after the feature was, there's no old ABI
+  // to maintain.
+  if (accessorAvailability.getPlatformRange().isContainedIn(
+          featureAvailability))
+    return false;
+
+  // The underscored accessor is required for ABI stability.
+  return true;
+}
+
+bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
+    AccessorKind kind, AccessorDecl const *decl) const {
+  return requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+      this, kind, decl,
+      /*derived=*/this);
+}
+
+bool RequiresOpaqueModifyCoroutineRequest::evaluate(
+    Evaluator &evaluator, AbstractStorageDecl *storage,
+    bool isUnderscored) const {
+  auto &ctx = storage->getASTContext();
+  bool hasModifyFeature = ctx.LangOpts.hasFeature(Feature::CoroutineAccessors);
+
+  // No `modify` accessor without the feature.
+  if (!hasModifyFeature && !isUnderscored)
+    return false;
+
+  if (hasModifyFeature && isUnderscored) {
+    return storage->requiresCorrespondingUnderscoredCoroutineAccessor(
+        AccessorKind::YieldingMutate);
+  }
+
   // Only for mutable storage.
   if (!storage->supportsMutation())
     return false;
@@ -2593,6 +3110,10 @@ RequiresOpaqueModifyCoroutineRequest::evaluate(Evaluator &evaluator,
     if (protoDecl->isObjC())
       return false;
 
+  if (storage->getParsedAccessor(AccessorKind::Mutate)) {
+    return false;
+  }
+
   return true;
 }
 
@@ -2616,10 +3137,15 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   if (accessor->getAttrs().hasAttribute<TransparentAttr>())
     return true;
 
+  // Default implementations of `yielding borrow` and `yielding mutate`
+  // for back-deployment are transparent.
+  if (accessor->isRequirementWithSynthesizedDefaultImplementation())
+    return true;
+
   if (!accessor->isImplicit())
     return false;
 
-  if (!doesAccessorHaveBody(accessor))
+  if (!accessor->doesAccessorHaveBody())
     return false;
 
   auto *DC = accessor->getDeclContext();
@@ -2691,12 +3217,15 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
         }
       }
 
-      if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+      if (isa<SubscriptDecl>(storage)) {
         break;
       }
 
-      // Anything else should not have a synthesized setter.
-      LLVM_FALLTHROUGH;
+      // Anything else we'll synthesize an invalid setter for in
+      // `synthesizeSetterBody`, this happens for cases such as stored
+      // properties defined in extensions or enums, we implicitly treat them as
+      // computed.
+      return false;
     case WriteImplKind::Immutable:
       if (accessor->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
         return false;
@@ -2712,15 +3241,20 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
     case WriteImplKind::Stored:
     case WriteImplKind::MutableAddress:
     case WriteImplKind::Modify:
+    case WriteImplKind::YieldingMutate:
+    case WriteImplKind::Mutate:
       break;
     }
     break;
 
   case AccessorKind::Read:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::Modify:
+  case AccessorKind::YieldingMutate:
   case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:  
     break;
-
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
@@ -2760,7 +3294,7 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
                                         VD->getLoc(), StorageName,
                                         VD->getDeclContext());
   Storage->setInterfaceType(StorageInterfaceTy);
-  Storage->setLazyStorageProperty(true);
+  Storage->setLazyStorageFor(VD);
   Storage->setUserAccessible(false);
 
   // The storage is implicit and private.
@@ -2786,9 +3320,10 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
   addMemberToContextIfNeeded(PBD, VD->getDeclContext(), Storage);
 
   // Make sure the original init is marked as subsumed.
-  auto *originalPBD = VD->getParentPatternBinding();
-  auto originalIndex = originalPBD->getPatternEntryIndexForVarDecl(VD);
-  originalPBD->setInitializerSubsumed(originalIndex);
+  if (auto *originalPBD = VD->getParentPatternBinding()) {
+    auto originalIndex = originalPBD->getPatternEntryIndexForVarDecl(VD);
+    originalPBD->setInitializerSubsumed(originalIndex);
+  }
 
   return Storage;
 }
@@ -2810,30 +3345,35 @@ static VarDecl *synthesizeLocalWrappedValueVar(VarDecl *var) {
   }
   Identifier name = ctx.getIdentifier(nameBuf);
 
+  std::optional<StorageImplInfo> mutability;
+  if (var->hasImplicitPropertyWrapper()) {
+    // FIXME: This can have a setter, but we need a resolved wrapper type
+    // to figure it out.
+    mutability.emplace(StorageImplInfo::getImmutableComputed());
+  } else {
+    auto possibleMutability = var->getPropertyWrapperMutability();
+    if (!possibleMutability)
+      return nullptr;
+
+    if (possibleMutability->Getter == PropertyWrapperMutability::Mutating) {
+      ctx.Diags.diagnose(var->getLoc(), diag::property_wrapper_param_mutating);
+      return nullptr;
+    }
+
+    if (possibleMutability->Setter == PropertyWrapperMutability::Nonmutating) {
+      mutability.emplace(StorageImplInfo::getMutableComputed());
+    } else {
+      mutability.emplace(StorageImplInfo::getImmutableComputed());
+    }
+  }
+
   VarDecl *localVar = new (ctx) VarDecl(/*IsStatic=*/false,
                                         VarDecl::Introducer::Var,
                                         var->getLoc(), name, dc);
   localVar->setImplicit();
   localVar->getAttrs() = var->getAttrs();
   localVar->overwriteAccess(var->getFormalAccess());
-
-  if (var->hasImplicitPropertyWrapper()) {
-    // FIXME: This can have a setter, but we need a resolved wrapper type
-    // to figure it out.
-    localVar->setImplInfo(StorageImplInfo::getImmutableComputed());
-  } else {
-    auto mutability = *var->getPropertyWrapperMutability();
-    if (mutability.Getter == PropertyWrapperMutability::Mutating) {
-      ctx.Diags.diagnose(var->getLoc(), diag::property_wrapper_param_mutating);
-      return nullptr;
-    }
-
-    if (mutability.Setter == PropertyWrapperMutability::Nonmutating) {
-      localVar->setImplInfo(StorageImplInfo::getMutableComputed());
-    } else {
-      localVar->setImplInfo(StorageImplInfo::getImmutableComputed());
-    }
-  }
+  localVar->setImplInfo(*mutability);
 
   return localVar;
 }
@@ -2911,9 +3451,9 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
   }
 
   if (!isa<ParamDecl>(var))
-    var->getAttrs().add(
-        new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(), SourceRange(),
-                                             /*Implicit=*/true));
+    var->addAttribute(new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(),
+                                                           SourceRange(),
+                                                           /*Implicit=*/true));
   return property;
 }
 
@@ -2940,7 +3480,7 @@ static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
   // will be done in visitPatternBindingDecl.
   if (!contextualize)
     return;
-  TypeChecker::contextualizeInitializer(initContext, initializer);
+  TypeChecker::contextualizeExpr(initializer, initContext);
   checkPropertyWrapperActorIsolation(wrappedVar, initializer);
   TypeChecker::checkInitializerEffects(initContext, initializer);
 }
@@ -3183,7 +3723,7 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
   if (!wrapperType || wrapperType->hasError())
     return PropertyWrapperInitializerInfo();
 
-  Type storageType = dc->mapTypeIntoContext(wrapperType);
+  Type storageType = dc->mapTypeIntoEnvironment(wrapperType);
   Expr *initializer = nullptr;
   PropertyWrapperValuePlaceholderExpr *wrappedValue = nullptr;
 
@@ -3343,7 +3883,8 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
     info = StorageImplInfo::getComputed(info.supportsMutation());
   } else {
     info = StorageImplInfo::getOpaque(info.supportsMutation(),
-                                      storage->getOpaqueReadOwnership());
+                                      storage->getOpaqueReadOwnership(),
+                                      storage->getASTContext());
   }
 }
 
@@ -3431,14 +3972,12 @@ static void finishNSManagedImplInfo(VarDecl *var,
   if (var->isLet())
     diagnoseAttrWithRemovalFixIt(var, attr, diag::attr_NSManaged_let_property);
 
-  SourceFile *parentFile = var->getDeclContext()->getParentSourceFile();
-
   auto diagnoseNotStored = [&](unsigned kind) {
     // Skip diagnosing @NSManaged declarations in module interfaces. They are
     // properties that are stored, but have specially synthesized observers
     // and we should allow them to have getters and setters in a module
     // interface.
-    if (parentFile && parentFile->Kind == SourceFileKind::Interface)
+    if (var->getDeclContext()->isInSwiftinterface())
       return;
 
     diagnoseAttrWithRemovalFixIt(var, attr, diag::attr_NSManaged_not_stored, kind);
@@ -3566,6 +4105,11 @@ static StorageImplInfo classifyWithHasStorageAttr(VarDecl *var) {
 
 bool HasStorageRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
+  // ABI decl inherits this from API.
+  auto abiRole = ABIRoleInfo(storage);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->hasStorage();
+
   // Parameters are always stored.
   if (isa<ParamDecl>(storage))
     return true;
@@ -3576,8 +4120,12 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
     return false;
 
   // @_hasStorage implies that it... has storage.
-  if (var->getAttrs().hasAttribute<HasStorageAttr>())
-    return true;
+  if (var->getAttrs().hasAttribute<HasStorageAttr>()) {
+    // Except in contexts where it would be invalid. This is diagnosed in
+    // StorageImplInfoRequest.
+    return !isa<ProtocolDecl, ExtensionDecl, EnumDecl>(
+               storage->getDeclContext()->getImplementedObjCContext());
+  }
 
   // Protocol requirements never have storage.
   if (isa<ProtocolDecl>(storage->getDeclContext()))
@@ -3594,11 +4142,15 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
   // Any accessors that read or write imply that there is no storage.
   if (storage->getParsedAccessor(AccessorKind::Get) ||
       storage->getParsedAccessor(AccessorKind::Read) ||
+      storage->getParsedAccessor(AccessorKind::YieldingBorrow) ||
       storage->getParsedAccessor(AccessorKind::Address) ||
+      storage->getParsedAccessor(AccessorKind::Borrow) ||
       storage->getParsedAccessor(AccessorKind::Set) ||
       storage->getParsedAccessor(AccessorKind::Modify) ||
+      storage->getParsedAccessor(AccessorKind::YieldingMutate) ||
       storage->getParsedAccessor(AccessorKind::MutableAddress) ||
-      storage->getParsedAccessor(AccessorKind::Init))
+      storage->getParsedAccessor(AccessorKind::Init) ||
+      storage->getParsedAccessor(AccessorKind::Mutate))
     return false;
 
   // willSet or didSet in an overriding property imply that there is no storage.
@@ -3649,15 +4201,23 @@ void HasStorageRequest::cacheResult(bool hasStorage) const {
     return;
   
   if (auto varDecl = dyn_cast<VarDecl>(decl)) {
-    if (hasStorage && !varDecl->getAttrs().hasAttribute<HasStorageAttr>())
-      varDecl->getAttrs().add(new (varDecl->getASTContext())
-                              HasStorageAttr(/*isImplicit=*/true));
+    auto abiRole = ABIRoleInfo(varDecl);
+    bool abiOnly = !abiRole.providesAPI() && abiRole.getCounterpart();
+
+    if (hasStorage && !abiOnly &&
+          !varDecl->getAttrs().hasAttribute<HasStorageAttr>())
+      varDecl->addAttribute(new (varDecl->getASTContext())
+                                HasStorageAttr(/*isImplicit=*/true));
   }
 }
 
 StorageImplInfo
 StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
+  auto abiRole = ABIRoleInfo(storage);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getImplInfo();
+
   if (auto *param = dyn_cast<ParamDecl>(storage)) {
     return StorageImplInfo::getSimpleStored(
       param->isImmutableInFunctionBody()
@@ -3665,10 +4225,20 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
         : StorageIsMutable);
   }
 
-  if (auto *var = dyn_cast<VarDecl>(storage)) {
+  // If we're in an @implementation extension, we care about the semantics of
+  // the decl it implements.
+  auto *DC = storage->getDeclContext()->getImplementedObjCContext();
+
+  if (auto attr = storage->getParsedAttrs().getAttribute<HasStorageAttr>()) {
+    // If we see `@_hasStorage` in a context with no stored properties, diagnose
+    // and ignore it.
+    if (isa<ExtensionDecl, EnumDecl, ProtocolDecl>(DC)) {
+      storage->diagnose(diag::attr_invalid_in_context, attr, DC->getAsDecl())
+          .warnInSwiftInterface(storage->getDeclContext());
+
     // Allow the @_hasStorage attribute to override all the accessors we parsed
     // when making the final classification.
-    if (var->getParsedAttrs().hasAttribute<HasStorageAttr>()) {
+    } else if (auto *var = dyn_cast<VarDecl>(storage)) {
       // The SIL rules for @_hasStorage are slightly different from the non-SIL
       // rules. In SIL mode, @_hasStorage marks that the type is simply stored,
       // and the only thing that determines mutability is the existence of the
@@ -3703,8 +4273,20 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       readImpl = ReadImplKind::Get;
       writeImpl = WriteImplKind::Set;
       readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
-    } else if (storage->getParsedAccessor(AccessorKind::Get)) {
+    }
+    if (storage->getParsedAccessor(AccessorKind::Get)) {
       readImpl = ReadImplKind::Get;
+    }
+    if (storage->getParsedAccessor(AccessorKind::YieldingBorrow)) {
+      readImpl = ReadImplKind::YieldingBorrow;
+    }
+    if (storage->getParsedAccessor(AccessorKind::Mutate)) {
+      readImpl = ReadImplKind::Borrow;
+      writeImpl = WriteImplKind::Mutate;
+      readWriteImpl = ReadWriteImplKind::Mutate;
+    }
+    if (storage->getParsedAccessor(AccessorKind::Borrow)) {
+      readImpl = ReadImplKind::Borrow;
     }
 
     StorageImplInfo info(readImpl, writeImpl, readWriteImpl);
@@ -3718,6 +4300,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   bool hasWillSet = storage->getParsedAccessor(AccessorKind::WillSet);
   bool hasDidSet = storage->getParsedAccessor(AccessorKind::DidSet);
+  bool hasCoroutineAccessorFeature =
+      storage->getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors);
   if ((hasWillSet || hasDidSet) && !isa<SubscriptDecl>(storage)) {
     // Observers conflict with non-observers.
     AccessorDecl *firstNonObserver = nullptr;
@@ -3730,19 +4314,21 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
     if (firstNonObserver) {
       if (auto willSet = storage->getParsedAccessor(AccessorKind::WillSet)) {
-        willSet->diagnose(
-            diag::observing_accessor_conflicts_with_accessor, 0,
-            getAccessorNameForDiagnostic(
-                firstNonObserver->getAccessorKind(), /*article=*/ true));
+        willSet->diagnose(diag::observing_accessor_conflicts_with_accessor, 0,
+                          getAccessorNameForDiagnostic(
+                              firstNonObserver->getAccessorKind(),
+                              /*article=*/true,
+                              /*underscored=*/hasCoroutineAccessorFeature));
         willSet->setInvalid();
         hasWillSet = false;
       }
 
       if (auto didSet = storage->getParsedAccessor(AccessorKind::DidSet)) {
-        didSet->diagnose(
-            diag::observing_accessor_conflicts_with_accessor, 1,
-            getAccessorNameForDiagnostic(
-              firstNonObserver->getAccessorKind(), /*article=*/ true));
+        didSet->diagnose(diag::observing_accessor_conflicts_with_accessor, 1,
+                         getAccessorNameForDiagnostic(
+                             firstNonObserver->getAccessorKind(),
+                             /*article=*/true,
+                             /*underscored=*/hasCoroutineAccessorFeature));
         didSet->setInvalid();
         hasDidSet = false;
       }
@@ -3751,22 +4337,29 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   bool hasSetter = storage->getParsedAccessor(AccessorKind::Set);
   bool hasModify = storage->getParsedAccessor(AccessorKind::Modify);
+  bool hasYieldingMutate = storage->getParsedAccessor(AccessorKind::YieldingMutate);
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
   bool hasInit = storage->getParsedAccessor(AccessorKind::Init);
+  auto *borrow = storage->getParsedAccessor(AccessorKind::Borrow);
+  auto *mutate = storage->getParsedAccessor(AccessorKind::Mutate);
 
-  auto *DC = storage->getDeclContext();
-  // 'get', 'read', and a non-mutable addressor are all exclusive.
+  // 'get', 'read', 'borrow' and a non-mutable addressor are all exclusive.
   ReadImplKind readImpl;
   if (storage->getParsedAccessor(AccessorKind::Get)) {
     readImpl = ReadImplKind::Get;
+  } else if (storage->getParsedAccessor(AccessorKind::YieldingBorrow)) {
+    readImpl = ReadImplKind::YieldingBorrow;
   } else if (storage->getParsedAccessor(AccessorKind::Read)) {
     readImpl = ReadImplKind::Read;
   } else if (storage->getParsedAccessor(AccessorKind::Address)) {
     readImpl = ReadImplKind::Address;
+  } else if (storage->getParsedAccessor(AccessorKind::Borrow)) {
+    readImpl = ReadImplKind::Borrow;
 
-  // If there's a writing accessor of any sort, there must also be a
-  // reading accessor.
-  } else if (hasInit || hasSetter || hasModify || hasMutableAddress) {
+    // If there's a writing accessor of any sort, there must also be a
+    // reading accessor.
+  } else if (hasInit || hasSetter || hasModify || hasYieldingMutate ||
+             hasMutableAddress || mutate) {
     readImpl = ReadImplKind::Get;
 
   // Subscripts always have to have some sort of accessor; they can't be
@@ -3795,16 +4388,24 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     readImpl = ReadImplKind::Stored;
   }
 
-  // Prefer using 'set' and 'modify' over a mutable addressor.
+  // Prefer using 'set', 'mutate' and 'modify' over a mutable addressor.
   WriteImplKind writeImpl;
   ReadWriteImplKind readWriteImpl;
   if (hasSetter) {
     writeImpl = WriteImplKind::Set;
-    if (hasModify) {
+    if (hasYieldingMutate) {
+      readWriteImpl = ReadWriteImplKind::YieldingMutate;
+    } else if (hasModify) {
       readWriteImpl = ReadWriteImplKind::Modify;
     } else {
       readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
     }
+  } else if (mutate) {
+    writeImpl = WriteImplKind::Mutate;
+    readWriteImpl = ReadWriteImplKind::Mutate;
+  } else if (hasYieldingMutate) {
+    writeImpl = WriteImplKind::YieldingMutate;
+    readWriteImpl = ReadWriteImplKind::YieldingMutate;
   } else if (hasModify) {
     writeImpl = WriteImplKind::Modify;
     readWriteImpl = ReadWriteImplKind::Modify;
@@ -3840,6 +4441,30 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   } else {
     writeImpl = WriteImplKind::Immutable;
     readWriteImpl = ReadWriteImplKind::Immutable;
+  }
+
+  if (borrow || mutate) {
+    if (auto *extDecl = dyn_cast<ExtensionDecl>(DC)) {
+      auto extNominal = extDecl->getExtendedNominal();
+      if (!isa<StructDecl>(extNominal)) {
+        if (borrow) {
+          storage->getASTContext().Diags.diagnose(
+              borrow->getLoc(),
+              diag::borrow_mutate_accessor_not_supported_in_decl,
+              getAccessorNameForDiagnostic(borrow->getAccessorKind(),
+                                           /*article*/ true,
+                                           /*underscored*/ false));
+        }
+        if (mutate) {
+          storage->getASTContext().Diags.diagnose(
+              mutate->getLoc(),
+              diag::borrow_mutate_accessor_not_supported_in_decl,
+              getAccessorNameForDiagnostic(mutate->getAccessorKind(),
+                                           /*article*/ true,
+                                           /*underscored*/ false));
+        }
+      }
+    }
   }
 
   StorageImplInfo info(readImpl, writeImpl, readWriteImpl);
@@ -3922,4 +4547,3 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
   }
   return false;
 }
-

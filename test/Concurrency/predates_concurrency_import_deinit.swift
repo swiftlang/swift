@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -swift-version 6 %S/Inputs/StrictModule.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
 
-// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -verify-ignore-unrelated -strict-concurrency=complete
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -15,8 +15,8 @@ actor ActorWithDeinit {
   var ns: NonStrictClass = NonStrictClass()
   var ss: StrictStruct = StrictStruct()
 
-  deinit {
+  deinit { // expected-note{{add 'isolated' to run isolated to 'ActorWithDeinit', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
     print(ns)
-    print(ss) // expected-warning{{cannot access property 'ss' with a non-sendable type 'StrictStruct' from non-isolated deinit}}
+    print(ss) // expected-warning{{cannot access property 'ss' with a non-Sendable type 'StrictStruct' from nonisolated deinit}}
   }
 }

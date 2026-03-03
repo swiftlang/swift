@@ -134,7 +134,7 @@ private:
 
 public:
   CompileJobAction(file_types::ID OutputType)
-      : JobAction(Action::Kind::CompileJob, std::nullopt, OutputType) {}
+      : JobAction(Action::Kind::CompileJob, {}, OutputType) {}
   CompileJobAction(Action *Input, file_types::ID OutputType)
       : JobAction(Action::Kind::CompileJob, Input, OutputType) {}
 
@@ -169,8 +169,7 @@ private:
 
 public:
   explicit InterpretJobAction()
-      : JobAction(Action::Kind::InterpretJob, std::nullopt,
-                  file_types::TY_Nothing) {}
+      : JobAction(Action::Kind::InterpretJob, {}, file_types::TY_Nothing) {}
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::Kind::InterpretJob;
@@ -209,7 +208,7 @@ private:
   Mode RequestedMode;
 public:
   REPLJobAction(Mode mode)
-      : JobAction(Action::Kind::REPLJob, std::nullopt, file_types::TY_Nothing),
+      : JobAction(Action::Kind::REPLJob, {}, file_types::TY_Nothing),
         RequestedMode(mode) {}
 
   Mode getRequestedMode() const { return RequestedMode; }

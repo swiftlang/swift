@@ -8,11 +8,11 @@
 // CHECK-NEXT:   struct ForwardDeclared<T> {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   struct Decl<CInt> {
-// CHECK-NEXT:     init()
 // CHECK-NEXT:     init(fwd: NS1.ForwardDeclared<CInt>)
-// CHECK-NEXT:     typealias MyInt = Int32
+// CHECK-NEXT:     init()
 // CHECK-NEXT:     var fwd: NS1.ForwardDeclared<CInt>
-// CHECK-NEXT:     static let intValue: NS1.Decl<CInt>.MyInt
+// CHECK-NEXT:     typealias MyInt = Int32
+// CHECK-NEXT:     static var intValue: NS1.Decl<CInt>.MyInt { get }
 // CHECK-NEXT:   }
 // CHECK-NEXT:   @available(*, unavailable, message: "Un-specialized class templates are not currently supported. Please use a specialization of this type.")
 // CHECK-NEXT:   struct Decl<T> {

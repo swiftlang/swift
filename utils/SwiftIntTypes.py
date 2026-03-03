@@ -72,6 +72,16 @@ def all_integer_types(word_bits):
             is_word=True, bits=word_bits,
             is_signed=is_signed)
 
+def all_signed_types(word_bits):
+    for bitwidth in _all_integer_type_bitwidths:
+        yield SwiftIntegerType(
+            is_word=False, bits=bitwidth,
+            is_signed=True)
+    
+    yield SwiftIntegerType(
+        is_word=True, bits=word_bits,
+        is_signed=True)
+
 # 'truncatingBitPattern' initializer is defined if the conversion is truncating
 # on any platform that Swift supports.
 

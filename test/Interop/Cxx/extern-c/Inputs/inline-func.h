@@ -2,13 +2,13 @@ extern "C" {
 
 inline void inlineFn();
 
-void cacheMis() { }
+void cacheMiss() { }
 void incorrectCacheHit() {
   inlineFn();
 }
 
 static void caller() {
-  cacheMis();
+  cacheMiss();
   incorrectCacheHit();
 }
 

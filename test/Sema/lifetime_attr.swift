@@ -1,0 +1,312 @@
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature Lifetimes
+
+// REQUIRES: swift_feature_Lifetimes
+
+struct NE : ~Escapable {
+  @_lifetime(copy self) // expected-error{{invalid lifetime dependence specifier on non-existent self}}
+  init() {}
+}
+
+@_lifetime(copy nonexisting) // expected-error{{invalid parameter name specified 'nonexisting'}}
+func invalidAttrOnNonExistingParam(_ ne: NE) -> NE {
+  ne
+}
+
+@_lifetime(copy self) // expected-error{{invalid lifetime dependence specifier on non-existent self}}
+func invalidAttrOnNonExistingSelf(_ ne: NE) -> NE {
+  ne
+}
+
+@_lifetime(copy 0) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
+func invalidAttrOnExistingParamIndex(_ ne: NE) -> NE {
+  ne
+}
+
+@_lifetime(2) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
+func invalidAttrOnNonExistingParamIndex(_ ne: NE) -> NE {
+  ne
+}
+
+@_lifetime(copy ne, borrow ne) // expected-error{{duplicate lifetime dependence specifier}}
+func invalidDuplicateLifetimeDependence1(_ ne: borrowing NE) -> NE {
+  ne
+}
+
+class Klass {}
+
+@_lifetime(borrow x) // expected-error{{invalid use of borrow dependence with consuming ownership}}
+func invalidDependenceConsumeKlass(_ x: consuming Klass) -> NE {
+  NE()
+}
+
+@_lifetime(&x) // expected-error{{invalid use of & dependence with borrowing ownership}}
+               // expected-note @-1{{use '@_lifetime(borrow x)' instead}}
+func invalidDependenceBorrowKlass(_ x: borrowing Klass) -> NE {
+  NE()
+}
+
+@_lifetime(borrow x) // expected-error{{invalid use of borrow dependence with inout ownership}}
+                     // expected-note @-1{{use '@_lifetime(&x)' instead}}
+func invalidDependenceInoutKlass(_ x: inout Klass) -> NE {
+  NE()
+}
+
+@_lifetime(borrow x) // OK
+func invalidDependenceConsumeInt(_ x: consuming Int) -> NE {
+  NE()
+}
+
+@_lifetime(&x) // expected-error{{invalid use of & dependence with borrowing ownership}}
+               // expected-note @-1{{use '@_lifetime(borrow x)' instead}}
+func invalidDependenceBorrowInt(_ x: borrowing Int) -> NE {
+  NE()
+}
+
+@_lifetime(borrow x) // expected-error{{invalid use of borrow dependence with inout ownership}}
+                     // expected-note @-1{{use '@_lifetime(&x)' instead}}
+func invalidDependenceInoutInt(_ x: inout Int) -> NE {
+  NE()
+}
+
+@_lifetime(immortal)
+func immortalDependenceInout(_ ne: inout NE) -> NE {
+  NE()
+}
+
+@_lifetime(result: copy source1) // expected-error{{invalid duplicate target lifetime dependencies on function}}
+@_lifetime(result: copy source2)
+func invalidTarget(_ result: inout NE, _ source1: consuming NE, _ source2: consuming NE) {
+  result = source1
+}
+
+@_lifetime(result: copy source)   // expected-error{{invalid duplicate target lifetime dependencies on function}}
+@_lifetime(result: borrow source)
+func invalidSource(_ result: inout NE, _ source: consuming NE) {
+  result = source
+}
+
+@_lifetime(immortal)
+func immortalConflict(_ immortal: Int) -> NE { // expected-error{{conflict between the parameter name and 'immortal' contextual keyword}}
+  NE()
+}
+
+do {
+  struct Test: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+    var v1: Int
+    var v2: NE
+  }
+
+  _ = \Test.v1 // expected-error {{key path cannot refer to nonescapable type 'Test'}}
+  _ = \Test.v2 // expected-error {{key path cannot refer to nonescapable type 'Test'}} expected-error {{key path cannot refer to nonescapable type 'NE'}}
+
+  func use(t: Test) {
+    t[keyPath: \.v1] // expected-error {{key path cannot refer to nonescapable type 'Test'}}
+    t[keyPath: \.v2] // expected-error {{key path cannot refer to nonescapable type 'Test'}} expected-error {{key path cannot refer to nonescapable type 'NE'}}
+  }
+}
+
+// rdar://146401190 ([nonescapable] implement non-inout parameter dependencies)
+@_lifetime(span: borrow holder)
+func testParameterDep(holder: AnyObject, span: Span<Int>) {}  // expected-error{{lifetime-dependent parameter 'span' must be 'inout'}}
+
+@_lifetime(&ne)
+func inoutLifetimeDependence(_ ne: inout NE) -> NE {
+  ne
+}
+
+@_lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                   // expected-note@-1{{use '@_lifetime(&k)' instead}}
+func dependOnEscapable(_ k: inout Klass) -> NE {
+  NE()
+}
+
+@_lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                   // expected-note@-1{{use '@_lifetime(borrow k)' instead}}
+func dependOnEscapable(_ k: borrowing Klass) -> NE { 
+  NE()
+}
+
+@_lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                   // expected-note@-1{{use '@_lifetime(borrow k)' instead}}
+func dependOnEscapable(_ k: consuming Klass) -> NE { 
+  NE()
+}
+
+struct Wrapper : ~Escapable {
+  var _ne: NE
+
+  var ne: NE {
+    @_lifetime(copy self)
+    get {
+      _ne
+    }
+    @_lifetime(self: &self)
+    nonmutating _modify {// expected-error{{lifetime-dependent parameter 'self' must be 'inout'}}
+      // expected-error@-1{{cannot infer the lifetime dependence scope on a method with a ~Escapable parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
+    }
+  }
+
+  var otherNE: NE {
+    @_lifetime(copy self)
+    get {
+      _ne
+    }
+    @_lifetime(self: borrow newValue)
+    set {
+      self._ne = newValue
+    }
+    @_lifetime(&self)
+    _modify {
+      yield &self._ne
+    }
+  }
+}
+
+@_lifetime(inValue) // expected-error{{invalid lifetime dependence on an Escapable result}}
+func getInt(_ inValue: Int) -> Int {
+  return inValue
+}
+
+@_lifetime(_outValue: borrow inValue) // expected-error{{invalid lifetime dependence on an Escapable target}}
+func getInt(_outValue: inout Int, _ inValue: Int)  {
+  _outValue = inValue
+}
+
+@_lifetime(inValue) // expected-error{{invalid lifetime dependence on an Escapable result}}
+func getGeneric<T>(_ inValue: T) -> T {
+  return inValue
+}
+
+@_lifetime(_outValue: borrow inValue) // expected-error{{invalid lifetime dependence on an Escapable target}}
+func getGeneric<T>(_outValue: inout T, _ inValue: T)  {
+  _outValue = inValue
+}
+
+@_lifetime(borrow inValue)
+func getGeneric<T : ~Escapable>(_ inValue: T) -> T {
+  return inValue
+}
+
+@_lifetime(_outValue: borrow inValue)
+func getGeneric<T : ~Escapable>(_outValue: inout T, _ inValue: T)  {
+  _outValue = inValue
+}
+
+// =============================================================================
+// Depenencies on conditionally Escapable parameters
+// =============================================================================
+
+@_lifetime(copy t)
+func unrelatedTypeParameter<T: ~Escapable, U: ~Escapable>(t: T, u: U) -> U { u }
+
+@_lifetime(copy t) // OK
+func sameTypeParameter<T: ~Escapable>(t: T) -> T { t }
+
+struct NE1<T: ~Escapable>: ~Escapable {
+  var t: T
+}
+
+extension NE1: Escapable where T: Escapable {}
+
+@_lifetime(copy ne) // OK
+func conditionalNESource<T: ~Escapable>(ne: NE1<T>) -> T {
+  ne.t
+}
+
+@_lifetime(copy t) // OK
+func conditionalNEDest<T: ~Escapable>(t: T) -> NE1<T> {
+  NE1(t: t)
+}
+
+struct NE2<T: ~Escapable>: ~Escapable {
+  var t: T
+}
+
+extension NE2: Escapable where T: Escapable {}
+
+@_lifetime(copy ne) // OK
+func conditionalNESourceDest<T: ~Escapable>(ne: NE1<T>) -> NE2<T> {
+  NE2(t: ne.t)
+}
+
+@_lifetime(copy ne) // OK
+func conditionalNENestedSource<T: ~Escapable>(ne: NE1<NE1<T>>) -> NE2<T> {
+  NE2(t: ne.t.t)
+}
+
+@_lifetime(copy ne) // OK
+func specializedNESource(ne: NE1<NE>) -> NE { ne.t }
+
+@_lifetime(copy ne) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                    // expected-note@-1{{use '@_lifetime(borrow ne)' instead}}
+func specializedESource(ne: NE1<Int>) -> NE { NE() }
+
+@_lifetime(copy ne) // OK
+func specializedNEDest(ne: NE) -> NE1<NE> { NE1(t: ne) }
+
+@_lifetime(copy ne) // expected-error{{invalid lifetime dependence on an Escapable result}}
+func specializedEDest(ne: NE) -> NE1<Int> { NE1(t: 3) }
+
+@_lifetime(copy ne) // OK
+func specializedNESourceDest(ne: NE1<NE>) -> NE2<NE> {
+  NE2<NE>(t: ne.t)
+}
+
+@_lifetime(copy ne) // OK
+func optionalUnwrap(ne: NE?) -> NE { ne! }
+
+@_lifetime(copy ne) // OK
+func optionalWrap(ne: NE) -> NE? { ne }
+
+@_lifetime(copy a) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                   // expected-note@-1{{use '@_lifetime(borrow a)' instead}}
+func optionalEscapableUnwrap(a: Int?) -> NE { NE() }
+
+// MARK: Static Method Lifetimes
+
+struct EStruct {
+  @_lifetime(copy self, copy ne) // expected-error {{cannot copy the lifetime of an Escapable type}}
+                                 // expected-note@-1 {{use '@_lifetime(borrow self)' instead}}
+  func transferCopyingSelf(ne: NE) -> NE { ne }
+  @_lifetime(borrow self, copy ne) // OK
+  func transferBorrowingSelf(ne: NE) -> NE { ne }
+}
+
+struct NEStruct: ~Escapable {
+  @_lifetime(copy self, copy ne) // OK
+  func transferCopyingSelf(ne: NE) -> NE { ne }
+  @_lifetime(borrow self, copy ne) // OK
+  func transferBorrowingSelf(ne: NE) -> NE { ne }
+  @_lifetime(copy self, copy ne) // expected-error{{invalid lifetime dependence specifier on non-existent self}}
+  static func staticTransferCopyingSelf(ne: NE) -> NE { ne }
+  @_lifetime(borrow self, copy ne) // expected-error{{invalid lifetime dependence specifier on non-existent self}}
+  static func staticTransferBorrowingSelf(ne: NE) -> NE { ne }
+}
+func foo(_ closure: @_lifetime(copy span) (_ span: Span<Int>) -> Span<Int>, _ span: Span<Int>) -> Span<Int> {
+  return closure(span)
+}
+
+class Holder {
+  @_lifetime(copy span)
+  static func correct(_ span: Span<Int>) -> Span<Int> {
+    return span
+  }
+
+  @_lifetime(borrow span)
+  static func incorrect(_ span: Span<Int>) -> Span<Int> {
+    return span
+  }
+}
+
+func bar(_ span: Span<Int>) {
+  _ = foo(Holder.incorrect, span) // expected-error{{cannot convert value of type '@_lifetime(borrow 0) (Span<Int>) -> Span<Int>' to expected argument type '@_lifetime(copy span) (_ span: Span<Int>) -> Span<Int>'}}
+  _ = foo(Holder.correct, span) // OK
+}
+
+func baz1() -> @_lifetime(copy span) (_ span: Span<Int>) -> Span<Int> {
+  return Holder.correct // OK
+}
+
+func baz2() -> @_lifetime(copy span) (_ span: Span<Int>) -> Span<Int> {
+  return Holder.incorrect  // expected-error{{cannot convert return expression of type '@_lifetime(borrow 0) (Span<Int>) -> Span<Int>' to return type '@_lifetime(copy span) (_ span: Span<Int>) -> Span<Int>'}}
+}

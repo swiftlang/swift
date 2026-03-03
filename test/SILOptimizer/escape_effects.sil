@@ -384,3 +384,72 @@ bb0(%0 : $*Str):
   return %1 : $Y
 }
 
+class Klass {}
+
+struct Wrapper {
+  let _k: Klass
+}
+
+// CHECK: sil [ossa] @borrow_accessor1 : $@convention(thin) (@guaranteed Wrapper) -> @guaranteed Klass {
+// CHECK: [%0: escape v** => %r.v**, escape v**.c*.v** => %r.v**.c*.v**]
+sil [ossa] @borrow_accessor1 : $@convention(thin) (@guaranteed Wrapper) -> @guaranteed Klass {
+bb0(%0 : @guaranteed $Wrapper):
+  %1 = struct_extract %0, #Wrapper._k
+  return %1
+}
+
+// CHECK: sil [ossa] @borrow_accessor2 : $@convention(thin) (@in_guaranteed Wrapper) -> @guaranteed Klass {
+// CHECK: [%0: escape v** -> %r.v**, escape v**.c*.v** -> %r.v**.c*.v**]
+sil [ossa] @borrow_accessor2 : $@convention(thin) (@in_guaranteed Wrapper) -> @guaranteed Klass {
+bb0(%0 : $*Wrapper):
+  %1 = load_borrow %0
+  %2 = struct_extract %1, #Wrapper._k
+  return_borrow %1 from_scopes (%1)
+}
+
+// CHECK: sil [ossa] @mutate_accessor : $@convention(thin) (@inout Wrapper) -> @inout Klass {
+// CHECK: [%0: escape v** => %r.v**, escape v**.c*.v** => %r.v**.c*.v**]
+sil [ossa] @mutate_accessor : $@convention(thin) (@inout Wrapper) -> @inout Klass {
+bb0(%0 : $*Wrapper):
+  %2 = struct_element_addr %0, #Wrapper._k
+  return %2
+}
+
+// CHECK: sil [ossa] @call_mutate_accessor : $@convention(thin) (@inout Wrapper, @owned Klass) -> () {
+// CHECK-NOT: [.*]
+// CHECK: bb0({{.*}}):
+sil [ossa] @call_mutate_accessor : $@convention(thin) (@inout Wrapper, @owned Klass) -> () {
+bb0(%0 : $*Wrapper, %1 : @owned $Klass):
+  %func = function_ref @mutate_accessor : $@convention(thin) (@inout Wrapper) -> @inout Klass
+  %addr = apply %func(%0) : $@convention(thin) (@inout Wrapper) -> @inout Klass
+  store %1 to [assign] %addr
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @modify_accessor : $@yield_once @convention(thin) (@inout Wrapper) -> @yields @inout Klass {
+bb0(%0 : $*Wrapper):
+  %2 = struct_element_addr %0, #Wrapper._k
+  yield %2, resume bb1, unwind bb2
+
+bb1:
+  %t = tuple ()
+  return %t
+
+bb2:
+  unwind
+}
+
+// CHECK: sil [ossa] @call_modify_accessor : $@convention(thin) (@inout Wrapper, @owned Klass) -> () {
+// CHECK-NOT: [.*]
+// CHECK: bb0({{.*}}):
+sil [ossa] @call_modify_accessor : $@convention(thin) (@inout Wrapper, @owned Klass) -> () {
+bb0(%0 : $*Wrapper, %1 : @owned $Klass):
+  %func = function_ref @modify_accessor : $@yield_once @convention(thin) (@inout Wrapper) -> @yields @inout Klass
+  (%addr, %tok) = begin_apply %func(%0) : $@yield_once @convention(thin) (@inout Wrapper) -> @yields @inout Klass
+  store %1 to [assign] %addr
+  end_apply %tok as $()
+  %r = tuple ()
+  return %r
+}
+

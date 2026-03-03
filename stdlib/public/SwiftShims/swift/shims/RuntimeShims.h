@@ -32,6 +32,15 @@ extern "C" {
 SWIFT_RUNTIME_STDLIB_API
 void *_swift_objCMirrorSummary(const void * nsObject);
 
+// Caveat: _swift_stdlib_strto{f,d,ld}_clocale() was called directly from inlineable
+// code until Feb 2020 (commit 4d0e2adbef4d changed this), so they need to be
+// exported with the same C-callable ABI for as long as we support code compiled
+// with Swift 5.3.
+
+// _swift_stdlib_strto{d,f,f16}_clocale were reimplemented in
+// Swift in Dec 2025.  See FloatingPointFromString.swift
+// _swift_stdlib_strtold_clocale was not reimplemented at that time.
+
 /// Call strtold_l with the C locale, swapping argument and return
 /// types so we can operate on Float80.
 SWIFT_RUNTIME_STDLIB_API
@@ -46,6 +55,8 @@ SWIFT_RUNTIME_STDLIB_API
 const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult);
 /// Call strtof_l with the C locale, swapping argument and return
 /// types so we can operate consistently on Float80.
+// FIXME? Can this be deleted?  _swift_stdlib_strtof16_clocale was never
+// actually called from inlineable code.
 SWIFT_RUNTIME_STDLIB_API
 const char *_swift_stdlib_strtof16_clocale(const char *nptr, __fp16 *outResult);
 
@@ -136,6 +147,11 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_bool _swift_stdlib_isExecutableLinkedOnOrAfter(
   _SwiftStdlibVersion version
 ) __attribute__((const));
+
+/// Redeclare _swift_disableExclusivityChecking from Exclusivity.h for use in
+/// Exclusivity.swift
+SWIFT_RUNTIME_EXPORT
+__swift_bool _swift_disableExclusivityChecking;
 
 #ifdef __cplusplus
 } // extern "C"

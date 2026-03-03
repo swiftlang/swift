@@ -30,14 +30,15 @@ WARNING(ide_availability_softdeprecated, Deprecation,
         "%0 will be deprecated"
         " in %select{a future version|%select{a future version of %2|%2 %4}3}1"
         "%select{|: %5}5",
-        (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple,
+        (const ValueDecl *, bool, AvailabilityDomain, bool, AvailabilityRange,
          StringRef))
 
 WARNING(ide_availability_softdeprecated_rename, Deprecation,
         "%0 will be deprecated"
         " in %select{a future version|%select{a future version of %2|%2 %4}3}1"
         ": renamed to '%5'",
-        (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple, StringRef))
+        (const ValueDecl *, bool, AvailabilityDomain, bool, AvailabilityRange,
+         StringRef))
 
 WARNING(ide_recursive_accessor_reference,none,
         "attempting to %select{access|modify}1 %0 within its own "

@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature NonescapableTypes -disable-availability-checking -module-name main %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen -enable-experimental-feature LifetimeDependence -disable-availability-checking -module-name main %s | %FileCheck %s
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 protocol NoCopyP: ~Copyable {}
 
@@ -15,14 +17,14 @@ enum RudeEnum<T: ~Copyable>: Copyable {
 
 struct CondCopyableStruct<T: ~Copyable>: ~Copyable {}
 
-extension CondCopyableStruct: Copyable {}
+extension CondCopyableStruct: Copyable where T: Copyable {}
 
 enum CondCopyableEnum<T: ~Copyable>: ~Copyable {
   case some(T)
   case none
 }
 
-extension CondCopyableEnum: Copyable {}
+extension CondCopyableEnum: Copyable where T: Copyable {}
 
 protocol NoEscapeP: ~Escapable {}
 
@@ -39,14 +41,14 @@ enum TooRudeEnum<T: ~Escapable>: Escapable {
 
 struct CondEscapableStruct<T: ~Escapable>: ~Escapable {}
 
-extension CondEscapableStruct: Escapable {}
+extension CondEscapableStruct: Escapable where T: Escapable {}
 
 enum CondEscapableEnum<T: ~Escapable>: ~Escapable {
   case some(T)
   case none
 }
 
-extension CondEscapableEnum: Escapable {}
+extension CondEscapableEnum: Escapable where T: Escapable {}
 
 // MARK: ensure certain conditionally Copyable types are treated as trivial (no ownership in func signature).
 
@@ -133,7 +135,7 @@ func check(_ t: borrowing any NoEscapeP & ~Escapable) {}
 // CHECK: sil hidden [ossa] @$s4main5checkyyAA9NoEscapeP_pRi0_s_XPnF : $@convention(thin) (@in any NoEscapeP & ~Escapable) -> () {
 func check(_ t: consuming any NoEscapeP & ~Escapable) {}
 
-// CHECK: sil hidden [ossa] @$s4main5checkyyAA9NoEscapeP_pRi0_s_XPzF : $@convention(thin) (@inout any NoEscapeP & ~Escapable) -> () {
+// CHECK: sil hidden [ossa] @$s4main5checkyyAA9NoEscapeP_pRi0_s_XPzF : $@convention(thin) (@lifetime(copy 0) @inout any NoEscapeP & ~Escapable) -> () {
 func check(_ t: inout any NoEscapeP & ~Escapable) {}
 
 // MARK: conditionally Copyable & Escapable SILGen
@@ -142,18 +144,18 @@ struct MyStruct<T: ~Copyable & ~Escapable>: ~Copyable & ~Escapable {
     var x: T
 }
 
-extension MyStruct: Copyable where T: Copyable & ~Escapable {}
+extension MyStruct: Copyable where T: Copyable, T: ~Escapable {}
 
-extension MyStruct: Escapable where T: Escapable & ~Copyable {}
+extension MyStruct: Escapable where T: Escapable, T: ~Copyable {}
 
 enum MyEnum<T: ~Copyable & ~Escapable>: ~Copyable & ~Escapable {
     case x(T)
     case knoll
 }
 
-extension MyEnum: Copyable where T: Copyable & ~Escapable {}
+extension MyEnum: Copyable where T: Copyable, T: ~Escapable {}
 
-extension MyEnum: Escapable where T: Escapable & ~Copyable {}
+extension MyEnum: Escapable where T: Escapable, T: ~Copyable {}
 
 enum Trivial {
     case a, b, c

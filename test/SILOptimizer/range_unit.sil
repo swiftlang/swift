@@ -1,0 +1,420 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+class C {}
+
+// CHECK-LABEL: testIdentity: range_overlaps_path
+// CHECK: Overlap kind: containsBegin
+sil [ossa] @testIdentity : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %range"
+  %range = begin_borrow %0
+  end_borrow %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testContainsPath1: range_overlaps_path
+// CHECK: Overlap kind: containsPath
+sil [ossa] @testContainsPath1 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %range = begin_borrow %0
+  %path = begin_borrow %0
+  end_borrow %path
+  end_borrow %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testContainsPath2: range_overlaps_path
+// CHECK: Overlap kind: containsPath
+sil [ossa] @testContainsPath2 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %range = begin_borrow %0
+  br bb1
+bb1:
+  %path = begin_borrow %0
+  end_borrow %path
+  end_borrow %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testContainsPath3: range_overlaps_path
+// CHECK: Overlap kind: containsPath
+sil [ossa] @testContainsPath3 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %range = begin_borrow %0
+  br bb1
+bb1:
+  %path = begin_borrow %0
+  br bb2
+bb2:
+  end_borrow %path
+  end_borrow %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testContainsPath4: range_overlaps_path
+// CHECK: Overlap kind: containsPath
+sil [ossa] @testContainsPath4 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %range = begin_borrow %0
+  br bb1
+bb1:
+  %path = begin_borrow %0
+  br bb2
+bb2:
+  end_borrow %path
+  br bb3
+bb3:
+  end_borrow %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testContainsBegin1: range_overlaps_path
+// CHECK: Overlap kind: containsBegin
+sil [ossa] @testContainsBegin1 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %range = begin_borrow %0
+  %path = begin_borrow %0
+  end_borrow %range
+  end_borrow %path
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testContainsBegin2: range_overlaps_path
+// CHECK: Overlap kind: containsBegin
+sil [ossa] @testContainsBegin2 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %range = begin_borrow %0
+  br bb1
+bb1:
+  %path = begin_borrow %0
+  end_borrow %range
+  end_borrow %path
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testContainsBegin3: range_overlaps_path
+// CHECK: Overlap kind: containsBegin
+sil [ossa] @testContainsBegin3 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %range = begin_borrow %0
+  br bb1
+bb1:
+  %path = begin_borrow %0
+  br bb2
+bb2:
+  end_borrow %range
+  end_borrow %path
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testContainsBegin4: range_overlaps_path
+// CHECK: Overlap kind: containsBegin
+sil [ossa] @testContainsBegin4 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %range = begin_borrow %0
+  br bb1
+bb1:
+  %path = begin_borrow %0
+  br bb2
+bb2:
+  end_borrow %range
+  br bb3
+bb3:
+  end_borrow %path
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testContainsEnd1: range_overlaps_path
+// CHECK: Overlap kind: containsEnd
+sil [ossa] @testContainsEnd1 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = begin_borrow %0
+  %range = begin_borrow %0
+  end_borrow %path
+  end_borrow %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testContainsEnd2: range_overlaps_path
+// CHECK: Overlap kind: containsEnd
+sil [ossa] @testContainsEnd2 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = begin_borrow %0
+  br bb1
+bb1:
+  %range = begin_borrow %0
+  end_borrow %path
+  end_borrow %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testContainsEnd3: range_overlaps_path
+// CHECK: Overlap kind: containsEnd
+sil [ossa] @testContainsEnd3 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = begin_borrow %0
+  br bb1
+bb1:
+  %range = begin_borrow %0
+  br bb2
+bb2:
+  end_borrow %path
+  end_borrow %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testContainsEnd4: range_overlaps_path
+// CHECK: Overlap kind: containsEnd
+sil [ossa] @testContainsEnd4 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = begin_borrow %0
+  br bb1
+bb1:
+  %range = begin_borrow %0
+  br bb2
+bb2:
+  end_borrow %path
+  br bb3
+bb3:
+  end_borrow %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testOverlappedByPath1: range_overlaps_path
+// CHECK: Overlap kind: overlappedByPath
+sil [ossa] @testOverlappedByPath1 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = begin_borrow %0
+  %range = begin_borrow %0
+  end_borrow %range
+  end_borrow %path
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testOverlappedByPath2: range_overlaps_path
+// CHECK: Overlap kind: overlappedByPath
+sil [ossa] @testOverlappedByPath2 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = begin_borrow %0
+  br bb1
+bb1:
+  %range = begin_borrow %0
+  end_borrow %range
+  end_borrow %path
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testOverlappedByPath3: range_overlaps_path
+// CHECK: Overlap kind: overlappedByPath
+sil [ossa] @testOverlappedByPath3 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = begin_borrow %0
+  br bb1
+bb1:
+  %range = begin_borrow %0
+  br bb2
+bb2:
+  end_borrow %range
+  end_borrow %path
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testOverlappedByPath4: range_overlaps_path
+// CHECK: Overlap kind: overlappedByPath
+sil [ossa] @testOverlappedByPath4 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = begin_borrow %0
+  br bb1
+bb1:
+  %range = begin_borrow %0
+  br bb2
+bb2:
+  end_borrow %range
+  br bb3
+bb3:
+  end_borrow %path
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testOverlappedByPath5: range_overlaps_path
+// CHECK: Overlap kind: overlappedByPath
+sil [ossa] @testOverlappedByPath5 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%0 : @owned $C, %1 : @owned $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = move_value %0
+  %range = move_value %1
+  %tuple = tuple (%path, %range)
+  destroy_value %tuple
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testDisjoint1: range_overlaps_path
+// CHECK: Overlap kind: disjoint
+sil [ossa] @testDisjoint1 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = begin_borrow %0
+  end_borrow %path
+  %range = begin_borrow %0
+  end_borrow %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testDisjoint2: range_overlaps_path
+// CHECK: Overlap kind: disjoint
+sil [ossa] @testDisjoint2 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %range = begin_borrow %0
+  end_borrow %range
+  %path = begin_borrow %0
+  end_borrow %path
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testDisjoint3: range_overlaps_path
+// CHECK: Overlap kind: disjoint
+sil [ossa] @testDisjoint3 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %range = begin_borrow %0
+  end_borrow %range
+  %path = begin_borrow %0
+  br bb1
+bb1:
+  end_borrow %path
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testDisjoint4: range_overlaps_path
+// CHECK: Overlap kind: disjoint
+sil [ossa] @testDisjoint4 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = begin_borrow %0
+  br bb1
+bb1:
+  end_borrow %path
+  %range = begin_borrow %0
+  end_borrow %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testDisjoint5: range_overlaps_path
+// CHECK: Overlap kind: disjoint
+sil [ossa] @testDisjoint5 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %range = begin_borrow %0
+  br bb1
+bb1:
+  end_borrow %range
+  %path = begin_borrow %0
+  br bb2
+bb2:
+  end_borrow %path
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testDisjoint6: range_overlaps_path
+// CHECK: Overlap kind: disjoint
+sil [ossa] @testDisjoint6 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = begin_borrow %0
+  br bb1
+bb1:
+  end_borrow %path
+  %range = begin_borrow %0
+  br bb2
+bb2:
+  end_borrow %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testDisjoint7: range_overlaps_path
+// CHECK: Overlap kind: disjoint
+sil [ossa] @testDisjoint7 : $@convention(thin) (@guaranteed C) -> () {
+entry(%0 : @guaranteed $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = begin_borrow %0
+  br bb1
+bb1:
+  end_borrow %path
+  br bb2
+bb2:
+  %range = begin_borrow %0
+  br bb3
+bb3:
+  end_borrow %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testDisjoint8: range_overlaps_path
+// CHECK: Overlap kind: disjoint
+sil [ossa] @testDisjoint8 : $@convention(thin) (@owned C) -> () {
+entry(%0 : @owned $C):
+  specify_test "range_overlaps_path %range %path"
+  %path = move_value %0
+  %range = move_value %path
+  destroy_value %range
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testDisjoint9: range_overlaps_path
+// CHECK: Overlap kind: disjoint
+sil [ossa] @testDisjoint9 : $@convention(thin) (@owned C) -> () {
+entry(%0 : @owned $C):
+  specify_test "range_overlaps_path %range %path"
+  %range = move_value %0
+  %path = move_value %range
+  destroy_value %path
+  %retval = tuple ()
+  return %retval : $()
+}

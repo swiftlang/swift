@@ -117,26 +117,33 @@ enum class TypeInfoKind : unsigned {
   Reference,
   Invalid,
   Enum,
+  Array,
+  Borrow,
 };
 
 class TypeInfo {
   TypeInfoKind Kind;
   unsigned Size, Alignment, Stride, NumExtraInhabitants;
-  bool BitwiseTakable;
+  BitwiseBorrowability Borrowability;
+  bool AddressableForDependencies;
 
 public:
   TypeInfo(TypeInfoKind Kind,
            unsigned Size, unsigned Alignment,
            unsigned Stride, unsigned NumExtraInhabitants,
-           bool BitwiseTakable)
+           BitwiseBorrowability Borrowability,
+           bool AFD)
     : Kind(Kind), Size(Size), Alignment(Alignment), Stride(Stride),
       NumExtraInhabitants(NumExtraInhabitants),
-      BitwiseTakable(BitwiseTakable) {
+      Borrowability(Borrowability),
+      AddressableForDependencies(AFD) {
     assert(Alignment > 0);
   }
 
   TypeInfo(): Kind(TypeInfoKind::Invalid), Size(0), Alignment(0), Stride(0),
-              NumExtraInhabitants(0), BitwiseTakable(true) {
+              NumExtraInhabitants(0),
+              Borrowability(BitwiseBorrowability::TakableAndBorrowable),
+              AddressableForDependencies(false) {
   }
 
   TypeInfoKind getKind() const { return Kind; }
@@ -145,7 +152,16 @@ public:
   unsigned getAlignment() const { return Alignment; }
   unsigned getStride() const { return Stride; }
   unsigned getNumExtraInhabitants() const { return NumExtraInhabitants; }
-  bool isBitwiseTakable() const { return BitwiseTakable; }
+  BitwiseBorrowability getBorrowability() const { return Borrowability; }
+  bool isBitwiseTakable() const {
+    return Borrowability >= BitwiseBorrowability::TakableOnly;
+  }
+  bool isBitwiseBorrowable() const {
+    return Borrowability == BitwiseBorrowability::TakableAndBorrowable;
+  }
+  bool isAddressableForDependencies() const {
+    return AddressableForDependencies;
+  }
 
   void dump() const;
   void dump(std::ostream &stream, unsigned Indent = 0) const;
@@ -185,7 +201,10 @@ public:
                            BuiltinTypeDescriptorBase &descriptor);
 
   explicit BuiltinTypeInfo(unsigned Size, unsigned Alignment, unsigned Stride,
-                           unsigned NumExtraInhabitants, bool BitwiseTakable);
+                           unsigned NumExtraInhabitants,
+                           BitwiseBorrowability Borrowability,
+                           bool AddressableForDependencies);
+
   /// Construct an empty builtin type info.
   BuiltinTypeInfo()
       : TypeInfo(TypeInfoKind::Builtin,
@@ -193,7 +212,8 @@ public:
                  /*Alignment=*/1,
                  /*Stride=*/1,
                  /*ExtraInhabitants=*/0,
-                 /*BitwiseTakable=*/true),
+                 /*BitwiseTakable=*/BitwiseBorrowability::TakableAndBorrowable,
+                 /*AFD=*/false),
         Name("") {}
 
   const std::string &getMangledTypeName() const {
@@ -219,10 +239,11 @@ class RecordTypeInfo : public TypeInfo {
 public:
   RecordTypeInfo(unsigned Size, unsigned Alignment,
                  unsigned Stride, unsigned NumExtraInhabitants,
-                 bool BitwiseTakable,
+                 BitwiseBorrowability Borrowable,
+                 bool AFD,
                  RecordKind SubKind, const std::vector<FieldInfo> &Fields)
     : TypeInfo(TypeInfoKind::Record, Size, Alignment, Stride,
-               NumExtraInhabitants, BitwiseTakable),
+               NumExtraInhabitants, Borrowable, AFD),
       SubKind(SubKind), Fields(Fields) {}
 
   RecordKind getRecordKind() const { return SubKind; }
@@ -248,10 +269,11 @@ class EnumTypeInfo : public TypeInfo {
 protected:
   EnumTypeInfo(unsigned Size, unsigned Alignment,
                unsigned Stride, unsigned NumExtraInhabitants,
-               bool BitwiseTakable,
+               BitwiseBorrowability Borrowable,
+               bool AFD,
                EnumKind SubKind, const std::vector<FieldInfo> &Cases)
     : TypeInfo(TypeInfoKind::Enum, Size, Alignment, Stride,
-               NumExtraInhabitants, BitwiseTakable),
+               NumExtraInhabitants, Borrowable, AFD),
       SubKind(SubKind), Cases(Cases) {}
 
 public:
@@ -319,10 +341,11 @@ class ReferenceTypeInfo : public TypeInfo {
 public:
   ReferenceTypeInfo(unsigned Size, unsigned Alignment,
                     unsigned Stride, unsigned NumExtraInhabitants,
-                    bool BitwiseTakable, ReferenceKind SubKind,
+                    BitwiseBorrowability Borrowable, ReferenceKind SubKind,
                     ReferenceCounting Refcounting)
     : TypeInfo(TypeInfoKind::Reference, Size, Alignment, Stride,
-               NumExtraInhabitants, BitwiseTakable),
+               NumExtraInhabitants, Borrowable,
+               /* AFD */ false),
       SubKind(SubKind), Refcounting(Refcounting) {}
 
   ReferenceKind getReferenceKind() const {
@@ -350,12 +373,62 @@ public:
   }
 };
 
+/// Array based layouts like Builtin.FixedArray<N, T>
+class ArrayTypeInfo : public TypeInfo {
+  const TypeInfo *ElementTI;
+
+public:
+  explicit ArrayTypeInfo(intptr_t size, const TypeInfo *elementTI);
+
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *extraInhabitantIndex) const override;
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
+  const TypeInfo *getElementTypeInfo() const { return ElementTI; }
+  static bool classof(const TypeInfo *TI) {
+    return TI->getKind() == TypeInfoKind::Array;
+  }
+};
+
+/// Builtin.Borrow<T>
+class BorrowTypeInfo : public TypeInfo {
+  const TypeInfo *ReferentTI;
+  // This is either the referent's type info, or the type info for
+  // Builtin.RawPointer, depending on whether the borrow uses the value or
+  // pointer representation.
+  const TypeInfo *RepresentationTI;
+
+public:
+  explicit BorrowTypeInfo(const TypeInfo *referentTI,
+                          const TypeInfo *representationTI)
+    : TypeInfo(TypeInfoKind::Borrow,
+               representationTI->getSize(),
+               representationTI->getAlignment(),
+               representationTI->getStride(),
+               representationTI->getNumExtraInhabitants(),
+               BitwiseBorrowability::TakableAndBorrowable,
+               /*afd*/ false),
+      ReferentTI(referentTI), RepresentationTI(representationTI)
+  {}
+
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *extraInhabitantIndex) const override;
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
+  const TypeInfo *getReferentTypeInfo() const { return ReferentTI; }
+  static bool classof(const TypeInfo *TI) {
+    return TI->getKind() == TypeInfoKind::Borrow;
+  }
+};
+
 /// This class owns the memory for all TypeInfo instances that it vends.
 class TypeConverter {
   TypeRefBuilder &Builder;
   std::vector<std::unique_ptr<const TypeInfo>> Pool;
-  llvm::DenseMap<std::pair<const TypeRef *, remote::TypeInfoProvider::IdType>,
-                 const TypeInfo *> Cache;
+  using KeyT = std::pair<const TypeRef *, remote::TypeInfoProvider::IdType>;
+  llvm::DenseMap<KeyT, const TypeInfo *> Cache;
   llvm::DenseSet<const TypeRef *> RecursionCheck;
   llvm::DenseMap<std::pair<unsigned, unsigned>,
                  const ReferenceTypeInfo *> ReferenceCache;
@@ -366,14 +439,33 @@ class TypeConverter {
   const TypeRef *ThinFunctionTR = nullptr;
   const TypeRef *AnyMetatypeTR = nullptr;
 
+  const TypeInfo *RawPointerTI = nullptr;
   const TypeInfo *ThinFunctionTI = nullptr;
   const TypeInfo *ThickFunctionTI = nullptr;
   const TypeInfo *AnyMetatypeTI = nullptr;
   const TypeInfo *DefaultActorStorageTI = nullptr;
   const TypeInfo *EmptyTI = nullptr;
 
+  /// Used for lightweight error handling. We don't have access to
+  /// llvm::Expected<> here, so TypeConverter just stores a pointer to the last
+  /// encountered error instead that is stored in the cache.
+  using TCError = std::pair<const char *, const TypeRef *>;
+  TCError LastError = {nullptr, nullptr};
+  std::unique_ptr<llvm::DenseMap<KeyT, TCError>> ErrorCache;
+
 public:
   explicit TypeConverter(TypeRefBuilder &Builder) : Builder(Builder) {}
+
+  /// Called by LLDB.
+  void enableErrorCache() {
+    ErrorCache = std::make_unique<llvm::DenseMap<KeyT, TCError>>();
+  }
+
+  /// Set the LastError variable.
+  void setError(const char *msg, const TypeRef *TR = nullptr);
+
+  /// Retreive the error and reset it.
+  std::string takeLastError();
 
   TypeRefBuilder &getBuilder() { return Builder; }
 
@@ -399,8 +491,7 @@ public:
                            remote::TypeInfoProvider *ExternalTypeInfo);
 
   unsigned targetPointerSize() {
-    auto *rawPointerTI = getTypeInfo(getRawPointerTypeRef(), nullptr);
-    return rawPointerTI->getSize();
+    return getRawPointerTypeInfo()->getSize();
   }
 
 private:
@@ -424,10 +515,12 @@ private:
   const TypeRef *getThinFunctionTypeRef();
   const TypeRef *getAnyMetatypeTypeRef();
 
+  const TypeInfo *getRawPointerTypeInfo();
   const TypeInfo *getThinFunctionTypeInfo();
   const TypeInfo *getThickFunctionTypeInfo();
   const TypeInfo *getAnyMetatypeTypeInfo();
   const TypeInfo *getDefaultActorStorageTypeInfo();
+  const TypeInfo *getRawUnsafeContinuationTypeInfo();
   const TypeInfo *getEmptyTypeInfo();
 
   template <typename TypeInfoTy, typename... Args>
@@ -443,7 +536,8 @@ private:
 class RecordTypeInfoBuilder {
   TypeConverter &TC;
   unsigned Size, Alignment, NumExtraInhabitants;
-  bool BitwiseTakable;
+  BitwiseBorrowability Borrowability;
+  bool AddressableForDependencies;
   RecordKind Kind;
   std::vector<FieldInfo> Fields;
   bool Empty;
@@ -452,15 +546,20 @@ class RecordTypeInfoBuilder {
 public:
   RecordTypeInfoBuilder(TypeConverter &TC, RecordKind Kind)
     : TC(TC), Size(0), Alignment(1), NumExtraInhabitants(0),
-      BitwiseTakable(true), Kind(Kind), Empty(true), Invalid(false) {}
+      Borrowability(BitwiseBorrowability::TakableAndBorrowable),
+      AddressableForDependencies(false), Kind(Kind), Empty(true),
+      Invalid(false) {}
 
-  bool isInvalid() const {
-    return Invalid;
+  bool isInvalid() const { return Invalid; }
+  void markInvalid(const char *msg, const TypeRef *TR = nullptr) {
+    Invalid = true;
+    TC.setError(msg, TR);
   }
 
   unsigned addField(unsigned fieldSize, unsigned fieldAlignment,
                     unsigned numExtraInhabitants,
-                    bool bitwiseTakable);
+                    BitwiseBorrowability borrowability,
+                    bool AFD);
 
   // Add a field of a record type, such as a struct.
   void addField(const std::string &Name, const TypeRef *TR,

@@ -12,12 +12,13 @@
 
 #include "swift/IDETool/CompilerInvocation.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/TargetInfo.h"
-#include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Frontend/PCHContainerOperations.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Serialization/ASTReader.h"
@@ -86,8 +87,10 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
   assert(FileSystem);
 
   llvm::SmallString<128> PrimaryFile;
-  if (auto err = FileSystem->getRealPath(UnresolvedPrimaryFile, PrimaryFile))
-    PrimaryFile = UnresolvedPrimaryFile;
+  if (!UnresolvedPrimaryFile.empty()) {
+    if (auto err = FileSystem->getRealPath(UnresolvedPrimaryFile, PrimaryFile))
+      PrimaryFile = UnresolvedPrimaryFile;
+  }
 
   unsigned primaryCount = 0;
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
@@ -156,18 +159,13 @@ bool ide::initCompilerInvocation(
     StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     const std::string &swiftExecutablePath,
-    const std::string &runtimeResourcePath,
-    const std::string &diagnosticDocumentationPath, time_t sessionTimestamp,
+    const std::string &runtimeResourcePath, time_t sessionTimestamp,
     std::string &Error) {
   SmallVector<const char *, 16> Args;
-  // Make sure to put '-resource-dir' and '-diagnostic-documentation-path' at
-  // the top to allow overriding them with the passed in arguments.
+  // Make sure to put '-resource-dir' at the top to allow overriding them with
+  // the passed in arguments.
   Args.push_back("-resource-dir");
   Args.push_back(runtimeResourcePath.c_str());
-  Args.push_back("-Xfrontend");
-  Args.push_back("-diagnostic-documentation-path");
-  Args.push_back("-Xfrontend");
-  Args.push_back(diagnosticDocumentationPath.c_str());
   Args.append(OrigArgs.begin(), OrigArgs.end());
 
   SmallString<32> ErrStr;
@@ -222,8 +220,12 @@ bool ide::initCompilerInvocation(
 
   auto &LangOpts = Invocation.getLangOptions();
   LangOpts.AttachCommentsToDecls = true;
-  LangOpts.DiagnosticsEditorMode = true;
   LangOpts.CollectParsedToken = true;
+  #if defined(_WIN32)
+  // Source files that might be open in an editor should not be memory mapped on Windows,
+  // as they will become read-only.
+  LangOpts.OpenSourcesAsVolatile = true;
+  #endif
   if (LangOpts.PlaygroundTransform) {
     // The playground instrumenter changes the AST in ways that disrupt the
     // SourceKit functionality. Since we don't need the instrumenter, and all we
@@ -256,8 +258,6 @@ bool ide::initCompilerInvocation(
                                      std::to_string(sessionTimestamp - 1));
     ImporterOpts.ExtraArgs.push_back(
         "-fmodules-validate-once-per-build-session");
-
-    SearchPathOpts.DisableModulesValidateSystemDependencies = true;
   }
 
   // Disable expensive SIL options to reduce time spent in SILGen.
@@ -269,13 +269,13 @@ bool ide::initCompilerInvocation(
 bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
                                          CompilerInvocation &Invok,
                                          std::string &Error) {
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> DiagOpts{
-    new clang::DiagnosticOptions()
-  };
+  const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
+      llvm::vfs::createPhysicalFileSystem();
 
   clang::TextDiagnosticBuffer DiagBuf;
+  clang::DiagnosticOptions DiagOpts;
   llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> ClangDiags =
-      clang::CompilerInstance::createDiagnostics(DiagOpts.get(), &DiagBuf,
+      clang::CompilerInstance::createDiagnostics(*VFS, DiagOpts, &DiagBuf,
                                                  /*ShouldOwnClient=*/false);
 
   // Clang expects this to be like an actual command line. So we need to pass in
@@ -324,9 +324,6 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
       CCArgs.push_back("-iquote");
       CCArgs.push_back(Entry.Path);
       break;
-    case clang::frontend::IndexHeaderMap:
-      CCArgs.push_back("-index-header-map");
-      LLVM_FALLTHROUGH;
     case clang::frontend::Angled: {
       std::string Flag;
       if (Entry.IsFramework)
@@ -356,7 +353,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
 
   if (!PPOpts.ImplicitPCHInclude.empty()) {
     clang::FileSystemOptions FileSysOpts;
-    clang::FileManager FileMgr(FileSysOpts);
+    clang::FileManager FileMgr(FileSysOpts, VFS);
     auto PCHContainerOperations =
         std::make_shared<clang::PCHContainerOperations>();
     std::string HeaderFile = clang::ASTReader::getOriginalSourceFile(

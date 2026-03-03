@@ -1,16 +1,16 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -verify -module-name Utils %t/Utils.swift -emit-module -emit-module-path %t/Utils.swiftmodule -package-name myLib
+// RUN: %target-swift-frontend -verify -verify-ignore-unrelated -module-name Utils %t/Utils.swift -emit-module -emit-module-path %t/Utils.swiftmodule -package-name myLib
 // RUN: test -f %t/Utils.swiftmodule
 
-// RUN: %target-swift-frontend -verify -module-name LibGood %t/LibGood.swift -emit-module -emit-module-path %t/LibGood.swiftmodule -package-name myLib -I %t
+// RUN: %target-swift-frontend -verify -verify-ignore-unrelated -module-name LibGood %t/LibGood.swift -emit-module -emit-module-path %t/LibGood.swiftmodule -package-name myLib -I %t
 // RUN: test -f %t/LibGood.swiftmodule
 
-// RUN: %target-swift-frontend -verify -module-name Client %t/Client.swift -emit-module -emit-module-path %t/Client.swiftmodule -package-name client -I %t
+// RUN: %target-swift-frontend -verify -verify-ignore-unrelated -module-name Client %t/Client.swift -emit-module -emit-module-path %t/Client.swiftmodule -package-name client -I %t
 
-// RUN: %target-swift-frontend -typecheck -verify %t/LibSamePackage.swift -package-name myLib -I %t
-// RUN: %target-swift-frontend -typecheck -verify %t/LibOtherPackage.swift -package-name "otherLib" -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/LibSamePackage.swift -package-name myLib -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/LibOtherPackage.swift -package-name "otherLib" -I %t
 
 //--- Utils.swift
 package protocol PackageProto {

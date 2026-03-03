@@ -48,6 +48,7 @@ private:
   void computePlaygroundOptions();
   void computePrintStatsOptions();
   void computeTBDOptions();
+  bool computeAvailabilityDomains();
 
   bool setUpImmediateArgs();
 

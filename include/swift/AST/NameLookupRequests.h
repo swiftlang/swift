@@ -25,6 +25,7 @@
 #include "swift/AST/TypeOrExtensionDecl.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -202,7 +203,7 @@ public:
 class AllInheritedProtocolsRequest
     : public SimpleRequest<
           AllInheritedProtocolsRequest, ArrayRef<ProtocolDecl *>(ProtocolDecl *),
-          RequestFlags::Cached> {
+          RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -216,6 +217,8 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
+  std::optional<ArrayRef<ProtocolDecl *>> getCachedResult() const;
+  void cacheResult(ArrayRef<ProtocolDecl *> value) const;
 };
 
 class ProtocolRequirementsRequest
@@ -236,6 +239,30 @@ public:
   bool isCached() const { return true; }
   std::optional<ArrayRef<ValueDecl *>> getCachedResult() const;
   void cacheResult(ArrayRef<ValueDecl *> value) const;
+};
+
+/// Computes the set of protocols that are reparenting a given protocol.
+class ReparentingProtocolsRequest
+    : public SimpleRequest<
+          ReparentingProtocolsRequest,
+          ArrayRef<std::tuple<ProtocolDecl *, ExtensionDecl *, unsigned>>(
+              ProtocolDecl *),
+          RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  /// Indicates a reparenting by a protocol, defined at a specific extension,
+  /// with an index into the extension's InheritedTypes establishing it.
+  using Result = std::tuple<ProtocolDecl *, ExtensionDecl *, unsigned>;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Result> evaluate(Evaluator &, ProtocolDecl *) const;
+
+public:
+  bool isCached() const { return true; }
 };
 
 /// Requests whether or not this class has designated initializers that are
@@ -264,7 +291,7 @@ public:
 /// Request the nominal declaration extended by a given extension declaration.
 class ExtendedNominalRequest
     : public SimpleRequest<
-          ExtendedNominalRequest, NominalTypeDecl *(ExtensionDecl *),
+          ExtendedNominalRequest, NominalTypeDecl *(const ExtensionDecl *),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -273,8 +300,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  NominalTypeDecl *
-  evaluate(Evaluator &evaluator, ExtensionDecl *ext) const;
+  NominalTypeDecl * evaluate(Evaluator &evaluator, const ExtensionDecl *ext) const;
 
 public:
   // Separate caching.
@@ -348,10 +374,10 @@ private:
 
 /// Request the nominal type declaration to which the given custom
 /// attribute refers.
-class CustomAttrNominalRequest :
-    public SimpleRequest<CustomAttrNominalRequest,
-                         NominalTypeDecl *(CustomAttr *, DeclContext *),
-                         RequestFlags::Cached> {
+class CustomAttrNominalRequest
+    : public SimpleRequest<CustomAttrNominalRequest,
+                           NominalTypeDecl *(CustomAttr *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -359,8 +385,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  NominalTypeDecl *
-  evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc) const;
+  NominalTypeDecl *evaluate(Evaluator &evaluator, CustomAttr *attr) const;
 
 public:
   // Caching
@@ -474,23 +499,43 @@ using QualifiedLookupResult = SmallVector<ValueDecl *, 4>;
 class LookupInModuleRequest
     : public SimpleRequest<
           LookupInModuleRequest,
-          QualifiedLookupResult(const DeclContext *, DeclName, NLKind,
+          QualifiedLookupResult(const DeclContext *, DeclName, bool, NLKind,
                                 namelookup::ResolutionKind, const DeclContext *,
                                 NLOptions),
           RequestFlags::Uncached | RequestFlags::DependencySink> {
 public:
   LookupInModuleRequest(
-      const DeclContext *, DeclName, NLKind,
+      const DeclContext *, DeclName, bool, NLKind,
       namelookup::ResolutionKind, const DeclContext *,
       SourceLoc, NLOptions);
 
 private:
   friend SimpleRequest;
 
-  // Evaluation.
+  /// Performs a lookup into the given module and its imports.
+  ///
+  /// If 'moduleOrFile' is a ModuleDecl, we search the module and its
+  /// public imports. If 'moduleOrFile' is a SourceFile, we search the
+  /// file's parent module, the module's public imports, and the source
+  /// file's private imports.
+  ///
+  /// \param evaluator The request evaluator.
+  /// \param moduleOrFile The module or file unit to search, including imports.
+  /// \param name The name to look up.
+  /// \param hasModuleSelector Whether \p name was originally qualified by a
+  ///        module selector. This information is threaded through to underlying
+  ///        lookup calls; the callee is responsible for actually applying the
+  ///        module selector.
+  /// \param lookupKind Whether this lookup is qualified or unqualified.
+  /// \param resolutionKind What sort of decl is expected.
+  /// \param moduleScopeContext The top-level context from which the lookup is
+  ///        being performed, for checking access. This must be either a
+  ///        FileUnit or a Module.
+  /// \param options Lookup options to apply.
   QualifiedLookupResult
   evaluate(Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
-           NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
+           bool hasModuleSelector, NLKind lookupKind,
+           namelookup::ResolutionKind resolutionKind,
            const DeclContext *moduleScopeContext, NLOptions options) const;
 
 public:
@@ -648,7 +693,7 @@ public:
   DeclContext *getDC() const {
     if (auto *module = getModule())
       return module;
-    return fileOrModule.get<FileUnit *>();
+    return cast<FileUnit *>(fileOrModule);
   }
 
   friend llvm::hash_code hash_value(const OperatorLookupDescriptor &desc) {
@@ -730,21 +775,18 @@ public:
 
 class LookupConformanceDescriptor final {
 public:
-  ModuleDecl *Mod;
   Type Ty;
   ProtocolDecl *PD;
 
-  LookupConformanceDescriptor(ModuleDecl *Mod, Type Ty, ProtocolDecl *PD)
-      : Mod(Mod), Ty(Ty), PD(PD) {}
+  LookupConformanceDescriptor(Type Ty, ProtocolDecl *PD) : Ty(Ty), PD(PD) {}
 
   friend llvm::hash_code hash_value(const LookupConformanceDescriptor &desc) {
-    return llvm::hash_combine(desc.Mod, desc.Ty.getPointer(), desc.PD);
+    return llvm::hash_combine(desc.Ty.getPointer(), desc.PD);
   }
 
   friend bool operator==(const LookupConformanceDescriptor &lhs,
                          const LookupConformanceDescriptor &rhs) {
-    return lhs.Mod == rhs.Mod && lhs.Ty.getPointer() == rhs.Ty.getPointer() &&
-           lhs.PD == rhs.PD;
+    return lhs.Ty.getPointer() == rhs.Ty.getPointer() && lhs.PD == rhs.PD;
   }
 
   friend bool operator!=(const LookupConformanceDescriptor &lhs,
@@ -758,10 +800,11 @@ void simple_display(llvm::raw_ostream &out,
 
 SourceLoc extractNearestSourceLoc(const LookupConformanceDescriptor &desc);
 
-class LookupConformanceInModuleRequest
-    : public SimpleRequest<LookupConformanceInModuleRequest,
+class LookupConformanceRequest
+    : public SimpleRequest<LookupConformanceRequest,
                            ProtocolConformanceRef(LookupConformanceDescriptor),
-                           RequestFlags::Uncached|RequestFlags::DependencySink> {
+                           RequestFlags::Uncached |
+                               RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -998,6 +1041,32 @@ private:
   ObjCCategoryNameMap evaluate(Evaluator &evaluator,
                                ClassDecl *classDecl,
                                ExtensionDecl *lastExtension) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+struct DeclABIRoleInfoResult {
+  llvm::PointerIntPair<Decl *, 2, uint8_t> storage;
+  DeclABIRoleInfoResult(Decl *counterpart, uint8_t roleValue)
+    : storage(counterpart, roleValue) {}
+};
+
+/// Return the ABI role info (role and counterpart) of a given declaration.
+class DeclABIRoleInfoRequest
+    : public SimpleRequest<DeclABIRoleInfoRequest,
+                           DeclABIRoleInfoResult(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  void recordABIOnly(Evaluator &evaluator, Decl *counterpart);
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  DeclABIRoleInfoResult evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }

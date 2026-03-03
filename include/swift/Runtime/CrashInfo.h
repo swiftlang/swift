@@ -24,7 +24,6 @@
 namespace swift {
 namespace runtime {
 namespace backtrace {
-extern "C" {
 #endif
 
 // Note: The "pointers" below are pointers in a different process's address
@@ -49,6 +48,9 @@ struct CrashInfo {
 #elif defined(__linux__)
   // The head of the thread list; points at a "struct thread" (see below).
   uint64_t thread_list;
+#elif defined(_WIN32)
+  // The EXCEPTION_POINTERS pointer.
+  uint64_t exception_info;
 #endif
 };
 
@@ -89,7 +91,6 @@ struct thread {
 #endif
 
 #ifdef __cplusplus
-} // extern "C"
 } // namespace backtrace
 } // namespace runtime
 } // namespace swift

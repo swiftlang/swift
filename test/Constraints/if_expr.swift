@@ -89,8 +89,7 @@ func testNil3(_ x: Bool) {
   let _: _? = if x { 42 } else { nil }
 }
 func testNil4(_ x: Bool) {
-  // FIXME: Bad diagnostic (#63130)
-  let _: _? = if x { nil } else { 42 } // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _: _? = if x { nil } else { 42 } // expected-error {{could not infer type for placeholder}}
 }
 
 enum F<T> {
@@ -385,8 +384,10 @@ func testVoidConversion() {
 
 func testReturnMismatch() {
   let _ = if .random() {
-    return 1 // expected-error {{unexpected non-void return value in void function}}
-    // expected-note@-1 {{did you mean to add a return type?}}
+    return 1
+    // expected-error@-1 {{cannot use 'return' to transfer control out of 'if' expression}}
+    // expected-error@-2 {{unexpected non-void return value in void function}}
+    // expected-note@-3 {{did you mean to add a return type?}}
   } else {
     0
   }
@@ -434,7 +435,9 @@ func testAssignment() {
 }
 
 struct TestBadReturn {
-  var y = if .random() { return } else { 0 } // expected-error {{return invalid outside of a func}}
+  var y = if .random() { return } else { 0 }
+  // expected-error@-1 {{return invalid outside of a func}}
+  // expected-error@-2 {{cannot use 'return' to transfer control out of 'if' expression}}
 }
 
 struct SomeError: Error {}
@@ -702,4 +705,27 @@ func builderInClosure() {
 func testInvalidOptionalChainingInIfContext() {
   let v63796 = 1
   if v63796? {} // expected-error{{cannot use optional chaining on non-optional value of type 'Int'}}
+  // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+}
+
+// https://github.com/swiftlang/swift/issues/79395
+_ = {
+  if .random() {
+    struct S: Error {}
+    throw S()
+  } else {
+    1
+  }
+}
+_ = {
+  if .random() {
+    if .random() {
+      struct S: Error {}
+      throw S()
+    } else {
+      0
+    }
+  } else {
+    1
+  }
 }

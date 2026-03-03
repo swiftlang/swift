@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -114,8 +115,11 @@ operator<<(raw_ostream &os, const std::optional<CopyPropagationOption> option) {
     case CopyPropagationOption::RequestedPassesOnly:
       os << "requested-passes-only";
       break;
-    case CopyPropagationOption::On:
-      os << "on";
+    case CopyPropagationOption::Optimizing:
+      os << "optimizing";
+      break;
+    case CopyPropagationOption::Always:
+      os << "always";
       break;
     }
   } else {
@@ -134,24 +138,27 @@ public:
   // parse - Return true on error.
   bool parse(Option &O, StringRef ArgName, StringRef Arg,
              std::optional<CopyPropagationOption> &Value) {
-    if (Arg == "" || Arg == "true" || Arg == "TRUE" || Arg == "True" ||
-        Arg == "1") {
-      Value = CopyPropagationOption::On;
+    if (Arg.compare_insensitive("always")) {
+      Value = CopyPropagationOption::Always;
       return false;
     }
-    if (Arg == "false" || Arg == "FALSE" || Arg == "False" || Arg == "0") {
+    if (Arg.compare_insensitive("optimizing")) {
+      Value = CopyPropagationOption::Optimizing;
+      return false;
+    }
+    if (Arg.compare_insensitive("false") || Arg.compare_insensitive("off") ||
+        Arg == "0") {
       Value = CopyPropagationOption::Off;
       return false;
     }
-    if (Arg == "requested-passes-only" || Arg == "REQUESTED-PASSES-ONLY" ||
-        Arg == "Requested-Passes-Only") {
+    if (Arg.compare_insensitive("requested-passes-only")) {
       Value = CopyPropagationOption::RequestedPassesOnly;
       return false;
     }
 
     return O.error("'" + Arg +
-                   "' is invalid for CopyPropagationOption! Try true, false, "
-                   "or requested-passes-only.");
+                   "' is invalid for CopyPropagationOption!"
+                   " Try always, optimizing, or requested-passes-only.");
   }
 
   void initialize() {}
@@ -222,7 +229,7 @@ struct SILOptOptions {
 
   llvm::cl::opt<bool>
   DisableSILOwnershipVerifier = llvm::cl::opt<bool>(
-      "disable = llvm::cl::opt<bool> DisableSILOwnershipVerifier(-sil-ownership-verifier",
+      "disable-sil-ownership-verifier",
       llvm::cl::desc(
           "Do not verify SIL ownership invariants during SIL verification"));
 
@@ -231,19 +238,21 @@ struct SILOptOptions {
                         llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
 
   llvm::cl::opt<bool>
-  EnableOSSACompleteLifetimes = llvm::cl::opt<bool>("enable-ossa-complete-lifetimes",
-                        llvm::cl::desc("Require linear OSSA lifetimes after SILGenCleanup."));
-  llvm::cl::opt<bool>
-  EnableOSSAVerifyComplete = llvm::cl::opt<bool>("enable-ossa-verify-complete",
-                        llvm::cl::desc("Verify linear OSSA lifetimes after SILGenCleanup."));
-
-  llvm::cl::opt<bool>
   EnableObjCInterop = llvm::cl::opt<bool>("enable-objc-interop",
                     llvm::cl::desc("Enable Objective-C interoperability."));
 
   llvm::cl::opt<bool>
   DisableObjCInterop = llvm::cl::opt<bool>("disable-objc-interop",
                      llvm::cl::desc("Disable Objective-C interoperability."));
+
+  llvm::cl::opt<bool>
+  DisableImplicitModules = llvm::cl::opt<bool>("disable-implicit-swift-modules",
+                     llvm::cl::desc("Disable implicit swift modules."));
+
+  llvm::cl::opt<std::string>
+  ExplicitSwiftModuleMapPath = llvm::cl::opt<std::string>(
+    "explicit-swift-module-map-file",
+    llvm::cl::desc("Explict swift module map file path"));
 
   llvm::cl::list<std::string>
   ExperimentalFeatures = llvm::cl::list<std::string>("enable-experimental-feature",
@@ -281,23 +290,20 @@ struct SILOptOptions {
                     llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
 
   llvm::cl::opt<bool>
-  EnableSpeculativeDevirtualization = llvm::cl::opt<bool>("enable-spec-devirt",
-                    llvm::cl::desc("Enable Speculative Devirtualization pass."));
-
-  llvm::cl::opt<bool>
   EnableAsyncDemotion = llvm::cl::opt<bool>("enable-async-demotion",
                     llvm::cl::desc("Enables an optimization pass to demote async functions."));
 
   llvm::cl::opt<bool>
-  EnableMoveInoutStackProtection = llvm::cl::opt<bool>("enable-move-inout-stack-protector",
-                    llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
+  EnableThrowsPrediction = llvm::cl::opt<bool>("enable-throws-prediction",
+                     llvm::cl::desc("Enables optimization assumption that functions rarely throw errors."));
 
   llvm::cl::opt<bool>
-  EnableOSSAModules = llvm::cl::opt<bool>(
-      "enable-ossa-modules",
-      llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
-                     "this is disabled we do not serialize in OSSA "
-                     "form when optimizing."));
+  EnableNoReturnCold = llvm::cl::opt<bool>("enable-noreturn-prediction",
+                     llvm::cl::desc("Enables optimization assumption that calls to no-return functions are cold."));
+
+  llvm::cl::opt<bool>
+  EnableMoveInoutStackProtection = llvm::cl::opt<bool>("enable-move-inout-stack-protector",
+                    llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
 
   cl::opt<EnforceExclusivityMode>
     EnforceExclusivity = cl::opt<EnforceExclusivityMode>(
@@ -571,26 +577,33 @@ struct SILOptOptions {
       "Xcc",
       llvm::cl::desc("option to pass to clang"));
 
-  llvm::cl::opt<bool> DisableRegionBasedIsolationWithStrictConcurrency =
-      llvm::cl::opt<bool>(
-          "disable-region-based-isolation-with-strict-concurrency",
-          llvm::cl::init(false));
-
-  llvm::cl::opt<bool>
-      DisableTransferringArgsAndResultsWithRegionBasedIsolation = llvm::cl::opt<
-          bool>(
-          "disable-transferring-args-and-results-with-region-based-isolation",
-          llvm::cl::init(false));
-
-  llvm::cl::opt<bool> DisableSendingArgsAndResultsWithRegionBasedIsolation =
-      llvm::cl::opt<bool>(
-          "disable-sending-args-and-results-with-region-based-isolation",
-          llvm::cl::init(false));
-
   llvm::cl::opt<std::string> SwiftVersionString = llvm::cl::opt<std::string>(
       "swift-version",
       llvm::cl::desc(
           "The swift version to assume AST declarations correspond to"));
+
+  llvm::cl::opt<bool> EnableAddressDependencies = llvm::cl::opt<bool>(
+      "enable-address-dependencies",
+      llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
+
+  llvm::cl::opt<bool> DisaleAggressiveReg2Mem = llvm::cl::opt<bool>(
+      "disable-aggressive-reg2mem",
+      llvm::cl::desc("Disable aggressive reg2mem optimizations."),
+      llvm::cl::init(false));
+
+  llvm::cl::opt<bool> EnableCalleeAllocatedCoroAbi = llvm::cl::opt<bool>(
+      "enable-callee-allocated-coro-abi",
+      llvm::cl::desc("Override per-platform settings and use yield_once_2."),
+      llvm::cl::init(false));
+  llvm::cl::opt<bool> DisableCalleeAllocatedCoroAbi = llvm::cl::opt<bool>(
+      "disable-callee-allocated-coro-abi",
+      llvm::cl::desc(
+          "Override per-platform settings and don't use yield_once_2."),
+      llvm::cl::init(false));
+
+  llvm::cl::opt<bool> MergeableTraps = llvm::cl::opt<bool>(
+      "mergeable-traps",
+      llvm::cl::desc("Enable cond_fail merging."));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -645,7 +658,6 @@ getASTOverrideKind(const SILOptOptions &options) {
 
 int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   INITIALIZE_LLVM();
-  llvm::setBugReportMsg(SWIFT_CRASH_BUG_REPORT_MESSAGE  "\n");
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   SILOptOptions options;
@@ -661,8 +673,12 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       llvm::sys::fs::getMainExecutable(argv[0], MainAddr));
 
   // Give the context the list of search paths to use for modules.
-  Invocation.setImportSearchPaths(options.ImportPaths);
-  std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
+  std::vector<SearchPathOptions::SearchPath> ImportPaths;
+  for (const auto &path : options.ImportPaths) {
+    ImportPaths.push_back({path, /*isSystem=*/false});
+  }
+  Invocation.setImportSearchPaths(ImportPaths);
+  std::vector<SearchPathOptions::SearchPath> FramePaths;
   for (const auto &path : options.FrameworkPaths) {
     FramePaths.push_back({path, /*isSystem=*/false});
   }
@@ -682,10 +698,16 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Invocation.setTargetTriple(options.Target);
   if (!options.ResourceDir.empty())
     Invocation.setRuntimeResourcePath(options.ResourceDir);
-  Invocation.getFrontendOptions().EnableLibraryEvolution
-    = options.EnableLibraryEvolution;
+  if (options.EnableLibraryEvolution)
+    Invocation.getLangOptions().enableFeature(Feature::LibraryEvolution);
   Invocation.getFrontendOptions().StrictImplicitModuleContext
     = options.StrictImplicitModuleContext;
+
+  Invocation.getFrontendOptions().DisableImplicitModules =
+    options.DisableImplicitModules;
+  Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath =
+    options.ExplicitSwiftModuleMapPath;
+
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = options.ModuleCachePath;
@@ -728,22 +750,25 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   Invocation.getLangOptions().BypassResilienceChecks =
       options.BypassResilienceChecks;
-  Invocation.getDiagnosticOptions().PrintDiagnosticNames =
-      options.DebugDiagnosticNames;
+  if (options.DebugDiagnosticNames) {
+    Invocation.getDiagnosticOptions().PrintDiagnosticNames =
+        PrintDiagnosticNamesMode::Identifier;
+  }
 
   for (auto &featureName : options.UpcomingFeatures) {
-    auto feature = getUpcomingFeature(featureName);
+    auto feature = Feature::getUpcomingFeature(featureName);
     if (!feature) {
       llvm::errs() << "error: unknown upcoming feature "
                    << QuotedString(featureName) << "\n";
       exit(-1);
     }
 
-    if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
-      if (Invocation.getLangOptions().isSwiftVersionAtLeast(*firstVersion)) {
+    if (auto languageMode = feature->getLanguageMode()) {
+      if (Invocation.getLangOptions().isLanguageModeAtLeast(
+              languageMode.value())) {
         llvm::errs() << "error: upcoming feature " << QuotedString(featureName)
-                     << " is already enabled as of Swift version "
-                     << *firstVersion << '\n';
+                     << " already enabled as of the Swift "
+                     << languageMode->versionString() << " language mode\n";
         exit(-1);
       }
     }
@@ -751,7 +776,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
 
   for (auto &featureName : options.ExperimentalFeatures) {
-    if (auto feature = getExperimentalFeature(featureName)) {
+    if (auto feature = Feature::getExperimentalFeature(featureName)) {
       Invocation.getLangOptions().enableFeature(*feature);
     } else {
       llvm::errs() << "error: unknown experimental feature "
@@ -763,8 +788,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   Invocation.getLangOptions().EnableObjCInterop =
     options.EnableObjCInterop ? true :
     options.DisableObjCInterop ? false : llvm::Triple(options.Target).isOSDarwin();
-
-  Invocation.getLangOptions().enableFeature(Feature::LayoutPrespecialization);
 
   Invocation.getLangOptions().OptimizationRemarkPassedPattern =
       createOptRemarkRegex(options.PassRemarksPassed);
@@ -780,9 +803,12 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
 
   Invocation.getLangOptions().EnableCXXInterop = options.EnableCxxInterop;
+  Invocation.computeCXXStdlibOptions();
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
+
+  Invocation.computeAArch64TBIOptions();
 
   // Enable strict concurrency if we have the feature specified or if it was
   // specified via a command line option to sil-opt.
@@ -799,23 +825,9 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
 
   // If we have strict concurrency set as a feature and were told to turn off
-  // region based isolation... do so now.
-  if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency) &&
-      !options.DisableRegionBasedIsolationWithStrictConcurrency) {
+  // region-based isolation... do so now.
+  if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency)) {
     Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
-  }
-
-  if (Invocation.getLangOptions().hasFeature(Feature::RegionBasedIsolation)) {
-    if (!options.DisableTransferringArgsAndResultsWithRegionBasedIsolation)
-      Invocation.getLangOptions().enableFeature(
-          Feature::TransferringArgsAndResults);
-    if (!options.DisableSendingArgsAndResultsWithRegionBasedIsolation)
-      Invocation.getLangOptions().enableFeature(Feature::SendingArgsAndResults);
-  }
-
-  if (Invocation.getLangOptions().hasFeature(
-          Feature::TransferringArgsAndResults)) {
-    Invocation.getLangOptions().enableFeature(Feature::SendingArgsAndResults);
   }
 
   Invocation.getDiagnosticOptions().VerifyMode =
@@ -874,13 +886,12 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EmitVerboseSIL |= options.EmitVerboseSIL;
   SILOpts.EmitSortedSIL |= options.EmitSortedSIL;
 
-  SILOpts.EnableSpeculativeDevirtualization = options.EnableSpeculativeDevirtualization;
   SILOpts.EnableAsyncDemotion = options.EnableAsyncDemotion;
+  SILOpts.EnableThrowsPrediction = options.EnableThrowsPrediction;
+  SILOpts.EnableNoReturnCold = options.EnableNoReturnCold;
   SILOpts.IgnoreAlwaysInline = options.IgnoreAlwaysInline;
-  SILOpts.EnableOSSAModules = options.EnableOSSAModules;
   SILOpts.EnableSILOpaqueValues = options.EnableSILOpaqueValues;
-  SILOpts.OSSACompleteLifetimes = options.EnableOSSACompleteLifetimes;
-  SILOpts.OSSAVerifyComplete = options.EnableOSSAVerifyComplete;
+  SILOpts.StopOptimizationAfterSerialization |= options.EmitSIB;
 
   if (options.CopyPropagationState) {
     SILOpts.CopyPropagation = *options.CopyPropagationState;
@@ -888,7 +899,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   // Unless overridden below, enabling copy propagation means enabling lexical
   // lifetimes.
-  if (SILOpts.CopyPropagation == CopyPropagationOption::On)
+  if (SILOpts.CopyPropagation >= CopyPropagationOption::Optimizing)
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::On;
 
   // Unless overridden below, disable copy propagation means disabling lexical
@@ -906,6 +917,15 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   SILOpts.EnablePackMetadataStackPromotion =
       options.EnablePackMetadataStackPromotion;
+
+  SILOpts.EnableAddressDependencies = options.EnableAddressDependencies;
+  if (options.DisaleAggressiveReg2Mem)
+    SILOpts.UseAggressiveReg2MemForCodeSize = false;
+  if (options.EnableCalleeAllocatedCoroAbi)
+    SILOpts.CoroutineAccessorsUseYieldOnce2 = true;
+  if (options.DisableCalleeAllocatedCoroAbi)
+    SILOpts.CoroutineAccessorsUseYieldOnce2 = false;
+  SILOpts.MergeableTraps = options.MergeableTraps;
 
   if (options.OptModeFlag == OptimizationMode::NotSet) {
     if (options.OptimizationGroup == OptGroup::Diagnostics)

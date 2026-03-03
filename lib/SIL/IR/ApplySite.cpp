@@ -30,8 +30,9 @@ void ApplySite::insertAfterApplication(
   case ApplySiteKind::BeginApplyInst:
     SmallVector<EndApplyInst *, 2> endApplies;
     SmallVector<AbortApplyInst *, 2> abortApplies;
+    SmallVector<EndBorrowInst *, 2> endBorrows;
     auto *bai = cast<BeginApplyInst>(getInstruction());
-    bai->getCoroutineEndPoints(endApplies, abortApplies);
+    bai->getCoroutineEndPoints(endApplies, abortApplies, &endBorrows);
     for (auto *eai : endApplies) {
       SILBuilderWithScope builder(std::next(eai->getIterator()));
       func(builder);
@@ -40,8 +41,21 @@ void ApplySite::insertAfterApplication(
       SILBuilderWithScope builder(std::next(aai->getIterator()));
       func(builder);
     }
+    for (auto *ebi : endBorrows) {
+      SILBuilderWithScope builder(std::next(ebi->getIterator()));
+      func(builder);
+    }
     return;
   }
   llvm_unreachable("covered switch isn't covered");
 }
 
+bool ApplySite::isAddressable(const Operand &operand) const {
+  unsigned calleeArgIndex = getCalleeArgIndex(operand);
+  assert(calleeArgIndex >= getSubstCalleeConv().getSILArgIndexOfFirstParam());
+  unsigned paramIdx =
+    calleeArgIndex - getSubstCalleeConv().getSILArgIndexOfFirstParam();
+
+  CanSILFunctionType calleeType = getSubstCalleeType();
+  return calleeType->isAddressable(paramIdx, getFunction());
+}

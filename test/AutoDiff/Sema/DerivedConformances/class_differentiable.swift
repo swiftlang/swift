@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/class_differentiable_other_module.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -primary-file %s %S/Inputs/class_differentiable_other_module.swift
 
 import _Differentiation
 
@@ -607,7 +607,9 @@ class WrappedProperties: Differentiable {
 // Test derived conformances in disallowed contexts.
 
 extension OtherFileNonconforming: Differentiable {}
-// expected-error @-1 {{extension outside of file declaring class 'OtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-error@-1 {{extension outside of file declaring class 'OtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-note@-2 {{add stubs for conformance}}
 
 extension GenericOtherFileNonconforming: Differentiable {}
-// expected-error @-1 {{extension outside of file declaring generic class 'GenericOtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-error@-1 {{extension outside of file declaring generic class 'GenericOtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-note@-2 {{add stubs for conformance}}

@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swift
+// RUN: %empty-directory(%t/cache)
+// RUN: %target-run-simple-swift(-module-cache-path %t/cache)
 // REQUIRES: executable_test
 
 // NSButtonType (from AppKit) and UIViewAnimationCurve (from UIKit) both have

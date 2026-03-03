@@ -17,6 +17,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -129,8 +130,7 @@ class BugReducerTester : public SILFunctionTransform {
         }
 
         auto *FRI = dyn_cast<FunctionRefInst>(FAS.getCallee());
-        if (!FRI || !FRI->getReferencedFunction()->getName().equals(
-                        FunctionTarget)) {
+        if (!FRI || FRI->getReferencedFunction()->getName() != FunctionTarget) {
           ++II;
           continue;
         }

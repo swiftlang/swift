@@ -33,12 +33,12 @@ constexpr static const StringLiteral SWIFT_MODULE_ABI_NAME_PREFIX = "Compiler";
 constexpr static const StringLiteral SWIFT_DISTRIBUTED_NAME = "Distributed";
 /// The name of the StringProcessing module, which supports that extension.
 constexpr static const StringLiteral SWIFT_STRING_PROCESSING_NAME = "_StringProcessing";
-/// The name of the Backtracing module, which supports that extension.
-constexpr static const StringLiteral SWIFT_BACKTRACING_NAME = "_Backtracing";
 /// The name of the SwiftShims module, which contains private stdlib decls.
 constexpr static const StringLiteral SWIFT_SHIMS_NAME = "SwiftShims";
 /// The name of the CxxShim module, which contains a cxx casting utility.
 constexpr static const StringLiteral CXX_SHIM_NAME = "CxxShim";
+/// The name of the CxxStdlibShim module, which contains utilities for the C++ stdlib overlay.
+constexpr static const StringLiteral CXX_STDLIB_SHIM_NAME = "CxxStdlibShim";
 /// The name of the Cxx module, which contains C++ interop helper protocols.
 constexpr static const StringLiteral CXX_MODULE_NAME = "Cxx";
 /// The name of the Builtin module, which contains Builtin functions.
@@ -84,6 +84,10 @@ constexpr static const StringLiteral CLANG_MODULE_DEFAULT_SPI_GROUP_NAME =
 /// The attribute name for @_spi_available
 constexpr static const StringLiteral SPI_AVAILABLE_ATTRNAME =
   "_spi_available";
+
+/// The attribute name for @_unavailableInEmbedded
+constexpr static const StringLiteral UNAVAILABLE_IN_EMBEDDED_ATTRNAME =
+    "_unavailableInEmbedded";
 
 /// A composition class containing a StringLiteral for the names of
 /// Swift builtins. The reason we use this is to ensure that we when
@@ -142,6 +146,8 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_NATIVEOBJECT = {
 /// The name of the Builtin type for BridgeObject
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_BRIDGEOBJECT = {
     "Builtin.BridgeObject"};
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_IMPLICITACTOR = {
+    "Builtin.ImplicitActor"};
 /// The name of the Builtin type for RawPointer
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_RAWPOINTER = {
     "Builtin.RawPointer"};
@@ -172,6 +178,10 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNKNOWNOBJECT = {
 /// The name of the Builtin type for Vector
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_VEC = {
     "Builtin.Vec"};
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_FIXEDARRAY = {
+    "Builtin.FixedArray"};
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_BORROW = {
+    "Builtin.Borrow"};
 /// The name of the Builtin type for SILToken
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_SILTOKEN = {
     "Builtin.SILToken"};

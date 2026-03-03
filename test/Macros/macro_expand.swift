@@ -4,13 +4,13 @@
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift
 
 // Diagnostics testing
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS
 
 // Diagnostics testing by importing macros from a module
 // RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/freestanding_macro_library.swiftmodule %S/Inputs/freestanding_macro_library.swift -module-name freestanding_macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
 // RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/freestanding_macro_library_2.swiftmodule %S/Inputs/freestanding_macro_library_2.swift -module-name freestanding_macro_library_2 -load-plugin-library %t/%target-library-name(MacroDefinition) -I %t
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -I %t -DIMPORT_MACRO_LIBRARY
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -I %t -DIMPORT_MACRO_LIBRARY
 
 // RUN: not %target-swift-frontend -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics -Rmacro-loading > %t/macro-printing.txt
 // RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS -dump-input=always %s
@@ -24,6 +24,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -emit-sil -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
 
 // Debug info IR testing
+// RUN: %target-swift-frontend -swift-version 5 -dwarf-version=4 -emit-ir -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR-DWARF4 %s
 // RUN: %target-swift-frontend -swift-version 5 -dwarf-version=5 -emit-ir -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR %s
 
 // Execution testing
@@ -62,6 +63,9 @@ macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(mo
 
 #endif
 
+@freestanding(declaration, names: named(storedProperty))
+public macro AddStoredProperty<T>(_ x: T) = #externalMacro(module: "MacroDefinition", type: "StoredPropertyMacro")
+
 #if TEST_DIAGNOSTICS
 @freestanding(declaration)
 macro NotCovered() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro")
@@ -69,11 +73,11 @@ macro NotCovered() = #externalMacro(module: "MacroDefinition", type: "InvalidMac
 struct MemberNotCovered {
   #NotCovered
   // expected-note@-1 {{in expansion of macro 'NotCovered' here}}
-
-  // CHECK-DIAGS: error: declaration name 'value' is not covered by macro 'NotCovered'
-  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser16MemberNotCoveredV33_4361AD9339943F52AE6186DD51E04E91Ll0dE0fMf_.swift
-  // CHECK-DIAGS: var value: Int
-  // CHECK-DIAGS: END CONTENTS OF FILE
+  /*
+  expected-expansion@-3:3 {{
+    expected-error@1:5{{declaration name 'value' is not covered by macro 'NotCovered'}}
+  }}
+  */
 }
 
 @attached(peer)
@@ -82,24 +86,29 @@ macro Invalid() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro"
 @Invalid
 struct Bad {}
 // expected-note@-2 18 {{in expansion of macro 'Invalid' on struct 'Bad' here}}
+/*
+expected-expansion@-3:14 {{
+  expected-error@1:8{{macro expansion cannot introduce import}}
+  expected-error@3:17{{macro expansion cannot introduce precedence group}}
+  expected-error@6:25{{macro 'myMacro()' requires a definition}}
+  expected-error@6:25{{macro expansion cannot introduce macro}}
+  expected-error@8:1{{macro expansion cannot introduce extension}}
+  expected-error@11:1{{macro expansion cannot introduce '@main' type}}
+  expected-error@12:8{{declaration name 'MyMain' is not covered by macro 'Invalid'}}
+  expected-error@17:11{{declaration name 'Array' is not covered by macro 'Invalid'}}
+  expected-error@19:11{{declaration name 'Dictionary' is not covered by macro 'Invalid'}}
+  expected-error@21:11{{macro expansion cannot introduce default literal type 'BooleanLiteralType'}}
+  expected-error@23:11{{macro expansion cannot introduce default literal type 'ExtendedGraphemeClusterType'}}
+  expected-error@25:11{{macro expansion cannot introduce default literal type 'FloatLiteralType'}}
+  expected-error@27:11{{macro expansion cannot introduce default literal type 'IntegerLiteralType'}}
+  expected-error@29:11{{macro expansion cannot introduce default literal type 'StringLiteralType'}}
+  expected-error@31:11{{macro expansion cannot introduce default literal type 'UnicodeScalarType'}}
+  expected-error@33:11{{macro expansion cannot introduce default literal type '_ColorLiteralType'}}
+  expected-error@35:11{{macro expansion cannot introduce default literal type '_ImageLiteralType'}}
+  expected-error@37:11{{macro expansion cannot introduce default literal type '_FileReferenceLiteralType'}}
+}}
+*/
 
-// CHECK-DIAGS: error: macro expansion cannot introduce import
-// CHECK-DIAGS: error: macro expansion cannot introduce precedence group
-// CHECK-DIAGS: error: macro expansion cannot introduce macro
-// CHECK-DIAGS: error: macro expansion cannot introduce extension
-// CHECK-DIAGS: error: macro expansion cannot introduce '@main' type
-// CHECK-DIAGS: error: declaration name 'MyMain' is not covered by macro 'Invalid'
-// CHECK-DIAGS: error: declaration name 'Array' is not covered by macro 'Invalid'
-// CHECK-DIAGS: error: declaration name 'Dictionary' is not covered by macro 'Invalid'
-// CHECK-DIAGS: error: macro expansion cannot introduce default literal type 'BooleanLiteralType'
-// CHECK-DIAGS: error: macro expansion cannot introduce default literal type 'ExtendedGraphemeClusterType'
-// CHECK-DIAGS: error: macro expansion cannot introduce default literal type 'FloatLiteralType'
-// CHECK-DIAGS: error: macro expansion cannot introduce default literal type 'IntegerLiteralType'
-// CHECK-DIAGS: error: macro expansion cannot introduce default literal type 'StringLiteralType'
-// CHECK-DIAGS: error: macro expansion cannot introduce default literal type 'UnicodeScalarType'
-// CHECK-DIAGS: error: macro expansion cannot introduce default literal type '_ColorLiteralType'
-// CHECK-DIAGS: error: macro expansion cannot introduce default literal type '_ImageLiteralType'
-// CHECK-DIAGS: error: macro expansion cannot introduce default literal type '_FileReferenceLiteralType'
 
 // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3Bad7InvalidfMp_.swift
 // CHECK-DIAGS: import Swift
@@ -125,6 +134,56 @@ struct Bad {}
 // CHECK-DIAGS: typealias _ImageLiteralType = Void
 // CHECK-DIAGS: typealias _FileReferenceLiteralType = Void
 // CHECK-DIAGS: END CONTENTS OF FILE
+
+class HasStoredPropertyClassInvalid {
+  #AddStoredProperty((Self.self, 0).1) // expected-note {{in expansion of macro 'AddStoredProperty' here}}
+  /*
+  expected-expansion@-2:3 {{
+    expected-error@1:22{{covariant 'Self' type cannot be referenced from a stored property initializer}}
+  }}
+  */
+}
+
+// Redeclaration checking should behave as though expansions are part of the
+// source file.
+struct RedeclChecking {
+  #varValue
+  /*
+  expected-expansion@-2:3 {{
+    expected-note@1:5{{'value' previously declared here}}
+  }}
+  */
+
+  // expected-error@+1 {{invalid redeclaration of 'value'}}
+  var value: Int { 0 }
+}
+
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-12]]_2_33_4361AD9339943F52AE6186DD51E04E91Ll8varValuefMf_.swift:
+// CHECK-DIAGS: var value: Int {
+// CHECK-DIAGS:     1
+// CHECK-DIAGS: }
+// CHECK-DIAGS: END CONTENTS OF FILE
+
+@attached(body)
+public macro ThrowCancellation() = #externalMacro(module: "MacroDefinition", type: "ThrowCancellationMacro")
+
+// https://github.com/swiftlang/swift/issues/79039 - Make sure we diagnose the
+// error mismatch.
+@ThrowCancellation // expected-note {{in expansion of macro 'ThrowCancellation' on global function 'issue79039()' here}}
+func issue79039() throws(DecodingError)
+/*
+expected-expansion@-2:39 {{
+  expected-error@2:11{{thrown expression type 'CancellationError' cannot be converted to error type 'DecodingError'}}
+}}
+*/
+
+@ThrowCancellation // expected-note {{in expansion of macro 'ThrowCancellation' on global function 'issue79039_2()' here}}
+func issue79039_2() throws(DecodingError) {}
+/*
+expected-expansion@-2:43 {{
+  expected-error@2:11{{thrown expression type 'CancellationError' cannot be converted to error type 'DecodingError'}}
+}}
+*/
 #endif
 
 @freestanding(declaration)
@@ -137,11 +196,29 @@ macro AccidentalCodeItem() = #externalMacro(module: "MacroDefinition", type: "Fa
 func invalidDeclarationMacro() {
   #accidentalCodeItem
   // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
-  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF18accidentalCodeItemfMf_.swift:1:1: error: expected macro expansion to produce a declaration
+  /*
+  expected-expansion@-3:3 {{
+    expected-error@1:1{{expected macro expansion to produce a declaration}}
+  }}
+  */
 
   @AccidentalCodeItem struct S {}
   // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}
-  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF1SL_18AccidentalCodeItemfMp_.swift:1:1: error: expected macro expansion to produce a declaration
+  /*
+  expected-expansion@-3:34 {{
+    expected-error@1:1{{expected macro expansion to produce a declaration}}
+  }}
+  */
+
+  do {
+    @AccidentalCodeItem struct S {}
+    // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}
+    /*
+    expected-expansion@-3:36 {{
+      expected-error@1:1{{expected macro expansion to produce a declaration}}
+    }}
+    */
+  }
 }
 #endif
 
@@ -155,17 +232,18 @@ func testFileID(a: Int, b: Int) {
   print("Result is \(#customFileID)")
   // CHECK-SIL: sil_scope [[SRC_SCOPE:[0-9]+]] { loc "{{.*}}macro_expand.swift":[[@LINE-3]]:6 parent {{.*}}testFileID
   // CHECK-SIL: sil_scope [[EXPANSION_SCOPE:[0-9]+]] { loc "{{.*}}macro_expand.swift":[[@LINE-2]]:22 parent [[SRC_SCOPE]]
-  // CHECK-SIL: sil_scope [[MACRO_SCOPE:[0-9]+]] { loc "@__swiftmacro{{.*}}":1:1 parent @$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_ {{.*}} inlined_at [[EXPANSION_SCOPE]] }
-  // CHECK-SIL: string_literal utf8 "MacroUser/macro_expand.swift", loc "@__swiftmacro_9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_.swift":1:1, scope [[MACRO_SCOPE]]
-  // CHECK-IR-DAG: !DISubprogram(name: "customFileID", linkageName: "$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_"
+  // CHECK-SIL: sil_scope [[MACRO_SCOPE:[0-9]+]] { loc "@__swiftmacro{{.*}}":1:1 parent @$s9MacroUser0023macro_expandswift_elFCffMX{{.*}}_12customFileIDfMf_ {{.*}} inlined_at [[EXPANSION_SCOPE]] }
+  // CHECK-SIL: string_literal utf8 "MacroUser/macro_expand.swift", loc "@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX{{.*}}_12customFileIDfMf_.swift":1:1, scope [[MACRO_SCOPE]]
+  // CHECK-IR-DAG: !DISubprogram(name: "customFileID", linkageName: "$s9MacroUser0023macro_expandswift_elFCffMX{{.*}}_12customFileIDfMf_"
 
   // CHECK: Builtin result is MacroUser/macro_expand.swift
   // CHECK-AST: macro_expansion_expr type='String'{{.*}}name=line
   print("Builtin result is \(#fileID)")
   print(
-    // CHECK-IR-DAG: ![[L1:[0-9]+]] = distinct !DILocation(line: [[@LINE+3]], column: 5
+    // CHECK-IR-DAG: ![[L1:[0-9]+]] = distinct !DILocation(line: [[@LINE+4]], column: 5
     // CHECK-IR-DAG: ![[L2:[0-9]+]] = distinct !DILocation({{.*}}inlinedAt: ![[L1]])
-    // CHECK-IR-DAG: !DIFile(filename: "{{.*}}@__swiftmacro_9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_.swift", {{.*}}source: "{{.*}}MacroUser/macro_expand.swift{{.*}}// original-source-range: {{.*}}")
+    // CHECK-IR-DAG: !DIFile(filename: "{{.*}}@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX{{.*}}_12customFileIDfMf_.swift", {{.*}}source: "{{.*}}MacroUser/macro_expand.swift{{.*}}// original-source-range: {{.*}}")
+    // CHECK-IR-DWARF4: {{(target triple = .*-unknown-windows-msvc)|(!DIFile\(filename: ".*generated-.*@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX.*_12customFileIDfMf_.swift", directory: "[^"]*"\))}}
     #addBlocker(
       #stringify(a - b)
       )
@@ -277,9 +355,14 @@ func testNested() {
   struct Nested { }
   _ = #stringify(#assertAny(Nested()))
   // expected-note@-1 {{in expansion of macro 'stringify' here}}
-// CHECK-DIAGS-NOT: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
-// CHECK-DIAGS: @__swiftmacro_9MacroUser10testNestedyyF9stringifyfMf_9assertAnyfMf_.swift:1:8: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
-// CHECK-DIAGS-NOT: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
+  /*
+  expected-expansion@-3:7 {{
+    expected-note@1:2{{in expansion of macro 'assertAny' here}}
+    expected-expansion@1:2{{
+      expected-error@1:8{{cannot convert value of type 'Nested' to expected argument type 'Bool'}}
+    }}
+  }}
+  */
 
   // PRETTY-DIAGS: 1:8: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
   // PRETTY-DIAGS: macro_expand.swift:{{.*}}:39: note: expanded code originates here
@@ -298,12 +381,31 @@ func testStringifyWithThrows() throws {
 #if TEST_DIAGNOSTICS
   // FIXME: Lots of duplicate notes here
   _ = #stringify(maybeThrowing()) // expected-note 4{{in expansion of macro 'stringify' here}}
+  /*
+  expected-expansion@-2:7 {{
+    expected-error@1:2{{call can throw but is not marked with 'try'}}
+    expected-note@1:2{{did you mean to disable error propagation?}}
+    expected-note@1:2{{did you mean to handle error as optional value?}}
+    expected-note@1:2{{did you mean to use 'try'?}}
+  }}
+  */
 
-    // CHECK-DIAGS: @__swiftmacro_9MacroUser23testStringifyWithThrowsyyKF9stringifyfMf1_.swift:1:2: error: call can throw but is not marked with 'try'
 #endif
 
   // The macro adds the 'try' for us.
   _ = #stringifyAndTry(maybeThrowing())
+}
+
+@available(SwiftStdlib 5.1, *)
+func throwingFunc() async throws -> Int { 5 }
+
+@freestanding(expression) macro callThrowingFunc<T>(_ body: () -> T) -> T = #externalMacro(module: "MacroDefinition", type: "TryCallThrowingFuncMacro")
+
+@available(SwiftStdlib 5.1, *)
+func testThrowingCall() async throws -> Int {
+  #callThrowingFunc {
+    [1, 2, 3, 4, 5].map { $0 + 1 }.first!
+  }
 }
 
 func testStringifyWithLocalType() throws {
@@ -327,14 +429,18 @@ func testAddBlocker(a: Int, b: Int, c: Int, oa: OnlyAdds) {
   _ = #addBlocker(oa + oa) // expected-error{{blocked an add; did you mean to subtract? (from macro 'addBlocker')}}
   // expected-note@-1{{in expansion of macro 'addBlocker' here}}
   // expected-note@-2{{use '-'}}{{22-23=-}}
-
-  // CHECK-DIAGS: @__swiftmacro_9MacroUser14testAddBlocker1a1b1c2oaySi_S2iAA8OnlyAddsVtF03addE0fMf1_.swift:1:4: error: binary operator '-' cannot be applied to two 'OnlyAdds' operands [] []
-  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser14testAddBlocker1a1b1c2oaySi_S2iAA8OnlyAddsVtF03addE0fMf1_.swift:
-  // CHECK-DIAGS-NEXT: Original source range: {{.*}}macro_expand.swift:[[@LINE-6]]:7 - {{.*}}macro_expand.swift:[[@LINE-6]]:27
-  // CHECK-DIAGS-NEXT: oa - oa
-  // CHECK-DIAGS-NEXT: END CONTENTS OF FILE
+  /*
+  expected-expansion@-4:7 {{
+    expected-error@1:4{{binary operator '-' cannot be applied to two 'OnlyAdds' operands}}
+  }}
+  */
 
   _ = #addBlocker({ // expected-note{{in expansion of macro 'addBlocker' here}}
+  /*
+  expected-expansion@-2:7 {{
+    expected-error@9:16{{referencing operator function '-' on 'FloatingPoint' requires that 'OnlyAdds' conform to 'FloatingPoint'}}
+  }}
+  */
 
       print("hello")
       print(oa + oa) // expected-error{{blocked an add; did you mean to subtract? (from macro 'addBlocker')}}
@@ -345,7 +451,13 @@ func testAddBlocker(a: Int, b: Int, c: Int, oa: OnlyAdds) {
 
   // Check recursion.
   #recurse(false) // okay
-  #recurse(true) // expected-note{{in expansion of macro 'recurse' here}}
+  #recurse(true)
+  /*
+  expected-expansion@-2:3 {{
+    expected-error@1:1{{recursive expansion of macro 'recurse'}}
+  }}
+  expected-note@-5{{in expansion of macro 'recurse' here}}
+  */
 #endif
 }
 
@@ -373,7 +485,7 @@ func testNestedDeclInExpr() {
 macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")
 
 // Freestanding macros are not in inlined scopes.
-// CHECK-SIL: sil_scope {{.*}} { loc "@__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo2L_V25defineDeclsWithKnownNamesfMf_.swift"{{.*}} -> Int }
+// CHECK-SIL: sil_scope {{.*}} { loc "@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX{{.*}}_25defineDeclsWithKnownNamesfMf_.swift"{{.*}} -> Int }
 
 // FIXME: Macros producing arbitrary names are not supported yet
 #if false
@@ -436,10 +548,18 @@ func testFreestandingMacroExpansion() {
   struct Foo3 {
     #bitwidthNumberedStructs("BUG", blah: false)
     // expected-note@-1 4{{in expansion of macro 'bitwidthNumberedStructs' here}}
-    // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_.swift
+    /*
+    expected-expansion@-3:5 {{
+      expected-error@3:14{{unexpected non-void return value in void function}}
+      expected-note@3:14{{did you mean to add a return type?}}
+      expected-error@6:14{{unexpected non-void return value in void function}}
+      expected-note@6:14{{did you mean to add a return type?}}
+    }}
+    */
+    // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX{{.*}}_23bitwidthNumberedStructsfMf_.swift
     // CHECK-DIAGS: struct BUG {
-    // CHECK-DIAGS:   func $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu_()
-    // CHECK-DIAGS:   func $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu0{{_?}}()
+    // CHECK-DIAGS:   func $s9MacroUser0023macro_expandswift_elFCffMX{{.*}}_23bitwidthNumberedStructsfMf_6methodfMu_()
+    // CHECK-DIAGS:   func $s9MacroUser0023macro_expandswift_elFCffMX{{.*}}_23bitwidthNumberedStructsfMf_6methodfMu0{{_?}}()
   }
   #endif
 
@@ -626,11 +746,100 @@ struct HasNestedType {
   #DefineComparableType
 }
 
+@attached(accessor)
+macro AddGetter() = #externalMacro(module: "MacroDefinition", type: "AddGetterMacro")
+
+// Make sure the mangling for the accessor macro doesn't kick local
+// discriminator assignment, which would miss the autoclosure.
+func testLocalAccessorMacroWithAutoclosure() {
+  @AddGetter
+  var x: Int = 2
+
+  func takesAutoclosure(_ x: @autoclosure () -> Int) {}
+  takesAutoclosure(1)
+}
+
+@propertyWrapper
+struct SomePropertyWrapper<T> {
+  var wrappedValue: T
+  init(wrappedValue: T) {
+    self.wrappedValue = wrappedValue
+  }
+  init(projectedValue: Self) {
+    self = projectedValue
+  }
+  var projectedValue: Self { self }
+}
+
+// Property wrappers on macros probably aren't all that useful, but make sure
+// we don't crash.
+@freestanding(expression)
+macro hasPropertyWrapperParam(@SomePropertyWrapper x: Int) = #externalMacro(module: "MacroDefinition", type: "GenericToVoidMacro")
+
+func testPropertyWrapperMacro() {
+  #hasPropertyWrapperParam(x: 0)
+  #hasPropertyWrapperParam($x: .init(wrappedValue: 0))
+}
+
+#if swift(>=1.0) && TEST_DIAGNOSTICS
+// Test that macros can't be used in @abi
+
+struct ABIAttrWithFreestandingMacro1 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  #varValue
+  // expected-note@-1 {{in expansion of macro 'varValue' here}}
+  /*
+  expected-expansion@-3:3 {{
+    expected-error@2:6{{cannot use pound literal in '@abi'}}
+  }}
+  */
+}
+
+struct ABIAttrWithFreestandingMacro2 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  var value: Int { 0 }
+}
+
+struct ABIAttrWithFreestandingMacro3 {
+  @abi(var value: Int)
+  #varValue
+}
+
+#endif
+
 #if TEST_DIAGNOSTICS
 @freestanding(expression)
 macro missingMacro() = #externalMacro(module: "MacroDefinition", type: "BluhBlah")
-// expected-warning@-1 {{external macro implementation type 'MacroDefinition.BluhBlah' could not be found for macro 'missingMacro()'; 'MacroDefinition.BluhBlah' could not be found in library plugin '}}
+// FIXME: xpected-warning@-1 {{external macro implementation type 'MacroDefinition.BluhBlah' could not be found for macro 'missingMacro()'; 'MacroDefinition.BluhBlah' could not be found in library plugin '}}
 @freestanding(expression)
 macro notMacro() = #externalMacro(module: "MacroDefinition", type: "NotMacroStruct")
-// expected-warning@-1 {{macro implementation type 'MacroDefinition.NotMacroStruct' could not be found for macro 'notMacro()'; 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '}}
+// FIXME: xpected-warning@-1 {{macro implementation type 'MacroDefinition.NotMacroStruct' could not be found for macro 'notMacro()'; 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '}}
+
+// Because this is a method in a local decl, it ends up getting delayed, so
+// we need to check it at the end of the file.
+// FIXME: We either need to switch to using CHECK-DAG, or ideally teach
+// the diagnostic verifier about macro expansion buffers.
+func invalidDeclarationMacro2() {
+  struct LocalThing1 {
+    func f() {
+      #accidentalCodeItem
+      // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
+      /*
+      expected-expansion@-3:7 {{
+        expected-error@1:1{{expected macro expansion to produce a declaration}}
+      }}
+      */
+    }
+  }
+}
 #endif
+
+// Make sure we compute captures for the introduced stored property here.
+struct HasStoredProperty {
+  #AddStoredProperty(0)
+}
+class HasStoredPropertyClass {
+  #AddStoredProperty(0)
+}

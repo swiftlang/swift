@@ -21,14 +21,14 @@
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 
-// RUN: %target-swift-frontend -cache-compile-job -Rcache-compile-job %t/test.swift -O -emit-module -o %t/Test.swiftmodule \
+// RUN: %target-swift-frontend-plain -cache-compile-job -Rcache-compile-job %t/test.swift -O -emit-module -o %t/Test.swiftmodule \
 // RUN:  -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:  -disable-implicit-swift-modules -explicit-swift-module-map-file @%t/map.casid \
 // RUN:  -module-name Test -cas-path %t/cas @%t/MyApp.cmd -index-system-modules -index-store-path %t/db 2>&1 | %FileCheck --check-prefix=CACHE-MISS %s
 // RUN: ls %t/db
 
 /// Cache hit with a different index-store-path. Note cache hit will skip replay index data.
-// RUN: %target-swift-frontend -cache-compile-job -Rcache-compile-job %t/test.swift -O -emit-module -o %t/Test.swiftmodule \
+// RUN: %target-swift-frontend-plain -cache-compile-job -Rcache-compile-job %t/test.swift -O -emit-module -o %t/Test.swiftmodule \
 // RUN:  -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:  -disable-implicit-swift-modules -explicit-swift-module-map-file @%t/map.casid \
 // RUN:  -module-name Test -cas-path %t/cas @%t/MyApp.cmd -index-system-modules -index-store-path %t/db2 2>&1 | %FileCheck --check-prefix=CACHE-HIT %s

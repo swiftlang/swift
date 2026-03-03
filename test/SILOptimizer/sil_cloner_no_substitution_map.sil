@@ -1,0 +1,44 @@
+// RUN: %target-sil-opt %s -mandatory-allocbox-to-stack
+
+// This tickled a bug in the SILCloner that was caught by the verifier.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+protocol P {
+    associatedtype A
+}
+
+protocol Q: AnyObject {
+}
+
+struct S: P {
+  typealias A = Int
+}
+
+sil [ossa] @testit : $@convention(thin) (Int, @guaranteed any Q, @in_guaranteed Int, @in_guaranteed S) -> () {
+bb0(%0 : $Int, %3 : @guaranteed $any Q, %4 : $*Int, %5 : $*S):
+  %6 = alloc_box ${ var Int }, var, name "duration"
+  %7 = begin_borrow [var_decl] %6
+  %8 = project_box %7, 0
+  store %0 to [trivial] %8
+  %66 = function_ref @closure : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 == τ_0_1.A, τ_0_1 : P> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1, @guaranteed { var Int }, @guaranteed any Q) -> ()
+  %67 = apply %66<Int, S>(%4, %5, %7, %3) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 == τ_0_1.A, τ_0_1 : P> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1, @guaranteed { var Int }, @guaranteed any Q) -> ()
+  end_borrow %7
+  destroy_value %6
+  %75 = tuple ()
+  return %75
+}
+
+sil private [ossa] @closure : $@convention(thin) <T, V where T == V.A, V : P> (@in_guaranteed T, @in_guaranteed V, @guaranteed { var Int }, @guaranteed any Q) -> () {
+bb0(%0 : $*T, %1 : $*V, %2 : @closureCapture @guaranteed ${ var Int }, %3 : @closureCapture @guaranteed $any Q):
+  %13 = open_existential_ref %3 to $@opened("891BD9C8-56A2-11F0-A4DF-0EA13E3AABAF", any Q) Self
+  %17 = apply undef<@opened("891BD9C8-56A2-11F0-A4DF-0EA13E3AABAF", any Q) Self, V>(%0, %1) : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : P> (@in_guaranteed τ_1_0.A, @in_guaranteed τ_1_0) -> ()
+  %20 = tuple ()
+  return %20
+}
+
+

@@ -15,7 +15,7 @@ bb0(%0 : $ConformingAssoc):
   return %2 : $()
 }
 
-sil @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@convention(witness_method: AssocReqt) (@inout ConformingAssoc) -> () {
+sil @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@convention(witness_method: AssocReqt) (@in_guaranteed ConformingAssoc) -> () {
 bb0(%0 : $*ConformingAssoc):
   %1 = load %0 : $*ConformingAssoc
   %2 = function_ref @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@convention(method) (ConformingAssoc) -> ()
@@ -27,6 +27,13 @@ bb0(%0 : $*ConformingAssoc):
 // CHECK: #AssocReqt.requiredMethod: {{.*}} : @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
 // CHECK: }
 sil_witness_table ConformingAssoc: AssocReqt module witness_tables {
+  method #AssocReqt.requiredMethod: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
+}
+
+// CHECK-LABEL: sil_witness_table [specialized] ConformingAssoc: AssocReqt module witness_tables {
+// CHECK: #AssocReqt.requiredMethod: {{.*}} : @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
+// CHECK: }
+sil_witness_table [specialized] ConformingAssoc: AssocReqt module witness_tables {
   method #AssocReqt.requiredMethod: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
 }
 
@@ -66,11 +73,11 @@ sil_witness_table InheritedConformance: InheritedProtocol1 module witness_tables
 
 // CHECK-LABEL: sil_witness_table shared InheritedConformance: AnyProtocol module
 // CHECK: associated_type AssocType: SomeAssoc
-// CHECK: associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module
+// CHECK: associated_conformance (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module
 // CHECK: }
 sil_witness_table shared InheritedConformance: AnyProtocol module witness_tables {
   associated_type AssocType: SomeAssoc
-  associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
+  associated_conformance (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 }
 
 // CHECK-LABEL: sil_witness_table InheritedConformance2: InheritedProtocol1 module witness_tables
@@ -107,10 +114,10 @@ extension ConditionalStruct : P where T : P {
 }
 
 // CHECK-LABEL: sil_witness_table hidden <T where T : P> ConditionalStruct<T>: P module witness_tables {
-// CHECK-NEXT:    conditional_conformance (T: P): dependent
+// CHECK-NEXT:    conditional_conformance (T: P): dependent T
 // CHECK-NEXT:   }
 sil_witness_table hidden <T where T : P> ConditionalStruct<T>: P module t4 {
-  conditional_conformance (T: P): dependent
+  conditional_conformance (T: P): dependent T
 }
 
 sil_default_witness_table hidden P {

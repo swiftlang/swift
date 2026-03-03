@@ -118,7 +118,7 @@ func readInputNormalizationTest(index: Int) -> [NormalizationTest] {
 public let normalizationTests = readInputNormalizationTest(index: 2)
 
 // Native normalization in stdlib supporting Unicode 14
-public let normalizationTests14 = readInputNormalizationTest(index: 3)
+public let normalizationTestsNew = readInputNormalizationTest(index: 3)
 #endif
 
 public struct UTFTest {

@@ -28,6 +28,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
@@ -39,18 +40,23 @@ class FindCapturedVars : public ASTWalker {
   SmallVector<CapturedValue, 4> Captures;
   llvm::SmallDenseMap<ValueDecl*, unsigned, 4> captureEntryNumber;
 
-  /// We track the pack expansion expressions in ForEachStmts, because
-  /// their local generics remain in scope until the end of the statement.
-  llvm::DenseSet<PackExpansionExpr *> ForEachPatternSequences;
+  /// Opened element environments introduced by `for ... in repeat`
+  /// statements.
+  llvm::SetVector<GenericEnvironment *> VisitingForEachEnv;
 
-  /// A stack of pack element environments we're currently walking into.
-  /// A reference to an element archetype defined by one of these is not
-  /// a capture.
-  llvm::SetVector<GenericEnvironment *> VisitingEnvironments;
+  /// Opened element environments introduced by `repeat` expressions.
+  llvm::SetVector<GenericEnvironment *> VisitingPackExpansionEnv;
 
-  /// A set of pack element environments we've encountered that were not
+  /// A set of local generic environments we've encountered that were not
   /// in the above stack; those are the captures.
+  ///
+  /// Once we can capture opened existentials, opened existential environments
+  /// can go here too.
   llvm::SetVector<GenericEnvironment *> CapturedEnvironments;
+
+  /// The captured types.
+  SmallVector<CapturedType, 4> CapturedTypes;
+  llvm::SmallDenseMap<CanType, unsigned, 4> CapturedTypeEntryNumber;
 
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
@@ -60,6 +66,7 @@ class FindCapturedVars : public ASTWalker {
   DeclContext *CurDC;
   bool NoEscape, ObjC;
   bool HasGenericParamCaptures;
+  bool HasUsesOfCurrentIsolation = false;
 
 public:
   FindCapturedVars(SourceLoc CaptureLoc,
@@ -81,7 +88,12 @@ public:
 
     return CaptureInfo(Context, Captures, dynamicSelfToRecord,
                        OpaqueValue, HasGenericParamCaptures,
-                       CapturedEnvironments.getArrayRef());
+                       CapturedEnvironments.getArrayRef(),
+                       CapturedTypes);
+  }
+
+  bool hasUsesOfCurrentIsolation() const {
+    return HasUsesOfCurrentIsolation;
   }
 
   bool hasGenericParamCaptures() const {
@@ -154,6 +166,22 @@ public:
       }));
     }
 
+    // Note that we're using a generic type.
+    auto recordUseOfGenericType = [&](Type type) {
+      if (!HasGenericParamCaptures) {
+        GenericParamCaptureLoc = loc;
+        HasGenericParamCaptures = true;
+      }
+
+      auto [insertionPos, inserted] = CapturedTypeEntryNumber.insert(
+          {type->getCanonicalType(), CapturedTypes.size()});
+      if (inserted) {
+        CapturedTypes.push_back(CapturedType(type, loc));
+      } else if (CapturedTypes[insertionPos->second].getLoc().isInvalid()) {
+        CapturedTypes[insertionPos->second] = CapturedType(type, loc);
+      }
+    };
+
     // Similar to dynamic 'Self', IRGen doesn't really need type metadata
     // for class-bound archetypes in nearly as many cases as with opaque
     // archetypes.
@@ -167,27 +195,23 @@ public:
         // outside the body of the current closure.
         if (auto *element = t->getAs<ElementArchetypeType>()) {
           auto *env = element->getGenericEnvironment();
-          if (VisitingEnvironments.count(env) == 0)
+          if (VisitingForEachEnv.count(env) == 0 &&
+              VisitingPackExpansionEnv.count(env) == 0)
             CapturedEnvironments.insert(env);
         }
 
-        if ((t->is<PrimaryArchetypeType>() ||
-             t->is<PackArchetypeType>() ||
-             t->is<GenericTypeParamType>()) &&
-            !HasGenericParamCaptures) {
-          GenericParamCaptureLoc = loc;
-          HasGenericParamCaptures = true;
+        if (t->is<PrimaryArchetypeType>() ||
+            t->is<PackArchetypeType>() ||
+            t->is<GenericTypeParamType>()) {
+          recordUseOfGenericType(t);
         }
       }));
     }
 
     if (auto *gft = type->getAs<GenericFunctionType>()) {
       TypeCaptureWalker walker(ObjC, [&](Type t) {
-        if (t->is<GenericTypeParamType>() &&
-            !HasGenericParamCaptures) {
-          GenericParamCaptureLoc = loc;
-          HasGenericParamCaptures = true;
-        }
+        if (t->is<GenericTypeParamType>())
+          recordUseOfGenericType(t);
       });
 
       for (const auto &param : gft->getParams())
@@ -201,7 +225,11 @@ public:
   /// if invalid.
   void addCapture(CapturedValue capture) {
     auto VD = capture.getDecl();
-    
+    if (!VD) {
+      Captures.push_back(capture);
+      return;
+    }
+
     if (auto var = dyn_cast<VarDecl>(VD)) {
       // `async let` variables cannot currently be captured.
       if (var->isAsyncLet()) {
@@ -227,22 +255,38 @@ public:
 
     // Visit the type of the capture, if it isn't a class reference, since
     // we'd need the metadata to do so.
-    if (VD->hasInterfaceType()
-        && (!ObjC
+    if (!ObjC
             || !isa<VarDecl>(VD)
-            || !cast<VarDecl>(VD)->getTypeInContext()->hasRetainablePointerRepresentation()))
+            || !cast<VarDecl>(VD)->getTypeInContext()->hasRetainablePointerRepresentation())
       checkType(VD->getInterfaceType(), VD->getLoc());
   }
 
   LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
-    // We don't want to walk into lazy initializers because they're not
-    // really present at this level.  We'll catch them when processing
-    // the getter.
-    return LazyInitializerWalking::None;
+    // Captures for lazy initializers are computed as part of the parent
+    // accessor.
+    return LazyInitializerWalking::InAccessor;
   }
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Expansion;
+  }
+
+  PreWalkResult<Expr *> walkToPackElementExpr(PackElementExpr *PEE) {
+    // A pack element reference expression like `each t` or `each f()`
+    // expands within the innermost pack expansion expression. If there
+    // isn't one, it's from an outer function, so we record the capture.
+    if (!VisitingPackExpansionEnv.empty())
+      return Action::Continue(PEE);
+
+    unsigned Flags = 0;
+
+    // If the closure is noescape, then we can capture the pack element
+    // as noescape.
+    if (NoEscape)
+      Flags |= CapturedValue::IsNoEscape;
+
+    addCapture(CapturedValue(PEE, Flags));
+    return Action::SkipChildren(PEE);
   }
 
   PreWalkResult<Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
@@ -325,9 +369,8 @@ public:
         // }
         if (!isa<FuncDecl>(D)) {
           if (DC->isLocalContext()) {
-            Context.Diags.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
-                                   NTD->getDescriptiveKind(),
-                                   D->getBaseIdentifier());
+            Context.Diags.diagnose(DRE->getLoc(),
+                                   diag::capture_across_type_decl, NTD, D);
 
             NTD->diagnose(diag::kind_declared_here,
                           DescriptiveDeclKind::Type);
@@ -357,13 +400,11 @@ public:
     // If this is a direct reference to underlying storage, then this is a
     // capture of the storage address - not a capture of the getter/setter.
     if (auto var = dyn_cast<VarDecl>(D)) {
-      if (var->getAccessStrategy(DRE->getAccessSemantics(),
-                                 var->supportsMutation()
-                                   ? AccessKind::ReadWrite
-                                   : AccessKind::Read,
-                                 CurDC->getParentModule(),
-                                 CurDC->getResilienceExpansion())
-          .getKind() == AccessStrategy::Storage)
+      if (var->isAccessedViaPhysicalStorage(
+              DRE->getAccessSemantics(),
+              var->supportsMutation() ? AccessKind::ReadWrite
+                                      : AccessKind::Read,
+              CurDC->getParentModule(), CurDC->getResilienceExpansion()))
         Flags |= CapturedValue::IsDirect;
     }
 
@@ -378,7 +419,14 @@ public:
   void propagateCaptures(CaptureInfo captureInfo, SourceLoc loc) {
     for (auto capture : captureInfo.getCaptures()) {
       // If the decl was captured from us, it isn't captured *by* us.
-      if (capture.getDecl()->getDeclContext() == CurDC)
+      if (capture.getDecl() &&
+          capture.getDecl()->getDeclContext() == CurDC)
+        continue;
+
+      // If the inner closure is nested in a PackExpansionExpr, it's
+      // PackElementExpr captures are not our captures.
+      if (capture.getPackElement() &&
+          !VisitingPackExpansionEnv.empty())
         continue;
 
       // Compute adjusted flags.
@@ -393,7 +441,7 @@ public:
       if (!NoEscape)
         Flags &= ~CapturedValue::IsNoEscape;
 
-      addCapture(CapturedValue(capture.getDecl(), Flags, capture.getLoc()));
+      addCapture(capture.mergeFlags(Flags));
     }
 
     if (!HasGenericParamCaptures) {
@@ -609,11 +657,8 @@ public:
     if (auto *DRE = dyn_cast<DeclRefExpr>(E))
       return walkToDeclRefExpr(DRE);
 
-    // Look into lazy initializers.
-    if (auto *LIE = dyn_cast<LazyInitializerExpr>(E)) {
-      LIE->getSubExpr()->walk(*this);
-      return Action::Continue(E);
-    }
+    if (auto *PEE = dyn_cast<PackElementExpr>(E))
+      return walkToPackElementExpr(PEE);
 
     // When we see a reference to the 'super' expression, capture 'self' decl.
     if (auto *superE = dyn_cast<SuperRefExpr>(E)) {
@@ -644,8 +689,37 @@ public:
 
     if (auto expansion = dyn_cast<PackExpansionExpr>(E)) {
       if (auto *env = expansion->getGenericEnvironment()) {
-        assert(VisitingEnvironments.count(env) == 0);
-        VisitingEnvironments.insert(env);
+        assert(VisitingPackExpansionEnv.count(env) == 0);
+        VisitingPackExpansionEnv.insert(env);
+      }
+    }
+
+    if (auto typeValue = dyn_cast<TypeValueExpr>(E)) {
+      checkType(typeValue->getParamType(), E->getLoc());
+    }
+
+    // Record that we saw an #isolation expression that hasn't been filled in.
+    if (auto currentIsolation = dyn_cast<CurrentContextIsolationExpr>(E)) {
+      if (!currentIsolation->getActor())
+        HasUsesOfCurrentIsolation = true;
+    }
+
+    // Record that we saw an apply of a function with caller isolation.
+    if (auto apply = dyn_cast<ApplyExpr>(E)) {
+      if (auto type = apply->getFn()->getType()) {
+        if (auto fnType = type->getAs<AnyFunctionType>();
+            fnType && fnType->getIsolation().isNonIsolatedCaller()) {
+          HasUsesOfCurrentIsolation = true;
+        }
+      }
+    }
+
+    // Look into caller-side default arguments.
+    if (auto defArg = dyn_cast<DefaultArgumentExpr>(E)) {
+      if (defArg->isCallerSide()) {
+        if (auto callerSideExpr = defArg->getCallerSideDefaultExpr()) {
+          callerSideExpr->walk(*this);
+        }
       }
     }
 
@@ -655,13 +729,10 @@ public:
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     if (auto expansion = dyn_cast<PackExpansionExpr>(E)) {
       if (auto *env = expansion->getGenericEnvironment()) {
-        assert(env == VisitingEnvironments.back());
+        assert(env == VisitingPackExpansionEnv.back());
         (void) env;
 
-        // If this is the pack expansion of a for .. in loop, the generic
-        // environment remains in scope until the end of the loop.
-        if (ForEachPatternSequences.count(expansion) == 0)
-          VisitingEnvironments.pop_back();
+        VisitingPackExpansionEnv.pop_back();
       }
     }
 
@@ -671,12 +742,12 @@ public:
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *forEachStmt = dyn_cast<ForEachStmt>(S)) {
       if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(forEachStmt->getParsedSequence())) {
+              dyn_cast<PackExpansionExpr>(forEachStmt->getSequence())) {
         if (auto *env = expansion->getGenericEnvironment()) {
           // Remember this generic environment, so that it remains on the
           // visited stack until the end of the for .. in loop.
-          assert(ForEachPatternSequences.count(expansion) == 0);
-          ForEachPatternSequences.insert(expansion);
+          assert(VisitingForEachEnv.count(env) == 0);
+          VisitingForEachEnv.insert(env);
         }
       }
     }
@@ -687,15 +758,12 @@ public:
   PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
     if (auto *forEachStmt = dyn_cast<ForEachStmt>(S)) {
       if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(forEachStmt->getParsedSequence())) {
+              dyn_cast<PackExpansionExpr>(forEachStmt->getSequence())) {
         if (auto *env = expansion->getGenericEnvironment()) {
-          assert(ForEachPatternSequences.count(expansion) != 0);
-          ForEachPatternSequences.erase(expansion);
-
-          // Clean up the generic environment bound by the for loop.
-          assert(env == VisitingEnvironments.back());
-          VisitingEnvironments.pop_back();
+          assert(VisitingForEachEnv.back() == env);
           (void) env;
+
+          VisitingForEachEnv.pop_back();
         }
       }
     }
@@ -706,6 +774,36 @@ public:
 
 } // end anonymous namespace
 
+/// Given that a local function is isolated to the given var, should we
+/// force a capture of the var?
+static bool shouldCaptureIsolationInLocalFunc(AbstractFunctionDecl *AFD,
+                                              VarDecl *var,
+                                              bool hasUsesOfCurrentIsolation) {
+  assert(isa<ParamDecl>(var));
+
+  // Don't try to capture an isolated parameter of the function itself.
+  if (var->getDeclContext() == AFD)
+    return false;
+
+  // Force capture if we have uses of the isolation in the function body.
+  if (hasUsesOfCurrentIsolation)
+    return true;
+
+  // We only *need* to force a capture of the isolation in an async function
+  // (in which case it's needed for executor switching) or if we're in the
+  // mode that forces an executor check in all synchronous functions. But
+  // it's a simpler rule if we just do it unconditionally.
+
+  // However, don't do it for the implicit functions that represent defer
+  // bodies, where it is both unnecessary and likely to lead to bad diagnostics.
+  // We already suppress the executor check in defer bodies.
+  if (auto FD = dyn_cast<FuncDecl>(AFD))
+    if (FD->isDeferBody())
+      return false;
+
+  return true;
+}
+
 CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
                                          AbstractFunctionDecl *AFD) const {
   auto type = AFD->getInterfaceType();
@@ -714,13 +812,26 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
 
   bool isNoEscape = type->castTo<AnyFunctionType>()->isNoEscape();
   FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape,
-                          AFD->isObjC(), AFD->isGeneric());
+                          AFD->isObjC(), AFD->hasGenericParamList());
 
   if (auto *body = AFD->getTypecheckedBody())
     body->walk(finder);
 
   if (!AFD->isObjC()) {
     finder.checkType(type, AFD->getLoc());
+  }
+
+  if (AFD->isLocalCapture()) {
+    // If a local function inherits isolation from the enclosing context,
+    // make sure we capture the isolated parameter, if we haven't already.
+    auto actorIsolation = getActorIsolation(AFD);
+    if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
+      if (auto *var = actorIsolation.getActorInstance()) {
+        if (shouldCaptureIsolationInLocalFunc(AFD, var,
+                                              finder.hasUsesOfCurrentIsolation()))
+          finder.addCapture(CapturedValue(var, 0, AFD->getLoc()));
+      }
+    }
   }
 
   // Extensions of generic ObjC functions can't use generic parameters from
@@ -734,8 +845,9 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
         std::optional<ForeignAsyncConvention> asyncConvention;
         std::optional<ForeignErrorConvention> errorConvention;
         if (!AFD->isObjC() &&
-            isRepresentableInObjC(AFD, ObjCReason::MemberOfObjCMembersClass,
-                                  asyncConvention, errorConvention)) {
+            isRepresentableInLanguage(AFD,
+                                      ObjCReason::MemberOfObjCMembersClass,
+                                      asyncConvention, errorConvention)) {
           AFD->diagnose(
                    diag::objc_generic_extension_using_type_parameter_try_objc)
             .fixItInsert(AFD->getAttributeInsertionLoc(false), "@objc ");
@@ -801,43 +913,30 @@ CaptureInfo ParamCaptureInfoRequest::evaluate(Evaluator &evaluator,
   return finder.getCaptureInfo();
 }
 
-static bool isLazy(PatternBindingDecl *PBD) {
-  if (auto var = PBD->getSingleVar())
-    return var->getAttrs().hasAttribute<LazyAttr>();
-  return false;
-}
+CaptureInfo PatternBindingCaptureInfoRequest::evaluate(Evaluator &evaluator,
+                                                       PatternBindingDecl *PBD,
+                                                       unsigned int idx) const {
+  auto *init = PBD->getExecutableInit(idx);
+  if (!init)
+    return CaptureInfo::empty();
 
-void TypeChecker::checkPatternBindingCaptures(IterableDeclContext *DC) {
-  for (auto member : DC->getMembers()) {
-    // Ignore everything other than PBDs.
-    auto *PBD = dyn_cast<PatternBindingDecl>(member);
-    if (!PBD) continue;
-    // Walk the initializers for all properties declared in the type with
-    // an initializer.
-    for (unsigned i : range(PBD->getNumPatternEntries())) {
-      if (PBD->isInitializerSubsumed(i))
-        continue;
+  // Only have captures when we have a PatternBindingInitializer context, i.e
+  // local variables don't have captures.
+  auto *DC = PBD->getInitContext(idx);
+  if (!DC)
+    return CaptureInfo::empty();
 
-      auto *init = PBD->getInit(i);
-      if (init == nullptr)
-        continue;
+  FindCapturedVars finder(init->getLoc(), DC,
+                          /*NoEscape=*/false,
+                          /*ObjC=*/false,
+                          /*IsGenericFunction*/ false);
+  init->walk(finder);
 
-      auto *DC = PBD->getInitContext(i);
-      FindCapturedVars finder(init->getLoc(),
-                              DC,
-                              /*NoEscape=*/false,
-                              /*ObjC=*/false,
-                              /*IsGenericFunction*/false);
-      init->walk(finder);
-
-      auto &ctx = DC->getASTContext();
-      if (finder.getDynamicSelfCaptureLoc().isValid() && !isLazy(PBD)) {
-        ctx.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
-                           diag::dynamic_self_stored_property_init);
-      }
-
-      auto captures = finder.getCaptureInfo();
-      PBD->setCaptureInfo(i, captures);
-    }
+  auto &ctx = DC->getASTContext();
+  if (finder.getDynamicSelfCaptureLoc().isValid()) {
+    ctx.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
+                       diag::dynamic_self_stored_property_init);
   }
+
+  return finder.getCaptureInfo();
 }

@@ -1,10 +1,10 @@
 // RUN: %batch-code-completion
 
-// GLOBAL: Decl[GlobalVar]/CurrModule:         invalidDecl[#<<error type>>#];
+// GLOBAL: Decl[GlobalVar]/CurrModule:         invalidDecl[#_#];
 let invalidDecl = INVALID
 
 struct S {
-  // MEMBER: Decl[InstanceMethod]/CurrNominal:   invalidMethod()[#<<error type>>#];
+  // MEMBER: Decl[InstanceMethod]/CurrNominal:   invalidMethod()[#_#];
   func invalidMethod() -> INVALID
 }
 

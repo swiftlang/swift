@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 
 #include "swift/Strings.h"
@@ -92,26 +93,30 @@ bool file_types::isTextual(ID Id) {
   switch (Id) {
   case file_types::TY_Swift:
   case file_types::TY_SIL:
+  case file_types::TY_LoweredSIL:
   case file_types::TY_Dependencies:
   case file_types::TY_Assembly:
   case file_types::TY_ASTDump:
   case file_types::TY_RawSIL:
+  case file_types::TY_RawLLVM_IR:
   case file_types::TY_LLVM_IR:
   case file_types::TY_ClangHeader:
   case file_types::TY_AutolinkFile:
   case file_types::TY_ImportedModules:
   case file_types::TY_TBD:
   case file_types::TY_ModuleTrace:
+  case file_types::TY_FineModuleTrace:
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
   case file_types::TY_PackageSwiftModuleInterfaceFile:
   case file_types::TY_SwiftOverlayFile:
   case file_types::TY_JSONDependencies:
-  case file_types::TY_JSONFeatures:
+  case file_types::TY_JSONArguments:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_SwiftAPIDescriptor:
   case file_types::TY_ConstValues:
+  case file_types::TY_SymbolGraphFile:
     return true;
   case file_types::TY_Image:
   case file_types::TY_Object:
@@ -158,12 +163,14 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_ImportedModules:
   case file_types::TY_TBD:
   case file_types::TY_SIL:
+  case file_types::TY_LoweredSIL:
   case file_types::TY_Dependencies:
   case file_types::TY_ASTDump:
   case file_types::TY_RawSIL:
   case file_types::TY_ClangHeader:
   case file_types::TY_AutolinkFile:
   case file_types::TY_Image:
+  case file_types::TY_RawLLVM_IR:
   case file_types::TY_dSYM:
   case file_types::TY_SIB:
   case file_types::TY_RawSIB:
@@ -181,13 +188,14 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
   case file_types::TY_ModuleTrace:
+  case file_types::TY_FineModuleTrace:
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
   case file_types::TY_PackageSwiftModuleInterfaceFile:
   case file_types::TY_JSONDependencies:
-  case file_types::TY_JSONFeatures:
+  case file_types::TY_JSONArguments:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_SwiftAPIDescriptor:
@@ -195,6 +203,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_SwiftFixIt:
   case file_types::TY_ModuleSemanticInfo:
   case file_types::TY_CachedDiagnostics:
+  case file_types::TY_SymbolGraphFile:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
@@ -208,11 +217,13 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   switch (Id) {
   case file_types::TY_Swift:
   case file_types::TY_SIL:
+  case file_types::TY_LoweredSIL:
   case file_types::TY_RawSIL:
   case file_types::TY_SIB:
   case file_types::TY_RawSIB:
     return true;
   case file_types::TY_Assembly:
+  case file_types::TY_RawLLVM_IR:
   case file_types::TY_LLVM_IR:
   case file_types::TY_LLVM_BC:
   case file_types::TY_Object:
@@ -242,10 +253,11 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
   case file_types::TY_ModuleTrace:
+  case file_types::TY_FineModuleTrace:
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_JSONDependencies:
-  case file_types::TY_JSONFeatures:
+  case file_types::TY_JSONArguments:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_SwiftAPIDescriptor:
@@ -253,6 +265,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_SwiftFixIt:
   case file_types::TY_ModuleSemanticInfo:
   case file_types::TY_CachedDiagnostics:
+  case file_types::TY_SymbolGraphFile:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
@@ -270,10 +283,12 @@ bool file_types::isProducedFromDiagnostics(ID Id) {
     return true;
   case file_types::TY_Swift:
   case file_types::TY_SIL:
+  case file_types::TY_LoweredSIL:
   case file_types::TY_RawSIL:
   case file_types::TY_SIB:
   case file_types::TY_RawSIB:
   case file_types::TY_Assembly:
+  case file_types::TY_RawLLVM_IR:
   case file_types::TY_LLVM_IR:
   case file_types::TY_LLVM_BC:
   case file_types::TY_Object:
@@ -302,15 +317,17 @@ bool file_types::isProducedFromDiagnostics(ID Id) {
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
   case file_types::TY_ModuleTrace:
+  case file_types::TY_FineModuleTrace:
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_JSONDependencies:
-  case file_types::TY_JSONFeatures:
+  case file_types::TY_JSONArguments:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_SwiftAPIDescriptor:
   case file_types::TY_ConstValues:
   case file_types::TY_ModuleSemanticInfo:
+  case file_types::TY_SymbolGraphFile:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");

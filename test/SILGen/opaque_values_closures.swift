@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -disable-availability-checking -enable-sil-opaque-values -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -disable-availability-checking -enable-sil-opaque-values -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // Test SILGen -enable-sil-opaque-values with tests that depend on the stdlib.
 
@@ -374,7 +374,7 @@ func captureBoxNonopaqueOwnedEscaping_vend() -> C { return C() }
 // CHECK:         destroy_value [[VAR]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF'
 // CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF : {{.*}}
-// CHECK:       bb0(%0 : @closureCapture @guaranteed $<τ_0_0> { var BoxWrapper<τ_0_0> } <U>, 
+// CHECK:       bb0(%0 : @closureCapture @guaranteed $<τ_0_0> { var BoxWrapper<τ_0_0> } <U>,
 // CHECK-SAME:      %1 :
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF'
 func captureBoxNonopaqueOwnedNonescaping<U>(_ get: () -> U) {
@@ -385,4 +385,3 @@ func captureBoxNonopaqueOwnedNonescaping<U>(_ get: () -> U) {
   }
   local()
 }
-

@@ -25,7 +25,7 @@ public func foo() {}
 
 /// 2. Test importing the non-resilient no-channel library from a channel compiler.
 //--- NonResilientClient.swift
-import NonResilientLib // expected-error {{compiled module was created for a different distribution channel '' than the local compiler 'restricted-channel', please ensure 'NonResilientLib' is found from the expected path:}}
+import NonResilientLib // expected-error {{the binary module for 'NonResilientLib' was compiled for '', it cannot be imported by the current compiler which is aligned with 'restricted-channel'. Binary module loaded from path:}}
 foo()
 
 /// Building a NonResilientLib client should reject the import for a tagged compiler
@@ -37,7 +37,7 @@ foo()
 
 /// 3. Test importing the resilient no-channel library.
 //--- ResilientClient.swift
-import ResilientLib // expected-reject-error {{compiled module was created for a different distribution channel '' than the local compiler 'restricted-channel', please ensure 'ResilientLib' is found from the expected path:}}
+import ResilientLib // expected-reject-error {{the binary module for 'ResilientLib' was compiled for '', it cannot be imported by the current compiler which is aligned with 'restricted-channel'. Binary module loaded from path:}}
  // expected-rebuild-remark @-1 {{rebuilding module 'ResilientLib' from interface}}
  // expected-rebuild-note @-2 {{compiled module is out of date}}
  // expected-rebuild-note @-3 {{compiled for a different distribution channel}}
@@ -80,7 +80,7 @@ foo()
 
 /// 4. Test importing the channel restricted library
 //--- ChannelClient.swift
-import ChannelLib // expected-reject-error {{compiled module was created for a different distribution channel 'restricted-channel' than the local compiler 'other-channel', please ensure 'ChannelLib' is found from the expected path}}
+import ChannelLib // expected-reject-error {{the binary module for 'ChannelLib' was compiled for 'restricted-channel', it cannot be imported by the current compiler which is aligned with 'other-channel'. Binary module loaded from path:}}
 foo()
 
 /// Importing ChannelLib should succeed with the same channel.

@@ -80,6 +80,7 @@
     "RangeSetRanges.swift",
     "CollectionOfOne.swift",
     "BridgingBuffer.swift",
+    "BorrowingSequence.swift",
     "Sequence.swift",
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollection.swift",
@@ -96,6 +97,7 @@
       ],
       "Lazy Views": [
         "Algorithm.swift",
+        "EnumeratedSequence.swift",
         "Flatten.swift",
         "FlatMap.swift",
         "Map.swift",
@@ -122,7 +124,6 @@
         "ContiguousArray.swift",
         "ContiguousArrayBuffer.swift",
         "ContiguouslyStored.swift",
-        "FixedArray.swift",
         "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
@@ -178,25 +179,48 @@
       "UInt128.swift"],
     "Floating": [
       "FloatingPoint.swift",
+      "FloatingPointFromString.swift",
       "FloatingPointParsing.swift",
+      "FloatingPointToString.swift",
       "FloatingPointTypes.swift",
       "FloatingPointRandom.swift"],
     "Vector": [
-      "SIMDConcreteOperations.swift",
+      "SIMDIntegerConcreteOperations.swift",
+      "SIMDFloatConcreteOperations.swift",
+      "SIMDMaskConcreteOperations.swift",
       "SIMDVector.swift",
-      "SIMDVectorTypes.swift"]}
+      "SIMDVectorTypes.swift"
+    ]}
   ],
   "Optional": [
     "Optional.swift"
   ],
   "Pointer": [
     "Pointer.swift",
+    "SwiftifyImport.swift",
     "TemporaryAllocation.swift",
     "UnsafePointer.swift",
     "UnsafeRawPointer.swift",
     "UnsafeBufferPointer.swift",
     "UnsafeBufferPointerSlice.swift",
     "UnsafeRawBufferPointer.swift"
+  ],
+  "Span": [
+    "MutableRawSpan.swift",
+    "MutableSpan.swift",
+    "OutputRawSpan.swift",
+    "OutputSpan.swift",
+    "RawSpan.swift",
+    "Span.swift"
+  ],
+  "UTF8Span": [ 
+    "UTF8EncodingError.swift",
+    "UTF8Span.swift",
+    "UTF8SpanBits.swift",
+    "UTF8SpanComparisons.swift",
+    "UTF8SpanFundamentals.swift",
+    "UTF8SpanInternalHelpers.swift",
+    "UTF8SpanIterators.swift"
   ],
   "Protocols": [
     "CompilerProtocols.swift",
@@ -252,7 +276,12 @@
     "Instant.swift",
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
-    "EmbeddedPrint.swift"
+    "EmbeddedPrint.swift",
+    "InlineArray.swift",
+    "_InlineArray.swift",
+    "Exclusivity.swift",
+    "Borrow.swift",
+    "Inout.swift"
   ],
   "Result": [
     "Result.swift"

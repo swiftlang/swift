@@ -4,6 +4,10 @@
 // SIL verification error regarding `CapturePropagation::rewritePartialApply`
 // for `partial_apply` with `@convention(method)` callee
 
+// On linux this test sometimes fails with a linker crash
+// rdar://143988849
+// REQUIRES: OS=macosx
+
 import _Differentiation
 
 protocol Protocol: Differentiable {

@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -primary-file %s -Onone -emit-sil \
+// RUN: %target-swift-frontend -primary-file %s -Onone -Xllvm -sil-print-types -emit-sil \
 // RUN:   -enable-library-evolution \
-// RUN:   -Xllvm -sil-print-after=definite-init \
+// RUN:   -Xllvm -sil-print-types -Xllvm -sil-print-after=definite-init \
 // RUN:   -o /dev/null -module-name init_accessors 2>&1 | %FileCheck %s
 
 public class Test {

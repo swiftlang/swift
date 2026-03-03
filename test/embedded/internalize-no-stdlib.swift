@@ -4,6 +4,7 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none-macho -wmo | %FileCheck %s --check-prefix CHECK-MACHO
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 struct Bool {}
 

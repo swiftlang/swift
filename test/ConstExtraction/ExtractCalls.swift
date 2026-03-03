@@ -7,12 +7,15 @@
 protocol MyProto {}
 
 public struct Foo : MyProto {
-    let init1 = Bar()
-    let init2: Bat = .init()
-    let init3 = Bat(buz: "hello", fuz: adder(2, 3))
-    static var init4: Bar? = Bar()
+  let init1 = Bar()
+  let init2: Bat = .init()
+  let init3 = Bat(buz: "hello", fuz: adder(2, 3))
+  static var init4: Bar? = Bar()
 
-    let func1: Int = adder(2, 3)
+  let init5 = Hux()
+  let init6 = Hux(fuz: 42)
+
+  let func1: Int = adder(2, 3)
 }
 
 extension Foo {
@@ -26,15 +29,18 @@ func adder(_ x: Int, _ y: Int) -> Int {
 }
 
 public struct Bar {}
-public struct Bat {
-    let buz: String
+
+public class Bat {
+    let buz: String?
     let fuz: Int
 
-    init(buz: String = "", fuz: Int = 0) {
+    init(buz: String? = nil, fuz: Int = 0) {
         self.buz = buz
         self.fuz = fuz
     }
 }
+
+public class Hux: Bat {}
 
 // CHECK: [
 // CHECK-NEXT:  {
@@ -45,6 +51,12 @@ public struct Bat {
 // CHECK-NEXT:    "line": 9,
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractCalls.MyProto"
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractCalls.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractCalls"
+// CHECK-NEXT:      }
 // CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
@@ -76,9 +88,8 @@ public struct Bat {
 // CHECK-NEXT:          "arguments": [
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "buz",
-// CHECK-NEXT:              "type": "Swift.String",
-// CHECK-NEXT:              "valueKind": "RawLiteral",
-// CHECK-NEXT:              "value": ""
+// CHECK-NEXT:              "type": "Swift.Optional<Swift.String>",
+// CHECK-NEXT:              "valueKind": "NilLiteral"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "fuz",
@@ -103,14 +114,83 @@ public struct Bat {
 // CHECK-NEXT:          "arguments": [
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "buz",
-// CHECK-NEXT:              "type": "Swift.String",
+// CHECK-NEXT:              "type": "Swift.Optional<Swift.String>",
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "hello"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "fuz",
 // CHECK-NEXT:              "type": "Swift.Int",
-// CHECK-NEXT:              "valueKind": "Runtime"
+// CHECK-NEXT:              "valueKind": "FunctionCall",
+// CHECK-NEXT:              "value": {
+// CHECK-NEXT:              "name": "adder",
+// CHECK-NEXT:              "arguments": [
+// CHECK-NEXT:                {
+// CHECK-NEXT:                   "label": "",
+// CHECK-NEXT:                   "type": "Swift.Int",
+// CHECK-NEXT:                   "valueKind": "RawLiteral",
+// CHECK-NEXT:                   "value": "2"
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "label": "",
+// CHECK-NEXT:                   "type": "Swift.Int",
+// CHECK-NEXT:                   "valueKind": "RawLiteral",
+// CHECK-NEXT:                   "value": "3"
+// CHECK-NEXT:                 }
+// CHECK-NEXT:               ]
+// CHECK-NEXT:             }
+// CHECK-NEXT:            }
+// CHECK-NEXT:          ]
+// CHECK-NEXT:        }
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "init5",
+// CHECK-NEXT:        "type": "ExtractCalls.Hux",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:        "line": 15,
+// CHECK-NEXT:        "valueKind": "InitCall",
+// CHECK-NEXT:        "value": {
+// CHECK-NEXT:          "type": "ExtractCalls.Hux",
+// CHECK-NEXT:          "arguments": [
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "buz",
+// CHECK-NEXT:              "type": "Swift.Optional<Swift.String>",
+// CHECK-NEXT:              "valueKind": "NilLiteral"
+// CHECK-NEXT:            },
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "fuz",
+// CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "0"
+// CHECK-NEXT:            }
+// CHECK-NEXT:          ]
+// CHECK-NEXT:        }
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "init6",
+// CHECK-NEXT:        "type": "ExtractCalls.Hux",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:        "line": 16,
+// CHECK-NEXT:        "valueKind": "InitCall",
+// CHECK-NEXT:        "value": {
+// CHECK-NEXT:          "type": "ExtractCalls.Hux",
+// CHECK-NEXT:          "arguments": [
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "buz",
+// CHECK-NEXT:              "type": "Swift.Optional<Swift.String>",
+// CHECK-NEXT:              "valueKind": "NilLiteral"
+// CHECK-NEXT:            },
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "fuz",
+// CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "42"
 // CHECK-NEXT:            }
 // CHECK-NEXT:          ]
 // CHECK-NEXT:        }
@@ -122,8 +202,25 @@ public struct Bat {
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
-// CHECK-NEXT:        "line": 15,
-// CHECK-NEXT:        "valueKind": "Runtime"
+// CHECK-NEXT:        "line": 18,
+// CHECK-NEXT:         "valueKind": "FunctionCall",
+// CHECK-NEXT:         "value": {
+// CHECK-NEXT:           "name": "adder",
+// CHECK-NEXT:           "arguments": [
+// CHECK-NEXT:            {
+// CHECK-NEXT:               "label": "",
+// CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:               "valueKind": "RawLiteral",
+// CHECK-NEXT:               "value": "2"
+// CHECK-NEXT:             },
+// CHECK-NEXT:             {
+// CHECK-NEXT:               "label": "",
+// CHECK-NEXT:               "type": "Swift.Int",
+// CHECK-NEXT:               "valueKind": "RawLiteral",
+// CHECK-NEXT:               "value": "3"
+// CHECK-NEXT:             }
+// CHECK-NEXT:           ]
+// CHECK-NEXT:         }
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "init4",
@@ -146,7 +243,7 @@ public struct Bat {
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
-// CHECK-NEXT:        "line": 21,
+// CHECK-NEXT:        "line": 24,
 // CHECK-NEXT:        "valueKind": "InitCall",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "type": "ExtractCalls.Foo.Boo",

@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -mem2reg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mem2reg | %FileCheck %s
 
 import Builtin
+import Swift
 
 //////////////////
 // Declarations //
@@ -44,6 +45,22 @@ class C {}
 
 struct S {
   var field: C
+}
+
+struct J {
+  var c: C
+}
+
+struct I {
+  var j: J
+}
+
+struct S1 {
+  var i: I
+}
+
+struct S2 {
+  var t: (J, J)
 }
 
 ///////////
@@ -760,4 +777,122 @@ entry(%instance : @owned $C):
   dealloc_stack %stack : $*C
   %retval = tuple ()
   return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @no_promo_proj_uac_1 : {{.*}} {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'no_promo_proj_uac_1'
+sil [ossa] @no_promo_proj_uac_1 : $@convention(thin) () -> () {
+bb0:
+  %s = apply undef() : $@convention(thin) () -> (@owned S1)
+  %addr = alloc_stack $S1
+  store %s to [init] %addr
+  %i_addr = unchecked_addr_cast %addr to $*I
+  %j_addr = struct_element_addr %i_addr, #I.j
+  %j = load [copy] %j_addr
+  destroy_addr %addr
+  dealloc_stack %addr
+  apply undef(%j) : $@convention(thin) (@owned J) -> ()
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @no_promo_proj_uac_2 : {{.*}} {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'no_promo_proj_uac_2'
+sil [ossa] @no_promo_proj_uac_2 : $@convention(thin) () -> () {
+bb0:
+  %s = apply undef() : $@convention(thin) () -> (@owned S2)
+  %addr = alloc_stack $S2
+  store %s to [init] %addr
+  %t_addr = unchecked_addr_cast %addr to $*(J, J)
+  %j_addr = tuple_element_addr %t_addr, 0
+  %j = load [copy] %j_addr
+  destroy_addr %addr
+  dealloc_stack %addr
+  apply undef(%j) : $@convention(thin) (@owned J) -> ()
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @promo_uac_uac : {{.*}} {
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function 'promo_uac_uac'
+sil [ossa] @promo_uac_uac : $@convention(thin) () -> () {
+bb0:
+  %s = apply undef() : $@convention(thin) () -> (@owned S1)
+  %addr = alloc_stack $S1
+  store %s to [init] %addr
+  %i_addr = unchecked_addr_cast %addr to $*I
+  %j_addr = unchecked_addr_cast %i_addr to $*J
+  %j = load [copy] %j_addr
+  destroy_addr %addr
+  dealloc_stack %addr
+  apply undef(%j) : $@convention(thin) (@owned J) -> ()
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @dead_end_only_store_lexical :
+// CHECK-NOT:     alloc_stack
+// CHECK:         %1 = move_value [lexical] %0
+// CHECK:         destroy_value [dead_end] %1
+// CHECK-LABEL: } // end sil function 'dead_end_only_store_lexical'
+sil [ossa] @dead_end_only_store_lexical : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = alloc_stack [lexical] $C
+  store %0 to [init] %1
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @dead_end_only_store_non_lexical :
+// CHECK-NOT:     alloc_stack
+// CHECK:         destroy_value [dead_end] %0
+// CHECK-LABEL: } // end sil function 'dead_end_only_store_non_lexical'
+sil [ossa] @dead_end_only_store_non_lexical : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = alloc_stack $C
+  store %0 to [init] %1
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @write_only_in_dead_end :
+// CHECK:       bb2:
+// CHECK-NEXT:    [[L:%.*]] = load [take] %0
+// CHECK-NEXT:    destroy_value [dead_end] [[L]]
+// CHECK-LABEL: } // end sil function 'write_only_in_dead_end'
+sil [ossa] @write_only_in_dead_end : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $any Error
+  %1 = alloc_stack $any Error
+  try_apply undef(%1) : $@noescape @callee_guaranteed () -> ((), @error_indirect any Error), normal bb1, error bb2
+
+bb1(%3 : $()):
+  dealloc_stack %1
+  dealloc_stack %0
+  return %3
+
+bb2:
+  %7 = load [take] %1
+  dealloc_stack %1
+  store %7 to [init] %0
+  dealloc_stack %0
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @write_only_in_single_block_dead_end :
+// CHECK:         apply
+// CHECK-NEXT:    [[L:%.*]] = load [take] %0
+// CHECK-NEXT:    destroy_value [dead_end] [[L]]
+// CHECK-LABEL: } // end sil function 'write_only_in_single_block_dead_end'
+sil [ossa] @write_only_in_single_block_dead_end : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $AnyObject
+  %1 = alloc_stack $AnyObject
+  %2 = apply undef(%1) : $@noescape @callee_guaranteed () -> @out AnyObject
+  %7 = load [take] %1
+  dealloc_stack %1
+  store %7 to [init] %0
+  dealloc_stack %0
+  unreachable
 }

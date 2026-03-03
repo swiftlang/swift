@@ -20,6 +20,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
+using namespace llvm::opt;
 using namespace sourcekitd_test;
 using llvm::StringRef;
 
@@ -28,30 +29,23 @@ namespace {
 // Create enum with OPT_xxx values for each option in Options.td.
 enum Opt {
   OPT_INVALID = 0,
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELP, META, VALUES)                                             \
-  OPT_##ID,
+#define OPTION(...) LLVM_MAKE_OPT_ID(__VA_ARGS__),
 #include "Options.inc"
   LastOption
 #undef OPTION
 };
 
-// Create prefix string literals used in Options.td.
-#define PREFIX(NAME, VALUE)                                                    \
-  constexpr llvm::StringLiteral NAME##_init[] = VALUE;                         \
-  constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                          \
-      NAME##_init, std::size(NAME##_init) - 1);
+#define OPTTABLE_STR_TABLE_CODE
 #include "Options.inc"
-#undef PREFIX
+#undef OPTTABLE_STR_TABLE_CODE
+
+#define OPTTABLE_PREFIXES_TABLE_CODE
+#include "Options.inc"
+#undef OPTTABLE_PREFIXES_TABLE_CODE
 
 // Create table mapping all options defined in Options.td.
 static const llvm::opt::OptTable::Info InfoTable[] = {
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELPTEXT, METAVAR, VALUES)                                      \
-  {PREFIX,      NAME,      HELPTEXT,                                           \
-   METAVAR,     OPT_##ID,  llvm::opt::Option::KIND##Class,                     \
-   PARAM,       FLAGS,     OPT_##GROUP,                                        \
-   OPT_##ALIAS, ALIASARGS, VALUES},
+#define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
 #include "Options.inc"
 #undef OPTION
 };
@@ -59,7 +53,8 @@ static const llvm::opt::OptTable::Info InfoTable[] = {
 // Create OptTable class for parsing actual command line arguments
 class TestOptTable : public llvm::opt::GenericOptTable {
 public:
-  TestOptTable() : GenericOptTable(InfoTable) {}
+  TestOptTable()
+      : GenericOptTable(OptionStrTable, OptionPrefixesTable, InfoTable) {}
 };
 
 } // end anonymous namespace
@@ -122,6 +117,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("complete.setpopularapi", SourceKitRequest::CodeCompleteSetPopularAPI)
         .Case("typecontextinfo", SourceKitRequest::TypeContextInfo)
         .Case("conformingmethods", SourceKitRequest::ConformingMethodList)
+        .Case("signaturehelp", SourceKitRequest::SignatureHelp)
         .Case("cursor", SourceKitRequest::CursorInfo)
         .Case("related-idents", SourceKitRequest::RelatedIdents)
         .Case("active-regions", SourceKitRequest::ActiveRegions)
@@ -179,6 +175,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                      << "- complete.setpopularapi\n"
                      << "- typecontextinfo\n"
                      << "- conformingmethods\n"
+                     << "- signaturehelp\n"
                      << "- cursor\n"
                      << "- related-idents\n"
                      << "- syntax-map\n"
@@ -468,10 +465,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_disable_implicit_string_processing_module_import:
       DisableImplicitStringProcessingModuleImport = true;
-      break;
-
-    case OPT_disable_implicit_backtracing_module_import:
-      DisableImplicitBacktracingModuleImport = true;
       break;
 
     case OPT_UNKNOWN:

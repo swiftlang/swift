@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name access_marker_gen -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name access_marker_gen -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked %s | %FileCheck %s
 
 func modify<T>(_ x: inout T) {}
 
@@ -111,8 +111,9 @@ func testClassInstanceProperties(c: C) {
 // CHECK-NEXT:  debug_value
 // CHECK-NEXT:  [[CX:%.*]] = ref_element_addr [[C]] : $C, #C.x
 // CHECK-NEXT:  [[ACCESS:%.*]] = begin_access [read] [dynamic] [[CX]] : $*Int
-// CHECK-NEXT:  [[Y:%.*]] = load [trivial] [[ACCESS]]
+// CHECK-NEXT:  [[L:%.*]] = load [trivial] [[ACCESS]]
 // CHECK-NEXT:  end_access [[ACCESS]]
+// CHECK-NEXT:  [[Y:%.*]] = move_value [var_decl] [[L]]
 // CHECK-NEXT:  debug_value
 // CHECK-NEXT:  [[CX:%.*]] = ref_element_addr [[C]] : $C, #C.x
 // CHECK-NEXT:  [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[CX]] : $*Int

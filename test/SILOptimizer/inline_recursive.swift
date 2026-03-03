@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s  -parse-as-library -emit-sil -O | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s  -parse-as-library -Xllvm -sil-print-types -emit-sil -O | %FileCheck %s
 
 private func recFunc(_ x: Int32) -> Int32 {
   if x > 0 {

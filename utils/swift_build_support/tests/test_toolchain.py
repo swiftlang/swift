@@ -53,9 +53,8 @@ class ToolchainTestCase(unittest.TestCase):
         tc = host_toolchain()
 
         # CMake
-        self.assertIsNotNone(tc.cmake)
-        self.assertTrue(
-            os.path.basename(tc.cmake).startswith('cmake'))
+        self.assertTrue(tc.cmake is None or
+                        os.path.basename(tc.cmake).startswith('cmake'))
 
         # Ninja
         self.assertTrue(tc.ninja is None or

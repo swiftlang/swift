@@ -47,8 +47,10 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects") {
     }
 
     // First check: is the argument (or a projected value of it) escaping at all?
-    if !arg.at(.anything).isEscapingWhenWalkingDown(using: IgnoreRecursiveCallVisitor(),
-                                                    context) {
+    if !arg.at(.anything).isEscaping(using: IgnoreRecursiveCallVisitor(),
+                                     initialWalkingDirection: .down,
+                                     context)
+    {
       let effect = EscapeEffects.ArgumentEffect(.notEscaping, argumentIndex: arg.index,
                                                 pathPattern: SmallProjectionPath(.anything))
       newEffects.append(effect)
@@ -70,7 +72,7 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects") {
     return
   }
 
-  context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
+  function.modifyEffects(context) { (effects: inout FunctionEffects) in
     effects.escapeEffects.arguments = newEffects
   }
 }
@@ -79,12 +81,12 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects") {
 private
 func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
                    to newEffects: inout [EscapeEffects.ArgumentEffect],
-                   _ returnInst: ReturnInst?, _ context: FunctionPassContext) -> Bool {
+                   _ returnInst: ReturnInstruction?, _ context: FunctionPassContext) -> Bool {
   // Correct the path if the argument is not a class reference itself, but a value type
   // containing one or more references.
   let argPath = arg.type.isClass ? ap : ap.push(.anyValueFields)
   
-  guard let result = arg.at(argPath).visitByWalkingDown(using: ArgEffectsVisitor(), context) else {
+  guard let result = arg.at(argPath).visit(using: ArgEffectsVisitor(), initialWalkingDirection: .down, context) else {
     return false
   }
   
@@ -139,8 +141,8 @@ private func isOperandOfRecursiveCall(_ op: Operand) -> Bool {
   if let applySite = inst as? FullApplySite,
      let callee = applySite.referencedFunction,
      callee == inst.parentFunction,
-     let argIdx = applySite.calleeArgumentIndex(of: op),
-     op.value == callee.arguments[argIdx] {
+     let calleeArg = applySite.calleeArgument(of: op, in: callee),
+     op.value == calleeArg {
     return true
   }
   return false
@@ -155,7 +157,7 @@ private struct ArgEffectsVisitor : EscapeVisitorWithResult {
   var result = EscapeDestination.notSet
 
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
-    if operand.instruction is ReturnInst {
+    if operand.instruction is ReturnInstruction {
       // The argument escapes to the function return
       if path.followStores {
         // The escaping path must not introduce a followStores.
@@ -207,13 +209,13 @@ private struct IsExclusiveReturnEscapeVisitor : EscapeVisitorWithResult {
   let returnPath: SmallProjectionPath
   var result = false
 
-  func isExclusiveEscape(returnInst: ReturnInst, _ context: FunctionPassContext) -> Bool {
+  func isExclusiveEscape(returnInst: ReturnInstruction, _ context: FunctionPassContext) -> Bool {
     return returnInst.returnedValue.at(returnPath).visit(using: self, context) ?? false
   }
 
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
     switch operand.instruction {
-    case is ReturnInst:
+    case is ReturnInstruction:
       if path.followStores { return .abort }
       if path.projectionPath.matches(pattern: returnPath) {
         return .ignore

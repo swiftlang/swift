@@ -1,0 +1,24 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: not %target-swift-typecheck-module-from-interface(%t/Test.swiftinterface) -module-name Test 2>&1 | %FileCheck %s
+
+// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=visionos
+
+// This test uses split-file because the check lines cannot appear as comments
+// in the interface (they'd match themselves in the diagnostic output).
+// FIXME: -verify should work for -typecheck-module-from-interface
+
+// CHECK: Test.swiftinterface:5:2: error: '@backDeployed' requires that global function 'backDeployedFuncWithoutBody()' have a body
+// CHECK: Test.swiftinterface:9:2: error: '@backDeployed' must not be used on stored properties
+
+//--- Test.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags:
+
+@available(macOS 14.4, iOS 17.4, watchOS 10.4, tvOS 17.4, visionOS 1.1, *)
+@backDeployed(before: macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0)
+public func backDeployedFuncWithoutBody()
+
+@available(macOS 14.4, iOS 17.4, watchOS 10.4, tvOS 17.4, visionOS 1.1, *)
+@backDeployed(before: macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0)
+public var backDeployedVarWithoutBody: Int

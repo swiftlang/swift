@@ -1,0 +1,32 @@
+{
+  "CanonicalName": "macosx10.15",
+  "Version": "10.15.4",
+  "IsBaseSDK": "YES",
+  "DisplayName": "macOS 10.15",
+  "MinimalDisplayName": "10.15",
+  "SupportedTargets": {
+    "macosx": {
+      "Archs": ["x86_64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "macosx", "LLVMTargetTripleEnvironment": "",
+      "BuildVersionPlatformID": "1",
+      "DefaultDeploymentTarget": "10.15",
+      "MinimumDeploymentTarget": "10.6", "MaximumDeploymentTarget": "10.15.99",
+      "ValidDeploymentTargets": ["10.6", "10.7", "10.8", "10.9", "10.10", "10.11", "10.12", "10.13", "10.14", "10.15"]
+    },
+    "iosmac": {
+      "Archs": ["x86_64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "ios", "LLVMTargetTripleEnvironment": "macabi",
+      "BuildVersionPlatformID": "6",
+      "DefaultDeploymentTarget": "13.4",
+      "MinimumDeploymentTarget": "13.1", "MaximumDeploymentTarget": "13.4.99",
+      "ValidDeploymentTargets": ["13.1", "13.2", "13.3", "13.3.1", "13.4"]
+    }
+  },
+  "VersionMap": {
+    "macOS_iOSMac": {"10.15": "13.1", "10.15.1": "13.2", "10.15.2": "13.3", "10.15.3": "13.3.1", "10.15.4": "13.4"},
+    "iOSMac_macOS": {"13.1": "10.15", "13.2": "10.15.1", "13.3": "10.15.2", "13.3.1": "10.15.3", "13.4": "10.15.4"}
+  },
+  "DefaultDeploymentTarget": "10.15",
+  "MaximumDeploymentTarget": "10.15.99",
+  "Comments": [
+    "The actual SDK was MacOSX10.15.sdk, the .4 was added just so this could sit next to the Version=10.15 SDK."
+  ]
+}

@@ -3,13 +3,7 @@
 
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   %t/main.swift -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -I %t/include
-
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:A > %t/A.cmd
-// RUN: %swift_frontend_plain @%t/A.cmd
-
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:B > %t/B.cmd
-// RUN: %swift_frontend_plain @%t/B.cmd
+// RUN:   %t/main.swift -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -I %t/include -F %t/frameworks
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json C > %t/C.cmd
 // RUN: %swift_frontend_plain @%t/C.cmd
@@ -18,12 +12,49 @@
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
-// RUN: %target-swift-frontend \
+// RUN: %FileCheck %s --check-prefix=CMD --input-file=%t/MyApp.cmd
+// CMD: "-module-can-import"
+// CMD-NEXT: "A.Sub"
+// CMD-NEXT: "-module-can-import"
+// CMD-NEXT: "B"
+// CMD-NEXT: "-module-can-import-version"
+// CMD-NEXT: "C"
+// CMD-NEXT: "1.0"
+// CMD-NEXT: "0"
+// CMD-NEXT: "-module-can-import-version"
+// CMD-NEXT: "D"
+// CMD-NEXT: "1.0"
+// CMD-NEXT: "0"
+// CMD-NEXT: "-module-can-import-version"
+// CMD-NEXT: "Simple"
+// CMD-NEXT: "0"
+// CMD-NEXT: "1000.0.0"
+
+// RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -module-name Test -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   %t/main.swift @%t/MyApp.cmd
+
+/// Check that a single canImport check eval to false is behaving correctly.
+// RUN: %target-swift-frontend -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache -O \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
+// RUN:   %t/single.swift -o %t/deps2.json -swift-version 5 -cache-compile-job -cas-path %t/cas -I %t/include -F %t/frameworks
+
+// RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps2.json -o %t/Test.cmd
+// RUN: %FileCheck %s --check-prefix=SINGLE --input-file=%t/Test.cmd
+// SINGLE:      "-module-can-import-version"
+// SINGLE-NEXT: "Simple"
+// SINGLE-NEXT: "0"
+// SINGLE-NEXT: "1000.0.0"
+
+// RUN: %target-swift-frontend-plain \
+// RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
+// RUN:   -swift-version 5 \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
+// RUN:   -module-name Test \
+// RUN:   %t/single.swift @%t/Test.cmd
 
 //--- main.swift
 #if canImport(A.Sub)
@@ -38,6 +69,7 @@ import A.Missing
 func b() {}
 #endif
 
+// check version.
 #if canImport(C, _version: 1.0)
 import C
 #endif
@@ -46,11 +78,37 @@ import C
 import Missing
 #endif
 
+// check succeeded canImport followed by unsuccessful versioned canImport check.
+#if canImport(D)
+func imported() {}
+#endif
+
+#if canImport(D, _version: 2.0)
+import Missing
+#endif
+
+// check underlyingVersion.
+#if canImport(Simple, _underlyingVersion: 10)
+func simple() {}
+#endif
+
+#if canImport(Simple, _underlyingVersion: 2000)
+#error("wrong version")
+#endif
+
 func useA() {
   a()
   b()
   c()
+  simple()
 }
+
+//--- single.swift
+import Simple
+
+#if canImport(Simple, _underlyingVersion: 3000)
+#error("wrong version")
+#endif
 
 //--- include/module.modulemap
 module A {
@@ -75,3 +133,36 @@ void notused2(void);
 // swift-interface-format-version: 1.0
 // swift-module-flags: -module-name C -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -user-module-version 1.0
 public func c() { }
+
+//--- include/D.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name D -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -user-module-version 1.0
+public func d() { }
+
+//--- include/Simple.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name Simple -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib
+@_exported import Simple
+public func simple() { }
+
+//--- frameworks/Simple.framework/Modules/module.modulemap
+framework module Simple {
+  umbrella header "Simple.h"
+  export *
+  module * {
+    export *
+  }
+}
+
+//--- frameworks/Simple.framework/Headers/Simple.h
+void simple(void);
+
+//--- frameworks/Simple.framework/Simple.tbd
+--- !tapi-tbd
+tbd-version:     4
+targets:         [ arm64-macos, arm64-ios, arm64-watchos, arm64-tvos, 
+                   arm64-ios-simulator, arm64-watchos-simulator, arm64-tvos-simulator ]
+flags:           [ not_app_extension_safe ]
+install-name:    '/System/Library/Frameworks/Simple.framework/Versions/A/Simple'
+current-version: 1000
+...

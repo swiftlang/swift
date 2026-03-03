@@ -4,7 +4,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 @dynamicMemberLookup
 public struct Box<T>: ~Copyable {
@@ -12,7 +12,7 @@ public struct Box<T>: ~Copyable {
         self.value = UnsafeMutablePointer<T>.allocate(capacity: 1)
     }
 
-    subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> U {
+    public subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> U {
         @_transparent
         get { return self.value.pointer(to: member)!.pointee }
 
@@ -20,6 +20,7 @@ public struct Box<T>: ~Copyable {
         set { self.value.pointer(to: member)!.pointee = newValue }
     }
 
+    @usableFromInline
     var value: UnsafeMutablePointer<T>
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift -strict-concurrency=complete
 // REQUIRES: executable_test
 // REQUIRES: VENDOR=apple || OS=linux-androideabi || OS=linux-android || OS=linux-gnu || OS=openbsd || OS=freebsd
 // UNSUPPORTED: freestanding
@@ -10,11 +10,17 @@ import StdlibUnittest
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(Android)
+  import Android
 #else
 #error("Unsupported platform")
 #endif
 
 var POSIXErrorCodeTestSuite = TestSuite("POSIXErrorCode")
+
+// Ensure that POSIXErrorCode is actually Sendable
+func send(_ value: some Sendable) {}
+send(POSIXErrorCode.EPERM)
 
 #if canImport(Darwin)
 

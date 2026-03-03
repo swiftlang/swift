@@ -62,7 +62,7 @@ SWIFT_RUNTIME_STDLIB_API
 
 @implementation __SwiftNativeNS${Class}Base
 
-- (id)initWithCoder: (NSCoder *)coder {
+- (instancetype)initWithCoder: (NSCoder *)coder {
   return [super init];
 }
 

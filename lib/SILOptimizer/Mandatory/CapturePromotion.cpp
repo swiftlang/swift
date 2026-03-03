@@ -47,6 +47,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILCloner.h"
@@ -402,8 +403,9 @@ computeNewArgInterfaceTypes(SILFunction *f, IndicesSet &promotableIndices,
     } else if (paramTL.isTrivial()) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
-      convention = param.isGuaranteed() ? ParameterConvention::Direct_Guaranteed
-                                        : ParameterConvention::Direct_Owned;
+      convention = param.isGuaranteedInCallee()
+                       ? ParameterConvention::Direct_Guaranteed
+                       : ParameterConvention::Direct_Owned;
     }
     outTys.push_back(SILParameterInfo(paramBoxedTy.getASTType(), convention,
                                       param.getOptions()));
@@ -414,7 +416,7 @@ static std::string getSpecializedName(SILFunction *f,
                                       SerializedKind_t serialized,
                                       IndicesSet &promotableIndices) {
   auto p = Demangle::SpecializationPass::CapturePromotion;
-  Mangle::FunctionSignatureSpecializationMangler mangler(p, serialized, f);
+  Mangle::FunctionSignatureSpecializationMangler mangler(f->getASTContext(), p, serialized, f);
   auto fnConv = f->getConventions();
 
   for (unsigned argIdx = 0, endIdx = fnConv.getNumSILArguments();
@@ -560,6 +562,10 @@ SILFunction *ClosureCloner::constructClonedFunction(
   ClosureCloner cloner(funcBuilder, origF, serializedKind, clonedName,
                        promotableIndices, resilienceExpansion);
   cloner.populateCloned();
+
+  // The cloner may clone `unreachable` instructions. However, cloning a
+  // whole function  does not introduce any incomplete lifetimes.
+  cloner.getCloned()->setNeedCompleteLifetimes(false);
   return cloner.getCloned();
 }
 
@@ -1069,14 +1075,9 @@ public:
   ALWAYS_NON_ESCAPING_INST(StrongRelease)
   ALWAYS_NON_ESCAPING_INST(DestroyValue)
   ALWAYS_NON_ESCAPING_INST(EndBorrow)
+  ALWAYS_NON_ESCAPING_INST(DeallocBox)
+  ALWAYS_NON_ESCAPING_INST(EndAccess)
 #undef ALWAYS_NON_ESCAPING_INST
-
-  bool visitDeallocBoxInst(DeallocBoxInst *dbi) {
-    markCurrentOpAsMutation();
-    return true;
-  }
-
-  bool visitEndAccessInst(EndAccessInst *) { return true; }
 
   bool visitApplyInst(ApplyInst *ai) {
     auto argIndex = currentOp.get()->getOperandNumber() - 1;
@@ -1220,7 +1221,7 @@ static bool findEscapeOrMutationUses(Operand *op,
       if (isa<PartialApplyInst>(parent))
         return false;
       state.accumulatedEscapes.push_back(
-          &userMDI->getOperandRef(MarkDependenceInst::Value));
+          &userMDI->getOperandRef(MarkDependenceInst::Dependent));
       return true;
     }
   }
@@ -1476,9 +1477,25 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
       funcBuilder, pai, fri, promotableIndices, f->getResilienceExpansion());
   worklist.push_back(clonedFn);
 
+  SILFunction *origFn = fri->getReferencedFunction();
+  for (const auto *w : mod.lookUpDifferentiabilityWitnessesForFunction(
+         origFn->getName())) {
+    // @derivative(of:) attribute could only be applied at global scope, therefore
+    // local functions might not have custom derivatives registered
+    assert(!w->getJVP() && !w->getVJP() && "does not expect custom derivatives here");
+    auto linkage = stripExternalFromLinkage(clonedFn->getLinkage());
+    SILDifferentiabilityWitness::createDefinition(
+      mod, linkage, clonedFn,
+      w->getKind(), w->getParameterIndices(), w->getResultIndices(),
+      w->getDerivativeGenericSignature(),
+      /*jvp*/ nullptr, /*vjp*/ nullptr,
+      /*isSerialized*/ hasPublicVisibility(clonedFn->getLinkage()),
+      w->getAttribute());
+  }
+
   // Mark the original partial apply function as deletable if it doesn't have
   // uses later.
-  fri->getReferencedFunction()->addSemanticsAttr(semantics::DELETE_IF_UNUSED);
+  origFn->addSemanticsAttr(semantics::DELETE_IF_UNUSED);
 
   // Initialize a SILBuilder and create a function_ref referencing the cloned
   // closure.
@@ -1499,7 +1516,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   unsigned opNo = 1;
   unsigned opCount = pai->getNumOperands() - pai->getNumTypeDependentOperands();
   SmallVector<SILValue, 16> args;
-  auto numIndirectResults = calleeConv.getNumIndirectSILResults();
+  auto numIndirectResults = calleeConv.getSILArgIndexOfFirstParam();
   llvm::DenseMap<SILValue, SILValue> capturedMap;
   llvm::SmallSet<SILValue, 16> newCaptures;
   for (; opNo != opCount; ++opNo) {
@@ -1535,7 +1552,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
     // alloc_box. Otherwise, it is on the specific iterated copy_value that we
     // started with.
     SILParameterInfo cpInfo = calleePInfo[index - numIndirectResults];
-    assert(calleeConv.getSILType(cpInfo, builder.getTypeExpansionContext()) ==
+    ASSERT(calleeConv.getSILType(cpInfo, builder.getTypeExpansionContext()) ==
                box->getType() &&
            "SILType of parameter info does not match type of parameter");
     releasePartialApplyCapturedArg(builder, pai->getLoc(), box, cpInfo);
@@ -1612,7 +1629,7 @@ namespace {
 class CapturePromotionPass : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() override {
-    SmallVector<SILFunction *, 128> worklist;
+    SmallVector<SILFunction *, 8> worklist;
     for (auto &f : *getModule()) {
       if (f.wasDeserializedCanonical() || !f.hasOwnership())
         continue;

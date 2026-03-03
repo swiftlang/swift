@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %s -module-name Structs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/structs.h
 // RUN: %FileCheck %s < %t/structs.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h -Wno-unused-private-field -Wno-unused-function)
@@ -16,7 +16,7 @@
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::StructWithIntField> = true;
+// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<Structs::StructWithIntField> = true;
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 
@@ -49,12 +49,6 @@
 // CHECK-NEXT:     vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT:   return *this;
 // CHECK-NEXT:  }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField &operator =(StructWithIntField &&other) = delete;
-// CHECK-NEXT:   noreturn]] SWIFT_INLINE_PRIVATE_HELPER StructWithIntField(StructWithIntField &&) noexcept {
-// CHECK-NEXT:   swift::_impl::_fatalError_Cxx_move_of_Swift_value_type_not_supported_yet();
-// CHECK-NEXT:   swift::_impl::_swift_stdlib_reportFatalError("swift", 5, "C++ does not support moving a Swift value yet", 45, 0);
-// CHECK-NEXT:   abort();
-// CHECK-NEXT:   }
 // CHECK-NEXT: private:
 // CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField() noexcept {}
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK StructWithIntField _make() noexcept { return StructWithIntField(); }
@@ -112,7 +106,7 @@
 // CHECK-NEXT: };
 // CHECK-NEXT: namespace _impl{
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isValueType<Structs::StructWithIntField> = true;
+// CHECK-NEXT: inline const constexpr bool isValueType<Structs::StructWithIntField> = true;
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct implClassFor<Structs::StructWithIntField> { using type = Structs::_impl::_impl_StructWithIntField; };
 // CHECK-NEXT: } // namespace

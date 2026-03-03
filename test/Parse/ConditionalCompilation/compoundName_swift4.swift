@@ -2,6 +2,6 @@
 
 /// Reject compound names.
 #if BAR(_:) // expected-error@:5 {{invalid conditional compilation expression}}
-#elseif os(x:)(macOS) // expected-error@:9 {{unexpected platform condition (expected 'os', 'arch', or 'swift')}}
-#elseif os(Linux(foo:bar:)) // expected-error@:12 {{unexpected platform condition argument: expected identifier}}
+#elseif os(x:)(macOS) // expected-error@:9 {{invalid conditional compilation expression}}
+#elseif os(Linux(foo:bar:)) // expected-error@:9 {{'os' requires a single unlabeled argument for the operating system}}
 #endif

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 func sequence() {}
 
@@ -123,8 +123,10 @@ func copyOrThrowIntoTuple<each T>(_ args: repeat each T) throws -> (repeat each 
 // CHECK-NEXT:    dealloc_pack [[ARG_PACK]] : $*Pack{Int, String, String}
 //   Load from the pack and bind the locals.
 // CHECK-NEXT:    [[A:%.*]] = load [trivial] [[R0]] : $*Int
-// CHECK-NEXT:    debug_value [[A]] : $Int
+// CHECK-NEXT:    [[MV:%.*]] = move_value [var_decl] %39 : $Int
+// CHECK-NEXT:    debug_value [[MV]] : $Int
 // CHECK-NEXT:    [[B:%.*]] = load [take] [[R1]] : $*String
+// CHECK-NEXT:    ignored_use [[B]]
 // CHECK-NEXT:    [[C:%.*]] = load [take] [[R2]] : $*String
 // CHECK-NEXT:    [[C_LIFETIME:%.*]] = move_value [var_decl] [[C]]
 // CHECK-NEXT:    debug_value [[C_LIFETIME]] : $String
@@ -140,6 +142,7 @@ func copyOrThrowIntoTuple<each T>(_ args: repeat each T) throws -> (repeat each 
 // CHECK-NEXT:    apply [[SEQUENCE_FN]]()
 //   Leave the function.
 // CHECK-NEXT:    destroy_value [[C_LIFETIME]] : $String
+// CHECK-NEXT:    extend_lifetime [[MV]] : $Int
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func callCopyAndDestructure(a: Int, b: String, c: String) {

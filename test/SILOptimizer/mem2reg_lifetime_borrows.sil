@@ -561,3 +561,21 @@ bb6:
   %17 = tuple ()
   return %17 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @multiple_storeborrow_lexical :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_storeborrow_lexical'
+sil [ossa] @multiple_storeborrow_lexical : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = alloc_stack [lexical] $Klass
+  br bb1
+
+bb1:
+  %sb1 = store_borrow %0 to %1 : $*Klass
+  end_borrow %sb1 : $*Klass
+  %sb2 = store_borrow %0 to %1 : $*Klass
+  end_borrow %sb2 : $*Klass
+  dealloc_stack  %1 : $*Klass
+  %6 = tuple ()
+  return %6 : $()
+}

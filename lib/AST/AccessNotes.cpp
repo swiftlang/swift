@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,11 +16,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AccessNotes.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Module.h"     // DeclContext::isModuleScopeContext()
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Parse/Parser.h"
+#include "swift/AST/Module.h" // DeclContext::isModuleScopeContext()
+#include "swift/Basic/Assertions.h"
+#include "swift/Parse/ParseDeclName.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -163,15 +165,35 @@ void AccessNote::dump(llvm::raw_ostream &os, int indent) const {
 
 }
 
-LLVM_YAML_DECLARE_SCALAR_TRAITS(swift::AccessNoteDeclName, QuotingType::Single)
-LLVM_YAML_DECLARE_SCALAR_TRAITS(swift::ObjCSelector, QuotingType::Single)
 LLVM_YAML_IS_SEQUENCE_VECTOR(swift::AccessNote)
-LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::AccessNotesFile)
+
+// Not using macro to avoid dllimport/dllexport issues on Windows.
+template <> struct llvm::yaml::ScalarTraits<swift::AccessNoteDeclName> {
+  static void output(const swift::AccessNoteDeclName &Value, void *ctx,
+                     raw_ostream &Out);
+  static StringRef input(StringRef Scalar, void *ctxt,
+                         swift::AccessNoteDeclName &Value);
+  static QuotingType mustQuote(StringRef);
+};
+
+// Not using macro to avoid dllimport/dllexport issues on Windows.
+template <> struct llvm::yaml::ScalarTraits<swift::ObjCSelector> {
+  static void output(const swift::ObjCSelector &Value, void *ctx,
+                     raw_ostream &Out);
+  static StringRef input(StringRef Scalar, void *ctxt,
+                         swift::ObjCSelector &Value);
+  static QuotingType mustQuote(StringRef);
+};
 
 // Not using macro to avoid validation issues.
 template <> struct llvm::yaml::MappingTraits<swift::AccessNote> {
   static void mapping(IO &IO, swift::AccessNote &Obj);
   static std::string validate(IO &IO, swift::AccessNote &Obj);
+};
+
+// Not using macro to avoid dllimport/dllexport issues on Windows.
+template <> struct llvm::yaml::MappingTraits<swift::AccessNotesFile> {
+  static void mapping(IO &IO, swift::AccessNotesFile &Obj);
 };
 
 namespace swift {
@@ -180,7 +202,7 @@ static void
 convertToErrorAndJoin(const llvm::SMDiagnostic &diag, void *ctxPtr) {
   ASTContext &ctx = *(ASTContext*)ctxPtr;
 
-  SourceLoc loc{diag.getLoc()};
+  auto loc = SourceLoc::getFromPointer(diag.getLoc().getPointer());
   assert(ctx.SourceMgr.isOwning(loc));
 
   switch (diag.getKind()) {
@@ -235,6 +257,10 @@ input(StringRef str, void *ctxPtr, AccessNoteDeclName &name) {
   return name.empty() ? "invalid declaration name" : "";
 }
 
+QuotingType ScalarTraits<AccessNoteDeclName>::mustQuote(StringRef) {
+  return QuotingType::Single;
+}
+
 void ScalarTraits<ObjCSelector>::output(const ObjCSelector &selector,
                                         void *ctxPtr, raw_ostream &os) {
   os << selector;
@@ -250,6 +276,10 @@ StringRef ScalarTraits<ObjCSelector>::input(StringRef str, void *ctxPtr,
   }
 
   return "invalid selector";
+}
+
+QuotingType ScalarTraits<ObjCSelector>::mustQuote(StringRef) {
+  return QuotingType::Single;
 }
 
 void MappingTraits<AccessNote>::mapping(IO &io, AccessNote &note) {

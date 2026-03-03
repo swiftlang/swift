@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -code-complete-inits-in-postfix-expr -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion -code-complete-inits-in-postfix-expr
 
 protocol MyProto {
   init(value: String)
@@ -35,7 +34,7 @@ func test3<MyGeneric: MyProto>() {
       #^GENERICEXPR^#
 // GENERICEXPR: Decl[GenericTypeParam]/Local:       MyGeneric[#MyGeneric#]; name=MyGeneric
 // GENERICEXPR: Decl[Constructor]/Local:            MyGeneric({#value: String#})[#MyProto#]; name=MyGeneric(value:)
-// GENERICEXPR: Decl[Constructor]/Local:            MyGeneric({#arg: String#})[#MyStruct#]; name=MyGeneric(arg:)
+// GENERICEXPR: Decl[Constructor]/Local:            MyGeneric({#arg: String#})[#MyProto#]; name=MyGeneric(arg:)
     }
   }
 }

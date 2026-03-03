@@ -38,6 +38,7 @@ class DominanceInfo;
 class PostOrderFunctionInfo;
 class ReversePostOrderInfo;
 class Operand;
+class InstructionIndices;
 class SILInstruction;
 class SILArgument;
 class SILLocation;
@@ -353,6 +354,30 @@ struct ValueOwnershipKind {
                       });
   }
 
+  // An initialized value whose nominal type has a deinit() must be 'owned'. For
+  // example, an owned struct/enum-with-deinit may be initialized by
+  // "forwarding" a trivial value. A struct/enum-with-deinit must be prevented
+  // from forwarding a guaranteed value.
+  //
+  // Simply consider all non-Copyable types to be 'owned'. This could instead be
+  // limited to isValueTypeWithDeinit(). However, forcing non-Copyable types to
+  // be owned is consistent with the fact that their type is non-Trivial and
+  // simplifies reasoning about non-Copyable ownership.
+  ValueOwnershipKind forwardToInit(SILType nominalType) {
+    if (nominalType.isMoveOnly()) {
+      switch (value) {
+      case OwnershipKind::Any:
+      case OwnershipKind::None:
+      case OwnershipKind::Owned:
+        return OwnershipKind::Owned;
+      case OwnershipKind::Guaranteed:
+      case OwnershipKind::Unowned:
+        ABORT("Cannot initialize a nonCopyable type with a guaranteed value");
+      }
+    }
+    return *this;
+  }
+
   StringRef asString() const;
 };
 
@@ -592,6 +617,8 @@ public:
 
   bool isBeginApplyToken() const;
 
+  bool isBorrowAccessorResult() const;
+
   /// Unsafely eliminate moveonly from this value's type. Returns true if the
   /// value's underlying type was move only and thus was changed. Returns false
   /// otherwise.
@@ -599,20 +626,18 @@ public:
   /// NOTE: Please do not use this directly! It is only meant to be used by the
   /// optimizer pass: SILMoveOnlyWrappedTypeEliminator.
   bool unsafelyEliminateMoveOnlyWrapper(const SILFunction *fn) {
-    if (!Type.isMoveOnlyWrapped() && !Type.isBoxedMoveOnlyWrappedType(fn))
+    if (!Type.hasAnyMoveOnlyWrapping(fn))
       return false;
-    if (Type.isMoveOnlyWrapped()) {
-      Type = Type.removingMoveOnlyWrapper();
-    } else {
-      assert(Type.isBoxedMoveOnlyWrappedType(fn));
-      Type = Type.removingMoveOnlyWrapperToBoxedType(fn);
-    }
+    Type = Type.removingAnyMoveOnlyWrapping(fn);
     return true;
   }
 
   /// Returns true if this value should be traced for optimization debugging
   /// (it has a debug_value [trace] user).
   bool hasDebugTrace() const;
+
+  /// Does this SILValue begin a VarDecl scope? Only true in OSSA.
+  bool isFromVarDecl();
 
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_ValueBase &&
@@ -704,7 +729,7 @@ public:
   /// Verify that this SILValue and its uses respects ownership invariants.
   ///
   /// \p DEBlocks is nullptr when OSSA lifetimes are complete.
-  void verifyOwnership(DeadEndBlocks *DEBlocks) const;
+  void verifyOwnership(DeadEndBlocks *DEBlocks, InstructionIndices *instIndices) const;
 
   SWIFT_DEBUG_DUMP;
 };
@@ -850,6 +875,13 @@ struct OperandOwnership {
     /// value are in scope.
     /// (ref_element_addr, open_existential_box)
     InteriorPointer,
+
+    // TODO: Remove AnyInteriorPointer after fixing
+    // OperandOwnership::getOwnershipConstraint() to allow InteriorPointer
+    // operands to take any operand ownership.  This will prevent useless borrow
+    // scopes from being generated, so it will require some SIL migration. But
+    // all OSSA utilities need to correctly handle interior uses anyway.
+    AnyInteriorPointer,
     /// Forwarded Borrow. Propagates the guaranteed value within the base's
     /// borrow scope.
     /// (tuple_extract, struct_extract, cast, switch)
@@ -944,6 +976,9 @@ inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
   case OperandOwnership::DestroyingConsume:
   case OperandOwnership::ForwardingConsume:
     return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
+  case OperandOwnership::AnyInteriorPointer:
+    return {OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding};
+  // TODO: InteriorPointer should be handled like AnyInteriorPointer.
   case OperandOwnership::InteriorPointer:
   case OperandOwnership::GuaranteedForwarding:
     return {OwnershipKind::Guaranteed,
@@ -973,6 +1008,7 @@ inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
   case OperandOwnership::DestroyingConsume:
   case OperandOwnership::ForwardingConsume:
   case OperandOwnership::InteriorPointer:
+  case OperandOwnership::AnyInteriorPointer:
   case OperandOwnership::GuaranteedForwarding:
   case OperandOwnership::EndBorrow:
   case OperandOwnership::Reborrow:
@@ -1023,7 +1059,9 @@ ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
 class Operand {
 public:
   enum { numCustomBits = 8 };
-  enum { maxBitfieldID = std::numeric_limits<uint64_t>::max() >> numCustomBits };
+
+  constexpr static const uint64_t maxBitfieldID =
+      std::numeric_limits<uint64_t>::max() >> numCustomBits;
 
 private:
   template <class, class> friend class SILBitfield;
@@ -1041,6 +1079,7 @@ private:
   Operand **Back = nullptr;
 
   /// The owner of this operand.
+  /// If null, the Owner was deleted (but not freed, yet).
   /// FIXME: this could be space-compressed.
   SILInstruction *Owner;
 
@@ -1075,9 +1114,11 @@ public:
     removeFromCurrent();
     TheValue = newValue;
     insertIntoCurrent();
+    updateReborrowFlags();
     verify();
   }
 
+  void updateReborrowFlags();
   void verify() const;
 
   /// Swap the given operand with the current one.
@@ -1091,9 +1132,12 @@ public:
   void drop() {
     removeFromCurrent();
     TheValue = SILValue();
-    NextUse = nullptr;
     Back = nullptr;
     Owner = nullptr;
+    // Note: we are _not_ clearing the `NextUse` pointer to be able to delete
+    // users while iterating over the use list.
+    // In such a case, the iterator can detect that the Owner is null and skip
+    // to the next (non-deleted) use by following the non-null `NextUse` pointer.
   }
 
   ~Operand() {
@@ -1193,6 +1237,11 @@ private:
   template <unsigned N> friend class FixedOperandList;
   friend class TrailingOperandsList;
 };
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Operand &op) {
+  op.print(OS);
+  return OS;
+}
 
 /// A class which adapts an array of Operands into an array of Values.
 ///

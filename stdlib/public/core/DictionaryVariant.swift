@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -33,6 +33,7 @@ internal protocol _DictionaryBuffer {
 extension Dictionary {
   @usableFromInline
   @frozen
+  @safe
   internal struct _Variant {
     @usableFromInline
     internal var object: _BridgeStorage<__RawDictionaryStorage>
@@ -40,14 +41,14 @@ extension Dictionary {
     @inlinable
     @inline(__always)
     init(native: __owned _NativeDictionary<Key, Value>) {
-      self.object = _BridgeStorage(native: native._storage)
+      unsafe self.object = _BridgeStorage(native: native._storage)
     }
 
     @inlinable
     @inline(__always)
     init(dummy: Void) {
 #if _pointerBitWidth(_64) && !$Embedded
-      self.object = _BridgeStorage(taggedPayload: 0)
+      unsafe self.object = _BridgeStorage(taggedPayload: 0)
 #elseif _pointerBitWidth(_32) || $Embedded
       self.init(native: _NativeDictionary())
 #else
@@ -59,7 +60,7 @@ extension Dictionary {
     @inlinable
     @inline(__always)
     init(cocoa: __owned __CocoaDictionary) {
-      self.object = _BridgeStorage(objC: cocoa.object)
+      unsafe self.object = _BridgeStorage(objC: cocoa.object)
     }
 #endif
   }
@@ -75,29 +76,29 @@ extension Dictionary._Variant {
 
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
-    return object.isUniquelyReferencedUnflaggedNative()
+    return unsafe object.isUniquelyReferencedUnflaggedNative()
   }
 
 #if _runtime(_ObjC)
   @usableFromInline @_transparent
   internal var isNative: Bool {
     if guaranteedNative { return true }
-    return object.isUnflaggedNative
+    return unsafe object.isUnflaggedNative
   }
 #endif
 
   @usableFromInline @_transparent
   internal var asNative: _NativeDictionary<Key, Value> {
     get {
-      return _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
+      return unsafe _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
     }
     set {
       self = .init(native: newValue)
     }
     _modify {
-      var native = _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
+      var native = unsafe _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
       self = .init(dummy: ())
-      defer { object = .init(native: native._storage) }
+      defer { unsafe object = .init(native: native._storage) }
       yield &native
     }
   }
@@ -105,7 +106,7 @@ extension Dictionary._Variant {
 #if _runtime(_ObjC)
   @inlinable
   internal var asCocoa: __CocoaDictionary {
-    return __CocoaDictionary(object.objCInstance)
+    return unsafe __CocoaDictionary(object.objCInstance)
   }
 #endif
 
@@ -390,7 +391,7 @@ extension Dictionary._Variant {
     // operation.
     let native = ensureUniqueNative()
     let bucket = native.validatedBucket(for: index)
-    return asNative.uncheckedRemove(at: bucket, isUnique: true)
+    return unsafe asNative.uncheckedRemove(at: bucket, isUnique: true)
   }
 
   @inlinable
@@ -403,7 +404,7 @@ extension Dictionary._Variant {
       var native = _NativeDictionary<Key, Value>(cocoa)
       let (bucket, found) = native.find(key)
       _precondition(found, "Bridging did not preserve equality")
-      let old = native.uncheckedRemove(at: bucket, isUnique: true).value
+      let old = unsafe native.uncheckedRemove(at: bucket, isUnique: true).value
       self = .init(native: native)
       return old
     }
@@ -411,7 +412,7 @@ extension Dictionary._Variant {
     let (bucket, found) = asNative.find(key)
     guard found else { return nil }
     let isUnique = isUniquelyReferenced()
-    return asNative.uncheckedRemove(at: bucket, isUnique: isUnique).value
+    return unsafe asNative.uncheckedRemove(at: bucket, isUnique: isUnique).value
   }
 
   @inlinable
@@ -451,10 +452,10 @@ extension Dictionary._Variant {
 }
 
 extension Dictionary._Variant {
-  @inlinable
-  internal func mapValues<T>(
-    _ transform: (Value) throws -> T
-  ) rethrows -> _NativeDictionary<Key, T> {
+  @_alwaysEmitIntoClient
+  internal func mapValues<T, E: Error>(
+    _ transform: (Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
 #if _runtime(_ObjC)
     guard isNative else {
       return try asCocoa.mapValues(transform)
@@ -463,11 +464,29 @@ extension Dictionary._Variant {
     return try asNative.mapValues(transform)
   }
 
-  @inlinable
-  internal mutating func merge<S: Sequence>(
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of mapValues, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func mapValues<T>(
+      _ transform: (Value) throws -> T
+    ) throws -> _NativeDictionary<Key, T>
+  )
+  @usableFromInline
+  internal func __rethrows_mapValues<T>(
+    _ transform: (Value) throws -> T
+  ) throws -> _NativeDictionary<Key, T> {
+    try mapValues(transform)
+  }
+#endif
+
+  @_alwaysEmitIntoClient
+  internal mutating func merge<S: Sequence, E: Error>(
     _ keysAndValues: __owned S,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Element == (Key, Value) {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where S.Element == (Key, Value) {
 #if _runtime(_ObjC)
     guard isNative else {
       var native = _NativeDictionary<Key, Value>(asCocoa)
@@ -485,5 +504,25 @@ extension Dictionary._Variant {
       isUnique: isUnique,
       uniquingKeysWith: combine)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of merge, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    mutating func merge<S: Sequence>(
+      _ keysAndValues: __owned S,
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) throws where S.Element == (Key, Value)
+  )
+  @usableFromInline
+  internal mutating func __rethrows_merge<S: Sequence>(
+    _ keysAndValues: __owned S,
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) throws where S.Element == (Key, Value) {
+    try merge(keysAndValues, uniquingKeysWith: combine)
+  }
+#endif
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 
@@ -56,7 +56,7 @@ class A {
     var a: MyArray<Int>
     init() {
         a = MyArray<Int // expected-error {{generic parameter 'Element' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
-       // expected-error@-1 {{binary operator '<' cannot be applied to operands of type 'MyArray<_>.Type' and 'Int.Type'}}
+       // expected-error@-1 {{binary operator '<' cannot be applied to operands of type 'MyArray<Element>.Type' and 'Int.Type'}}
        // expected-error@-2 {{cannot assign value of type 'Bool' to type 'MyArray<Int>'}}
     }
 }
@@ -109,6 +109,10 @@ func insertA<T>(array : inout [T], elt : T) {
   array.append(T); // expected-error {{cannot convert value of type 'T.Type' to expected argument type 'T'}}
 }
 
+extension Array {
+  fileprivate mutating func appendLocal(_ newElement: Element) {}
+}
+
 // <rdar://problem/17875634> can't append to array of tuples
 func test17875634() {
   var match: [(Int, Int)] = []
@@ -122,12 +126,12 @@ func test17875634() {
 
   match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
-  match.append(row, col) // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
+  match.appendLocal(row, col) // expected-error {{instance method 'appendLocal' expects a single parameter of type '(Int, Int)'}} {{21-21=(}} {{29-29=)}}
 
-  match.append(1, 2) // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{20-20=)}}
+  match.appendLocal(1, 2) // expected-error {{instance method 'appendLocal' expects a single parameter of type '(Int, Int)'}} {{21-21=(}} {{25-25=)}}
 
-  match.append(coord)
-  match.append((1, 2))
+  match.appendLocal(coord)
+  match.appendLocal((1, 2))
 
   // Make sure the behavior matches the non-generic case.
   struct FakeNonGenericArray {

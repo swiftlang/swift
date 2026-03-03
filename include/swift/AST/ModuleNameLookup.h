@@ -44,26 +44,35 @@ enum class ResolutionKind {
 
 void simple_display(llvm::raw_ostream &out, ResolutionKind kind);
 
-/// Performs a lookup into the given module and it's imports.
+/// Performs a lookup into the given module and its imports.
 ///
-/// If 'moduleOrFile' is a ModuleDecl, we search the module and it's
+/// If 'moduleOrFile' is a ModuleDecl, we search the module and its
 /// public imports. If 'moduleOrFile' is a SourceFile, we search the
 /// file's parent module, the module's public imports, and the source
 /// file's private imports.
 ///
-/// \param moduleOrFile The module or file unit whose imports to search.
+/// \param moduleOrFile The module or file unit to search, including imports.
 /// \param name The name to look up.
+/// \param hasModuleSelector Whether \p name was originally qualified by a
+///        module selector. This information is threaded through to underlying
+///        lookup calls; the callee is responsible for actually applying the
+///        module selector.
 /// \param[out] decls Any found decls will be added to this vector.
 /// \param lookupKind Whether this lookup is qualified or unqualified.
 /// \param resolutionKind What sort of decl is expected.
 /// \param moduleScopeContext The top-level context from which the lookup is
 ///        being performed, for checking access. This must be either a
 ///        FileUnit or a Module.
+/// \param loc Source location of the lookup. Used to add contextual options,
+///        such as disabling macro expansions inside macro arguments.
 /// \param options name lookup options. Currently only used to communicate the
-/// NL_IncludeUsableFromInline option.
+///        NL_IncludeUsableFromInline option.
 void lookupInModule(const DeclContext *moduleOrFile,
-                    DeclName name, SmallVectorImpl<ValueDecl *> &decls,
-                    NLKind lookupKind, ResolutionKind resolutionKind,
+                    DeclName name,
+                    bool hasModuleSelector,
+                    SmallVectorImpl<ValueDecl *> &decls,
+                    NLKind lookupKind,
+                    ResolutionKind resolutionKind,
                     const DeclContext *moduleScopeContext,
                     SourceLoc loc, NLOptions options);
 

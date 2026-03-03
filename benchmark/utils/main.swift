@@ -27,7 +27,10 @@ import ArrayOfPOD
 import ArrayOfRef
 import ArrayRemoveAll
 import ArraySetElement
+import ArraySliceTests
 import ArraySubscript
+import ArrayTests
+import AsyncTree
 import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
 import BitCount
@@ -52,11 +55,15 @@ import Chars
 import ClassArrayGetter
 import CodableTest
 import Combos
+import ContiguousArrayTests
 import CountAlgo
 import CreateObjects
-import CxxSetToCollection
+// rdar://128520766
+// import CxxSetToCollection
+import CxxSpanTests
 import CxxStringConversion
-import CxxVectorSum
+// rdar://128520766
+// import CxxVectorSum
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
@@ -71,6 +78,7 @@ import DictionaryBridgeToObjC
 import DictionaryCompactMapValues
 import DictionaryCopy
 import DictionaryGroup
+import DictionaryIdentical
 import DictionaryKeysContains
 import DictionaryLiteralTest
 import DictionaryOfAnyHashableStrings
@@ -87,6 +95,7 @@ import DropLast
 import DropWhile
 import ErrorHandling
 import Exclusivity
+import ExecutorEnqueue
 import ExistentialPerformance
 import Fibonacci
 import FindStringNaive
@@ -102,6 +111,7 @@ import HTTP2StateMachine
 import IndexPathTest
 import InsertCharacter
 import IntegerParsing
+import IntegerToString
 import Integrate
 import IterateData
 import Join
@@ -113,6 +123,7 @@ import LuhnAlgoLazy
 import MapReduce
 import Memset
 import MirrorTest
+import Monoids
 import MonteCarloE
 import MonteCarloPi
 import NaiveRangeReplaceableCollectionConformance
@@ -138,6 +149,7 @@ import ObserverPartiallyAppliedMethod
 import ObserverUnappliedMethod
 import OpaqueConsumingUsers
 import OpenClose
+import ParameterPacks
 import Phonebook
 import PointerArithmetics
 import PolymorphicCalls
@@ -159,6 +171,7 @@ import RandomShuffle
 import RandomTree
 import RandomValues
 import RangeAssignment
+import RangeContains
 import RangeIteration
 import RangeOverlaps
 import RangeReplaceableCollectionPlusDefault
@@ -171,6 +184,7 @@ import RomanNumbers
 import SIMDRandomMask
 import SIMDReduceInteger
 import SequenceAlgos
+import SetIdentical
 import SetTests
 import SevenBoom
 import Sim2DArray
@@ -180,7 +194,6 @@ import SortIntPyramids
 import SortLargeExistentials
 import SortLettersInPlace
 import SortStrings
-import StackPromo
 import StaticArray
 import StrComplexWalk
 import StrToInt
@@ -222,7 +235,10 @@ register(ArrayOfPOD.benchmarks)
 register(ArrayOfRef.benchmarks)
 register(ArrayRemoveAll.benchmarks)
 register(ArraySetElement.benchmarks)
+register(ArraySliceTests.benchmarks)
 register(ArraySubscript.benchmarks)
+register(ArrayTests.benchmarks)
+register(AsyncTree.benchmarks)
 register(BinaryFloatingPointConversionFromBinaryInteger.benchmarks)
 register(BinaryFloatingPointProperties.benchmarks)
 register(BitCount.benchmarks)
@@ -246,12 +262,16 @@ register(CharacterRecognizer.benchmarks)
 register(Chars.benchmarks)
 register(CodableTest.benchmarks)
 register(Combos.benchmarks)
+register(ContiguousArrayTests.benchmarks)
 register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
-register(CxxSetToCollection.benchmarks)
+// rdar://128520766
+// register(CxxSetToCollection.benchmarks)
+register(CxxSpanTests.benchmarks)
 register(CxxStringConversion.benchmarks)
-register(CxxVectorSum.benchmarks)
+// rdar://128520766
+// register(CxxVectorSum.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)
 register(DevirtualizeProtocolComposition.benchmarks)
@@ -266,6 +286,7 @@ register(DictionaryBridgeToObjC.benchmarks)
 register(DictionaryCompactMapValues.benchmarks)
 register(DictionaryCopy.benchmarks)
 register(DictionaryGroup.benchmarks)
+register(DictionaryIdentical.benchmarks)
 register(DictionaryKeysContains.benchmarks)
 register(DictionaryLiteralTest.benchmarks)
 register(DictionaryOfAnyHashableStrings.benchmarks)
@@ -282,6 +303,7 @@ register(DropLast.benchmarks)
 register(DropWhile.benchmarks)
 register(ErrorHandling.benchmarks)
 register(Exclusivity.benchmarks)
+register(ExecutorEnqueue.benchmarks)
 register(ExistentialPerformance.benchmarks)
 register(Fibonacci.benchmarks)
 register(FindStringNaive.benchmarks)
@@ -297,6 +319,7 @@ register(HTTP2StateMachine.benchmarks)
 register(IndexPathTest.benchmarks)
 register(InsertCharacter.benchmarks)
 register(IntegerParsing.benchmarks)
+register(IntegerToString.benchmarks)
 register(Integrate.benchmarks)
 register(IterateData.benchmarks)
 register(Join.benchmarks)
@@ -308,6 +331,7 @@ register(LuhnAlgoLazy.benchmarks)
 register(MapReduce.benchmarks)
 register(Memset.benchmarks)
 register(MirrorTest.benchmarks)
+register(Monoids.benchmarks)
 register(MonteCarloE.benchmarks)
 register(MonteCarloPi.benchmarks)
 register(NaiveRangeReplaceableCollectionConformance.benchmarks)
@@ -333,6 +357,7 @@ register(ObserverPartiallyAppliedMethod.benchmarks)
 register(ObserverUnappliedMethod.benchmarks)
 register(OpaqueConsumingUsers.benchmarks)
 register(OpenClose.benchmarks)
+register(ParameterPacks.benchmarks)
 register(Phonebook.benchmarks)
 register(PointerArithmetics.benchmarks)
 register(PolymorphicCalls.benchmarks)
@@ -354,6 +379,7 @@ register(RandomShuffle.benchmarks)
 register(RandomTree.benchmarks)
 register(RandomValues.benchmarks)
 register(RangeAssignment.benchmarks)
+register(RangeContains.benchmarks)
 register(RangeIteration.benchmarks)
 register(RangeOverlaps.benchmarks)
 register(RangeReplaceableCollectionPlusDefault.benchmarks)
@@ -367,6 +393,7 @@ register(RomanNumbers.benchmarks)
 register(SIMDRandomMask.benchmarks)
 register(SIMDReduceInteger.benchmarks)
 register(SequenceAlgos.benchmarks)
+register(SetIdentical.benchmarks)
 register(SetTests.benchmarks)
 register(SevenBoom.benchmarks)
 register(Sim2DArray.benchmarks)
@@ -376,7 +403,6 @@ register(SortIntPyramids.benchmarks)
 register(SortLargeExistentials.benchmarks)
 register(SortLettersInPlace.benchmarks)
 register(SortStrings.benchmarks)
-register(StackPromo.benchmarks)
 register(StaticArray.benchmarks)
 register(StrComplexWalk.benchmarks)
 register(StrToInt.benchmarks)
@@ -409,4 +435,4 @@ register(Walsh.benchmarks)
 register(WordCount.benchmarks)
 register(XorLoop.benchmarks)
 
-main()
+await main()

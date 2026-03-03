@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name unowned %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name unowned %s | %FileCheck %s
 
 func takeClosure(_ fn: () -> Int) {}
 

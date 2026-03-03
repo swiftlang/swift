@@ -25,12 +25,13 @@
 
 // CHECK-LOAD-PKG-ENABLED: loaded module 'Bar'; source: '{{.*}}Bar.package.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
 
-/// Client should not load a package interface module without the flag or the env var
+/// Client should not load a package interface without the flag or the env var above;
+/// in such case, private swiftinterface is loaded but an error should be thrown in typecheck.
 // RUN: not %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -package-name barpkg \
 // RUN:   -Rmodule-loading 2> %t/load-pkg-off.output
 // RUN: %FileCheck -check-prefix=CHECK-LOAD-PKG-OFF %s < %t/load-pkg-off.output
-// CHECK-LOAD-PKG-OFF: no such module 'Bar'
+// CHECK-LOAD-PKG-OFF: error: module 'Bar' is in package 'barpkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface:{{.*}}Bar.private.swiftinterface
 
 /// Client loads a private interface since the package-name is different from the loaded module's.
 // RUN: not %target-swift-frontend -typecheck %t/Client.swift -I %t \

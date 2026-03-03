@@ -14,20 +14,22 @@
 #define SWIFT_SERIALIZATION_VALIDATION_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Version.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-
-namespace llvm {
-class Triple;
-}
+#include "llvm/TargetParser/Triple.h"
 
 namespace swift {
 
 class ModuleFile;
+struct ExplicitSwiftModuleMap;
+struct ExplicitClangModuleMap;
 enum class ResilienceStrategy : unsigned;
 
 namespace serialization {
@@ -50,9 +52,6 @@ enum class Status {
 
   /// The distribution channel doesn't match.
   ChannelIncompatible,
-
-  /// The module is required to be in OSSA, but is not.
-  NotInOSSA,
 
   /// The module file depends on another module that can't be loaded.
   MissingDependency,
@@ -128,6 +127,9 @@ class ExtendedValidationInfo {
   StringRef ModuleABIName;
   StringRef ModulePackageName;
   StringRef ExportAsName;
+  StringRef PublicModuleName;
+  CXXStdlibKind CXXStdlib;
+  version::Version SwiftInterfaceCompilerVersion;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
@@ -143,7 +145,10 @@ class ExtendedValidationInfo {
     unsigned HasCxxInteroperability : 1;
     unsigned AllowNonResilientAccess: 1;
     unsigned SerializePackageEnabled: 1;
+    unsigned StrictMemorySafety: 1;
+    unsigned DeferredCodeGen: 1;
   } Bits;
+
 public:
   ExtendedValidationInfo() : Bits() {}
 
@@ -228,6 +233,9 @@ public:
   StringRef getModulePackageName() const { return ModulePackageName; }
   void setModulePackageName(StringRef name) { ModulePackageName = name; }
 
+  StringRef getPublicModuleName() const { return PublicModuleName; }
+  void setPublicModuleName(StringRef name) { PublicModuleName = name; }
+
   StringRef getExportAsName() const { return ExportAsName; }
   void setExportAsName(StringRef name) { ExportAsName = name; }
 
@@ -237,9 +245,35 @@ public:
   void setIsConcurrencyChecked(bool val = true) {
     Bits.IsConcurrencyChecked = val;
   }
+  bool strictMemorySafety() const {
+    return Bits.StrictMemorySafety;
+  }
+  void setStrictMemorySafety(bool val = true) {
+    Bits.StrictMemorySafety = val;
+  }
+
+  bool deferredCodeGen() const {
+    return Bits.DeferredCodeGen;
+  }
+  void setDeferredCodeGen(bool val = true) {
+    Bits.DeferredCodeGen = val;
+  }
+
   bool hasCxxInteroperability() const { return Bits.HasCxxInteroperability; }
   void setHasCxxInteroperability(bool val) {
     Bits.HasCxxInteroperability = val;
+  }
+
+  CXXStdlibKind getCXXStdlibKind() const { return CXXStdlib; }
+  void setCXXStdlibKind(CXXStdlibKind kind) { CXXStdlib = kind; }
+
+  version::Version getSwiftInterfaceCompilerVersion() const {
+    return SwiftInterfaceCompilerVersion;
+  }
+  void setSwiftInterfaceCompilerVersion(StringRef version) {
+    if (auto genericVersion = VersionParser::parseVersionString(
+            version, SourceLoc(), /*Diags=*/nullptr))
+      SwiftInterfaceCompilerVersion = genericVersion.value();
   }
 };
 
@@ -262,22 +296,24 @@ struct SearchPath {
 ///
 /// \param data A buffer containing the serialized AST. Result information
 /// refers directly into this buffer.
-/// \param requiresOSSAModules If true, necessitates the module to be
-/// compiled with -enable-ossa-modules.
 /// \param requiredSDK If not empty, only accept modules built with
 /// a compatible SDK. The StringRef represents the canonical SDK name.
+/// \param target The target triple of the current compilation for
+/// validating that the module we are attempting to load is compatible.
 /// \param[out] extendedInfo If present, will be populated with additional
 /// compilation options serialized into the AST at build time that may be
 /// necessary to load it properly.
 /// \param[out] dependencies If present, will be populated with list of
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
-    StringRef data, bool requiresOSSAModules,
-    StringRef requiredSDK,
+    StringRef data, StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
         nullptr,
-    SmallVectorImpl<SearchPath> *searchPaths = nullptr);
+    SmallVectorImpl<SearchPath> *searchPaths = nullptr,
+    ExplicitSwiftModuleMap *explicitSwiftModuleMap = nullptr,
+    ExplicitClangModuleMap *explicitClangModuleMa = nullptr,
+    std::optional<llvm::Triple> target = std::nullopt);
 
 /// Emit diagnostics explaining a failure to load a serialized AST.
 ///

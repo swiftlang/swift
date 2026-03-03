@@ -92,8 +92,7 @@ public:
     return Components.empty();
   }
 
-  /// Convert to a (maximum-4-element) llvm::VersionTuple, truncating
-  /// away any 5th component that might be in this version.
+  /// Convert to an llvm::VersionTuple.
   operator llvm::VersionTuple() const;
 
   /// Returns the concrete version to use when \e this version is provided as
@@ -131,11 +130,12 @@ public:
   /// SWIFT_VERSION_MINOR.
   static Version getCurrentLanguageVersion();
 
-  // List of backward-compatibility versions that we permit passing as
-  // -swift-version <vers>
-  static std::array<StringRef, 4> getValidEffectiveVersions() {
-    return {{"4", "4.2", "5", "6"}};
-  };
+  /// Returns a major version to represent the next future language mode. This
+  /// exists to make it easier to find and update clients when a new language
+  /// mode is added.
+  static constexpr unsigned getFutureMajorLanguageVersion() {
+    return 7;
+  }
 };
 
 bool operator>=(const Version &lhs, const Version &rhs);
@@ -164,11 +164,6 @@ std::string getSwiftFullVersion(Version effectiveLanguageVersion =
 /// this Swift was built.
 StringRef getSwiftRevision();
 
-/// Is the running compiler built with a version tag for distribution?
-/// When true, \c version::getCurrentCompilerVersion returns a valid version
-/// and \c getCurrentCompilerTag returns the version tuple in string format.
-bool isCurrentCompilerTagged();
-
 /// Retrieves the distribution tag of the running compiler, if any.
 StringRef getCurrentCompilerTag();
 
@@ -182,10 +177,9 @@ StringRef getCurrentCompilerSerializationTag();
 /// same serialization tag.
 StringRef getCurrentCompilerChannel();
 
-/// Retrieves the value of the upcoming C++ interoperability compatibility
-/// version that's going to be presented as some new concrete version to the
-/// users.
-unsigned getUpcomingCxxInteropCompatVersion();
+/// Retrieves the version of the running compiler. It could be a tag or
+/// a "development" version that only has major/minor.
+std::string getCompilerVersion();
 
 } // end namespace version
 } // end namespace swift

@@ -36,10 +36,10 @@ public func overflowWithUnsafeBytes() {
   }
 }
 
-// CHECK-LABEL: sil [stack_protection] @$s4test31owerflowWithUnsafeBorrowedBytes5valueySi_tF
+// CHECK-LABEL: sil [stack_protection] @$s4test31overflowWithUnsafeBorrowedBytes5valueySi_tF
 // CHECK-NOT:     copy_addr
-// CHECK:       } // end sil function '$s4test31owerflowWithUnsafeBorrowedBytes5valueySi_tF'
-public func owerflowWithUnsafeBorrowedBytes(value: Int) {
+// CHECK:       } // end sil function '$s4test31overflowWithUnsafeBorrowedBytes5valueySi_tF'
+public func overflowWithUnsafeBorrowedBytes(value: Int) {
   withUnsafeBytes(of: value) {
     potentiallyBadCFunction($0.bindMemory(to: Int.self).baseAddress!)
   }

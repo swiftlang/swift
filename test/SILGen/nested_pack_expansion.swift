@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -target %target-swift-5.9-abi-triple | %FileCheck %s
 
 typealias A<each T, U, V> = (repeat (each T, U, V))
 

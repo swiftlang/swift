@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking
 
-// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-availability-checking 2>&1 | %FileCheck %s
-
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-availability-checking >%t.output 2>&1
+// RUN: %FileCheck --input-file %t.output %s
 
 /// Test some invalid syntax first
 
@@ -31,7 +31,6 @@ protocol Invalid5<Element, Element> {
 
 protocol Sequence<Element> {
   associatedtype Element
-  // expected-note@-1 2{{protocol requires nested type 'Element'; add nested type 'Element' for conformance}}
 }
 
 extension Sequence {
@@ -54,13 +53,6 @@ struct ConcreteEquatableSequence<Element : Equatable> : EquatableSequence {}
 // CHECK-LABEL: parameterized_protocol.(file).IntSequence@
 // CHECK: Requirement signature: <Self where Self : Sequence, Self.[Sequence]Element == Int>
 protocol IntSequence : Sequence<Int> {}
-
-
-/// Concrete types cannot inherit from a parameterized protocol
-
-struct SillyStruct : Sequence<Int> {}
-// expected-error@-1 {{cannot inherit from protocol type with generic argument 'Sequence<Int>'}}
-// expected-error@-2 {{type 'SillyStruct' does not conform to protocol 'Sequence'}}
 
 
 /// Parameterized protocol in generic parameter inheritance clause
@@ -175,7 +167,7 @@ struct OpaqueTypes<E> {
 // CHECK: Generic signature: <Self where Self : Sequence, Self.[Sequence]Element == Int>
 extension Sequence<Int> {
 
-  // CHECK-LABEL: parameterized_protocol.(file).Sequence extension.doSomethingGeneric@
+  // CHECK-LABEL: parameterized_protocol.(file).Sequence<Int> extension.doSomethingGeneric@
   // CHECK: Generic signature: <Self, E where Self : Sequence, Self.[Sequence]Element == Int>
   func doSomethingGeneric<E>(_: E) {}
 }
@@ -211,11 +203,6 @@ func testComposition2(_: some Sequence<Int> & Sendable) {}
 protocol TestCompositionProtocol1 {
   associatedtype S : Sequence<Int> & Sendable
 }
-
-struct TestStructComposition : Sequence<Int> & Sendable {}
-// expected-error@-1 {{cannot inherit from protocol type with generic argument 'Sequence<Int>'}}
-// expected-error@-2 {{type 'TestStructComposition' does not conform to protocol 'Sequence'}}
-
 
 /// Conflicts
 

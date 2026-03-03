@@ -49,7 +49,7 @@
 
 // RUN: %target-swift-frontend %s \
 // RUN:     -O \
-// RUN:     -enable-copy-propagation=true \
+// RUN:     -enable-copy-propagation=optimizing \
 // RUN:     -Xllvm -sil-print-pass-name \
 // RUN:     -emit-ir \
 // RUN:     -o /dev/null \
@@ -57,7 +57,7 @@
 
 // RUN: %target-swift-frontend %s \
 // RUN:     -O \
-// RUN:     -enable-copy-propagation=true \
+// RUN:     -enable-copy-propagation=optimizing \
 // RUN:     -enable-destroy-hoisting=false \
 // RUN:     -Xllvm -sil-print-pass-name \
 // RUN:     -emit-ir \
@@ -66,7 +66,7 @@
 
 // RUN: %target-swift-frontend %s \
 // RUN:     -O \
-// RUN:     -enable-copy-propagation=true \
+// RUN:     -enable-copy-propagation=optimizing \
 // RUN:     -enable-destroy-hoisting=true \
 // RUN:     -Xllvm -sil-print-pass-name \
 // RUN:     -emit-ir \

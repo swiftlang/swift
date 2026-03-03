@@ -14,11 +14,11 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name pkg -verify
+// RUN:   -package-name pkg -verify -verify-ignore-unrelated
 // RUN: %target-swift-frontend -typecheck %t/PackageTypeImportedAsPackageClient.swift -I %t \
-// RUN:   -package-name pkg -verify
+// RUN:   -package-name pkg -verify -verify-ignore-unrelated
 // RUN: %target-swift-frontend -typecheck %t/LocalVsImportClient.swift -I %t \
-// RUN:   -package-name pkg -verify
+// RUN:   -package-name pkg -verify -verify-ignore-unrelated
 
 //--- PublicLib.swift
 public struct PublicImportType {}

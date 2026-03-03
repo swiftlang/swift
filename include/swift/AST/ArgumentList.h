@@ -93,7 +93,7 @@ public:
   bool isInOut() const;
 
   /// Whether the argument is a compile-time constant value.
-  bool isConst() const;
+  bool isCompileTimeLiteral() const;
 
   bool operator==(const Argument &other) const {
     return LabelLoc == other.LabelLoc && Label == other.Label &&

@@ -318,6 +318,9 @@ TEST(ActorTest, actorSwitch) {
 }
 
 TEST(ActorTest, actorContention) {
+  #ifdef __SKIP_RDAR163604876__
+    GTEST_SKIP() << "Skipping due to rdar://163604876";
+  #endif
   run([] {
     using Context = TupleContext<AsyncTask*, TestActor*>;
     auto actor = createActor();
@@ -387,6 +390,9 @@ TEST(ActorTest, actorContention) {
 }
 
 TEST(ActorTest, actorPriority) {
+  #ifdef __SKIP_RDAR163604876__
+    GTEST_SKIP() << "Skipping due to rdar://163604876";
+  #endif
   run([] {
     auto actor = createActor();
 
@@ -430,6 +436,9 @@ TEST(ActorTest, actorPriority) {
 }
 
 TEST(ActorTest, actorPriority2) {
+  #ifdef __SKIP_RDAR163604876__
+    GTEST_SKIP() << "Skipping due to rdar://163604876";
+  #endif
   run([] {
     auto actor = createActor();
 

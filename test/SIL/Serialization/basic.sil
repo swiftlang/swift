@@ -1,10 +1,11 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name borrow
-// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name borrow -emit-sorted-sil | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.2.sib -module-name borrow -emit-sorted-sil | %FileCheck %s
 
 import Builtin
+import Swift
 
 class TestArrayStorage {
   @_hasStorage var count: Int32
@@ -23,7 +24,7 @@ struct Int32 {
 
 struct EmptyStruct {}
 
-@_moveOnly struct MoveOnlyStruct {
+struct MoveOnlyStruct: ~Copyable {
   @_hasStorage var i: Int32
   deinit
 }

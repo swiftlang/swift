@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -release-hoisting %s | %FileCheck --check-prefix=CHECK-RELEASE-HOISTING %s
-// RUN: %target-sil-opt -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -release-hoisting %s | %FileCheck --check-prefix=CHECK-RELEASE-HOISTING %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
 
 // REQUIRES: swift_in_compiler
 
@@ -1121,5 +1121,52 @@ bb1:
   strong_release %1 : $C
   %5 = tuple()
   return %5 : $()
+}
+
+// CHECK: sil @dont_hoist_release_accross_cast
+// CHECK: retain
+// CHECK: apply
+// CHECK: unconditional_checked_cast
+// CHECK: release
+sil @dont_hoist_release_accross_cast : $@convention(thin) (B, B) -> () {
+bb0(%0 : $B, %1: $B):
+  strong_retain %0: $B
+  apply undef() : $@convention(thin) () -> ()
+  %3 = unconditional_checked_cast %0 : $B to Builtin.NativeObject
+  strong_release %0: $B
+  %5 = tuple()
+  return %5 : $()
+}
+
+enum NCEnum : ~Copyable {
+  case some([Int])
+  case none
+}
+
+sil @use_ncenum : $@convention(thin) (@guaranteed Array<Int>) -> ()
+
+// CHECK-LABEL: sil hidden @testNoncopyable : $@convention(thin) (@guaranteed NCEnum) -> () {
+// CHECK-NOT: retain_value %0
+// CHECK: retain_value
+// CHECK-LABEL: } // end sil function 'testNoncopyable'
+sil hidden @testNoncopyable : $@convention(thin) (@guaranteed NCEnum) -> () {
+bb0(%0 : $NCEnum):
+  switch_enum %0, case #NCEnum.none!enumelt: bb1, case #NCEnum.some!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2(%4 : $Array<Int>):
+  %5 = alloc_stack [var_decl] $Array<Int>, var, name "array"
+  retain_value %4
+  store %4 to %5
+  %11 = function_ref @use_ncenum : $@convention(thin) (@guaranteed Array<Int>) -> ()
+  %12 = apply %11(%4) : $@convention(thin) (@guaranteed Array<Int>) -> ()
+  destroy_addr %5
+  dealloc_stack %5
+  br bb3
+bb3:
+  %16 = tuple ()
+  return %16
 }
 

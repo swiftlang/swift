@@ -16,6 +16,9 @@ import TestModule
  // CHECK-DAG:          "swift": "Swift"
  // CHECK-DAG:          "swift": "SwiftOnoneSupport"
 
+// Additional occurence in source-imported dependencies field
+ // CHECK:      "swift": "TestModule"
+
  // CHECK:      "swift": "TestModule"
  // CHECK-NEXT:    },
  // CHECK-NEXT:    {
@@ -30,7 +33,8 @@ import TestModule
  // CHECK-NEXT:          "swift": "SwiftOnoneSupport"
  // CHECK-NEXT:        }
  // CHECK-NEXT:      ],
- // CHECK-NEXT:      "details": {
+ // CHECK-NEXT:      "linkLibraries": [
+ // CHECK:           "details": {
  // CHECK-NEXT:        "swift": {
  // CHECK-NEXT:          "moduleInterfacePath": 
  // CHECK-NEXT:          "compiledModuleCandidates": [

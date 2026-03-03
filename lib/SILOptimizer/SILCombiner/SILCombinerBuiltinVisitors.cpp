@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-combine"
 
 #include "SILCombiner.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
@@ -118,8 +119,10 @@ SILCombiner::optimizeBuiltinCOWBufferForReadingOSSA(BuiltinInst *bi) {
     if (auto operand = BorrowingOperand(use)) {
       if (operand.isReborrow())
         return nullptr;
-      auto bv = operand.getBorrowIntroducingUserResult();
-      accumulatedBorrowedValues.push_back(bv);
+      auto result = operand.getBorrowIntroducingUserResult();
+      if (auto bv = BorrowedValue(result)) {
+        accumulatedBorrowedValues.push_back(bv);
+      }
       continue;
     }
 
@@ -162,6 +165,7 @@ SILCombiner::optimizeBuiltinCOWBufferForReadingOSSA(BuiltinInst *bi) {
             return;
           case InteriorPointerOperandKind::OpenExistentialBox:
           case InteriorPointerOperandKind::ProjectBox:
+          case InteriorPointerOperandKind::MarkDependenceNonEscaping:
             // Can not mark this immutable.
             return;
           }
@@ -655,7 +659,7 @@ SILInstruction *SILCombiner::optimizeStringObject(BuiltinInst *BI) {
                                       setBits & andBits);
 }
 
-SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
+SILInstruction *SILCombiner::legacyVisitBuiltinInst(BuiltinInst *I) {
   if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
     return optimizeBuiltinCanBeObjCClass(I, Builder);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::IsConcrete)

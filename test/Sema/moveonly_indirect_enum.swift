@@ -3,27 +3,23 @@
 // This test validates that move only enums cannot be marked indirect or have
 // indirect cases.
 
-@_moveOnly
-struct S {
+struct S: ~Copyable {
     var i = 5
 }
 
-@_moveOnly enum E { }
+enum E: ~Copyable { }
 
-@_moveOnly
-enum E1 {
+enum E1: ~Copyable {
     case first
     case second(S)
 }
 
-@_moveOnly
-indirect enum E2 { // expected-error {{noncopyable enum 'E2' cannot be marked indirect or have indirect cases yet}}
+indirect enum E2: ~Copyable { // expected-error {{noncopyable enum 'E2' cannot be marked indirect or have indirect cases yet}}
     case first
     case second(S)
 }
 
-@_moveOnly
-enum E3 {
+enum E3: ~Copyable {
     case first
     indirect case second(S) // expected-error {{noncopyable enum 'E3' cannot be marked indirect or have indirect cases yet}}
 }

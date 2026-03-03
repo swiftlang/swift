@@ -78,6 +78,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"
@@ -162,9 +163,9 @@ public:
 
     this->stringInitIntrinsic = callee;
 
-    MetatypeInst *stringMetatypeInst =
-        dyn_cast<MetatypeInst>(inst->getOperand(4)->getDefiningInstruction());
-    this->stringMetatype = stringMetatypeInst->getType();
+    auto stringMetatype = inst->getOperand(4)->getType();
+    assert(stringMetatype.isMetatype());
+    this->stringMetatype = stringMetatype;
   }
 
   bool isInitialized() { return stringInitIntrinsic != nullptr; }
@@ -517,8 +518,7 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   // call returns a two-element tuple, where the first element is the newly
   // created array and the second element is a pointer to the internal storage
   // of the array.
-  SubstitutionMap subMap = arrayType->getContextSubstitutionMap(
-      module.getSwiftModule(), astContext.getArrayDecl());
+  SubstitutionMap subMap = arrayType->getContextSubstitutionMap();
   FunctionRefInst *arrayAllocateRef =
       builder.createFunctionRef(loc, arrayAllocateFun);
   ApplyInst *applyInst = builder.createApply(
@@ -580,38 +580,6 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
                                    ArrayRef<SILValue>(arraySIL));
   }
   return arraySIL;
-}
-
-/// Given a SILValue \p value, return the instruction immediately following the
-/// definition of the value. That is, if the value is defined by an
-/// instruction, return the instruction following the definition. Otherwise, if
-/// the value is a basic block parameter, return the first instruction of the
-/// basic block.
-SILInstruction *getInstructionFollowingValueDefinition(SILValue value) {
-  SILInstruction *definingInst = value->getDefiningInstruction();
-  if (definingInst) {
-    return &*std::next(definingInst->getIterator());
-  }
-  // Here value must be a basic block argument.
-  SILBasicBlock *bb = value->getParentBlock();
-  return &*bb->begin();
-}
-
-/// Given a SILValue \p value, create a copy of the value using copy_value in
-/// OSSA or retain in non-OSSA, if \p value is a non-trivial type. Otherwise, if
-/// \p value is a trivial type, return the value itself.
-SILValue makeOwnedCopyOfSILValue(SILValue value, SILFunction &fun) {
-  SILType type = value->getType();
-  if (type.isTrivial(fun) || type.isAddress())
-    return value;
-
-  SILInstruction *instAfterValueDefinition =
-      getInstructionFollowingValueDefinition(value);
-  SILLocation copyLoc = instAfterValueDefinition->getLoc();
-  SILBuilderWithScope builder(instAfterValueDefinition);
-  const TypeLowering &typeLowering = builder.getTypeLowering(type);
-  SILValue copy = typeLowering.emitCopyValue(builder, copyLoc, value);
-  return copy;
 }
 
 /// Generate SIL code that computes the constant given by the symbolic value
@@ -682,8 +650,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
            "aggregate symbolic value's type and expected type do not match");
 
     VarDecl *propertyDecl = structDecl->getStoredProperties().front();
-    Type propertyType = expectedType->getTypeOfMember(
-        propertyDecl->getModuleContext(), propertyDecl);
+    Type propertyType = expectedType->getTypeOfMember(propertyDecl);
     SymbolicValue propertyVal = symVal.lookThroughSingleElementAggregates();
     SILValue newPropertySIL = emitCodeForSymbolicValue(
         propertyVal, propertyType, builder, loc, stringInfo);
@@ -732,7 +699,8 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     if (originalClosureInst->getFunction() == &fun) {
       // Copy the closure, since the returned value must be owned and the
       // closure's lifetime must be extended until this point.
-      resultVal = makeOwnedCopyOfSILValue(originalClosureInst, fun);
+      resultVal = makeCopiedValueAvailable(originalClosureInst,
+                                           builder.getInsertionBB());
     } else {
       // If the closure captures a value that is not a constant, it should only
       // come from the caller of the log call. It should be handled by the then
@@ -939,6 +907,16 @@ static void substituteConstants(FoldState &foldState) {
   for (SILValue constantSILValue : foldState.getConstantSILValues()) {
     SymbolicValue constantSymbolicVal =
         evaluator.lookupConstValue(constantSILValue).value();
+    CanType instType = constantSILValue->getType().getASTType();
+
+    // If the SymbolicValue is a string but the instruction that is folded is
+    // not String typed, we are tracking a StaticString which is represented as
+    // a raw pointer. Skip folding StaticString as they are already efficiently
+    // represented.
+    if (constantSymbolicVal.getKind() == SymbolicValue::String &&
+        !instType->isString())
+      continue;
+
     // Make sure that the symbolic value tracked in the foldState is a constant.
     // In the case of ArraySymbolicValue, the array storage could be a non-constant
     // if some instruction in the array initialization sequence was not evaluated
@@ -977,7 +955,6 @@ static void substituteConstants(FoldState &foldState) {
 
     SILBuilderWithScope builder(insertionPoint);
     SILLocation loc = insertionPoint->getLoc();
-    CanType instType = constantSILValue->getType().getASTType();
     SILValue foldedSILVal = emitCodeForSymbolicValue(
         constantSymbolicVal, instType, builder, loc, foldState.stringInfo);
 
@@ -1198,7 +1175,7 @@ static bool tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
         }
         (void)deletedInstructions.insert(deadInst);
       });
-  InstructionDeleter deleter(std::move(callbacks));
+  InstructionDeleter deleter(std::move(callbacks), /*assumeFixedLifetimes=*/ false);
 
   unsigned startIndex = 0;
   while (startIndex < worklist.size()) {
@@ -1425,7 +1402,7 @@ suppressGlobalStringTablePointerError(SingleValueInstruction *oslogMessage) {
 
   // Replace the globalStringTablePointer builtins by a string_literal
   // instruction for an empty string and clean up dead code.
-  InstructionDeleter deleter;
+  InstructionDeleter deleter(/*assumeFixedLifetimes=*/ false);
   for (BuiltinInst *bi : globalStringTablePointerInsts) {
     SILBuilderWithScope builder(bi);
     StringLiteralInst *stringLiteral = builder.createStringLiteral(

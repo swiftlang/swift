@@ -10,16 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Dependencies.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/FrontendTool/Dependencies.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringRef.h"

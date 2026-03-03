@@ -1,0 +1,16 @@
+// RUN: %scale-test --begin 1 --end 15 --step 1 --select NumLeafScopes %s
+// REQUIRES: asserts,no_asan
+
+struct MyIntValue: ExpressibleByArrayLiteral {
+    init(arrayLiteral: Int...) {}
+}
+
+func +(x: MyIntValue, y: MyIntValue) -> MyIntValue { [] }
+func +(x: MyIntValue, y: Int) -> MyIntValue { [] }
+
+func test(y: Int) {
+%for i in range(0, N):
+  [1] + y +
+%end
+  [1] + y
+}

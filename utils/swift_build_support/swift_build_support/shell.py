@@ -88,8 +88,8 @@ def call(command, stderr=None, env=None, dry_run=None, echo=True):
         subprocess.check_call(command, env=_env, stderr=stderr)
     except subprocess.CalledProcessError as e:
         _fatal_error(
-            "command terminated with a non-zero exit status " +
-            str(e.returncode) + ", aborting")
+            f"command `{command}` terminated with a non-zero exit status "
+            f"{str(e.returncode)}, aborting")
     except OSError as e:
         _fatal_error(
             "could not execute '" + quote_command(command) +
@@ -138,8 +138,8 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
         if optional:
             return None
         _fatal_error(
-            "command terminated with a non-zero exit status " +
-            str(e.returncode) + ", aborting")
+            f"command `{command}` terminated with a non-zero exit status "
+            f"{str(e.returncode)}, aborting")
     except OSError as e:
         if optional:
             return None
@@ -209,50 +209,3 @@ def remove(path, dry_run=None, echo=True):
     if dry_run:
         return
     os.remove(path)
-
-
-# Initialized later
-lock = None
-
-
-def run(*args, **kwargs):
-    repo_path = os.getcwd()
-    echo_output = kwargs.pop('echo', False)
-    dry_run = kwargs.pop('dry_run', False)
-    env = kwargs.get('env', None)
-    prefix = kwargs.pop('prefix', '')
-    if dry_run:
-        _echo_command(dry_run, *args, env=env, prompt="{0}+ ".format(prefix))
-        return (None, 0, args)
-
-    my_pipe = subprocess.Popen(
-        *args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        universal_newlines=True,
-        encoding='utf-8',
-        **kwargs)
-    (output, _) = my_pipe.communicate()
-    output = output.encode(encoding='ascii', errors='replace')
-    ret = my_pipe.wait()
-
-    if lock:
-        lock.acquire()
-    if echo_output:
-        sys.stdout.flush()
-        sys.stderr.flush()
-        _echo_command(dry_run, *args, env=env, prompt="{0}+ ".format(prefix))
-        if output:
-            for line in output.splitlines():
-                print("{0}{1}".format(prefix, line.decode('utf-8', errors='replace')))
-        sys.stdout.flush()
-        sys.stderr.flush()
-    if lock:
-        lock.release()
-
-    if ret != 0:
-        eout = Exception()
-        eout.ret = ret
-        eout.args = args
-        eout.repo_path = repo_path
-        eout.stderr = output
-        raise eout
-    return (output, 0, args)

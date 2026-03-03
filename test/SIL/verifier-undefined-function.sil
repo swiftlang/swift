@@ -1,0 +1,16 @@
+// RUN: not %target-sil-opt -o /dev/null %s 2>&1 | %FileCheck %s
+
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+
+sil  @undefined_function_ref : $@convention(thin) () -> () {
+bb0:
+  // CHECK:  :[[@LINE+1]]:21: error: use of undefined value 'undefined_function'
+  %0 = function_ref @undefined_function : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r
+}
+

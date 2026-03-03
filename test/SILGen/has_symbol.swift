@@ -30,7 +30,7 @@ func testGlobalFunctions() {
 
 // --- cdeclFunc() ---
 // CHECK: sil @$s17has_symbol_helper9cdeclFuncyyF : $@convention(thin) () -> ()
-// CHECK: sil [serialized] @cdecl_func : $@convention(c) () -> ()
+// CHECK: sil [serialized] [asmname "cdecl_func"] @$s17has_symbol_helper9cdeclFuncyyFTo : $@convention(c) () -> ()
 
 // --- forwardDeclaredFunc() ---
 // CHECK: sil @forward_declared_func : $@convention(thin) () -> ()

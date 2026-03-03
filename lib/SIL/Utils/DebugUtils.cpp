@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/DebugUtils.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -33,7 +34,7 @@ bool swift::hasNonTrivialNonDebugTransitiveUsers(
       Worklist.push_back(User);
     }
   } else {
-    auto *I = V.get<SILInstruction *>();
+    auto *I = cast<SILInstruction *>(V);
     SeenInsts.insert(I);
     Worklist.push_back(I);
   }

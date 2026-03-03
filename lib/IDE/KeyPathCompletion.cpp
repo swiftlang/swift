@@ -10,10 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/KeyPathCompletion.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/TypeVariableType.h"
 
 using namespace swift;
 using namespace swift::constraints;
@@ -52,7 +54,7 @@ void KeyPathTypeCheckCompletionCallback::sawSolutionImpl(
             return Entry.first->getImpl().getLocator() == RootLocator;
           });
       if (BaseVariableTypeBinding != S.typeBindings.end()) {
-        BaseType = S.simplifyType(BaseVariableTypeBinding->getSecond());
+        BaseType = S.simplifyType(BaseVariableTypeBinding->second);
       }
     }
   } else {

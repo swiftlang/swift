@@ -2,7 +2,15 @@
 // RUN: %FileCheck %s --check-prefix=CHECK < %t.txt
 // RUN: %FileCheck %s --check-prefix=CHECK-CONSTANTS < %t.txt
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
+
+// This fails with an unoptimized stdlib. Disable it on that so we can get
+// builds green.
+//
+// rdar://131554269
+//
+// REQUIRES: optimized_stdlib
+// UNSUPPORTED: CPU=arm64e
 
 func blah<T>(_: T.Type) {}
 

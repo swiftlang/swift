@@ -1,8 +1,8 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // FIXME: No simd module on linux rdar://problem/20795411
-// XFAIL: OS=linux-gnu, OS=windows-msvc, OS=openbsd, OS=linux-android, OS=linux-androideabi
-// XFAIL: OS=wasi
+// XFAIL: OS=linux-gnu, OS=windows-msvc, OS=openbsd, OS=linux-android, OS=linux-androideabi, OS=freebsd
+// XFAIL: CPU=wasm32
 
 import simd
 

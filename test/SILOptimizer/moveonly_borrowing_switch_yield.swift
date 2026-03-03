@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -O -emit-sil -verify %s
+// RUN: %target-swift-frontend -parse-as-library -O -emit-sil -verify %s -disable-availability-checking
 
 extension List {
     var peek: Element {
@@ -13,30 +13,8 @@ extension List {
     }
 }
 
-struct MyPointer<Wrapped: ~Copyable>: Copyable {
-    var v: UnsafeMutablePointer<Int>
-
-    static func allocate(capacity: Int) -> Self {
-        fatalError()
-    }
-
-    func initialize(to: consuming Wrapped) {
-    }
-    func deinitialize(count: Int) {
-    }
-    func deallocate() {
-    }
-    func move() -> Wrapped {
-        fatalError()
-    }
-
-    var pointee: Wrapped {
-        _read { fatalError() }
-    }
-}
-
 struct Box<Wrapped: ~Copyable>: ~Copyable {
-    private let _pointer: MyPointer<Wrapped>
+    private let _pointer: UnsafeMutablePointer<Wrapped>
     
     init(_ element: consuming Wrapped) {
         _pointer = .allocate(capacity: 1)

@@ -35,13 +35,19 @@ public struct ObservationRegistrar: Sendable {
       storage.cancel()
     }
   }
-  
+
+  enum Dirty {
+    case clean
+    case willSet(AnyKeyPath)
+    case didSet(AnyKeyPath)
+    case `deinit`
+  }
+
   private struct State: @unchecked Sendable {
     private enum ObservationKind {
       case willSetTracking(@Sendable (AnyKeyPath) -> Void)
       case didSetTracking(@Sendable (AnyKeyPath) -> Void)
-      case computed(@Sendable (Any) -> Void)
-      case values(ValuesObserver)
+      case deinitTracking(@Sendable () -> Void)
     }
     
     private struct Observation {
@@ -70,58 +76,41 @@ public struct ObservationRegistrar: Sendable {
           return nil
         }
       }
-      
-      var observer: (@Sendable (Any) -> Void)? {
+
+      var deinitTracker: (@Sendable () -> Void)? {
         switch kind {
-        case .computed(let observer):
-          return observer
+        case .deinitTracking(let tracker):
+          return tracker
         default:
           return nil
         }
       }
-      
-      var isValueObserver: Bool {
-        switch kind {
-        case .values:
-          return true
-        default:
-          return false
-        }
-      }
-      
-      func emit<Element>(_ value: Element) -> Bool {
-        switch kind {
-        case .values(let observer):
-          return observer.emit(value)
-        default:
-          return false
-        }
-      }
-      
-      func cancel() {
-        switch kind {
-        case .values(let observer):
-          observer.cancel()
-        default:
-          break
-        }
-      }
     }
     
+    private var used = UInt64(0)
     private var id = 0
     private var observations = [Int : Observation]()
     private var lookups = [AnyKeyPath : Set<Int>]()
+
+    var dirty: Dirty = .clean
+    var trackingLists = Set<UnsafeRawPointer>()
     
     internal mutating func generateId() -> Int {
-      defer { id &+= 1 }
-      return id
+      let available = (~used).trailingZeroBitCount
+      if available < 64 {
+        used |= 1 << available
+        return available
+      } else {
+        defer { id &+= 1 }
+        return id &+ 64
+      }
     }
     
     internal mutating func registerTracking(for properties: Set<AnyKeyPath>, willSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       let id = generateId()
       observations[id] = Observation(kind: .willSetTracking(observer), properties: properties)
-      for keyPath in properties {
-        lookups[keyPath, default: []].insert(id)
+      for property in properties {
+        lookups[property, default: []].insert(id)
       }
       return id
     }
@@ -129,57 +118,45 @@ public struct ObservationRegistrar: Sendable {
     internal mutating func registerTracking(for properties: Set<AnyKeyPath>, didSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       let id = generateId()
       observations[id] = Observation(kind: .didSetTracking(observer), properties: properties)
-      for keyPath in properties {
-        lookups[keyPath, default: []].insert(id)
+      for property in properties {
+        lookups[property, default: []].insert(id)
       }
       return id
     }
-    
-    internal mutating func registerComputedValues(for properties: Set<AnyKeyPath>, observer: @Sendable @escaping (Any) -> Void) -> Int {
+
+    internal mutating func registerTracking(deinit observer: @Sendable @escaping () -> Void) -> Int {
       let id = generateId()
-      observations[id] = Observation(kind: .computed(observer), properties: properties)
-      for keyPath in properties {
-        lookups[keyPath, default: []].insert(id)
-      }
+      observations[id] = Observation(kind: .deinitTracking(observer), properties: [])
       return id
-    }
-    
-    internal mutating func registerValues(for properties: Set<AnyKeyPath>, storage: ValueObservationStorage) -> Int {
-      let id = generateId()
-      observations[id] = Observation(kind: .values(ValuesObserver(storage: storage)), properties: properties)
-      for keyPath in properties {
-        lookups[keyPath, default: []].insert(id)
-      }
-      return id
-    }
-    
-    internal func valueObservers(for keyPath: AnyKeyPath) -> Set<Int> {
-      guard let ids = lookups[keyPath] else {
-        return []
-      }
-      return ids.filter { observations[$0]?.isValueObserver == true }
     }
     
     internal mutating func cancel(_ id: Int) {
+      if id < 64 {
+        used &= ~(1 << id)
+      }
       if let observation = observations.removeValue(forKey: id) {
-        for keyPath in observation.properties {
-          if let index = lookups.index(forKey: keyPath) {
+        for property in observation.properties {
+          if let index = lookups.index(forKey: property) {
             lookups.values[index].remove(id)
             if lookups.values[index].isEmpty {
               lookups.remove(at: index)
             }
           }
         }
-        observation.cancel()
       }
     }
 
-    internal mutating func cancelAll() {
-      for observation in observations.values {
-        observation.cancel()
-      }
+    internal mutating func deinitialize() -> [@Sendable () -> Void] {
+      var trackers = [@Sendable () -> Void]()
+      let values = observations
       observations.removeAll()
       lookups.removeAll()
+      for value in values.values {
+        if let tracker = value.deinitTracker {
+          trackers.append(tracker)
+        }
+      }
+      return trackers
     }
     
     internal mutating func willSet(keyPath: AnyKeyPath) -> [@Sendable (AnyKeyPath) -> Void] {
@@ -194,29 +171,16 @@ public struct ObservationRegistrar: Sendable {
       return trackers
     }
     
-    internal mutating func didSet<Subject: Observable, Member>(keyPath: KeyPath<Subject, Member>) -> ([@Sendable (Any) -> Void], [@Sendable (AnyKeyPath) -> Void]) {
-      var observers = [@Sendable (Any) -> Void]()
+    internal mutating func didSet<Subject: Observable, Member>(keyPath: KeyPath<Subject, Member>) -> [@Sendable (AnyKeyPath) -> Void] {
       var trackers = [@Sendable (AnyKeyPath) -> Void]()
       if let ids = lookups[keyPath] {
         for id in ids {
-          if let observer = observations[id]?.observer {
-            observers.append(observer)
-            cancel(id)
-          }
           if let tracker = observations[id]?.didSetTracker {
             trackers.append(tracker)
           }
         }
       }
-      return (observers, trackers)
-    }
-    
-    internal mutating func emit<Element>(_ value: Element, ids: Set<Int>) {
-      for id in ids {
-        if observations[id]?.emit(value) == true {
-          cancel(id)
-        }
-      }
+      return trackers
     }
   }
   
@@ -232,28 +196,63 @@ public struct ObservationRegistrar: Sendable {
     internal func registerTracking(for properties: Set<AnyKeyPath>, didSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       state.withCriticalRegion { $0.registerTracking(for: properties, didSet: observer) }
     }
-    
-    internal func registerComputedValues(for properties: Set<AnyKeyPath>, observer: @Sendable @escaping (Any) -> Void) -> Int {
-      state.withCriticalRegion { $0.registerComputedValues(for: properties, observer: observer) }
-    }
-    
-    internal func registerValues(for properties: Set<AnyKeyPath>, storage: ValueObservationStorage) -> Int {
-      state.withCriticalRegion { $0.registerValues(for: properties, storage: storage) }
+
+    internal func registerTracking(deinit observer: @Sendable @escaping () -> Void) -> Int {
+      state.withCriticalRegion { $0.registerTracking(deinit: observer) }
     }
     
     internal func cancel(_ id: Int) {
       state.withCriticalRegion { $0.cancel(id) }
     }
 
-    internal func cancelAll() {
-      state.withCriticalRegion { $0.cancelAll() }
+    internal func deinitialize() {
+      let tracking = state.withCriticalRegion { 
+        let flagDirty: Bool
+        if let ptr = _ThreadLocal.value {
+          flagDirty = !$0.trackingLists.contains(ptr)
+        } else {
+          flagDirty = true
+        }
+        if flagDirty, case .clean = $0.dirty {
+          $0.dirty = .deinit
+        }
+        return $0.deinitialize() 
+      }
+      for action in tracking {
+        action()
+      }
+    }
+
+    func startTrackingIfNeeded(_ tracking: UnsafeRawPointer) {
+      state.withCriticalRegion { state in
+        _ = state.trackingLists.insert(tracking)
+      }
+    }
+
+    func clearDirty(_ tracking: UnsafeRawPointer) -> Dirty? {
+      state.withCriticalRegion { state in
+        defer { state.dirty = .clean }
+        state.trackingLists.remove(tracking)
+        return state.dirty
+      }
     }
     
     internal func willSet<Subject: Observable, Member>(
        _ subject: Subject,
        keyPath: KeyPath<Subject, Member>
     ) {
-      let tracking = state.withCriticalRegion { $0.willSet(keyPath: keyPath) }
+      let tracking = state.withCriticalRegion {
+        let flagDirty: Bool
+        if let ptr = _ThreadLocal.value {
+          flagDirty = !$0.trackingLists.contains(ptr)
+        } else {
+          flagDirty = true
+        }
+        if flagDirty, case .clean = $0.dirty {
+          $0.dirty = .willSet(keyPath) 
+        }
+        return $0.willSet(keyPath: keyPath) 
+      }
       for action in tracking {
         action(keyPath)
       }
@@ -263,16 +262,20 @@ public struct ObservationRegistrar: Sendable {
       _ subject: Subject,
       keyPath: KeyPath<Subject, Member>
     ) {
-      let (ids, (actions, tracking)) = state.withCriticalRegion { ($0.valueObservers(for: keyPath), $0.didSet(keyPath: keyPath)) }
-      if !ids.isEmpty {
-        let value = subject[keyPath: keyPath]
-        state.withCriticalRegion { $0.emit(value, ids: ids) }
+      let tracking = state.withCriticalRegion {
+        let flagDirty: Bool
+        if let ptr = _ThreadLocal.value {
+          flagDirty = !$0.trackingLists.contains(ptr)
+        } else {
+          flagDirty = true
+        }
+        if flagDirty, case .clean = $0.dirty {
+          $0.dirty = .didSet(keyPath)
+        }
+        return $0.didSet(keyPath: keyPath) 
       }
       for action in tracking {
         action(keyPath)
-      }
-      for action in actions {
-        action(subject)
       }
     }
   }
@@ -284,7 +287,7 @@ public struct ObservationRegistrar: Sendable {
     }
 
     deinit {
-      context.cancelAll()
+      context.deinitialize()
     }
   }
   
@@ -298,7 +301,7 @@ public struct ObservationRegistrar: Sendable {
   ///
   /// You don't need to create an instance of
   /// ``Observation/ObservationRegistrar`` when using the
-  /// ``Observation/Observable()`` macro to indicate observably
+  /// ``Observation/Observable()`` macro to indicate observability
   /// of a type.
   public init() {
   }
@@ -316,6 +319,7 @@ public struct ObservationRegistrar: Sendable {
       .assumingMemoryBound(to: ObservationTracking._AccessList?.self) {
       if trackingPtr.pointee == nil {
         trackingPtr.pointee = ObservationTracking._AccessList()
+        context.startTrackingIfNeeded(trackingPtr)
       }
       trackingPtr.pointee?.addAccess(keyPath: keyPath, context: context)
     }

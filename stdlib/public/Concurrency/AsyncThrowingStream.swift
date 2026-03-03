@@ -133,7 +133,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// A type that indicates how the stream terminated.
     ///
     /// The `onTermination` closure receives an instance of this type.
-    public enum Termination {
+    public enum Termination: Sendable {
       
       /// The stream finished as a result of calling the continuation's
       ///  `finish` method.
@@ -184,7 +184,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     }
     
     /// A strategy that handles exhaustion of a buffer’s capacity.
-    public enum BufferingPolicy {
+    public enum BufferingPolicy: Sendable {
       /// Continue to add to the buffer, treating its capacity as infinite.
       case unbounded
       
@@ -214,7 +214,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// This can be called more than once and returns to the caller immediately
     /// without blocking for any awaiting consumption from the iteration.
     @discardableResult
-    public func yield(_ value: __owned Element) -> YieldResult {
+    public func yield(_ value: sending Element) -> YieldResult {
       storage.yield(value)
     }
 
@@ -242,6 +242,11 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// iterator. This means that you can perform needed cleanup in the
     ///  cancellation handler. After reaching a terminal state, the
     ///  `AsyncThrowingStream` disposes of the callback.
+    ///
+    /// - Note: Because the system might call the `onTermination` callback as
+    /// part of task cancellation, it's subject to the same considerations for
+    /// avoiding deadlock as outlined in the documentation for
+    /// ``withTaskCancellationHandler(operation:onCancel:)``.
     public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
         return storage.getOnTermination()
@@ -285,7 +290,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///
   /// The `AsyncStream.Continuation` received by the `build` closure is
   /// appropriate for use in concurrent contexts. It is thread safe to send and
-  /// finish; all calls are to the continuation are serialized. However, calling
+  /// finish; all calls to the continuation are serialized. However, calling
   /// this from multiple concurrent contexts could result in out-of-order
   /// delivery.
   ///
@@ -463,7 +468,7 @@ extension AsyncThrowingStream.Continuation {
   /// blocking for any awaiting consumption from the iteration.
   @discardableResult
   public func yield(
-    with result: Result<Element, Failure>
+    with result: __shared sending Result<Element, Failure>
   ) -> YieldResult where Failure == Error {
     switch result {
     case .success(let val):
@@ -503,7 +508,9 @@ extension AsyncThrowingStream {
   /// - Returns: A tuple containing the stream and its continuation. The continuation should be passed to the
   /// producer while the stream should be passed to the consumer.
   @available(SwiftStdlib 5.1, *)
+  #if !hasFeature(Embedded)
   @backDeployed(before: SwiftStdlib 5.9)
+  #endif
   public static func makeStream(
       of elementType: Element.Type = Element.self,
       throwing failureType: Failure.Type = Failure.self,
@@ -517,6 +524,26 @@ extension AsyncThrowingStream {
 
 @available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream: @unchecked Sendable where Element: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingStream.Continuation.YieldResult: Sendable where Element: Sendable { }
+
+@available(SwiftStdlib 6.2, *)
+extension AsyncThrowingStream.Continuation: Hashable {
+  @available(SwiftStdlib 6.2, *)
+  public func hash(into hasher: inout Hasher) {
+    return hasher.combine(ObjectIdentifier(storage))
+  }
+  @available(SwiftStdlib 6.2, *)
+  public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+  @available(SwiftStdlib 6.2, *)
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs.storage === rhs.storage
+  }
+}
+
 #else
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
@@ -547,7 +574,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     @discardableResult
     @available(SwiftStdlib 5.1, *)
     @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-    public func yield(_ value: __owned Element) -> YieldResult {
+    public func yield(_ value: sending Element) -> YieldResult {
       fatalError("Unavailable in task-to-thread concurrency model")
     }
     @available(SwiftStdlib 5.1, *)
@@ -610,7 +637,7 @@ extension AsyncThrowingStream.Continuation {
   @available(SwiftStdlib 5.1, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public func yield(
-    with result: Result<Element, Failure>
+    with result: __shared sending Result<Element, Failure>
   ) -> YieldResult where Failure == Error {
     fatalError("Unavailable in task-to-thread concurrency model")
   }

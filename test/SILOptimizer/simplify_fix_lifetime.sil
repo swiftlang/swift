@@ -1,0 +1,106 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=fix_lifetime | %FileCheck %s
+
+import Swift
+import Builtin
+
+class C {}
+
+// CHECK-LABEL: sil @load_from_alloc_stack :
+// CHECK:         %1 = alloc_stack
+// CHECK-NEXT:    store %0 to %1
+// CHECK-NEXT:    %3 = load %1
+// CHECK-NEXT:    fix_lifetime %3
+// CHECK-NEXT:    dealloc_stack %1
+// CHECK:       } // end sil function 'load_from_alloc_stack'
+sil @load_from_alloc_stack : $@convention(thin) (@owned C) -> () {
+bb0(%0: $C):
+  %1 = alloc_stack $C
+  store %0 to %1
+  fix_lifetime %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @load_from_inout :
+// CHECK-NOT:     load
+// CHECK:         fix_lifetime %0
+// CHECK:       } // end sil function 'load_from_inout'
+sil @load_from_inout : $@convention(thin) (@inout C) -> () {
+bb0(%0: $*C):
+  fix_lifetime %0
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @not_loadable :
+// CHECK-NOT:     load
+// CHECK:         fix_lifetime %1
+// CHECK:       } // end sil function 'not_loadable'
+sil @not_loadable : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0: $*T):
+  %1 = alloc_stack $T
+  copy_addr %0 to %1
+  fix_lifetime %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_from_alloc_stack_ossa :
+// CHECK:         %1 = alloc_stack
+// CHECK-NEXT:    store %0 to [init] %1
+// CHECK-NEXT:    %3 = load_borrow %1
+// CHECK-NEXT:    fix_lifetime %3
+// CHECK-NEXT:    end_borrow %3
+// CHECK-NEXT:    destroy_addr %1
+// CHECK-NEXT:    dealloc_stack %1
+// CHECK:       } // end sil function 'load_from_alloc_stack_ossa'
+sil [ossa] @load_from_alloc_stack_ossa : $@convention(thin) (@owned C) -> () {
+bb0(%0: @owned $C):
+  %1 = alloc_stack $C
+  store %0 to [init] %1
+  fix_lifetime %1
+  destroy_addr %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_from_store_borrow :
+// CHECK:         %1 = alloc_stack
+// CHECK-NEXT:    %2 = store_borrow %0 to %1
+// CHECK-NEXT:    %3 = load_borrow %2
+// CHECK-NEXT:    fix_lifetime %3
+// CHECK-NEXT:    end_borrow %3
+// CHECK-NEXT:    end_borrow %2
+// CHECK-NEXT:    dealloc_stack %1
+// CHECK:       } // end sil function 'load_from_store_borrow'
+sil [ossa] @load_from_store_borrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0: @guaranteed $C):
+  %1 = alloc_stack $C
+  %2 = store_borrow %0 to %1
+  fix_lifetime %2
+  end_borrow %2
+  dealloc_stack %1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_trivial_from_alloc_stack :
+// CHECK:         %1 = alloc_stack
+// CHECK-NEXT:    store %0 to [trivial] %1
+// CHECK-NEXT:    %3 = load [trivial] %1
+// CHECK-NEXT:    fix_lifetime %3
+// CHECK-NEXT:    dealloc_stack %1
+// CHECK:       } // end sil function 'load_trivial_from_alloc_stack'
+sil [ossa] @load_trivial_from_alloc_stack : $@convention(thin) (Int) -> () {
+bb0(%0: $Int):
+  %1 = alloc_stack $Int
+  store %0 to [trivial] %1
+  fix_lifetime %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r : $()
+}
+

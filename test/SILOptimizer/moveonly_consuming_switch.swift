@@ -1,27 +1,7 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
-
-// TODO: Remove this and just use the real `UnsafeMutablePointer` when
-// noncopyable type support has been upstreamed.
-struct MyPointer<Wrapped: ~Copyable>: Copyable {
-    var v: UnsafeMutablePointer<Int>
-
-    static func allocate(capacity: Int) -> Self {
-        fatalError()
-    }
-
-    func initialize(to: consuming Wrapped) {
-    }
-    func deinitialize(count: Int) {
-    }
-    func deallocate() {
-    }
-    func move() -> Wrapped {
-        fatalError()
-    }
-}
+// RUN: %target-swift-frontend -emit-sil -verify %s -disable-availability-checking
 
 struct Box<Wrapped: ~Copyable>: ~Copyable {
-    private let _pointer: MyPointer<Wrapped>
+    private let _pointer: UnsafeMutablePointer<Wrapped>
     
     init(_ element: consuming Wrapped) {
         _pointer = .allocate(capacity: 1)

@@ -30,19 +30,45 @@ import SwiftShims
 ///   already been reached when `readLine()` is called, the result is `nil`.
 public func readLine(strippingNewline: Bool = true) -> String? {
   var utf8Start: UnsafeMutablePointer<UInt8>?
-  let utf8Count = swift_stdlib_readLine_stdin(&utf8Start)
+  let utf8Count = unsafe swift_stdlib_readLine_stdin(&utf8Start)
   defer {
-    _swift_stdlib_free(utf8Start)
+    unsafe _swift_stdlib_free(utf8Start)
   }
   guard utf8Count > 0 else {
     return nil
   }
-  let utf8Buffer = UnsafeBufferPointer(start: utf8Start, count: utf8Count)
-  var result = String._fromUTF8Repairing(utf8Buffer).result
-  if strippingNewline, result.last == "\n" || result.last == "\r\n" {
-    _ = result.removeLast()
+  let utf8Buffer = unsafe UnsafeBufferPointer(start: utf8Start, count: utf8Count)
+  var result = unsafe String._fromUTF8Repairing(utf8Buffer).result
+  if strippingNewline {
+    result.removeNewline()
   }
   return result
+}
+
+extension String {
+  /// Remove the newline from the string
+  fileprivate mutating func removeNewline() {
+    var scalars = unicodeScalars[...]
+
+    // If the last character is not "\n", there's nothing to do.
+    let newline: UnicodeScalar = "\n"
+    guard let lastNewline = scalars.last, lastNewline == newline else {
+      return
+    }
+
+    // Drop the "\n".
+    scalars = scalars.dropLast()
+
+    // Now remove "\r" if it's also there.
+    let carriageReturn: UnicodeScalar = "\r"
+    if let lastCR = scalars.last, lastCR == carriageReturn {
+      // Drop the "\rn".
+      scalars = scalars.dropLast()
+    }
+
+    // Remove from the end of the adjusted scalars to the end of this string.
+    _guts.remove(from: scalars.endIndex, to: endIndex)
+  }
 }
 
 #endif

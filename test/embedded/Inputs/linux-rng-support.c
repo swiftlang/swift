@@ -7,6 +7,8 @@
 
 ssize_t getrandom(void *buf, size_t len, unsigned int flags);
 
+void arc4random_buf(void *buf, size_t nbytes);
+
 void arc4random_buf(void *buf, size_t nbytes) {
   while (nbytes > 0) {
     ssize_t actual_nbytes = 0;

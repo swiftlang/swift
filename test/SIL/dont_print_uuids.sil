@@ -1,0 +1,18 @@
+// RUN: %target-sil-opt -print-no-uuids %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+protocol P {}
+
+sil [ossa] @testit : $@convention(thin) (@in_guaranteed P) -> () {
+bb0(%0 :  $*P):
+  // CHECK: %1 = open_existential_addr immutable_access %0 to $*@opened("", any P) Self 
+  %1 = open_existential_addr immutable_access %0 to $*@opened("8D8C5442-F841-11F0-91F8-0EA13E3AABB4", any P) Self 
+  %r = tuple ()
+  return %r
+}
+

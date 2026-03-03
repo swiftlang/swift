@@ -19,6 +19,8 @@
 // RUN: %target-swift-frontend -typecheck -verify %t/Client_Swift5.swift -I %t \
 // RUN:   -swift-version 5
 
+// REQUIRES: swift_feature_InternalImportsByDefault
+
 //--- Lib.swift
 
 public struct Type1 {}
@@ -63,10 +65,7 @@ internal import Lib1 // expected-warning {{module 'Lib1' is imported as 'public'
 
 // There's no warning about "will be ignored" for a matching implicit access level.
 public import Lib2
-// expected-note @-1 {{imported 'public' here}}
 import Lib2
-// expected-error @-1 {{ambiguous implicit access level for import of 'Lib2'; it is imported as 'public' elsewhere}}
-// expected-note @-2 {{silence these warnings by adopting the upcoming feature 'InternalImportsByDefault'}}
 
 public func dummyAPI(t: Lib1.Type1, t2: Lib2.Type1) {}
 

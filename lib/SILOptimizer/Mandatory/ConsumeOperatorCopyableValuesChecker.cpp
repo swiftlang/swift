@@ -13,7 +13,9 @@
 #define DEBUG_TYPE "sil-consume-operator-copyable-values-checker"
 
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
@@ -25,12 +27,13 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 
 using namespace swift;
 
@@ -154,6 +157,11 @@ bool CheckerLivenessInfo::compute() {
               return false;
             }
           }
+        } else if (isa<StoreBorrowInst>(user)) {
+          if (liveness->updateForBorrowingOperand(use) !=
+              InnerBorrowKind::Contained) {
+            return false;
+          }
         }
         // FIXME: this ignores all other forms of Borrow ownership, such as
         // partial_apply [onstack] and mark_dependence [nonescaping].
@@ -172,7 +180,8 @@ bool CheckerLivenessInfo::compute() {
           return true;
         });
         break;
-      case OperandOwnership::InteriorPointer: {
+      case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer: {
         // An interior pointer user extends liveness until the end of the
         // interior pointer section.
         //
@@ -216,17 +225,19 @@ namespace {
 struct ConsumeOperatorCopyableValuesChecker {
   SILFunction *fn;
   CheckerLivenessInfo livenessInfo;
-  DominanceInfo *dominanceToUpdate;
-  SILLoopInfo *loopInfoToUpdate;
+  DominanceInfo *dominance;
+  InstructionDeleter deleter;
+  OSSACanonicalizeOwned canonicalizer;
 
-  ConsumeOperatorCopyableValuesChecker(SILFunction *fn)
-      : fn(fn), dominanceToUpdate(nullptr), loopInfoToUpdate(nullptr) {}
-
-  void setDominanceToUpdate(DominanceInfo *newDFI) {
-    dominanceToUpdate = newDFI;
-  }
-
-  void setLoopInfoToUpdate(SILLoopInfo *newLFI) { loopInfoToUpdate = newLFI; }
+  ConsumeOperatorCopyableValuesChecker(
+      SILFunction *fn, DominanceInfo *dominance,
+      BasicCalleeAnalysis *calleeAnalysis,
+      DeadEndBlocksAnalysis *deadEndBlocksAnalysis)
+      : fn(fn), dominance(dominance),
+        canonicalizer(DontPruneDebugInsts,
+                      MaximizeLifetime_t(!fn->shouldOptimize()), fn,
+                      /*accessBlockAnalysis=*/nullptr, deadEndBlocksAnalysis,
+                      dominance, calleeAnalysis, deleter) {}
 
   bool check();
 
@@ -424,7 +435,9 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
   for (auto &block : *fn) {
     for (auto &ii : block) {
       if (auto *mvi = dyn_cast<MoveValueInst>(&ii)) {
-        if (mvi->isFromVarDecl() && !mvi->getType().isMoveOnly()) {
+        if (mvi->isFromVarDecl()
+            && mvi->getOwnershipKind() != OwnershipKind::None
+            && !mvi->getType().isMoveOnly()) {
           LLVM_DEBUG(llvm::dbgs()
                      << "Found lexical lifetime to check: " << *mvi);
           valuesToCheck.insert(mvi);
@@ -480,6 +493,7 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
     // Then look at all of our found consuming uses. See if any of these are
     // _move that are within the boundary.
     bool foundMove = false;
+    SmallVector<SILInstruction *, 2> validMoves;
     auto dbgVarInst = DebugVarCarryingInst::getFromValue(lexicalValue);
     StringRef varName = DebugVarCarryingInst::getName(dbgVarInst);
     for (auto *use : livenessInfo.consumingUse) {
@@ -494,7 +508,8 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
         mvi->setAllowsDiagnostics(false);
 
         LLVM_DEBUG(llvm::dbgs() << "Move Value: " << *mvi);
-        if (livenessInfo.liveness->isWithinBoundary(mvi)) {
+        if (livenessInfo.liveness->isWithinBoundary(
+                mvi, /*deadEndBlocks=*/nullptr)) {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: Yes!\n");
           emitDiagnosticForMove(lexicalValue, varName, mvi);
         } else {
@@ -508,8 +523,9 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
             builder.setCurrentDebugScope(dbgVarInst->getDebugScope());
             builder.createDebugValue(
                 dbgVarInst->getLoc(), SILUndef::get(mvi->getOperand()),
-                *varInfo, false /*poison*/, UsesMoveableValueDebugInfo);
+                *varInfo, DontPoisonRefs, UsesMoveableValueDebugInfo);
           }
+          validMoves.push_back(mvi);
         }
         foundMove = true;
       }
@@ -519,6 +535,11 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
     // ensures we emit llvm.dbg.addr instead of llvm.dbg.declare in IRGen.
     if (foundMove) {
       dbgVarInst.markAsMoved();
+    }
+
+    if (validMoves.size() > 0) {
+      canonicalizer.clear();
+      canonicalizer.canonicalizeValueLifetime(lexicalValue, validMoves);
     }
   }
 
@@ -544,8 +565,7 @@ static bool tryEmitCannotConsumeNonLocalMemoryError(MoveValueInst *mvi) {
     return false;
 
   auto &astContext = mvi->getModule().getASTContext();
-  if (auto *gai =
-          dyn_cast<GlobalAddrInst>(stripAccessMarkers(li->getOperand()))) {
+  if (isa<GlobalAddrInst>(stripAccessMarkers(li->getOperand()))) {
     auto diag = diag::sil_movekillscopyable_move_applied_to_nonlocal_memory;
     diagnose(astContext, mvi->getLoc().getSourceLoc(), diag, 0);
     mvi->setAllowsDiagnostics(false);
@@ -575,18 +595,17 @@ class ConsumeOperatorCopyableValuesCheckerPass : public SILFunctionTransform {
     LLVM_DEBUG(llvm::dbgs() << "*** Checking moved values in fn: "
                             << getFunction()->getName() << '\n');
 
-    ConsumeOperatorCopyableValuesChecker checker(getFunction());
-
-    // If we already had dominance or loop info generated, update them when
-    // splitting blocks.
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
-    if (dominanceAnalysis->hasFunctionInfo(fn))
-      checker.setDominanceToUpdate(dominanceAnalysis->get(fn));
+    auto *dominance = dominanceAnalysis->get(fn);
+    auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
+    auto *deadEndBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
+    ConsumeOperatorCopyableValuesChecker checker(
+        getFunction(), dominance, calleeAnalysis, deadEndBlocksAnalysis);
     auto *loopAnalysis = getAnalysis<SILLoopAnalysis>();
-    if (loopAnalysis->hasFunctionInfo(fn))
-      checker.setLoopInfoToUpdate(loopAnalysis->get(fn));
 
     if (checker.check()) {
+      // If we already had dominance or loop info generated, update them when
+      // splitting blocks.
       AnalysisPreserver preserveDominance(dominanceAnalysis);
       AnalysisPreserver preserveLoop(loopAnalysis);
       invalidateAnalysis(

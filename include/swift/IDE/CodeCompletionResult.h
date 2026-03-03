@@ -16,6 +16,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/CodeCompletionResultType.h"
 #include "swift/IDE/CodeCompletionString.h"
+#include "swift/IDE/CommentConversion.h"
 
 namespace swift {
 namespace ide {
@@ -190,6 +191,7 @@ enum class CodeCompletionKeywordKind : uint8_t {
 enum class CompletionKind : uint8_t {
   None,
   Import,
+  Using,
   UnresolvedMember,
   DotExpr,
   StmtOrExpr,
@@ -197,12 +199,14 @@ enum class CompletionKind : uint8_t {
   PostfixExpr,
   KeyPathExprObjC,
   KeyPathExprSwift,
+  TypePossibleFunctionParamBeginning,
   TypeDeclResultBeginning,
   TypeBeginning,
   TypeSimpleOrComposition,
   TypeSimpleBeginning,
   TypeSimpleWithDot,
   TypeSimpleWithoutDot,
+  TypeSimpleInverted,
   CaseStmtKeyword,
   CaseStmtBeginning,
   NominalMemberBeginning,
@@ -228,10 +232,8 @@ enum class CompletionKind : uint8_t {
   StmtLabel,
   ForEachPatternBeginning,
   TypeAttrBeginning,
+  TypeAttrInheritanceBeginning,
   OptionalBinding,
-
-  /// Completion after `~` in an inheritance clause.
-  WithoutConstraintType
 };
 
 enum class CodeCompletionDiagnosticSeverity : uint8_t {
@@ -322,6 +324,7 @@ enum class CodeCompletionMacroRole : uint8_t {
   AttachedVar = 1 << 3,
   AttachedContext = 1 << 4,
   AttachedDecl = 1 << 5,
+  AttachedFunction = 1 << 6,
 };
 using CodeCompletionMacroRoles = OptionSet<CodeCompletionMacroRole>;
 
@@ -336,6 +339,7 @@ enum class CodeCompletionFilterFlag : uint16_t {
   AttachedVarMacro = 1 << 7,
   AttachedContextMacro = 1 << 8,
   AttachedDeclMacro = 1 << 9,
+  AttachedFunctionMacro = 1 << 10,
 };
 using CodeCompletionFilter = OptionSet<CodeCompletionFilterFlag>;
 
@@ -376,6 +380,9 @@ class ContextFreeCodeCompletionResult {
   NullTerminatedStringRef ModuleName;
   NullTerminatedStringRef BriefDocComment;
   ArrayRef<NullTerminatedStringRef> AssociatedUSRs;
+  /// The Swift USR for a declaration (including for Clang declarations) used
+  /// for looking up the \c Decl instance for cached results.
+  NullTerminatedStringRef SwiftUSR;
   CodeCompletionResultType ResultType;
 
   ContextFreeNotRecommendedReason NotRecommended : 3;
@@ -408,7 +415,7 @@ public:
       NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
       ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
-      CodeCompletionResultType ResultType,
+      NullTerminatedStringRef SwiftUSR, CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       NullTerminatedStringRef DiagnosticMessage,
@@ -419,8 +426,8 @@ public:
         HasAsyncAlternative(HasAsyncAlternative),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        ResultType(ResultType), NotRecommended(NotRecommended),
-        DiagnosticSeverity(DiagnosticSeverity),
+        SwiftUSR(SwiftUSR), ResultType(ResultType),
+        NotRecommended(NotRecommended), DiagnosticSeverity(DiagnosticSeverity),
         DiagnosticMessage(DiagnosticMessage), FilterName(FilterName),
         NameForDiagnostics(NameForDiagnostics) {
     this->AssociatedKind.Opaque = AssociatedKind;
@@ -483,17 +490,16 @@ public:
   /// \note The caller must ensure that the \p CompletionString and all
   /// \c StringRefs outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
-  static ContextFreeCodeCompletionResult *
-  createDeclResult(CodeCompletionResultSink &Sink,
-                   CodeCompletionString *CompletionString,
-                   const Decl *AssociatedDecl,
-                   bool HasAsyncAlternative, NullTerminatedStringRef ModuleName,
-                   NullTerminatedStringRef BriefDocComment,
-                   ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
-                   CodeCompletionResultType ResultType,
-                   ContextFreeNotRecommendedReason NotRecommended,
-                   CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-                   NullTerminatedStringRef DiagnosticMessage);
+  static ContextFreeCodeCompletionResult *createDeclResult(
+      CodeCompletionResultSink &Sink, CodeCompletionString *CompletionString,
+      const Decl *AssociatedDecl, bool HasAsyncAlternative,
+      NullTerminatedStringRef ModuleName,
+      NullTerminatedStringRef BriefDocComment,
+      ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
+      NullTerminatedStringRef SwiftUSR, CodeCompletionResultType ResultType,
+      ContextFreeNotRecommendedReason NotRecommended,
+      CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+      NullTerminatedStringRef DiagnosticMessage);
 
   CodeCompletionResultKind getKind() const { return Kind; }
 
@@ -536,6 +542,8 @@ public:
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
     return AssociatedUSRs;
   }
+
+  NullTerminatedStringRef getSwiftUSR() const { return SwiftUSR; }
 
   const CodeCompletionResultType &getResultType() const { return ResultType; }
 
@@ -591,6 +599,10 @@ public:
 /// the completion's usage context.
 class CodeCompletionResult {
   const ContextFreeCodeCompletionResult &ContextFree;
+  /// Contains the associated declaration if fetched; if not, stores the
+  /// ASTContext to use for finding the associated declaration through the Swift
+  /// USR.
+  mutable llvm::PointerUnion<const Decl *, ASTContext *> DeclOrCtx;
   SemanticContextKind SemanticContext : 3;
   static_assert(int(SemanticContextKind::MAX_VALUE) < 1 << 3, "");
 
@@ -619,13 +631,15 @@ public:
   /// done by allocating the two in the same sink or adopting the context free
   /// sink in the sink that allocates this result.
   CodeCompletionResult(const ContextFreeCodeCompletionResult &ContextFree,
+                       llvm::PointerUnion<const Decl *, ASTContext *> DeclOrCtx,
                        SemanticContextKind SemanticContext,
                        CodeCompletionFlair Flair, uint8_t NumBytesToErase,
                        CodeCompletionResultTypeRelation TypeDistance,
                        ContextualNotRecommendedReason NotRecommended)
-      : ContextFree(ContextFree), SemanticContext(SemanticContext),
-        Flair(Flair.toRaw()), NotRecommended(NotRecommended),
-        NumBytesToErase(NumBytesToErase), TypeDistance(TypeDistance) {}
+      : ContextFree(ContextFree), DeclOrCtx(DeclOrCtx),
+        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
+        NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
+        TypeDistance(TypeDistance) {}
 
   const ContextFreeCodeCompletionResult &getContextFreeResult() const {
     return ContextFree;
@@ -713,6 +727,9 @@ public:
     }
   }
 
+  /// Finds the associated declaration on-demand and caches it.
+  const Decl *getAssociatedDecl() const;
+
   SemanticContextKind getSemanticContext() const { return SemanticContext; }
 
   CodeCompletionFlair getFlair() const { return CodeCompletionFlair(Flair); }
@@ -736,6 +753,26 @@ public:
 
   NullTerminatedStringRef getBriefDocComment() const {
     return getContextFreeResult().getBriefDocComment();
+  }
+
+  /// Prints the full documentation comment as XML to the provided \p OS stream.
+  ///
+  /// \returns true if the result has a documentation comment.
+  bool printFullDocCommentAsXML(raw_ostream &OS) const {
+    if (auto *D = getAssociatedDecl())
+      return ide::getDocumentationCommentAsXML(D, OS);
+
+    return false;
+  }
+
+  /// Prints the raw documentation comment to the provided \p OS stream.
+  ///
+  /// \returns true if the result has a documentation comment.
+  bool printRawDocComment(raw_ostream &OS) const {
+    if (auto *D = getAssociatedDecl())
+      return ide::getRawDocumentationComment(D, OS);
+
+    return false;
   }
 
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {

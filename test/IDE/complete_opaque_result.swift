@@ -1,13 +1,13 @@
 // RUN: %batch-code-completion
 
 protocol MyProtocol {
-  associatedtype Mistery
+  associatedtype Mystery
 }
 struct MyStruct {}
 enum MyEnum {}
 class MyClass {}
 struct ConcreteMyProtocol : MyProtocol {
-  typealias Mistery = MyStruct
+  typealias Mystery = MyStruct
 }
 
 // MARK: 'some' keyword.
@@ -19,7 +19,7 @@ struct ConcreteMyProtocol : MyProtocol {
 // BEGINNING_WITH_SOME-DAG: Decl[Protocol]/CurrModule:          MyProtocol[#MyProtocol#]; name=MyProtocol
 // BEGINNING_WITH_SOME-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 
-func gloabalFunc() -> #^GLOBAL_FUNC?check=BEGINNING_WITH_SOME^#
+func globalFunc() -> #^GLOBAL_FUNC?check=BEGINNING_WITH_SOME^#
 var globalVar: #^GLOBAL_VAR?check=BEGINNING_WITH_SOME^#
 
 protocol SomeProto {
@@ -129,7 +129,7 @@ class HasTypealias : HasAssocWithConformanceConstraint {
 // OVERRIDE_HasTypealias-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConformanceConstraint(fn: (Int) -> Int) -> ConcreteMyProtocol {|};
 }
 
-// MARK: Postfix expession for opaque result types.
+// MARK: Postfix expression for opaque result types.
 
 protocol TestProtocol {
   associatedtype Assoc1
@@ -181,13 +181,33 @@ struct ConcreteTestProtocol2: TestProtocol2 {
 // OVERRIDE_TestProtocol2-NOT: foo()
 // OVERRIDE_TestProtocol2-NOT: inExt()
 }
+struct ConcreteGenericTestProtocol2<U>: TestProtocol2 {
+  func foo() -> some Comparable { 1 }
+  #^OVERRIDE_Generic_TestProtocol2^#
+  // OVERRIDE_Generic_TestProtocol2-NOT: foo()
+  // OVERRIDE_Generic_TestProtocol2-NOT: inExt()
+  // OVERRIDE_Generic_TestProtocol2-DAG: Decl[InstanceMethod]/Super:         func bar() -> Assoc {|};
+  // OVERRIDE_Generic_TestProtocol2-DAG: Decl[InstanceMethod]/Super:         func baz(x: @autoclosure () -> Assoc) -> (Assoc) -> Assoc {|};
+  // OVERRIDE_Generic_TestProtocol2-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#};
+  // OVERRIDE_Generic_TestProtocol2-NOT: foo()
+  // OVERRIDE_Generic_TestProtocol2-NOT: inExt()
+
+  func test() {
+    self.#^POSTFIX_ConcreteGenericTestProtocol2^#
+    // POSTFIX_ConcreteGenericTestProtocol2-DAG: Keyword[self]/CurrNominal:          self[#ConcreteGenericTestProtocol2<U>#];
+    // POSTFIX_ConcreteGenericTestProtocol2-DAG: Decl[InstanceMethod]/CurrNominal:   foo()[#Comparable#];
+    // POSTFIX_ConcreteGenericTestProtocol2-DAG: Decl[InstanceMethod]/Super:         bar()[#Comparable#];
+    // POSTFIX_ConcreteGenericTestProtocol2-DAG: Decl[InstanceMethod]/Super:         baz({#x: Comparable#})[#(Comparable) -> Comparable#];
+    // POSTFIX_ConcreteGenericTestProtocol2-DAG: Decl[InstanceMethod]/Super:         inExt()[#Comparable#];
+  }
+}
 func testUseTestProtocol2(value: ConcreteTestProtocol2) {
   value.#^POSTFIX_ConcreteTestProtocol2^#
 // POSTFIX_ConcreteTestProtocol2-DAG: Keyword[self]/CurrNominal:          self[#ConcreteTestProtocol2#];
 // POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/CurrNominal:   foo()[#Comparable#];
-// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         bar()[#ConcreteTestProtocol2.Assoc#];
-// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         baz({#x: ConcreteTestProtocol2.Assoc#})[#(ConcreteTestProtocol2.Assoc) -> ConcreteTestProtocol2.Assoc#];
-// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         inExt()[#ConcreteTestProtocol2.Assoc#];
+// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         bar()[#Comparable#];
+// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         baz({#x: Comparable#})[#(Comparable) -> Comparable#];
+// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         inExt()[#Comparable#];
 }
 
 struct Generic<T> {

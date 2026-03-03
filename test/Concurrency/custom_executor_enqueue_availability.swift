@@ -1,11 +1,9 @@
 // RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
 // RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
-// REQUIRES: asserts
 
 // rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
@@ -26,10 +24,12 @@ final class OldExecutorOldStdlib: SerialExecutor {
 /// availability, since in this case the UnownedJob version needs to exist.
 @available(SwiftStdlib 5.1, *)
 final class BothExecutorOldStdlib: SerialExecutor {
-  func enqueue(_ job: UnownedJob) {} // expected-note{{'enqueue' declared here}}
+  func enqueue(_ job: UnownedJob) {}
 
+  // This no longer warns, because of the use of StdlibDeploymentTarget in the
+  // runtime.
   @available(SwiftStdlib 5.9, *)
-  func enqueue(_ job: __owned ExecutorJob) {} // expected-warning{{'Executor.enqueue(ExecutorJob)' will never be used, due to the presence of 'enqueue(UnownedJob)'}}
+  func enqueue(_ job: __owned ExecutorJob) {}
 
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(ordinary: self)
@@ -55,7 +55,7 @@ final class TripleExecutor: SerialExecutor {
 
   // expected-warning@+2{{'Job' is deprecated: renamed to 'ExecutorJob'}}
   // expected-note@+1{{use 'ExecutorJob' instead}}
-  func enqueue(_ job: __owned Job) {} // expected-warning{{'Executor.enqueue(Job)' is deprecated as a protocol requirement; conform type 'TripleExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
+  func enqueue(_ job: __owned Job) {} // expected-warning{{'Executor.enqueue(Job)' is deprecated as a protocol requirement; conform type 'TripleExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}{{documentation-file=deprecated-declaration}}
 
   func enqueue(_ job: consuming ExecutorJob) {}
 

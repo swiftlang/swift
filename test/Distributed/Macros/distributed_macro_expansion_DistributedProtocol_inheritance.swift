@@ -7,7 +7,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t-scratch)
 
-// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -plugin-path %swift-plugin-dir -I %t -dump-macro-expansions %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-6.0-abi-triple -plugin-path %swift-plugin-dir -I %t -dump-macro-expansions %s 2>&1 | %FileCheck %s
 
 import Distributed
 
@@ -25,7 +25,7 @@ protocol Base: DistributedActor where ActorSystem: DistributedActorSystem<any Co
 
 // CHECK: extension Base where Self: Distributed._DistributedActorStub {
 // CHECK:   distributed func base() -> Int {
-// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
@@ -49,14 +49,14 @@ protocol G3<ActorSystem>: DistributedActor, Base where ActorSystem: DistributedA
 
 // CHECK: extension G3 where Self: Distributed._DistributedActorStub {
 // CHECK:   distributed func get() -> String {
-// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
 // CHECK:     }
 // CHECK:   }
 // CHECK:   distributed func greet(name: String) -> String {
-// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()

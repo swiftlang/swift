@@ -18,7 +18,7 @@
 // RUN: %target-run %t/a.out_Debug
 // RUN: %target-run %t/a.out_Release
 // REQUIRES: executable_test
-// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: OS=wasip1
 
 import StdlibUnittest
 

@@ -1,6 +1,8 @@
 // RUN: not %target-swift-frontend -typecheck %s  2>&1 |  %FileCheck %s --check-prefix=CHECK-NO-ASSERTION
 
+// CHECK-NO-ASSERTION-NOT: Assertion
 // Used to trip an assertion
+
 
 public struct Foo {
     func bar() {
@@ -14,5 +16,4 @@ private extension String {}
 
 
 
-
-// CHECK-NO-ASSERTION-NOT: Assertion
+// EOF

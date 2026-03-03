@@ -83,6 +83,143 @@ static inline void _swift_embedded_set_heap_object_metadata_pointer(void *object
   ((EmbeddedHeapObject *)object)->metadata = metadata;
 }
 
+typedef struct {
+  void  *initializeBufferWithCopyOfBufferFn;
+#if __has_feature(ptrauth_calls)
+  void  (* __ptrauth(0, 1, 0x04f8)  destroyFn)(void *, void*);
+#else
+  void  (*destroyFn)(void *, void*);
+#endif
+#if __has_feature(ptrauth_calls)
+  void* (* __ptrauth(0, 1, 0xe3ba) initializeWithCopyFn)(void*, void*, void*);
+#else
+  void* (*initializeWithCopyFn)(void*, void*, void*);
+#endif
+  void  *assignWithCopyFn;
+#if __has_feature(ptrauth_calls)
+  void* (* __ptrauth(0, 1, 0x48d8) initializeWithTakeFn)(void*, void*, void*);
+#else
+  void* (*initializeWithTakeFn)(void *, void*, void*);
+#endif
+  void  *assignWithTakeFn;
+  void  *getEnumTagSinglePayloadFn;
+  void  *storeEnumTagSinglePayload;
+  __swift_size_t size;
+  __swift_size_t stride;
+  unsigned flags;
+} EmbeddedValueWitnessTable;
+
+typedef struct {
+#if __has_feature(ptrauth_calls)
+  EmbeddedValueWitnessTable * __ptrauth(2, 1, 0x2e3f) vwt;
+#else
+  EmbeddedValueWitnessTable *vwt;
+#endif
+} EmbeddedMetaDataPrefix;
+
+typedef enum {
+  AlignmentMask =                0x000000FF,
+  IsNonInline =                  0x00020000,
+} ValueWitnessTableFlags;
+
+static inline
+EmbeddedMetaDataPrefix *_swift_embedded_get_full_metadata(void *metadata) {
+  EmbeddedMetaDataPrefix *fullmeta = (EmbeddedMetaDataPrefix*)&((void **)metadata)[-1];
+  return fullmeta;
+}
+
+static inline __swift_size_t
+_swift_embedded_metadata_get_size(void *metadata) {
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  return fullmeta->vwt->size;
+}
+
+static inline __swift_size_t
+_swift_embedded_metadata_get_align_mask_impl(EmbeddedMetaDataPrefix *fullMetadata) {
+  unsigned flags =  fullMetadata->vwt->flags;
+  ValueWitnessTableFlags alignMask = AlignmentMask;
+  return flags & alignMask;
+}
+
+static inline __swift_size_t
+_swift_embedded_metadata_get_align_mask(void *metadata) {
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  return _swift_embedded_metadata_get_align_mask_impl(fullmeta);
+}
+
+static inline void *
+_swift_embedded_box_project(void *object, EmbeddedMetaDataPrefix *fullmeta) {
+  __swift_size_t alignMask = _swift_embedded_metadata_get_align_mask_impl(fullmeta);
+  __swift_size_t headerSize = sizeof(void*) + sizeof(__swift_size_t);
+  __swift_size_t startOfBoxedValue = (headerSize + alignMask) & ~alignMask;
+  void *addrInBox = (void *)(((unsigned char *)object) + startOfBoxedValue);
+  return addrInBox;
+}
+static inline void
+_swift_embedded_invoke_box_destroy(void *object) {
+  void *metadata = ((EmbeddedHeapObject *)object)->metadata;
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  void *addrInBox = _swift_embedded_box_project(object, fullmeta);
+  fullmeta->vwt->destroyFn(addrInBox, metadata);
+}
+
+static inline void
+_swift_embedded_initialize_box(void *metadata, void *newObjectAddr, void *oldObjectAddr) {
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  fullmeta->vwt->initializeWithCopyFn(newObjectAddr, oldObjectAddr, metadata);
+}
+
+typedef struct {
+  void *inlineBuffer[3];
+  void *metadata;
+} ExistentialValue;
+
+static inline void
+_swift_embedded_existential_destroy(void *exist, void (*releaseBoxFn) (void *)) {
+  ExistentialValue* existVal = (ExistentialValue*)exist;
+  void *metadata = existVal->metadata;
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  ValueWitnessTableFlags isNonInlineMask = IsNonInline;
+  if (fullmeta->vwt->flags & IsNonInline) {
+    releaseBoxFn(existVal->inlineBuffer[0]);
+  } else {
+    fullmeta->vwt->destroyFn(&(existVal->inlineBuffer[0]), metadata);
+  }
+}
+
+static inline void
+_swift_embedded_existential_init_with_take(void *dst, void *srcExist,
+                                           void (*releaseBoxFn) (void *)) {
+  ExistentialValue* existVal = (ExistentialValue*)srcExist;
+  void *metadata = existVal->metadata;
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  ValueWitnessTableFlags isNonInlineMask = IsNonInline;
+  if (fullmeta->vwt->flags & IsNonInline) {
+    void *addrInBox = _swift_embedded_box_project(existVal->inlineBuffer[0], fullmeta);
+    // Need to call initWithCopy (instead of initWithTake) so that we can call
+    // swift_releaseBox which will also destroy the value in the box (if the
+    // refcount == 1).
+    fullmeta->vwt->initializeWithCopyFn(dst, addrInBox, metadata);
+    releaseBoxFn(existVal->inlineBuffer[0]);
+  } else {
+    fullmeta->vwt->initializeWithTakeFn(dst, &(existVal->inlineBuffer[0]), metadata);
+  }
+}
+
+static inline void
+_swift_embedded_existential_init_with_copy(void *dst, void *srcExist) {
+  ExistentialValue* existVal = (ExistentialValue*)srcExist;
+  void *metadata = existVal->metadata;
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  ValueWitnessTableFlags isNonInlineMask = IsNonInline;
+  if (fullmeta->vwt->flags & IsNonInline) {
+    void *addrInBox = _swift_embedded_box_project(existVal->inlineBuffer[0], fullmeta);
+    fullmeta->vwt->initializeWithCopyFn(dst, addrInBox, metadata);
+  } else {
+    fullmeta->vwt->initializeWithCopyFn(dst, &(existVal->inlineBuffer[0]), metadata);
+  }
+}
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

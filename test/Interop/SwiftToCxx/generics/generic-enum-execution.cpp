@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/generic-enum-in-cxx.swift -typecheck -module-name Generics -clang-header-expose-decls=all-public -emit-clang-header-path %t/generics.h
+// RUN: %target-swift-frontend %S/generic-enum-in-cxx.swift -module-name Generics -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/generics.h
 
 // RUN: %target-interop-build-clangxx -std=gnu++20 -c %s -I %t -o %t/swift-generics-execution.o
 // RUN: %target-interop-build-swift %S/generic-enum-in-cxx.swift -o %t/swift-generics-execution -Xlinker %t/swift-generics-execution.o -module-name Generics -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -122,6 +122,13 @@ int main() {
     assert(getRetainCount(ptr) == 1);
     // CHECK-NEXT: after some
     // CHECK-NEXT: destroy-TracksDeinit
+  }
+  {
+    auto opt = swift::Optional<int>::some(14);
+    auto x = GenericCustomType<int>::success(opt);
+    auto y = x;
+    assert(y.isSuccess());
+    assert(y.getSuccess().getSome() == 14);
   }
   puts("EOF");
   // CHECK-NEXT: EOF

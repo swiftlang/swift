@@ -11,52 +11,52 @@
 
 // CHECK: class Base {
 public class Base {
-  // CHECK: init(x: Swift.Int = 3)
+  // CHECK: init(x: Swift{{::|\.}}Int = 3)
   public init(x: Int = 3) {}
   public convenience init(convInit: Int) {
     self.init(x: convInit)
   }
-  // CHECK: foo(y: Swift.Int = 42)
+  // CHECK: foo(y: Swift{{::|\.}}Int = 42)
   public func foo(y: Int = 42) {}
 }
 
-// CHECK: class Derived : Test.Base {
+// CHECK: class Derived : Test{{::|\.}}Base {
 public class Derived: Base {
-  // CHECK: init(y: Swift.Int)
+  // CHECK: init(y: Swift{{::|\.}}Int)
   public convenience init(y: Int) {
     self.init()
   }
 
-  // CHECK-NOT: init(convInit: Swift.Int = super)
-  // CHECK: override {{(public )?}}init(x: Swift.Int = super)
-  // CHECK-NOT: init(convInit: Swift.Int = super)
+  // CHECK-NOT: init(convInit: Swift{{::|\.}}Int = super)
+  // CHECK: override {{(public )?}}init(x: Swift{{::|\.}}Int = super)
+  // CHECK-NOT: init(convInit: Swift{{::|\.}}Int = super)
 }
 
 public enum Enum {
-  // CHECK: case pie(filling: Swift.String = "apple")
+  // CHECK: case pie(filling: Swift{{::|\.}}String = "apple")
   case pie(filling: String = "apple")
 }
 
 public struct HasSubscript {
-  // CHECK: subscript(x: Swift.Int = 0) -> Swift.Int {
+  // CHECK: subscript(x: Swift{{::|\.}}Int = 0) -> Swift{{::|\.}}Int {
   public subscript(x: Int = 0) -> Int { return 0 }
 }
 
-// CHECK: func hasClosureDefaultArg(_ x: () -> Swift.Void = {
+// CHECK: func hasClosureDefaultArg(_ x: () -> Swift{{::|\.}}Void = {
 // CHECK-NEXT: })
 public func hasClosureDefaultArg(_ x: () -> Void = {
 }) {
 }
 
-// CHECK: func hasMagicDefaultArgs(_ f: Swift.String = #file, _ fu: Swift.String = #function, _ l: Swift.Int = #line)
+// CHECK: func hasMagicDefaultArgs(_ f: Swift{{::|\.}}String = #file, _ fu: Swift{{::|\.}}String = #function, _ l: Swift{{::|\.}}Int = #line)
 public func hasMagicDefaultArgs(_ f: String = #file, _ fu: String = #function, _ l: Int = #line) {}
 
-// CHECK: func hasSimpleDefaultArgs(_ x: Swift.Int = 0, b: Swift.Int = 1)
+// CHECK: func hasSimpleDefaultArgs(_ x: Swift{{::|\.}}Int = 0, b: Swift{{::|\.}}Int = 1)
 public func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1) {
 }
 
 // rdar://83202870
 // https://github.com/apple/swift/issues/57504
 // Make sure we can extract the textual representation here.
-// CHECK: func hasTupleConstructionDefaultArgs(_ x: Any = (), y: (Swift.String, Swift.Int) = ("", 0))
+// CHECK: func hasTupleConstructionDefaultArgs(_ x: Any = (), y: (Swift{{::|\.}}String, Swift{{::|\.}}Int) = ("", 0))
 public func hasTupleConstructionDefaultArgs(_ x: Any = Void(), y: (String, Int) = (String, Int)("", 0)) {}

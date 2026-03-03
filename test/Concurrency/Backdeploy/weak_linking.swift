@@ -6,10 +6,10 @@
 // RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx12.0 -module-name main -emit-ir -o %t/backdeploy_56.ir
 // RUN: %FileCheck %s --check-prefix=BACKDEPLOY56 < %t/backdeploy_56.ir
 
-// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.15 -module-name main -emit-ir -o %t/backdeployed_concurrency.ir -disable-availability-checking
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.15 -module-name main -emit-ir -o %t/backdeployed_concurrency.ir -target %target-swift-5.1-abi-triple
 // RUN: %FileCheck %s --check-prefixes=BACKDEPLOY_CONCURRENCY,BACKDEPLOY56 < %t/backdeployed_concurrency.ir
 
-// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.15 -O -module-name main -emit-ir -o %t/optimized.ir -disable-availability-checking
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.15 -O -module-name main -emit-ir -o %t/optimized.ir -target %target-swift-5.1-abi-triple
 // RUN: %FileCheck %s --check-prefix=OPTIMIZED < %t/optimized.ir
 
 

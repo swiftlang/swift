@@ -18,7 +18,9 @@
 namespace swift {
 
 /// Attempt to merge the ValueOwnershipKind of the passed in range's
-/// SILValues. Returns Optional<None> if we found an incompatibility.
+/// SILValues. Returns OwnershipKind::Any if we found an incompatibility.
+/// If \p is a move-only type, we return OwnershipKind::Owned since such
+/// values can have deinit side-effects.
 ///
 /// NOTE: This assumes that the passed in SILValues are not values used as type
 /// dependent operands.

@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-sil -enable-experimental-feature MoveOnlyPartialReinitialization -sil-verify-all -verify %s
 
+// REQUIRES: swift_feature_MoveOnlyPartialReinitialization
+
 //////////////////
 // Declarations //
 //////////////////

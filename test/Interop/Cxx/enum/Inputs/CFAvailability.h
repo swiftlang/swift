@@ -10,13 +10,9 @@
 #endif
 
 #if (__cplusplus)
-#define CF_OPTIONS(_type, _name)                                               \
-  _type __attribute__((availability(swift, unavailable))) _name;               \
-  enum __CF_OPTIONS_ATTRIBUTES : _name
+#define CF_OPTIONS(_type, _name) __attribute__((availability(swift,unavailable))) _type _name; enum __CF_OPTIONS_ATTRIBUTES : _name
 #else
-#define CF_OPTIONS(_type, _name)                                               \
-  enum __CF_OPTIONS_ATTRIBUTES _name : _type _name;                            \
-  enum _name : _type
+#define CF_OPTIONS(_type, _name) enum __CF_OPTIONS_ATTRIBUTES _name : _type _name; enum _name : _type
 #endif
 
 #define NS_OPTIONS(_type, _name) CF_OPTIONS(_type, _name)

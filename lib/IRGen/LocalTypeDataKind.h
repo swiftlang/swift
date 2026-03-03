@@ -19,6 +19,8 @@
 #ifndef SWIFT_IRGEN_LOCALTYPEDATAKIND_H
 #define SWIFT_IRGEN_LOCALTYPEDATAKIND_H
 
+#include "swift/AST/PackConformance.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
 #include "swift/IRGen/ValueWitness.h"
@@ -50,6 +52,7 @@ private:
     RepresentationTypeMetadata,
     ValueWitnessTable,
     Shape,
+    GenericValue,
     // <- add more special cases here
 
     // The first enumerator for an individual value witness.
@@ -102,6 +105,11 @@ public:
     return LocalTypeDataKind(Shape);
   }
 
+  /// A reference to the value of a variable generic argument.
+  static LocalTypeDataKind forValue() {
+    return LocalTypeDataKind(GenericValue);
+  }
+
   /// A reference to a protocol witness table for an archetype.
   ///
   /// This only works for non-concrete types because in principle we might
@@ -109,19 +117,19 @@ public:
   /// same function.
   static LocalTypeDataKind
   forAbstractProtocolWitnessTable(ProtocolDecl *protocol) {
-    assert(protocol && "protocol reference may not be null");
+    ASSERT(protocol && "protocol reference may not be null");
     return LocalTypeDataKind(uintptr_t(protocol) | Kind_Decl);
   }
 
   /// A reference to a protocol witness table for a concrete type.
   static LocalTypeDataKind
   forConcreteProtocolWitnessTable(ProtocolConformance *conformance) {
-    assert(conformance && "conformance reference may not be null");
+    ASSERT(conformance && "conformance reference may not be null");
     return LocalTypeDataKind(uintptr_t(conformance) | Kind_Conformance);
   }
 
   static LocalTypeDataKind forProtocolWitnessTablePack(PackConformance *pack) {
-    assert(pack && "pack conformance reference may not be null");
+    ASSERT(pack && "pack conformance reference may not be null");
     return LocalTypeDataKind(uintptr_t(pack) | Kind_PackConformance);
   }
 
@@ -132,7 +140,7 @@ public:
     } else if (conformance.isPack()) {
       return forProtocolWitnessTablePack(conformance.getPack());
     } else {
-      return forAbstractProtocolWitnessTable(conformance.getAbstract());
+      return forAbstractProtocolWitnessTable(conformance.getProtocol());
     }
   }
 
@@ -177,10 +185,23 @@ public:
     return reinterpret_cast<PackConformance*>(Value - Kind_PackConformance);
   }
 
-  ProtocolConformanceRef getProtocolConformance() const {
+  ProtocolDecl *getConformedProtocol() const {
     assert(!isSingletonKind());
     if ((Value & KindMask) == Kind_Decl) {
-      return ProtocolConformanceRef(getAbstractProtocolConformance());
+      return getAbstractProtocolConformance();
+    } else if ((Value & KindMask) == Kind_PackConformance) {
+      return getPackProtocolConformance()->getProtocol();
+    } else {
+      assert((Value & KindMask) == Kind_Conformance);
+      return getConcreteProtocolConformance()->getProtocol();
+    }
+  }
+
+  ProtocolConformanceRef getProtocolConformance(Type conformingType) const {
+    assert(!isSingletonKind());
+    if ((Value & KindMask) == Kind_Decl) {
+      return ProtocolConformanceRef::forAbstract(
+          conformingType, getAbstractProtocolConformance());
     } else if ((Value & KindMask) == Kind_PackConformance) {
       return ProtocolConformanceRef(getPackProtocolConformance());
     } else {

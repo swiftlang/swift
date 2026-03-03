@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -typecheck -verify %s
 
 protocol P {
   func paul()
@@ -13,7 +13,7 @@ class C {}
 class D: C, P, Q { func paul() {}; func priscilla() {}; func quinn() {}; func d() {} }
 
 let property: some P = 1
-let deflessLet: some P // expected-error{{has no initializer}} {{educational-notes=opaque-type-inference}}
+let deflessLet: some P // expected-error{{has no initializer}} {{documentation-file=opaque-type-inference}}
 var deflessVar: some P // expected-error{{has no initializer}}
 
 struct GenericProperty<T: P> {
@@ -173,13 +173,13 @@ func recursion(x: Int) -> some P {
   return recursion(x: x - 1)
 }
 
-func noReturnStmts() -> some P {} // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}} {{educational-notes=opaque-type-inference}}
+func noReturnStmts() -> some P {} // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}} {{documentation-file=opaque-type-inference}}
 
 func returnUninhabited() -> some P { // expected-note {{opaque return type declared here}}
     fatalError() // expected-error{{return type of global function 'returnUninhabited()' requires that 'Never' conform to 'P'}}
 }
 
-func mismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> some P { // expected-error{{do not have matching underlying types}} {{educational-notes=opaque-type-inference}}
+func mismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> some P { // expected-error{{do not have matching underlying types}} {{documentation-file=opaque-type-inference}}
   if x {
     return y // expected-note{{underlying type 'Int'}}
   } else {
@@ -203,13 +203,6 @@ struct MismatchedReturnTypesSubscript {
       return z // expected-note{{underlying type 'String'}}
     }
   }
-}
-
-func jan() -> some P {
-  return [marcia(), marcia(), marcia()]
-}
-func marcia() -> some P {
-  return [marcia(), marcia(), marcia()] // expected-error{{defines the opaque type in terms of itself}} {{educational-notes=opaque-type-inference}}
 }
 
 protocol R {
@@ -273,11 +266,9 @@ func associatedTypeIdentity() {
   sameType(cr, dr) // expected-error {{conflicting arguments to generic parameter 'T' ('(some R).S' (result type of 'candace') vs. '(some R).S' (result type of 'doug'))}}
   sameType(gary(candace()).r_out(), gary(candace()).r_out())
   sameType(gary(doug()).r_out(), gary(doug()).r_out())
-  // TODO(diagnostics): This is not great but the problem comes from the way solver discovers and attempts bindings, if we could detect that
-  // `(some R).S` from first reference to `gary()` in inconsistent with the second one based on the parent type of `S` it would be much easier to diagnose.
   sameType(gary(doug()).r_out(), gary(candace()).r_out())
-  // expected-error@-1:12 {{conflicting arguments to generic parameter 'T' ('some R' (result type of 'doug') vs. 'some R' (result type of 'candace'))}}
-  // expected-error@-2:34 {{conflicting arguments to generic parameter 'T' ('some R' (result type of 'doug') vs. 'some R' (result type of 'candace'))}}
+  // expected-error@-1 {{conflicting arguments to generic parameter 'T' ('some R' (result type of 'doug') vs. 'some R' (result type of 'candace'))}}
+  // expected-error@-2 {{conflicting arguments to generic parameter 'T' ('some R' (result type of 'doug') vs. 'some R' (result type of 'candace'))}}
 }
 
 func redeclaration() -> some P { return 0 } // expected-note 2{{previously declared}}

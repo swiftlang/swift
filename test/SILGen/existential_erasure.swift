@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name existential_erasure %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name existential_erasure %s | %FileCheck %s
 
 protocol P {
   func downgrade(_ m68k: Bool) -> Self
@@ -127,5 +127,18 @@ class EraseDynamicSelf {
     let instance = self.init()
     let _: Any = instance
     return instance
+  }
+
+// CHECK-LABEL: sil hidden [ossa] @$s19existential_erasure16EraseDynamicSelfC23eraseToClassExistentialyXlyF : $@convention(method) (@guaranteed EraseDynamicSelf) -> @owned AnyObject
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $EraseDynamicSelf):
+// CHECK:  debug_value [[ARG]] : $EraseDynamicSelf, let, name "self", argno 1
+// CHECK:  [[METATYPE:%.*]] = metatype $@thick @dynamic_self EraseDynamicSelf.Type
+// CHECK:  [[UPCAST:%.*]] = upcast [[METATYPE]] : $@thick @dynamic_self EraseDynamicSelf.Type to $@thick EraseDynamicSelf.Type
+// CHECK:  [[METHOD:%.*]] = class_method [[UPCAST]] : $@thick EraseDynamicSelf.Type, #EraseDynamicSelf.factory
+// CHECK:  [[INSTANCE:%.*]] = apply [[METHOD]]([[UPCAST]]) : $@convention(method) (@thick EraseDynamicSelf.Type) -> @owned EraseDynamicSelf
+// CHECK:  [[EXISTENTIAL:%.*]] = init_existential_ref [[INSTANCE]] : $EraseDynamicSelf : $@dynamic_self EraseDynamicSelf, $AnyObject
+// CHECK:  return [[EXISTENTIAL]] : $AnyObject
+  func eraseToClassExistential() -> AnyObject {
+    return Self.factory()
   }
 }

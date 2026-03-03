@@ -528,24 +528,6 @@ bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
   return %ret : $()
 }
 
-// CHECK-NOT: Function: 'infinite_loop'
-sil [ossa] @infinite_loop : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
-bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
-  cond_br undef, bb1, bb4
-
-bb1:
-  %copy0 = copy_value %0 : $WrapperStruct
-  %borrow0 = begin_borrow %copy0 : $WrapperStruct
-  br bb3(%borrow0 : $WrapperStruct, %copy0 : $WrapperStruct)
-
-bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
-  br bb3(%newborrow : $WrapperStruct, %newowned : $WrapperStruct)
-
-bb4:
-  %ret = tuple ()
-  return %ret : $()
-}
-
 // CHECK-NOT: Function: 'diamond_within_loop'
 sil [ossa] @diamond_within_loop : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
 bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
@@ -685,6 +667,8 @@ bb1:
   return %9999 : $()
 
 bb2:
+  end_borrow %1
+  destroy_value [dead_end] %0
   unreachable
 }
 

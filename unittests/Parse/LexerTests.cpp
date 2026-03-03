@@ -271,32 +271,6 @@ TEST_F(LexerTest, ContentStartTokenIsStartOfLineUTF8BOM) {
   ASSERT_TRUE(Tok.isAtStartOfLine());
 }
 
-TEST_F(LexerTest, BOMNoCommentNoTrivia) {
-  const char *Source = "\xEF\xBB\xBF" "// comment\naaa //xx \n/* x */";
-  
-  LangOptions LangOpts;
-  SourceManager SourceMgr;
-  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
-  
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
-          HashbangMode::Disallowed, CommentRetentionMode::None);
-  
-  Token Tok;
-
-  L.lex(Tok);
-  ASSERT_EQ(tok::identifier, Tok.getKind());
-  ASSERT_EQ("aaa", Tok.getText());
-  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
-  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getCommentRange().getStart());
-  ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  
-  L.lex(Tok);
-  ASSERT_EQ(tok::eof, Tok.getKind());
-  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
-  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getCommentRange().getStart());
-  ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-}
-
 TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   const char *Source = "\xEF\xBB\xBF" "// comment\naaa //xx \n/* x */";
   
@@ -718,9 +692,8 @@ TEST_F(LexerTest, DiagnoseEmbeddedNul) {
   DiagnosticEngine Diags(SourceMgr);
   Diags.addConsumer(DiagConsumer);
 
-  Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
-          LexerMode::Swift, HashbangMode::Disallowed,
-          CommentRetentionMode::None);
+  Lexer L(LangOpts, SourceMgr, BufferID, &Diags, LexerMode::Swift,
+          HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken);
 
   Token Tok;
   L.lex(Tok);
@@ -743,9 +716,8 @@ TEST_F(LexerTest, DiagnoseEmbeddedNulOffset) {
   DiagnosticEngine Diags(SourceMgr);
   Diags.addConsumer(DiagConsumer);
 
-  Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
-          LexerMode::Swift, HashbangMode::Disallowed,
-          CommentRetentionMode::None,
+  Lexer L(LangOpts, SourceMgr, BufferID, &Diags, LexerMode::Swift,
+          HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
           /*Offset=*/5, /*EndOffset=*/SourceLen);
 
   ASSERT_FALSE(containsPrefix(

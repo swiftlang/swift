@@ -15,34 +15,34 @@
 // CHECK: [[@LINE-1]]:{{[0-9]+}} | module/Swift | CoreFoo | c:@M@CoreFoo | Ref | rel: 0
 
 internal class SECRETSubclass : SECRETClass {}
-// CHECK: [[@LINE-1]]:{{[0-9]+}} | class/Swift | SECRETSubclass | [[SECRET_SUBCLASS_USR:s:[^|]+]] | Def | rel: 0
+// CHECK: [[@LINE-1]]:{{[0-9]+}} | class(internal)/Swift | SECRETSubclass | [[SECRET_SUBCLASS_USR:s:[^|]+]] | Def | rel: 0
 // CHECK: [[@LINE-2]]:{{[0-9]+}} | class/Swift | SECRETClass | [[SECRET_CLASS_USR:s:[^|]+]] | Ref,RelBase | rel: 1
 // CHECK-NEXT:  RelBase | class/Swift | SECRETSubclass | [[SECRET_SUBCLASS_USR]]{{$}}
 
 public class PublicClass {
-  // CHECK: [[@LINE-1]]:{{[0-9]+}} | class/Swift | PublicClass | [[PUBLIC_CLASS_USR:s:[^|]+]] | Def | rel: 0
+  // CHECK: [[@LINE-1]]:{{[0-9]+}} | class(public)/Swift | PublicClass | [[PUBLIC_CLASS_USR:s:[^|]+]] | Def | rel: 0
   internal var propSECRET: SECRETClass? { nil }
-  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-property/Swift | propSECRET |
+  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-property(internal)/Swift | propSECRET |
   internal var propSECRET2: SECRETSubclass? { nil }
-  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-property/Swift | propSECRET2 |
+  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-property(internal)/Swift | propSECRET2 |
 }
 
 extension SECRETClass {
   // CHECK: [[@LINE-1]]:{{[0-9]+}} | extension/ext-class/Swift | SECRETClass |
   internal func testSECRET() {}
-  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-method/Swift | testSECRET() |
+  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-method(internal)/Swift | testSECRET() |
 }
 
 extension PublicClass {
   // CHECK: [[@LINE-1]]:{{[0-9]+}} | extension/ext-class/Swift | PublicClass | [[PUBLIC_CLASS_EXTENSION_USR:s:[^|]+]] |
   public func extensionNamingMethod() {}
-  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-method/Swift | extensionNamingMethod() |
+  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-method(public)/Swift | extensionNamingMethod() |
 
   internal func testSECRET() {}
-  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-method/Swift | testSECRET() |
+  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-method(internal)/Swift | testSECRET() |
 
   internal struct SECRETStruct: SECRETProtocol {}
-  // CHECK: [[@LINE-1]]:{{[0-9]+}} | struct/Swift | SECRETStruct | [[SECRET_NESTED_STRUCT_USR:s:[^|]+]] |
+  // CHECK: [[@LINE-1]]:{{[0-9]+}} | struct(internal)/Swift | SECRETStruct | [[SECRET_NESTED_STRUCT_USR:s:[^|]+]] |
   // CHECK: [[@LINE-2]]:{{[0-9]+}} | protocol/Swift | SECRETProtocol | [[SECRET_PROTOCOL_USR:s:[^|]+]] | Ref,RelBase | rel: 1
   // CHECK-NEXT: RelBase | struct/Swift | SECRETStruct | [[SECRET_NESTED_STRUCT_USR]]
 }
@@ -50,16 +50,16 @@ extension PublicClass {
 extension Optional where Wrapped: SECRETProtocol {
   // CHECK: [[@LINE-1]]:{{[0-9]+}} | extension/ext-enum/Swift | Optional |
   internal func extensionNamingMethod() {}
-  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-method/Swift | extensionNamingMethod() |
+  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-method(internal)/Swift | extensionNamingMethod() |
 
   internal func testSECRET() {}
-  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-method/Swift | testSECRET() |
+  // CHECK: [[@LINE-1]]:{{[0-9]+}} | instance-method(internal)/Swift | testSECRET() |
 }
 
 // CHECK-LABEL: ---FROM MODULE---
 // NEGATIVE-LABEL: ---FROM MODULE---
 
-// CHECK: 0:0 | class/Swift | PublicClass | [[PUBLIC_CLASS_USR]] | Def | rel: 0
+// CHECK: 0:0 | class(public)/Swift | PublicClass | [[PUBLIC_CLASS_USR]] | Def | rel: 0
 // CHECK: 0:0 | extension/ext-class/Swift | PublicClass | [[PUBLIC_CLASS_EXTENSION_USR]] | Def | rel: 0
 // CHECK: 0:0 | class/Swift | PublicClass | [[PUBLIC_CLASS_USR]] | Ref,RelExt | rel: 1
 // CHECK-NEXT: RelExt | extension/ext-class/Swift | PublicClass | [[PUBLIC_CLASS_EXTENSION_USR]]

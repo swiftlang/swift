@@ -1,6 +1,5 @@
-
-// RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library  %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name closures -parse-stdlib -parse-as-library %s -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name closures -parse-stdlib -parse-as-library %s -disable-availability-checking | %FileCheck %s --check-prefix=GUARANTEED
 
 import Swift
 
@@ -666,7 +665,7 @@ class SuperSub : SuperBase {
 // -- We enter with an assumed strong +1.
 // CHECK:  bb0([[SELF:%.*]] : @guaranteed $UnownedSelfNestedCapture):
 // CHECK:         [[OUTER_SELF_CAPTURE:%.*]] = alloc_box ${ var @sil_unowned UnownedSelfNestedCapture }
-// CHECK:         [[OUTER_SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[OUTER_SELF_CAPTURE]]
+// CHECK:         [[OUTER_SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[OUTER_SELF_CAPTURE]]
 // CHECK:         [[PB:%.*]] = project_box [[OUTER_SELF_LIFETIME]]
 // -- strong +2
 // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -875,3 +874,11 @@ func test() {
     assert(k.x == k2.x)
 }
 
+struct ValueGenericType<let N: Int> {
+  // CHECK-LABEL: @$s8closures16ValueGenericTypeV9somethingSiycyFSiycfU_ : $@convention(thin) <let N : Int> () -> Int
+  // CHECK: type_value $Int for N
+  // CHECK-NOT: type_value $Int for @error_type N
+  func something() -> (() -> Int) {
+    { N }
+  }
+}

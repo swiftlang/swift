@@ -1,0 +1,206 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=struct | %FileCheck %s
+
+import Swift
+import Builtin
+
+struct S {
+  let a: String
+  let b: Int
+}
+
+struct Outer {
+  let s: S
+}
+
+// CHECK-LABEL: sil [ossa] @simple_delay_struct :
+// CHECK:       bb0
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow %0
+// CHECK-NEXT:    fix_lifetime [[B]]
+// CHECK-NEXT:    fix_lifetime %1
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    [[S:%.*]] = struct $S (%0, %1)
+// CHECK-NEXT:    destroy_value [[S]]
+// CHECK:       } // end sil function 'simple_delay_struct'
+sil [ossa] @simple_delay_struct : $@convention(thin) (@owned String, Int) -> () {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0, %1)
+  debug_value %2, name "x"
+  %3 = begin_borrow %2
+  debug_value %3, name "x"
+  %4 = struct_extract %3, #S.a
+  %5 = struct_extract %3, #S.b
+  fix_lifetime %4
+  fix_lifetime %5
+  end_borrow %3
+  destroy_value %2
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_nested :
+// CHECK:       bb0
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow %0
+// CHECK-NEXT:    fix_lifetime [[B]]
+// CHECK-NEXT:    fix_lifetime %1
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    [[S:%.*]] = struct $S (%0, %1)
+// CHECK-NEXT:    [[OUTER:%.*]] = struct $Outer ([[S]])
+// CHECK-NEXT:    destroy_value [[OUTER]]
+// CHECK:       } // end sil function 'test_nested'
+sil [ossa] @test_nested : $@convention(thin) (@owned String, Int) -> () {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0, %1)
+  %3 = struct $Outer (%2)
+  %4 = begin_borrow %3
+  %5 = struct_extract %4, #Outer.s
+  %6 = struct_extract %5, #S.a
+  %7 = struct_extract %5, #S.b
+  fix_lifetime %6
+  fix_lifetime %7
+  end_borrow %4
+  destroy_value %3
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multi_lifetime_ends :
+// CHECK:       bb0
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow %0
+// CHECK-NEXT:    fix_lifetime [[B]]
+// CHECK-NEXT:    fix_lifetime %1
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       bb1:
+// CHECK-NEXT:    [[S1:%.*]] = struct $S (%0, %1)
+// CHECK-NEXT:    destroy_value [[S1]]
+// CHECK:       bb2:
+// CHECK-NEXT:    [[S2:%.*]] = struct $S (%0, %1)
+// CHECK-NEXT:    destroy_value [[S2]]
+// CHECK:       } // end sil function 'multi_lifetime_ends'
+sil [ossa] @multi_lifetime_ends : $@convention(thin) (@owned String, Int) -> () {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0, %1)
+  %3 = begin_borrow %2
+  %4 = struct_extract %3, #S.a
+  %5 = struct_extract %3, #S.b
+  fix_lifetime %4
+  fix_lifetime %5
+  end_borrow %3
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_value %2
+  br bb3
+bb2:
+  destroy_value %2
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multi_borrows :
+// CHECK:       bb1:
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow %0
+// CHECK-NEXT:    fix_lifetime [[B]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       bb2:
+// CHECK-NEXT:    fix_lifetime %1
+// CHECK:       bb3:
+// CHECK-NEXT:    [[S:%.*]] = struct $S (%0, %1)
+// CHECK-NEXT:    destroy_value [[S]]
+// CHECK:       } // end sil function 'multi_borrows'
+sil [ossa] @multi_borrows : $@convention(thin) (@owned String, Int) -> () {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0, %1)
+  cond_br undef, bb1, bb2
+bb1:
+  %3 = begin_borrow %2
+  %4 = struct_extract %3, #S.a
+  fix_lifetime %4
+  end_borrow %3
+  br bb3
+bb2:
+  %7 = begin_borrow %2
+  %8 = struct_extract %7, #S.b
+  fix_lifetime %8
+  end_borrow %7
+  br bb3
+bb3:
+  destroy_value %2
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @unknown_struct_use :
+// CHECK:         struct_extract
+// CHECK:         struct_extract
+// CHECK:       } // end sil function 'unknown_struct_use'
+sil [ossa] @unknown_struct_use : $@convention(thin) (@owned String, Int) -> () {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0, %1)
+  fix_lifetime %2
+  %3 = begin_borrow %2
+  %4 = struct_extract %3, #S.a
+  %5 = struct_extract %3, #S.b
+  fix_lifetime %4
+  fix_lifetime %5
+  end_borrow %3
+  destroy_value %2
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @unknown_borrow_use :
+// CHECK:         struct_extract
+// CHECK:         struct_extract
+// CHECK:       } // end sil function 'unknown_borrow_use'
+sil [ossa] @unknown_borrow_use : $@convention(thin) (@owned String, Int) -> () {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0, %1)
+  %3 = begin_borrow %2
+  fix_lifetime %3
+  %4 = struct_extract %3, #S.a
+  %5 = struct_extract %3, #S.b
+  fix_lifetime %4
+  fix_lifetime %5
+  end_borrow %3
+  destroy_value %2
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @no_borrows :
+// CHECK:         %2 = struct
+// CHECK:         destroy_value %2
+// CHECK:       } // end sil function 'no_borrows'
+sil [ossa] @no_borrows : $@convention(thin) (@owned String, Int) -> () {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0, %1)
+  destroy_value %2
+  %r = tuple ()
+  return %r : $()
+}
+
+// TODO: remove this test once we require complete OSSA lifetimes
+// CHECK-LABEL: sil [ossa] @incomplete_lifetimes :
+// CHECK:       bb0
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow %0
+// CHECK-NEXT:    fix_lifetime [[B]]
+// CHECK-NEXT:    fix_lifetime %1
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    struct
+// CHECK-NEXT:    destroy_value [dead_end]
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'incomplete_lifetimes'
+sil [ossa] @incomplete_lifetimes : $@convention(thin) (@owned String, Int) -> () {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0, %1)
+  %3 = begin_borrow %2
+  %4 = struct_extract %3, #S.a
+  %5 = struct_extract %3, #S.b
+  fix_lifetime %4
+  fix_lifetime %5
+  end_borrow %3
+  destroy_value [dead_end] %2
+  unreachable
+}
+

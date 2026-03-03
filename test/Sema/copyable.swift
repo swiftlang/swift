@@ -8,7 +8,7 @@ typealias WhatIfIQualify = Swift.Copyable
 
 class C: Copyable {} 
 
-@_moveOnly struct MOStruct: Copyable {}
+struct MOStruct: Copyable, ~Copyable {}
 // expected-error@-1 {{struct 'MOStruct' required to be 'Copyable' but is marked with '~Copyable'}}
 
 

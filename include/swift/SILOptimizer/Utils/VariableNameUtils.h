@@ -41,9 +41,26 @@ public:
   using Options = OptionSet<Flag>;
 
 private:
-  template <typename T, unsigned smallSize>
+  /// A two phase stack data structure. The first phase only allows for two
+  /// operations:
+  ///
+  /// 1. pushing elements onto the stack.
+  /// 2. pushing/popping a "snapshot" of the stack (see description below).
+  ///
+  /// The second phase only allows for the stack to be drained.
+  ///
+  /// DISCUSSION: The snapshot operation stashes the current size of the
+  /// variable name path array when the snapshot operation occurs. If one pops
+  /// the snapshot, the data structure sets its current insertion point to be
+  /// the old stack point effectively popping off all of the elements of the
+  /// stack until the last snapshot. This is useful when working with things
+  /// like phis where one wants to speculatively push items onto this stack
+  /// while discovering if one has an actual interesting value from the phi. If
+  /// one fails to find something interesting, then one can just pop the
+  /// snapshot and go process the next phi incoming value.
+  template <typename T, unsigned SmallSize>
   class VariableNamePathArray {
-    SmallVector<T, smallSize> data;
+    SmallVector<T, SmallSize> data;
 
     unsigned lastSnapShotIndex = 0;
     unsigned insertionPointIndex = 0;
@@ -105,12 +122,14 @@ private:
     bool empty() const { return !insertionPointIndex; }
   };
 
+  /// ASTContext for forming identifiers when we need to.
+  ASTContext &astContext;
+
   /// The stacklist that we use to print out variable names.
   ///
   /// Has to be a small vector since we push/pop the last segment start. This
   /// lets us speculate when processing phis.
-  VariableNamePathArray<PointerUnion<SILInstruction *, SILValue>, 4>
-      variableNamePath;
+  VariableNamePathArray<StringRef, 4> variableNamePath;
 
   /// The root value of our string.
   ///
@@ -128,12 +147,13 @@ private:
 
 public:
   VariableNameInferrer(SILFunction *fn, SmallString<64> &resultingString)
-      : variableNamePath(), resultingString(resultingString) {}
+      : astContext(fn->getASTContext()), variableNamePath(),
+        resultingString(resultingString) {}
 
   VariableNameInferrer(SILFunction *fn, Options options,
                        SmallString<64> &resultingString)
-      : variableNamePath(), resultingString(resultingString), options(options) {
-  }
+      : astContext(fn->getASTContext()), variableNamePath(),
+        resultingString(resultingString), options(options) {}
 
   /// Attempts to infer a name from just uses of \p searchValue.
   ///
@@ -192,6 +212,8 @@ public:
 
   StringRef getName() const { return resultingString; }
 
+  SWIFT_DEBUG_DUMP { llvm::dbgs() << getName() << '\n'; }
+
   /// Given a specific SILValue, construct a VariableNameInferrer and use it to
   /// attempt to infer an identifier for the value.
   static std::optional<Identifier> inferName(SILValue value);
@@ -201,9 +223,15 @@ public:
   static std::optional<std::pair<Identifier, SILValue>>
   inferNameAndRoot(SILValue value);
 
+  /// Given a specific decl \p d, come up with a name for it.
+  ///
+  /// This is used internally for translating all decls to names. This is
+  /// exposed in case someone wants to wrap VariableNameUtils and needs to use
+  /// the same internal mapping that VariableNameUtils uses.
+  static StringRef getNameFromDecl(Decl *d);
+
 private:
   void drainVariableNamePath();
-  void popSingleVariableName();
 
   /// Finds the SILValue that either provides the direct debug information or
   /// that has a debug_value user that provides the name of the value.
@@ -222,6 +250,15 @@ private:
   /// DebugVariable provided name, attempt to find a root value from its
   /// initialization.
   SILValue getRootValueForTemporaryAllocation(AllocationInst *allocInst);
+
+  StringRef getStringRefForIndex(unsigned index) const {
+    llvm::SmallString<64> indexString;
+    {
+      llvm::raw_svector_ostream stream(indexString);
+      stream << index;
+    }
+    return astContext.getIdentifier(indexString).str();
+  }
 };
 
 } // namespace swift

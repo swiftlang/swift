@@ -1,0 +1,3 @@
+// {"kind":"typecheck","signature":"swift::TypeBase::computeInvertibleConformances()","signatureAssert":"Assertion failed: (!canType->hasUnboundGenericType()), function computeInvertibleConformances"}
+// RUN: not --crash %target-swift-frontend -typecheck %s
+typealias a = FlattenCollection...

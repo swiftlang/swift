@@ -119,8 +119,8 @@ public:
 
   // Handle the data witnesses explicitly so we can use more specific
   // types for the flags enums.
-  typedef size_t size;
-  typedef size_t stride;
+  typedef typename Runtime::StoredSize size;
+  typedef typename Runtime::StoredSize stride;
   typedef TargetValueWitnessFlags<typename Runtime::StoredSize> flags;
   typedef uint32_t extraInhabitantCount;
 };
@@ -169,6 +169,16 @@ template <typename Runtime> struct TargetValueWitnessTable {
   /// Is this type bitwise-takable?
   bool isBitwiseTakable() const {
     return flags.isBitwiseTakable();
+  }
+
+  /// Is this type bitwise-borrowable?
+  bool isBitwiseBorrowable() const {
+    return flags.isBitwiseBorrowable();
+  }
+
+  /// Is this type '@_addressableForDependencies'?
+  bool isAddressableForDependencies() const {
+    return flags.isAddressableForDependencies();
   }
 
   /// Return the size of this type.  Unlike in C, this has not been

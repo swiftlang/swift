@@ -55,11 +55,16 @@ bb3:
   return %1 : $()
 }
 
-// CHECK: Begin Error in function test_missing_end_borrow
-// CHECK: SIL verification failed: inconsistent active-operations sets entering basic block: state.ActiveOps == foundState.ActiveOps || isUnreachable()
-// CHECK: Verifying instruction:
-// CHECK: ->   br bb3                                       // id: %5
-// CHECK: End Error in function test_missing_end_borrow
+// CHECK:      Begin Error in function test_missing_end_borrow
+// CHECK-NEXT: SIL verification failed: inconsistent active-operations sets entering basic block
+// CHECK-NEXT: Entering basic block bb3
+// CHECK-NEXT: Current active operations: []
+// CHECK-NEXT: Recorded active operations: [
+// CHECK-NEXT:   %2 = store_borrow %0 to %1 : $*Klass
+// CHECK-NEXT: ]
+// CHECK-NEXT: Verifying instruction:
+// CHECK-NEXT: ->   br bb3                                       // id: %5
+// CHECK-NEXT: End Error in function test_missing_end_borrow
 sil [ossa] @test_missing_end_borrow_dead : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %stk = alloc_stack $Klass

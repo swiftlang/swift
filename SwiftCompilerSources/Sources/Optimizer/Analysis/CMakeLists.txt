@@ -9,6 +9,7 @@
 swift_compiler_sources(Optimizer
   AliasAnalysis.swift
   CalleeAnalysis.swift
+  LoopTree.swift
   DeadEndBlocksAnalysis.swift
   DominatorTree.swift
   PostDominatorTree.swift)

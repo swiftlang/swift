@@ -1,4 +1,4 @@
-module SomeModule [extern_c] {
+module SomeModule {
   requires objc
   header "SomeModule.h"
 }

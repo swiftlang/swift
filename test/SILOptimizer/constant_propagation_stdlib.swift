@@ -1,7 +1,9 @@
-// RUN: %target-swift-frontend -module-name constant_propagation_stdlib %s -parse-stdlib -emit-sil -o -    | %FileCheck --check-prefix=CHECK-ONONE %s
-// RUN: %target-swift-frontend -module-name constant_propagation_stdlib %s -parse-stdlib -emit-sil -o - -O | %FileCheck --check-prefix=CHECK-O %s
+// RUN: %target-swift-frontend -module-name constant_propagation_stdlib %s -Xllvm -sil-print-types -emit-sil -enable-builtin-module -o -    | %FileCheck --check-prefix=CHECK-ONONE %s
+// RUN: %target-swift-frontend -module-name constant_propagation_stdlib %s -Xllvm -sil-print-types -emit-sil -enable-builtin-module -o - -O | %FileCheck --check-prefix=CHECK-O %s
 
 // REQUIRES: swift_in_compiler
+
+import Builtin
 
 public struct MyInt {
   var v: Builtin.Int32
@@ -26,7 +28,7 @@ public func isConcrete_true(_ x: MyInt) -> Builtin.Int1 {
 // CHECK-ONONE:         [[RESULT:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-ONONE:         return [[RESULT]]
 // CHECK-ONONE:       } // end sil function '$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF'
-// CHECK-O-LABEL:     sil [signature_optimized_thunk] [always_inline] {{.*}}@$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1 {
+// CHECK-O-LABEL:     sil [signature_optimized_thunk] [heuristic_always_inline] {{.*}}@$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1 {
 // CHECK-O:           bb0(
 // CHECK-O:             [[GEN_FUNC:%.*]] = function_ref @$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlFTf4d_n : $@convention(thin) <τ_0_0> () -> Builtin.Int1
 // CHECK-O:             [[RESULT:%.*]] = apply [[GEN_FUNC]]<T>() : $@convention(thin) <τ_0_0> () -> Builtin.Int1

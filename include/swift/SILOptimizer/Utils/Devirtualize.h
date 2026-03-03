@@ -76,7 +76,7 @@ bool canDevirtualizeClassMethod(FullApplySite AI, ClassDecl *CD,
                                 CanType ClassType,
                                 OptRemark::Emitter *ORE = nullptr,
                                 bool isEffectivelyFinalMethod = false);
-SILFunction *getTargetClassMethod(SILModule &M, ClassDecl *CD,
+SILFunction *getTargetClassMethod(SILModule &M, FullApplySite as, ClassDecl *CD,
                                   CanType ClassType, MethodInst *MI);
 CanType getSelfInstanceType(CanType ClassOrMetatypeType);
 

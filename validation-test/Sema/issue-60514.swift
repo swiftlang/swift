@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
 
 // https://github.com/apple/swift/issues/60514
 // Make sure that `makeIterator` witness is picked over the non-witness.

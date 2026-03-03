@@ -6,8 +6,8 @@
 //
 // RUN: %target-swiftc_driver -driver-print-jobs -emit-object -index-ignore-system-modules -index-store-path %t/index_store -o %t/file.o %s | %FileCheck -check-prefix=JOBS %s
 // RUN: %target-swiftc_driver -driver-print-jobs -emit-object -index-ignore-system-modules -index-include-locals -index-store-path %t/index_store -o %t/file.o %s | %FileCheck -check-prefix=LOCAL-JOBS %s
-// JOBS-NOT: {{.*}}swift{{(-frontend)?(c\.exe")?}} -frontend {{.*}}-index-store-path {{.*}}/index_store{{"?}} -index-include-locals
-// LOCAL-JOBS: {{.*}}swift{{(-frontend)?(c\.exe")?}} -frontend {{.*}}-index-store-path {{.*}}/index_store{{"?}} -index-include-locals
+// JOBS-NOT: {{.*}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} -frontend {{.*}}-index-store-path {{.*}}/index_store{{"?}} -index-include-locals
+// LOCAL-JOBS: {{.*}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} -frontend {{.*}}-index-store-path {{.*}}/index_store{{"?}} -index-include-locals
 //
 // Verify the frontend actually generates local index data:
 //

@@ -1,6 +1,6 @@
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendableCompletionHandlers
 
 // RUN: %empty-directory(%t)
 

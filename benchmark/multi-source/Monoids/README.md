@@ -1,0 +1,30 @@
+# Monoids Benchmark
+
+This benchmark solves the "word problem" in a bunch of monoids simultaneously, using Swift concurrency (or really, just `Task`). It exercises the standard library data structures heavily. You can also run "sh compile.sh" inside the source directory to build a standalone binary separately from the benchmark harness. The standalone binary prints results to standard output.
+
+More specifically, this program enumerates two-generator two-relation monoid presentations up to length 10, and then applies the Knuth-Bendix algorithm to each one:
+
+    <a,b|u=v,w=x>  where |u| + |v| + |w| + |x| <= 10
+
+The program applies various "strategies" to solve the harder instances, such as attempting different reduction orders, as well as a simple [morphocompletion](https://link.springer.com/chapter/10.1007/3-540-51081-8_141) implementation that adds an extra letter to the alphabet.
+
+This takes a few seconds to finish and solves all but three instances. The three it cannot solve are:
+
+    <a,b|aaa=a,abba=bb>
+    <a,b|bab=aaa,bbbb=1>
+    <a,b|aaaa=1,abbba=b>
+
+It turns out the first one cannot be presented by a finite complete rewriting system over any alphabet. The status of the other two remains an open question.
+
+In addition to Knuth-Bendix completion, there are some other interesting algorithms here as well:
+- Shortlex order with arbitrary permutation of alphabet
+- Wreath product order (also known as recursive path order) with arbitrary degree mapping
+- Enumerating all words, permutations, monoid presentations
+- Inverse of a permutation
+- Computing number of irreducible words in complete presentation (= cardinality of presented monoid) with finite state automata
+
+The Knuth-Bendix implementation is pretty fast. It uses a trie to speed up reduction and finding overlaps.
+
+The main "entry point" is `func run()` in Monoids.swift.
+
+A formal write-up is here: https://factorcode.org/slava/aaaaabbabb.pdf

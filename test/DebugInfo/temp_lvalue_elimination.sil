@@ -1,0 +1,26 @@
+// RUN: %target-sil-opt -sil-print-types -sil-verify-all -temp-lvalue-elimination %s | %FileCheck %s
+sil_stage canonical
+
+// REQUIRES: swift_in_compiler
+
+import Builtin
+
+// This verifies that the TempLValueElimination pass correctly salvages the
+// debug variable attribute of alloc_stack instructions.
+//
+// CHECK-LABEL: sil @stack_var_elimination : $@convention(thin) (Builtin.Int32) -> @out Builtin.Int32 {
+// CHECK:       bb0([[X:%[0-9]+]] : $*Builtin.Int32, [[VAL:%[0-9]+]] : $Builtin.Int32):
+// CHECK-NEXT:    debug_value [[X]] : $*Builtin.Int32, var, name "x"
+// CHECK-NEXT:    store [[VAL]] to [[X]] : $*Builtin.Int32
+// CHECK-NEXT:    [[E:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[E]] : $()
+// CHECK-LABEL: } // end sil function 'stack_var_elimination'
+sil @stack_var_elimination : $@convention(thin) (Builtin.Int32) -> @out Builtin.Int32 {
+bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
+  %2 = alloc_stack [var_decl] $Builtin.Int32, var, name "x"
+  store %1 to %2
+  copy_addr %2 to %0
+  dealloc_stack %2
+  %3 = tuple ()
+  return %3
+}

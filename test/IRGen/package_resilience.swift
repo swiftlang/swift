@@ -1,19 +1,15 @@
 //
-// Unlike its counterparts in the other *_resilience.swift files, the goal is
-// for the package's component modules to all be considered within the same
-// resilience domain. This file ensures that we use direct access to package
-// decls at use site as much as possible with -experimental-package-bypass-resilience.
+// Tests resilient access is bypassed when package optimization flags are passed.
 //
-
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/package_resilience.swift
-// RUN: %target-swift-frontend -package-name MyPkg -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct -experimental-allow-non-resilient-access %S/Inputs/package_types/resilient_struct.swift
-// RUN: %target-swift-frontend -package-name MyPkg -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/Inputs/package_types/resilient_enum.swift -experimental-allow-non-resilient-access
-// RUN: %target-swift-frontend -package-name MyPkg -emit-module -enable-library-evolution -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/Inputs/package_types/resilient_class.swift -experimental-allow-non-resilient-access
+// RUN: %target-swift-frontend -package-name MyPkg -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct -allow-non-resilient-access -package-cmo %S/Inputs/package_types/resilient_struct.swift
+// RUN: %target-swift-frontend -package-name MyPkg -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/Inputs/package_types/resilient_enum.swift -allow-non-resilient-access -package-cmo
+// RUN: %target-swift-frontend -package-name MyPkg -emit-module -enable-library-evolution -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/Inputs/package_types/resilient_class.swift -allow-non-resilient-access -package-cmo
 
-// RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience -experimental-package-bypass-resilience -enable-objc-interop -I %t -emit-ir -enable-library-evolution %t/package_resilience.swift | %FileCheck %t/package_resilience.swift --check-prefixes=CHECK,CHECK-objc,CHECK-objc%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-%target-import-type-objc-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=7 -D#MDSIZE32=52 -D#MDSIZE64=80 -D#WORDSIZE=%target-alignment
+// RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience -enable-objc-interop -I %t -emit-ir -enable-library-evolution %t/package_resilience.swift | %FileCheck %t/package_resilience.swift --check-prefixes=CHECK,CHECK-objc,CHECK-objc%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-%target-import-type-objc-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=7 -D#MDSIZE32=52 -D#MDSIZE64=80 -D#WORDSIZE=%target-alignment
 
-// RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience -experimental-package-bypass-resilience -disable-objc-interop -I %t -emit-ir -enable-library-evolution %t/package_resilience.swift | %FileCheck %t/package_resilience.swift --check-prefixes=CHECK,CHECK-native,CHECK-native%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-native-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=4 -D#MDSIZE32=40 -D#MDSIZE64=56 -D#WORDSIZE=%target-alignment
+// RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience  -disable-objc-interop -I %t -emit-ir -enable-library-evolution %t/package_resilience.swift | %FileCheck %t/package_resilience.swift --check-prefixes=CHECK,CHECK-native,CHECK-native%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-native-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=4 -D#MDSIZE32=40 -D#MDSIZE64=56 -D#WORDSIZE=%target-alignment
 
 // RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience -experimental-package-bypass-resilience -I %t -emit-ir -enable-library-evolution -O %t/package_resilience.swift -package-name MyPkg
 
@@ -176,22 +172,22 @@ package class ClassWithResilientThenEmpty {
 // ClassWithResilientProperty.color getter
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s18package_resilience26ClassWithResilientPropertyC5colors5Int32Vvg"(ptr swiftself %0)
-// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds %T18package_resilience26ClassWithResilientPropertyC, ptr %0,
-// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
+// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience26ClassWithResilientPropertyC, ptr %0,
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, ptr [[FIELD_PAYLOAD]]
 // CHECK:      ret i32 [[FIELD_VALUE]]
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s18package_resilience33ClassWithResilientlySizedPropertyC5colors5Int32Vvg"(ptr swiftself %0)
-// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds %T18package_resilience33ClassWithResilientlySizedPropertyC, ptr %0,
-// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
+// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience33ClassWithResilientlySizedPropertyC, ptr %0,
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, ptr [[FIELD_PAYLOAD]]
 // CHECK:      ret i32 [[FIELD_VALUE]]
 
 // ClassWithIndirectResilientEnum.color getter
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s18package_resilience30ClassWithIndirectResilientEnumC5colors5Int32Vvg"(ptr swiftself %0)
-// CHECK:      [[FIELD_PTR:%.*]] = getelementptr inbounds %T18package_resilience30ClassWithIndirectResilientEnumC, ptr %0, i32 0, i32 2
-// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[FIELD_PTR]], i32 0, i32 0
+// CHECK:      [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience30ClassWithIndirectResilientEnumC, ptr %0, i32 0, i32 2
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, ptr [[FIELD_PAYLOAD]]
 // CHECK-NEXT: ret i32 [[FIELD_VALUE]]
 
@@ -201,8 +197,8 @@ package class ClassWithResilientThenEmpty {
 // MyResilientChild.field getter
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s18package_resilience16MyResilientChildC5fields5Int32Vvg"(ptr swiftself %0)
-// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds %T18package_resilience16MyResilientChildC, ptr %0, i32 0, i32 2
-// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
+// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience16MyResilientChildC, ptr %0, i32 0, i32 2
+// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[RESULT:%.*]] = load i32, ptr [[PAYLOAD_ADDR]]
 // CHECK:      ret i32 [[RESULT]]
 
@@ -236,14 +232,14 @@ public func memoryLayoutDotAlignmentWithResilientStruct() -> Int {
 
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void  @"$s18package_resilience31constructResilientEnumNoPayload14resilient_enum6MediumOyF"
 package func constructResilientEnumNoPayload() -> Medium {
-  // CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds %T14resilient_enum6MediumO, ptr %0, i32 0, i32 1
+  // CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %T14resilient_enum6MediumO, ptr %0, i32 0, i32 1
   // CHECK: ret void
   return Medium.Paper
 }
 
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s18package_resilience39constructExhaustiveWithResilientMembers14resilient_enum11SimpleShapeOyF"
 package func constructExhaustiveWithResilientMembers() -> SimpleShape {
-  // CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds %T14resilient_enum11SimpleShapeO, ptr %0, i32 0, i32 1
+  // CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %T14resilient_enum11SimpleShapeO, ptr %0, i32 0, i32 1
   // CHECK: ret void
   return .KleinBottle
 }

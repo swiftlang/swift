@@ -1402,3 +1402,38 @@ func testBuildFinalResultDependentOnContextualType() {
 
 testBuildFinalResultDependentOnContextualType()
 // CHECK: Optional(42)
+
+protocol TestLeadingDot {
+}
+
+@resultBuilder
+struct IntBuilder {
+  static func buildBlock(_ v: Int) -> Int {
+    print("buildBlock: \(v)")
+    return v
+  }
+}
+
+extension TestLeadingDot where Self == NoopImpl {
+  static func test(@IntBuilder builder: () -> Int) -> NoopImpl {
+    builder()
+    return NoopImpl()
+  }
+}
+
+struct NoopImpl : TestLeadingDot {
+}
+
+@available(SwiftStdlib 5.1, *)
+func testLeadingDotSyntax(v: Int) {
+  let x: some TestLeadingDot = .test {
+    v
+  }
+}
+
+if #available(SwiftStdlib 5.1, *) {
+  testLeadingDotSyntax(v: -42)
+} else {
+  print("buildBlock: -42") // Fallback for the back deployment bots
+}
+// CHECK: buildBlock: -42

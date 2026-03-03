@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Refactoring/Refactoring.h"
 
@@ -146,6 +147,18 @@ void RenameRangeDetailCollector::splitAndRenameLabel(CharSourceRange Range,
     return splitAndRenameCallArg(Range, NameIndex);
   case LabelRangeType::Param:
     return splitAndRenameParamLabel(Range, NameIndex, /*IsCollapsible=*/true);
+  case LabelRangeType::EnumCaseParam:
+    if (Range.getByteLength() == 0) {
+      // If the associated value currently doesn't have a label, emit a
+      // `CallArgumentCombined` range, which will cause a new label followed by
+      // `:` to be inserted in the same fashion that call arguments get inserted
+      // to calls
+      return addRenameRange(Range, RefactoringRangeKind::CallArgumentCombined, NameIndex);
+    } else {
+      // If the associated value has a label already, we are in the same case as
+      // function parameters.
+      return splitAndRenameParamLabel(Range, NameIndex, /*IsCollapsible=*/true);
+    }
   case LabelRangeType::NoncollapsibleParam:
     return splitAndRenameParamLabel(Range, NameIndex,
                                     /*IsCollapsible=*/false);
@@ -248,6 +261,7 @@ bool RenameRangeDetailCollector::labelRangeMatches(CharSourceRange Range,
       LLVM_FALLTHROUGH;
     case LabelRangeType::CallArg:
     case LabelRangeType::Param:
+    case LabelRangeType::EnumCaseParam:
     case LabelRangeType::CompoundName:
       return ExistingLabel == (Expected.empty() ? "_" : Expected);
     case LabelRangeType::None:
@@ -269,12 +283,12 @@ bool RenameRangeDetailCollector::renameLabelsLenient(
     LabelRanges = LabelRanges.take_front(*FirstTrailingLabel);
 
     for (auto LabelIndex : llvm::reverse(indices(TrailingLabels))) {
+      if (OldNames.empty())
+        return true;
+
       CharSourceRange Label = TrailingLabels[LabelIndex];
 
       if (Label.getByteLength()) {
-        if (OldNames.empty())
-          return true;
-
         while (!labelRangeMatches(Label, LabelRangeType::CompoundName,
                                   OldNames.back())) {
           if ((OldNames = OldNames.drop_back()).empty())
@@ -288,9 +302,6 @@ bool RenameRangeDetailCollector::renameLabelsLenient(
 
       // empty labelled trailing closure label
       if (LabelIndex) {
-        if (OldNames.empty())
-          return true;
-
         while (!OldNames.back().empty()) {
           if ((OldNames = OldNames.drop_back()).empty())
             return true;
@@ -316,6 +327,8 @@ bool RenameRangeDetailCollector::renameLabelsLenient(
 
       // first name pos
       if (!NameIndex) {
+        if (NameIndex >= OldNames.size())
+          return true;
         while (!OldNames[NameIndex].empty()) {
           if (++NameIndex >= OldNames.size())
             return true;

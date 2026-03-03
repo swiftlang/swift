@@ -21,7 +21,7 @@ sil_vtable A {}
 // CHECK-LABEL: define {{.*}}void @testUnpairedExternal(
 sil @testUnpairedExternal : $(@guaranteed A, @inout Builtin.UnsafeValueBuffer) -> () {
 bb0(%0 : $A, %1 : $*Builtin.UnsafeValueBuffer):
-  // CHECK:      [[PROPERTY:%.*]] = getelementptr inbounds [[C]], ptr %0, i32 0, i32 1
+  // CHECK:      [[PROPERTY:%.*]] = getelementptr inbounds{{.*}} [[C]], ptr %0, i32 0, i32 1
   %2 = ref_element_addr %0 : $A, #A.property
 
   // CHECK-NEXT: [[PC:%.*]] = call ptr @llvm.returnaddress(i32 0)

@@ -17,22 +17,22 @@
 
 // Used for any magic identifier.
 #ifndef MAGIC_IDENTIFIER
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)
+#define MAGIC_IDENTIFIER(NAME, STRING)
 #endif
 
 // Used for magic identifiers which produce string literals.
 #ifndef MAGIC_STRING_IDENTIFIER
-#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING) MAGIC_IDENTIFIER(NAME, STRING)
 #endif
 
 // Used for magic identifiers which produce integer literals.
 #ifndef MAGIC_INT_IDENTIFIER
-#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)
+#define MAGIC_INT_IDENTIFIER(NAME, STRING) MAGIC_IDENTIFIER(NAME, STRING)
 #endif
 
 // Used for magic identifiers which produce raw pointers.
 #ifndef MAGIC_POINTER_IDENTIFIER
-#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING) MAGIC_IDENTIFIER(NAME, STRING)
 #endif
 
 // Used when a given token always maps to a particular magic identifier kind.
@@ -45,27 +45,27 @@
 //
 
 /// The \c #fileID magic identifier literal.
-MAGIC_STRING_IDENTIFIER(FileID, "#fileID", PoundFileIDExpr)
+MAGIC_STRING_IDENTIFIER(FileID, "#fileID")
   MAGIC_IDENTIFIER_TOKEN(FileID, pound_fileID)
 
 /// The \c #file magic identifier literal, written in code where it is
 /// a synonym for \c #fileID (i.e. "Swift 6 mode" code).
-MAGIC_STRING_IDENTIFIER(FileIDSpelledAsFile, "#file", PoundFileExpr)
+MAGIC_STRING_IDENTIFIER(FileIDSpelledAsFile, "#file")
   // tok::pound_file is shared with FilePathSpelledAsFile; please write custom
   // code paths for it.
 
 /// The \c #filePath magic identifier literal.
-MAGIC_STRING_IDENTIFIER(FilePath, "#filePath", PoundFilePathExpr)
+MAGIC_STRING_IDENTIFIER(FilePath, "#filePath")
   MAGIC_IDENTIFIER_TOKEN(FilePath, pound_filePath)
 
 /// The \c #file magic identifier literal, written in code where it is
 /// a synonym for \c #filePath (i.e. Swift 5 mode code).
-MAGIC_STRING_IDENTIFIER(FilePathSpelledAsFile, "#file", PoundFileExpr)
+MAGIC_STRING_IDENTIFIER(FilePathSpelledAsFile, "#file")
   // tok::pound_file is shared with FileIDSpelledAsFile; please write custom
   // code paths for it.
 
 /// The \c #function magic identifier literal.
-MAGIC_STRING_IDENTIFIER(Function, "#function", PoundFunctionExpr)
+MAGIC_STRING_IDENTIFIER(Function, "#function")
   MAGIC_IDENTIFIER_TOKEN(Function, pound_function)
 
 
@@ -75,11 +75,11 @@ MAGIC_STRING_IDENTIFIER(Function, "#function", PoundFunctionExpr)
 //
 
 /// The \c #line magic identifier literal.
-MAGIC_INT_IDENTIFIER(Line, "#line", PoundLineExpr)
+MAGIC_INT_IDENTIFIER(Line, "#line")
   MAGIC_IDENTIFIER_TOKEN(Line, pound_line)
 
 /// The \c #column magic identifier literal.
-MAGIC_INT_IDENTIFIER(Column, "#column", PoundColumnExpr)
+MAGIC_INT_IDENTIFIER(Column, "#column")
   MAGIC_IDENTIFIER_TOKEN(Column, pound_column)
 
 
@@ -89,7 +89,7 @@ MAGIC_INT_IDENTIFIER(Column, "#column", PoundColumnExpr)
 //
 
 /// The \c #dsohandle magic identifier literal.
-MAGIC_POINTER_IDENTIFIER(DSOHandle, "#dsohandle", PoundDsohandleExpr)
+MAGIC_POINTER_IDENTIFIER(DSOHandle, "#dsohandle")
   MAGIC_IDENTIFIER_TOKEN(DSOHandle, pound_dsohandle)
 
 #undef MAGIC_IDENTIFIER

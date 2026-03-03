@@ -5,7 +5,9 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
+// REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_Sensitive
 
 var checkBuffer: UnsafeBufferPointer<UInt32>?
 
@@ -38,9 +40,9 @@ func testSensitive<T>(_ t: T) {
 
 @sensitive
 struct SensitiveStruct {
-  var a = 0xdeadbeaf
-  var b = 0xdeadbeaf
-  var c = 0xdeadbeaf
+  var a: UInt = 0xdeadbeaf
+  var b: UInt = 0xdeadbeaf
+  var c: UInt = 0xdeadbeaf
 }
 
 struct Container<T> {

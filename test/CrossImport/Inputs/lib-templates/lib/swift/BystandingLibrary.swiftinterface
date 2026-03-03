@@ -3,5 +3,7 @@
 
 import Swift
 
-public struct BystandingLibraryTy {}
+public struct BystandingLibraryTy {
+  public init()
+}
 

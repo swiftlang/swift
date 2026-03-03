@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=50000
 // REQUIRES: tools-release,no_asan
 
-// Missing force of optional result of dictionary lookup.
+// Invalid expression: Missing force of optional result of dictionary lookup.
 func rdar19368383(d: [String : String]) -> [String] {
   var r = [String]()
   r += [ // expected-error {{reasonable time}}

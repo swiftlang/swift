@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-objc-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -disable-objc-interop
 
 // Test that we get a custom diagnostic for an ephemeral conversion to non-ephemeral param for an Unsafe[Mutable][Raw][Buffer]Pointer init.
 func unsafePointerInitEphemeralConversions() {
@@ -9,7 +9,7 @@ func unsafePointerInitEphemeralConversions() {
   var optionalArr: [Int]? = [0]
   var c: C?
 
-  _ = UnsafePointer(&foo) // expected-warning {{initialization of 'UnsafePointer<Int>' results in a dangling pointer}} {{educational-notes=temporary-pointers}}
+  _ = UnsafePointer(&foo) // expected-warning {{initialization of 'UnsafePointer<Int>' results in a dangling pointer}} {{documentation-file=temporary-pointers}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to 'init(_:)'}}
   // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 

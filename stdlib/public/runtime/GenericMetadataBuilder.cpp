@@ -56,7 +56,7 @@ public:
 
     /// Construct an arbitrarily typed buffer from a Buffer<const char>, using
     /// const char as an "untyped" buffer type.
-    Buffer(Buffer<const char> buffer)
+    Buffer(const Buffer<const char> &buffer)
         : ptr(reinterpret_cast<T *>(buffer.ptr)) {}
 
     /// The pointer to the buffer's underlying storage.

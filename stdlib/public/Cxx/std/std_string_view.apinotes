@@ -1,0 +1,14 @@
+Name: std_string_view
+Namespaces:
+- Name: std
+  Tags:
+  - Name: basic_string_view
+    Methods:
+    - Name: size
+      SwiftSafety: safe
+    - Name: max_size
+      SwiftSafety: safe
+    - Name: length
+      SwiftSafety: safe
+    - Name: empty
+      SwiftSafety: safe

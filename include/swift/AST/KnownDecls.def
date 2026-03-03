@@ -73,7 +73,6 @@ FUNC_DECL(DiagnoseUnexpectedNilOptional, "_diagnoseUnexpectedNilOptional")
 FUNC_DECL(DiagnoseUnexpectedEnumCase, "_diagnoseUnexpectedEnumCase")
 FUNC_DECL(DiagnoseUnexpectedEnumCaseValue, "_diagnoseUnexpectedEnumCaseValue")
 FUNC_DECL(DiagnoseUnavailableCodeReached, "_diagnoseUnavailableCodeReached")
-FUNC_DECL(DiagnoseUnavailableCodeReachedAEIC, "_diagnoseUnavailableCodeReached_aeic")
 
 FUNC_DECL(GetErrorEmbeddedNSError, "_getErrorEmbeddedNSError")
 
@@ -92,6 +91,6 @@ FUNC_DECL(ModifyAtReferenceWritableKeyPath, "_modifyAtReferenceWritableKeyPath")
 FUNC_DECL(Swap, "swap")
 
 FUNC_DECL(UnimplementedInitializer, "_unimplementedInitializer")
-FUNC_DECL(Undefined, "_undefined")
+FUNC_DECL(UndefinedEditorPlaceholder, "_undefinedEditorPlaceholder")
 
 #undef FUNC_DECL

@@ -1,4 +1,4 @@
-//===--- Demangler.h - String to Node-Tree Demangling -----------*- C++ -*-===//
+//===--- RemanglerBase.h - String to Node-Tree Demangling -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,6 +19,7 @@
 
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/NamespaceMacros.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include <unordered_map>
 
 using namespace swift::Demangle;
@@ -37,14 +38,19 @@ SWIFT_BEGIN_INLINE_NAMESPACE
 
 // An entry in the remangler's substitution map.
 class SubstitutionEntry {
-  Node *TheNode = nullptr;
+  llvm::PointerIntPair<Node *, 1, bool> NodeAndTreatAsIdentifier;
   size_t StoredHash = 0;
-  bool treatAsIdentifier = false;
+
+  Node *getNode() const { return NodeAndTreatAsIdentifier.getPointer(); }
+
+  bool getTreatAsIdentifier() const {
+    return NodeAndTreatAsIdentifier.getInt();
+  }
 
 public:
   void setNode(Node *node, bool treatAsIdentifier, size_t hash) {
-    this->treatAsIdentifier = treatAsIdentifier;
-    TheNode = node;
+    NodeAndTreatAsIdentifier.setPointer(node);
+    NodeAndTreatAsIdentifier.setInt(treatAsIdentifier);
     StoredHash = hash;
   }
 
@@ -54,10 +60,10 @@ public:
     }
   };
 
-  bool isEmpty() const { return !TheNode; }
+  bool isEmpty() const { return !getNode(); }
 
   bool matches(Node *node, bool treatAsIdentifier) const {
-    return node == TheNode && treatAsIdentifier == this->treatAsIdentifier;
+    return node == getNode() && treatAsIdentifier == getTreatAsIdentifier();
   }
 
   size_t hash() const { return StoredHash; }
@@ -67,12 +73,12 @@ private:
                          const SubstitutionEntry &rhs) {
     if (lhs.StoredHash != rhs.StoredHash)
       return false;
-    if (lhs.treatAsIdentifier != rhs.treatAsIdentifier)
+    if (lhs.getTreatAsIdentifier() != rhs.getTreatAsIdentifier())
       return false;
-    if (lhs.treatAsIdentifier) {
-      return identifierEquals(lhs.TheNode, rhs.TheNode);
+    if (lhs.getTreatAsIdentifier()) {
+      return identifierEquals(lhs.getNode(), rhs.getNode());
     }
-    return lhs.deepEquals(lhs.TheNode, rhs.TheNode);
+    return lhs.deepEquals(lhs.getNode(), rhs.getNode());
   }
 
   static bool identifierEquals(Node *lhs, Node *rhs);

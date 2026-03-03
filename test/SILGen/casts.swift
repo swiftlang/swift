@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name casts %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name casts %s | %FileCheck %s
 
 class B { }
 class D : B { }

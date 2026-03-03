@@ -21,7 +21,7 @@
 internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Array<SourceValue>>,
   _ target: UnsafeMutablePointer<Array<TargetValue>>) {
-  target.initialize(to: _arrayForceCast(source.pointee))
+  unsafe target.initialize(to: _arrayForceCast(source.pointee))
 }
 
 /// Implements `source as! [TargetElement]`.
@@ -49,11 +49,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
     return Array(_immutableCocoaArray: source._buffer._asCocoaArray())
   }
 #endif
-#if $TypedThrows
   return source.map { $0 as! TargetElement }
-#else
-  return try! source.__rethrows_map { $0 as! TargetElement }
-#endif
 }
 
 /// Called by the casting machinery.
@@ -62,8 +58,8 @@ internal func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Array<SourceValue>>,
   _ target: UnsafeMutablePointer<Array<TargetValue>>
 ) -> Bool {
-  if let result: Array<TargetValue> = _arrayConditionalCast(source.pointee) {
-    target.initialize(to: result)
+  if let result: Array<TargetValue> = unsafe _arrayConditionalCast(source.pointee) {
+    unsafe target.initialize(to: result)
     return true
   }
   return false
@@ -75,6 +71,7 @@ internal func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
 ///
 /// - Complexity: O(n), because each element must be checked.
 @inlinable //for performance reasons
+@_semantics("array.conditional_cast")
 public func _arrayConditionalCast<SourceElement, TargetElement>(
   _ source: [SourceElement]
 ) -> [TargetElement]? {

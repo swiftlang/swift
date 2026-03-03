@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-requirement-machine-opaque-archetypes
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -enable-requirement-machine-opaque-archetypes
 
 // FIXME: This does not work with -enable-requirement-machine-opaque-archetypes.
 // See opaque_archetype_concrete_requirement_recursive.swift for a demonstration

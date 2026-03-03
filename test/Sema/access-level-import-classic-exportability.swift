@@ -1,13 +1,33 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
 
-/// Build the libraries.
+/// Non-library-evolution.
+// RUN: %target-swift-frontend -emit-module %t/PublicLib.swift -o %t
+// RUN: %target-swift-frontend -emit-module %t/PackageLib.swift -o %t
+// RUN: %target-swift-frontend -emit-module %t/InternalLib.swift -o %t \
+// RUN:   -package-name pkg
+// RUN: %target-swift-frontend -emit-module %t/FileprivateLib.swift -o %t
+// RUN: %target-swift-frontend -emit-module %t/PrivateLib.swift -o %t
+
+/// Check diagnostics.
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -package-name pkg -swift-version 5 \
+// RUN:   -verify -verify-ignore-unrelated
+
+/// CheckImplementationOnly doesn't change the results.
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -package-name pkg -swift-version 5 \
+// RUN:   -enable-experimental-feature CheckImplementationOnly \
+// RUN:   -verify -verify-ignore-unrelated
+
+
+/// Library-evolution.
 // RUN: %target-swift-frontend -emit-module %t/PublicLib.swift -o %t \
 // RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/PackageLib.swift -o %t \
 // RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/InternalLib.swift -o %t \
-// RUN:   -enable-library-evolution
+// RUN:   -enable-library-evolution -package-name pkg
 // RUN: %target-swift-frontend -emit-module %t/FileprivateLib.swift -o %t \
 // RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/PrivateLib.swift -o %t \
@@ -15,14 +35,18 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name TestPackage -swift-version 5 \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
-
-/// Check diagnostics with library-evolution.
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name TestPackage -swift-version 5 \
+// RUN:   -package-name pkg -swift-version 5 \
 // RUN:   -enable-library-evolution \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -verify -verify-ignore-unrelated
+
+/// CheckImplementationOnly doesn't change the results.
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -package-name pkg -swift-version 5 \
+// RUN:   -enable-library-evolution \
+// RUN:   -enable-experimental-feature CheckImplementationOnly \
+// RUN:   -verify -verify-ignore-unrelated
+
+// REQUIRES: swift_feature_CheckImplementationOnly
 
 //--- PublicLib.swift
 public struct PublicImportType {
@@ -39,6 +63,8 @@ public struct InternalImportType {
     public init() {}
 }
 
+package struct InternalImportPackageType {}
+
 //--- FileprivateLib.swift
 public struct FileprivateImportType {
     public init() {}
@@ -52,9 +78,9 @@ public struct PrivateImportType {
 //--- Client.swift
 public import PublicLib
 package import PackageLib // expected-note 2 {{struct 'PackageImportType' imported as 'package' from 'PackageLib' here}}
-internal import InternalLib // expected-note 4 {{struct 'InternalImportType' imported as 'internal' from 'InternalLib' here}}
-fileprivate import FileprivateLib // expected-note 4 {{struct 'FileprivateImportType' imported as 'fileprivate' from 'FileprivateLib' here}}
-private import PrivateLib // expected-note 4 {{struct 'PrivateImportType' imported as 'private' from 'PrivateLib' here}}
+internal import InternalLib // expected-note 2 {{struct 'InternalImportType' imported as 'internal' from 'InternalLib' here}}
+fileprivate import FileprivateLib // expected-note 2 {{struct 'FileprivateImportType' imported as 'fileprivate' from 'FileprivateLib' here}}
+private import PrivateLib // expected-note 2 {{struct 'PrivateImportType' imported as 'private' from 'PrivateLib' here}}
 
 public protocol PublicConstrainedExtensionProto {}
 extension Array: PublicConstrainedExtensionProto where Element == PublicImportType {}
@@ -87,8 +113,8 @@ extension PublicImportType {
 }
 
 public protocol PackageConstrainedExtensionProto {}
-extension Array: PackageConstrainedExtensionProto where Element == PackageImportType {} // expected-error {{cannot use struct 'PackageImportType' in an extension with conditional conformances; 'PackageLib' was imported as package}}
-extension PackageImportType { // expected-error {{cannot use struct 'PackageImportType' in an extension with public or '@usableFromInline' members; 'PackageLib' was imported as package}}
+extension Array: PackageConstrainedExtensionProto where Element == PackageImportType {} // expected-error {{cannot use struct 'PackageImportType' in an extension with conditional conformances; 'PackageLib' was not imported publicly}}
+extension PackageImportType { // expected-error {{cannot use struct 'PackageImportType' in an extension with public or '@usableFromInline' members; 'PackageLib' was not imported publicly}}
     public func publicMethod() {}
 }
 
@@ -123,8 +149,8 @@ extension InternalImportType { // expected-error {{cannot use struct 'InternalIm
 }
 
 package protocol InternalConstrainedExtensionProtoInPackage {}
-extension Array: InternalConstrainedExtensionProtoInPackage where Element == InternalImportType {} // expected-error {{cannot use struct 'InternalImportType' in an extension with conditional conformances; 'InternalLib' was not imported publicly or as package}}
-extension InternalImportType { // expected-error {{cannot use struct 'InternalImportType' in an extension with public, package, or '@usableFromInline' members; 'InternalLib' was not imported publicly or as package}}
+extension Array: InternalConstrainedExtensionProtoInPackage where Element == InternalImportType {}
+extension InternalImportType {
     package func packageMethod() {}
 }
 
@@ -138,6 +164,9 @@ fileprivate protocol InternalConstrainedExtensionProtoInFileprivate {}
 extension Array: InternalConstrainedExtensionProtoInFileprivate where Element == InternalImportType {}
 extension InternalImportType {
     fileprivate func fileprivateMethod() {}
+}
+extension InternalImportPackageType { // No error
+    public func foo() {}
 }
 
 private protocol InternalConstrainedExtensionProtoInPrivate {}
@@ -153,8 +182,8 @@ extension FileprivateImportType { // expected-error {{cannot use struct 'Filepri
 }
 
 package protocol FileprivateConstrainedExtensionProtoInPackage {}
-extension Array: FileprivateConstrainedExtensionProtoInPackage where Element == FileprivateImportType {} // expected-error {{cannot use struct 'FileprivateImportType' in an extension with conditional conformances; 'FileprivateLib' was not imported publicly or as package}}
-extension FileprivateImportType {  // expected-error {{cannot use struct 'FileprivateImportType' in an extension with public, package, or '@usableFromInline' members; 'FileprivateLib' was not imported publicly or as package}}
+extension Array: FileprivateConstrainedExtensionProtoInPackage where Element == FileprivateImportType {}
+extension FileprivateImportType {
     package func packageMethod() {}
 }
 
@@ -183,8 +212,8 @@ extension PrivateImportType { // expected-error {{cannot use struct 'PrivateImpo
 }
 
 package protocol PrivateConstrainedExtensionProtoInPackage {}
-extension Array: PrivateConstrainedExtensionProtoInPackage where Element == PrivateImportType {} // expected-error {{cannot use struct 'PrivateImportType' in an extension with conditional conformances; 'PrivateLib' was not imported publicly or as package}}
-extension PrivateImportType { // expected-error {{cannot use struct 'PrivateImportType' in an extension with public, package, or '@usableFromInline' members; 'PrivateLib' was not imported publicly or as package}}
+extension Array: PrivateConstrainedExtensionProtoInPackage where Element == PrivateImportType {}
+extension PrivateImportType {
     package func packageMethod() {}
 }
 

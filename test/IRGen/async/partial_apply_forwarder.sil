@@ -89,6 +89,11 @@ entry(%e : $EmptyType, %b : $WeakBox<τ_0_0>):
   unreachable
 }
 
+// CHECK-DAG: @"$s7takingQTATu" = internal
+// CHECK-DAG: @"$s11takingQAndSTATu" = internal
+// CHECK-DAG: @"$s13inner_closureTATu" = internal
+// CHECK-DAG: @"$s15returns_closureTATu" = internal
+
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @bind_polymorphic_param_from_context(
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingQTA"(
 sil public @bind_polymorphic_param_from_context : $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @async @callee_guaranteed () -> () {

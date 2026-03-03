@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -debug-constraints -disable-availability-checking 2>%t.err
+// RUN: %target-typecheck-verify-swift -debug-constraints -target %target-swift-5.1-abi-triple 2>%t.err
 // RUN: %FileCheck %s < %t.err
 
 protocol P<Output> {
@@ -71,7 +71,7 @@ do {
   // CHECK: (pattern_named implicit "$__builder{{.*}}")
   // CHECK: (applying conjunction result to outer context
   // CHECK: (attempting type variable {{.*}} := (Int?) -> {{.*}}
-  // CHECK: (attempting disjunction choice {{.*}} bound to decl {{.*}}.Int.init(_:)
+  // CHECK: (attempting disjunction choice {{.*}} bound to decl Swift.(file).SignedInteger extension.init(_:)
   let _ = {
     let x = 42
     test { cond in

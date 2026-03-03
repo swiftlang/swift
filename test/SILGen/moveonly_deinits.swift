@@ -1,6 +1,8 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck -check-prefix=SILGEN %s
-// RUN: %target-swift-emit-sil -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck -check-prefix=SIL %s
-// RUN: %target-swift-emit-sil -O -sil-verify-all -enable-experimental-feature MoveOnlyEnumDeinits %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck -check-prefix=SILGEN %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck -check-prefix=SIL %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -O -sil-verify-all -enable-experimental-feature MoveOnlyEnumDeinits %s
+
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 // Test that makes sure that throughout the pipeline we properly handle
 // conditional releases for trivial and non-trivial move only types.
@@ -20,14 +22,12 @@ func doSomething() {
     print("123")
 }
 
-@_moveOnly
-struct KlassPairWithoutDeinit {
+struct KlassPairWithoutDeinit: ~Copyable {
     var lhs = Klass()
     var rhs = Klass()
 }
 
-@_moveOnly
-struct KlassPairWithDeinit {
+struct KlassPairWithDeinit: ~Copyable {
     var lhs = Klass()
     var rhs = Klass()
 
@@ -36,14 +36,12 @@ struct KlassPairWithDeinit {
     }
 }
 
-@_moveOnly
-struct IntPairWithoutDeinit {
+struct IntPairWithoutDeinit: ~Copyable {
     var k: Int = 5
     var k2: Int = 6
 }
 
-@_moveOnly
-struct IntPairWithDeinit {
+struct IntPairWithDeinit: ~Copyable {
     var k: Int = 5
     var k2: Int = 6
 
@@ -290,14 +288,12 @@ public func testKlassPairWithDeinit() {
 // MARK: Enum Declarations //
 /////////////////////////////
 
-@_moveOnly
-enum KlassEnumPairWithoutDeinit {
+enum KlassEnumPairWithoutDeinit: ~Copyable {
     case lhs(Klass)
     case rhs(Klass)
 }
 
-@_moveOnly
-enum KlassEnumPairWithDeinit {
+enum KlassEnumPairWithDeinit: ~Copyable {
     case lhs(Klass)
     case rhs(Klass)
 
@@ -306,14 +302,12 @@ enum KlassEnumPairWithDeinit {
     }
 }
 
-@_moveOnly
-enum IntEnumPairWithoutDeinit {
+enum IntEnumPairWithoutDeinit: ~Copyable {
 case lhs(Int)
 case rhs(Int)
 }
 
-@_moveOnly
-enum IntEnumPairWithDeinit {
+enum IntEnumPairWithDeinit: ~Copyable {
     case lhs(Int)
     case rhs(Int)
 

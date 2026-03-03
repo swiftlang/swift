@@ -8,6 +8,9 @@
 // rdar://101876380
 // UNSUPPORTED: OS=ios
 
+// rdar://165448053
+// UNSUPPORTED: OS=freebsd
+
 // FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
 // don't support TSan.
 // UNSUPPORTED: remote_run
@@ -16,6 +19,12 @@
 // globals at start-up, but rather uses `swift_once()`.  This is thread safe, but
 // on some platforms TSan wasn't seeing the synchronization, so would report
 // a false positive.
+
+// TSan is detecting race conditions in the concurrency runtime.
+// This might be an issue in how it is hooked into the underlying threading
+// model on FreeBSD.
+// rdar://158355890
+// XFAIL: OS=freebsd
 
 import Dispatch
 

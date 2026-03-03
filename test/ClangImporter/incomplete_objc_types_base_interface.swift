@@ -8,6 +8,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_ImportObjcForwardDeclarations
 
 import Foundation
 import IncompleteTypeLibrary1

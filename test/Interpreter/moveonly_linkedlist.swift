@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all)
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all)
-// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -Xfrontend -enable-ossa-modules)
 
 // REQUIRES: executable_test
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -target %target-swift-5.9-abi-triple | %FileCheck %s
 
 // CHECK-LABEL: sil [ossa] @$s19pack_expansion_type16variadicFunction1t1ux_q_txQp_txxQp_q_xQptRvzRv_q_Rhzr0_lF : $@convention(thin) <each T, each U where (repeat (each T, each U)) : Any> (@pack_guaranteed Pack{repeat each T}, @pack_guaranteed Pack{repeat each U}) -> @pack_out Pack{repeat (each T, each U)} {
 // CHECK: bb0(%0 : $*Pack{repeat (each T, each U)}, %1 : $*Pack{repeat each T}, %2 : $*Pack{repeat each U}):
@@ -49,4 +49,47 @@ public func sameExpansionTwice<each U, each V>(us: repeat each U, more_us: repea
 // SILVerifier bug
 public func nonPackAndPackParameterInExpansion<each T, U, V>(t: repeat each T, u: U, v: V) -> (repeat (each T, U, V)) {
   return (repeat (each t, u, v))
+}
+
+func testForEach(_ i: Int) {
+  func foo<each T>(_ xs: repeat each T) -> some Collection<(repeat each T)> {
+    [(repeat each xs)]
+  }
+  func bar<each T>(_ xs: repeat each T) -> any Collection<(repeat each T)> {
+    [(repeat each xs)]
+  }
+
+  for _ in foo(i) {}
+  for _ in bar(i) {}
+
+  for _ in foo(i, i) {}
+  for _ in foo(0, "") {}
+  for (_, _) in foo(i, i) {}
+  for (_, _) in foo(0, "") {}
+
+  for _ in bar(i, i) {}
+  for _ in bar(0, "") {}
+  for (_, _) in bar(i, i) {}
+  for (_, _) in bar(0, "") {}
+
+  let _ = foo(i).first
+  let _ = foo(i).first!
+
+  let _ = foo(i, i).first
+  let _ = foo(0, "").first
+
+  let _ = bar(i).first
+  let _ = bar(i, i).first
+  let _ = bar(0, "").first
+
+  let _ = bar(i).first!
+  let _ = bar(i, i).first!
+  let _ = bar(0, "").first!
+  let (_, _) = bar(i, i).first!
+  let (_, _) = bar(0, "").first!
+
+  let _ = foo(i, i).first!
+  let _ = foo(0, "").first!
+  let (_, _) = foo(i, i).first!
+  let (_, _) = foo(0, "").first!
 }

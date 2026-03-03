@@ -27,6 +27,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/Sema/Concurrency.h"
 
@@ -53,7 +54,6 @@ class DiagnoseUnnecessaryPreconcurrencyImports : public SILModuleTransform {
       }
 
       data.push_back(sf);
-      assert(sf->getBufferID() != -1 && "Must have a buffer id");
     }
 
     // Sort unique by filename so our diagnostics are deterministic.

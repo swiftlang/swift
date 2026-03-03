@@ -10,6 +10,10 @@
 #
 # ----------------------------------------------------------------------------
 
+import os
+
+from build_swift.build_swift.constants import SWIFT_REPO_NAME
+
 from . import cmark
 from . import earlyswiftdriver
 from . import libcxx
@@ -60,9 +64,6 @@ class Swift(product.Product):
         # Add experimental distributed flag.
         self.cmake_options.extend(self._enable_experimental_distributed)
 
-        # Add experimental NonescapableTypes flag.
-        self.cmake_options.extend(self._enable_experimental_nonescapable_types)
-
         # Add backtracing flag.
         self.cmake_options.extend(self._enable_backtracing)
 
@@ -71,6 +72,12 @@ class Swift(product.Product):
 
         # Add synchronization flag.
         self.cmake_options.extend(self._enable_synchronization)
+
+        # Add volatile flag.
+        self.cmake_options.extend(self._enable_volatile)
+
+        # Add runtime module flag.
+        self.cmake_options.extend(self._enable_runtime_module)
 
         # Add static vprintf flag
         self.cmake_options.extend(self._enable_stdlib_static_vprintf)
@@ -82,6 +89,12 @@ class Swift(product.Product):
 
         self.cmake_options.extend(self._enable_stdlib_unicode_data)
 
+        self.cmake_options.extend(self._enable_embedded_stdlib)
+
+        self.cmake_options.extend(self._enable_embedded_stdlib_cross_compiling)
+
+        self.cmake_options.extend(self._enable_stdlib_symbol_graphs)
+
         self.cmake_options.extend(
             self._swift_tools_ld64_lto_codegen_only_for_supporting_targets)
 
@@ -89,6 +102,22 @@ class Swift(product.Product):
             self._enable_experimental_parser_validation)
 
         self._handle_swift_debuginfo_non_lto_args()
+
+        self.cmake_options.extend(
+            self._enable_new_runtime_build)
+
+        self.cmake_options.extend(
+            self._darwin_test_deployment_versions)
+
+        self.cmake_options.extend_raw(self.args.extra_swift_cmake_options)
+
+    @classmethod
+    def product_source_name(cls):
+        """product_source_name() -> str
+
+        The name of the source code directory of this product.
+        """
+        return SWIFT_REPO_NAME
 
     @classmethod
     def is_build_script_impl_product(cls):
@@ -141,11 +170,18 @@ updated without updating swift.py?")
     def _version_flags(self):
         r = CMakeOptions()
         if self.args.swift_compiler_version is not None:
-            swift_compiler_version = self.args.swift_compiler_version
-            r.define('SWIFT_COMPILER_VERSION', str(swift_compiler_version))
+            swift_compiler_version = str(self.args.swift_compiler_version)
+            r.define('SWIFT_COMPILER_VERSION', swift_compiler_version)
+            r.define('SWIFT_TOOLCHAIN_VERSION', "swiftlang-" + swift_compiler_version)
+        else:
+            toolchain_version = os.environ.get('TOOLCHAIN_VERSION')
+            if toolchain_version:
+                r.define('SWIFT_TOOLCHAIN_VERSION', toolchain_version)
+
         if self.args.clang_compiler_version is not None:
             clang_compiler_version = self.args.clang_compiler_version
             r.define('CLANG_COMPILER_VERSION', str(clang_compiler_version))
+
         return r
 
     @property
@@ -200,11 +236,6 @@ updated without updating swift.py?")
                  self.args.enable_experimental_distributed)]
 
     @property
-    def _enable_experimental_nonescapable_types(self):
-        return [('SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES:BOOL',
-                 self.args.enable_experimental_nonescapable_types)]
-
-    @property
     def _enable_backtracing(self):
         return [('SWIFT_ENABLE_BACKTRACING:BOOL',
                  self.args.swift_enable_backtracing)]
@@ -218,6 +249,16 @@ updated without updating swift.py?")
     def _enable_synchronization(self):
         return [('SWIFT_ENABLE_SYNCHRONIZATION:BOOL',
                  self.args.enable_synchronization)]
+
+    @property
+    def _enable_volatile(self):
+        return [('SWIFT_ENABLE_VOLATILE:BOOL',
+                 self.args.enable_volatile)]
+
+    @property
+    def _enable_runtime_module(self):
+        return [('SWIFT_ENABLE_RUNTIME_MODULE:BOOL',
+                 self.args.enable_runtime_module)]
 
     @property
     def _enable_stdlib_static_vprintf(self):
@@ -248,6 +289,39 @@ updated without updating swift.py?")
     def _enable_experimental_parser_validation(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION:BOOL',
                  self.args.enable_experimental_parser_validation)]
+
+    @property
+    def _enable_embedded_stdlib(self):
+        return [('SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB',
+                 self.args.build_embedded_stdlib)]
+
+    @property
+    def _enable_embedded_stdlib_cross_compiling(self):
+        return [('SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING',
+                 self.args.build_embedded_stdlib_cross_compiling)]
+
+    @property
+    def _enable_stdlib_symbol_graphs(self):
+        return [('SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL',
+                 self.args.build_stdlib_docs)]
+
+    @property
+    def _enable_new_runtime_build(self):
+        return [('SWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL',
+                 self.args.enable_new_runtime_build)]
+
+    @property
+    def _darwin_test_deployment_versions(self):
+        return [('SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_OSX:STRING',
+                 self.args.darwin_test_deployment_version_osx),
+                 ('SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_IOS:STRING',
+                   self.args.darwin_test_deployment_version_ios),
+                 ('SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_TVOS:STRING',
+                   self.args.darwin_test_deployment_version_tvos),
+                 ('SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_WATCHOS:STRING',
+                   self.args.darwin_test_deployment_version_watchos),
+                 ('SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_XROS:STRING',
+                   self.args.darwin_test_deployment_version_xros)]
 
     def _handle_swift_debuginfo_non_lto_args(self):
         if ('swift_debuginfo_non_lto_args' not in self.args

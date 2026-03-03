@@ -50,7 +50,7 @@ struct CursorInfoOwner {
     return !(lhs == rhs);
   }
   bool isValid() const {
-    return File && File->getBufferID() && Loc.isValid();
+    return File && Loc.isValid();
   }
 };
 
@@ -110,7 +110,7 @@ struct RangeInfoOwner {
   }
 
   bool isValid() const {
-    return File && File->getBufferID() && StartLoc.isValid() && EndLoc.isValid();
+    return File && StartLoc.isValid() && EndLoc.isValid();
   }
 };
 

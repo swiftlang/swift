@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_MANGLER_H
 #define SWIFT_BASIC_MANGLER_H
 
+#include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Basic/Debug.h"
@@ -70,6 +71,8 @@ protected:
 
   size_t MaxNumWords = 26;
 
+  ManglingFlavor Flavor = ManglingFlavor::Default;
+
   /// If enabled, non-ASCII names are encoded in modified Punycode.
   bool UsePunycode = true;
 
@@ -111,6 +114,13 @@ public:
     print(llvm::dbgs());
   }
 
+  /// Appends the given raw identifier to the buffer in the form required to
+  /// mangle it. This handles the transformations needed for such identifiers
+  /// to retain compatibility with older runtimes.
+  static void
+  appendRawIdentifierForRuntime(StringRef ident,
+                                llvm::SmallVectorImpl<char> &buffer);
+
 protected:
   /// Removes the last characters of the buffer by setting it's size to a
   /// smaller value.
@@ -135,12 +145,12 @@ protected:
   void finalize(llvm::raw_ostream &stream);
 
   /// Verify that demangling and remangling works.
-  static void verify(StringRef mangledName);
+  static void verify(StringRef mangledName, ManglingFlavor Flavor);
 
   SWIFT_DEBUG_DUMP;
 
   /// Appends a mangled identifier string.
-  void appendIdentifier(StringRef ident);
+  void appendIdentifier(StringRef ident, bool allowRawIdentifiers = true);
 
   // NOTE: the addSubstitution functions perform the value computation before
   // the assignment because there is no sequence point synchronising the

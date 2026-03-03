@@ -3,6 +3,7 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_RawLayout
 
 @_rawLayout(size: 16, alignment: 16)
 struct Foo: ~Copyable {

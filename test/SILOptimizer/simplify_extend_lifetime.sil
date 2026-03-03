@@ -1,0 +1,21 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+// extend_lifetime should not be eliminated as dead code.
+//
+// CHECK-LABEL: sil [ossa] @do_not_remove_extend : $@convention(thin) (Int) -> () {
+// CHECK:       extend_lifetime %0 : $Int
+// CHECK-LABEL: } // end sil function 'do_not_remove_extend'
+sil [ossa] @do_not_remove_extend : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  extend_lifetime %0 : $Int
+  %4 = tuple ()
+  return %4 : $()
+}

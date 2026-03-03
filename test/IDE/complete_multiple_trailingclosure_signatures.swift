@@ -25,7 +25,7 @@ func test() {
 // GLOBALFUNC_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn8:  (Int...) -> Void {<#Int...#> in|}#}[#(Int...) -> Void#];
 }
 
-func testStringAndMulipleTrailingClosures() {
+func testStringAndMultipleTrailingClosures() {
   func stringAndClosure(_ key: String, _ body: () -> Void) {}
 
   func takeClosure(_ x: () -> Void) {}

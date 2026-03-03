@@ -1,0 +1,56 @@
+// RUN: %sil-llvm-gen %s -output-kind=llvm-as -o - | %FileCheck %s
+
+import Builtin
+
+sil @use_value : $@convention(thin) <T> (@inout T) -> ()
+sil @use_pack : $@convention(thin) <each τ_0_0> (@pack_guaranteed Pack{repeat each τ_0_0}) -> ()
+
+// CHECK: define {{.*}}swiftcc void @test_alloc_stack(ptr noalias [[IN:%.*]], ptr [[META:%.*]]){{.*}} {
+// CHECK: [[VALUE_WITNESS_TABLE_PTR:%.*]] = getelementptr inbounds ptr, ptr [[META]], {{.*}} -1
+// CHECK: [[VALUE_WITNESS_TABLE:%.*]] = load ptr, ptr [[VALUE_WITNESS_TABLE_PTR]]
+// CHECK: [[SIZE_VALUE_WITNESS:%.*]] = getelementptr {{.*}} %swift.vwtable, ptr [[VALUE_WITNESS_TABLE]], i32 0, i32 8
+// CHECK: [[SIZE:%.*]] = load {{.*}}ptr [[SIZE_VALUE_WITNESS]]
+// CHECK: [[MALLOC:%.*]] = call ptr @malloc({{.*}} [[SIZE]])
+// CHECK: call void @llvm.lifetime.start.p0({{.*}} -1, ptr [[MALLOC]])
+// CHECK: [[INIT_WITH_COPY_PTR:%.*]] = getelementptr inbounds ptr, ptr [[VALUE_WITNESS_TABLE]], i32 2
+// CHECK: [[INIT_WITH_COPY:%.*]] = load ptr, ptr [[INIT_WITH_COPY_PTR]]
+// CHECK: call ptr %InitializeWithCopy(ptr {{.*}}[[MALLOC]], ptr {{.*}}[[IN]], ptr [[META]])
+// CHECK: call swiftcc void @use_value(ptr [[MALLOC]], ptr [[META]])
+// CHECK: call void @llvm.lifetime.end.p0({{.*}} -1, ptr [[MALLOC]])
+// CHECK: call void @free(ptr [[MALLOC]])
+// CHECK-NEXT: ret void
+sil @test_alloc_stack : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = alloc_stack [non_nested] $T
+  copy_addr %0 to [init] %1
+  %f = function_ref @use_value : $@convention(thin) <T> (@inout T) -> ()
+  apply %f<T>(%1) : $@convention(thin) <T> (@inout T) -> ()
+  dealloc_stack %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: define {{.*}}swiftcc void @test_alloc_stack_name(ptr noalias [[IN:%.*]], ptr [[META:%.*]]){{.*}} {
+// CHECK: [[VALUE_WITNESS_TABLE_PTR:%.*]] = getelementptr inbounds ptr, ptr [[META]], {{.*}} -1
+// CHECK: [[VALUE_WITNESS_TABLE:%.*]] = load ptr, ptr [[VALUE_WITNESS_TABLE_PTR]]
+// CHECK: [[SIZE_VALUE_WITNESS:%.*]] = getelementptr {{.*}} %swift.vwtable, ptr [[VALUE_WITNESS_TABLE]], i32 0, i32 8
+// CHECK: [[SIZE:%.*]] = load {{.*}}ptr [[SIZE_VALUE_WITNESS]]
+// CHECK: [[MALLOC:%.*]] = call ptr @malloc({{.*}} [[SIZE]])
+// CHECK: call void @llvm.lifetime.start.p0({{.*}} -1, ptr [[MALLOC]])
+// CHECK: [[INIT_WITH_COPY_PTR:%.*]] = getelementptr inbounds ptr, ptr [[VALUE_WITNESS_TABLE]], i32 2
+// CHECK: [[INIT_WITH_COPY:%.*]] = load ptr, ptr [[INIT_WITH_COPY_PTR]]
+// CHECK: call ptr %InitializeWithCopy(ptr {{.*}}[[MALLOC]], ptr {{.*}}[[IN]], ptr [[META]])
+// CHECK: call swiftcc void @use_value(ptr [[MALLOC]], ptr [[META]])
+// CHECK: call void @llvm.lifetime.end.p0({{.*}} -1, ptr [[MALLOC]])
+// CHECK: call void @free(ptr [[MALLOC]])
+// CHECK-NEXT: ret void
+sil @test_alloc_stack_name : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = alloc_stack [non_nested] $T, var, name "name"
+  copy_addr %0 to [init] %1
+  %f = function_ref @use_value : $@convention(thin) <T> (@inout T) -> ()
+  apply %f<T>(%1) : $@convention(thin) <T> (@inout T) -> ()
+  dealloc_stack %1
+  %9999 = tuple ()
+  return %9999 : $()
+}

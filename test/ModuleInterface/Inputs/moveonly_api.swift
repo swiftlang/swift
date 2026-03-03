@@ -8,8 +8,7 @@ public enum Descriptor {
   public func message() -> String { return "hello world" }
 }
 
-@_moveOnly
-public struct File {
+public struct File: ~Copyable {
 
 #if SYNTHESIZE_ACCESSORS
   public var fd: Descriptor = .other(1337)

@@ -2,10 +2,6 @@
 //
 // REQUIRES: executable_test
 
-// The test is enabled only on windows until https://github.com/apple/swift/pull/73019
-// is fixed.
-// REQUIRES: OS=windows-msvc
-
 import StdlibUnittest
 import Closure
 
@@ -13,6 +9,10 @@ var ClosureTestSuite = TestSuite("Closure")
 
 ClosureTestSuite.test("ConvertToFunctionPointer") {
   cfunc2({N in})
+}
+
+ClosureTestSuite.test("Pass FRT to function pointer") {
+  cppGo({N in })
 }
 
 runAllTests()

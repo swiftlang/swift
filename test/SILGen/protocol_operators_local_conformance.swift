@@ -64,7 +64,7 @@ func test6() {
 // CHECK: function_ref @$[[TEST6_EQUALS_WITNESS:[_0-9a-zA-Z]+]]
 // CHECK: }
 
-// CHECK: sil [serialized] @$[[TEST6_EQUALS_WITNESS]] : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
+// CHECK: sil [serialized] {{.*}}@$[[TEST6_EQUALS_WITNESS]] : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
 
 func test7() {
   struct Outer {

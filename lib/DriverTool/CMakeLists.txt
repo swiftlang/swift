@@ -11,17 +11,17 @@ set(driver_sources_and_options
                 modulewrap_main.cpp
                 swift_api_digester_main.cpp
                 swift_cache_tool_main.cpp
-                swift_indent_main.cpp
                 swift_symbolgraph_extract_main.cpp
-                swift_api_extract_main.cpp
-                swift_parse_test_main.cpp)
+                swift_synthesize_interface_main.cpp
+                swift_parse_test_main.cpp
+  LLVM_LINK_COMPONENTS
+                BitstreamReader)
 
 set(driver_common_libs
                 swiftAPIDigester
                 swiftDriver
                 swiftFrontendTool
-                swiftSymbolGraphGen
-                LLVMBitstreamReader)
+                swiftSymbolGraphGen)
 
 add_swift_host_library(swiftDriverTool STATIC
   ${driver_sources_and_options}
@@ -29,6 +29,17 @@ add_swift_host_library(swiftDriverTool STATIC
 target_link_libraries(swiftDriverTool
                       PUBLIC
                       ${driver_common_libs})
+
+if (SWIFT_BUILD_SWIFT_SYNTAX)
+  target_link_libraries(swiftDriverTool
+    PRIVATE
+    swiftASTGen
+  )
+
+  add_dependencies(swiftDriverTool
+    swiftASTGen
+  )
+endif()
 
 # If building as part of clang, make sure the headers are installed.
 if(NOT SWIFT_BUILT_STANDALONE)

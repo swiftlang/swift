@@ -1,5 +1,13 @@
 # Toolchain-only build products
 
+# `-fsized-deallocation` would cause a build failure
+# when targeting macOS 14.0 SDK used in some configuration
+get_property(directory_compile_options
+  DIRECTORY
+  PROPERTY COMPILE_OPTIONS)
+list(FILTER directory_compile_options EXCLUDE REGEX ".*-fsized-deallocation.*")
+set_property(DIRECTORY PROPERTY COMPILE_OPTIONS ${directory_compile_options})
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../cmake/modules)
 include(StdlibOptions)
 include(AddSwiftStdlib)
@@ -50,6 +58,7 @@ if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
   add_subdirectory(Compatibility50)
   add_subdirectory(Compatibility51)
   add_subdirectory(Compatibility56)
+  add_subdirectory(CompatibilitySpan)
   add_subdirectory(CompatibilityDynamicReplacements)
   add_subdirectory(CompatibilityConcurrency)
   add_subdirectory(CompatibilityThreading)

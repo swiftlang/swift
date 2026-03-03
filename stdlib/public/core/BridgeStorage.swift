@@ -178,7 +178,9 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inlinable
   @inline(__always)
   internal init(native: Native) {
+    #if !$Embedded
     _internalInvariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    #endif
     rawValue = native
   }
 

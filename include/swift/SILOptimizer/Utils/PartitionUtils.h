@@ -19,6 +19,9 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/RegionIsolation.h"
+#include "swift/SILOptimizer/Utils/SILIsolationInfo.h"
 
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -28,23 +31,11 @@
 #include <algorithm>
 #include <variant>
 
-#define DEBUG_TYPE "transfer-non-sendable"
+#define DEBUG_TYPE "send-non-sendable"
 
 namespace swift {
 
 namespace PartitionPrimitives {
-
-#ifndef NDEBUG
-extern bool REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING;
-#define REGIONBASEDISOLATION_VERBOSE_LOG(...)                                  \
-  do {                                                                         \
-    if (PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING) {    \
-      LLVM_DEBUG(__VA_ARGS__);                                                 \
-    }                                                                          \
-  } while (0);
-#else
-#define REGIONBASEDISOLATION_VERBOSE_LOG(...)
-#endif
 
 struct Element {
   unsigned num;
@@ -95,323 +86,108 @@ struct DenseMapInfo<swift::PartitionPrimitives::Region> {
 
 namespace swift {
 
-class ActorInstance {
+class Partition;
+class SendingOperandToStateMap;
+class RegionAnalysisValueMap;
+
+/// The representative value of the equivalence class that makes up a tracked
+/// value.
+///
+/// We model the following value kinds:
+///
+/// 1. SILValue: a normal value. Can be object or memory. If memory, represents
+/// a value stored in that memory.
+///
+/// 2. SILInstruction *: A "fake" actor-isolated values that we inject into the
+/// regions of values that become merged into an actor by calling an actor
+/// isolated function that does not have any non-Sendable results. This results
+/// in us having no value to use to inject the actor-isolatedness into the
+/// region. So we use a "fake" value to do so. We identify it with the
+/// instruction so we have a unique representation of it.
+///
+/// 3. Operand *: A value that was previously in a piece of memory but was
+/// assigned over. We do not want to drop that the given value was already in
+/// that piece of memory since otherwise we could lose that a region was actor
+/// isolated or task isolated. We use the operand of the assign that overwrites
+/// the value to uniquely identify the value in our data structures to ensure
+/// that we distinguish in between the values stored in a piece of memory that
+/// is overwritten multiple times. Example:
+///
+///   %0 = alloc_stack
+///   ...
+///   // Represent original value as the dest operand of
+///   // the assign (the operand referencing %0)....
+///   store %1 to [assign] %0
+///   ...
+///   // So we can distinguish it from this subsequent assignment.
+///   store %2 to [assign] %0
+class RepresentativeValue {
+  friend llvm::DenseMapInfo<RepresentativeValue>;
+
+  using InnerType = PointerUnion<SILValue, SILInstruction *, Operand *>;
+
+  /// If this is set to a SILValue then it is the actual represented value. If
+  /// it is set to a SILInstruction, then this is a "fake" representative value
+  /// used to inject actor isolation. The instruction stored is the
+  /// instruction that introduced the actor isolation.
+  InnerType value;
+
 public:
-  enum class Kind : uint8_t {
-    Value,
-    ActorAccessorInit = 0x1,
-  };
+  RepresentativeValue() : value() {}
+  RepresentativeValue(SILValue value) : value(value) {}
+  RepresentativeValue(SILInstruction *actorRegionInst)
+      : value(actorRegionInst) {}
+  RepresentativeValue(Operand *memoryAssignment) : value(memoryAssignment) {}
 
-  llvm::PointerIntPair<SILValue, 1> value;
+  operator bool() const { return bool(value); }
 
-  ActorInstance(SILValue value, Kind kind)
-      : value(value, std::underlying_type<Kind>::type(kind)) {}
-
-public:
-  ActorInstance() : ActorInstance(SILValue(), Kind::Value) {}
-
-  static ActorInstance getForValue(SILValue value) {
-    return ActorInstance(value, Kind::Value);
-  }
-
-  static ActorInstance getForActorAccessorInit() {
-    return ActorInstance(SILValue(), Kind::ActorAccessorInit);
-  }
-
-  explicit operator bool() const { return bool(value.getOpaqueValue()); }
-
-  Kind getKind() const { return Kind(value.getInt()); }
-
-  SILValue getValue() const {
-    assert(getKind() == Kind::Value);
-    return value.getPointer();
-  }
-
-  bool isValue() const { return getKind() == Kind::Value; }
-
-  bool isAccessorInit() const { return getKind() == Kind::ActorAccessorInit; }
-
-  bool operator==(const ActorInstance &other) const {
-    // If both are null, return true.
-    if (!bool(*this) && !bool(other))
-      return true;
-
-    // Otherwise, check if the kinds match.
-    if (getKind() != other.getKind())
-      return false;
-
-    // Now that we know that the kinds match, perform the kind specific check.
-    switch (getKind()) {
-    case Kind::Value:
-      return getValue() == other.getValue();
-    case Kind::ActorAccessorInit:
-      return true;
+  void print(llvm::raw_ostream &os) const {
+    if (auto *inst = value.dyn_cast<SILInstruction *>()) {
+      os << "ActorRegionIntroducingInst: " << *inst;
+      return;
     }
+
+    if (auto *op = value.dyn_cast<Operand *>()) {
+      os << "Value from Overwritten Memory. Op Num: " << op->getOperandNumber()
+         << ". User: " << *op->getUser();
+      return;
+    }
+
+    os << *cast<SILValue>(value);
   }
 
-  bool operator!=(const ActorInstance &other) const {
-    return !(*this == other);
+  SILValue getValue() const { return cast<SILValue>(value); }
+  SILValue maybeGetValue() const { return value.dyn_cast<SILValue>(); }
+  bool hasRegionIntroducingInst() const { return isa<SILInstruction *>(value); }
+  SILInstruction *getActorRegionIntroducingInst() const {
+    return cast<SILInstruction *>(value);
   }
-};
+  Operand *getOperand() const { return cast<Operand *>(value); }
+  Operand *maybeGetOperand() const { return value.dyn_cast<Operand *>(); }
 
-class SILIsolationInfo {
-public:
-  /// The lattice is:
-  ///
-  /// Unknown -> Disconnected -> TransferringParameter -> Task -> Actor.
-  ///
-  /// Unknown means no information. We error when merging on it.
-  enum Kind {
-    Unknown,
-    Disconnected,
-    Task,
-    Actor,
-  };
+  bool operator==(SILValue other) const {
+    if (hasRegionIntroducingInst())
+      return false;
+    if (maybeGetOperand())
+      return false;
+    return getValue() == other;
+  }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
 private:
-  Kind kind;
-
-  /// The actor isolation if this value has one. The default unspecified case
-  /// otherwise.
-  ActorIsolation actorIsolation;
-
-  /// This is the value that we got isolation from if we were able to find
-  /// one. Used for isolation history.
-  SILValue isolatedValue;
-
-  /// If set this is the SILValue that represents the actor instance that we
-  /// derived isolatedValue from.
-  ///
-  /// If set to (SILValue(), 1), then we are in an
-  ActorInstance actorInstance;
-
-  SILIsolationInfo(SILValue isolatedValue, SILValue actorInstance,
-                   ActorIsolation actorIsolation)
-      : kind(Actor), actorIsolation(actorIsolation),
-        isolatedValue(isolatedValue),
-        actorInstance(ActorInstance::getForValue(actorInstance)) {
-    assert((!actorInstance ||
-            (actorIsolation.getKind() == ActorIsolation::ActorInstance &&
-             actorInstance->getType()
-                 .getASTType()
-                 ->lookThroughAllOptionalTypes()
-                 ->getAnyActor())) &&
-           "actorInstance must be an actor if it is non-empty");
-  }
-
-  SILIsolationInfo(SILValue isolatedValue, ActorInstance actorInstance,
-                   ActorIsolation actorIsolation)
-      : kind(Actor), actorIsolation(actorIsolation),
-        isolatedValue(isolatedValue), actorInstance(actorInstance) {
-    assert(actorInstance);
-    assert(actorIsolation.getKind() == ActorIsolation::ActorInstance);
-  }
-
-  SILIsolationInfo(Kind kind, SILValue isolatedValue)
-      : kind(kind), actorIsolation(), isolatedValue(isolatedValue) {}
-
-  SILIsolationInfo(Kind kind) : kind(kind), actorIsolation() {}
-
-public:
-  SILIsolationInfo() : kind(Kind::Unknown), actorIsolation() {}
-
-  operator bool() const { return kind != Kind::Unknown; }
-
-  operator Kind() const { return kind; }
-
-  Kind getKind() const { return kind; }
-
-  bool isDisconnected() const { return kind == Kind::Disconnected; }
-  bool isActorIsolated() const { return kind == Kind::Actor; }
-  bool isTaskIsolated() const { return kind == Kind::Task; }
-
-  void print(llvm::raw_ostream &os) const;
-
-  SWIFT_DEBUG_DUMP {
-    print(llvm::dbgs());
-    llvm::dbgs() << '\n';
-  }
-
-  void printForDiagnostics(llvm::raw_ostream &os) const;
-
-  SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
-    printForDiagnostics(llvm::dbgs());
-    llvm::dbgs() << '\n';
-  }
-
-  ActorIsolation getActorIsolation() const {
-    assert(kind == Actor);
-    return actorIsolation;
-  }
-
-  /// If we are actor or task isolated and could find a specific value that
-  /// caused the isolation, put it here. Used for isolation history.
-  SILValue getIsolatedValue() const {
-    assert(kind == Task || kind == Actor);
-    return isolatedValue;
-  }
-
-  /// Return the specific SILValue for the actor that our isolated value is
-  /// isolated to if one exists.
-  ActorInstance getActorInstance() const {
-    assert(kind == Actor);
-    return actorInstance;
-  }
-
-  bool hasActorIsolation() const { return kind == Actor; }
-
-  bool hasIsolatedValue() const {
-    return (kind == Task || kind == Actor) && bool(isolatedValue);
-  }
-
-  [[nodiscard]] SILIsolationInfo merge(SILIsolationInfo other) const;
-
-  static SILIsolationInfo getDisconnected() { return {Kind::Disconnected}; }
-
-  /// Create an actor isolation for a value that we know is actor isolated to a
-  /// specific actor, but we do not know the specific instance yet.
-  ///
-  /// This can occur when closing over a closure with an isolated parameter or
-  /// if we are determining isolation of a function_ref that takes an isolated
-  /// parameter. In both cases, we cannot know what the actual isolation is
-  /// until we invoke the closure or function.
-  ///
-  /// TODO: This is just a stub currently until I implement the flow sensitive
-  /// part. We just treat all instances the same. There are tests that validate
-  /// this behavior.
-  static SILIsolationInfo
-  getFlowSensitiveActorIsolated(SILValue isolatedValue,
-                                ActorIsolation actorIsolation) {
-    return {isolatedValue, SILValue(), actorIsolation};
-  }
-
-  /// Only use this as a fallback if we cannot find better information.
-  static SILIsolationInfo
-  getWithIsolationCrossing(ApplyIsolationCrossing crossing) {
-    if (crossing.getCalleeIsolation().isActorIsolated()) {
-      // SIL level, just let it through
-      return SILIsolationInfo(SILValue(), SILValue(),
-                              crossing.getCalleeIsolation());
-    }
-
-    return {};
-  }
-
-  static SILIsolationInfo getActorInstanceIsolated(SILValue isolatedValue,
-                                                   SILValue actorInstance,
-                                                   NominalTypeDecl *typeDecl) {
-    assert(actorInstance);
-    if (!typeDecl->isAnyActor()) {
-      assert(!swift::getActorIsolation(typeDecl).isGlobalActor() &&
-             "Should have called getGlobalActorIsolated");
-      return {};
-    }
-    return {isolatedValue, actorInstance,
-            ActorIsolation::forActorInstanceSelf(typeDecl)};
-  }
-
-  static SILIsolationInfo getActorInstanceIsolated(SILValue isolatedValue,
-                                                   ActorInstance actorInstance,
-                                                   NominalTypeDecl *typeDecl) {
-    assert(actorInstance);
-    if (!typeDecl->isAnyActor()) {
-      assert(!swift::getActorIsolation(typeDecl).isGlobalActor() &&
-             "Should have called getGlobalActorIsolated");
-      return {};
-    }
-    return {isolatedValue, actorInstance,
-            ActorIsolation::forActorInstanceSelf(typeDecl)};
-  }
-
-  /// A special actor instance isolated for partial apply cases where we do not
-  /// close over the isolated parameter and thus do not know the actual actor
-  /// instance that we are going to use.
-  static SILIsolationInfo
-  getPartialApplyActorInstanceIsolated(SILValue isolatedValue,
-                                       NominalTypeDecl *typeDecl) {
-    if (!typeDecl->isAnyActor()) {
-      assert(!swift::getActorIsolation(typeDecl).isGlobalActor() &&
-             "Should have called getGlobalActorIsolated");
-      return {};
-    }
-    return {isolatedValue, SILValue(),
-            ActorIsolation::forActorInstanceSelf(typeDecl)};
-  }
-
-  static SILIsolationInfo getGlobalActorIsolated(SILValue value,
-                                                 Type globalActorType) {
-    return {value, SILValue() /*no actor instance*/,
-            ActorIsolation::forGlobalActor(globalActorType)};
-  }
-
-  static SILIsolationInfo getGlobalActorIsolated(SILValue value,
-                                                 ValueDecl *decl) {
-    auto isolation = swift::getActorIsolation(decl);
-    if (!isolation.isGlobalActor())
-      return {};
-    return SILIsolationInfo::getGlobalActorIsolated(value,
-                                                    isolation.getGlobalActor());
-  }
-
-  static SILIsolationInfo getTaskIsolated(SILValue value) {
-    return {Kind::Task, value};
-  }
-
-  /// Attempt to infer the isolation region info for \p inst.
-  static SILIsolationInfo get(SILInstruction *inst);
-
-  /// Attempt to infer the isolation region info for \p arg.
-  static SILIsolationInfo get(SILArgument *arg);
-
-  static SILIsolationInfo get(SILValue value) {
-    if (auto *arg = dyn_cast<SILArgument>(value))
-      return get(arg);
-    if (auto *inst = dyn_cast<SingleValueInstruction>(value))
-      return get(inst);
-    return {};
-  }
-
-  /// A helper that is used to ensure that we treat certain builtin values as
-  /// non-Sendable that the AST level otherwise thinks are non-Sendable.
-  ///
-  /// E.x.: Builtin.RawPointer and Builtin.NativeObject
-  ///
-  /// TODO: Fix the type checker.
-  static bool isNonSendableType(SILType type, SILFunction *fn);
-
-  static bool isNonSendableType(SILValue value) {
-    return isNonSendableType(value->getType(), value->getFunction());
-  }
-
-  bool hasSameIsolation(ActorIsolation actorIsolation) const;
-
-  /// Returns true if \p this and \p other have the same isolation. It allows
-  /// for the isolated values if any to not match.
-  ///
-  /// This is useful if one has two non-Sendable values projected from the same
-  /// actor or global actor isolated value. E.x.: two different ref_element_addr
-  /// from the same actor.
-  bool hasSameIsolation(const SILIsolationInfo &other) const;
-
-  /// Returns true if this SILIsolationInfo is deeply equal to other. This means
-  /// that the isolation and the isolated value match.
-  bool isEqual(const SILIsolationInfo &other) const;
-
-  void Profile(llvm::FoldingSetNodeID &id) const;
+  RepresentativeValue(InnerType value) : value(value) {}
 };
-
-class Partition;
-class TransferringOperandToStateMap;
 
 /// A persistent data structure that is used to "rewind" partition history so
 /// that we can discover when values become part of the same region.
 ///
-/// NOTE: This does not track whether or not values are transferred. This is
+/// NOTE: This does not track whether or not values are sent. This is
 /// because from the perspective of determining when two values become part of
 /// the same region, that information is not important. To unroll history, a
-/// Partition must have no transfers to use this. NOTE: There is a method that
+/// Partition must have no sends to use this. NOTE: There is a method that
 /// takes a Partition and produces a new Partition that does not have any
-/// transfers.
+/// sends.
 class IsolationHistory {
 public:
   class Factory;
@@ -423,7 +199,7 @@ private:
 
   // TODO: This shouldn't need to be a friend.
   friend class Partition;
-  friend TransferringOperandToStateMap;
+  friend SendingOperandToStateMap;
 
   /// First node in the immutable linked list.
   Node *head = nullptr;
@@ -542,7 +318,7 @@ private:
 
   /// Access the tail allocated buffer of additional element arguments.
   MutableArrayRef<Element> getAdditionalElementArgs() {
-    return {getTrailingObjects<Element>(), numAdditionalElements};
+    return getTrailingObjects(numAdditionalElements);
   }
 
   Node(Kind kind, Node *parent)
@@ -641,37 +417,37 @@ public:
   IsolationHistory get() { return IsolationHistory(this); }
 };
 
-struct TransferringOperandState {
-  /// The dynamic isolation info of the region of value when we transferred.
+/// A struct that represents a specific "sending" operand of an ApplySite.
+struct SendingOperandState {
+  /// The dynamic isolation info of the region of value when we sent.
   ///
   /// This will contain the isolated value if we found one.
-  SILIsolationInfo isolationInfo;
+  SILDynamicMergedIsolationInfo isolationInfo;
 
   /// The dynamic isolation history at this point.
   IsolationHistory isolationHistory;
 
-  /// Set to true if the element associated with the operand's vlaue is closure
+  /// Set to true if the element associated with the operand's value is closure
   /// captured by the user. In such a case, if our element is a sendable var of
   /// a non-Sendable type, we cannot access it since we could race against an
   /// assignment to the var in a closure.
   bool isClosureCaptured;
 
-  TransferringOperandState(IsolationHistory history)
+  SendingOperandState(IsolationHistory history)
       : isolationInfo(), isolationHistory(history), isClosureCaptured(false) {}
 };
 
-class TransferringOperandToStateMap {
-  llvm::SmallDenseMap<Operand *, TransferringOperandState> internalMap;
+class SendingOperandToStateMap {
+  llvm::SmallDenseMap<Operand *, SendingOperandState> internalMap;
   IsolationHistory::Factory &isolationHistoryFactory;
 
 public:
-  TransferringOperandToStateMap(
-      IsolationHistory::Factory &isolationHistoryFactory)
+  SendingOperandToStateMap(IsolationHistory::Factory &isolationHistoryFactory)
       : isolationHistoryFactory(isolationHistoryFactory) {}
-  TransferringOperandState &get(Operand *op) const {
-    auto *self = const_cast<TransferringOperandToStateMap *>(this);
+  SendingOperandState &get(Operand *op) const {
+    auto *self = const_cast<SendingOperandToStateMap *>(this);
     auto history = IsolationHistory(&isolationHistoryFactory);
-    return self->internalMap.try_emplace(op, TransferringOperandState(history))
+    return self->internalMap.try_emplace(op, SendingOperandState(history))
         .first->getSecond();
   }
 };
@@ -684,127 +460,305 @@ namespace swift {
 /// SILInstructions can be translated to
 enum class PartitionOpKind : uint8_t {
   /// Assign one value to the region of another, takes two args, second arg
-  /// must already be tracked with a non-transferred region
-  Assign,
+  /// must already be tracked with a non-sent region.
+  ///
+  /// In this case, we do not care if there is a value already in the SSA value,
+  /// so this can be either an object value or an address value that is produced
+  /// from an instruction. It cannot be an address produced by a different
+  /// instruction that we are initializing or writing over.
+  AssignDirect,
+
+  /// Assign to a piece of memory produced by a different instruction
+  /// indirectly. Takes 3 arguments:
+  ///
+  /// - arg1 (dest): the element representing the memory location being written.
+  /// - arg2 (src): the element representing the value being stored.
+  /// - arg3 (overwritten): the element for the value that was in the memory
+  ///   before.
+  ///
+  /// NOTE: We do not care if there was actually a value in memory or not. We
+  /// will track a new value for the overwritten value. If there wasn't anything
+  /// in the memory location we will just have a disconnected value. We should
+  /// track destruction more closely in the future.
+  AssignIndirect,
 
   /// Assign one value to a fresh region, takes one arg.
+  ///
+  /// NOTE: This just produces a new value that is tracked by the dataflow. The
+  /// isolation characteristics of the value are actually decided by
+  /// tryToTrackValue and SILIsolationInfo::get().
   AssignFresh,
 
+  /// Assign one value to a fresh region and then assign it to another value
+  /// that was also just assign fresh. Takes two parameters. The first is the
+  /// element to assign fresh and the second is the element to assign to.
+  ///
+  /// Used in combination with AssignFresh to initialize a chain of
+  /// values. Different from Assign since Assign allows for errors to
+  /// occur. This does not allow for any errors to be emitted since we are just
+  /// initializing a chain of values.
+  AssignFreshAssign,
+
   /// Merge the regions of two values, takes two args, both must be from
-  /// non-transferred regions.
+  /// non-sent regions.
   Merge,
 
-  /// Transfer the region of a value if not already transferred, takes one arg.
-  Transfer,
+  /// Send the region of a value if not already sent, takes one arg.
+  Send,
 
-  /// Due to an async let or something like that a value that was transferred is
-  /// no longer transferred.
-  UndoTransfer,
+  /// Due to an async let or something like that a value that was sent is
+  /// no longer sent.
+  UndoSend,
 
-  /// Require the region of a value to be non-transferred, takes one arg.
+  /// Require the region of a value to be non-sent, takes one arg.
   Require,
+
+  /// Emit an error saying that the given instruction was not understood for
+  /// some reason and that a bug should be filed. It expects some sort of
+  /// Element number since in most cases we need to define a value for later
+  /// potential uses of the value (e.x.: an alloc_stack that we emit an unknown
+  /// pattern error will have later uses that will use the value... without
+  /// defining the value, the dataflow will assert).
+  ///
+  /// This is used if we need to reject the program and do not want to assert.
+  UnknownPatternError,
+
+  /// Require that a 'inout sending' parameter's region is not sent and
+  /// disconnected at a specific function exiting term inst.
+  ///
+  /// This ensures that if users send away an inout sending parameter, the
+  /// parameter is reinitialized with a disconnected value.
+  ///
+  /// Takes one parameter, the inout parameter that we need to check.
+  InOutSendingAtFunctionExit,
+
+  /// This is the result of an isolation crossing apply site. We need to emit a
+  /// special error since we never allow this.
+  ///
+  /// DISCUSSION: This is actually just a form of "send". Sadly, we can not use
+  /// "send" directly since "send" expects a SILOperand and these are values. So
+  /// to work around the API issue, we have to use a different, specific entry.
+  NonSendableIsolationCrossingResult,
 };
 
 /// PartitionOp represents a primitive operation that can be performed on
-/// Partitions. This is part of the TransferNonSendable SIL pass workflow:
+/// Partitions. This is part of the SendNonSendable SIL pass workflow:
 /// first SILBasicBlocks are compiled to vectors of PartitionOps, then a fixed
 /// point partition is found over the CFG.
 class PartitionOp {
   using Element = PartitionPrimitives::Element;
 
-private:
-  PartitionOpKind opKind;
-  llvm::SmallVector<Element, 2> opArgs;
+public:
+  enum class Flag : uint8_t {
+    None,
 
+    /// This is a require of a non-Sendable base that we have a Sendable use
+    /// from. If the region was sent but at the sent point did not have any
+    /// element of the region that was captured by reference in a closure, we
+    /// can ignore the use.
+    RequireOfMutableBaseOfSendableValue,
+  };
+  using Options = OptionSet<Flag>;
+
+private:
   /// Record the SILInstruction that this PartitionOp was generated from, if
   /// generated during compilation from a SILBasicBlock
   PointerUnion<SILInstruction *, Operand *> source;
 
+  std::optional<Element> opArg1;
+  std::optional<Element> opArg2;
+  std::optional<Element> opArg3;
+
+  PartitionOpKind opKind;
+
+  Options options;
+
   // TODO: can the following declarations be merged?
   PartitionOp(PartitionOpKind opKind, Element arg1,
-              SILInstruction *sourceInst = nullptr)
-      : opKind(opKind), opArgs({arg1}), source(sourceInst) {
-    assert(((opKind != PartitionOpKind::Transfer &&
-             opKind != PartitionOpKind::UndoTransfer) ||
+              SILInstruction *sourceInst = nullptr, Options options = {})
+      : source(sourceInst), opArg1(arg1), opKind(opKind), options(options) {
+    assert(((opKind != PartitionOpKind::Send &&
+             opKind != PartitionOpKind::UndoSend) ||
             sourceInst) &&
-           "Transfer needs a sourceInst");
+           "Send needs a sourceInst");
   }
 
-  PartitionOp(PartitionOpKind opKind, Element arg1, Operand *sourceOperand)
-      : opKind(opKind), opArgs({arg1}), source(sourceOperand) {
-    assert(((opKind != PartitionOpKind::Transfer &&
-             opKind != PartitionOpKind::UndoTransfer) ||
+  PartitionOp(PartitionOpKind opKind, Element arg1, Operand *sourceOperand,
+              Options options = {})
+      : source(sourceOperand), opArg1(arg1), opKind(opKind), options(options) {
+    assert(((opKind != PartitionOpKind::Send &&
+             opKind != PartitionOpKind::UndoSend) ||
             bool(sourceOperand)) &&
-           "Transfer needs a sourceInst");
+           "Send needs a sourceInst");
   }
 
   PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2,
-              SILInstruction *sourceInst = nullptr)
-      : opKind(opKind), opArgs({arg1, arg2}), source(sourceInst) {
-    assert(((opKind != PartitionOpKind::Transfer &&
-             opKind != PartitionOpKind::UndoTransfer) ||
+              SILInstruction *sourceInst = nullptr, Options options = {})
+      : source(sourceInst), opArg1(arg1), opArg2(arg2), opKind(opKind),
+        options(options) {
+    assert(((opKind != PartitionOpKind::Send &&
+             opKind != PartitionOpKind::UndoSend) ||
             sourceInst) &&
-           "Transfer needs a sourceInst");
+           "Send needs a sourceInst");
   }
+
+  PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2,
+              Operand *sourceOp = nullptr, Options options = {})
+      : source(sourceOp), opArg1(arg1), opArg2(arg2), opKind(opKind),
+        options(options) {
+    assert((opKind == PartitionOpKind::AssignDirect ||
+            opKind == PartitionOpKind::Merge) &&
+           "Only supported for assign_direct and merge");
+  }
+
+  PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2, Element arg3,
+              Operand *sourceOp = nullptr, Options options = {})
+      : source(sourceOp), opArg1(arg1), opArg2(arg2), opArg3(arg3),
+        opKind(opKind), options(options) {
+    assert(opKind == PartitionOpKind::AssignIndirect &&
+           "Only supported for assign_indirect");
+  }
+
+  PartitionOp(PartitionOpKind opKind, SILInstruction *sourceInst,
+              Options options = {})
+      : source(sourceInst), opKind(opKind), options(options) {}
 
   friend class Partition;
 
 public:
-  static PartitionOp Assign(Element tgt, Element src,
-                            SILInstruction *sourceInst = nullptr) {
-    return PartitionOp(PartitionOpKind::Assign, tgt, src, sourceInst);
+  static PartitionOp AssignDirect(Element destElt, Element srcElt,
+                                  Operand *srcOperand = nullptr) {
+    return PartitionOp(PartitionOpKind::AssignDirect, destElt, srcElt,
+                       srcOperand);
   }
 
-  static PartitionOp AssignFresh(Element tgt,
+  static PartitionOp AssignIndirect(Element destElt, Element srcElt,
+                                    Element overwrittenDestValueElt,
+                                    Operand *srcOperand = nullptr) {
+    return PartitionOp(PartitionOpKind::AssignIndirect, destElt, srcElt,
+                       overwrittenDestValueElt, srcOperand);
+  }
+
+  static PartitionOp AssignFresh(Element elt,
                                  SILInstruction *sourceInst = nullptr) {
-    return PartitionOp(PartitionOpKind::AssignFresh, tgt, sourceInst);
+    return PartitionOp(PartitionOpKind::AssignFresh, elt, sourceInst);
   }
 
-  static PartitionOp Transfer(Element tgt, Operand *transferringOp) {
-    return PartitionOp(PartitionOpKind::Transfer, tgt, transferringOp);
+  /// Assign fresh \p elt and then assign it to \p srcElt.
+  ///
+  /// Used as part of emitting a sequence of AssignFresh that join the same
+  /// element.
+  static PartitionOp AssignFreshAssign(Element elt, Element srcElt,
+                                       SILInstruction *sourceInst = nullptr) {
+    return PartitionOp(PartitionOpKind::AssignFreshAssign, elt, srcElt,
+                       sourceInst);
   }
 
-  static PartitionOp UndoTransfer(Element tgt,
-                                  SILInstruction *untransferringInst) {
-    return PartitionOp(PartitionOpKind::UndoTransfer, tgt, untransferringInst);
+  static PartitionOp Send(Element tgt, Operand *sendingOp) {
+    return PartitionOp(PartitionOpKind::Send, tgt, sendingOp);
   }
 
-  static PartitionOp Merge(Element tgt1, Element tgt2,
-                           SILInstruction *sourceInst = nullptr) {
-    return PartitionOp(PartitionOpKind::Merge, tgt1, tgt2, sourceInst);
+  static PartitionOp UndoSend(Element tgt, SILInstruction *unsendingInst) {
+    return PartitionOp(PartitionOpKind::UndoSend, tgt, unsendingInst);
   }
 
-  static PartitionOp Require(Element tgt,
-                             SILInstruction *sourceInst = nullptr) {
-    return PartitionOp(PartitionOpKind::Require, tgt, sourceInst);
+  static PartitionOp Merge(Element destElement, Element srcElement,
+                           Operand *sourceOperand = nullptr) {
+    return PartitionOp(PartitionOpKind::Merge, destElement, srcElement,
+                       sourceOperand);
+  }
+
+  static PartitionOp Require(Element tgt, SILInstruction *sourceInst = nullptr,
+                             Options options = {}) {
+    return PartitionOp(PartitionOpKind::Require, tgt, sourceInst, options);
+  }
+
+  static PartitionOp UnknownPatternError(Element elt,
+                                         SILInstruction *sourceInst) {
+    return PartitionOp(PartitionOpKind::UnknownPatternError, elt, sourceInst);
+  }
+
+  static PartitionOp InOutSendingAtFunctionExit(Element elt,
+                                                SILInstruction *sourceInst) {
+    return PartitionOp(PartitionOpKind::InOutSendingAtFunctionExit, elt,
+                       sourceInst);
+  }
+
+  static PartitionOp
+  NonSendableIsolationCrossingResult(Element elt, SILInstruction *sourceInst) {
+    return PartitionOp(PartitionOpKind::NonSendableIsolationCrossingResult, elt,
+                       sourceInst);
   }
 
   bool operator==(const PartitionOp &other) const {
-    return opKind == other.opKind && opArgs == other.opArgs &&
+    return opKind == other.opKind && opArg1 == other.opArg1 &&
+           opArg2 == other.opArg2 && opArg3 == other.opArg3 &&
            source == other.source;
   };
 
   bool operator<(const PartitionOp &other) const {
     if (opKind != other.opKind)
       return opKind < other.opKind;
-    if (opArgs != other.opArgs)
-      return opArgs < other.opArgs;
+
+    if (opArg1 != other.opArg1) {
+      // null < non-null always.
+      if (!opArg1.has_value() && other.opArg1.has_value())
+        return true;
+      // non-null >= null always.
+      if (opArg1.has_value() && !other.opArg1.has_value())
+        return false;
+      return *opArg1 < other.opArg1;
+    }
+
+    if (opArg2 != other.opArg2) {
+      // null < non-null always.
+      if (!opArg2.has_value() && other.opArg2.has_value())
+        return true;
+      // non-null >= null always.
+      if (opArg2.has_value() && !other.opArg2.has_value())
+        return false;
+      return *opArg2 < other.opArg2;
+    }
+
+    if (opArg3 != other.opArg3) {
+      // null < non-null always.
+      if (!opArg3.has_value() && other.opArg3.has_value())
+        return true;
+      // non-null >= null always.
+      if (opArg3.has_value() && !other.opArg3.has_value())
+        return false;
+      return *opArg3 < other.opArg3;
+    }
+
     return source < other.source;
   }
 
   PartitionOpKind getKind() const { return opKind; }
 
-  ArrayRef<Element> getOpArgs() const { return opArgs; }
+  Element getOpArg1() const { return opArg1.value(); }
+  Element getOpArg2() const { return opArg2.value(); }
+  Element getOpArg3() const { return opArg3.value(); }
 
-  SILInstruction *getSourceInst() const {
-    if (source.is<Operand *>())
-      return source.get<Operand *>()->getUser();
-    return source.get<SILInstruction *>();
+  Options getOptions() const { return options; }
+
+  void getOpArgs(SmallVectorImpl<Element> &args) const {
+    if (opArg1.has_value())
+      args.push_back(*opArg1);
+    if (opArg2.has_value())
+      args.push_back(*opArg2);
+    if (opArg3.has_value())
+      args.push_back(*opArg3);
   }
 
-  bool hasSourceInst() const { return source.is<SILInstruction *>(); }
+  SILInstruction *getSourceInst() const {
+    if (isa<Operand *>(source))
+      return cast<Operand *>(source)->getUser();
+    return cast<SILInstruction *>(source);
+  }
 
-  Operand *getSourceOp() const { return source.get<Operand *>(); }
+  bool hasSourceInst() const { return isa<SILInstruction *>(source); }
+
+  Operand *getSourceOp() const { return cast<Operand *>(source); }
 
   SILLocation getSourceLoc() const { return getSourceInst()->getLoc(); }
 
@@ -822,12 +776,12 @@ public:
 
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
-  using TransferringOperandSet = ImmutablePointerSet<Operand *>;
-  using TransferringOperandSetFactory = ImmutablePointerSetFactory<Operand *>;
+  using SendingOperandSet = ImmutablePointerSet<Operand *>;
+  using SendingOperandSetFactory = ImmutablePointerSetFactory<Operand *>;
   using IsolationHistoryNode = IsolationHistory::Node;
 
 private:
-  /// A map from a region number to a instruction that consumes it.
+  /// A map from a region number to a instruction that sends it.
   ///
   /// All we care is that we ever track a single SILInstruction for a region
   /// since we are fine with emitting a single error per value and letting the
@@ -835,8 +789,7 @@ private:
   /// multi map here. The implication of this is that when we are performing
   /// dataflow we use a union operation to combine CFG elements and just take
   /// the first instruction that we see.
-  llvm::SmallMapVector<Region, TransferringOperandSet *, 2>
-      regionToTransferredOpMap;
+  llvm::SmallMapVector<Region, SendingOperandSet *, 2> regionToSendingOpMap;
 
   /// Label each index with a non-negative (unsigned) label if it is associated
   /// with a valid region.
@@ -883,13 +836,12 @@ public:
     snd.canonicalize();
 
     return fst.elementToRegionMap == snd.elementToRegionMap &&
-           fst.regionToTransferredOpMap.size() ==
-               snd.regionToTransferredOpMap.size() &&
+           fst.regionToSendingOpMap.size() == snd.regionToSendingOpMap.size() &&
            llvm::all_of(
-               fst.regionToTransferredOpMap,
-               [&snd](const std::pair<Region, TransferringOperandSet *> &p) {
-                 auto sndIter = snd.regionToTransferredOpMap.find(p.first);
-                 return sndIter != snd.regionToTransferredOpMap.end() &&
+               fst.regionToSendingOpMap,
+               [&snd](const std::pair<Region, SendingOperandSet *> &p) {
+                 auto sndIter = snd.regionToSendingOpMap.find(p.first);
+                 return sndIter != snd.regionToSendingOpMap.end() &&
                         sndIter->second == p.second;
                });
   }
@@ -898,13 +850,12 @@ public:
     return elementToRegionMap.count(val);
   }
 
-  /// Mark val as transferred.
-  void markTransferred(Element val,
-                       TransferringOperandSet *transferredOperandSet);
+  /// Mark val as having been sent.
+  void markSent(Element val, SendingOperandSet *sendingOperandSet);
 
-  /// If val was marked as transferred, unmark it as transfer. Returns true if
-  /// we found that \p val was transferred. We return false otherwise.
-  bool undoTransfer(Element val);
+  /// If val was marked as sent, unmark it as sent. Returns true if we found
+  /// that \p val was sent. We return false otherwise.
+  bool undoSend(Element val);
 
   /// If \p newElt is not being tracked, create a new region for \p newElt. If
   /// \p newElt is already being tracked, remove it from its old region as well.
@@ -927,11 +878,11 @@ public:
   iterator end() { return elementToRegionMap.end(); }
   llvm::iterator_range<iterator> range() { return {begin(), end()}; }
 
-  void clearTransferState() { regionToTransferredOpMap.clear(); }
+  void clearSendingOperandState() { regionToSendingOpMap.clear(); }
 
-  Partition removingTransferState() const {
+  Partition removingSendingOperandState() const {
     Partition p = *this;
-    p.clearTransferState();
+    p.clearSendingOperandState();
     return p;
   }
 
@@ -942,12 +893,12 @@ public:
   /// afterwards if the current linear history does not find what one is looking
   /// for.
   ///
-  /// NOTE: This can only be used if one has cleared transfer state using
-  /// Partition::clearTransferState or constructed a new Partiton using
-  /// Partition::withoutTransferState(). This is because history rewinding
-  /// doesn't use transfer information so just to be careful around potential
-  /// invariants being broken, we just require the elimination of the transfer
-  /// information.
+  /// NOTE: This can only be used if one has cleared the sent state using
+  /// Partition::clearSendingOperandState or constructed a new Partiton using
+  /// Partition::removingSendingOperandState(). This is because history
+  /// rewinding doesn't use send information so just to be careful around
+  /// potential invariants being broken, we just require the elimination of the
+  /// send information.
   ///
   /// \returns true if there is more history that can be popped.
   bool popHistory(SmallVectorImpl<IsolationHistory> &foundJoinedHistories);
@@ -984,19 +935,19 @@ public:
   /// Runs in quadratic time.
   static Partition join(const Partition &fst, Partition &snd);
 
-  /// Return a vector of the transferred values in this partition.
-  std::vector<Element> getTransferredVals() const {
+  /// Return a vector of the sent values in this partition.
+  std::vector<Element> getSentValues() const {
     // For effeciency, this could return an iterator not a vector.
-    std::vector<Element> transferredVals;
+    std::vector<Element> sentVals;
     for (auto [i, _] : elementToRegionMap)
-      if (isTransferred(i))
-        transferredVals.push_back(i);
-    return transferredVals;
+      if (isSent(i))
+        sentVals.push_back(i);
+    return sentVals;
   }
 
-  /// Return a vector of the non-transferred regions in this partition, each
+  /// Return a vector of the non-sent regions in this partition, each
   /// represented as a vector of values.
-  std::vector<std::vector<Element>> getNonTransferredRegions() const {
+  std::vector<std::vector<Element>> getNonSentRegions() const {
     // For effeciency, this could return an iterator not a vector.
     std::map<Region, std::vector<Element>> buckets;
 
@@ -1037,38 +988,38 @@ public:
     return history.pushHistorySequenceBoundary(loc);
   }
 
-  bool isTransferred(Element val) const {
+  bool isSent(Element val) const {
     auto iter = elementToRegionMap.find(val);
     if (iter == elementToRegionMap.end())
       return false;
-    return regionToTransferredOpMap.count(iter->second);
+    return regionToSendingOpMap.count(iter->second);
   }
 
-  /// Return the instruction that transferred \p val's region or nullptr
+  /// Return the instruction that sent \p val's region or nullptr
   /// otherwise.
-  TransferringOperandSet *getTransferred(Element val) const {
+  SendingOperandSet *getSentOperandSet(Element val) const {
     auto iter = elementToRegionMap.find(val);
     if (iter == elementToRegionMap.end())
       return nullptr;
-    auto iter2 = regionToTransferredOpMap.find(iter->second);
-    if (iter2 == regionToTransferredOpMap.end())
+    auto iter2 = regionToSendingOpMap.find(iter->second);
+    if (iter2 == regionToSendingOpMap.end())
       return nullptr;
     auto *set = iter2->second;
     assert(!set->empty());
     return set;
   }
 
-  /// Validate that all regions in the regionToTransferredOpMap exist in the
+  /// Validate that all regions in the regionToSentOpMap exist in the
   /// elementToRegionMap.
   ///
   /// Asserts when NDEBUG is set. Does nothing otherwise.
-  void validateRegionToTransferredOpMapRegions() const {
+  void validateRegionToSendingOpMapRegions() const {
 #ifndef NDEBUG
     llvm::SmallSet<Region, 8> regions;
     for (auto [eltNo, regionNo] : elementToRegionMap) {
       regions.insert(regionNo);
     }
-    for (auto [regionNo, opSet] : regionToTransferredOpMap) {
+    for (auto [regionNo, opSet] : regionToSendingOpMap) {
       assert(regions.contains(regionNo) && "Region doesn't exist?!");
     }
 #endif
@@ -1135,7 +1086,7 @@ private:
     history.pushMergeElementRegions(elementToMergeInto, otherRegions);
   }
 
-  /// Remove a single element without touching the region to transferring inst
+  /// Remove a single element without touching the region to sending inst
   /// multimap. Assumes that the element is never the last element in a region.
   ///
   /// Just a helper routine.
@@ -1146,6 +1097,305 @@ private:
     canonical = false;
     assert(result && "Failed to erase?!");
   }
+};
+
+/// Swift style enum we use to decouple and reduce boilerplate in between the
+/// diagnostic and non-diagnostic part of the infrastructure.
+///
+/// NOTE: This is a noncopyable type so that we can store Partitions in these
+/// errors without copying them all over the place.
+class PartitionOpError {
+public:
+  using Element = PartitionPrimitives::Element;
+  using Region = PartitionPrimitives::Region;
+
+  enum Kind {
+#define PARTITION_OP_ERROR(NAME) NAME,
+#include "PartitionOpError.def"
+  };
+
+  struct UnknownCodePatternError {
+    const PartitionOp *op;
+
+    UnknownCodePatternError(const PartitionOp &op) : op(&op) {}
+    UnknownCodePatternError(UnknownCodePatternError &&other) = default;
+    UnknownCodePatternError &
+    operator=(UnknownCodePatternError &&other) = default;
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
+  };
+
+  struct LocalUseAfterSendError {
+    const PartitionOp *op;
+    Element sentElement;
+    Operand *sendingOp;
+
+    LocalUseAfterSendError(const PartitionOp &op, Element elt,
+                           Operand *sendingOp)
+        : op(&op), sentElement(elt), sendingOp(sendingOp) {}
+
+    LocalUseAfterSendError(LocalUseAfterSendError &&other) = default;
+    LocalUseAfterSendError &operator=(LocalUseAfterSendError &&other) = default;
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
+  };
+
+  struct SentNeverSendableError {
+    const PartitionOp *op;
+    Element sentElement;
+    SILDynamicMergedIsolationInfo isolationRegionInfo;
+
+    SentNeverSendableError(const PartitionOp &op, Element sentElement,
+                           SILDynamicMergedIsolationInfo isolationRegionInfo)
+        : op(&op), sentElement(sentElement),
+          isolationRegionInfo(isolationRegionInfo) {}
+
+    SentNeverSendableError(SentNeverSendableError &&other) = default;
+    SentNeverSendableError &operator=(SentNeverSendableError &&other) = default;
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
+  };
+
+  struct AssignNeverSendableIntoSendingResultError {
+    const PartitionOp *op;
+    Element destElement;
+    SILFunctionArgument *destValue;
+    Element srcElement;
+    SILValue srcValue;
+    SILDynamicMergedIsolationInfo srcIsolationRegionInfo;
+
+    AssignNeverSendableIntoSendingResultError(
+        const PartitionOp &op, Element destElement,
+        SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
+        SILDynamicMergedIsolationInfo srcIsolationRegionInfo)
+        : op(&op), destElement(destElement), destValue(destValue),
+          srcElement(srcElement), srcValue(srcValue),
+          srcIsolationRegionInfo(srcIsolationRegionInfo) {}
+
+    AssignNeverSendableIntoSendingResultError(
+        AssignNeverSendableIntoSendingResultError &&other) = default;
+    AssignNeverSendableIntoSendingResultError &
+    operator=(AssignNeverSendableIntoSendingResultError &&other) = default;
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
+  };
+
+  struct InOutSendingNotInitializedAtExitError {
+    const PartitionOp *op;
+    Element sentElement;
+    Operand *sendingOp;
+
+    InOutSendingNotInitializedAtExitError(const PartitionOp &op, Element elt,
+                                          Operand *sendingOp)
+        : op(&op), sentElement(elt), sendingOp(sendingOp) {}
+
+    InOutSendingNotInitializedAtExitError(
+        InOutSendingNotInitializedAtExitError &&other) = default;
+    InOutSendingNotInitializedAtExitError &
+    operator=(InOutSendingNotInitializedAtExitError &&other) = default;
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
+  };
+
+  struct InOutSendingNotDisconnectedAtExitError {
+    const PartitionOp *op;
+    Element inoutSendingElement;
+    SILDynamicMergedIsolationInfo isolationInfo;
+
+    InOutSendingNotDisconnectedAtExitError(
+        const PartitionOp &op, Element elt,
+        SILDynamicMergedIsolationInfo isolation)
+        : op(&op), inoutSendingElement(elt), isolationInfo(isolation) {}
+
+    InOutSendingNotDisconnectedAtExitError(
+        InOutSendingNotDisconnectedAtExitError &&other) = default;
+    InOutSendingNotDisconnectedAtExitError &
+    operator=(InOutSendingNotDisconnectedAtExitError &&other) = default;
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
+  };
+
+  struct InOutSendingReturnedError {
+    const PartitionOp *op;
+
+    /// The 'inout sending' parameter that caused the error to be emitted.
+    Element inoutSendingElement;
+
+    /// The actual returned value. If we return the 'inout sending' parameter
+    /// then this will equal inoutSendingElement.
+    Element returnedValue;
+
+    /// If we are actor isolated due to being in the same region as the out
+    /// parameter of a actor isolated method... this is that actor isolation.
+    SILDynamicMergedIsolationInfo isolationInfo;
+
+    InOutSendingReturnedError(const PartitionOp &op,
+                              Element inoutSendingElement,
+                              Element returnedValue,
+                              SILDynamicMergedIsolationInfo isolationInfo = {})
+        : op(&op), inoutSendingElement(inoutSendingElement),
+          returnedValue(returnedValue), isolationInfo(isolationInfo) {}
+
+    InOutSendingReturnedError(const PartitionOp &op,
+                              Element inoutSendingElement,
+                              SILDynamicMergedIsolationInfo isolationInfo = {})
+        : InOutSendingReturnedError(op, inoutSendingElement,
+                                    inoutSendingElement, isolationInfo) {}
+
+    InOutSendingReturnedError(InOutSendingReturnedError &&other) = default;
+    InOutSendingReturnedError &
+    operator=(InOutSendingReturnedError &&other) = default;
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
+  };
+
+  struct InOutSendingParametersInSameRegionError {
+    const PartitionOp *op;
+    Element firstInoutSendingParam;
+    SmallVector<Element, 1> otherInOutSendingParams;
+
+    InOutSendingParametersInSameRegionError(
+        const PartitionOp &op, Element firstInoutSendingParam,
+        SmallVector<Element, 1> &&otherInOutSendingParams)
+        : op(&op), firstInoutSendingParam(firstInoutSendingParam),
+          otherInOutSendingParams(std::move(otherInOutSendingParams)) {}
+
+    InOutSendingParametersInSameRegionError(
+        InOutSendingParametersInSameRegionError &&other) = default;
+    InOutSendingParametersInSameRegionError &
+    operator=(InOutSendingParametersInSameRegionError &&other) = default;
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
+  };
+
+  struct NonSendableIsolationCrossingResultError {
+    const PartitionOp *op;
+
+    Element returnValueElement;
+
+    NonSendableIsolationCrossingResultError(const PartitionOp &op,
+                                            Element returnValue)
+        : op(&op), returnValueElement(returnValue) {}
+
+    NonSendableIsolationCrossingResultError(
+        NonSendableIsolationCrossingResultError &&other) = default;
+    NonSendableIsolationCrossingResultError &
+    operator=(NonSendableIsolationCrossingResultError &&other) = default;
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
+  };
+
+#define PARTITION_OP_ERROR(NAME)                                               \
+  static_assert(!std::is_copy_constructible_v<NAME##Error>,                    \
+                #NAME " must not be copy constructable");                      \
+  static_assert(std::is_move_constructible_v<NAME##Error>,                     \
+                #NAME " must be move constructable");                          \
+  static_assert(!std::is_copy_assignable_v<NAME##Error>,                       \
+                #NAME " must not be copy assignable");                         \
+  static_assert(std::is_move_assignable_v<NAME##Error>,                        \
+                #NAME " must be move assignable");
+#include "PartitionOpError.def"
+
+private:
+  Kind kind;
+  std::variant<
+#define PARTITION_OP_ERROR(NAME) NAME##Error,
+#include "PartitionOpError.def"
+      bool // sentinel value to avoid syntax issues.
+      >
+      data;
+
+public:
+#define PARTITION_OP_ERROR(NAME)                                               \
+  PartitionOpError(NAME##Error &&error)                                        \
+      : kind(Kind::NAME), data(std::move(error)) {}
+#include "PartitionOpError.def"
+
+  PartitionOpError(PartitionOpError &&error)
+      : kind(error.kind), data(std::move(error.data)) {
+    switch (getKind()) {
+#define PARTITION_OP_ERROR(NAME)                                               \
+  case NAME:                                                                   \
+    assert(std::holds_alternative<NAME##Error>(data) &&                        \
+           "Data has value that does not match kind?!");                       \
+    break;
+#include "PartitionOpError.def"
+    }
+  }
+
+  PartitionOpError &operator=(PartitionOpError &&error) {
+    kind = error.kind;
+    data = std::move(error.data);
+
+    switch (getKind()) {
+#define PARTITION_OP_ERROR(NAME)                                               \
+  case NAME:                                                                   \
+    assert(std::holds_alternative<NAME##Error>(data) &&                        \
+           "Data has value that does not match kind?!");                       \
+    break;
+#include "PartitionOpError.def"
+    }
+    return *this;
+  }
+
+  Kind getKind() const { return kind; }
+
+  void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+    switch (getKind()) {
+#define PARTITION_OP_ERROR(NAME)                                               \
+  case NAME:                                                                   \
+    return std::get<NAME##Error>(data).print(os, valueMap);
+#include "PartitionOpError.def"
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+    return print(llvm::dbgs(), valueMap);
+  }
+
+#define PARTITION_OP_ERROR(NAME)                                               \
+  NAME##Error get##NAME##Error() && {                                          \
+    assert(getKind() == Kind::NAME);                                           \
+    return std::get<NAME##Error>(std::move(data));                             \
+  }
+#include "PartitionOpError.def"
 };
 
 /// A data structure that applies a series of PartitionOps to a single Partition
@@ -1163,19 +1413,21 @@ private:
 public:
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
-  using TransferringOperandSetFactory =
-      Partition::TransferringOperandSetFactory;
+  using SendingOperandSetFactory = Partition::SendingOperandSetFactory;
+
+#define PARTITION_OP_ERROR(NAME)                                               \
+  using NAME##Error = PartitionOpError::NAME##Error;
+#include "PartitionOpError.def"
 
 protected:
-  TransferringOperandSetFactory &ptrSetFactory;
-  TransferringOperandToStateMap &operandToStateMap;
+  SendingOperandSetFactory &ptrSetFactory;
+  SendingOperandToStateMap &operandToStateMap;
 
   Partition &p;
 
 public:
-  PartitionOpEvaluator(Partition &p,
-                       TransferringOperandSetFactory &ptrSetFactory,
-                       TransferringOperandToStateMap &operandToStateMap)
+  PartitionOpEvaluator(Partition &p, SendingOperandSetFactory &ptrSetFactory,
+                       SendingOperandToStateMap &operandToStateMap)
       : ptrSetFactory(ptrSetFactory), operandToStateMap(operandToStateMap),
         p(p) {}
 
@@ -1184,26 +1436,8 @@ public:
     return asImpl().shouldEmitVerboseLogging();
   }
 
-  /// Call handleLocalUseAfterTransfer on our CRTP subclass.
-  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
-                                   Operand *transferringOp) const {
-    return asImpl().handleLocalUseAfterTransfer(op, elt, transferringOp);
-  }
-
-  /// Call handleTransferNonTransferrable on our CRTP subclass.
-  void
-  handleTransferNonTransferrable(const PartitionOp &op, Element elt,
-                                 SILIsolationInfo isolationRegionInfo) const {
-    return asImpl().handleTransferNonTransferrable(op, elt,
-                                                   isolationRegionInfo);
-  }
-  /// Just call our CRTP subclass.
-  void
-  handleTransferNonTransferrable(const PartitionOp &op, Element elt,
-                                 Element otherElement,
-                                 SILIsolationInfo isolationRegionInfo) const {
-    return asImpl().handleTransferNonTransferrable(op, elt, otherElement,
-                                                   isolationRegionInfo);
+  void handleError(PartitionOpError &&error) {
+    asImpl().handleError(std::move(error));
   }
 
   /// Call isActorDerived on our CRTP subclass.
@@ -1219,26 +1453,104 @@ public:
   ///
   /// The bool result is if it is captured by a closure element. That only is
   /// computed if \p sourceOp is non-null.
-  std::pair<SILIsolationInfo, bool>
+  std::optional<std::pair<SILDynamicMergedIsolationInfo, bool>>
   getIsolationRegionInfo(Region region, Operand *sourceOp) const {
     bool isClosureCapturedElt = false;
-    SILIsolationInfo isolationRegionInfo;
+    std::optional<SILDynamicMergedIsolationInfo> isolationRegionInfo =
+        SILDynamicMergedIsolationInfo();
 
     for (const auto &pair : p.range()) {
       if (pair.second == region) {
         isolationRegionInfo =
-            isolationRegionInfo.merge(getIsolationRegionInfo(pair.first));
-        if (sourceOp)
+            isolationRegionInfo->merge(getIsolationRegionInfo(pair.first));
+        if (!isolationRegionInfo)
+          return {};
+        if (sourceOp) {
           isClosureCapturedElt |= isClosureCaptured(pair.first, sourceOp);
+        }
       }
     }
 
-    return {isolationRegionInfo, isClosureCapturedElt};
+    return {{isolationRegionInfo.value(), isClosureCapturedElt}};
   }
 
   /// Overload of \p getIsolationRegionInfo without an Operand.
-  SILIsolationInfo getIsolationRegionInfo(Region region) const {
-    return getIsolationRegionInfo(region, nullptr).first;
+  SILDynamicMergedIsolationInfo getIsolationRegionInfo(Region region) const {
+    if (auto opt = getIsolationRegionInfo(region, nullptr))
+      return opt->first;
+    return SILDynamicMergedIsolationInfo();
+  }
+
+  /// If \p region is not disconnected only because of an out parameter, return
+  /// that out parameter. We do not care about other non-disconnected parameters
+  /// since we always want to prefer the return error.
+  SILValue findNonDisconnectedOutParameterInRegion(Region region) const {
+    for (const auto &pair : p.range()) {
+      if (pair.second != region)
+        continue;
+      auto info = getIsolationRegionInfo(pair.first);
+
+      // If we do not have any isolation info, then something bad
+      // happened. Return SILValue().
+      if (!info)
+        return {};
+
+      // If we have something that is disconnected... continue. We do not care
+      // about this.
+      if (info.isDisconnected())
+        continue;
+
+      // See if we ahve an indirect out parameter...
+      if (auto value = asImpl().getIndirectOutParameter(pair.first)) {
+        return value;
+      }
+
+      // If this was not an out parameter, return {}.
+      return {};
+    }
+
+    // After going over our loop, if result is not SILValue(), then we found
+    // that our region is not disconnected due only to a single 'indirect out'
+    // parameter. If SILValue() then we had all disconnected values. If we found
+    // multiple non-disconnected things, we would have bailed earlier in the
+    // loop itself.
+    return SILValue();
+  }
+
+  /// Given the region \p regionOfInOutSendingParam containing the 'inout
+  /// sending' parameter \p firstInOutSendingParam, see if that region contains
+  /// any other 'inout sending' parameters with greater element numbers than \p
+  /// firstInOutSendingParam. If so, place all of the found params into \p
+  /// foundInOutSendingParams and return true. Otherwise return false.
+  ///
+  /// DISCUSSION: The reason why we return all of the found 'inout sending'
+  /// params is at this point we do not know if any of the params have
+  /// diagnostic behavior reduction. It would not be correct if we returned the
+  /// first one and that had that its diagnostic should be ignored but later
+  /// ones did not.
+  ///
+  /// DISCUSSION: The reason why we only place in the elements that have element
+  /// numbers greater than \p firstInOutsendingParam is to ensure that we do not
+  /// emit diagnostics multiple times for the same variables, one for $VAR1,
+  /// $VAR2 and the second for $VAR2, $VAR1.
+  bool findOtherInOutSendingParameters(
+      Region regionOfInOutSendingParam, Element firstInOutSendingParam,
+      SmallVectorImpl<Element> &foundInOutSendingParams) const {
+    for (const auto &pair : p.range()) {
+      // Skip values that are not in the region or if the value is our
+      // firstInOutSendingParam.
+      if (pair.second != regionOfInOutSendingParam ||
+          pair.first <= firstInOutSendingParam)
+        continue;
+
+      auto *value = dyn_cast_or_null<SILFunctionArgument>(
+          getRepresentativeValue(pair.first).maybeGetValue());
+      if (!value || !value->isInOutSending())
+        continue;
+      foundInOutSendingParams.push_back(pair.first);
+    }
+
+    return foundInOutSendingParams.size();
   }
 
   bool isTaskIsolatedDerived(Element elt) const {
@@ -1267,8 +1579,61 @@ public:
     return Impl::getIsolationInfo(partitionOp);
   }
 
+  /// Some evaluators do not support accessing fields on their SILInstruction
+  /// since they just pass in "mocked" SILInstruction. We allow for them to just
+  /// return false for this case to prevent dereference issues.
+  static bool
+  doesParentFunctionHaveSendingResult(const PartitionOp &partitionOp) {
+    return Impl::doesFunctionHaveSendingResult(partitionOp);
+  }
+
+  std::optional<Element> getElement(SILValue value) const {
+    return asImpl().getElement(value);
+  }
+
+  SILValue getRepresentative(SILValue value) const {
+    return asImpl().getRepresentative(value);
+  }
+
+  RepresentativeValue getRepresentativeValue(Element element) const {
+    return asImpl().getRepresentativeValue(element);
+  }
+
+  /// See if we are assigning an a non-disconnected value into a 'out
+  /// sending' parameter. In such a case, we emit a diagnostic.
+  ///
+  /// Helper used to handle assignment into sending results in the context of
+  /// assigns or merges.
+  void handleAssignNonDisconnectedIntoSendingResult(const PartitionOp &op) {
+    if (!doesParentFunctionHaveSendingResult(op))
+      return;
+
+    auto instance = getRepresentativeValue(op.getOpArg1());
+    if (!instance)
+      return;
+
+    auto *fArg =
+        dyn_cast_or_null<SILFunctionArgument>(instance.maybeGetValue());
+    if (!fArg || !fArg->getArgumentConvention().isIndirectOutParameter())
+      return;
+
+    auto staticRegionIsolation = getIsolationRegionInfo(op.getOpArg2());
+    Region srcRegion = p.getRegion(op.getOpArg2());
+    auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
+
+    // We can unconditionally getValue here since we can never
+    // assign an actor introducing inst.
+    auto rep = getRepresentativeValue(op.getOpArg2()).getValue();
+    if (dynamicRegionIsolation.isDisconnected() ||
+        staticRegionIsolation.isUnsafeNonIsolated())
+      return;
+
+    handleError(AssignNeverSendableIntoSendingResultError(
+        op, op.getOpArg1(), fArg, op.getOpArg2(), rep, dynamicRegionIsolation));
+  }
+
   /// Apply \p op to the partition op.
-  void apply(const PartitionOp &op) const {
+  void apply(const PartitionOp &op) {
     if (shouldEmitVerboseLogging()) {
       REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Applying: ";
                                        op.print(llvm::dbgs()));
@@ -1290,127 +1655,286 @@ public:
     p.pushHistorySequenceBoundary(loc);
 
     switch (op.getKind()) {
-    case PartitionOpKind::Assign:
-      assert(op.getOpArgs().size() == 2 &&
-             "Assign PartitionOp should be passed 2 arguments");
-      assert(p.isTrackingElement(op.getOpArgs()[1]) &&
+    case PartitionOpKind::AssignDirect: {
+      assert(p.isTrackingElement(op.getOpArg2()) &&
              "Assign PartitionOp's source argument should be already tracked");
-      // If we are using a region that was transferred as our assignment source
-      // value... emit an error.
-      if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[1])) {
-        for (auto transferredOperand : transferredOperandSet->data()) {
-          handleLocalUseAfterTransferHelper(op, op.getOpArgs()[1],
-                                            transferredOperand);
-        }
-      }
-      p.assignElement(op.getOpArgs()[0], op.getOpArgs()[1]);
-      return;
-    case PartitionOpKind::AssignFresh:
-      assert(op.getOpArgs().size() == 1 &&
-             "AssignFresh PartitionOp should be passed 1 argument");
 
-      p.trackNewElement(op.getOpArgs()[0]);
+      // First emit any errors if we are assigning a non-disconnected thing into
+      // a sending result.
+      handleAssignNonDisconnectedIntoSendingResult(op);
+
+      // Then perform the actual assignment.
+      //
+      // NOTE: This does not emit any errors on purpose. We rely on requires and
+      // other instructions to emit errors.
+      p.assignElement(op.getOpArg1(), op.getOpArg2());
       return;
-    case PartitionOpKind::Transfer: {
-      // NOTE: We purposely do not check here if a transferred value is already
-      // transferred. Callers are expected to put a require for that
-      // purpose. This ensures that if we pass the same argument multiple times
-      // to the same transferring function as weakly transferred arguments, we
-      // do not get an error.
-      assert(op.getOpArgs().size() == 1 &&
-             "Transfer PartitionOp should be passed 1 argument");
-      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
-             "Transfer PartitionOp's argument should already be tracked");
+    }
+    case PartitionOpKind::AssignIndirect: {
+      assert(p.isTrackingElement(op.getOpArg1()) &&
+             "Assign PartitionOp's dest argument should be already tracked");
+      assert(p.isTrackingElement(op.getOpArg2()) &&
+             "Assign PartitionOp's source argument should be already tracked");
+
+      // First emit any errors if we are assigning a non-disconnected thing into
+      // a sending result.
+      handleAssignNonDisconnectedIntoSendingResult(op);
+
+      // Create extra region for our dest and merge it into dest's region.
+      p.trackNewElement(op.getOpArg3());
+      p.merge(op.getOpArg1(), op.getOpArg3());
+
+      // Then perform the actual assignment.
+      //
+      // NOTE: This does not emit any errors on purpose. We rely on requires and
+      // other instructions to emit errors.
+      p.assignElement(op.getOpArg1(), op.getOpArg2());
+      return;
+    }
+    case PartitionOpKind::AssignFresh: {
+      p.trackNewElement(op.getOpArg1());
+      return;
+    }
+    case PartitionOpKind::Send: {
+      // NOTE: We purposely do not check here if the value has already been
+      // sent. Callers are expected to put a require for that purpose. This
+      // ensures that if we pass the same argument multiple times to the same
+      // sending function as weakly sent arguments, we do not get an
+      // error.
+      assert(p.isTrackingElement(op.getOpArg1()) &&
+             "Send PartitionOp's argument should already be tracked");
+
+      // Before we do any further work, see if we have a nonisolated(unsafe)
+      // element. In such a case, this is also not a real send point.
+      Element sentElement = op.getOpArg1();
+      if (getIsolationRegionInfo(sentElement).isUnsafeNonIsolated()) {
+        return;
+      }
 
       // Otherwise, we need to merge our isolation region info with the
       // isolation region info of everything else in our region. This is the
       // dynamic isolation region info found by the dataflow.
-      Element transferredElement = op.getOpArgs()[0];
-      Region transferredRegion = p.getRegion(transferredElement);
-      bool isClosureCapturedElt = false;
-      SILIsolationInfo transferredRegionIsolation;
-      std::tie(transferredRegionIsolation, isClosureCapturedElt) =
-          getIsolationRegionInfo(transferredRegion, op.getSourceOp());
+      Region sentRegion = p.getRegion(sentElement);
+      bool regionHasClosureCapturedElt = false;
+      SILDynamicMergedIsolationInfo sentRegionIsolation;
 
-      // Before we do anything, see if our dynamic isolation kind is the same as
-      // the isolation info for our partition op. If they match, this is not a
-      // real transfer operation.
-      //
-      // DISCUSSION: We couldn't not emit this earlier since we needed the
-      // dynamic isolation info of our value.
-      if (auto calleeIsolationInfo = getIsolationInfo(op)) {
-        if (transferredRegionIsolation.hasSameIsolation(calleeIsolationInfo)) {
+      // TODO: Today we only return the first element in our region that has
+      // some form of isolation. This causes us to in the case of sending
+      // partial_applies to only emit a diagnostic for the first element in the
+      // capture list of the partial_apply. If we returned a list of potential
+      // errors... we could emit the error for each capture individually.
+      auto pairOpt = getIsolationRegionInfo(sentRegion, op.getSourceOp());
+      if (!pairOpt) {
+        return handleError(UnknownCodePatternError(op));
+      }
+      std::tie(sentRegionIsolation, regionHasClosureCapturedElt) = *pairOpt;
+
+      auto calleeIsolationInfo = getIsolationInfo(op);
+
+      // If our callee and region are both actor isolated and part of the same
+      // isolation domain, do not treat this as a send.
+      if (calleeIsolationInfo.isActorIsolated() &&
+          sentRegionIsolation.hasSameIsolation(calleeIsolationInfo))
+        return;
+
+      // At this point, check if our sent value is not disconnected. If so, emit
+      // a sent never sendable helper.
+      if (sentRegionIsolation && !sentRegionIsolation.isDisconnected()) {
+        return handleSendNeverSentHelper(op, op.getOpArg1(), sentRegionIsolation);
+      }
+
+      // Next see if we are disconnected and have the same isolation. In such a
+      // case, if we are not marked explicitly as sending, we do not send
+      // since the disconnected value is allowed to be resued after we
+      // return. If we are passed as a sending parameter, we cannot do this.
+      if (auto *sourceInst = Impl::getSourceInst(op)) {
+        if (auto fas = FullApplySite::isa(sourceInst);
+            (!fas || !fas.isSending(*op.getSourceOp())) &&
+            sentRegionIsolation.isDisconnected() && calleeIsolationInfo &&
+            sentRegionIsolation.hasSameIsolation(calleeIsolationInfo))
           return;
-        }
       }
 
-      // If we merged anything, we need to handle a transfer
-      // non-transferrable. We pass in the dynamic isolation region info of our
-      // region.
-      if (bool(transferredRegionIsolation) &&
-          !transferredRegionIsolation.isDisconnected()) {
-        return handleTransferNonTransferrable(op, op.getOpArgs()[0],
-                                              transferredRegionIsolation);
+      // Mark op.getOpArg1() as sent.
+      SendingOperandState &state = operandToStateMap.get(op.getSourceOp());
+      state.isClosureCaptured |= regionHasClosureCapturedElt;
+      if (auto newInfo = state.isolationInfo.merge(sentRegionIsolation)) {
+        state.isolationInfo = *newInfo;
+      } else {
+        handleError(UnknownCodePatternError(op));
       }
-
-      // Mark op.getOpArgs()[0] as transferred.
-      TransferringOperandState &state = operandToStateMap.get(op.getSourceOp());
-      state.isClosureCaptured |= isClosureCapturedElt;
-      state.isolationInfo =
-          state.isolationInfo.merge(transferredRegionIsolation);
       assert(state.isolationInfo && "Cannot have unknown");
       state.isolationHistory.pushCFGHistoryJoin(p.getIsolationHistory());
       auto *ptrSet = ptrSetFactory.get(op.getSourceOp());
-      p.markTransferred(op.getOpArgs()[0], ptrSet);
+      p.markSent(op.getOpArg1(), ptrSet);
       return;
     }
-    case PartitionOpKind::UndoTransfer: {
-      assert(op.getOpArgs().size() == 1 &&
-             "UndoTransfer PartitionOp should be passed 1 argument");
-      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
-             "UndoTransfer PartitionOp's argument should already be tracked");
+    case PartitionOpKind::UndoSend: {
+      assert(p.isTrackingElement(op.getOpArg1()) &&
+             "UndoSend PartitionOp's argument should already be tracked");
 
-      // Mark op.getOpArgs()[0] as not transferred.
-      p.undoTransfer(op.getOpArgs()[0]);
+      // Mark op.getOpArg1() as not sent.
+      p.undoSend(op.getOpArg1());
       return;
     }
-    case PartitionOpKind::Merge:
-      assert(op.getOpArgs().size() == 2 &&
-             "Merge PartitionOp should be passed 2 arguments");
-      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
-             p.isTrackingElement(op.getOpArgs()[1]) &&
+    case PartitionOpKind::Merge: {
+      assert(p.isTrackingElement(op.getOpArg1()) &&
+             p.isTrackingElement(op.getOpArg2()) &&
              "Merge PartitionOp's arguments should already be tracked");
 
-      // if attempting to merge a transferred region, handle the failure
-      if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
-        for (auto transferredOperand : transferredOperandSet->data()) {
-          handleLocalUseAfterTransferHelper(op, op.getOpArgs()[0],
-                                            transferredOperand);
-        }
-      }
-      if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[1])) {
-        for (auto transferredOperand : transferredOperandSet->data()) {
-          handleLocalUseAfterTransferHelper(op, op.getOpArgs()[1],
-                                            transferredOperand);
-        }
-      }
+      // Emit an error if we are assigning a non-disconnected thing into a
+      // sending result.
+      handleAssignNonDisconnectedIntoSendingResult(op);
 
-      p.merge(op.getOpArgs()[0], op.getOpArgs()[1]);
-      return;
-    case PartitionOpKind::Require:
-      assert(op.getOpArgs().size() == 1 &&
-             "Require PartitionOp should be passed 1 argument");
-      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
-             "Require PartitionOp's argument should already be tracked");
-      if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
-        for (auto transferredOperand : transferredOperandSet->data()) {
-          handleLocalUseAfterTransferHelper(op, op.getOpArgs()[0],
-                                            transferredOperand);
-        }
-      }
+      // Then perform the actual merge.
+      //
+      // NOTE: This does not emit any errors on purpose. We rely on requires and
+      // other instructions to emit errors.
+      p.merge(op.getOpArg1(), op.getOpArg2());
       return;
     }
+    case PartitionOpKind::Require:
+      assert(p.isTrackingElement(op.getOpArg1()) &&
+             "Require PartitionOp's argument should already be tracked");
+      if (auto *sentOperandSet = p.getSentOperandSet(op.getOpArg1())) {
+        for (auto sentOperand : sentOperandSet->data()) {
+          handleLocalUseAfterSendHelper(op, op.getOpArg1(), sentOperand);
+        }
+      }
+      return;
+    case PartitionOpKind::InOutSendingAtFunctionExit: {
+      assert(p.isTrackingElement(op.getOpArg1()) &&
+             "Require PartitionOp's argument should already be tracked");
 
+      // First check if the region of our 'inout sending' element has been
+      // sent. In that case, we emit a special use after free error so that the
+      // user knows that they need to reinitialize the 'inout sending'
+      // parameter.
+      if (auto *sentOperandSet = p.getSentOperandSet(op.getOpArg1())) {
+        for (auto sentOperand : sentOperandSet->data()) {
+          handleError(InOutSendingNotInitializedAtExitError(op, op.getOpArg1(),
+                                                            sentOperand));
+        }
+        return;
+      }
+
+      // If we were not sent, check if our region is not disconnected. If so,
+      // error since we need a disconnected value in the inout parameter.
+      Region inoutSendingRegion = p.getRegion(op.getOpArg1());
+      auto dynamicRegionIsolation = getIsolationRegionInfo(inoutSendingRegion);
+
+      // If we failed to merge emit an unknown pattern error so we fail.
+      if (!dynamicRegionIsolation) {
+        handleError(UnknownCodePatternError(op));
+        return;
+      }
+
+      auto handleDirectReturn = [&]() -> bool {
+        bool emittedDiagnostic = false;
+
+        // For each value we are returning...
+        for (auto value : op.getSourceInst()->getOperandValues()) {
+          // Find its element and check if that element is in the same region as
+          // our inout sending param...
+          auto elt = asImpl().getElement(value);
+          if (!elt || inoutSendingRegion != p.getRegion(*elt))
+            continue;
+
+          emittedDiagnostic = true;
+          // Then check if our element is the same as our inoutSendingParam. In
+          // that case, we emit a special error that only refers to the
+          // inoutSendingParam as one entity.
+          //
+          // NOTE: This is taking advantage of us looking through loads when
+          // determining element identity. When that changes, this code will
+          // need to be updated to look through loads.
+          if (*elt == op.getOpArg1()) {
+            handleError(InOutSendingReturnedError(op, op.getOpArg1(),
+                                                  dynamicRegionIsolation));
+            continue;
+          }
+
+          // Otherwise, we need to refer to a different value in the same region
+          // as the 'inout sending' parameter. Emit a special error. For that.
+          handleError(InOutSendingReturnedError(op, op.getOpArg1(), *elt,
+                                                dynamicRegionIsolation));
+        }
+
+        return emittedDiagnostic;
+      };
+
+      // Then check if our region isolated value is not disconnected...
+      if (!dynamicRegionIsolation.isDisconnected()) {
+        // Before we emit the more general "inout sending" not disconnected at
+        // exit error... check if our dynamic region isolation is not
+        // disconnected since it is in the same region an out parameter. In that
+        // case we want to emit a special 'cannot return value' error.
+        if (auto outParam =
+                findNonDisconnectedOutParameterInRegion(inoutSendingRegion)) {
+          handleError(InOutSendingReturnedError(op, op.getOpArg1(),
+                                                getElement(outParam).value(),
+                                                dynamicRegionIsolation));
+          return;
+        }
+
+        // If we did not have an out parameter, see if we are returning a
+        // value that is in the region as our 'inout sending' parameter.
+        if (handleDirectReturn())
+          return;
+
+        // Otherwise, we emit the normal not disconnected at exit error.
+        handleError(InOutSendingNotDisconnectedAtExitError(
+            op, op.getOpArg1(), dynamicRegionIsolation));
+        return;
+      }
+
+      // Ok, we have a disconnected value. First check if we have two 'inout
+      // sending' values in the same region. We want the two values to still be
+      // in different regions in the caller.
+      SmallVector<Element, 1> foundInOutSendingElts;
+      if (findOtherInOutSendingParameters(inoutSendingRegion, op.getOpArg1(),
+                                          foundInOutSendingElts)) {
+        handleError(InOutSendingParametersInSameRegionError(
+            op, op.getOpArg1(), std::move(foundInOutSendingElts)));
+        return;
+      }
+
+      // Finally We could still be returning a disconnected value in the same
+      // region as an 'inout sending' parameter. We cannot allow that since the
+      // caller considers 'inout sending' values to be in their own region on
+      // function return. So it would assume that it could potentially send the
+      // value in the 'inout sending' parameter and the return value to
+      // different isolation domains... allowing for races.
+
+      // Even though we are disconnected, see if our SILFunction has an actor
+      // isolation. In that case, we want to use that since the direct return
+      // value will be inferred in the caller to have that isolation.
+      if (auto isolation = SILIsolationInfo::getFunctionIsolation(
+              op.getSourceInst()->getFunction())) {
+        dynamicRegionIsolation = {isolation};
+      }
+
+      handleDirectReturn();
+      return;
+    }
+    case PartitionOpKind::UnknownPatternError:
+      // Begin tracking the specified element in case we have a later use.
+      p.trackNewElement(op.getOpArg1());
+
+      // Then emit an unknown code pattern error.
+      return handleError(UnknownCodePatternError(op));
+    case PartitionOpKind::NonSendableIsolationCrossingResult: {
+      // Then emit the error.
+      return handleError(
+          NonSendableIsolationCrossingResultError(op, op.getOpArg1()));
+    }
+    case PartitionOpKind::AssignFreshAssign:
+      assert(p.isTrackingElement(op.getOpArg2()) &&
+             "Source argument should be already tracked");
+      p.trackNewElement(op.getOpArg1());
+      p.assignElement(op.getOpArg1(), op.getOpArg2());
+      return;
+    }
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
@@ -1428,32 +1952,131 @@ public:
   }
 
 private:
-  // Private helper that squelches the error if our transfer instruction and our
-  // use have the same isolation.
-  void handleLocalUseAfterTransferHelper(const PartitionOp &op, Element elt,
-                                         Operand *transferringOp) const {
+  /// To work around not having isolation in interface types, the type checker
+  /// inserts casts and other AST nodes that are used to enrich the AST with
+  /// isolation information. This results in Sendable functions being
+  /// wrapped/converted/etc in ways that hide the Sendability. This helper looks
+  /// through these conversions/wrappers/thunks to see if the original
+  /// underlying function is Sendable.
+  ///
+  /// The two ways this can happen is that we either get an actual function_ref
+  /// that is Sendable or we get a convert function with a Sendable operand.
+  bool isHiddenSendableFunctionType(SILValue equivalenceClassRep) const {
+    SILValue valueToTest = equivalenceClassRep;
+    while (true) {
+      if (auto *pai = dyn_cast<PartialApplyInst>(valueToTest)) {
+        if (auto *calleeFunction = pai->getCalleeFunction()) {
+          if (pai->getNumArguments() >= 1 &&
+              pai->getArgument(0)->getType().isFunction() &&
+              calleeFunction->isThunk()) {
+            valueToTest = pai->getArgument(0);
+            continue;
+          }
+
+          if (calleeFunction->getLoweredFunctionType()->isSendable())
+            return true;
+        }
+      }
+
+      if (auto *i = dyn_cast<ThinToThickFunctionInst>(valueToTest)) {
+        valueToTest = i->getOperand();
+        continue;
+      }
+      if (auto *i = dyn_cast<ConvertEscapeToNoEscapeInst>(valueToTest)) {
+        valueToTest = i->getOperand();
+        continue;
+      }
+      break;
+    }
+
+    if (auto *fn = dyn_cast<FunctionRefInst>(valueToTest))
+      return fn->getReferencedFunction()->getLoweredFunctionType()->isSendable();
+
+    auto *cvi = dyn_cast<ConvertFunctionInst>(valueToTest);
+    if (!cvi)
+      return false;
+
+    return cvi->getOperand()->getType().isSendable(
+        equivalenceClassRep->getFunction());
+  }
+
+  // Private helper that squelches the error if our send instruction and our use
+  // have the same isolation.
+  void handleLocalUseAfterSendHelper(const PartitionOp &op, Element elt,
+                                     Operand *sentOp) {
     if (shouldTryToSquelchErrors()) {
-      if (auto isolationInfo = getIsolationInfo(op)) {
-        if (isolationInfo.isActorIsolated() &&
-            isolationInfo.hasSameIsolation(
-                SILIsolationInfo::get(transferringOp->getUser())))
+      if (SILValue equivalenceClassRep = getRepresentative(sentOp->get())) {
+
+        // If we have a temporary that is initialized with an unsafe nonisolated
+        // value... squelch the error like if we were that value.
+        //
+        // TODO: This goes away with opaque values.
+        if (auto *asi = dyn_cast<AllocStackInst>(equivalenceClassRep)) {
+          if (SILValue value = getInitOfTemporaryAllocStack(asi)) {
+            if (auto elt = getElement(value)) {
+              SILIsolationInfo eltIsolationInfo = getIsolationRegionInfo(*elt);
+              if (eltIsolationInfo.isUnsafeNonIsolated()) {
+                return;
+              }
+            }
+          }
+        }
+
+        // See if we have a convert function from a `@Sendable` type. In this
+        // case, we want to squelch the error.
+        if (isHiddenSendableFunctionType(equivalenceClassRep))
           return;
       }
 
       // If our instruction does not have any isolation info associated with it,
       // it must be nonisolated. See if our function has a matching isolation to
-      // our transferring operand. If so, we can squelch this.
+      // our sent operand. If so, we can squelch this.
       if (auto functionIsolation =
-              transferringOp->getUser()->getFunction()->getActorIsolation()) {
-        if (functionIsolation.isActorIsolated() &&
-            SILIsolationInfo::get(transferringOp->getUser())
-                .hasSameIsolation(functionIsolation))
+              sentOp->getUser()->getFunction()->getActorIsolation()) {
+        if (functionIsolation->isActorIsolated() &&
+            SILIsolationInfo::get(sentOp->getUser())
+                .hasSameIsolation(*functionIsolation))
           return;
       }
     }
 
     // Ok, we actually need to emit a call to the callback.
-    return handleLocalUseAfterTransfer(op, elt, transferringOp);
+    return handleError(LocalUseAfterSendError(op, elt, sentOp));
+  }
+
+  // Private helper that squelches the error if our send instruction and our
+  // use have the same isolation.
+  void handleSendNeverSentHelper(
+      const PartitionOp &op, Element elt,
+      SILDynamicMergedIsolationInfo dynamicMergedIsolationInfo) {
+    if (shouldTryToSquelchErrors()) {
+      if (SILValue equivalenceClassRep =
+              getRepresentative(op.getSourceOp()->get())) {
+        // If we have a temporary that is initialized with an unsafe nonisolated
+        // value... squelch the error like if we were that value.
+        //
+        // TODO: This goes away with opaque values.
+        if (auto *asi = dyn_cast<AllocStackInst>(equivalenceClassRep)) {
+          if (SILValue value = getInitOfTemporaryAllocStack(asi)) {
+            if (auto elt = getElement(value)) {
+              SILIsolationInfo eltIsolationInfo = getIsolationRegionInfo(*elt);
+              if (eltIsolationInfo.isUnsafeNonIsolated()) {
+                return;
+              }
+            }
+          }
+        }
+
+        // See if we have a convert function from a `@Sendable` type. In this
+        // case, we want to squelch the error.
+        if (isHiddenSendableFunctionType(equivalenceClassRep))
+          return;
+      }
+    }
+
+    // Ok, we actually need to emit a call to the callback.
+    return handleError(
+        SentNeverSendableError(op, elt, dynamicMergedIsolationInfo));
   }
 };
 
@@ -1464,57 +2087,55 @@ template <typename Subclass>
 struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
-  using TransferringOperandSetFactory =
-      Partition::TransferringOperandSetFactory;
+  using SendingOperandSetFactory = Partition::SendingOperandSetFactory;
   using Super = PartitionOpEvaluator<Subclass>;
 
   PartitionOpEvaluatorBaseImpl(Partition &workingPartition,
-                               TransferringOperandSetFactory &ptrSetFactory,
-                               TransferringOperandToStateMap &operandToStateMap)
+                               SendingOperandSetFactory &ptrSetFactory,
+                               SendingOperandToStateMap &operandToStateMap)
       : Super(workingPartition, ptrSetFactory, operandToStateMap) {}
 
   /// Should we emit extra verbose logging statements when evaluating
   /// PartitionOps.
   bool shouldEmitVerboseLogging() const { return true; }
 
-  /// A function called if we discover a transferred value was used after it
-  /// was transferred.
-  ///
-  /// The arguments passed to the closure are:
-  ///
-  /// 1. The PartitionOp that required the element to be alive.
-  ///
-  /// 2. The element in the PartitionOp that was asked to be alive.
-  ///
-  /// 3. The operand of the instruction that originally transferred the
-  /// region. Can be used to get the immediate value transferred or the
-  /// transferring instruction.
-  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
-                                   Operand *transferringOp) const {}
-
-  /// This is called if we detect a never transferred element that was passed to
-  /// a transfer instruction.
-  void handleTransferNonTransferrable(const PartitionOp &op, Element elt,
-                                      SILIsolationInfo regionInfo) const {}
-
-  void
-  handleTransferNonTransferrable(const PartitionOp &op, Element elt,
-                                 Element otherElement,
-                                 SILIsolationInfo isolationRegionInfo) const {}
-
   /// This is used to determine if an element is actor derived. If we determine
-  /// that a region containing such an element is transferred, we emit an error
-  /// since actor regions cannot be transferred.
+  /// that a region containing such an element is sent, we emit an error since
+  /// actor regions cannot be sent.
   bool isActorDerived(Element elt) const { return false; }
 
   /// This is used to determine if an element is in the same region as a task
   /// isolated value.
   bool isTaskIsolatedDerived(Element elt) const { return false; }
 
+  /// If \p elt maps to a representative that is an indirect out parameter,
+  /// return that value.
+  SILValue getIndirectOutParameter(Element elt) const { return {}; }
+
+  /// If \p elt maps to a representative that is an 'inout sending' parameter
+  /// that returns that value.
+  SILValue getInOutSendingParameter(Element elt) const { return {}; }
+
+  /// By default, do nothing upon error.
+  void handleError(PartitionOpError &&error) {}
+
   /// Returns the information about \p elt's isolation that we ascertained from
   /// SIL and the AST.
   SILIsolationInfo getIsolationRegionInfo(Element elt) const {
     return SILIsolationInfo();
+  }
+
+  /// If we are able to, return the element associated with \p value. If
+  /// unsupported, returns none.
+  std::optional<Element> getElement(SILValue value) const { return {}; }
+
+  /// If supported, returns the representative in \p value's equivalence
+  /// class. Returns an empty SILValue if this is unsupported or if it does not
+  /// have one.
+  SILValue getRepresentative(SILValue value) const { return SILValue(); }
+
+  RepresentativeValue getRepresentativeValue(Element element) const {
+    return RepresentativeValue();
   }
 
   /// Check if the representative value of \p elt is closure captured at \p
@@ -1531,8 +2152,17 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
 
   static SILLocation getLoc(SILInstruction *inst) { return inst->getLoc(); }
   static SILLocation getLoc(Operand *op) { return op->getUser()->getLoc(); }
+  static SILInstruction *getSourceInst(const PartitionOp &partitionOp) {
+    return partitionOp.getSourceInst();
+  }
   static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
     return SILIsolationInfo::get(partitionOp.getSourceInst());
+  }
+  static bool doesFunctionHaveSendingResult(const PartitionOp &partitionOp) {
+    return partitionOp.getSourceInst()
+        ->getFunction()
+        ->getLoweredFunctionType()
+        ->hasSendingResult();
   }
 };
 
@@ -1541,12 +2171,44 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
 struct PartitionOpEvaluatorBasic final
     : PartitionOpEvaluatorBaseImpl<PartitionOpEvaluatorBasic> {
   PartitionOpEvaluatorBasic(Partition &workingPartition,
-                            TransferringOperandSetFactory &ptrSetFactory,
-                            TransferringOperandToStateMap &operandToStateMap)
+                            SendingOperandSetFactory &ptrSetFactory,
+                            SendingOperandToStateMap &operandToStateMap)
       : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory,
                                      operandToStateMap) {}
 };
 
 } // namespace swift
+
+namespace llvm {
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const swift::RepresentativeValue &value) {
+  value.print(os);
+  return os;
+}
+
+template <>
+struct DenseMapInfo<swift::RepresentativeValue> {
+  using RepresentativeValue = swift::RepresentativeValue;
+  using InnerType = RepresentativeValue::InnerType;
+  using InnerDenseMapInfo = DenseMapInfo<InnerType>;
+
+  static RepresentativeValue getEmptyKey() {
+    return RepresentativeValue(InnerDenseMapInfo::getEmptyKey());
+  }
+  static RepresentativeValue getTombstoneKey() {
+    return RepresentativeValue(InnerDenseMapInfo::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(RepresentativeValue value) {
+    return InnerDenseMapInfo::getHashValue(value.value);
+  }
+
+  static bool isEqual(RepresentativeValue LHS, RepresentativeValue RHS) {
+    return InnerDenseMapInfo::isEqual(LHS.value, RHS.value);
+  }
+};
+
+} // namespace llvm
 
 #endif // SWIFT_PARTITIONUTILS_H

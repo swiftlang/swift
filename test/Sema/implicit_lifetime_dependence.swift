@@ -1,16 +1,18 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Lifetimes
+
+// REQUIRES: swift_feature_Lifetimes
 
 struct BufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeRawBufferPointer?
   let c: Int
-  init(_ ptr: UnsafeRawBufferPointer?, _ c: Int) -> dependsOn(ptr) Self {
+  @_lifetime(borrow ptr)
+  init(_ ptr: UnsafeRawBufferPointer?, _ c: Int) {
     self.ptr = ptr
     self.c = c
   }
 }
 
-struct ImplicitInit1 : ~Escapable { // expected-error{{cannot infer lifetime dependence on implicit initializer, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
+struct ImplicitInit1 : ~Escapable {
   let ptr: UnsafeRawBufferPointer
 }
 
@@ -18,20 +20,21 @@ struct ImplicitInit2 : ~Escapable, ~Copyable {
   let mbv: BufferView
 }
 
-struct ImplicitInit3 : ~Escapable, ~Copyable { // expected-error{{cannot infer lifetime dependence on implicit initializer, multiple parameters qualifiy as a candidate}}
+struct ImplicitInit3 : ~Escapable, ~Copyable {
   let mbv1: BufferView
   let mbv2: BufferView
 }
 
-func foo1() -> BufferView { // expected-error{{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
+func foo1() -> BufferView { // expected-error{{a function with a ~Escapable result needs a parameter to depend on}}
+  // expected-note@-1{{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
   return BufferView(nil, 0)
 }
 
-func foo2(_ i: borrowing Int) -> BufferView { // expected-error{{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
+func foo2(_ i: borrowing Int) -> BufferView {
   return BufferView(nil, 0)
 }
 
-func foo3<T: BitwiseCopyable>(arg: borrowing T) -> BufferView { // expected-error{{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
+func foo3<T: BitwiseCopyable>(arg: borrowing T) -> BufferView {
   return BufferView(nil, 0)
 }
 

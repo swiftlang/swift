@@ -53,7 +53,10 @@ public:
                              AbstractStorageDecl *Decl,
                              std::optional<KeyPathPatternComponent> Component);
 
-  bool isNotSerialized() const { return SerializedKind_t(Serialized) == IsNotSerialized; }
+  bool isAnySerialized() const {
+    return SerializedKind_t(Serialized) == IsSerialized ||
+           SerializedKind_t(Serialized) == IsSerializedForPackage;
+  }
   SerializedKind_t getSerializedKind() const {
     return SerializedKind_t(Serialized);
   }
@@ -67,6 +70,8 @@ public:
   const std::optional<KeyPathPatternComponent> &getComponent() const {
     return Component;
   }
+
+  CanType getBaseType() const;
 
   void print(SILPrintContext &Ctx) const;
   void dump() const;

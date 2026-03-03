@@ -7,9 +7,9 @@ class MyClass {}
 public func f() {
   var object: MyClass
   // CHECK: %[[OBJ:.*]] = alloca ptr, align
-  // CHECK: call void @llvm.dbg.declare(metadata ptr %[[OBJ]],
+  // CHECK: #dbg_declare(ptr %[[OBJ]],
   // CHECK: void @llvm.memset.{{.*}}(ptr align {{(4|8)}} %[[OBJ]], i8 0,
-  // CHECK-SAME:                    ){{$}}
+  // CHECK-SAME:                    ), !Swift.isSwiftLLDBpreinit
   // OPT-NOT: @llvm.memset
   // OPT: ret
 }
@@ -19,9 +19,9 @@ public func f() {
 public func g() {
   var dict: Dictionary<Int64, Int64>
   // CHECK: %[[DICT:.*]] = alloca
-  // CHECK: call void @llvm.dbg.declare(metadata ptr %[[DICT]],
+  // CHECK: #dbg_declare(ptr %[[DICT]],
   // CHECK: void @llvm.memset.{{.*}}(ptr align {{(4|8)}} %[[DICT]], i8 0,
-  // CHECK-SAME:                    ){{$}}
+  // CHECK-SAME:                    ), !Swift.isSwiftLLDBpreinit
   // OPT-NOT: @llvm.memset
   // OPT: ret
 }

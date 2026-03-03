@@ -5,7 +5,7 @@
 @available(SwiftStdlib 5.1, *)
 @_spi(Foo)
 @globalActor
-public struct SPIGA { // expected-note {{type declared here}}
+public struct SPIGA { // expected-note {{struct declared here}}
   public actor Actor {}
   public static let shared = Actor()
 }

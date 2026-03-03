@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -344,7 +344,7 @@
 ///     } else {
 ///         print("No glyphs found!")
 ///     }
-///     // Prints "The 'star' image is a glyph.")
+///     // Prints "The 'star' image is a glyph."
 ///
 /// Note that in this example, `imagePaths` is subscripted using a dictionary
 /// index. Unlike the key-based subscript, the index-based subscript returns
@@ -481,15 +481,7 @@ public struct Dictionary<Key: Hashable, Value> {
     }
     var native = _NativeDictionary<Key, Value>(
       capacity: keysAndValues.underestimatedCount)
-    // '_MergeError.keyCollision' is caught and handled with an appropriate
-    // error message one level down, inside native.merge(_:...). We throw an
-    // error instead of calling fatalError() directly because we want the
-    // message to include the duplicate key, and the closure only has access to
-    // the conflicting values.
-    try! native.merge(
-      keysAndValues,
-      isUnique: true,
-      uniquingKeysWith: { _, _ in throw _MergeError.keyCollision })
+    native.merge(trappingOnDuplicates: keysAndValues)
     self.init(_native: native)
   }
 
@@ -523,16 +515,36 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   - combine: A closure that is called with the values for any duplicate
   ///     keys that are encountered. The closure returns the desired value for
   ///     the final dictionary.
-  @inlinable
-  public init<S: Sequence>(
+  @_alwaysEmitIntoClient
+  public init<S: Sequence, E: Error>(
     _ keysAndValues: __owned S,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Element == (Key, Value) {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where S.Element == (Key, Value) {
     var native = _NativeDictionary<Key, Value>(
       capacity: keysAndValues.underestimatedCount)
     try native.merge(keysAndValues, isUnique: true, uniquingKeysWith: combine)
     self.init(_native: native)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of init, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    init<S: Sequence>(
+      _ keysAndValues: __owned S,
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) throws where S.Element == (Key, Value)
+  )
+  @usableFromInline
+  internal init<S: Sequence>(
+    __rethrows_keysAndValues keysAndValues: __owned S,
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) throws where S.Element == (Key, Value) {
+    try self.init(keysAndValues, uniquingKeysWith: combine)
+  }
+#endif
 
   /// Creates a new dictionary whose keys are the groupings returned by the
   /// given closure and whose values are arrays of the elements that returned
@@ -556,13 +568,33 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   - values: A sequence of values to group into a dictionary.
   ///   - keyForValue: A closure that returns a key for each element in
   ///     `values`.
-  @inlinable
-  public init<S: Sequence>(
+  @_alwaysEmitIntoClient
+  public init<S: Sequence, E: Error>(
     grouping values: __owned S,
-    by keyForValue: (S.Element) throws -> Key
-  ) rethrows where Value == [S.Element] {
+    by keyForValue: (S.Element) throws(E) -> Key
+  ) throws(E) where Value == [S.Element] {
     try self.init(_native: _NativeDictionary(grouping: values, by: keyForValue))
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of init, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    init<S: Sequence>(
+      grouping values: __owned S,
+      by keyForValue: (S.Element) throws -> Key
+    ) throws where Value == [S.Element]
+  )
+  @usableFromInline
+  internal init<S: Sequence>(
+    __rethrows_grouping values: __owned S,
+    by keyForValue: (S.Element) throws -> Key
+  ) throws where Value == [S.Element] {
+    try self.init(grouping: values, by: keyForValue)
+  }
+#endif
 }
 
 //
@@ -604,11 +636,11 @@ extension Dictionary {
   ///   argument and returns a Boolean value indicating whether the pair
   ///   should be included in the returned dictionary.
   /// - Returns: A dictionary of the key-value pairs that `isIncluded` allows.
-  @inlinable
+  @_alwaysEmitIntoClient
   @available(swift, introduced: 4.0)
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Key: Value] {
+  public consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Key: Value] {
   #if _runtime(_ObjC)
     guard _variant.isNative else {
       // Slow path for bridged dictionaries
@@ -623,6 +655,24 @@ extension Dictionary {
   #endif
     return Dictionary(_native: try _variant.asNative.filter(isIncluded))
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @abi(
+    __consuming func filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Key: Value]
+  )
+  internal __consuming func __rethrows_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Key: Value] {
+    try filter(isIncluded)
+  }
+#endif
 }
 
 extension Dictionary: Collection {
@@ -900,9 +950,9 @@ extension Dictionary {
         let value = defaultValue()
         native._insert(at: bucket, key: key, value: value)
       }
-      let address = native._values + bucket.offset
+      let address = unsafe native._values + bucket.offset
       defer { _fixLifetime(self) }
-      yield &address.pointee
+      yield unsafe &address.pointee
     }
   }
 
@@ -916,12 +966,30 @@ extension Dictionary {
   ///   this dictionary.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the dictionary.
-  @inlinable
-  public func mapValues<T>(
-    _ transform: (Value) throws -> T
-  ) rethrows -> Dictionary<Key, T> {
+  @_alwaysEmitIntoClient
+  public func mapValues<T, E: Error>(
+    _ transform: (Value) throws(E) -> T
+  ) throws(E) -> Dictionary<Key, T> {
     return try Dictionary<Key, T>(_native: _variant.mapValues(transform))
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of mapValues, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func mapValues<T>(
+      _ transform: (Value) throws -> T
+    ) throws -> Dictionary<Key, T>
+  )
+  @usableFromInline
+  internal func __rethrows_mapValues<T>(
+    _ transform: (Value) throws -> T
+  ) throws -> Dictionary<Key, T> {
+    try mapValues(transform)
+  }
+#endif
 
   /// Returns a new dictionary containing only the key-value pairs that have
   /// non-`nil` values as the result of transformation by the given closure.
@@ -1031,13 +1099,33 @@ extension Dictionary {
   ///   - combine: A closure that takes the current and new values for any
   ///     duplicate keys. The closure returns the desired value for the final
   ///     dictionary.
-  @inlinable
-  public mutating func merge<S: Sequence>(
+  @_alwaysEmitIntoClient
+  public mutating func merge<S: Sequence, E: Error>(
     _ other: __owned S,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Element == (Key, Value) {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where S.Element == (Key, Value) {
     try _variant.merge(other, uniquingKeysWith: combine)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of merge, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    mutating func merge<S: Sequence>(
+      _ other: __owned S,
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) throws where S.Element == (Key, Value)
+  )
+  @usableFromInline
+  internal mutating func __rethrows_merge<S: Sequence>(
+    _ other: __owned S,
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) throws where S.Element == (Key, Value) {
+    try merge(other, uniquingKeysWith: combine)
+  }
+#endif
 
   /// Merges the given dictionary into this dictionary, using a combining
   /// closure to determine the value for any duplicate keys.
@@ -1066,14 +1154,34 @@ extension Dictionary {
   ///   - combine: A closure that takes the current and new values for any
   ///     duplicate keys. The closure returns the desired value for the final
   ///     dictionary.
-  @inlinable
-  public mutating func merge(
+  @_alwaysEmitIntoClient
+  public mutating func merge<E: Error>(
     _ other: __owned [Key: Value],
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) {
     try _variant.merge(
       other.lazy.map { ($0, $1) }, uniquingKeysWith: combine)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of merge, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    mutating func merge(
+      _ other: __owned [Key: Value],
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) throws
+  )
+  @usableFromInline
+  internal mutating func __rethrows_merge_dictionary(
+    _ other: __owned [Key: Value],
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) throws {
+    try merge(other, uniquingKeysWith: combine)
+  }
+#endif
 
   /// Creates a dictionary by merging key-value pairs in a sequence into the
   /// dictionary, using a combining closure to determine the value for
@@ -1103,15 +1211,35 @@ extension Dictionary {
   ///     dictionary.
   /// - Returns: A new dictionary with the combined keys and values of this
   ///   dictionary and `other`.
-  @inlinable
-  public __consuming func merging<S: Sequence>(
+  @_alwaysEmitIntoClient
+  public __consuming func merging<S: Sequence, E: Error>(
     _ other: __owned S,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows -> [Key: Value] where S.Element == (Key, Value) {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) -> [Key: Value] where S.Element == (Key, Value) {
     var result = self
     try result._variant.merge(other, uniquingKeysWith: combine)
     return result
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of merging, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func merging<S: Sequence>(
+      _ other: __owned S,
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) throws -> [Key: Value] where S.Element == (Key, Value)
+  )
+  @usableFromInline
+  internal __consuming func __rethrows_merging<S: Sequence>(
+    _ other: __owned S,
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) throws -> [Key: Value] where S.Element == (Key, Value) {
+    try merging(other, uniquingKeysWith: combine)
+  }
+#endif
 
   /// Creates a dictionary by merging the given dictionary into this
   /// dictionary, using a combining closure to determine the value for
@@ -1143,15 +1271,35 @@ extension Dictionary {
   ///     dictionary.
   /// - Returns: A new dictionary with the combined keys and values of this
   ///   dictionary and `other`.
-  @inlinable
-  public __consuming func merging(
+  @_alwaysEmitIntoClient
+  public __consuming func merging<E: Error>(
     _ other: __owned [Key: Value],
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows -> [Key: Value] {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) -> [Key: Value] {
     var result = self
     try result.merge(other, uniquingKeysWith: combine)
     return result
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of merging, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func merging(
+      _ other: __owned [Key: Value],
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) throws -> [Key: Value]
+  )
+  @usableFromInline
+  internal __consuming func __rethrows_merging_dictionary(
+    _ other: __owned [Key: Value],
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) throws -> [Key: Value] {
+    try merging(other, uniquingKeysWith: combine)
+  }
+#endif
 
   /// Removes and returns the key-value pair at the specified index.
   ///
@@ -1191,7 +1339,7 @@ extension Dictionary {
   ///     } else {
   ///         print("No value found for that key.")
   ///     }
-  ///     // Prints "No value found for that key.""
+  ///     // Prints "No value found for that key."
   ///
   /// - Parameter key: The key to remove along with its associated value.
   /// - Returns: The value that was removed, or `nil` if the key was not
@@ -1366,7 +1514,7 @@ extension Dictionary {
       if
         lhs._variant.isNative,
         rhs._variant.isNative,
-        lhs._variant.asNative._storage === rhs._variant.asNative._storage
+        unsafe (lhs._variant.asNative._storage === rhs._variant.asNative._storage)
       {
         return true
       }
@@ -1378,7 +1526,7 @@ extension Dictionary {
         return true
       }
 #else
-      if lhs._variant.asNative._storage === rhs._variant.asNative._storage {
+      if unsafe (lhs._variant.asNative._storage === rhs._variant.asNative._storage) {
         return true
       }
 #endif
@@ -1449,9 +1597,9 @@ extension Dictionary {
       _modify {
         let native = _variant.ensureUniqueNative()
         let bucket = native.validatedBucket(for: position)
-        let address = native._values + bucket.offset
+        let address = unsafe native._values + bucket.offset
         defer { _fixLifetime(self) }
-        yield &address.pointee
+        yield unsafe &address.pointee
       }
     }
 
@@ -1675,7 +1823,7 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
     into result: UnsafeMutablePointer<T>
   ) -> Bool {
     guard let value = _value as? T else { return false }
-    result.initialize(to: value)
+    unsafe result.initialize(to: value)
     return true
   }
 }
@@ -1763,6 +1911,7 @@ extension Dictionary {
 
     @frozen
     @usableFromInline
+    @safe
     internal enum _Variant {
       case native(_HashTable.Index)
 #if _runtime(_ObjC)
@@ -1782,7 +1931,7 @@ extension Dictionary {
     @inlinable
     @inline(__always)
     internal init(_native index: _HashTable.Index) {
-      self.init(_variant: .native(index))
+      unsafe self.init(_variant: .native(index))
     }
 
 #if _runtime(_ObjC)
@@ -1837,7 +1986,7 @@ extension Dictionary.Index {
   internal var _asNative: _HashTable.Index {
     switch _variant {
     case .native(let nativeIndex):
-      return nativeIndex
+      return unsafe nativeIndex
 #if _runtime(_ObjC)
     case .cocoa:
       _preconditionFailure(
@@ -1864,8 +2013,8 @@ extension Dictionary.Index {
         _preconditionFailure(
           "Attempting to access Dictionary elements using an invalid index")
       }
-      let dummy = _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
-      _variant = .native(dummy)
+      let dummy = unsafe _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
+      _variant = unsafe .native(dummy)
       defer { _variant = .cocoa(cocoa) }
       yield &cocoa
     }
@@ -1881,7 +2030,7 @@ extension Dictionary.Index: Equatable {
   ) -> Bool {
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
-      return lhsNative == rhsNative
+      return unsafe lhsNative == rhsNative
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
       lhs._cocoaPath()
@@ -1901,7 +2050,7 @@ extension Dictionary.Index: Comparable {
   ) -> Bool {
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
-      return lhsNative < rhsNative
+      return unsafe lhsNative < rhsNative
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
       lhs._cocoaPath()
@@ -1923,9 +2072,9 @@ extension Dictionary.Index: Hashable {
       return
     }
     hasher.combine(0 as UInt8)
-    hasher.combine(_asNative.bucket.offset)
+    unsafe hasher.combine(_asNative.bucket.offset)
 #else
-    hasher.combine(_asNative.bucket.offset)
+    unsafe hasher.combine(_asNative.bucket.offset)
 #endif
   }
 }
@@ -2143,3 +2292,63 @@ extension Dictionary.Index: @unchecked Sendable
   where Key: Sendable, Value: Sendable {}
 extension Dictionary.Iterator: @unchecked Sendable
   where Key: Sendable, Value: Sendable {}
+
+extension Dictionary {
+  /// Returns a boolean value indicating whether this dictionary is identical to
+  /// `other`.
+  ///
+  /// Two dictionary values are identical if there is no way to distinguish
+  /// between them.
+  ///
+  /// For any values `a`, `b`, and `c`:
+  ///
+  /// - `a.isTriviallyIdentical(to: a)` is always `true`. (Reflexivity)
+  /// - `a.isTriviallyIdentical(to: b)` implies `b.isTriviallyIdentical(to: a)`.
+  /// (Symmetry)
+  /// - If `a.isTriviallyIdentical(to: b)` and `b.isTriviallyIdentical(to: c)`
+  /// are both `true`, then `a.isTriviallyIdentical(to: c)` is also `true`.
+  /// (Transitivity)
+  /// - If `a` and `b` are `Equatable`, then `a.isTriviallyIdentical(b)` implies
+  /// `a == b`. `a == b` does not imply `a.isTriviallyIdentical(b)`
+  ///
+  /// Values produced by copying the same value, with no intervening mutations,
+  /// will compare identical:
+  ///
+  /// ```swift
+  /// let d = c
+  /// print(c.isTriviallyIdentical(to: d))
+  /// // Prints true
+  /// ```
+  /// 
+  /// Comparing dictionaries this way includes comparing (normally) hidden
+  /// implementation details such as the memory location of any underlying
+  /// dictionary storage object. Therefore, identical dictionaries are
+  /// guaranteed to compare equal with `==`, but not all equal dictionaries are
+  /// considered identical.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+#if _runtime(_ObjC)
+    if
+      self._variant.isNative,
+      other._variant.isNative,
+      unsafe (self._variant.asNative._storage === other._variant.asNative._storage)
+    {
+      return true
+    }
+    if
+      !self._variant.isNative,
+      !other._variant.isNative,
+      self._variant.asCocoa.object === other._variant.asCocoa.object
+    {
+      return true
+    }
+#else
+    if unsafe (self._variant.asNative._storage === other._variant.asNative._storage) {
+      return true
+    }
+#endif
+    return false
+  }
+}

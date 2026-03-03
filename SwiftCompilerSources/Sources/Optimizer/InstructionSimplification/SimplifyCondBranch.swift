@@ -12,7 +12,7 @@
 
 import SIL
 
-extension CondBranchInst : OnoneSimplifyable {
+extension CondBranchInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     tryConstantFold(context)
   }
@@ -27,9 +27,9 @@ private extension CondBranchInst {
     }
     let builder = Builder(before: self, context)
     if conditionValue == 0 {
-      builder.createBranch(to: falseBlock, arguments: Array(falseOperands.map { $0.value }))
+      builder.createBranch(to: falseBlock, arguments: Array(falseOperands.values))
     } else {
-      builder.createBranch(to: trueBlock, arguments: Array(trueOperands.map { $0.value }))
+      builder.createBranch(to: trueBlock, arguments: Array(trueOperands.values))
     }
     context.erase(instruction: self)
   }

@@ -1,0 +1,60 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+sil_stage canonical
+
+// CHECK-LABEL: begin running test 1 of 1 on simple_order: domtree with: @block[0]
+// CHECK:       order: [0, 6, 2, 4, 5, 1, 3]
+// CHECK:       end running test 1 of 1 on simple_order: domtree with: @block[0]
+sil [ossa] @simple_order : $@convention(thin) () -> () {
+bb0:
+  specify_test "domtree @block[0]"
+  cond_br undef, bb6, bb4
+bb1:
+  return undef : $()
+bb2:
+  br bb1
+bb3:
+  br bb2
+bb4:
+  br bb3
+bb5:
+  br bb2
+bb6:
+  br bb5
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on custom_start_block: domtree with: @block[1]
+// CHECK:       order: [1, 2]
+// CHECK:       end running test 1 of 1 on custom_start_block: domtree with: @block[1]
+sil [ossa] @custom_start_block : $@convention(thin) () -> () {
+bb0:
+  specify_test "domtree @block[1]"
+  cond_br undef, bb1, bb3
+bb1:
+  br bb2
+bb2:
+  br bb4
+bb3:
+  br bb4
+bb4:
+  return undef : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on filter: domtree with: @block[0]
+// CHECK:       order: [0, 4, 3]
+// CHECK:       end running test 1 of 1 on filter: domtree with: @block[0]
+sil [ossa] @filter : $@convention(thin) () -> () {
+bb0:
+  specify_test "domtree @block[0]"
+  cond_br undef, bb1, bb3
+bb1:
+  %1 = string_literal utf8 "skip"
+  br bb2
+bb2:
+  br bb4
+bb3:
+  br bb4
+bb4:
+  return undef : $()
+}
+

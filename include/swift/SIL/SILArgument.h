@@ -56,20 +56,20 @@ class SILArgument : public ValueBase {
   friend class SILBasicBlock;
 
   SILBasicBlock *parentBlock;
-  const ValueDecl *decl;
+  ValueDecl *decl;
   USE_SHARED_UINT8;
 
 protected:
   SILArgument(ValueKind subClassKind, SILBasicBlock *inputParentBlock,
               SILType type, ValueOwnershipKind ownershipKind,
-              const ValueDecl *inputDecl = nullptr, bool reborrow = false,
+              ValueDecl *inputDecl = nullptr, bool reborrow = false,
               bool pointerEscape = false);
 
   // A special constructor, only intended for use in
   // SILBasicBlock::replacePHIArg and replaceFunctionArg.
   explicit SILArgument(ValueKind subClassKind, SILType type,
                        ValueOwnershipKind ownershipKind,
-                       const ValueDecl *inputDecl = nullptr,
+                       ValueDecl *inputDecl = nullptr,
                        bool reborrow = false, bool pointerEscape = false)
       : ValueBase(subClassKind, type), parentBlock(nullptr), decl(inputDecl) {
     sharedUInt8().SILArgument.valueOwnershipKind = uint8_t(ownershipKind);
@@ -137,7 +137,7 @@ public:
 
   SILModule &getModule() const;
 
-  const ValueDecl *getDecl() const { return decl; }
+  ValueDecl *getDecl() const { return decl; }
 
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
@@ -246,7 +246,7 @@ class SILPhiArgument : public SILArgument {
 
   SILPhiArgument(SILBasicBlock *parentBlock, SILType type,
                  ValueOwnershipKind ownershipKind,
-                 const ValueDecl *decl = nullptr, bool isReborrow = false,
+                 ValueDecl *decl = nullptr, bool isReborrow = false,
                  bool hasPointerEscape = false)
       : SILArgument(ValueKind::SILPhiArgument, parentBlock, type, ownershipKind,
                     decl, isReborrow, hasPointerEscape) {}
@@ -254,7 +254,7 @@ class SILPhiArgument : public SILArgument {
   // A special constructor, only intended for use in
   // SILBasicBlock::replacePHIArg.
   explicit SILPhiArgument(SILType type, ValueOwnershipKind ownershipKind,
-                          const ValueDecl *decl = nullptr,
+                          ValueDecl *decl = nullptr,
                           bool isReborrow = false,
                           bool hasPointerEscape = false)
       : SILArgument(ValueKind::SILPhiArgument, type, ownershipKind, decl,
@@ -363,24 +363,24 @@ class SILFunctionArgument : public SILArgument {
 
   SILFunctionArgument(
       SILBasicBlock *parentBlock, SILType type,
-      ValueOwnershipKind ownershipKind, const ValueDecl *decl = nullptr,
+      ValueOwnershipKind ownershipKind, ValueDecl *decl = nullptr,
       bool isNoImplicitCopy = false,
       LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
       bool isCapture = false, bool isParameterPack = false,
-      bool hasResultDependsOn = false)
+      bool isInferredImmutable = false)
       : SILArgument(ValueKind::SILFunctionArgument, parentBlock, type,
                     ownershipKind, decl) {
     sharedUInt32().SILFunctionArgument.noImplicitCopy = isNoImplicitCopy;
     sharedUInt32().SILFunctionArgument.lifetimeAnnotation = lifetimeAnnotation;
     sharedUInt32().SILFunctionArgument.closureCapture = isCapture;
     sharedUInt32().SILFunctionArgument.parameterPack = isParameterPack;
-    sharedUInt32().SILFunctionArgument.hasResultDependsOn = hasResultDependsOn;
+    sharedUInt32().SILFunctionArgument.inferredImmutable = isInferredImmutable;
   }
 
   // A special constructor, only intended for use in
   // SILBasicBlock::replaceFunctionArg.
   explicit SILFunctionArgument(SILType type, ValueOwnershipKind ownershipKind,
-                               const ValueDecl *decl = nullptr)
+                               ValueDecl *decl = nullptr)
       : SILArgument(ValueKind::SILFunctionArgument, type, ownershipKind, decl) {
   }
 
@@ -417,6 +417,16 @@ public:
     sharedUInt32().SILFunctionArgument.parameterPack = isPack;
   }
 
+  /// Returns true if this argument is inferred to be immutable.
+  bool isInferredImmutable() const {
+    return sharedUInt32().SILFunctionArgument.inferredImmutable;
+  }
+
+  /// Set whether this argument is inferred to be immutable.
+  void setInferredImmutable(bool newValue) {
+    sharedUInt32().SILFunctionArgument.inferredImmutable = newValue;
+  }
+
   LifetimeAnnotation getLifetimeAnnotation() const {
     return LifetimeAnnotation::Case(
         sharedUInt32().SILFunctionArgument.lifetimeAnnotation);
@@ -426,16 +436,15 @@ public:
     sharedUInt32().SILFunctionArgument.lifetimeAnnotation = newValue;
   }
 
-  bool hasResultDependsOn() const {
-    return sharedUInt32().SILFunctionArgument.hasResultDependsOn;
-  }
+  bool isSending() const;
 
-  void setHasResultDependsOn(bool flag = true) {
-    sharedUInt32().SILFunctionArgument.hasResultDependsOn = flag;
-  }
+  /// Returns true if this SILFunctionArgument is an 'inout sending' parameter.
+  bool isInOutSending() const;
 
-  bool isSending() const {
-    return getKnownParameterInfo().hasOption(SILParameterInfo::Sending);
+  bool isIsolated() const {
+    return !isIndirectResult() && !isIndirectErrorResult() &&
+           getKnownParameterInfo().getOptions().contains(
+               SILParameterInfo::Isolated);
   }
 
   Lifetime getLifetime() const {
@@ -475,6 +484,7 @@ public:
     setLifetimeAnnotation(arg->getLifetimeAnnotation());
     setClosureCapture(arg->isClosureCapture());
     setFormalParameterPack(arg->isFormalParameterPack());
+    setInferredImmutable(arg->isInferredImmutable());
   }
 
   static bool classof(const SILInstruction *) = delete;

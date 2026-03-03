@@ -23,7 +23,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
   auto fragment = futureFragment();
 
   auto queueHead = fragment->waitQueue.load(std::memory_order_acquire);
-  bool contextIntialized = false;
+  bool contextInitialized = false;
   auto escalatedPriority = JobPriority::Unspecified;
   while (true) {
     switch (queueHead.getStatus()) {
@@ -32,7 +32,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       SWIFT_TASK_DEBUG_LOG("task %p waiting on task %p, completed immediately",
                            waitingTask, this);
       _swift_tsan_acquire(static_cast<Job *>(this));
-      if (contextIntialized) waitingTask->flagAsRunning();
+      if (contextInitialized) waitingTask->flagAsRunning();
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
 
@@ -44,8 +44,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       break;
     }
 
-    if (!contextIntialized) {
-      contextIntialized = true;
+    if (!contextInitialized) {
+      contextInitialized = true;
       auto context =
           reinterpret_cast<TaskFutureWaitAsyncContext *>(waitingTaskContext);
       context->errorResult = nullptr;
@@ -179,8 +179,11 @@ SWIFT_CC(swiftasync)
 static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
 
   auto context = static_cast<TaskFutureWaitAsyncContext *>(_context);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
   auto resumeWithError =
       reinterpret_cast<AsyncVoidClosureEntryPoint *>(context->ResumeParent);
+#pragma clang diagnostic pop
   return resumeWithError(context->Parent, context->errorResult);
 }
 
@@ -212,7 +215,10 @@ void SWIFT_CC(swiftasync) swift::swift56override_swift_task_future_wait_throwing
   waitingTask->ResumeTask = task_wait_throwing_resume_adapter;
   waitingTask->ResumeContext = callContext;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
   auto resumeFn = reinterpret_cast<TaskContinuationFunction *>(resumeFunction);
+#pragma clang diagnostic pop
 
   // Wait on the future.
   assert(task->isFuture());

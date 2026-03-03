@@ -164,19 +164,25 @@ public:
   /// The \c args arguments are passed through to Type::subst.
   template <typename ...Args>
   Requirement subst(Args &&...args) const {
-    auto newFirst = getFirstType().subst(std::forward<Args>(args)...);
+    return tranformSubjectTypes(
+        [&](Type ty) { return ty.subst(std::forward<Args>(args)...); });
+  }
+
+  /// Calls a transform function on the subject type(s) of the requirement.
+  /// Note this only deals with the top-level of the subjects.
+  Requirement tranformSubjectTypes(llvm::function_ref<Type(Type)> fn) const {
+    auto newFirst = fn(getFirstType());
     switch (getKind()) {
     case RequirementKind::SameShape:
-    case RequirementKind::Conformance:
     case RequirementKind::Superclass:
-    case RequirementKind::SameType: {
-      auto newSecond = getSecondType().subst(std::forward<Args>(args)...);
-      return Requirement(getKind(), newFirst, newSecond);
-    }
+    case RequirementKind::SameType:
+      return Requirement(getKind(), newFirst, fn(getSecondType()));
+    case RequirementKind::Conformance:
+      // The second type of a conformance isn't strictly speaking a subject.
+      return Requirement(getKind(), newFirst, getSecondType());
     case RequirementKind::Layout:
       return Requirement(getKind(), newFirst, getLayoutConstraint());
     }
-
     llvm_unreachable("Unhandled RequirementKind in switch.");
   }
 
@@ -187,9 +193,13 @@ public:
   /// \param subReqs An out parameter initialized to a list of simpler
   /// requirements which the caller must check to ensure this
   /// requirement is completely satisfied.
+  /// \param isolatedConformances If non-NULL, will be provided with all of the
+  /// isolated conformances that
   CheckRequirementResult checkRequirement(
       SmallVectorImpl<Requirement> &subReqs,
-      bool allowMissing = false) const;
+      bool allowMissing = false,
+      SmallVectorImpl<ProtocolConformanceRef> *isolatedConformances = nullptr
+  ) const;
 
   /// Determines if this substituted requirement can ever be satisfied,
   /// possibly with additional substitutions.
@@ -237,8 +247,7 @@ checkRequirementsWithoutContext(ArrayRef<Requirement> requirements);
 /// Check if each requirement is satisfied after applying the given
 /// substitutions. The substitutions must replace all type parameters that
 /// appear in the requirement with concrete types or archetypes.
-CheckRequirementsResult checkRequirements(ModuleDecl *module,
-                                          ArrayRef<Requirement> requirements,
+CheckRequirementsResult checkRequirements(ArrayRef<Requirement> requirements,
                                           TypeSubstitutionFn substitutions,
                                           SubstOptions options = std::nullopt);
 
@@ -267,9 +276,16 @@ struct InverseRequirement {
 
   /// Appends additional requirements corresponding to defaults for the given
   /// generic parameters.
+  /// \param gps the generic parameters for which start expanding defaults.
+  /// \param existingReqs The source-written requirements prior to expansion.
+  /// \param result The vector to append new default requirements into.
+  /// \param expandedGPs The subjects for which defaults were expanded,
+  ///                    which may be different and more Type's than 'gps'
   static void expandDefaults(ASTContext &ctx,
                              ArrayRef<Type> gps,
-                             SmallVectorImpl<StructuralRequirement> &result);
+                             ArrayRef<StructuralRequirement> existingReqs,
+                             SmallVectorImpl<StructuralRequirement> &result,
+                             SmallVectorImpl<Type> &expandedGPs);
 
   void print(raw_ostream &os, const PrintOptions &opts, bool forInherited=false) const;
 };

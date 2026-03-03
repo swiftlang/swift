@@ -14,13 +14,13 @@ public enum MyCase: Int {
 
 // CHECK: @_originallyDefinedIn(module: "Bar", macOS 10.9)
 // CHECK: @_originallyDefinedIn(module: "Bar", iOS 13.0)
-// CHECK: public enum MyCase : Swift.Int
+// CHECK: public enum MyCase : Swift::Int
 
 // CHECK: @_originallyDefinedIn(module: "Bar", macOS 10.9)
 // CHECK: @_originallyDefinedIn(module: "Bar", iOS 13.0)
-// CHECK: extension Foo.MyCase : Swift.Equatable {}
+// CHECK: extension Foo::MyCase : Swift::Equatable {}
 
 // CHECK: @_originallyDefinedIn(module: "Bar", macOS 10.9)
 // CHECK: @_originallyDefinedIn(module: "Bar", iOS 13.0)
-// CHECK: extension Foo.MyCase : Swift.Hashable {}
+// CHECK: extension Foo::MyCase : Swift::Hashable {}
 

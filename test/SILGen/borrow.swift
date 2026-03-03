@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name borrow -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name borrow -parse-stdlib %s | %FileCheck %s
 
 import Swift
 

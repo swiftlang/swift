@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend -primary-file %s -target %target-cpu-apple-macosx10.14 -enable-upcoming-feature DynamicActorIsolation -emit-silgen -o - | %FileCheck %s
 
-// REQUIRES: asserts
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_DynamicActorIsolation
 
 protocol P {
   associatedtype T

@@ -7,7 +7,7 @@ target triple = "x86_64-apple-macosx10.9"
 %swift.heapmetadata = type { ptr, ptr }
 
 declare ptr @swift_allocObject(ptr , i64, i64) nounwind
-declare void @swift_release(ptr nocapture)
+declare void @swift_release(ptr captures(none))
 declare void @swift_retain(ptr ) nounwind
 declare { i64, i64, i64 } @swift_retainAndReturnThree(ptr , i64, i64 , i64 )
 
@@ -36,7 +36,7 @@ entry:
 ; trivial_alloc_eliminate1 - Show that we can eliminate an allocation with a
 ; trivial destructor.
 @trivial_dtor_metadata = internal constant %swift.heapmetadata { ptr @trivial_dtor, ptr null }
-define internal i64 @trivial_dtor(ptr nocapture) nounwind readonly {
+define internal i64 @trivial_dtor(ptr captures(none)) nounwind readonly {
 entry:
   %1 = getelementptr inbounds %swift.refcounted, ptr %0, i64 1
   %length = load i64, ptr %1, align 8
@@ -59,7 +59,7 @@ entry:
 ; trivial_alloc_eliminate2 - Show that we can eliminate an allocation with a
 ; destructor that does a retain on the 'self' object.
 @trivial_dtor_metadata2 = internal constant %swift.heapmetadata { ptr @trivial_dtor2, ptr null }
-define internal i64 @trivial_dtor2(ptr nocapture %this) nounwind readonly {
+define internal i64 @trivial_dtor2(ptr captures(none) %this) nounwind readonly {
 entry:
   %0 = getelementptr inbounds %swift.refcounted, ptr %this, i64 1, i32 0
   store ptr inttoptr (i64 4 to ptr), ptr %0, align 8

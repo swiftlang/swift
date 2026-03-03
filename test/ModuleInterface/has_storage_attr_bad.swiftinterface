@@ -1,0 +1,9 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags:
+
+// RUN: %target-swift-typecheck-module-from-interface(%s) -module-name Test -verify -verify-ignore-unknown
+// REQUIRES: OS=macosx
+
+extension Array {
+  @_hasStorage public var foo: Int { get set }
+}

@@ -170,7 +170,6 @@ entry:
 // =============================================================================
 
 sil @closure_for_with_async_let : $@convention(thin) @Sendable @async @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>
-sil @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
 
 // Verify that a function with an async let builtin doesn't contain any marker
 // instructions and that it is annotated no_onstack_pack_metadata.  This is
@@ -194,8 +193,7 @@ entry:
     %addr : $Optional<Builtin.RawPointer>, 
     %thick_closure : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>, 
     %output_ptr : $Builtin.RawPointer) : $Builtin.RawPointer
-  %finish = function_ref @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
-  apply %finish(%alet, %output_ptr) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  builtin "finishAsyncLet"(%alet, %output_ptr) : $()
   builtin "endAsyncLetLifetime"(%alet : $Builtin.RawPointer) : $()
   dealloc_stack %output : $*Int
   %retval = tuple ()

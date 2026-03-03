@@ -34,7 +34,14 @@ AVAILABILITY_PLATFORM(visionOSApplicationExtension, "application extensions for 
 AVAILABILITY_PLATFORM(macOSApplicationExtension, "application extensions for macOS")
 AVAILABILITY_PLATFORM(macCatalyst, "Mac Catalyst")
 AVAILABILITY_PLATFORM(macCatalystApplicationExtension, "application extensions for Mac Catalyst")
+AVAILABILITY_PLATFORM(DriverKit, "DriverKit")
+/// A meta-platform representing the built-in Swift runtime.
+AVAILABILITY_PLATFORM(Swift, "Swift")
+/// A meta-platform for Apple operating systems with unified versioning.
+AVAILABILITY_PLATFORM(anyAppleOS, "any Apple OS")
+AVAILABILITY_PLATFORM(FreeBSD, "FreeBSD")
 AVAILABILITY_PLATFORM(OpenBSD, "OpenBSD")
 AVAILABILITY_PLATFORM(Windows, "Windows")
+AVAILABILITY_PLATFORM(Android, "Android")
 
 #undef AVAILABILITY_PLATFORM

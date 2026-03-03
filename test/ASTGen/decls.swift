@@ -1,21 +1,24 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only > %t/cpp-parser.ast.raw
-
-// Filter out any addresses in the dump, since they can differ.
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/astgen.ast.raw > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-concurrency -enable-experimental-feature ParserASTGen \
+// RUN:    -enable-experimental-feature CoroutineAccessors \
+// RUN:    -enable-experimental-feature DefaultIsolationPerFile \
+// RUN:    | %sanitize-address > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-concurrency \
+// RUN:    -enable-experimental-feature CoroutineAccessors \
+// RUN:    -enable-experimental-feature DefaultIsolationPerFile \
+// RUN:    | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-concurrency -enable-experimental-feature CoroutineAccessors -enable-experimental-feature DefaultIsolationPerFile -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ParserASTGen
+// REQUIRES: swift_feature_CoroutineAccessors
+// REQUIRES: swift_feature_DefaultIsolationPerFile
 
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
 // rdar://116686158
 // UNSUPPORTED: asan
 
@@ -30,6 +33,10 @@ import class Swift.KeyPath
 import protocol Swift.Sequence
 import func Swift.max
 import var Swift._playgroundPrintHook
+
+
+using @MainActor
+// FIXME: cannot add `using nonisolated` here because it's a re-declaration
 
 func
 test1
@@ -51,7 +58,13 @@ func test2(y: Int = 0, oi: Int? = nil) -> Int {
 }
 
 func test3(_ b: inout Bool) {
-  // b = true
+  b = true
+}
+
+func testInOutClosureParam() -> (inout (Int, String)) -> Void {
+  return { (arg: inout (Int, String)) in
+    arg.1 = "rewritten"
+  }
 }
 
 func test4(_ i: _const Int) {
@@ -105,6 +118,19 @@ func testVars() {
   var s: Int {
     get async throws { return 0 }
   }
+  var t: Int {
+    read { yield q }
+    modify { yield &q }
+  }
+}
+
+func rethrowingFn(fn: () throws -> Void) rethrows {}
+func reasyncFn(fn: () async -> Void) reasync {}
+func testRethrows() {
+    rethrowingFn { _ = 1 }
+
+    // FIXME: Assertion failed: (isAsync()), function getAsyncContext, file GenCall.cpp, line 215.
+    // reasyncFn { _ = 1 }
 }
 
 struct TestVars {
@@ -143,6 +169,8 @@ struct TestVars {
   var s: Int {
     get async throws { return 0 }
   }
+
+  private(set) var testPrivateSet = 1
 }
 
 extension TestVars {
@@ -158,6 +186,10 @@ struct TestSubscripts {
       return 0
     }
     set(x) {}
+  }
+
+  subscript<I: Proto3, J: Proto3>(i: I, j: J) -> Int where I.A == J.B {
+    1
   }
 }
 
@@ -284,3 +316,48 @@ struct TestStruct {
 // FIXME: Compute 'static' location
 //  static func instance(arg: Int) -> TestStruct { return TestStruct() }
 }
+
+struct ValueStruct<let N: Int> {}
+
+func genericTest1<T>(_: T) {}
+func genericTest2<each T>(_: repeat each T) {}
+func genericTest4<let T: Int>(_: ValueStruct<T>) {}
+
+func concreteValueTest1(_: ValueStruct<123>) {}
+func concreteValueTest2(_: ValueStruct<-123>) {}
+
+extension ValueStruct where N == 123 {}
+extension ValueStruct where 123 == N {}
+extension ValueStruct where N == -123 {}
+extension ValueStruct where -123 == N {}
+
+func testMagicIdentifier(file: String = #file, line: Int = #line) {
+    let _: String = file
+    let _: Int = line
+}
+
+class StaticTest {
+  class var classVar: Int { 42 }
+  static let staticVar = 42
+}
+
+func defaultArgInitTestFunc(fn: () -> () = {}) {}
+struct DefaultArgInitTestStruct {
+  func foo(fn: () -> () = {}) {}
+}
+enum DefaultArgInitTestEnum {
+    case foo(x: () -> () = {})
+}
+
+@resultBuilder
+struct MyBuilder {
+static func buildBlock(_ items: Any...) -> [Any] { items }
+}
+func acceptBuilder(@MyBuilder fn: () -> [Any]) -> [Any] { fn() }
+func testBuilder() {
+  let _: [Any] = acceptBuilder {
+    1
+  }
+}
+
+struct ExpansionRequirementTest<each T> where repeat each T: Comparable {}

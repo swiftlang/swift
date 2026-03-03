@@ -20,7 +20,7 @@ internal postfix func =->(lhs: Int) -> Int {
 public func visibleImport() {}
 public func hiddenImport() {}
 
-public func overlayedFoo() {}
+public func overlaidFoo() {}
 
 public var globalVar: Int = 0
 

@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver -O -Rpass-missed=sil-assembly-vision-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil %s -o /dev/null -Xfrontend -verify
+// RUN: %target-swiftc_driver -O -Xllvm -assemblyvisionremarkgen-diagnose-copy-destroy-addr=false -Rpass-missed=sil-assembly-vision-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil %s -o /dev/null -Xfrontend -verify
 
 // REQUIRES: objc_interop
 // REQUIRES: optimized_stdlib
@@ -18,18 +18,17 @@ public func forcedCast<NS, T>(_ ns: NS) -> T {
 
 public func forcedCast2<NS, T>(_ ns: NS) -> T {
   // Make sure the colon info is right so that the arrow is under the a.
-  let x = ns
+  let x = ns      // expected-note        {{of 'x'}}
   return x as! T  // expected-remark @:12 {{unconditional runtime cast of value with type 'NS' to 'T'}}
                   // expected-note @-4:34 {{of 'ns'}}
-                  // expected-note @-3:7 {{of 'x'}}
 }
 
 public func forcedCast3<NS, T>(_ ns: NS) -> T {
   // Make sure the colon info is right so that the arrow is under the a.
   var x = ns // expected-warning {{variable 'x' was never mutated}}
+             // expected-note @-1 {{of 'x'}}
   return x as! T  // expected-remark @:12 {{unconditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-4:34 {{of 'ns'}}
-                  // expected-note @-3:7 {{of 'x'}}
+                  // expected-note @-5:34 {{of 'ns'}}
 }
 
 public func forcedCast4<NS, T>(_ ns: NS, _ ns2: NS) -> T {
@@ -37,8 +36,6 @@ public func forcedCast4<NS, T>(_ ns: NS, _ ns2: NS) -> T {
   var x = ns
   x = ns2
   return x as! T  // expected-remark @:12 {{unconditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-5:44 {{of 'ns2'}}
-                  // expected-note @-4:7 {{of 'x'}}
 }
 
 public func condCast<NS, T>(_ ns: NS) -> T? {
@@ -49,18 +46,17 @@ public func condCast<NS, T>(_ ns: NS) -> T? {
 
 public func condCast2<NS, T>(_ ns: NS) -> T? {
   // Make sure the colon info is right so that the arrow is under the a.
-  let x = ns
+  let x = ns      // expected-note        {{of 'x'}}
   return x as? T  // expected-remark @:12 {{conditional runtime cast of value with type 'NS' to 'T'}}
                   // expected-note @-4:32 {{of 'ns'}}
-                  // expected-note @-3:7 {{of 'x'}}
 }
 
 public func condCast3<NS, T>(_ ns: NS) -> T? {
   // Make sure the colon info is right so that the arrow is under the a.
   var x = ns // expected-warning {{variable 'x' was never mutated}}
+             // expected-note @-1 {{of 'x'}}
   return x as? T  // expected-remark @:12 {{conditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-4:32 {{of 'ns'}}
-                  // expected-note @-3:7 {{of 'x'}}
+                  // expected-note @-5:32 {{of 'ns'}}
 }
 
 public func condCast4<NS, T>(_ ns: NS, _ ns2: NS) -> T? {
@@ -68,8 +64,6 @@ public func condCast4<NS, T>(_ ns: NS, _ ns2: NS) -> T? {
   var x = ns
   x = ns2
   return x as? T  // expected-remark @:12 {{conditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-5:42 {{of 'ns2'}}
-                  // expected-note @-4:7 {{of 'x'}}
 }
 
 public func condCast5<NS, T>(_ ns: NS) -> T? {

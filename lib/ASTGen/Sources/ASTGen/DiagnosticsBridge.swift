@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,6 +15,11 @@ import BasicBridging
 import SwiftDiagnostics
 import SwiftSyntax
 
+fileprivate struct PerFrontendDiagnosticState {
+  /// The set of categories that were referenced by a diagnostic.
+  var referencedCategories: Set<DiagnosticCategory> = []
+}
+
 fileprivate func emitDiagnosticParts(
   diagnosticEngine: BridgedDiagnosticEngine,
   sourceFileBuffer: UnsafeBufferPointer<UInt8>,
@@ -23,20 +28,20 @@ fileprivate func emitDiagnosticParts(
   position: AbsolutePosition,
   offset: Int,
   highlights: [Syntax] = [],
-  fixItChanges: [FixIt.Change] = []
+  edits: [SourceEdit] = []
 ) {
   // Map severity
   let bridgedSeverity = severity.bridged
 
-  func bridgedSourceLoc(at position: AbsolutePosition) -> BridgedSourceLoc {
-    return BridgedSourceLoc(at: position.advanced(by: offset), in: sourceFileBuffer)
+  func sourceLoc(at position: AbsolutePosition) -> SourceLoc {
+    return SourceLoc(at: position.advanced(by: offset), in: sourceFileBuffer)
   }
 
   // Emit the diagnostic
   var mutableMessage = message
   let diag = mutableMessage.withBridgedString { bridgedMessage in
     BridgedDiagnostic(
-      at: bridgedSourceLoc(at: position),
+      at: sourceLoc(at: position),
       message: bridgedMessage,
       severity: bridgedSeverity,
       engine: diagnosticEngine
@@ -46,45 +51,18 @@ fileprivate func emitDiagnosticParts(
   // Emit highlights
   for highlight in highlights {
     diag.highlight(
-      start: bridgedSourceLoc(at: highlight.positionAfterSkippingLeadingTrivia),
-      end: bridgedSourceLoc(at: highlight.endPositionBeforeTrailingTrivia)
+      start: sourceLoc(at: highlight.positionAfterSkippingLeadingTrivia),
+      end: sourceLoc(at: highlight.endPositionBeforeTrailingTrivia)
     )
   }
 
   // Emit changes for a Fix-It.
-  for change in fixItChanges {
-    let replaceStartLoc: BridgedSourceLoc
-    let replaceEndLoc: BridgedSourceLoc
-    var newText: String
-
-    switch change {
-    case .replace(let oldNode, let newNode):
-      replaceStartLoc = bridgedSourceLoc(at: oldNode.position)
-      replaceEndLoc = bridgedSourceLoc(at: oldNode.endPosition)
-      newText = newNode.description
-
-    case .replaceLeadingTrivia(let oldToken, let newTrivia):
-      replaceStartLoc = bridgedSourceLoc(at: oldToken.position)
-      replaceEndLoc = bridgedSourceLoc(
-        at: oldToken.positionAfterSkippingLeadingTrivia
-      )
-      newText = newTrivia.description
-
-    case .replaceTrailingTrivia(let oldToken, let newTrivia):
-      replaceStartLoc = bridgedSourceLoc(at: oldToken.endPositionBeforeTrailingTrivia)
-      replaceEndLoc = bridgedSourceLoc(at: oldToken.endPosition)
-      newText = newTrivia.description
-
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
-    }
-
+  for edit in edits {
+    var newText: String = edit.replacement
     newText.withBridgedString { bridgedMessage in
       diag.fixItReplace(
-        start: replaceStartLoc,
-        end: replaceEndLoc,
+        start: sourceLoc(at: edit.range.lowerBound),
+        end: sourceLoc(at: edit.range.upperBound),
         replacement: bridgedMessage
       )
     }
@@ -94,7 +72,7 @@ fileprivate func emitDiagnosticParts(
 }
 
 /// Emit the given diagnostic via the diagnostic engine.
-func emitDiagnostic(
+public func emitDiagnostic(
   diagnosticEngine: BridgedDiagnosticEngine,
   sourceFileBuffer: UnsafeBufferPointer<UInt8>,
   sourceFileBufferOffset: Int = 0,
@@ -114,6 +92,7 @@ func emitDiagnostic(
   )
 
   // Emit Fix-Its.
+  // FIXME: Ths assumes the fixIt is on the same tree/buffer, which is not guaranteed.
   for fixIt in diagnostic.fixIts {
     emitDiagnosticParts(
       diagnosticEngine: diagnosticEngine,
@@ -122,11 +101,12 @@ func emitDiagnostic(
       severity: .note,
       position: diagnostic.position,
       offset: sourceFileBufferOffset,
-      fixItChanges: fixIt.changes
+      edits: fixIt.edits
     )
   }
 
   // Emit any notes as follow-ons.
+  // FIXME: Ths assumes the node is on the same tree/buffer, which is not guaranteed.
   for note in diagnostic.notes {
     emitDiagnosticParts(
       diagnosticEngine: diagnosticEngine,
@@ -140,138 +120,12 @@ func emitDiagnostic(
 }
 
 extension DiagnosticSeverity {
-  var bridged: BridgedDiagnosticSeverity {
+  public var bridged: swift.DiagnosticKind {
     switch self {
     case .error: return .error
     case .note: return .note
     case .warning: return .warning
     case .remark: return .remark
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default: return .error
-#endif
-    }
-  }
-}
-
-extension SourceManager {
-  private func diagnoseSingle<Node: SyntaxProtocol>(
-    message: String,
-    severity: DiagnosticSeverity,
-    node: Node,
-    position: AbsolutePosition,
-    highlights: [Syntax] = [],
-    fixItChanges: [FixIt.Change] = []
-  ) {
-    // Map severity
-    let bridgedSeverity = severity.bridged
-
-    // Emit the diagnostic
-    var mutableMessage = message
-    let diag = mutableMessage.withBridgedString { bridgedMessage in
-      BridgedDiagnostic(
-        at: bridgedSourceLoc(for: node, at: position),
-        message: bridgedMessage,
-        severity: bridgedSeverity,
-        engine: bridgedDiagEngine
-      )
-    }
-
-    // Emit highlights
-    for highlight in highlights {
-      diag.highlight(
-        start: bridgedSourceLoc(for: highlight, at: highlight.positionAfterSkippingLeadingTrivia),
-        end: bridgedSourceLoc(for: highlight, at: highlight.endPositionBeforeTrailingTrivia)
-      )
-    }
-
-    // Emit changes for a Fix-It.
-    for change in fixItChanges {
-      let replaceStartLoc: BridgedSourceLoc
-      let replaceEndLoc: BridgedSourceLoc
-      var newText: String
-
-      switch change {
-      case .replace(let oldNode, let newNode):
-        replaceStartLoc = bridgedSourceLoc(
-          for: oldNode,
-          at: oldNode.positionAfterSkippingLeadingTrivia
-        )
-        replaceEndLoc = bridgedSourceLoc(
-          for: oldNode,
-          at: oldNode.endPositionBeforeTrailingTrivia
-        )
-        newText = newNode.description
-
-      case .replaceLeadingTrivia(let oldToken, let newTrivia):
-        replaceStartLoc = bridgedSourceLoc(for: oldToken)
-        replaceEndLoc = bridgedSourceLoc(
-          for: oldToken,
-          at: oldToken.positionAfterSkippingLeadingTrivia
-        )
-        newText = newTrivia.description
-
-      case .replaceTrailingTrivia(let oldToken, let newTrivia):
-        replaceStartLoc = bridgedSourceLoc(
-          for: oldToken,
-          at: oldToken.endPositionBeforeTrailingTrivia
-        )
-        replaceEndLoc = bridgedSourceLoc(
-          for: oldToken,
-          at: oldToken.endPosition
-        )
-        newText = newTrivia.description
-
-#if RESILIENT_SWIFT_SYNTAX
-      @unknown default:
-        fatalError()
-#endif
-      }
-
-      newText.withBridgedString { bridgedMessage in
-        diag.fixItReplace(
-          start: replaceStartLoc,
-          end: replaceEndLoc,
-          replacement: bridgedMessage
-        )
-      }
-    }
-
-    diag.finish();
-  }
-
-  /// Emit a diagnostic via the C++ diagnostic engine.
-  func diagnose(
-    diagnostic: Diagnostic,
-    messageSuffix: String? = nil
-  ) {
-    // Emit the main diagnostic.
-    diagnoseSingle(
-      message: diagnostic.diagMessage.message + (messageSuffix ?? ""),
-      severity: diagnostic.diagMessage.severity,
-      node: diagnostic.node,
-      position: diagnostic.position,
-      highlights: diagnostic.highlights
-    )
-
-    // Emit Fix-Its.
-    for fixIt in diagnostic.fixIts {
-      diagnoseSingle(
-        message: fixIt.message.message,
-        severity: .note,
-        node: diagnostic.node,
-        position: diagnostic.position,
-        fixItChanges: fixIt.changes
-      )
-    }
-
-    // Emit any notes as follow-ons.
-    for note in diagnostic.notes {
-      diagnoseSingle(
-        message: note.message,
-        severity: .note,
-        node: note.node,
-        position: note.position
-      )
     }
   }
 }
@@ -316,15 +170,16 @@ fileprivate struct SimpleDiagnostic: DiagnosticMessage {
 
   let severity: DiagnosticSeverity
 
+  let category: DiagnosticCategory?
+
   var diagnosticID: MessageID {
     .init(domain: "SwiftCompiler", id: "SimpleDiagnostic")
   }
 }
 
-extension BridgedDiagnosticSeverity {
+extension swift.DiagnosticKind {
   var asSeverity: DiagnosticSeverity {
     switch self {
-    case .fatalError: return .error
     case .error: return .error
     case .warning: return .warning
     case .remark: return .remark
@@ -380,22 +235,37 @@ public func addQueuedSourceFile(
   queuedDiagnostics.pointee.sourceFileIDs[bufferID] = allocatedSourceFileID
 }
 
+private struct BridgedFixItMessage: FixItMessage {
+  var message: String { "" }
+
+  var fixItID: MessageID {
+    .init(domain: "SwiftCompiler", id: "BridgedFixIt")
+  }
+}
+
 /// Add a new diagnostic to the queue.
 @_cdecl("swift_ASTGen_addQueuedDiagnostic")
 public func addQueuedDiagnostic(
   queuedDiagnosticsPtr: UnsafeMutableRawPointer,
-  text: UnsafePointer<UInt8>,
-  textLength: Int,
-  severity: BridgedDiagnosticSeverity,
-  position: BridgedSourceLoc,
-  highlightRangesPtr: UnsafePointer<BridgedSourceLoc>?,
-  numHighlightRanges: Int
+  perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
+  text: BridgedStringRef,
+  severity: swift.DiagnosticKind,
+  loc: SourceLoc,
+  categoryName: BridgedStringRef,
+  documentationPath: BridgedStringRef,
+  highlightRangesPtr: UnsafePointer<CharSourceRange>?,
+  numHighlightRanges: Int,
+  fixItsUntyped: BridgedArrayRef
 ) {
   let queuedDiagnostics = queuedDiagnosticsPtr.assumingMemoryBound(
     to: QueuedDiagnostics.self
   )
 
-  guard let rawPosition = position.getOpaquePointerValue() else {
+  let diagnosticState = perFrontendDiagnosticStatePtr.assumingMemoryBound(
+    to: PerFrontendDiagnosticState.self
+  )
+
+  guard let rawPosition = loc.raw else {
     return
   }
 
@@ -405,32 +275,47 @@ public func addQueuedDiagnostic(
       return false
     }
 
-    return rawPosition >= baseAddress && rawPosition < baseAddress + sf.buffer.count
+    return rawPosition >= baseAddress && rawPosition <= baseAddress + sf.buffer.count
   }
   guard let sourceFile = sourceFile else {
     // FIXME: Hard to report an error here...
     return
   }
 
-  // Find the token at that offset.
   let sourceFileBaseAddress = UnsafeRawPointer(sourceFile.buffer.baseAddress!)
   let sourceFileEndAddress = sourceFileBaseAddress + sourceFile.buffer.count
   let offset = rawPosition - sourceFileBaseAddress
-  guard let token = sourceFile.syntax.token(at: AbsolutePosition(utf8Offset: offset)) else {
+  let position = AbsolutePosition(utf8Offset: offset)
+
+  // Find the token at that offset.
+  let node: Syntax
+  if let token = sourceFile.syntax.token(at: position) {
+    node = Syntax(token)
+  } else if position == sourceFile.syntax.endPosition {
+    // FIXME: EOF token is not included in '.token(at: position)'
+    // We might want to include it, but want to avoid special handling.
+    // Also 'sourceFile.syntax' is not guaranteed to be 'SourceFileSyntax'.
+    if let token = sourceFile.syntax.lastToken(viewMode: .all) {
+      node = Syntax(token)
+    } else {
+      node = sourceFile.syntax
+    }
+  } else {
+    // position out of range.
     return
   }
 
   // Map the highlights.
   var highlights: [Syntax] = []
-  let highlightRanges = UnsafeBufferPointer<BridgedSourceLoc>(
+  let highlightRanges = UnsafeBufferPointer<CharSourceRange>(
     start: highlightRangesPtr,
-    count: numHighlightRanges * 2
+    count: numHighlightRanges
   )
   for index in 0..<numHighlightRanges {
+    let range = highlightRanges[index]
+
     // Make sure both the start and the end land within this source file.
-    guard let start = highlightRanges[index * 2].getOpaquePointerValue(),
-      let end = highlightRanges[index * 2 + 1].getOpaquePointerValue()
-    else {
+    guard let start = range.start.raw, let end = range.end.raw else {
       continue
     }
 
@@ -469,17 +354,124 @@ public func addQueuedDiagnostic(
     }
   }
 
-  let textBuffer = UnsafeBufferPointer(start: text, count: textLength)
+  let documentationPath = String(bridged: documentationPath)
+  let documentationURL: String? = if !documentationPath.isEmpty {
+      // If this looks doesn't look like a URL, prepend file://.
+      documentationPath.looksLikeURL ? documentationPath : "file://\(documentationPath)"
+    } else {
+      nil
+    }
+
+  let categoryName = String(bridged: categoryName)
+  // If the data comes from serialized diagnostics, it's possible that
+  // the category name is empty because StringRef() is serialized into
+  // an empty string.
+  let category: DiagnosticCategory? = if !categoryName.isEmpty {
+      DiagnosticCategory(
+        name: categoryName,
+        documentationURL: documentationURL
+      )
+    } else {
+      nil
+    }
+
+  // Note that we referenced this category.
+  if let category {
+    diagnosticState.pointee.referencedCategories.insert(category)
+  }
+
+  // Map the Fix-Its
+  let fixItChanges: [FixIt.Change] = fixItsUntyped.withElements(ofType: BridgedFixIt.self) { fixIts in
+    fixIts.compactMap { fixIt in
+      guard let startPos = sourceFile.position(of: fixIt.replacementRange.start),
+            let endPos = sourceFile.position(of: fixIt.replacementRange.end) else {
+        return nil
+      }
+
+      return FixIt.Change.replaceText(
+        range: startPos..<endPos,
+        with: String(bridged: fixIt.replacementText),
+        in: sourceFile.syntax
+      )
+    }
+  }
+
+  let fixIts: [FixIt] = fixItChanges.isEmpty
+      ? []
+      : [
+          FixIt(
+            message: BridgedFixItMessage(),
+            changes: fixItChanges
+          )
+        ]
+
   let diagnostic = Diagnostic(
-    node: Syntax(token),
+    node: node,
+    position: position,
     message: SimpleDiagnostic(
-      message: String(decoding: textBuffer, as: UTF8.self),
-      severity: severity.asSeverity
+      message: String(bridged: text),
+      severity: severity.asSeverity,
+      category: category
     ),
-    highlights: highlights
+    highlights: highlights,
+    fixIts: fixIts
   )
 
   queuedDiagnostics.pointee.grouped.addDiagnostic(diagnostic)
+}
+
+/// Render a single diagnostic that has no source location information.
+@_cdecl("swift_ASTGen_renderSingleDiagnostic")
+public func renderSingleDiagnostic(
+  perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
+  text: BridgedStringRef,
+  severity: swift.DiagnosticKind,
+  categoryName: BridgedStringRef,
+  documentationPath: BridgedStringRef,
+  colorize: Int,
+  renderedStringOutPtr: UnsafeMutablePointer<BridgedStringRef>
+) {
+  let diagnosticState = perFrontendDiagnosticStatePtr.assumingMemoryBound(
+    to: PerFrontendDiagnosticState.self
+  )
+
+  let documentationPath = String(bridged: documentationPath)
+  let documentationURL: String? = if !documentationPath.isEmpty {
+      // If this looks doesn't look like a URL, prepend file://.
+      documentationPath.looksLikeURL ? documentationPath : "file://\(documentationPath)"
+    } else {
+      nil
+    }
+
+  let categoryName = String(bridged: categoryName)
+  // If the data comes from serialized diagnostics, it's possible that
+  // the category name is empty because StringRef() is serialized into
+  // an empty string.
+  let category: DiagnosticCategory? = if !categoryName.isEmpty {
+      DiagnosticCategory(
+        name: categoryName,
+        documentationURL: documentationURL
+      )
+    } else {
+      nil
+    }
+
+  // Note that we referenced this category.
+  if let category {
+    diagnosticState.pointee.referencedCategories.insert(category)
+  }
+
+  let formatter = DiagnosticsFormatter(colorize: colorize != 0)
+
+  let renderedStr = formatter.formattedMessage(
+    SimpleDiagnostic(
+      message: String(bridged: text),
+      severity: severity.asSeverity,
+      category: category
+    )
+  )
+
+  renderedStringOutPtr.pointee = allocateBridgedString(renderedStr)
 }
 
 /// Render the queued diagnostics into a UTF-8 string.
@@ -495,4 +487,77 @@ public func renderQueuedDiagnostics(
   let renderedStr = formatter.annotateSources(in: queuedDiagnostics.pointee.grouped)
 
   renderedStringOutPtr.pointee = allocateBridgedString(renderedStr)
+}
+
+extension String {
+  /// Simple check to determine whether the string looks like the start of a
+  /// URL.
+  fileprivate var looksLikeURL: Bool {
+    var sawColon: Bool = false
+    var forwardSlashes: Int = 0
+    for c in self {
+      if c == ":" {
+        sawColon = true
+        continue
+      }
+
+      if c == "/" && sawColon {
+        forwardSlashes += 1
+        if forwardSlashes >= 2 {
+          return true
+        }
+
+        continue
+      }
+
+      if c.isLetter || c.isNumber {
+        forwardSlashes = 0
+        sawColon = false
+        continue
+      }
+
+      return false
+    }
+
+    return false
+  }
+}
+
+@_cdecl("swift_ASTGen_createPerFrontendDiagnosticState")
+public func createPerFrontendDiagnosticState() -> UnsafeMutableRawPointer {
+  let ptr = UnsafeMutablePointer<PerFrontendDiagnosticState>.allocate(capacity: 1)
+  ptr.initialize(to: .init())
+  return UnsafeMutableRawPointer(ptr)
+}
+
+@_cdecl("swift_ASTGen_destroyPerFrontendDiagnosticState")
+public func destroyPerFrontendDiagnosticState(
+  statePtr: UnsafeMutableRawPointer
+) {
+  let state = statePtr.assumingMemoryBound(to: PerFrontendDiagnosticState.self)
+  state.deinitialize(count: 1)
+  state.deallocate()
+}
+
+@_cdecl("swift_ASTGen_renderCategoryFootnotes")
+public func renderCategoryFootnotes(
+  statePtr: UnsafeMutableRawPointer,
+  colorize: Int,
+  renderedStringOutPtr: UnsafeMutablePointer<BridgedStringRef>
+) {
+  let state = statePtr.assumingMemoryBound(to: PerFrontendDiagnosticState.self)
+  let formatter = DiagnosticsFormatter(contextSize: 0, colorize: colorize != 0)
+  var renderedStr = formatter.categoryFootnotes(
+    Array(state.pointee.referencedCategories),
+    leadingText: "\n"
+  )
+
+  if !renderedStr.isEmpty {
+    renderedStr += "\n"
+  }
+
+  renderedStringOutPtr.pointee = allocateBridgedString(renderedStr)
+
+  // Clear out categories so we start fresh.
+  state.pointee.referencedCategories = []
 }

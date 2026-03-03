@@ -1,0 +1,3 @@
+module Issue_78447_C {
+  header "issue-78447-c.h"
+}

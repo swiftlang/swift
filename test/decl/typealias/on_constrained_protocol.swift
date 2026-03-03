@@ -45,11 +45,26 @@ func useDoubleOverloadedSameTypealias() -> DoubleOverloadedSameTypealias.Content
 // https://github.com/apple/swift/issues/50805
 
 protocol MarkerProtocol {}
+
 protocol ProtocolWithAssoctype {
-  associatedtype MyAssocType // expected-note {{found this candidate}} (from useAssocTypeInExtension) expected-note {{found candidate with type 'Self.MyAssocType'}} (from useAssocTypeOutsideExtension)
+  associatedtype MyAssocType
 }
+
 extension ProtocolWithAssoctype where Self: MarkerProtocol {
-  typealias MyAssocType = Int // expected-note {{found this candidate}} (from useAssocTypeInExtension) expected-note {{found candidate with type 'Int'}} (from useAssocTypeOutsideExtension)
-  func useAssocTypeInExtension() -> MyAssocType {} // expected-error {{'MyAssocType' is ambiguous for type lookup in this context}}
+  typealias MyAssocType = Int
+
+  func useAssocTypeInExtension(_ a: Self.MyAssocType) -> MyAssocType {
+    return a
+  }
+
+  func useAssocMetatypeInExtensionUnqualified() -> MyAssocType.Type {
+    return MyAssocType.self
+  }
+
+  func useAssocMetatypeInExtensionQualified() -> Self.MyAssocType.Type {
+    return Self.MyAssocType.self
+  }
 }
-func useAssocTypeOutsideExtension() -> ProtocolWithAssoctype.MyAssocType {} // expected-error {{ambiguous type name 'MyAssocType' in 'ProtocolWithAssoctype'}}
+
+func useAssocTypeOutsideExtension() -> ProtocolWithAssoctype.MyAssocType {}
+// expected-error@-1 {{cannot access associated type 'MyAssocType' from 'ProtocolWithAssoctype'; use a concrete type or generic parameter base instead}}

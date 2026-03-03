@@ -1,0 +1,14 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name _ModuleSelectorTestingKit_ctypes -swift-version 5
+
+import Swift
+@_exported import ModuleSelectorTestingKit
+import ctypes
+
+public struct E {
+  public init(value: Int)
+  public dynamic mutating func negate()
+  public var magnitude: Swift.UInt
+}
+
+public func e() -> Void

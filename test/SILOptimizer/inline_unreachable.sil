@@ -1,0 +1,41 @@
+// RUN: %target-sil-opt -inline -mem2reg  %s  | %FileCheck %s
+
+import Builtin
+import Swift
+
+class Klass {
+}
+
+sil shared [ossa] @callee : $@convention(method) (@guaranteed Klass) -> @error any Error {
+bb0(%0 : @guaranteed $Klass):
+  %1 = tuple ()                                   
+  return %1                                       
+} 
+
+// CHECK-LABEL: sil shared [ossa] @caller :
+// CHECK-NOT: try_apply
+// CHECK-NOT: alloc_stack 
+// CHECK-LABEL: } // end sil function 'caller'
+sil shared [ossa] @caller : $@convention(thin) (@guaranteed Klass) -> @error any Error {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0                              
+  %2 = alloc_stack $Klass                         
+  store %1 to [init] %2                           
+  %4 = function_ref @callee : $@convention(method) (@guaranteed Klass) -> @error any Error 
+  %5 = load_borrow %2                             
+  try_apply %4(%5) : $@convention(method) (@guaranteed Klass) -> @error any Error, normal bb1, error bb2 
+
+bb1(%7 : $()):                                    
+  end_borrow %5                                   
+  destroy_addr %2                                 
+  dealloc_stack %2                                
+  %11 = tuple ()                                  
+  return %11                                      
+
+bb2(%13 : @owned $any Error):                     
+  end_borrow %5                                   
+  destroy_addr %2                                 
+  dealloc_stack %2                                
+  throw %13                                       
+} 
+

@@ -92,9 +92,7 @@ CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
 
 bool importer::isCFTypeDecl(
        const clang::TypedefNameDecl *Decl) {
-  if (CFPointeeInfo::classifyTypedef(Decl))
-    return true;
-  return false;
+  return static_cast<bool>(CFPointeeInfo::classifyTypedef(Decl));
 }
 
 StringRef importer::getCFTypeName(

@@ -3,6 +3,11 @@
 // Weak symbols require additional work from the loader to resolve the symbol at
 // load time and can cause ODR violations as well as unexpected symbol
 // satisfaction because the weak symbol may be used from a separate module.
+//
+// Weak symbols in the runtime also conflict with the use of weak symbols in
+// embedded Swift. The presence of any weak symbol in swiftCore will allow its
+// strong symbols to override the weak symbols in the embedded runtime, and they
+// are not compatible.
 
 // RUN: %empty-directory(%t)
 

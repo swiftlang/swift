@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -22,13 +23,14 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
 
-static bool canInlineBeginApply(BeginApplyInst *BA) {
+bool SILInliner::canInlineBeginApply(BeginApplyInst *BA) {
   // Don't inline if we have multiple resumption sites (i.e. end_apply or
   // abort_apply instructions).  The current implementation clones a single
   // copy of the end_apply and abort_apply paths, so it can't handle values
@@ -36,8 +38,8 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
   // handle this in general, we'd need to separately clone the resume/unwind
   // paths into each end/abort.
   bool hasEndApply = false, hasAbortApply = false;
-  for (auto tokenUse : BA->getTokenResult()->getUses()) {
-    auto user = tokenUse->getUser();
+  for (auto *use : BA->getEndApplyUses()) {
+    auto *user = use->getUser();
     if (isa<EndApplyInst>(user)) {
       if (hasEndApply) return false;
       hasEndApply = true;
@@ -76,6 +78,15 @@ bool SILInliner::canInlineApplySite(FullApplySite apply) {
   if (auto BA = dyn_cast<BeginApplyInst>(apply))
     return canInlineBeginApply(BA);
 
+  if (apply.hasGuaranteedResult()) {
+    if (auto *callee = apply.getReferencedFunctionOrNull()) {
+      auto returnBB = callee->findReturnBB();
+      if (returnBB != callee->end() &&
+          isa<ReturnBorrowInst>(returnBB->getTerminator())) {
+        return false;
+      }
+    }
+  }
   return true;
 }
 
@@ -111,6 +122,8 @@ public:
     return BeginApplySite(BeginApply, Loc, Builder);
   }
 
+  bool needCompleteValues() const { return !EndBorrows.empty(); }
+
   void preprocess(SILBasicBlock *returnToBB,
                   SmallVectorImpl<SILInstruction *> &endBorrowInsertPts) {
     SmallVector<EndApplyInst *, 1> endApplyInsts;
@@ -126,6 +139,35 @@ public:
       auto *abortApply = abortApplyInsts.pop_back_val();
       collectAbortApply(abortApply);
       endBorrowInsertPts.push_back(&*std::next(abortApply->getIterator()));
+    }
+    for (auto *eb : EndBorrows) {
+      endBorrowInsertPts.push_back(&*std::next(eb->getIterator()));
+    }
+
+    // We may have a mark_dependence/mark_dependence_addr on the coroutine's
+    // token. This is needed to represent lifetime dependence on values created
+    // within the coroutine. Delete such mark_dependence instructions since the
+    // dependencies on values created within the coroutine will be exposed after
+    // inlining.
+    if (BeginApply->getCalleeFunction()
+            ->getLoweredFunctionType()
+            ->hasLifetimeDependencies()) {
+      SmallVector<SILInstruction *> toDelete;
+      for (auto *tokenUser : BeginApply->getTokenResult()->getUsers()) {
+        auto mdi = MarkDependenceInstruction(tokenUser);
+        if (!mdi) {
+          continue;
+        }
+        assert(mdi.isNonEscaping());
+        if (auto *valueMDI = dyn_cast<MarkDependenceInst>(*mdi)) {
+          valueMDI->replaceAllUsesWith(valueMDI->getValue());
+        }
+        toDelete.push_back(*mdi);
+      }
+
+      for (auto *inst : toDelete) {
+        inst->eraseFromParent();
+      }
     }
   }
 
@@ -234,7 +276,7 @@ public:
   /// Complete the begin_apply-specific inlining work. Delete vestiges of the
   /// apply site except the callee value. Return a valid iterator after the
   /// original begin_apply.
-  void complete() {
+  void complete(ArrayRef<SILValue> valuesToComplete, SILPassManager *pm) {
     // If there was no yield in the coroutine, then control never reaches
     // the end of the begin_apply, so all the downstream code is unreachable.
     // Make sure the function is well-formed, since we otherwise rely on
@@ -261,8 +303,28 @@ public:
       EndApply->eraseFromParent();
     if (AbortApply)
       AbortApply->eraseFromParent();
-    for (auto *EndBorrow : EndBorrows)
-      EndBorrow->eraseFromParent();
+
+    if (auto allocation = BeginApply->getCalleeAllocationResult()) {
+      SmallVector<SILInstruction *, 4> users(allocation->getUsers());
+      for (auto *user : users) {
+        auto *dsi = cast<DeallocStackInst>(user);
+        dsi->eraseFromParent();
+      }
+    }
+
+    llvm::SmallVector<SILInstruction *, 2> endBorrowInsts;
+    for (EndBorrowInst *endBorrow : EndBorrows) {
+      endBorrowInsts.push_back(endBorrow);
+    }
+
+    // Complete lifetimes of all inlined values at the point where the `begin_apply`
+    // is ended with an `end_borrow`.
+    // See `SILInlineCloner::valuesToComplete`.
+    completeLifetimes(pm, ArrayRef(valuesToComplete), ArrayRef(endBorrowInsts));
+
+    for (EndBorrowInst *endBorrow : EndBorrows) {
+      endBorrow->eraseFromParent();
+    }
 
     assert(!BeginApply->hasUsesOfAnyResult());
   }
@@ -272,10 +334,10 @@ public:
 
 namespace swift {
 class SILInlineCloner
-    : public TypeSubstCloner<SILInlineCloner, SILOptFunctionBuilder> {
+    : public TypeSubstCloner<SILInlineCloner> {
   friend class SILInstructionVisitor<SILInlineCloner>;
   friend class SILCloner<SILInlineCloner>;
-  using SuperTy = TypeSubstCloner<SILInlineCloner, SILOptFunctionBuilder>;
+  using SuperTy = TypeSubstCloner<SILInlineCloner>;
   using InlineKind = SILInliner::InlineKind;
 
   SILOptFunctionBuilder &FuncBuilder;
@@ -298,6 +360,14 @@ class SILInlineCloner
   llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>
       InlinedScopeCache;
 
+  // If an inlined `begin_apply` has some `end_borrow` scope-ending uses, all
+  // values of the inlined function must be completed, because such an
+  // `end_borrow` is effectively like an `unreachable` which cuts off the
+  // control flow at the `yield`. In other words: the continuation of the co-
+  // routine is not executed and we need to complete lifetimes which begin
+  // before the yield.
+  llvm::SmallVector<SILValue, 16> valuesToComplete;
+
   // Block in the original caller serving as the successor of the inlined
   // control path.
   SILBasicBlock *ReturnToBB = nullptr;
@@ -313,6 +383,16 @@ public:
   void cloneInline(ArrayRef<SILValue> AppliedArgs);
 
 protected:
+  void mapValue(SILValue origValue, SILValue mappedValue) {
+    if (BeginApply.has_value() && BeginApply->needCompleteValues() &&
+        (mappedValue->getOwnershipKind() != OwnershipKind::None ||
+         isa<BeginAccessInst>(mappedValue) ||
+         isa<StoreBorrowInst>(mappedValue))) {
+      valuesToComplete.push_back(mappedValue);
+    }
+    SuperTy::mapValue(origValue, mappedValue);
+  }
+
   SILValue borrowFunctionArgument(SILValue callArg, unsigned index);
   SILValue moveFunctionArgument(SILValue callArg, unsigned index);
 
@@ -341,7 +421,8 @@ protected:
 
   SILLocation remapLocation(SILLocation InLoc) {
     // For performance inlining return the original location.
-    if (IKind == InlineKind::PerformanceInline)
+    if (IKind == InlineKind::PerformanceInline ||
+        IKind == InlineKind::InlineAlwaysInline)
       return InLoc;
     // Inlined location wraps the call site that is being inlined, regardless of
     // the input location.
@@ -460,6 +541,7 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   auto calleeConv = getCalleeFunction()->getConventions();
   SmallBitVector borrowedArgs(AppliedArgs.size());
   SmallBitVector copiedArgs(AppliedArgs.size());
+  SmallBitVector inCxxArgs(AppliedArgs.size());
   if (!Apply->getFunction()->hasOwnership()) {
 
     for (auto p : llvm::enumerate(AppliedArgs)) {
@@ -490,6 +572,9 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
           if (!enableLexicalLifetimes)
             continue;
 
+          if (!Original.isDeinitBarrier())
+            continue;
+
           // Exclusive mutating accesses don't entail a lexical scope.
           if (paramInfo.getConvention() == ParameterConvention::Indirect_Inout)
             continue;
@@ -499,17 +584,20 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
             asi->setIsLexical();
         } else {
           // Insert begin/end borrow for guaranteed arguments.
-          if (paramInfo.isGuaranteed()) {
+          if (paramInfo.isGuaranteedInCaller()) {
             if (SILValue newValue = borrowFunctionArgument(callArg, idx)) {
               callArg = newValue;
               borrowedArgs[idx] = true;
             }
-          } else if (paramInfo.isConsumed()) {
+          } else if (paramInfo.isConsumedInCaller()) {
             if (SILValue newValue = moveFunctionArgument(callArg, idx)) {
               callArg = newValue;
             }
           }
         }
+
+        if (paramInfo.getConvention() == ParameterConvention::Indirect_In_CXX)
+          inCxxArgs[idx] = true;
       }
     }
   }
@@ -529,9 +617,17 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
         callerBlock->split(std::next(Apply.getInstruction()->getIterator()));
     endBorrowInsertPts.push_back(&*ReturnToBB->begin());
 
+    auto resultOwnership = OwnershipKind::Owned;
+
+    if (AI->hasGuaranteedResult()) {
+      resultOwnership = OwnershipKind::Guaranteed;
+    } else if (AI->hasAddressResult()) {
+      resultOwnership = OwnershipKind::None;
+    }
+
     // Create an argument on the return-to BB representing the returned value.
     auto *retArg =
-        ReturnToBB->createPhiArgument(AI->getType(), OwnershipKind::Owned);
+        ReturnToBB->createPhiArgument(AI->getType(), resultOwnership);
     // Replace all uses of the ApplyInst with the new argument.
     AI->replaceAllUsesWith(retArg);
     break;
@@ -565,6 +661,20 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
       for (auto *insertPt : endBorrowInsertPts) {
         SILBuilderWithScope returnBuilder(insertPt, getBuilder());
         returnBuilder.createEndBorrow(Apply.getLoc(), entryArgs[i]);
+      }
+    }
+  }
+
+  if (inCxxArgs.any()) {
+    for (unsigned i : indices(AppliedArgs)) {
+      if (!inCxxArgs.test(i)) {
+        continue;
+      }
+
+      for (auto *insertPt : endBorrowInsertPts) {
+        SILBuilderWithScope returnBuilder(insertPt->getParent()->begin(),
+                                          getBuilder());
+        returnBuilder.emitDestroyOperation(Apply.getLoc(), entryArgs[i]);
       }
     }
   }
@@ -665,7 +775,7 @@ void SILInlineCloner::preFixUp(SILFunction *calleeFunction) {
   // "Completing" the BeginApply only fixes the end of the apply scope. The
   // begin_apply itself lingers.
   if (BeginApply)
-    BeginApply->complete();
+    BeginApply->complete(valuesToComplete, &FuncBuilder.getPassManager());
 }
 
 void SILInlineCloner::postFixUp(SILFunction *calleeFunction) {
@@ -711,6 +821,14 @@ Scope scopeForArgument(Scope nonlexicalScope, SILValue callArg, unsigned index,
     // the argument.  Just do an ownership conversion if needed.
     return nonlexicalScope;
   }
+
+  // Use non-lexical scope for functions returning @guaranteed results.
+  // TODO: Represent the SILFunctionArgument of borrow accessors as non-lexical
+  // during SILGen.
+  if (callee->getConventions().hasGuaranteedResult()) {
+    return nonlexicalScope;
+  }
+
   // Lexical lifetimes are enabled, the function argument's lifetime is
   // lexical, but the caller's value is not lexical.  Extra care is required to
   // maintain the function argument's lifetime.  We need to add a lexical
@@ -851,6 +969,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BorrowedFromInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkDependenceAddrInst:
+  case SILInstructionKind::MergeIsolationRegionInst:
   case SILInstructionKind::PreviousDynamicFunctionRefInst:
   case SILInstructionKind::DynamicFunctionRefInst:
   case SILInstructionKind::FunctionRefInst:
@@ -858,6 +978,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::BaseAddrForOffsetInst:
   case SILInstructionKind::EndLifetimeInst:
+  case SILInstructionKind::ExtendLifetimeInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:
@@ -871,6 +992,15 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+  case SILInstructionKind::IgnoredUseInst:
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
+  case SILInstructionKind::UncheckedOwnershipInst:
+  case SILInstructionKind::MakeBorrowInst:
+  case SILInstructionKind::DereferenceBorrowInst:
+  case SILInstructionKind::MakeAddrBorrowInst:
+  case SILInstructionKind::DereferenceAddrBorrowInst:
+  case SILInstructionKind::InitBorrowAddrInst:
+  case SILInstructionKind::DereferenceBorrowAddrInst:
     return InlineCost::Free;
 
   // Typed GEPs are free.
@@ -886,8 +1016,10 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::TuplePackElementAddrInst:
     return InlineCost::Expensive;
 
-  // pack_length is just a few adds, which is close enough to free.
+  // pack_length and type_value is just a few adds, which is close enough to
+  // free.
   case SILInstructionKind::PackLengthInst:
+  case SILInstructionKind::TypeValueInst:
     return InlineCost::Free;
 
   // dynamic_pack_index is free.  The other pack-indexing instructions
@@ -985,11 +1117,13 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   // Return and unreachable are free.
   case SILInstructionKind::UnreachableInst:
   case SILInstructionKind::ReturnInst:
+  case SILInstructionKind::ReturnBorrowInst:
   case SILInstructionKind::ThrowInst:
   case SILInstructionKind::ThrowAddrInst:
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::EndCOWMutationAddrInst:
     return InlineCost::Free;
 
   // Turning the task reference into a continuation should be basically free.
@@ -1011,14 +1145,12 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AllocRefInst:
   case SILInstructionKind::AllocRefDynamicInst:
   case SILInstructionKind::AllocStackInst:
-  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::AllocPackMetadataInst:
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::ValueMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::AssignInst:
-  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::AssignOrInitInst:
   case SILInstructionKind::CheckedCastBranchInst:
   case SILInstructionKind::CheckedCastAddrBranchInst:
@@ -1060,6 +1192,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::DynamicMethodBranchInst:
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::IndexAddrInst:
+  case SILInstructionKind::VectorBaseAddrInst:
   case SILInstructionKind::TailAddrInst:
   case SILInstructionKind::IndexRawPointerInst:
   case SILInstructionKind::InitEnumDataAddrInst:
@@ -1078,6 +1211,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::OpenPackElementInst:
   case SILInstructionKind::PartialApplyInst:
+  case SILInstructionKind::ThunkInst:
   case SILInstructionKind::ExistentialMetatypeInst:
   case SILInstructionKind::RefElementAddrInst:
   case SILInstructionKind::RefTailAddrInst:
@@ -1095,7 +1229,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::InitBlockStorageHeaderInst:

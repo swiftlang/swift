@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILModule.h"
@@ -75,6 +76,7 @@ CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, BorrowedFrom)
 CONSTANT_OWNERSHIP_INST(Guaranteed, LoadBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, FunctionExtractIsolation)
+CONSTANT_OWNERSHIP_INST(Guaranteed, ImplicitActorToOpaqueIsolationCast)
 CONSTANT_OWNERSHIP_INST(None, GlobalValue)
 CONSTANT_OWNERSHIP_INST(Owned, AllocBox)
 CONSTANT_OWNERSHIP_INST(Owned, AllocExistentialBox)
@@ -84,12 +86,12 @@ CONSTANT_OWNERSHIP_INST(Owned, CopyBlock)
 CONSTANT_OWNERSHIP_INST(Owned, CopyBlockWithoutEscaping)
 CONSTANT_OWNERSHIP_INST(Owned, CopyValue)
 CONSTANT_OWNERSHIP_INST(Owned, ExplicitCopyValue)
-CONSTANT_OWNERSHIP_INST(Owned, MoveValue)
 CONSTANT_OWNERSHIP_INST(Owned, EndCOWMutation)
 CONSTANT_OWNERSHIP_INST(Owned, EndInitLetRef)
 CONSTANT_OWNERSHIP_INST(Owned, BeginDeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
+CONSTANT_OWNERSHIP_INST(Owned, Thunk)
 
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
@@ -104,7 +106,6 @@ CONSTANT_OWNERSHIP_INST(Owned, ObjCMetatypeToObject)
 // not though.
 CONSTANT_OWNERSHIP_INST(None, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(None, AllocStack)
-CONSTANT_OWNERSHIP_INST(None, AllocVector)
 CONSTANT_OWNERSHIP_INST(None, AllocPack)
 CONSTANT_OWNERSHIP_INST(None, AllocPackMetadata)
 CONSTANT_OWNERSHIP_INST(None, PackLength)
@@ -125,6 +126,7 @@ CONSTANT_OWNERSHIP_INST(None, PreviousDynamicFunctionRef)
 CONSTANT_OWNERSHIP_INST(None, GlobalAddr)
 CONSTANT_OWNERSHIP_INST(None, BaseAddrForOffset)
 CONSTANT_OWNERSHIP_INST(None, HasSymbol)
+CONSTANT_OWNERSHIP_INST(None, VectorBaseAddr)
 CONSTANT_OWNERSHIP_INST(None, IndexAddr)
 CONSTANT_OWNERSHIP_INST(None, IndexRawPointer)
 CONSTANT_OWNERSHIP_INST(None, InitEnumDataAddr)
@@ -132,7 +134,7 @@ CONSTANT_OWNERSHIP_INST(None, InitExistentialAddr)
 CONSTANT_OWNERSHIP_INST(None, InitExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(None, IntegerLiteral)
 CONSTANT_OWNERSHIP_INST(None, IsUnique)
-CONSTANT_OWNERSHIP_INST(None, IsEscapingClosure)
+CONSTANT_OWNERSHIP_INST(None, DestroyNotEscapedClosure)
 CONSTANT_OWNERSHIP_INST(None, Metatype)
 CONSTANT_OWNERSHIP_INST(None, ObjCToThickMetatype)
 CONSTANT_OWNERSHIP_INST(None, OpenExistentialAddr)
@@ -179,8 +181,34 @@ CONSTANT_OWNERSHIP_INST(None, PackElementGet)
 CONSTANT_OWNERSHIP_INST(None, TuplePackElementAddr)
 CONSTANT_OWNERSHIP_INST(None, Object)
 CONSTANT_OWNERSHIP_INST(None, Vector)
+CONSTANT_OWNERSHIP_INST(None, TypeValue)
+CONSTANT_OWNERSHIP_INST(None, MakeBorrow)
+CONSTANT_OWNERSHIP_INST(None, MakeAddrBorrow)
+CONSTANT_OWNERSHIP_INST(None, DereferenceAddrBorrow)
+CONSTANT_OWNERSHIP_INST(None, DereferenceBorrowAddr)
 
 #undef CONSTANT_OWNERSHIP_INST
+
+ValueOwnershipKind ValueOwnershipKindClassifier::visitStructExtractInst(StructExtractInst *sei) {
+  if (sei->getType().isTrivial(*sei->getFunction()) ||
+      // A struct value can have "none" ownership even if its type is not trivial.
+      // This happens when the struct/tuple contains a non-trivial enum, but it's initialized with
+      // a trivial enum case (e.g. with `Optional.none`).
+      sei->getOperand()->getOwnershipKind() == OwnershipKind::None) {
+    return OwnershipKind::None;
+  }
+  return OwnershipKind::Guaranteed;
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::visitTupleExtractInst(TupleExtractInst *tei) {
+  if (tei->getType().isTrivial(*tei->getFunction()) ||
+      // A tuple value can have "none" ownership even if its type is not trivial.
+      // This happens when the struct/tuple contains a non-trivial enum, but it's initialized with
+      // a trivial enum case (e.g. with `Optional.none`).
+      tei->getOperand()->getOwnershipKind() == OwnershipKind::None)
+    return OwnershipKind::None;
+  return OwnershipKind::Guaranteed;
+}
 
 #define CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP, INST)                       \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
@@ -191,8 +219,6 @@ CONSTANT_OWNERSHIP_INST(None, Vector)
     }                                                                          \
     return OwnershipKind::OWNERSHIP;                                           \
   }
-CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, StructExtract)
-CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TupleExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TuplePackExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, DifferentiableFunctionExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, LinearFunctionExtract)
@@ -211,9 +237,10 @@ CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, OpenExistentialBoxValue)
 // value).
 CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MarkUninitialized)
 
-// unchecked_bitwise_cast is a bitwise copy. It produces a trivial or unowned
-// result.
-//
+// In raw SIL, a MoveValue delimits the scope of trivial variables.
+CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MoveValue)
+CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, DereferenceBorrow)
+
 // If the operand is nontrivial and the result is trivial, then it is the
 // programmer's responsibility to use Builtin.fixLifetime.
 //
@@ -299,6 +326,7 @@ FORWARDING_OWNERSHIP_INST(MarkUnresolvedReferenceBinding)
 FORWARDING_OWNERSHIP_INST(MoveOnlyWrapperToCopyableValue)
 FORWARDING_OWNERSHIP_INST(CopyableToMoveOnlyWrapperValue)
 FORWARDING_OWNERSHIP_INST(MoveOnlyWrapperToCopyableBox)
+FORWARDING_OWNERSHIP_INST(UncheckedOwnership)
 #undef FORWARDING_OWNERSHIP_INST
 
 ValueOwnershipKind
@@ -553,6 +581,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, IsSameMetatype)
 CONSTANT_OWNERSHIP_BUILTIN(None, Alignof)
 CONSTANT_OWNERSHIP_BUILTIN(None, AllocRaw)
 CONSTANT_OWNERSHIP_BUILTIN(None, AssertConf)
+CONSTANT_OWNERSHIP_BUILTIN(None, InfiniteLoopTrueCondition)
 CONSTANT_OWNERSHIP_BUILTIN(None, UToSCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, StackAlloc)
 CONSTANT_OWNERSHIP_BUILTIN(None, UnprotectedStackAlloc)
@@ -601,6 +630,8 @@ CONSTANT_OWNERSHIP_BUILTIN(None, TSanInoutAccess)
 CONSTANT_OWNERSHIP_BUILTIN(None, PoundAssert)
 CONSTANT_OWNERSHIP_BUILTIN(None, TypePtrAuthDiscriminator)
 CONSTANT_OWNERSHIP_BUILTIN(None, TargetOSVersionAtLeast)
+CONSTANT_OWNERSHIP_BUILTIN(None, TargetVariantOSVersionAtLeast)
+CONSTANT_OWNERSHIP_BUILTIN(None, TargetOSVersionOrVariantOSVersionAtLeast)
 CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(None, CancelAsyncTask)
@@ -608,7 +639,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(None, ConvertTaskToJob)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDefaultActor)
-CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDistributedRemoteActor)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, InitializeDistributedRemoteActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeNonDefaultDistributedActor)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, AutoDiffCreateLinearMapContextWithType)
 CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffProjectTopLevelSubcontext)
@@ -622,19 +653,29 @@ CONSTANT_OWNERSHIP_BUILTIN(None, BuildOrdinarySerialExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildComplexEqualitySerialExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildDefaultActorExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildMainActorExecutorRef)
-CONSTANT_OWNERSHIP_BUILTIN(None, StartAsyncLet)
-CONSTANT_OWNERSHIP_BUILTIN(None, EndAsyncLet)
 CONSTANT_OWNERSHIP_BUILTIN(None, StartAsyncLetWithLocalBuffer)
+CONSTANT_OWNERSHIP_BUILTIN(None, FinishAsyncLet)
 CONSTANT_OWNERSHIP_BUILTIN(None, EndAsyncLetLifetime)
 CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroup)
 CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroupWithFlags)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyTaskGroup)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRunInline)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, FlowSensitiveSelfIsolation)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, FlowSensitiveDistributedSelfIsolation)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetEnumTag)
 CONSTANT_OWNERSHIP_BUILTIN(None, InjectEnumTag)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, DistributedActorAsAnyActor)
 CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, ExtractFunctionIsolation) // unreachable
 CONSTANT_OWNERSHIP_BUILTIN(None, AddressOfRawLayout)
+
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddCancellationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemoveCancellationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddPriorityEscalationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemovePriorityEscalationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskLocalValuePush)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskLocalValuePop)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPush)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPop)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
@@ -651,7 +692,10 @@ UNOWNED_OR_NONE_DEPENDING_ON_RESULT(CmpXChg)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(AtomicLoad)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ExtractElement)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(InsertElement)
+UNOWNED_OR_NONE_DEPENDING_ON_RESULT(Select)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ShuffleVector)
+UNOWNED_OR_NONE_DEPENDING_ON_RESULT(Interleave)
+UNOWNED_OR_NONE_DEPENDING_ON_RESULT(Deinterleave)
 #undef UNOWNED_OR_NONE_DEPENDING_ON_RESULT
 
 #define OWNED_OR_NONE_DEPENDING_ON_RESULT(ID)                                  \
@@ -666,6 +710,7 @@ UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ShuffleVector)
 // fields. The initialized value is immediately consumed by an assignment, so it
 // must be owned.
 OWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
+OWNED_OR_NONE_DEPENDING_ON_RESULT(PrepareInitialization)
 #undef OWNED_OR_NONE_DEPENDING_ON_RESULT
 
 #define BUILTIN(X,Y,Z)
@@ -720,7 +765,7 @@ namespace swift::test {
 // - SILValue: value
 // Dumps:
 // - message
-static FunctionTest GetOwnershipKind("get-ownership-kind", [](auto &function,
+static FunctionTest GetOwnershipKind("get_ownership_kind", [](auto &function,
                                                               auto &arguments,
                                                               auto &test) {
   SILValue value = arguments.takeValue();

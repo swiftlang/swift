@@ -20,6 +20,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -37,11 +38,7 @@ namespace {
 
 class OwnershipVerifierTextualErrorDumper : public SILFunctionTransform {
   void run() override {
-    SILFunction *f = getFunction();
-    auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
-    f->verifyOwnership(f->getModule().getOptions().OSSAVerifyComplete
-                           ? nullptr
-                           : deBlocksAnalysis->get(f));
+    getFunction()->verifyOwnership();
   }
 };
 

@@ -13,8 +13,8 @@ func foo1(e : E) {
 }
 
 func foo2(i : Int) {
-  // expected-note@+1{{add a default clause}}{{+2:3-3=default:\n<#code#>\n}}
   switch i { // expected-error{{switch must be exhaustive}}
+  // expected-note@-1{{add a default clause}}{{+3:3-3=default:\n<#code#>\n}}
   case 1: return
   }
 }
@@ -100,6 +100,7 @@ func testSwitchEnumBoolTuple(_ b1: Bool, b2: Bool, xi: Int) -> Int {
   switch Cond { // expected-error{{switch must be exhaustive}}
   // expected-note@-1 {{add missing case: '(false, _)'}}
   // expected-note@-2 {{add missing case: '(_, false)'}}
+  // expected-note@-3 {{add missing cases}}
   case (true, true):
     x += 1
   }
@@ -107,6 +108,7 @@ func testSwitchEnumBoolTuple(_ b1: Bool, b2: Bool, xi: Int) -> Int {
   switch Cond { // expected-error{{switch must be exhaustive}}
   // expected-note@-1 {{add missing case: '(true, _)'}}
   // expected-note@-2 {{add missing case: '(_, false)'}}
+  // expected-note@-3 {{add missing cases}}
   case (false, true):
     x += 1
   }

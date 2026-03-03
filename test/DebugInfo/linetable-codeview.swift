@@ -54,8 +54,8 @@ func foo() {
 
 // func myLoop() {
   // CHECK: define {{.*}} @"$s4main6myLoopyyF"
-  // CHECK: call void @llvm.dbg.declare(metadata ptr %index.debug, {{.*}}), !dbg ![[FORLOOP:[0-9]+]]
-  // CHECK: phi i64 [ %{{.[0-9]+}}, %{{.[0-9]+}} ], !dbg ![[FORLOOP]]
+  // CHECK: #dbg_declare(ptr %index.debug, {{.*}}, ![[INDEX:[0-9]+]]
+  // CHECK: phi i64 [ %{{.[0-9]+}}, %{{.[0-9]+}} ], !dbg ![[FORLOOP:[0-9]+]]
   // CHECK: call {{.*}} @"$s4main8markUsedyyxlF"{{.*}}, !dbg ![[FORBODY:[0-9]+]]
   // CHECK: ret void
 
@@ -70,8 +70,8 @@ func foo() {
 // func foo()
   // CHECK: define {{.*}} @"$s4main3fooyyF"
   // CHECK: %[[MYARRAY:.*]] = alloca
-  // CHECK: call void @llvm.dbg.declare(metadata ptr %[[MYARRAY]],
-  // CHECK-SAME: !dbg ![[ARRAY:[0-9]+]]
+  // CHECK: #dbg_declare(ptr %[[MYARRAY]], !{{.*}}, !DIExpression
+  // CHECK-SAME: ![[ARRAY:[0-9]+]]
   // CHECK: call swiftcc { {{.*}} } @"${{.*}}_allocateUninitializedArray{{.*}}"
   // CHECK-SAME: !dbg ![[ARRAY_ALLOC:[0-9]+]]
   // CHECK: ret void
@@ -88,6 +88,7 @@ func foo() {
 //       to keep the linetables contiguous.
 // CHECK-DAG: ![[SUM]] = distinct !DISubprogram(name: "sum", linkageName: "$s4main12SimpleStructV3sum5myArgySf_tF"
 // CHECK-DAG: ![[PROLOGUE]] = !DILocation(line: 12, scope: ![[SUM]])
+// CHECK-DAG: ![[INDEX]] = !DILocation(line: 17, scope:
 // CHECK-DAG: ![[FORLOOP]] = !DILocation(line: 17, scope:
 // CHECK-DAG: ![[FORBODY]] = !DILocation(line: 18, scope:
 // CHECK-DAG: ![[CASE]] = !DILocation(line: 24, scope:

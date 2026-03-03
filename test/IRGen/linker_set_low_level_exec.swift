@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature SymbolLinkageMarkers) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_in_compiler
@@ -6,19 +6,19 @@
 // https://github.com/apple/swift/issues/73321
 // UNSUPPORTED: OS=windows-msvc
 
-@_used
+@used
 #if canImport(Darwin)
-@_section("__TEXT,__mysection")
+@section("__TEXT,__mysection")
 #else
-@_section("__mysection")
+@section("__mysection")
 #endif
 let my_global1: Int = 42
 
-@_used
+@used
 #if canImport(Darwin)
-@_section("__TEXT,__mysection")
+@section("__TEXT,__mysection")
 #else
-@_section("__mysection")
+@section("__mysection")
 #endif
 let my_global2: Int = 46
 

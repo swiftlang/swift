@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-ir %s -module-name=main -enable-experimental-feature Embedded | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 @propertyWrapper
 @dynamicMemberLookup
@@ -12,7 +12,7 @@ public struct Binding<Value> {
     self.wrappedValue = get()
   }
 
-  subscript<Subject>(dynamicMember keyPath: WritableKeyPath<Value, Subject>) -> Binding<Subject> {
+  public subscript<Subject>(dynamicMember keyPath: WritableKeyPath<Value, Subject>) -> Binding<Subject> {
     get { fatalError() }
   }
 }
@@ -20,7 +20,7 @@ public struct Binding<Value> {
 
 public struct State<Wrapped> {
   public var wrappedValue: Wrapped
-  
+
   public init(wrappedValue: Wrapped) {
     self.wrappedValue = wrappedValue
   }
@@ -41,4 +41,14 @@ public struct State<Wrapped> {
   }
 }
 
-// CHECK: define {{.*}}@main(
+public struct S<T> {
+  public private(set) subscript(x: Int) -> Int {
+     get {
+       return 27
+     }
+     mutating set {
+     }
+   }
+}
+
+// CHECK: define {{.*}}@{{_*}}main{{.*}}(

@@ -29,7 +29,7 @@ import UIKit
 class MyDelegate : UIApplicationDelegate {}
 
 // CHECK-LABEL: sil [ossa] @main
-// CHECK:         function_ref @UIApplicationMain
+// CHECK:         function_ref @$sSo17UIApplicationMainys5Int32VAC_SpySpys4Int8VGSg{{.*}}To
 // IR-LABEL: define{{( protected)?}} i32 @main
 // IR:            call i32 @UIApplicationMain
 

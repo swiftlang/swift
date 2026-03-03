@@ -1,7 +1,5 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -30,15 +28,47 @@ struct SomeFile: Sendable {
   func close() {}
 }
 
+enum HomeworkError: Error {
+case dogAteIt
+}
+
 @available(SwiftStdlib 5.1, *)
 func test_cancellation_withTaskCancellationHandler(_ anything: Any) async -> PictureData? {
   let handle: Task<PictureData, Error> = .init {
     let file = SomeFile()
 
-    return await withTaskCancellationHandler {
-      await test_cancellation_guard_isCancelled(file)
-    } onCancel: {
-      file.close()
+    do throws(HomeworkError) {
+      return try await withTaskCancellationHandler { () throws(HomeworkError) in
+        await test_cancellation_guard_isCancelled(file)
+      } onCancel: {
+        file.close()
+      }
+    } catch .dogAteIt {
+      return PictureData.value("...")
+    }
+  }
+
+  handle.cancel()
+  return nil
+}
+
+@available(SwiftStdlib 6.0, *)
+func test_cancellation_withTaskCancellationHandler(_ anything: Any, isolation: (any Actor)? = #isolation) async -> PictureData? {
+  let handle: Task<PictureData, Error> = .init {
+    let file = SomeFile()
+
+    do {
+      return try await withTaskCancellationHandler(
+        operation: { () throws in
+          await test_cancellation_guard_isCancelled(file)
+        },
+        onCancel: {
+          file.close()
+        },
+        isolation: isolation
+      )
+    } catch {
+      return PictureData.value("...")
     }
   }
 

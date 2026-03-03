@@ -14,6 +14,8 @@
 
 #include "SourceKit/Support/Concurrency.h"
 #include "TestOptions.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -28,6 +30,7 @@
 #include "llvm/Support/Program.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/thread.h"
 #include <fstream>
@@ -235,6 +238,37 @@ static void skt_main(skt_args *args) {
   int argc = args->argc;
   const char **argv = args->argv;
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
+
+  // We should never set the current working directory for the process in
+  // SourceKit, since that would causes races for concurrent requests and breaks
+  // LSP when in-process. To enforce this, set the current working dir to a new
+  // temporary directory and make sure it's preserved.
+  auto realFS = llvm::vfs::getRealFileSystem();
+  auto origWorkingDir = realFS->getCurrentWorkingDirectory().get();
+  llvm::SmallString<256> tmpWorkingDir;
+  {
+    llvm::SmallString<256> tmpDir;
+    auto errCode = llvm::sys::fs::createUniqueDirectory("sourcekitd-test-cwd",
+                                                        tmpDir);
+    ASSERT(!errCode && "Failed to create temporary dir for sourcekitd-test");
+    errCode = realFS->getRealPath(tmpDir, tmpWorkingDir);
+    ASSERT(!errCode && !tmpWorkingDir.empty() &&
+           "Failed to resolve temporary dir real path");
+    realFS->setCurrentWorkingDirectory(tmpWorkingDir);
+  }
+  SWIFT_DEFER {
+    auto cwd = realFS->getCurrentWorkingDirectory().get();
+    if (tmpWorkingDir != cwd) {
+      ABORT([&](auto &out) {
+        out << "Working directory of the *process* was set to ";
+        out << "'" << cwd << "'; SourceKit does not support this. ";
+        out << "Make sure to use `llvm::vfs::createPhysicalFileSystem` ";
+        out << "instead of `llvm::vfs::getRealFileSystem`.";
+      });
+    }
+    realFS->setCurrentWorkingDirectory(origWorkingDir);
+    llvm::sys::fs::remove_directories(tmpWorkingDir);
+  };
 
   sourcekitd_initialize();
 
@@ -734,6 +768,9 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     // Default to sort by name.
     Opts.RequestOptions.insert(Opts.RequestOptions.begin(), "sort.byname=1");
+    // Default to verifying USR to Decl conversion to cover many use cases
+    Opts.RequestOptions.insert(Opts.RequestOptions.begin(),
+                               "verifyusrtodecl=1");
     addRequestOptions(Req, Opts, KeyCodeCompleteOptions, "key.codecomplete.");
     break;
 
@@ -815,6 +852,12 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                           RequestConformingMethodList);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     addRequestOptionsDirect(Req, Opts);
+    break;
+
+  case SourceKitRequest::SignatureHelp:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestSignatureHelp);
+    sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     break;
 
   case SourceKitRequest::CursorInfo:
@@ -1069,6 +1112,9 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                                Opts.InterestedUSR.c_str());
     if (!Opts.USR.empty())
       sourcekitd_request_dictionary_set_string(Req, KeyUSR, Opts.USR.c_str());
+
+    // add possible EnableDeclarations in particular
+    addRequestOptionsDirect(Req, Opts);
     break;
 
   case SourceKitRequest::FindInterfaceDoc:
@@ -1218,20 +1264,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                           "-Xfrontend");
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
           "-disable-implicit-string-processing-module-import");
-    }
-    if (Opts.EnableImplicitBacktracingModuleImport &&
-        !compilerArgsAreClang) {
-      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
-                                          "-Xfrontend");
-      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
-          "-enable-implicit-backtracing-module-import");
-    }
-    if (Opts.DisableImplicitBacktracingModuleImport &&
-        !compilerArgsAreClang) {
-      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
-                                          "-Xfrontend");
-      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
-          "-disable-implicit-backtracing-module-import");
     }
 
     for (auto Arg : Opts.CompilerArgs)
@@ -1427,6 +1459,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::CodeCompleteSetPopularAPI:
     case SourceKitRequest::TypeContextInfo:
     case SourceKitRequest::ConformingMethodList:
+    case SourceKitRequest::SignatureHelp:
     case SourceKitRequest::DependencyUpdated:
     case SourceKitRequest::Diagnostics:
     case SourceKitRequest::SemanticTokens:
@@ -1617,15 +1650,13 @@ static void getSemanticInfoImpl(sourcekitd_variant_t Info) {
 
 static void getSemanticInfoImplAfterDocUpdate(sourcekitd_variant_t EditOrOpen,
                                               sourcekitd_variant_t DocUpdate) {
+  // FIXME: currently we only return annotations once, so depending on thread
+  // ordering, the open/edit or update may contain them. Really we should
+  // switch everything to pull based to remove races like this.
   if (sourcekitd_variant_dictionary_get_uid(EditOrOpen, KeyDiagnosticStage) ==
-      SemaDiagnosticStage) {
-    // FIXME: currently we only return annotations once, so if the original edit
-    // or open request was slow enough, it may "take" the annotations. If that
-    // is fixed, we can skip checking the diagnostic stage and always use the
-    // DocUpdate variant.
-    assert(sourcekitd_variant_get_type(sourcekitd_variant_dictionary_get_value(
-               DocUpdate, KeyAnnotations)) == SOURCEKITD_VARIANT_TYPE_NULL);
-
+          SemaDiagnosticStage &&
+      sourcekitd_variant_get_type(sourcekitd_variant_dictionary_get_value(
+          DocUpdate, KeyAnnotations)) == SOURCEKITD_VARIANT_TYPE_NULL) {
     getSemanticInfoImpl(EditOrOpen);
   } else {
     getSemanticInfoImpl(DocUpdate);
@@ -2453,6 +2484,12 @@ static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII) {
   sourcekitd_variant_t structure =
       sourcekitd_variant_dictionary_get_value(Info, KeySubStructure);
   printRawVariant(structure);
+  sourcekitd_variant_t declarations =
+      sourcekitd_variant_dictionary_get_value(Info, KeyDeclarations);
+  // only output declarations if there are any (because this might have been
+  // disabled in the request itself)
+  if (sourcekitd_variant_get_type(declarations) != SOURCEKITD_VARIANT_TYPE_NULL)
+    printRawVariant(declarations);
 }
 
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,

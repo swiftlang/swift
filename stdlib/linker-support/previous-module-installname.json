@@ -1,6 +1,0 @@
-[
-  {
-    "module": "Darwin",
-    "install_name": "/usr/lib/swift/libswiftDarwin.dylib"
-  }
-]

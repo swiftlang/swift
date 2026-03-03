@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -verify -sil-verify-all -enable-experimental-feature ReferenceBindings -emit-sil %s
 
+// REQUIRES: swift_feature_ReferenceBindings
+
 func varBindingTest() {
     var x = "1"
     x = "1"

@@ -87,10 +87,10 @@ public:
   ParamDecl *back() const { return getArray().back(); }
 
   MutableArrayRef<ParamDecl*> getArray() {
-    return {getTrailingObjects<ParamDecl*>(), numParameters};
+    return getTrailingObjects(numParameters);
   }
   ArrayRef<ParamDecl*> getArray() const {
-    return {getTrailingObjects<ParamDecl*>(), numParameters};
+    return getTrailingObjects(numParameters);
   }
 
   size_t size() const {

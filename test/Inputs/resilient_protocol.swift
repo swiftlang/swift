@@ -44,3 +44,17 @@ public protocol ResilientSelfDefault : ResilientBaseProtocol {
 @_fixed_layout public protocol OtherFrozenProtocol {
   func protocolMethod()
 }
+
+public protocol ResilientSendableBase: Sendable {
+  func f()
+}
+
+public protocol ResilientSendable: ResilientSendableBase {
+  func g()
+}
+
+
+public struct ConformsToResilientSendable: ResilientSendable {
+  public func f() { }
+  public func g() { }
+}

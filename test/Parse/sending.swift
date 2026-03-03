@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature SendingArgsAndResults -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -enable-experimental-feature SendingArgsAndResults -strict-concurrency=complete
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendingArgsAndResults
 
 func testArg(_ x: sending String) {
 }
@@ -13,7 +13,18 @@ func testArgResult(_ x: sending String) -> sending String {
 }
 
 func testVarDeclDoesntWork() {
-  var x: sending String // expected-error {{'sending' may only be used on parameter}}
+  var x: sending String // expected-error {{'sending' may only be used on parameters and results}}
+  let y: sending String // expected-error {{'sending' may only be used on parameters and results}}
+
+  struct S {
+    var opaqueStored: sending some Equatable = 0 // expected-error {{'sending' may only be used on parameters and results}}
+    let opaqueStoredImmutable: sending some Equatable = 0 // expected-error {{'sending' may only be used on parameters and results}}
+    var opaqueComputed: sending some Equatable { 0 } // expected-error {{'sending' may only be used on parameters and results}}
+    var opaqueWriteback: sending some Equatable { // expected-error {{'sending' may only be used on parameters and results}}
+      get { 0 }
+      set {}
+    }
+  }
 }
 
 func testVarDeclTupleElt() -> (sending String, String) {} // expected-error {{'sending' cannot be applied to tuple elements}}
@@ -28,3 +39,6 @@ func testArgWithConsumingWrongOrder(_ x: sending consuming String, _ y: sending 
 func testArgWithConsumingWrongOrderType(_ x: (sending consuming String, sending inout String) -> ()) {}
 // expected-error @-1 {{'sending' must be placed after specifier 'consuming'}}
 // expected-error @-2 {{'sending' must be placed after specifier 'inout'}}
+
+func testBorrowSending(_ x: borrowing sending String) {}
+// expected-error @-1 {{'sending' cannot be used together with 'borrowing'}}

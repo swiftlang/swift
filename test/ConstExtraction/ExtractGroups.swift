@@ -45,6 +45,12 @@ extension String: Foo {}
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractGroups.MyProto"
 // CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractGroups.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractGroups"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
@@ -128,7 +134,13 @@ extension String: Foo {}
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractGroups.MyProto"
 // CHECK-NEXT:    ],
-// CHECK-NEXT:    "associatedTypeAliases": [],    
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractGroups.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractGroups"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "dict1",
@@ -267,6 +279,12 @@ extension String: Foo {}
 // CHECK-NEXT:    "line": 27,
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractGroups.MyProto"
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractGroups.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractGroups"
+// CHECK-NEXT:      }
 // CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -parse-serialized-sil -enable-sil-verify-all -sil-partial-specialization -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -parse-serialized-sil -enable-sil-verify-all -sil-partial-specialization -generic-specializer %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -44,7 +44,7 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK-LABEL: sil [ossa] @exp1 : $@convention(thin) () -> () {
 // CHECK-NOT: apply
 // Call of specialized initializer: <Int32>
-// CHECK: [[CTOR:%[0-9]+]] = function_ref @$s8XXX_inits5Int32V_Tgm5
+// CHECK: [[CTOR:%[0-9]+]] = function_ref @$s8XXX_inits5Int32V_Tt1g5
 // CHECK: apply [[CTOR]]
 // CHECK: [[ACCEPTS_INT:%[0-9]+]] = function_ref @acceptsInt
 // Call of specialized XXX_foo: <Int32>
@@ -635,7 +635,7 @@ bb0:
 
 // test_bind<A> (Builtin.RawPointer, A.Type) -> ()
 // Check that this is specialized as T=Int.
-// CHECK-LABEL: sil shared [ossa] @$s9test_bindSi_Tgm5 : $@convention(thin) (Builtin.RawPointer) -> () {
+// CHECK-LABEL: sil shared [ossa] @$s9test_bindSi_Tt0g5 : $@convention(thin) (Builtin.RawPointer) -> () {
 // CHECK: bind_memory %0 : $Builtin.RawPointer, {{%.*}} : $Builtin.Word to $*Int
 // CHECK: return
 sil hidden [ossa] @test_bind : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> () {
@@ -894,7 +894,7 @@ bb0(%0 : $*T, %1 :$*T):
 }
 
 // This should not assert.
-// CHECK-LABEL: sil shared [ossa] @$s26specialize_no_return_applys5NeverO_Tgm5 : $@convention(thin) () -> () {
+// CHECK-LABEL: sil shared [ossa] @$s26specialize_no_return_applys5NeverO_Ttg5 : $@convention(thin) () -> () {
 // CHECK:      apply
 // CHECK-NEXT: unreachable
 
@@ -1213,6 +1213,37 @@ bb2:
   unwind
 }
 
+sil [ossa] @calling_generic_co_routine_with_exit_edge : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = function_ref @generic_begin_apply_callee_inout : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
+  (%2, %3) = begin_apply %1<T>(%0) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %3
+  unreachable
+
+bb2:
+  %7 = end_apply %3 as $()
+  %8 = tuple ()
+  return %8
+}
+
+
+// Just make sure we pass the verifiers.
+//
+// CHECK-LABEL: sil [ossa] @test_calling_generic_co_routine_with_exit_edge :
+// CHECK:         %2 = load_borrow %0
+// CHECK:         apply %1(%2)
+// CHECK:       } // end sil function 'test_calling_generic_co_routine_with_exit_edge'
+sil [ossa] @test_calling_generic_co_routine_with_exit_edge : $@convention(thin) (@in_guaranteed String) -> () {
+bb0(%0 : $*String):
+  %1 = function_ref @calling_generic_co_routine_with_exit_edge : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %2 = apply %1<String>(%0) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %3 = tuple ()
+  return %3
+}
+
 // Just make sure we pass the verifiers.
 //
 // CHECK-LABEL: sil [ossa] @test_begin_apply_inguaranteed : $@convention(thin) (Builtin.Int32, @guaranteed Builtin.NativeObject) -> () {
@@ -1297,6 +1328,33 @@ bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @co_routine_with_exit_edge :
+// CHECK:         [[L:%.*]] = load_borrow %0
+// CHECK:         ({{%.*}}, [[T:%.*]]) = begin_apply {{%.*}}([[L]]) : $@yield_once @convention(thin) (@guaranteed String) -> @yields @inout String
+// CHECK:       bb1:
+// CHECK:         end_borrow [[T]]
+// CHECK:         end_borrow [[L]]
+// CHECK:         unreachable
+// CHECK:       bb2:
+// CHECK:         end_apply [[T]]
+// CHECK:         end_borrow [[L]]
+// CHECK:       } // end sil function 'co_routine_with_exit_edge'
+sil [ossa] @co_routine_with_exit_edge : $@convention(thin) (@in_guaranteed String) -> () {
+bb0(%0 : $*String):
+  %1 = function_ref @generic_begin_apply_callee_inout : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
+  (%2, %3) = begin_apply %1<String>(%0) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %3
+  unreachable
+
+bb2:
+  %7 = end_apply %3 as $()
+  %8 = tuple ()
+  return %8
+}
+
 sil @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed AnyObject) -> @out τ_0_0
 
 // rdar://99874173: assert; PrunedLiveness; No user in LiveWithin block
@@ -1306,16 +1364,14 @@ sil @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed AnyObject) -> @out
 // The generic cloner needs to be able to compute liveness to fixup a
 // store borrow scope when the only use is in unreachable code.
 // specialized testNoReturnSpecialization
-// CHECK-LABEL: sil shared [ossa] @$s26testNoReturnSpecializations5NeverO_Tgm5 : $@convention(thin) (@guaranteed AnyObject) -> () {
+// CHECK-LABEL: sil shared [ossa] @$s26testNoReturnSpecializations5NeverO_Tt0g5 : $@convention(thin) (@guaranteed AnyObject) -> () {
 // CHECK:   [[SB:%.*]] = store_borrow %0 to %{{.*}} : $*AnyObject
 // CHECK:   [[LB:%.*]] = load_borrow [[SB]] : $*AnyObject
 // CHECK:   apply %{{.*}}<Never>(%{{.*}}, [[LB]]) : $@convention(thin) <τ_0_0> (@guaranteed AnyObject) -> @out τ_0_0
-// CHECK:   end_borrow [[SB]] : $*AnyObject
-// CHECK:   unreachable
-// CHECK: bb1:
-// CHECK:   end_borrow [[LB]] : $AnyObject
-// CHECK:   end_borrow [[SB]] : $*AnyObject
-// CHECK-LABEL: } // end sil function '$s26testNoReturnSpecializations5NeverO_Tgm5'
+// CHECK-NEXT:   end_borrow [[LB]]
+// CHECK-NEXT:   end_borrow [[SB]]
+// CHECK-NEXT:   unreachable
+// CHECK-LABEL: } // end sil function '$s26testNoReturnSpecializations5NeverO_Tt0g5'
 sil [ossa] @testNoReturnSpecialization : $@convention(thin) <T> (@in_guaranteed AnyObject, @thick T.Type) -> () {
 bb0(%0 : $*AnyObject, %1 : $@thick T.Type):
   %2 = load_borrow %0 : $*AnyObject
@@ -1354,7 +1410,7 @@ bb0(%0 : $@thick GenericKlass<T>.Type):
 }
 
 // CHECK-LABEL: sil [ossa] @callUsedMetatypeWithConcreteMetatype :
-// CHECK:         = function_ref @$s12metatypeUsedSi_Tgm5 : $@convention(thin) () -> ()
+// CHECK:         = function_ref @$s12metatypeUsedSi_Ttg5 : $@convention(thin) () -> ()
 // CHECK-LABEL: } // end sil function 'callUsedMetatypeWithConcreteMetatype'
 sil [ossa] @callUsedMetatypeWithConcreteMetatype : $@convention(thin) () -> () {
 bb0:
@@ -1377,7 +1433,7 @@ bb0(%0 : $@thick GenericKlass<Int>.Type):
 }
 
 // CHECK-LABEL: sil [ossa] @callUnusedMetatypeWithUnknownMetatype :
-// CHECK:         = function_ref @$s14metatypeUnusedSi_Tgm5 : $@convention(thin) () -> ()
+// CHECK:         = function_ref @$s14metatypeUnusedSi_Ttg5 : $@convention(thin) () -> ()
 // CHECK-LABEL: } // end sil function 'callUnusedMetatypeWithUnknownMetatype'
 sil [ossa] @callUnusedMetatypeWithUnknownMetatype : $@convention(thin) (@thick GenericKlass<Int>.Type) -> () {
 bb0(%0 : $@thick GenericKlass<Int>.Type):
@@ -1394,7 +1450,7 @@ bb0(%0 : $*T, %1 : $@thick GenericKlass<T>.Type):
 }
 
 // CHECK-LABEL: sil [ossa] @returnClosureWithAppliedMetatype :
-// CHECK:         = function_ref @$s21closure_with_metatypeSi_TGm5 : $@convention(thin) (@in_guaranteed Int) -> ()
+// CHECK:         = function_ref @$s21closure_with_metatypeSi_Tt0G5 : $@convention(thin) (@in_guaranteed Int) -> ()
 // CHECK-LABEL: } // end sil function 'returnClosureWithAppliedMetatype'
 sil [ossa] @returnClosureWithAppliedMetatype : $@convention(thin) () -> @owned @callee_owned (@in_guaranteed Int) -> () {
 bb0:
@@ -1439,7 +1495,7 @@ bb0(%0 : $*T, %2 : $@thick T.Type, %3 : $*T, %4 : $Bool):
 }
 
 // CHECK-LABEL: sil [ossa] @returnComplexClosure :
-// CHECK:         = function_ref @$s15complex_closureSi_TGm5 : $@convention(thin) (@in_guaranteed Int, Bool) -> @out Int
+// CHECK:         = function_ref @$s15complex_closureSi_Tt0G5 : $@convention(thin) (@in_guaranteed Int, Bool) -> @out Int
 // CHECK-LABEL: } // end sil function 'returnComplexClosure'
 sil [ossa] @returnComplexClosure : $@convention(thin) (@in Int, Bool) -> @owned @callee_owned () -> @out Int {
 bb0(%0: $*Int, %1 : $Bool):
@@ -1610,4 +1666,108 @@ bb0:
   dealloc_stack %3 : $*()
   %9999 = tuple ()
   return %9999 : $()
+}
+
+sil [ossa] @unused_argument : $@convention(thin) <T> (@in_guaranteed T) -> () {
+[global: ]
+bb0(%0 : $*T):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @call_generic_func_with_no_arg_read :
+// CHECK-NOT:     load
+// CHECK:           [[L:%.*]] = load_borrow %1
+// CHECK:           = apply {{%[0-9]+}}([[L]]) :
+// CHECK:           end_borrow [[L]]
+// CHECK:       } // end sil function 'call_generic_func_with_no_arg_read'
+sil [ossa] @call_generic_func_with_no_arg_read : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1
+  %2 = function_ref @unused_argument : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<Klass>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %1
+  dealloc_stack %1 : $*Klass
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @callee : $@convention(thin) <Result> (@inout Result, @in_guaranteed Int, Int) -> () {
+bb0(%0 : $*Result, %1 : $*Int, %2 : $Int):
+  unreachable
+}
+
+sil [reabstraction_thunk] [ossa] @thunk : $@convention(thin) <τ_0_0> (@inout τ_0_0, Int, @guaranteed @noescape @callee_guaranteed (@inout τ_0_0, @in_guaranteed Int) -> ()) -> ()
+
+// CHECK-LABEL: sil [ossa] @insert_copy_when_removing_thunk :
+// CHECK:         [[P:%.*]] = partial_apply [callee_guaranteed] [on_stack] %2(%0)
+// CHECK:         [[C:%.*]] = copy_value [[P]]
+// CHECK:         [[V:%.*]] = convert_function [[C]]
+// CHECK:         apply [[V]]
+// CHECK:         destroy_value [[V]]
+// CHECK:         destroy_value [[P]]
+// CHECK:       } // end sil function 'insert_copy_when_removing_thunk'
+sil [ossa] @insert_copy_when_removing_thunk : $@convention(method) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  %2 = function_ref @callee : $@convention(thin) <τ_0_0> (@inout τ_0_0, @in_guaranteed Int, Int) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2<Int>(%0) : $@convention(thin) <τ_0_0> (@inout τ_0_0, @in_guaranteed Int, Int) -> ()
+  %4 = function_ref @thunk : $@convention(thin) <τ_0_0> (@inout τ_0_0, Int, @guaranteed @noescape @callee_guaranteed (@inout τ_0_0, @in_guaranteed Int) -> ()) -> ()
+  %5 = partial_apply [callee_guaranteed] [on_stack] %4<Int>(%3) : $@convention(thin) <τ_0_0> (@inout τ_0_0, Int, @guaranteed @noescape @callee_guaranteed (@inout τ_0_0, @in_guaranteed Int) -> ()) -> ()
+  %6 = convert_function %5 to $@noescape @callee_guaranteed @substituted <τ_0_0> (@inout τ_0_0, Int) -> () for <Int>
+  store %0 to [trivial] %1
+  %8 = apply %6(%1, %0) : $@noescape @callee_guaranteed @substituted <τ_0_0> (@inout τ_0_0, Int) -> () for <Int>
+  destroy_value %6
+  destroy_value %3
+  %11 = load [trivial] %1
+  dealloc_stack %1
+  return %11
+}
+
+
+sil hidden [ossa] @$s_custom_not_demangable_name : $@convention(thin) <T> (@thick T.Type) -> () {
+bb0(%0 : $@thick T.Type):
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @call_custom_name :
+// CHECK:         function_ref @$s29$s_custom_not_demangable_nameSi_Ttg5 : $@convention(thin) () -> ()
+// CHECK:       } // end sil function 'call_custom_name'
+sil [ossa] @call_custom_name : $@convention(thin) () -> () {
+bb0:
+  %2 = function_ref @$s_custom_not_demangable_name : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()
+  %3 = metatype $@thick Int.Type
+  %4 = apply %2<Int>(%3) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s19alloc_stack_of_packSS_QP_Tg5 :
+// CHECK:         %1 = alloc_stack [dynamic_lifetime] $String
+// CHECK:       } // end sil function '$s19alloc_stack_of_packSS_QP_Tg5'
+sil [ossa] @alloc_stack_of_pack : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> () {
+bb0(%0 : $*Pack{repeat each T}):
+  %1 = alloc_stack $(repeat each T)
+  dealloc_stack %1
+  %3 = tuple ()
+  return %3
+}
+
+sil [ossa] @call_alloc_stack_of_pack : $@convention(thin) (@guaranteed String) -> () {
+bb0(%0 : @guaranteed $String):
+  %2 = alloc_pack $Pack{String}
+  %3 = alloc_stack $String
+  %4 = copy_value %0
+  store %4 to [init] %3
+  %6 = scalar_pack_index 0 of $Pack{String}
+  pack_element_set %3 into %6 of %2
+  %8 = function_ref @alloc_stack_of_pack : $@convention(thin) <each τ_0_0> (@pack_guaranteed Pack{repeat each τ_0_0}) -> ()
+  %9 = apply %8<Pack{String}>(%2) : $@convention(thin) <each τ_0_0> (@pack_guaranteed Pack{repeat each τ_0_0}) -> ()
+  destroy_addr %3
+  dealloc_stack %3
+  dealloc_pack %2
+  %13 = tuple ()
+  return %13
 }

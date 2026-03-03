@@ -24,7 +24,7 @@ internal struct _StringGutsSlice {
   @inline(__always)
   internal init(_ guts: _StringGuts) {
     self._guts = guts
-    self._offsetRange = Range(_uncheckedBounds: (0, guts.count))
+    self._offsetRange = unsafe Range(_uncheckedBounds: (0, guts.count))
   }
 
   @inline(__always)
@@ -74,7 +74,7 @@ internal struct _StringGutsSlice {
         ._scalarAligned
       let higher = String.Index(_encodedOffset: _offsetRange.upperBound)
         ._scalarAligned
-      return Range(_uncheckedBounds: (lower, higher))
+      return unsafe Range(_uncheckedBounds: (lower, higher))
     }
   }
 
@@ -82,7 +82,7 @@ internal struct _StringGutsSlice {
   internal func withFastUTF8<R>(
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
-    return try _guts.withFastUTF8(range: _offsetRange, f)
+    return try unsafe _guts.withFastUTF8(range: _offsetRange, f)
   }
 
   @_effects(releasenone)

@@ -32,8 +32,8 @@
 
 #include "swift/SILOptimizer/Transforms/SimplifyCFG.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
-#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
@@ -51,6 +51,7 @@
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
@@ -231,6 +232,7 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
                    (*ThreadedSuccessorBlock->args_begin())->getType() &&
                "Argument types must match");
         Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
+        Cloner.registerBlockWithNewPhiArg(ThreadedSuccessorBlock);
       } else {
         assert(SEI->getDefaultBB() == ThreadedSuccessorBlock);
         auto *OldBlockArg = ThreadedSuccessorBlock->getArgument(0);
@@ -302,7 +304,8 @@ static SILValue createValueForEdge(SILInstruction *UserInst,
 
   if (auto *CBI = dyn_cast<CondBranchInst>(DominatingTerminator))
     return Builder.createIntegerLiteral(
-        CBI->getLoc(), CBI->getCondition()->getType(), EdgeIdx == 0 ? -1 : 0);
+        CBI->getLoc(), CBI->getCondition()->getType(), EdgeIdx == 0 ? -1 : 0,
+        /*treatAsSigned=*/true);
 
   auto *SEI = cast<SwitchEnumInst>(DominatingTerminator);
   auto *DstBlock = SEI->getSuccessors()[EdgeIdx].getBB();
@@ -1077,7 +1080,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGTryJumpThreading(
-    "simplify-cfg-try-jump-threading",
+    "simplify_cfg_try_jump_threading",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -1291,9 +1294,9 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
       if (auto *bfi = getBorrowedFromUser(arg)) {
         bfi->replaceAllUsesWith(Val);
         bfi->eraseFromParent();
-      } else {
-        arg->replaceAllUsesWith(Val);
       }
+      arg->replaceAllUsesWith(Val);
+
       if (!isVeryLargeFunction) {
         if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
           // Replacing operands may trigger constant folding which then could
@@ -1478,7 +1481,8 @@ static SILValue invertExpectAndApplyTo(SILBuilder &Builder,
   if (!IL)
     return V;
   SILValue NegatedExpectedValue = Builder.createIntegerLiteral(
-      IL->getLoc(), Args[1]->getType(), IL->getValue() == 0 ? -1 : 0);
+      IL->getLoc(), Args[1]->getType(), IL->getValue() == 0 ? -1 : 0,
+      /*treatAsSigned=*/true);
   return Builder.createBuiltin(BI->getLoc(), BI->getName(), BI->getType(), {},
                                {V, NegatedExpectedValue});
 }
@@ -1741,11 +1745,19 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
 // Does this basic block consist of only an "unreachable" instruction?
 static bool isOnlyUnreachable(SILBasicBlock *BB) {
-  auto *Term = BB->getTerminator();
-  if (!isa<UnreachableInst>(Term))
-    return false;
-
-  return (&*BB->begin() == BB->getTerminator());
+  for (SILInstruction &inst : *BB) {
+    switch (inst.getKind()) {
+    case SILInstructionKind::EndBorrowInst:
+    case SILInstructionKind::DestroyValueInst:
+    case SILInstructionKind::EndLifetimeInst:
+    case SILInstructionKind::DeallocStackInst:
+    case SILInstructionKind::UnreachableInst:
+      break;
+    default:
+      return false;
+    }
+  }
+  return true;
 }
 
 
@@ -1779,19 +1791,21 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   LLVM_DEBUG(llvm::dbgs() << "remove unreachable case " << *SEI);
 
   if (!Dest) {
-    addToWorklist(SEI->getParent());
-    SILBuilderWithScope(SEI).createUnreachable(SEI->getLoc());
-    for (auto &succ : SEI->getSuccessors()) {
-      succ.getBB()->removeDeadBlock();
-    }
-    SEI->eraseFromParent();
-    return true;
+    if (Count == 0)
+      return false;
+    // If all successors end in unreachable, pick the first one.
+    auto enumCase = SEI->getCase(0);
+    Element = enumCase.first;
+    Dest = enumCase.second;
   }
 
-  if (!Element || !Element->hasAssociatedValues() || Dest->args_empty()) {
-    assert(Dest->args_empty() && "Unexpected argument at destination!");
-
-    SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest);
+  if (Dest->args_empty()) {
+    SILBuilderWithScope builder(SEI);
+    if (SEI->getOperand()->getOwnershipKind() == OwnershipKind::Owned) {
+      // Note that a `destroy_value` would be wrong for non-copyable enums with deinits.
+      builder.createEndLifetime(SEI->getLoc(), SEI->getOperand());
+    }
+    builder.createBranch(SEI->getLoc(), Dest);
 
     addToWorklist(SEI->getParent());
     addToWorklist(Dest);
@@ -1800,16 +1814,25 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
     return true;
   }
 
-  auto &Mod = SEI->getModule();
-  auto OpndTy = SEI->getOperand()->getType();
-  auto Ty = OpndTy.getEnumElementType(
-      Element, Mod, TypeExpansionContext(*SEI->getFunction()));
-  auto *UED = SILBuilderWithScope(SEI)
-    .createUncheckedEnumData(SEI->getLoc(), SEI->getOperand(), Element, Ty);
-
+  // If the Dest has an argument, it's case should have an associated value or
+  // it is the default case in ossa.
+  assert((Element && Element->hasAssociatedValues()) ||
+         (SEI->getFunction()->hasOwnership() && SEI->hasDefault() &&
+          Dest == SEI->getDefaultBB()));
+  SILValue newValue;
+  if (SEI->getFunction()->hasOwnership() && SEI->hasDefault() &&
+      Dest == SEI->getDefaultBB()) {
+    newValue = SEI->getOperand();
+  } else {
+    auto OpndTy = SEI->getOperand()->getType();
+    auto Ty = OpndTy.getEnumElementType(
+        Element, SEI->getModule(), TypeExpansionContext(*SEI->getFunction()));
+    newValue = SILBuilderWithScope(SEI).createUncheckedEnumData(
+        SEI->getLoc(), SEI->getOperand(), Element, Ty);
+  }
   assert(Dest->args_size() == 1 && "Expected only one argument!");
   auto *DestArg = Dest->getArgument(0);
-  DestArg->replaceAllUsesWith(UED);
+  DestArg->replaceAllUsesWith(newValue);
   Dest->eraseArgument(0);
 
   SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest);
@@ -1827,7 +1850,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifySwitchEnumUnreachableBlocks(
-    "simplify-cfg-simplify-switch-enum-unreachable-blocks",
+    "simplify_cfg_simplify_switch_enum_unreachable_blocks",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -1836,6 +1859,7 @@ static FunctionTest SimplifyCFGSimplifySwitchEnumUnreachableBlocks(
                   /*EnableJumpThread=*/false)
           .simplifySwitchEnumUnreachableBlocks(
               cast<SwitchEnumInst>(arguments.takeInstruction()));
+      removeUnreachableBlocks(function);
     });
 } // end namespace swift::test
 
@@ -2137,7 +2161,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSwitchEnumOnObjcClassOptional(
-    "simplify-cfg-simplify-switch-enum-on-objc-class-optional",
+    "simplify_cfg_simplify_switch_enum_on_objc_class_optional",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -2146,6 +2170,7 @@ static FunctionTest SimplifyCFGSwitchEnumOnObjcClassOptional(
                   /*EnableJumpThread=*/false)
           .simplifySwitchEnumOnObjcClassOptional(
               cast<SwitchEnumInst>(arguments.takeInstruction()));
+      removeUnreachableBlocks(function);
     });
 } // end namespace swift::test
 
@@ -2187,8 +2212,11 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
     }
     Builder.createBranch(loc, LiveBlock, PayLoad);
     SEI->eraseFromParent();
-    updateBorrowedFromPhis(PM, { cast<SILPhiArgument>(LiveBlock->getArgument(0)) });
+    updateGuaranteedPhis(PM, { cast<SILPhiArgument>(LiveBlock->getArgument(0)) });
   } else {
+    if (SEI->getOperand()->getOwnershipKind() == OwnershipKind::Owned) {
+      Builder.createDestroyValue(loc, SEI->getOperand());
+    }
     Builder.createBranch(loc, LiveBlock);
     SEI->eraseFromParent();
   }
@@ -2213,7 +2241,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifySwitchEnumBlock(
-    "simplify-cfg-simplify-switch-enum-block",
+    "simplify_cfg_simplify_switch_enum_block",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -2222,6 +2250,7 @@ static FunctionTest SimplifyCFGSimplifySwitchEnumBlock(
                   /*EnableJumpThread=*/false)
           .simplifySwitchEnumBlock(
               cast<SwitchEnumInst>(arguments.takeInstruction()));
+      removeUnreachableBlocks(function);
     });
 } // end namespace swift::test
 
@@ -2331,8 +2360,6 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
     case SILInstructionKind::StrongReleaseInst:
     case SILInstructionKind::RetainValueInst:
     case SILInstructionKind::ReleaseValueInst:
-    case SILInstructionKind::DestroyValueInst:
-    case SILInstructionKind::EndBorrowInst:
       break;
     // We can only ignore a dealloc_stack instruction if we can ignore all
     // instructions in the block.
@@ -2515,17 +2542,12 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
 static bool isTryApplyWithUnreachableError(TryApplyInst *TAI,
                                            SILValue &Callee,
                                            SILType &CalleeType) {
-  SILBasicBlock *ErrorBlock = TAI->getErrorBB();
-  TermInst *Term = ErrorBlock->getTerminator();
-  if (!isa<UnreachableInst>(Term))
-    return false;
-  
-  if (&*ErrorBlock->begin() != Term)
-    return false;
-  
-  Callee = TAI->getCallee();
-  CalleeType = TAI->getSubstCalleeSILType();
-  return true;
+  if (isOnlyUnreachable(TAI->getErrorBB())) {
+    Callee = TAI->getCallee();
+    CalleeType = TAI->getSubstCalleeSILType();
+    return true;
+  }
+  return false;
 }
 
 bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
@@ -2533,98 +2555,110 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
   SILType CalleeType;
 
   // Two reasons for converting a try_apply to an apply.
-  if (isTryApplyOfConvertFunction(TAI, Callee, CalleeType) ||
-      isTryApplyWithUnreachableError(TAI, Callee, CalleeType)) {
+  if (!isTryApplyOfConvertFunction(TAI, Callee, CalleeType) &&
+      !isTryApplyWithUnreachableError(TAI, Callee, CalleeType)) {
+    return false;
+  }
+  LLVM_DEBUG(llvm::dbgs() << "simplify try_apply block\n");
 
-    LLVM_DEBUG(llvm::dbgs() << "simplify try_apply block\n");
+  auto CalleeFnTy = CalleeType.castTo<SILFunctionType>();
+  SILFunctionConventions calleeConv(CalleeFnTy, TAI->getModule());
+  auto ResultTy = calleeConv.getSILResultType(
+      TAI->getFunction()->getTypeExpansionContext());
+  auto OrigResultTy = TAI->getNormalBB()->getArgument(0)->getType();
 
-    auto CalleeFnTy = CalleeType.castTo<SILFunctionType>();
-    SILFunctionConventions calleeConv(CalleeFnTy, TAI->getModule());
-    auto ResultTy = calleeConv.getSILResultType(
-        TAI->getFunction()->getTypeExpansionContext());
-    auto OrigResultTy = TAI->getNormalBB()->getArgument(0)->getType();
+  SILBuilderWithScope Builder(TAI);
 
-    SILBuilderWithScope Builder(TAI);
+  auto TargetFnTy = CalleeFnTy;
+  if (TargetFnTy->isPolymorphic()) {
+    TargetFnTy = TargetFnTy->substGenericArgs(
+        TAI->getModule(), TAI->getSubstitutionMap(),
+        Builder.getTypeExpansionContext());
+  }
+  SILFunctionConventions targetConv(TargetFnTy, TAI->getModule());
 
-    auto TargetFnTy = CalleeFnTy;
-    if (TargetFnTy->isPolymorphic()) {
-      TargetFnTy = TargetFnTy->substGenericArgs(
-          TAI->getModule(), TAI->getSubstitutionMap(),
-          Builder.getTypeExpansionContext());
+  auto OrigFnTy = TAI->getCallee()->getType().getAs<SILFunctionType>();
+  if (OrigFnTy->isPolymorphic()) {
+    OrigFnTy =
+        OrigFnTy->substGenericArgs(TAI->getModule(), TAI->getSubstitutionMap(),
+                                   Builder.getTypeExpansionContext());
+  }
+  SILFunctionConventions origConv(OrigFnTy, TAI->getModule());
+  auto context = TAI->getFunction()->getTypeExpansionContext();
+  SmallVector<SILValue, 8> Args;
+  unsigned numArgs = TAI->getNumArguments();
+  unsigned calleeArgIdx = 0;
+  for (unsigned i = 0; i < numArgs; ++i) {
+    auto Arg = TAI->getArgument(i);
+    if (origConv.isArgumentIndexOfIndirectErrorResult(i) &&
+        !targetConv.isArgumentIndexOfIndirectErrorResult(i)) {
+      continue;
     }
-    SILFunctionConventions targetConv(TargetFnTy, TAI->getModule());
-
-    auto OrigFnTy = TAI->getCallee()->getType().getAs<SILFunctionType>();
-    if (OrigFnTy->isPolymorphic()) {
-      OrigFnTy = OrigFnTy->substGenericArgs(TAI->getModule(),
-                                            TAI->getSubstitutionMap(),
-                                            Builder.getTypeExpansionContext());
-    }
-    SILFunctionConventions origConv(OrigFnTy, TAI->getModule());
-    auto context = TAI->getFunction()->getTypeExpansionContext();
-    SmallVector<SILValue, 8> Args;
-    unsigned numArgs = TAI->getNumArguments();
-    unsigned calleeArgIdx = 0;
-    for (unsigned i = 0; i < numArgs; ++i) {
-      auto Arg = TAI->getArgument(i);
-      if (origConv.isArgumentIndexOfIndirectErrorResult(i) &&
-          !targetConv.isArgumentIndexOfIndirectErrorResult(i)) {
-        continue;
+    if (Fn.hasOwnership()) {
+      // If we have an @owned Arg which requires a cast, bailout if it has
+      // consuming uses other than the `try_apply` instead of creating a
+      // copy_value to fixup ownership.
+      if (Arg->getOwnershipKind() == OwnershipKind::Owned &&
+          origConv.getSILArgumentType(i, context) !=
+              targetConv.getSILArgumentType(calleeArgIdx, context)) {
+        auto *singleConsumingUse = Arg->getSingleConsumingUse();
+        if (!singleConsumingUse || singleConsumingUse->getUser() != TAI) {
+          return false;
+        }
       }
-      // Cast argument if required.
-      std::tie(Arg, std::ignore) = castValueToABICompatibleType(
-          &Builder, PM, TAI->getLoc(), Arg, origConv.getSILArgumentType(i, context),
-          targetConv.getSILArgumentType(calleeArgIdx, context), {TAI});
-      Args.push_back(Arg);
-      calleeArgIdx += 1;
     }
+    // Cast argument if required.
+    std::tie(Arg, std::ignore) = castValueToABICompatibleType(
+        &Builder, PM, TAI->getLoc(), Arg,
+        origConv.getSILArgumentType(i, context),
+        targetConv.getSILArgumentType(calleeArgIdx, context), {TAI});
+    Args.push_back(Arg);
+    calleeArgIdx += 1;
+  }
 
-    LLVM_DEBUG(llvm::dbgs() << "replace with apply: " << *TAI);
+  LLVM_DEBUG(llvm::dbgs() << "replace with apply: " << *TAI);
 
-    // If the new callee is owned, copy it to extend the lifetime
-    //
-    // TODO: The original convert_function will likely be dead after
-    // replacement. It could be deleted on-the-fly with a utility to avoid
-    // creating a new copy.
-    auto calleeLoc = RegularLocation::getAutoGeneratedLocation();
-    auto newCallee = Callee;
-    if (requiresOSSACleanup(newCallee)) {
-      newCallee = SILBuilderWithScope(newCallee->getNextInstruction())
-        .createCopyValue(calleeLoc, newCallee);
-      newCallee = makeValueAvailable(newCallee, TAI->getParent());
-    }
+  // If the new callee is owned, copy it to extend the lifetime
+  //
+  // TODO: The original convert_function will likely be dead after
+  // replacement. It could be deleted on-the-fly with a utility to avoid
+  // creating a new copy.
+  auto calleeLoc = RegularLocation::getAutoGeneratedLocation();
+  auto newCallee = Callee;
+  if (requiresOSSACleanup(newCallee)) {
+    newCallee = SILBuilderWithScope(newCallee->getNextInstruction())
+                    .createCopyValue(calleeLoc, newCallee);
+    newCallee = makeValueAvailable(newCallee, TAI->getParent());
+  }
 
-    ApplyOptions Options = TAI->getApplyOptions();
-    if (CalleeFnTy->hasErrorResult())
-      Options |= ApplyFlags::DoesNotThrow;
-    ApplyInst *NewAI = Builder.createApply(TAI->getLoc(), newCallee,
-                                           TAI->getSubstitutionMap(),
-                                           Args, Options);
+  ApplyOptions Options = TAI->getApplyOptions();
+  if (CalleeFnTy->hasErrorResult())
+    Options |= ApplyFlags::DoesNotThrow;
+  ApplyInst *NewAI = Builder.createApply(
+      TAI->getLoc(), newCallee, TAI->getSubstitutionMap(), Args, Options);
 
-    auto Loc = TAI->getLoc();
-    auto *NormalBB = TAI->getNormalBB();
+  auto Loc = TAI->getLoc();
+  auto *NormalBB = TAI->getNormalBB();
 
-    assert(NewAI->getOwnershipKind() != OwnershipKind::Guaranteed);
-    // Non-guaranteed values don't need use points when casting.
-    SILValue CastedResult;
-    std::tie(CastedResult, std::ignore) = castValueToABICompatibleType(
+  assert(NewAI->getOwnershipKind() != OwnershipKind::Guaranteed);
+  // Non-guaranteed values don't need use points when casting.
+  SILValue CastedResult;
+  std::tie(CastedResult, std::ignore) = castValueToABICompatibleType(
       &Builder, PM, Loc, NewAI, ResultTy, OrigResultTy, /*usePoints*/ {});
 
-    BranchInst *branch = Builder.createBranch(Loc, NormalBB, { CastedResult });
+  BranchInst *branch = Builder.createBranch(Loc, NormalBB, {CastedResult});
 
-    auto *oldCalleeOper = TAI->getCalleeOperand();
-    if (oldCalleeOper->getOwnershipConstraint().isConsuming()) {
-      // Destroy the oldCallee before the new call.
-      SILBuilderWithScope(NewAI).createDestroyValue(
-        TAI->getLoc(), oldCalleeOper->get());
-    } else if (newCallee != Callee) {
-      // Destroy the copied newCallee after the call.
-      SILBuilderWithScope(branch).createDestroyValue(TAI->getLoc(), newCallee);
-    }
-    TAI->eraseFromParent();
-    return true;
+  auto *oldCalleeOper = TAI->getCalleeOperand();
+  if (oldCalleeOper->getOwnershipConstraint().isConsuming()) {
+    // Destroy the oldCallee before the new call.
+    SILBuilderWithScope(NewAI).createDestroyValue(TAI->getLoc(),
+                                                  oldCalleeOper->get());
+  } else if (newCallee != Callee) {
+    // Destroy the copied newCallee after the call.
+    SILBuilderWithScope(branch).createDestroyValue(TAI->getLoc(), newCallee);
   }
-  return false;
+  TAI->eraseFromParent();
+  return true;
 }
 
 // Replace the terminator of BB with a simple branch if all successors go
@@ -2663,7 +2697,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifyTermWithIdenticalDestBlocks(
-    "simplify-cfg-simplify-term-with-identical-dest-blocks",
+    "simplify_cfg_simplify_term_with_identical_dest_blocks",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -2671,6 +2705,7 @@ static FunctionTest SimplifyCFGSimplifyTermWithIdenticalDestBlocks(
       SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
                   /*EnableJumpThread=*/false)
           .simplifyTermWithIdenticalDestBlocks(arguments.takeBlock());
+      removeUnreachableBlocks(function);
     });
 } // end namespace swift::test
 
@@ -2829,6 +2864,7 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::ThrowAddrInst:
     case TermKind::DynamicMethodBranchInst:
     case TermKind::ReturnInst:
+    case TermKind::ReturnBorrowInst:
     case TermKind::UnwindInst:
     case TermKind::YieldInst:
       break;
@@ -2909,7 +2945,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGCanonicalizeSwitchEnum(
-    "simplify-cfg-canonicalize-switch-enum",
+    "simplify_cfg_canonicalize_switch_enum",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -2917,6 +2953,7 @@ static FunctionTest SimplifyCFGCanonicalizeSwitchEnum(
       SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
                   /*EnableJumpThread=*/false)
           .canonicalizeSwitchEnums();
+      removeUnreachableBlocks(function);
     });
 } // end namespace swift::test
 
@@ -3305,6 +3342,12 @@ static bool splitBBArguments(SILFunction &Fn) {
 }
 
 bool SimplifyCFG::run() {
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
+  // This pass results in verification failures when Swift sources are not
+  // enabled.
+  LLVM_DEBUG(llvm::dbgs() << "SimplifyCFG disabled in C++-only Swift compiler\n");
+  return false;
+#endif //!SWIFT_ENABLE_SWIFT_IN_SWIFT
   LLVM_DEBUG(llvm::dbgs() << "### Run SimplifyCFG on " << Fn.getName() << '\n');
 
   // Disable some expensive optimizations if the function is huge.
@@ -3678,7 +3721,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifyBlockArgs(
-    "simplify-cfg-simplify-block-args",
+    "simplify_cfg_simplify_block_args",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -3718,8 +3761,6 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
     }
     if (inst->getOwnershipKind() == OwnershipKind::Owned)
       return !inst->getSingleUse();
-    if (BorrowedValue borrow = BorrowedValue(inst->getOperand(0)))
-      return borrow.isLocalScope();
     return false;
   };
 
@@ -3779,7 +3820,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
 
   proj->eraseFromParent();
 
-  updateBorrowedFromPhis(PM, { NewArg });
+  updateGuaranteedPhis(PM, { NewArg });
 
   return true;
 }
@@ -3791,7 +3832,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifyArgument(
-    "simplify-cfg-simplify-argument",
+    "simplify_cfg_simplify_argument",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -3840,11 +3881,21 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
   // An argument has one result value. We need to replace this with the *value*
   // of the incoming block(s).
   LLVM_DEBUG(llvm::dbgs() << "replace arg with incoming value:" << *A);
-  if (auto *bfi = getBorrowedFromUser(A)) {
-    bfi->replaceAllUsesWith(A);
-    bfi->eraseFromParent();
+  while (!A->use_empty()) {
+    Operand *op = *A->use_begin();
+    if (auto *bfi = dyn_cast<BorrowedFromInst>(op->getUser())) {
+      if (op->getOperandNumber() == 0) {
+        bfi->replaceAllUsesWith(V);
+        bfi->eraseFromParent();
+        continue;
+      }
+      if (auto *prevBfi = dyn_cast<BorrowedFromInst>(V)) {
+        op->set(prevBfi->getBorrowedValue());
+        continue;
+      }
+    }
+    op->set(V);
   }
-  A->replaceAllUsesWith(V);
 }
 
 bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
@@ -3944,10 +3995,15 @@ namespace {
 class SimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
-    if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
-                    /*EnableJumpThread=*/false)
+    SILFunction *f = getFunction();
+    if (SimplifyCFG(*f, *this, getOptions().VerifyAll, /*EnableJumpThread=*/false)
             .run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    if (f->needBreakInfiniteLoops())
+      breakInfiniteLoops(getPassManager(), f);
+    if (f->needCompleteLifetimes())
+      completeAllLifetimes(getPassManager(), f);
   }
 };
 } // end anonymous namespace
@@ -3961,10 +4017,15 @@ namespace {
 class JumpThreadSimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
-    if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
-                    /*EnableJumpThread=*/true)
+    SILFunction *f = getFunction();
+    if (SimplifyCFG(*f, *this, getOptions().VerifyAll, /*EnableJumpThread=*/true)
             .run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    if (f->needBreakInfiniteLoops())
+      breakInfiniteLoops(getPassManager(), f);
+    if (f->needCompleteLifetimes())
+      completeAllLifetimes(getPassManager(), f);
   }
 };
 } // end anonymous namespace

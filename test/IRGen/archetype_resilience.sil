@@ -1,10 +1,9 @@
-// REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
-// RUN: %target-swift-frontend -disable-type-layout -I %t -emit-ir -enable-library-evolution %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-type-layout -I %t -Xllvm -sil-disable-pass=mandatory-temp-rvalue-elimination -emit-ir -enable-library-evolution %s | %FileCheck %s
 
 sil_stage canonical
 

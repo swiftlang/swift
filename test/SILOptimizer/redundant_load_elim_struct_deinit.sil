@@ -1,0 +1,44 @@
+// RUN: %target-sil-opt -module-name Swift -sil-print-types -enforce-exclusivity=none -enable-sil-verify-all %s -redundant-load-elimination | %FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -sil-print-types -enforce-exclusivity=none -enable-sil-verify-all %s -redundant-load-elimination -disable-aggressive-reg2mem | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+import Builtin
+
+@_marker protocol Copyable {}
+
+final class C1 {}
+
+struct S1 {}
+
+struct StructWithDeinit : ~Copyable {
+  // stored class-instance to ensure this struct has a non-trivial
+  var f1: C1
+  var f2: S1
+  deinit
+}
+
+// CHECK-LABEL: sil [ossa] @test : $@convention(thin) (@owned StructWithDeinit, @owned S1) -> ()
+// CHECK:   %[[STACK:.*]] = alloc_stack $StructWithDeinit
+// CHECK:   load [take] %[[STACK]] : $*StructWithDeinit
+// CHECK: } // end sil function 'test'
+sil [ossa] @test : $@convention(thin) (@owned StructWithDeinit, @owned S1) -> () {
+bb0(%0 : @owned $StructWithDeinit, %1 : $S1):
+  %2 = alloc_stack $StructWithDeinit
+  store %0 to [init] %2
+  // partial store into f2
+  %3 = struct_element_addr %2, #StructWithDeinit.f2
+  store %1 to [trivial] %3
+
+  // redundant load of the whole struct
+  %4 = load [take] %2
+  destroy_value %4
+
+  dealloc_stack %2
+  %5 = tuple ()
+  return %5
+}
+
+sil @s1_deinit : $@convention(method) (@owned StructWithDeinit) -> ()
+sil_moveonlydeinit StructWithDeinit { @s1_deinit }
+

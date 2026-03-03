@@ -65,6 +65,12 @@ void MapOpaqueArchetypes::replace() {
   // Insert the new entry block at the beginning.
   fn.moveBlockBefore(clonedEntryBlock, fn.begin());
   removeUnreachableBlocks(fn);
+  // We know that this pass does not create infinite loops even if it
+  // deletes basic blocks.
+  fn.setNeedBreakInfiniteLoops(false);
+  // De-serializing `unreachable` instructions does not create incomplete
+  // lifetimes. We assume that the serialized SIL has no incomplete lifetimes.
+  fn.setNeedCompleteLifetimes(false);
 }
 
 static bool opaqueArchetypeWouldChange(TypeExpansionContext context,
@@ -114,7 +120,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   // Check substitution maps.
   switch (inst.getKind()) {
   case SILInstructionKind::AllocStackInst:
-  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::AllocPackMetadataInst:
   case SILInstructionKind::AllocRefInst:
@@ -167,6 +172,8 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkDependenceAddrInst:
+  case SILInstructionKind::MergeIsolationRegionInst:
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::CopyValueInst:
@@ -184,7 +191,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
@@ -208,6 +215,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ObjCProtocolInst:
   case SILInstructionKind::ObjectInst:
   case SILInstructionKind::VectorInst:
+  case SILInstructionKind::VectorBaseAddrInst:
   case SILInstructionKind::TupleInst:
   case SILInstructionKind::TupleAddrConstructorInst:
   case SILInstructionKind::TupleExtractInst:
@@ -239,6 +247,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::KeyPathInst:
   case SILInstructionKind::UnreachableInst:
   case SILInstructionKind::ReturnInst:
+  case SILInstructionKind::ReturnBorrowInst:
   case SILInstructionKind::ThrowInst:
   case SILInstructionKind::ThrowAddrInst:
   case SILInstructionKind::YieldInst:
@@ -287,7 +296,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::EndUnpairedAccessInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::AssignInst:
-  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::AssignOrInitInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::DebugValueInst:
@@ -301,6 +309,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::MarkUnresolvedMoveAddrInst:
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::EndLifetimeInst:
+  case SILInstructionKind::ExtendLifetimeInst:
   case SILInstructionKind::InjectEnumAddrInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:
@@ -319,6 +328,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::EndCOWMutationAddrInst:
   case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::GetAsyncContinuationInst:
   case SILInstructionKind::GetAsyncContinuationAddrInst:
@@ -330,6 +340,16 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::PackElementGetInst:
   case SILInstructionKind::PackElementSetInst:
   case SILInstructionKind::TuplePackElementAddrInst:
+  case SILInstructionKind::TypeValueInst:
+  case SILInstructionKind::IgnoredUseInst:
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
+  case SILInstructionKind::UncheckedOwnershipInst:
+  case SILInstructionKind::MakeBorrowInst:
+  case SILInstructionKind::DereferenceBorrowInst:
+  case SILInstructionKind::MakeAddrBorrowInst:
+  case SILInstructionKind::DereferenceAddrBorrowInst:
+  case SILInstructionKind::InitBorrowAddrInst:
+  case SILInstructionKind::DereferenceBorrowAddrInst:
     // Handle by operand and result check.
     break;
 
@@ -358,6 +378,15 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
       }
     });
     return wouldChange;
+  }
+
+  case SILInstructionKind::ThunkInst: {
+    auto subs = cast<ThunkInst>(&inst)->getSubstitutionMap();
+    for (auto ty : subs.getReplacementTypes()) {
+      if (opaqueArchetypeWouldChange(context, ty->getCanonicalType()))
+        return true;
+    }
+    break;
   }
 
   case SILInstructionKind::ApplyInst:
@@ -426,7 +455,7 @@ class SerializeSILPass : public SILModuleTransform {
   /// optimizations and for a better dead function elimination.
   void removeSerializedFlagFromAllFunctions(SILModule &M) {
     for (auto &F : M) {
-      bool wasSerialized = !F.isNotSerialized();
+      bool wasSerialized = F.isAnySerialized();
       F.setSerializedKind(IsNotSerialized);
 
       // We are removing [serialized] from the function. This will change how

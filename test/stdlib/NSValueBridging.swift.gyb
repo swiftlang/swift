@@ -17,6 +17,7 @@
 // REQUIRES: executable_test
 //
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=watchos
 
 import StdlibUnittest
 import StdlibUnittestFoundationExtras

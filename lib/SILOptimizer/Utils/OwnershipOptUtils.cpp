@@ -18,8 +18,10 @@
 
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -163,6 +165,9 @@ GuaranteedOwnershipExtension::Status
 GuaranteedOwnershipExtension::checkAddressOwnership(SILValue parentAddress,
                                                     SILValue childAddress) {
   AddressOwnership addressOwnership(parentAddress);
+  if (!addressOwnership) {
+    return Invalid;
+  }
   if (!addressOwnership.hasLocalOwnershipLifetime()) {
     // Indirect Arg, Stack, Global, Unidentified, Yield
     // (these have no reference lifetime to extend).
@@ -395,11 +400,46 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
   return true;
 }
 
+// When an unowned value is replaced with 'newValue', does the fixup require
+// finding all uses of the original unowned value?
+static bool doesUnownedFixupRequireUses(SILValue newValue) {
+  switch (newValue->getOwnershipKind()) {
+  case OwnershipKind::None:
+    return false;
+  case OwnershipKind::Any:
+    llvm_unreachable("Invalid for values");
+  case OwnershipKind::Unowned:
+    return false;
+  case OwnershipKind::Guaranteed: {
+    return !isa<SILFunctionArgument>(newValue);
+  }
+  case OwnershipKind::Owned: {
+    return true;
+  }
+  }
+}
+
 // Determine whether it is valid to replace \p oldValue with \p newValue and
 // extend the lifetime of \p oldValue to cover the new uses.
 static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
                                      OwnershipFixupContext &context) {
+  // Owned or unowned use points.
+  SmallVector<Operand *, 8> ownedUsePoints;
   switch (oldValue->getOwnershipKind()) {
+  case OwnershipKind::None:
+    break;
+  case OwnershipKind::Any:
+    llvm_unreachable("Invalid for values");
+  case OwnershipKind::Unowned: {
+    if (doesUnownedFixupRequireUses(newValue)) {
+      // Check that a copy can be extended across all unowned uses.
+      // Required by OwnershipRAUWPrepare::prepareUnowned for either
+      // borrowCopyOverGuaranteedUses or createPlusZeroCopy.
+      if (!findUsesOfSimpleValue(oldValue, &ownedUsePoints))
+        return false;
+    }
+    break;
+  }
   case OwnershipKind::Guaranteed: {
     // Check that the old lifetime can be extended and record the necessary
     // book-keeping in the OwnershipFixupContext.
@@ -421,18 +461,31 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
     return OwnershipRAUWHelper::hasValidRAUWOwnership(
         oldValue, newValue, context.guaranteedUsePoints);
   }
-  default: {
-    SmallVector<Operand *, 8> ownedUsePoints;
+  case OwnershipKind::Owned: {
     // If newValue is lexical, find the uses of oldValue so that it can be
     // determined whether the replacement would illegally extend the lifetime
-    // of newValue.
+    // of newValue. Only relevant when oldValue is Owned because the code above
+    // already checks for uses when oldValue is unowned or guaranteed.
     if (newValue->isLexical() &&
-        !findUsesOfSimpleValue(oldValue, &ownedUsePoints))
+        !findUsesOfSimpleValue(oldValue, &ownedUsePoints)) {
       return false;
-    return OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue,
-                                                      ownedUsePoints);
+    }
   }
   }
+  return OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue,
+                                                    ownedUsePoints);
+}
+
+bool OwnershipRAUWHelper::mayIntroduceUnoptimizableCopies() {
+  if (oldValue->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return false;
+  }
+
+  if (areUsesWithinValueLifetime(newValue, ctx->guaranteedUsePoints,
+                                 &ctx->deBlocks)) {
+    return false;
+  }
+  return true;
 }
 
 bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
@@ -453,6 +506,37 @@ bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
   }
 
   return false;
+}
+
+bool swift::areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses,
+                                       DeadEndBlocks *deBlocks) {
+  assert(value->getFunction()->hasOwnership());
+
+  if (value->getOwnershipKind() == OwnershipKind::None) {
+    return true;
+  }
+  if (value->getOwnershipKind() != OwnershipKind::Guaranteed &&
+      value->getOwnershipKind() != OwnershipKind::Owned) {
+    return false;
+  }
+  if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
+    // For guaranteed values, we have to find the borrow introducing guaranteed
+    // reference roots and then ensure uses are within all of their lifetimes.
+    // For simplicity, we only look through single forwarding operations to find
+    // a borrow introducer here.
+    value = findOwnershipReferenceAggregate(value);
+    BorrowedValue borrowedValue(value);
+    if (!borrowedValue) {
+      return false;
+    }
+    if (!borrowedValue.isLocalScope()) {
+      return true;
+    }
+  }
+  SSAPrunedLiveness liveness(value->getFunction());
+  liveness.initializeDef(value);
+  liveness.computeSimple();
+  return liveness.areUsesWithinBoundary(uses, deBlocks);
 }
 
 //===----------------------------------------------------------------------===//
@@ -571,7 +655,7 @@ void BorrowedLifetimeExtender::analyzeExtendedScope() {
       SWIFT_ASSERT_ONLY(reborrowedOperands.insert(endScope));
 
       // TODO: if non-phi reborrows are added, handle multiple results.
-      discoverReborrow(borrowingOper.getBorrowIntroducingUserResult().value);
+      discoverReborrow(borrowingOper.getBorrowIntroducingUserResult());
     }
     return true;
   };
@@ -758,10 +842,6 @@ struct OwnershipLifetimeExtender {
   /// the BorrowedValue that begins the scope.
   SILValue borrowOverSingleUse(SILValue newValue,
                                Operand *singleGuaranteedUse);
-
-  SILValue
-  borrowOverSingleNonLifetimeEndingUser(SILValue newValue,
-                                        SILInstruction *nonLifetimeEndingUser);
 };
 
 } // end anonymous namespace
@@ -843,7 +923,7 @@ OwnershipLifetimeExtender::createPlusZeroCopy(SILValue value,
   boundary.visitInsertionPoints(
       [&](SILBasicBlock::iterator insertPt) {
         SILBuilderWithScope builder(insertPt);
-        auto *dvi = builder.createDestroyValue(insertPt->getLoc(), copy);
+        auto *dvi = builder.createDestroyValue(RegularLocation(insertPt->getLoc()), copy);
         callbacks.createdNewInst(dvi);
       },
       &ctx.deBlocks);
@@ -926,7 +1006,14 @@ BeginBorrowInst *OwnershipLifetimeExtender::borrowCopyOverGuaranteedUsers(
   // Create destroys at the end of copy's lifetime. This only needs to consider
   // uses that end the borrow scope.
   {
-    ValueLifetimeAnalysis lifetimeAnalysis(copy, borrow->getEndBorrows());
+    SmallVector<SILInstruction *, 16> users;
+    for (auto *user : guaranteedUsers) {
+      users.push_back(user);
+    }
+    for (auto *user : borrow->getEndBorrows()) {
+      users.push_back(user);
+    }
+    ValueLifetimeAnalysis lifetimeAnalysis(copy, users);
     ValueLifetimeBoundary copyBoundary;
     lifetimeAnalysis.computeLifetimeBoundary(copyBoundary);
 
@@ -1043,27 +1130,6 @@ OwnershipLifetimeExtender::borrowOverSingleUse(SILValue newValue,
     return true;
   });
   return newBeginBorrow;
-}
-
-SILValue OwnershipLifetimeExtender::borrowOverSingleNonLifetimeEndingUser(
-    SILValue newValue, SILInstruction *nonLifetimeEndingUser) {
-  // Avoid borrowing guaranteed function arguments.
-  if (isa<SILFunctionArgument>(newValue) &&
-      newValue->getOwnershipKind() == OwnershipKind::Guaranteed) {
-    return newValue;
-  }
-  auto borrowPt = newValue->getNextInstruction()->getIterator();
-  return borrowCopyOverGuaranteedUsers(
-      newValue, borrowPt, ArrayRef<SILInstruction *>(nonLifetimeEndingUser));
-}
-
-SILValue swift::makeGuaranteedValueAvailable(SILValue value,
-                                             SILInstruction *user,
-                                             DeadEndBlocks &deBlocks,
-                                             InstModCallbacks callbacks) {
-  OwnershipFixupContext ctx{callbacks, deBlocks};
-  OwnershipLifetimeExtender extender{ctx};
-  return extender.borrowOverSingleNonLifetimeEndingUser(value, user);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1194,13 +1260,14 @@ SILValue OwnershipRAUWPrepare::prepareReplacement(SILValue newValue) {
       OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue,
                                                  ctx.guaranteedUsePoints) &&
       "Should have checked if can perform this operation before calling it?!");
-  // If our new value is just none, we can pass anything to it so just RAUW
+  // If our new value is just none, we can pass it to anything so just RAUW
   // and return.
   //
   // NOTE: This handles RAUWing with undef.
-  if (newValue->getOwnershipKind() == OwnershipKind::None)
+  if (newValue->getOwnershipKind() == OwnershipKind::None) {
+    cleanupOperandsBeforeDeletion(getConsumingPoint(), ctx.callbacks);
     return newValue;
-
+  }
   assert(oldValue->getOwnershipKind() != OwnershipKind::None);
 
   switch (oldValue->getOwnershipKind()) {
@@ -1384,6 +1451,12 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   // NOTE: We also need to handle this here since a pointer_to_address is not a
   // valid base value for an access path since it doesn't refer to any storage.
   AddressOwnership addressOwnership(newValue);
+
+  if (!addressOwnership) {
+    invalidate();
+    return;
+  }
+
   if (!addressOwnership.hasLocalOwnershipLifetime())
     return;
 
@@ -1912,27 +1985,89 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
 //                            Swift Bridging
 //===----------------------------------------------------------------------===//
 
-static BridgedUtilities::UpdateBorrowedFromFn updateBorrowedFromFunction;
-static BridgedUtilities::UpdateBorrowedFromPhisFn updateBorrowedFromPhisFunction;
+static BridgedUtilities::UpdateFunctionFn updateAllGuaranteedPhisFunction;
+static BridgedUtilities::UpdatePhisFn updateGuaranteedPhisFunction;
+static BridgedUtilities::UpdatePhisFn replacePhisWithIncomingValuesFunction;
 
-void BridgedUtilities::registerBorrowedFromUpdater(UpdateBorrowedFromFn updateBorrowedFromFn,
-                                                   UpdateBorrowedFromPhisFn updateBorrowedFromPhisFn) {
-  updateBorrowedFromFunction = updateBorrowedFromFn;
-  updateBorrowedFromPhisFunction = updateBorrowedFromPhisFn;
+void BridgedUtilities::registerPhiUpdater(UpdateFunctionFn updateAllGuaranteedPhisFn,
+                                          UpdatePhisFn updateGuaranteedPhisFn,
+                                          UpdatePhisFn replacePhisWithIncomingValuesFn) {
+  updateAllGuaranteedPhisFunction = updateAllGuaranteedPhisFn;
+  updateGuaranteedPhisFunction = updateGuaranteedPhisFn;
+  replacePhisWithIncomingValuesFunction = replacePhisWithIncomingValuesFn;
 }
 
-void swift::updateBorrowedFrom(SILPassManager *pm, SILFunction *f) {
-  if (updateBorrowedFromFunction)
-    updateBorrowedFromFunction({pm->getSwiftPassInvocation()}, {f});
+static BridgedOptimizerUtilities::UpdateLifetimeFunctionFn completeAllLifetimesFunction;
+static BridgedOptimizerUtilities::UpdateLifetimeValuesFn completeLifetimeFunction;
+
+void BridgedOptimizerUtilities::registerLifetimeCompletion(UpdateLifetimeFunctionFn completeAllLifetimesFn,
+                                                           UpdateLifetimeValuesFn completeLifetimeFn) {
+  completeAllLifetimesFunction = completeAllLifetimesFn;
+  completeLifetimeFunction = completeLifetimeFn;
 }
 
-void swift::updateBorrowedFromPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
-  if (!updateBorrowedFromPhisFunction)
+void swift::updateAllGuaranteedPhis(SILPassManager *pm, SILFunction *f) {
+  if (updateAllGuaranteedPhisFunction)
+    updateAllGuaranteedPhisFunction({pm->getSwiftPassInvocation()->getCurrent()}, {f});
+}
+
+void swift::updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
+  if (!updateGuaranteedPhisFunction)
     return;
 
   llvm::SmallVector<BridgedValue, 8> bridgedPhis;
   for (SILPhiArgument *phi : phis) {
     bridgedPhis.push_back({phi});
   }
-  updateBorrowedFromPhisFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
+  updateGuaranteedPhisFunction({pm->getSwiftPassInvocation()->getCurrent()}, ArrayRef(bridgedPhis));
+}
+
+void swift::replacePhisWithIncomingValues(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
+  if (!replacePhisWithIncomingValuesFunction)
+    return;
+
+  llvm::SmallVector<BridgedValue, 8> bridgedPhis;
+  for (SILPhiArgument *phi : phis) {
+    bridgedPhis.push_back({phi});
+  }
+  replacePhisWithIncomingValuesFunction({pm->getSwiftPassInvocation()->getCurrent()}, ArrayRef(bridgedPhis));
+}
+
+bool swift::hasOwnershipOperandsOrResults(SILInstruction *inst) {
+  if (!inst->getFunction()->hasOwnership())
+    return false;
+
+  for (SILValue result : inst->getResults()) {
+    if (result->getOwnershipKind() != OwnershipKind::None)
+      return true;
+  }
+  for (Operand &op : inst->getAllOperands()) {
+    if (op.get()->getOwnershipKind() != OwnershipKind::None)
+      return true;
+  }
+  return false;
+}
+
+void swift::completeAllLifetimes(SILPassManager *pm, SILFunction *f, bool includeTrivialVars) {
+  if (completeAllLifetimesFunction) {
+    completeAllLifetimesFunction({pm->getSwiftPassInvocation()->getCurrent()}, {f}, includeTrivialVars);
+  } else {
+    // If SwiftCompilerSources are not enabled or in SourceKit unit tests
+    f->setNeedCompleteLifetimes(false);
+  }
+}
+
+void swift::completeLifetimes(SILPassManager *pm, ArrayRef<SILValue> values, ArrayRef<SILInstruction *> deadEnds) {
+  if (completeLifetimeFunction) {
+    llvm::SmallVector<BridgedValue, 32> bridgedValues;
+    for (SILValue v : values) {
+      bridgedValues.push_back({v});
+    }
+    llvm::SmallVector<BridgedInstruction, 4> bridgedEnds;
+    for (SILInstruction *i : deadEnds) {
+      bridgedEnds.push_back(i->asSILNode());
+    }
+    completeLifetimeFunction({pm->getSwiftPassInvocation()->getCurrent()},
+                             ArrayRef(bridgedValues), ArrayRef(bridgedEnds));
+  }
 }

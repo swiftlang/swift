@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -O -emit-sil  %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -O -Xllvm -sil-print-types -emit-sil  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib,CPU=x86_64
 
 // This is an end-to-end test to ensure that the optimizer can propagate

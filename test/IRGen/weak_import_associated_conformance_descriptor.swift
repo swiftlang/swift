@@ -22,16 +22,16 @@ public protocol StrongProtoWithWeakLinkedAssoc {
 public struct LibConformsToP: P { }
 
 public protocol StrongProtoWithNewAssoc {
-  @available(macOS 10.50, *)
+  @available(macOS 50, *)
   associatedtype NewerAssoc: P = LibConformsToP
 }
 
-@available(macOS 10.50, *)
+@available(macOS 50, *)
 public protocol WeakProtoWithAssoc {
   associatedtype Assoc: P
 }
 
-@available(macOS 10.50, *)
+@available(macOS 50, *)
 public protocol WeakProtoWithStrongInheritedAssoc: StrongProtoWithAssoc where Self.Assoc: Q { }
 
 
@@ -60,13 +60,13 @@ struct ConformsToStrongProtoWithNewAssoc: StrongProtoWithNewAssoc {
 }
 
 // CHECK: @"$s7Library18WeakProtoWithAssocP0E0AC_AA1PTn" = extern_weak global %swift.protocol_requirement, align 4
-@available(macOS 10.50, *)
+@available(macOS 50, *)
 struct ConformsToWeakProtoWithAssoc: WeakProtoWithAssoc {
   typealias Assoc = ConformsToP
 }
 
 // CHECK: @"$s7Library33WeakProtoWithStrongInheritedAssocP0G0AA0ecdG0P_AA1QTn" = extern_weak global %swift.protocol_requirement, align 4
-@available(macOS 10.50, *)
+@available(macOS 50, *)
 struct ConformsToWeakProtoWithStrongInheritedAssoc: WeakProtoWithStrongInheritedAssoc {
   typealias Assoc = ConformsToQ
 }

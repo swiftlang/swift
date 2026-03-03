@@ -409,7 +409,7 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
   }
 
   // `other` must also be a _SwiftValue box
-  if (![other isKindOfClass:getSwiftValueClass()]) {
+  if (object_getClass(other) != getSwiftValueClass()) {
     return NO;
   }
 

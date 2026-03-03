@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "gtest/gtest.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Frontend/Frontend.h"
@@ -20,6 +19,7 @@
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include "gtest/gtest.h"
 
 using namespace swift;
 
@@ -104,14 +104,14 @@ protected:
     symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
     SILOptions silOpts;
     CASOptions casOpts;
+    SerializationOptions serializationOpts;
     auto ctx = ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts,
                                clangImpOpts, symbolGraphOpts, casOpts,
-                               sourceMgr, diags);
+                               serializationOpts, sourceMgr, diags);
 
     ctx->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(*ctx, cacheDir,
-        prebuiltCacheDir, ModuleInterfaceLoaderOptions(),
-        swift::RequireOSSAModules_t(silOpts)));
+        prebuiltCacheDir, ModuleInterfaceLoaderOptions()));
 
     auto loader = ModuleInterfaceLoader::create(
         *ctx, *static_cast<ModuleInterfaceCheckerImpl*>(
@@ -130,7 +130,7 @@ protected:
         SerializedModuleBaseName(tempDir, SerializedModuleBaseName("Library")),
         /*ModuleInterfacePath=*/nullptr, /*ModuleInterfaceSourcePath=*/nullptr,
         &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer,
-        /*skipBuildingInterface*/ false, /*IsFramework*/false);
+        /*isCanImportLookup*/ false, /*IsFramework*/false);
     ASSERT_FALSE(error);
     ASSERT_FALSE(diags.hadAnyError());
 
@@ -151,7 +151,7 @@ protected:
 
     auto bufData = (*bufOrErr)->getBuffer();
     auto validationInfo = serialization::validateSerializedAST(
-        bufData, silOpts.EnableOSSAModules,
+        bufData,
         /*requiredSDK*/StringRef());
     ASSERT_EQ(serialization::Status::Valid, validationInfo.status);
     ASSERT_EQ(bufData, moduleBuffer->getBuffer());

@@ -3,8 +3,7 @@
 
 // REQUIRES: executable_test
 
-@_moveOnly
-struct MO {
+struct MO: ~Copyable {
     var x: Int
     deinit { print("dying \(x)") }
 }

@@ -63,6 +63,10 @@
 #define PROTOCOL(name) PROTOCOL_WITH_NAME(name, #name)
 #define PROTOCOL_(name) PROTOCOL_WITH_NAME(name, "_" #name)
 
+#ifndef CXX_PROTOCOL
+#define CXX_PROTOCOL(name) PROTOCOL(name)
+#endif
+
 /// \param typeName supplies the name used for type lookup,
 /// \param performLocalLookup specifies whether to first look in the local context.
 #define EXPRESSIBLE_BY_LITERAL_PROTOCOL(name, typeName, performLocalLookup) \
@@ -77,7 +81,6 @@
     BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, "_" #name)
 
 PROTOCOL(Actor)
-PROTOCOL(AnyActor)
 PROTOCOL(Sequence)
 PROTOCOL(Identifiable)
 PROTOCOL(IteratorProtocol)
@@ -98,6 +101,7 @@ PROTOCOL(Executor)
 PROTOCOL(SerialExecutor)
 PROTOCOL(TaskExecutor)
 PROTOCOL(GlobalActor)
+PROTOCOL(ExecutorFactory)
 
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)
@@ -107,7 +111,8 @@ PROTOCOL(CodingKey)
 PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 
-PROTOCOL(Sendable)
+REPRESSIBLE_PROTOCOL(Sendable)
+PROTOCOL(SendableMetatype)
 PROTOCOL(UnsafeSendable)
 
 PROTOCOL_(ObjectiveCBridgeable)
@@ -120,29 +125,39 @@ PROTOCOL(Differentiable)
 
 // Distributed Actors
 PROTOCOL(DistributedActor)
+PROTOCOL_(DistributedActorStub)
 PROTOCOL(DistributedActorSystem)
 PROTOCOL(DistributedTargetInvocationEncoder)
 PROTOCOL(DistributedTargetInvocationDecoder)
 PROTOCOL(DistributedTargetInvocationResultHandler)
 
 // C++ Standard Library Overlay:
-PROTOCOL(CxxConvertibleToBool)
-PROTOCOL(CxxConvertibleToCollection)
-PROTOCOL(CxxDictionary)
-PROTOCOL(CxxOptional)
-PROTOCOL(CxxPair)
-PROTOCOL(CxxSet)
-PROTOCOL(CxxRandomAccessCollection)
-PROTOCOL(CxxSequence)
-PROTOCOL(CxxUniqueSet)
-PROTOCOL(CxxVector)
-PROTOCOL(UnsafeCxxInputIterator)
-PROTOCOL(UnsafeCxxMutableInputIterator)
-PROTOCOL(UnsafeCxxRandomAccessIterator)
-PROTOCOL(UnsafeCxxMutableRandomAccessIterator)
+CXX_PROTOCOL(CxxConvertibleToBool)
+CXX_PROTOCOL(CxxConvertibleToCollection)
+CXX_PROTOCOL(CxxDictionary)
+CXX_PROTOCOL(CxxOptional)
+CXX_PROTOCOL(CxxPair)
+CXX_PROTOCOL(CxxSet)
+CXX_PROTOCOL(CxxRandomAccessCollection)
+CXX_PROTOCOL(CxxMutableRandomAccessCollection)
+CXX_PROTOCOL(CxxSequence)
+CXX_PROTOCOL(CxxBorrowingSequence)
+CXX_PROTOCOL(CxxUniqueSet)
+CXX_PROTOCOL(CxxVector)
+CXX_PROTOCOL(CxxSpan)
+CXX_PROTOCOL(CxxMutableSpan)
+CXX_PROTOCOL(UnsafeCxxInputIterator)
+CXX_PROTOCOL(UnsafeCxxMutableInputIterator)
+CXX_PROTOCOL(UnsafeCxxRandomAccessIterator)
+CXX_PROTOCOL(UnsafeCxxMutableRandomAccessIterator)
+CXX_PROTOCOL(UnsafeCxxContiguousIterator)
+CXX_PROTOCOL(UnsafeCxxMutableContiguousIterator)
 
 PROTOCOL(AsyncSequence)
 PROTOCOL(AsyncIteratorProtocol)
+
+PROTOCOL_WITH_NAME(BorrowingSequence, "_BorrowingSequence")
+PROTOCOL_WITH_NAME(BorrowingIteratorProtocol, "_BorrowingIteratorProtocol")
 
 PROTOCOL(FloatingPoint)
 
@@ -186,3 +201,4 @@ BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinUnicodeScalarLitera
 #undef PROTOCOL
 #undef PROTOCOL_
 #undef PROTOCOL_WITH_NAME
+#undef CXX_PROTOCOL

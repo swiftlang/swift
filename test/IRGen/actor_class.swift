@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5  -disable-availability-checking | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 5  -target %target-swift-5.1-abi-triple | %IRGenFileCheck %s
 // REQUIRES: concurrency
 
 
@@ -41,8 +41,8 @@ public actor MyClass {
 }
 
 // CHECK-LABEL: define {{.*}}@"$s11actor_class7MyClassC1xSivg"
-// CHECK: [[T0:%.*]] = getelementptr inbounds %T11actor_class7MyClassC, ptr %0, i32 0, i32 2
-// CHECK: [[T1:%.*]] = getelementptr inbounds %TSi, ptr [[T0]], i32 0, i32 0
+// CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} %T11actor_class7MyClassC, ptr %0, i32 0, i32 2
+// CHECK: [[T1:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[T0]], i32 0, i32 0
 // CHECK: load [[INT]], ptr [[T1]], align
 
 // CHECK-LABEL: define {{.*}}swiftcc ptr @"$s11actor_class7MyClassCACycfc"

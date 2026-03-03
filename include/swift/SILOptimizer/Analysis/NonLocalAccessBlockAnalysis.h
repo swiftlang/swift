@@ -28,6 +28,7 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_NONLOCALACCESSBLOCKS_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_NONLOCALACCESSBLOCKS_H
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "llvm/ADT/SmallPtrSet.h"

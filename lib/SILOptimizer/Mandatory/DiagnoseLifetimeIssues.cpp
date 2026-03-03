@@ -31,6 +31,7 @@
 
 #define DEBUG_TYPE "diagnose-lifetime-issues"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockBits.h"
@@ -260,6 +261,7 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
         continue;
 
       case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer:
         // Treat most interior pointers as escapes until they can be audited.
         // But if the interior pointer cannot be used to copy the parent
         // reference, then it does not need to be considered an escape.
@@ -321,7 +323,7 @@ static bool isOutOfLifetime(SILInstruction *inst, SSAPrunedLiveness &liveness) {
   // impossible that a use of the object is not a potential load. So we would
   // always see a potential load if the lifetime of the object goes beyond the
   // store_weak.
-  return !liveness.isWithinBoundary(inst);
+  return !liveness.isWithinBoundary(inst, /*deadEndBlocks=*/nullptr);
 }
 
 /// Reports a warning if the stored object \p storedObj is never loaded within

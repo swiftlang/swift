@@ -1,4 +1,4 @@
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-linux-gnu -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -target x86_64-unknown-linux-gnu -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-lib-flag-space %s < %t.linux.txt
 
 // LINUX-lib-flag-space: swift

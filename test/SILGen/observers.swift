@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -swift-version 5 -disable-availability-checking -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 -target %target-swift-5.1-abi-triple -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 
 // REQUIRES: concurrency
 
@@ -398,6 +398,7 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [unknown] [[ARG2_PB]]
 // CHECK-NEXT:  [[ARG2_PB_VAL:%.*]] = load [trivial] [[READ]] : $*Int
 // CHECK-NEXT:  end_access [[READ]]
+// CHECK-NEXT:  [[MV_ARG2_PB_VAL:%.*]] = move_value [var_decl] [[ARG2_PB_VAL]] : $Int
 // CHECK-NEXT:  [[WRITE:%.*]] = begin_access [modify] [unknown] [[ARG2_PB]]
 // CHECK-NEXT:  assign [[ARG1]] to [[WRITE]] : $*Int
 // CHECK-NEXT:  end_access [[WRITE]]
@@ -405,7 +406,8 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK-NEXT:  mark_function_escape [[ARG2_PB]]
 // CHECK-NEXT:  // function_ref
 // CHECK-NEXT:  [[FUNC:%.*]] = function_ref @$s9observers32propertyWithDidSetTakingOldValueyyF1pL_SivW : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
-// CHECK-NEXT:  %{{.*}} = apply [[FUNC]]([[ARG2_PB_VAL]], [[ARG2]]) : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
+// CHECK-NEXT:  %{{.*}} = apply [[FUNC]]([[MV_ARG2_PB_VAL]], [[ARG2]]) : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
+// CHECK-NEXT:  extend_lifetime [[MV_ARG2_PB_VAL]] : $Int
 // CHECK-NEXT:  %{{.*}} = tuple ()
 // CHECK-NEXT:  return %{{.*}} : $()
 // CHECK-NEXT:} // end sil function '$s9observers32propertyWithDidSetTakingOldValue{{[_0-9a-zA-Z]*}}'

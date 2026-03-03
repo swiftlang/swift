@@ -6,6 +6,7 @@
 // RUN: %target-run %t/refcount_overflow
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_Extern
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
@@ -221,6 +222,15 @@ RefcountOverflowTests.test("nonatomic_unownedRetain moderate increment") {
   }
   expectTrue(didDeinit)
   didDeinit = false
+}
+
+RefcountOverflowTests.test("swift_retain overflow") {
+  let obj = C()
+  let u = Unmanaged.passRetained(obj)
+  expectCrashLater(withMessage: "Fatal error: Object was retained too many times")
+  while true {
+    _ = u.retain()
+  }
 }
 
 runAllTests()

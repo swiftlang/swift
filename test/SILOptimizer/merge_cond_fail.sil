@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -merge-cond_fails | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -merge-cond_fails -mergeable-traps | %FileCheck %s --check-prefix CHECK-FORCE-MERGE
 
 // REQUIRES: swift_in_compiler
 
@@ -34,5 +35,48 @@ bb0 (%0 : $Builtin.Int1, %1 : $Builtin.Int1, %2 : $Builtin.Int1, %3: $Builtin.In
   %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
   %10 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1
   cond_fail %10 : $Builtin.Int1
+  return %9 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @nonmergeable_cond_fail
+// CHECK: bb0([[ARG1:%.*]] : $Builtin.Int1, [[ARG2:%.*]] : $Builtin.Int1, [[ARG3:%.*]] : $Builtin.Int1, [[ARG4:%.*]] : $Builtin.Int1, [[ARG5:%.*]] : $*Builtin.Int64):
+// CHECK: {{ cond_fail}}
+// CHECK: {{ cond_fail}}
+// CHECK: [[LD:%.*]] = load [[ARG5]]
+// CHECK: {{ cond_fail}}
+// CHECK: {{ cond_fail}}
+// CHECK:  [[TUPLE:%.*]] = builtin "sadd_with_overflow_Int64"
+// CHECK:  [[RES:%.*]] = tuple_extract [[TUPLE]]{{.*}}, 0
+// CHECK:  [[OVERFLOW:%.*]] = tuple_extract [[TUPLE]]{{.*}}, 1
+// CHECK: {{ cond_fail}}
+// CHECK: return [[RES]]
+
+// CHECK-FORCE-MERGE-LABEL: sil @nonmergeable_cond_fail
+// CHECK-FORCE-MERGE: bb0([[ARG1:%.*]] : $Builtin.Int1, [[ARG2:%.*]] : $Builtin.Int1, [[ARG3:%.*]] : $Builtin.Int1, [[ARG4:%.*]] : $Builtin.Int1, [[ARG5:%.*]] : $*Builtin.Int64):
+// CHECK-FORCE-MERGE: [[COND1:%.*]] = builtin "or_Int1"([[ARG1]]{{.*}}, [[ARG2]]
+// CHECK-FORCE-MERGE: {{ cond_fail}} [[COND1]]
+// CHECK-FORCE-MERGE-NOT: {{ cond_fail}}
+// CHECK-FORCE-MERGE: [[LD:%.*]] = load [[ARG5]]
+// CHECK-FORCE-MERGE: [[COND2:%.*]] = builtin "or_Int1"([[ARG3]]{{.*}}, [[ARG4]]
+// CHECK-FORCE-MERGE: {{ cond_fail}} [[COND2]]
+// CHECK-FORCE-MERGE:  [[TUPLE:%.*]] = builtin "sadd_with_overflow_Int64"
+// CHECK-FORCE-MERGE:  [[RES:%.*]] = tuple_extract [[TUPLE]]{{.*}}, 0
+// CHECK-FORCE-MERGE:  [[OVERFLOW:%.*]] = tuple_extract [[TUPLE]]{{.*}}, 1
+// CHECK-FORCE-MERGE: {{ cond_fail}} [[OVERFLOW]]
+// CHECK-FORCE-MERGE: return [[RES]]
+
+sil @nonmergeable_cond_fail : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1, @inout Builtin.Int64) -> Builtin.Int64 {
+bb0 (%0 : $Builtin.Int1, %1 : $Builtin.Int1, %2 : $Builtin.Int1, %3: $Builtin.Int1, %4 : $*Builtin.Int64):
+  cond_fail %0 : $Builtin.Int1, "message1"
+  cond_fail %1 : $Builtin.Int1, "message2"
+  %5 = load %4 : $*Builtin.Int64
+  cond_fail %2 : $Builtin.Int1, "message3"
+  cond_fail %3 : $Builtin.Int1, "message4"
+  %6 = integer_literal $Builtin.Int1, -1
+  %7 = integer_literal $Builtin.Int64, 1
+  %8 = builtin "sadd_with_overflow_Int64"(%5 : $Builtin.Int64, %7 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
+  %10 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %10 : $Builtin.Int1, "message5"
   return %9 : $Builtin.Int64
 }

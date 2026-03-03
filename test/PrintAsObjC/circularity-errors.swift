@@ -11,7 +11,7 @@
 // FIXME: END -enable-source-import hackaround
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/circularity.h -emit-module -o %t %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/circularity.h -parse-as-library %t/circularity-errors.swiftmodule -typecheck -emit-objc-header-path %t/circularity-errors.h
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/circularity.h -parse-as-library %t/circularity-errors.swiftmodule -typecheck -verify -emit-objc-header-path %t/circularity-errors.h
 
 // RUN: %FileCheck %s < %t/circularity-errors.h
 // RUN: not %check-in-clang %t/circularity-errors.h

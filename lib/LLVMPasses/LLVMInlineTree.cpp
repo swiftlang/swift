@@ -19,6 +19,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "llvm-inlinetree"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/LLVMPasses/Passes.h"
@@ -26,6 +27,7 @@
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"

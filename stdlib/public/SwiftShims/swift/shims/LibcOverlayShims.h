@@ -121,15 +121,15 @@ int static inline _swift_stdlib_openat(int fd, const char *path, int oflag,
 #endif
 
 #if defined(__OpenBSD__)
-static inline FILE *_swift_stdlib_stdin(void) {
+static inline void *_swift_stdlib_stdin(void) {
   return stdin;
 }
 
-static inline FILE *_swift_stdlib_stdout(void) {
+static inline void *_swift_stdlib_stdout(void) {
   return stdout;
 }
 
-static inline FILE *_swift_stdlib_stderr(void) {
+static inline void *_swift_stdlib_stderr(void) {
   return stderr;
 }
 #endif

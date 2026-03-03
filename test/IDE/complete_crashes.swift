@@ -38,7 +38,7 @@ func globalFunc() {}
 func globalFuncInt() -> Int { return 0 }
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LET_COMPUTED | %FileCheck %s -check-prefix=WITH_GLOBAL
-class C {
+class C1 {
   let x : Int { #^LET_COMPUTED^# }
 }
 
@@ -85,7 +85,7 @@ private protocol RoundRobin : Sendable, Receivable {
 
 // rdar://problem/21435993
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21435993
-class C<T> {
+class C2<T> {
   func test() {
     do {} catch { #^RDAR_21435993^# }
   }
@@ -381,6 +381,6 @@ extension P_80635105 {
 func test_80635105() {
   let fn = { x in
     S_80635105.#^RDAR_80635105^#
-    // RDAR_80635105: Decl[InstanceMethod]/Super: foo({#(self): S_80635105<_>#})[#(P_80635105.T) -> Void#]; name=foo
+    // RDAR_80635105: Decl[InstanceMethod]/Super: foo({#(self): S_80635105<T>#})[#(P_80635105.T) -> Void#]; name=foo
   }
 }

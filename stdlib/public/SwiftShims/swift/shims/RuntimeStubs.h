@@ -20,6 +20,7 @@
 #define SWIFT_STDLIB_SHIMS_RUNTIMESTUBS_H_
 
 #include "LibcShims.h"
+#include "Visibility.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,6 +31,25 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 SWIFT_RUNTIME_STDLIB_API
 __swift_ssize_t
 swift_stdlib_readLine_stdin(unsigned char * _Nullable * _Nonnull LinePtr);
+
+// Pick a return-address strategy
+#if defined(__wasm__)
+// Wasm can't access call frame for security purposes
+#define get_return_address() ((void*) 0)
+#elif __GNUC__
+#define get_return_address() __builtin_return_address(0)
+#elif _MSC_VER
+#include <intrin.h>
+#define get_return_address() _ReturnAddress()
+#else
+#error missing implementation for get_return_address
+#define get_return_address() ((void*) 0)
+#endif
+
+SWIFT_ALWAYS_INLINE
+static inline const void *_Nullable _swift_stdlib_get_return_address() {
+  return get_return_address();
+}
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

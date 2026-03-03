@@ -29,7 +29,7 @@ Library evolution was formally described in `SE-0260 <SE0260_>`_, but this
 document should be kept up to date as new features are added to the language.
 
 .. _library evolution: https://swift.org/blog/abi-stability-and-more/
-.. _SE0260: https://github.com/apple/swift-evolution/blob/main/proposals/0260-library-evolution.md
+.. _SE0260: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0260-library-evolution.md
 
 .. contents:: :local:
 
@@ -108,7 +108,7 @@ with a single app target are not forced to think about access control, anyone
 writing a bundled library should (ideally) not be required to use any of the
 annotations described below in order to achieve full performance.
 
-.. _SE0193: https://github.com/apple/swift-evolution/blob/main/proposals/0193-cross-module-inlining-and-specialization.md
+.. _SE0193: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0193-cross-module-inlining-and-specialization.md
 .. _Swift Package Manager: https://swift.org/package-manager/
 
 .. note::
@@ -218,7 +218,7 @@ any future use of the function must take this into account.
 Although they are not a supported feature for arbitrary libraries at this time,
 public `transparent`_ functions are implicitly marked ``@inlinable``.
 
-.. _transparent: https://github.com/apple/swift/blob/main/docs/TransparentAttr.md
+.. _transparent: https://github.com/swiftlang/swift/blob/main/docs/TransparentAttr.md
 
 
 Restrictions on Inlinable Functions
@@ -365,8 +365,7 @@ the following changes are permitted:
   an existing property (unless the struct is marked ``@frozen``; see below).
   This is effectively the same as modifying the body of a setter.
 - Removing any non-ABI-public members, including stored properties.
-- Adding a conformance to an ABI-public protocol *that was introduced in the
-  same release* (see below).
+- Adding a conformance to an ABI-public protocol (see below about availability).
 - Adding or removing a conformance to a non-ABI-public protocol.
 - Adding ``@dynamicCallable`` to the struct.
 
@@ -382,17 +381,9 @@ target for the library is an error.
 It is not safe to add or remove ``mutating`` or ``nonmutating`` from a member
 or accessor within a struct.
 
-If a conformance is added to a type in version 1.1 of a library, it's important
-that it isn't accessed in version 1.0. This means that it is only safe to add
-new conformances to ABI-public protocols when the protocol is introduced, and
-not after. If the protocol comes from a separate module, there is no safe way
-to conform to it.
-
-.. admonition:: TODO
-
-    Coming up with a way to do this, either with availability annotations for
-    protocol conformances or a way to emit a fallback copy of the conformance
-    for clients on older library versions to use, is highly desired.
+When introducing a new conformance of an existing type to an existing protocol,
+it is important to annotate the conformance with availability. This is achieved
+by declaring the conformance on an extension and annotating the extension.
 
 
 Methods and Initializers
@@ -613,10 +604,13 @@ There are very few safe changes to make to protocols and their members:
   uses ``Self`` and the protocol has no other requirements using ``Self`` and
   no associated types, this is a `binary-compatible source-breaking change` due
   to restrictions on protocol value types.
+- A `@reparented` protocol refinement relationship may be added. All
+  requirements of this new parent must have default witnesses in the refining
+  protocol. A protocol can only be reparented by a `@reparentable` protocol.
 
 All other changes to the protocol itself are forbidden, including:
 
-- Adding or removing refined protocols.
+- Adding or removing refined protocols (see exception for `@reparented`).
 - Removing any existing requirements (type or non-type).
 - Removing the default type of an associated type.
 - Making an existing requirement optional.
@@ -625,6 +619,7 @@ All other changes to the protocol itself are forbidden, including:
   clause of an associated type.
 - Adding or removing constraints from the ``where`` clause of
   the protocol or an associated type.
+- Adding `@reparentable` to a protocol.
 
 Protocol extensions may be more freely modified; `see below`__.
 

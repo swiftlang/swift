@@ -8,12 +8,12 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   -module-name IndirectMixedDependency -I %t \
 // RUN:   -enable-library-evolution \
-// RUN:   -target %target-swift-abi-5.8-triple \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -emit-module %t/IndirectMixedDependency.swift \
 // RUN:   -emit-module-path %t/IndirectMixedDependency.swiftmodule
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   -enable-library-evolution \
-// RUN:   -target %target-swift-abi-5.8-triple \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -emit-module %t/SwiftDependency.swift \
 // RUN:   -module-name SwiftDependency -I %t\
 // RUN:   -emit-module-path %t/SwiftDependency.swiftmodule
@@ -21,7 +21,7 @@
 // Generate TBD file.
 // RUN: %target-swift-frontend -I %t -module-cache-path %t/cache \
 // RUN:   %t/Client.swift -emit-ir -o/dev/null -parse-as-library \
-// RUN:   -target %target-swift-abi-5.8-triple \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -module-name client -validate-tbd-against-ir=missing \
 // RUN:   -tbd-install_name client -emit-tbd -emit-tbd-path %t/client.tbd 
 

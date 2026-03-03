@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "bit-dataflow"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BitDataflow.h"
 #include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/MemoryLocations.h"
@@ -141,12 +142,12 @@ void BitDataflow::solveBackwardWithUnion() {
   });
 }
 
-void BitDataflow::dump() const {
-    for (auto bd : blockStates) {
-    llvm::dbgs() << "bb" << bd.block.getDebugID() << ":\n"
-                 << "    entry: " << bd.data.entrySet << '\n'
-                 << "    gen:   " << bd.data.genSet << '\n'
-                 << "    kill:  " << bd.data.killSet << '\n'
-                 << "    exit:  " << bd.data.exitSet << '\n';
+void BitDataflow::print(llvm::raw_ostream &os) const {
+  for (const auto &bd : blockStates) {
+    os << "bb" << bd.block.getDebugID() << ":\n"
+       << "    entry: " << bd.data.entrySet << '\n'
+       << "    gen:   " << bd.data.genSet << '\n'
+       << "    kill:  " << bd.data.killSet << '\n'
+       << "    exit:  " << bd.data.exitSet << '\n';
   }
 }

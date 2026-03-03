@@ -6,9 +6,9 @@
 // This is an end-to-end test to check if the array literal in the loop is
 // stack promoted.
 
-// CHECK-LABEL: sil @{{.*}}testit
-// CHECK:  alloc_ref{{.*}} [stack] [tail_elems
-
+// CHECK-LABEL: sil @$s4test6testityySi_SitF :
+// CHECK:         alloc_ref{{.*}} [stack] [tail_elems
+// CHECK:       } // end sil function '$s4test6testityySi_SitF'
 public func testit(_ N: Int, _ x: Int) {
   for _ in 0..<N {
     for _ in 0..<10 {
@@ -18,4 +18,29 @@ public func testit(_ N: Int, _ x: Int) {
        }
     }
   }
+}
+
+public protocol Proto {
+  func at() -> Int
+}
+
+// CHECK-LABEL: sil @$s4test5test2ySiAA5Proto_pF :
+// CHECK:         alloc_ref{{.*}} [stack] [tail_elems $any Proto
+// CHECK:         br bb1
+// CHECK:       bb1({{.*}}):
+// CHECK:         [[M:%.*]] = witness_method
+// CHECK:         apply [[M]]
+// CHECK:         cond_br
+// CHECK:       bb2:
+// CHECK:       } // end sil function '$s4test5test2ySiAA5Proto_pF'
+public func test2(_ p: Proto) -> Int {
+  var a = [p, p, p]
+  var b = 0
+  a.withUnsafeMutableBufferPointer {
+    let array = $0
+    for i in 0..<array.count {
+      b += array[i].at()
+    }
+  }
+  return b
 }

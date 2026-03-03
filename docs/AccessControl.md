@@ -26,7 +26,7 @@ framework module.
 _**Warning**_
 
 This document has not yet been updated for
-[SE-0117](https://github.com/apple/swift-evolution/blob/main/proposals/0117-non-public-subclassable-by-default.md),
+[SE-0117](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0117-non-public-subclassable-by-default.md),
 which adds the \"open\" level of access.
 
 ## Rules

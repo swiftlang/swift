@@ -22,6 +22,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImporterImpl.h"
+#include "swift/AST/ClangModuleLoader.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
 
 using namespace swift;
@@ -36,7 +38,8 @@ namespace {
 class SerializationPathFinder {
   ClangImporter::Implementation &Impl;
 public:
-  SerializationPathFinder(ClangImporter::Implementation &impl) : Impl(impl) {}
+  explicit SerializationPathFinder(ClangImporter::Implementation &impl)
+      : Impl(impl) {}
 
   StableSerializationPath find(const clang::Decl *decl) {
     // We can't do anything with non-NamedDecl declarations.
@@ -292,11 +295,12 @@ namespace {
       DataStreamBasicWriter<ClangTypeSerializationChecker> {
     ClangImporter::Implementation &Impl;
     bool IsSerializable = true;
+    bool HasSwiftDecl = false;
 
-    ClangTypeSerializationChecker(ClangImporter::Implementation &impl)
-      : DataStreamBasicWriter<ClangTypeSerializationChecker>(
-          impl.getClangASTContext()),
-        Impl(impl) {}
+    explicit ClangTypeSerializationChecker(ClangImporter::Implementation &impl)
+        : DataStreamBasicWriter<ClangTypeSerializationChecker>(
+              impl.getClangASTContext()),
+          Impl(impl) {}
 
     void writeUInt64(uint64_t value) {}
     void writeIdentifier(const clang::IdentifierInfo *ident) {}
@@ -305,8 +309,15 @@ namespace {
         IsSerializable = false;
     }
     void writeDeclRef(const clang::Decl *decl) {
-      if (decl && !Impl.findStableSerializationPath(decl))
+      if (!decl)
+        return;
+      auto path = Impl.findStableSerializationPath(decl);
+      if (!path) {
         IsSerializable = false;
+        return;
+      }
+      if (Impl.SwiftContext.getSwiftDeclForExportedClangDecl(decl))
+        HasSwiftDecl = true;
     }
     void writeSourceLocation(clang::SourceLocation loc) {
       // If a source location is written into a type, it's likely to be
@@ -317,16 +328,33 @@ namespace {
     }
 
     void writeAttr(const clang::Attr *attr) {}
-  };
-}
 
-bool ClangImporter::isSerializable(const clang::Type *type,
-                                   bool checkCanonical) const {
+    // CountAttributedType is a clang type representing a pointer with
+    // a "counted_by" type attribute and DynamicRangePointerType
+    // is representing a "__ended_by" type attribute.
+    // TypeCoupledDeclRefInfo is used to hold information of a declaration
+    // referenced from an expression argument of "__counted_by(expr)" or
+    // "__ended_by(expr)".
+    // Leave it non-serializable for now as we currently don't import
+    // these types into Swift.
+    void writeTypeCoupledDeclRefInfo(clang::TypeCoupledDeclRefInfo info) {
+      llvm_unreachable("TypeCoupledDeclRefInfo shouldn't be reached from swift");
+    }
+    void writeHLSLSpirvOperand(clang::SpirvOperand) {
+      llvm_unreachable("SpirvOperand shouldn't be reached from swift");
+    }
+  };
+  } // namespace
+
+ClangModuleLoader::SerializableInfo
+ClangImporter::isSerializable(const clang::Type *type,
+                              bool checkCanonical) const {
   return Impl.isSerializable(clang::QualType(type, 0), checkCanonical);
 }
 
-bool ClangImporter::Implementation::isSerializable(clang::QualType type,
-                                                   bool checkCanonical) {
+ClangModuleLoader::SerializableInfo
+ClangImporter::Implementation::isSerializable(clang::QualType type,
+                                              bool checkCanonical) {
   if (checkCanonical)
     type = getClangASTContext().getCanonicalType(type);
 
@@ -334,5 +362,5 @@ bool ClangImporter::Implementation::isSerializable(clang::QualType type,
   // anything that we can't stably serialize.
   ClangTypeSerializationChecker checker(*this);
   checker.writeQualType(type);
-  return checker.IsSerializable;
+  return {checker.IsSerializable, checker.HasSwiftDecl};
 }

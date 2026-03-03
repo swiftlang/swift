@@ -26,10 +26,12 @@
 
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
+#include "LiteralExpressionFolding.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 using namespace swift;
 
 /// Check whether a given \p decl has a @_semantics attribute with the given
@@ -174,7 +176,8 @@ static Expr *checkConstantness(Expr *expr) {
       return expr;
 
     ApplyExpr *apply = cast<ApplyExpr>(expr);
-    ValueDecl *calledValue = apply->getCalledValue();
+    ValueDecl *calledValue =
+        apply->getCalledValue(/*skipFunctionConversions=*/true);
     if (!calledValue)
       return expr;
 
@@ -203,19 +206,6 @@ static Expr *checkConstantness(Expr *expr) {
       expressionsToCheck.push_back(arg.getExpr());
   }
   return nullptr;
-}
-
-/// Return true iff the given \p type is a Stdlib integer type.
-static bool isIntegerType(Type type) {
-  return type->isInt() || type->isInt8() || type->isInt16() ||
-         type->isInt32() || type->isInt64() || type->isUInt() ||
-         type->isUInt8() || type->isUInt16() || type->isUInt32() ||
-         type->isUInt64();
-}
-
-/// Return true iff the given \p type is a Float type.
-static bool isFloatType(Type type) {
-  return type->isFloat() || type->isDouble() || type->isFloat80();
 }
 
 /// Given an error expression \p errorExpr, diagnose the error based on the type
@@ -254,11 +244,11 @@ static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_string_literal);
     return;
   }
-  if (isIntegerType(exprType)) {
+  if (exprType->isStdlibInteger()) {
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_integer_literal);
     return;
   }
-  if (isFloatType(exprType)) {
+  if (exprType->isStdlibFloat()) {
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_float_literal);
     return;
   }
@@ -299,7 +289,8 @@ static void diagnoseConstantArgumentRequirementOfCall(const CallExpr *callExpr,
                                                       const ASTContext &ctx) {
   assert(callExpr && callExpr->getType() &&
          "callExpr should have a valid type");
-  ValueDecl *calledDecl = callExpr->getCalledValue();
+  ValueDecl *calledDecl =
+      callExpr->getCalledValue(/*skipFunctionConversions=*/true);
   if (!calledDecl || !isa<AbstractFunctionDecl>(calledDecl))
     return;
   AbstractFunctionDecl *callee = cast<AbstractFunctionDecl>(calledDecl);

@@ -113,6 +113,7 @@ let squares = [ 1, 2, 3 ].reduce([:]) { (dict, n) in
 func r23670252(_ dictionary: [String : AnyObject], someObject: AnyObject) {
   let color : String?
   color = dictionary["color"]  // expected-error {{cannot assign value of type 'AnyObject?' to type 'String?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('AnyObject' and 'String') are expected to be equal}}
   _ = color
 }
 
@@ -229,11 +230,11 @@ func test_subscript_accepts_type_name_argument() {
   }
 
   func test(a: A, optA: A?) {
-    let _ = a[A] // expected-warning {{expected member name or initializer call after type name; this will be an error in Swift 6}}
+    let _ = a[A] // expected-warning {{expected member name or initializer call after type name; this is an error in the Swift 6 language mode}}
     // expected-note@-1 {{add arguments after the type to construct a value of the type}} {{16-16=()}}
     // expected-note@-2 {{use '.self' to reference the type object}} {{16-16=.self}}
 
-    let _ = optA?[A] // expected-warning {{expected member name or initializer call after type name; this will be an error in Swift 6}}
+    let _ = optA?[A] // expected-warning {{expected member name or initializer call after type name; this is an error in the Swift 6 language mode}}
     // expected-note@-1 {{add arguments after the type to construct a value of the type}} {{20-20=()}}
     // expected-note@-2 {{use '.self' to reference the type object}} {{20-20=.self}}
   }

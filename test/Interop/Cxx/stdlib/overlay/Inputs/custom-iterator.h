@@ -42,7 +42,7 @@ public:
 
 struct ConstRACIterator {
 private:
-  int value;
+  const int *value;
 
 public:
   using iterator_category = std::random_access_iterator_tag;
@@ -51,10 +51,10 @@ public:
   using reference = const int &;
   using difference_type = int;
 
-  ConstRACIterator(int value) : value(value) {}
+  ConstRACIterator(const int *value) : value(value) {}
   ConstRACIterator(const ConstRACIterator &other) = default;
 
-  const int &operator*() const { return value; }
+  const int &operator*() const { return *value; }
 
   ConstRACIterator &operator++() {
     value++;
@@ -97,7 +97,7 @@ public:
 // Same as ConstRACIterator, but operator+= returns a reference to this.
 struct ConstRACIteratorRefPlusEq {
 private:
-  int value;
+  const int *value;
 
 public:
   using iterator_category = std::random_access_iterator_tag;
@@ -106,10 +106,10 @@ public:
   using reference = const int &;
   using difference_type = int;
 
-  ConstRACIteratorRefPlusEq(int value) : value(value) {}
+  ConstRACIteratorRefPlusEq(const int *value) : value(value) {}
   ConstRACIteratorRefPlusEq(const ConstRACIteratorRefPlusEq &other) = default;
 
-  const int &operator*() const { return value; }
+  const int &operator*() const { return *value; }
 
   ConstRACIteratorRefPlusEq &operator++() {
     value++;
@@ -259,6 +259,29 @@ struct HasCustomRACIteratorTag {
   }
 };
 
+struct HasCustomInheritedRACIteratorTag {
+  struct CustomTag0 : public std::random_access_iterator_tag {};
+  using CustomTag1 = CustomTag0;
+  struct CustomTag2 : public CustomTag1 {};
+  using CustomTag3 = CustomTag2;
+  using CustomTag4 = CustomTag3;
+
+  int value;
+  using iterator_category = CustomTag4;
+  const int &operator*() const { return value; }
+  HasCustomInheritedRACIteratorTag &operator++() {
+    value++;
+    return *this;
+  }
+  void operator+=(int x) { value += x; }
+  int operator-(const HasCustomInheritedRACIteratorTag &x) const {
+    return value - x.value;
+  }
+  bool operator==(const HasCustomInheritedRACIteratorTag &other) const {
+    return value == other.value;
+  }
+};
+
 struct HasCustomIteratorTagInline {
   struct iterator_category : public std::input_iterator_tag {};
 
@@ -285,6 +308,316 @@ struct HasTypedefIteratorTag {
     return value == other.value;
   }
 };
+
+struct MutableRACIterator {
+private:
+  int *value;
+
+public:
+  struct iterator_category : std::random_access_iterator_tag,
+                             std::output_iterator_tag {};
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  MutableRACIterator(int *value) : value(value) {}
+  MutableRACIterator(const MutableRACIterator &other) = default;
+
+  const int &operator*() const { return *value; }
+  int &operator*() { return *value; }
+
+  MutableRACIterator &operator++() {
+    value++;
+    return *this;
+  }
+  MutableRACIterator operator++(int) {
+    auto tmp = MutableRACIterator(value);
+    value++;
+    return tmp;
+  }
+
+  void operator+=(difference_type v) { value += v; }
+  void operator-=(difference_type v) { value -= v; }
+  MutableRACIterator operator+(difference_type v) const {
+    return MutableRACIterator(value + v);
+  }
+  MutableRACIterator operator-(difference_type v) const {
+    return MutableRACIterator(value - v);
+  }
+  friend MutableRACIterator operator+(difference_type v,
+                                      const MutableRACIterator &it) {
+    return it + v;
+  }
+  int operator-(const MutableRACIterator &other) const {
+    return value - other.value;
+  }
+
+  bool operator<(const MutableRACIterator &other) const {
+    return value < other.value;
+  }
+
+  bool operator==(const MutableRACIterator &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const MutableRACIterator &other) const {
+    return value != other.value;
+  }
+};
+
+struct NonReferenceDereferenceOperator {
+private:
+  int value;
+
+public:
+  using iterator_category = std::input_iterator_tag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  NonReferenceDereferenceOperator(int value) : value(value) {}
+  NonReferenceDereferenceOperator(
+      const NonReferenceDereferenceOperator &other) = default;
+
+  int operator*() const { return value; }
+
+  NonReferenceDereferenceOperator &operator++() {
+    value++;
+    return *this;
+  }
+
+  bool operator==(const NonReferenceDereferenceOperator &other) const {
+    return value == other.value;
+  }
+};
+
+#if __cplusplus >= 202002L
+struct ConstContiguousIterator {
+private:
+  const int *value;
+
+public:
+  using iterator_category = std::random_access_iterator_tag;
+  using iterator_concept = std::contiguous_iterator_tag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  ConstContiguousIterator(const int *value) : value(value) {}
+  ConstContiguousIterator(const ConstContiguousIterator &other) = default;
+
+  const int &operator*() const { return *value; }
+
+  ConstContiguousIterator &operator++() {
+    value++;
+    return *this;
+  }
+  ConstContiguousIterator operator++(int) {
+    auto tmp = ConstContiguousIterator(value);
+    value++;
+    return tmp;
+  }
+
+  void operator+=(difference_type v) { value += v; }
+  void operator-=(difference_type v) { value -= v; }
+  ConstContiguousIterator operator+(difference_type v) const {
+    return ConstContiguousIterator(value + v);
+  }
+  ConstContiguousIterator operator-(difference_type v) const {
+    return ConstContiguousIterator(value - v);
+  }
+  friend ConstContiguousIterator operator+(difference_type v,
+                                           const ConstContiguousIterator &it) {
+    return it + v;
+  }
+  int operator-(const ConstContiguousIterator &other) const {
+    return value - other.value;
+  }
+
+  bool operator<(const ConstContiguousIterator &other) const {
+    return value < other.value;
+  }
+
+  bool operator==(const ConstContiguousIterator &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const ConstContiguousIterator &other) const {
+    return value != other.value;
+  }
+};
+
+struct HasCustomContiguousIteratorTag {
+private:
+  const int *value;
+
+public:
+  struct CustomTag : std::contiguous_iterator_tag {};
+  using iterator_category = std::random_access_iterator_tag;
+  using iterator_concept = CustomTag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  HasCustomContiguousIteratorTag(const int *value) : value(value) {}
+  HasCustomContiguousIteratorTag(const HasCustomContiguousIteratorTag &other) =
+      default;
+
+  const int &operator*() const { return *value; }
+
+  HasCustomContiguousIteratorTag &operator++() {
+    value++;
+    return *this;
+  }
+  HasCustomContiguousIteratorTag operator++(int) {
+    auto tmp = HasCustomContiguousIteratorTag(value);
+    value++;
+    return tmp;
+  }
+
+  void operator+=(difference_type v) { value += v; }
+  void operator-=(difference_type v) { value -= v; }
+  HasCustomContiguousIteratorTag operator+(difference_type v) const {
+    return HasCustomContiguousIteratorTag(value + v);
+  }
+  HasCustomContiguousIteratorTag operator-(difference_type v) const {
+    return HasCustomContiguousIteratorTag(value - v);
+  }
+  friend HasCustomContiguousIteratorTag
+  operator+(difference_type v, const HasCustomContiguousIteratorTag &it) {
+    return it + v;
+  }
+  int operator-(const HasCustomContiguousIteratorTag &other) const {
+    return value - other.value;
+  }
+
+  bool operator<(const HasCustomContiguousIteratorTag &other) const {
+    return value < other.value;
+  }
+
+  bool operator==(const HasCustomContiguousIteratorTag &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const HasCustomContiguousIteratorTag &other) const {
+    return value != other.value;
+  }
+};
+
+struct MutableContiguousIterator {
+private:
+  int *value;
+
+public:
+  using iterator_category = std::random_access_iterator_tag;
+  using iterator_concept = std::contiguous_iterator_tag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  MutableContiguousIterator(int *value) : value(value) {}
+  MutableContiguousIterator(const MutableContiguousIterator &other) = default;
+
+  const int &operator*() const { return *value; }
+  int &operator*() { return *value; }
+
+  MutableContiguousIterator &operator++() {
+    value++;
+    return *this;
+  }
+  MutableContiguousIterator operator++(int) {
+    auto tmp = MutableContiguousIterator(value);
+    value++;
+    return tmp;
+  }
+
+  void operator+=(difference_type v) { value += v; }
+  void operator-=(difference_type v) { value -= v; }
+  MutableContiguousIterator operator+(difference_type v) const {
+    return MutableContiguousIterator(value + v);
+  }
+  MutableContiguousIterator operator-(difference_type v) const {
+    return MutableContiguousIterator(value - v);
+  }
+  friend MutableContiguousIterator
+  operator+(difference_type v, const MutableContiguousIterator &it) {
+    return it + v;
+  }
+  int operator-(const MutableContiguousIterator &other) const {
+    return value - other.value;
+  }
+
+  bool operator<(const MutableContiguousIterator &other) const {
+    return value < other.value;
+  }
+
+  bool operator==(const MutableContiguousIterator &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const MutableContiguousIterator &other) const {
+    return value != other.value;
+  }
+};
+
+/// This is actually just a random access iterator
+struct HasNoContiguousIteratorConcept {
+private:
+  const int *value;
+
+public:
+  using iterator_category = std::contiguous_iterator_tag;
+  // no iterator_concept
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  HasNoContiguousIteratorConcept(const int *value) : value(value) {}
+  HasNoContiguousIteratorConcept(const HasNoContiguousIteratorConcept &other) =
+      default;
+
+  const int &operator*() const { return *value; }
+
+  HasNoContiguousIteratorConcept &operator++() {
+    value++;
+    return *this;
+  }
+  HasNoContiguousIteratorConcept operator++(int) {
+    auto tmp = HasNoContiguousIteratorConcept(value);
+    value++;
+    return tmp;
+  }
+
+  void operator+=(difference_type v) { value += v; }
+  void operator-=(difference_type v) { value -= v; }
+  HasNoContiguousIteratorConcept operator+(difference_type v) const {
+    return HasNoContiguousIteratorConcept(value + v);
+  }
+  HasNoContiguousIteratorConcept operator-(difference_type v) const {
+    return HasNoContiguousIteratorConcept(value - v);
+  }
+  friend HasNoContiguousIteratorConcept
+  operator+(difference_type v, const HasNoContiguousIteratorConcept &it) {
+    return it + v;
+  }
+  int operator-(const HasNoContiguousIteratorConcept &other) const {
+    return value - other.value;
+  }
+
+  bool operator<(const HasNoContiguousIteratorConcept &other) const {
+    return value < other.value;
+  }
+
+  bool operator==(const HasNoContiguousIteratorConcept &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const HasNoContiguousIteratorConcept &other) const {
+    return value != other.value;
+  }
+};
+#endif
 
 // MARK: Types that are not actually iterators
 
@@ -743,6 +1076,20 @@ struct InheritedTemplatedConstRACIterator : BaseTemplatedRACIterator<T> {
 
 typedef InheritedTemplatedConstRACIterator<int> InheritedTemplatedConstRACIteratorInt;
 
+struct InheritedTypedConstRACIterator: InheritedTemplatedConstRACIterator<int> {
+  using _super = InheritedTemplatedConstRACIterator<int>;
+  using iterator_category = std::random_access_iterator_tag;
+  using pointer = int *;
+
+  InheritedTypedConstRACIterator(int x)
+    : InheritedTemplatedConstRACIterator<int>(value) {}
+
+  int operator-(const InheritedTypedConstRACIterator &other) const {
+    return _super::value - other.value;
+  }
+  void operator+=(typename _super::difference_type v) { _super::value += v; }
+};
+
 template <typename T>
 struct BaseTemplatedRACIteratorOutOfLineOps {
   using value_type = T;
@@ -902,62 +1249,6 @@ public:
   }
 };
 
-struct MutableRACIterator {
-private:
-  int value;
-
-public:
-  struct iterator_category : std::random_access_iterator_tag,
-                             std::output_iterator_tag {};
-  using value_type = int;
-  using pointer = int *;
-  using reference = const int &;
-  using difference_type = int;
-
-  MutableRACIterator(int value) : value(value) {}
-  MutableRACIterator(const MutableRACIterator &other) = default;
-
-  const int &operator*() const { return value; }
-  int &operator*() { return value; }
-
-  MutableRACIterator &operator++() {
-    value++;
-    return *this;
-  }
-  MutableRACIterator operator++(int) {
-    auto tmp = MutableRACIterator(value);
-    value++;
-    return tmp;
-  }
-
-  void operator+=(difference_type v) { value += v; }
-  void operator-=(difference_type v) { value -= v; }
-  MutableRACIterator operator+(difference_type v) const {
-    return MutableRACIterator(value + v);
-  }
-  MutableRACIterator operator-(difference_type v) const {
-    return MutableRACIterator(value - v);
-  }
-  friend MutableRACIterator operator+(difference_type v,
-                                      const MutableRACIterator &it) {
-    return it + v;
-  }
-  int operator-(const MutableRACIterator &other) const {
-    return value - other.value;
-  }
-
-  bool operator<(const MutableRACIterator &other) const {
-    return value < other.value;
-  }
-
-  bool operator==(const MutableRACIterator &other) const {
-    return value == other.value;
-  }
-  bool operator!=(const MutableRACIterator &other) const {
-    return value != other.value;
-  }
-};
-
 /// clang::StmtIteratorBase
 class ProtectedIteratorBase {
 protected:
@@ -1008,5 +1299,172 @@ private:
   HasInheritedProtectedCopyConstructor(const ProtectedIteratorBase &other)
       : ProtectedIteratorImpl<HasInheritedProtectedCopyConstructor>(other) {}
 };
+
+// A simple wrapper around a char * with all the operator members required of
+// a full-strength iterator.
+//
+// The template parameter U is only used to generate fresh type instances,
+// and just has to be any unique number. This helps us avoid re-defining this
+// same type repeatedly, while we create different explicit specializations of
+// std::iterator_traits<NewPtr<U>> to test.
+template <unsigned U>
+struct NewPtr {
+private:
+  char *ptr;
+  NewPtr(char *ptr) : ptr{ptr} {}
+
+public:
+  const char &operator*() const { return *ptr; }
+  char &operator*() { return *ptr; }
+  NewPtr &operator++() {
+    ++ptr;
+    return *this;
+  }
+  bool operator==(const NewPtr &other) const { return ptr == other.ptr; }
+  bool operator!=(const NewPtr &other) const { return ptr != other.ptr; }
+  bool operator<(const NewPtr &other) const { return ptr < other.ptr; }
+  NewPtr operator+(int v) const { return NewPtr{ptr + v}; }
+  int operator-(const NewPtr &other) const { return ptr - other.ptr; }
+  NewPtr operator-(int v) const { return NewPtr{ptr - v}; }
+  void operator+=(int v) { ptr += v; }
+  void operator-=(int v) { ptr -= v; }
+};
+
+struct NewPtrTraits {
+  // Everything except for iterator_category and iterator_concept
+  using difference_type = std::ptrdiff_t;
+  using value_type = char;
+  using pointer = char *;
+  using reference = char &;
+};
+
+using TaglessNewPtr = NewPtr<__LINE__>;
+
+using InputCategoryNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<InputCategoryNewPtr> : NewPtrTraits {
+  using iterator_category = std::input_iterator_tag;
+};
+
+using ForwardCategoryNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<ForwardCategoryNewPtr> : NewPtrTraits {
+  using iterator_category = std::forward_iterator_tag;
+};
+
+using RandomAccessCategoryNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<RandomAccessCategoryNewPtr> : NewPtrTraits {
+  using iterator_category = std::random_access_iterator_tag;
+};
+
+#if __cplusplus >= 202002L
+
+using ContiguousCategoryNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<ContiguousCategoryNewPtr> : NewPtrTraits {
+  using iterator_category = std::random_access_iterator_tag;
+  using iterator_concept = std::contiguous_iterator_tag;
+};
+
+using InputConceptNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<InputConceptNewPtr> : NewPtrTraits {
+  using iterator_concept = std::input_iterator_tag;
+};
+
+using ForwardConceptNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<ForwardConceptNewPtr> : NewPtrTraits {
+  using iterator_concept = std::forward_iterator_tag;
+};
+
+using RandomAccessConceptNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<RandomAccessConceptNewPtr> : NewPtrTraits {
+  using iterator_concept = std::random_access_iterator_tag;
+};
+
+using ContiguousConceptNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<ContiguousConceptNewPtr> : NewPtrTraits {
+  using iterator_concept = std::contiguous_iterator_tag;
+};
+
+using InvalidContiguousCategoryNewPtr = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<InvalidContiguousCategoryNewPtr> : NewPtrTraits {
+  // You can't have a contiguous tag as the iterator_category (it has to be
+  // iterator_concept), but std::contiguous_iterator_tag inherits from
+  // std::random_access_iterator_tag, so this is treated as such.
+  using iterator_category = std::contiguous_iterator_tag;
+};
+#endif // __cplusplus >= 202002L
+
+using IteratorTagOfMemberTypedef = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<IteratorTagOfMemberTypedef> : NewPtrTraits {
+  using the_category = std::input_iterator_tag;
+  using iterator_category = the_category;
+};
+
+using non_member_input_iterator_tag = std::input_iterator_tag;
+using IteratorTagOfNonMemberTypedef = NewPtr<__LINE__>;
+template <> struct std::iterator_traits<IteratorTagOfNonMemberTypedef> : NewPtrTraits {
+  using iterator_category = non_member_input_iterator_tag;
+};
+
+
+// A simple wrapper around a char * with all the operator members required of
+// a full-strength iterator, plus a std::random_access_iterator_tag.
+//
+// The template parameter U is only used to generate fresh type instances,
+// and just has to be any unique number. This helps us avoid re-defining this
+// same type repeatedly, while we create different explicit specializations of
+// std::iterator_traits<LegacyPtr<U>> to test.
+template <unsigned U>
+struct LegacyPtr {
+  private:
+  char *ptr;
+  LegacyPtr(char *ptr) : ptr{ptr} {}
+
+public:
+  const char &operator*() const { return *ptr; }
+  char &operator*() { return *ptr; }
+  LegacyPtr &operator++() {
+    ++ptr;
+    return *this;
+  }
+  bool operator==(const LegacyPtr &other) const { return ptr == other.ptr; }
+  bool operator!=(const LegacyPtr &other) const { return ptr != other.ptr; }
+  bool operator<(const LegacyPtr &other) const { return ptr < other.ptr; }
+  LegacyPtr operator+(int v) const { return LegacyPtr{ptr + v}; }
+  int operator-(const LegacyPtr &other) const { return ptr - other.ptr; }
+  LegacyPtr operator-(int v) const { return LegacyPtr{ptr - v}; }
+  void operator+=(int v) { ptr += v; }
+  void operator-=(int v) { ptr -= v; }
+
+  using iterator_category = std::random_access_iterator_tag;
+};
+
+using BasicLegacyPtr = LegacyPtr<__LINE__>;
+
+using NotALegacyPtr = LegacyPtr<__LINE__>;
+template <> struct std::iterator_traits<NotALegacyPtr> : NewPtrTraits {};
+
+using InputCategoryLegacyPtr = LegacyPtr<__LINE__>;
+template <> struct std::iterator_traits<InputCategoryLegacyPtr> : NewPtrTraits {
+  using iterator_category = std::input_iterator_tag;
+};
+
+#if __cplusplus >= 202002L
+
+using InputConceptLegacyPtr = LegacyPtr<__LINE__>;
+template <> struct std::iterator_traits<InputConceptLegacyPtr> : NewPtrTraits {
+  using iterator_concept = std::input_iterator_tag;
+};
+
+using ContiguousConceptLegacyPtr = LegacyPtr<__LINE__>;
+template <> struct std::iterator_traits<ContiguousConceptLegacyPtr> : NewPtrTraits {
+  using iterator_concept = std::contiguous_iterator_tag;
+};
+
+using InputCategoryContiguousConceptLegacyPtr = LegacyPtr<__LINE__>;
+template <> struct std::iterator_traits<InputCategoryContiguousConceptLegacyPtr> : NewPtrTraits {
+  using iterator_category = std::input_iterator_tag;
+  using iterator_concept = std::contiguous_iterator_tag;
+};
+
+#endif // __cplusplus >= 202002L
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_ITERATOR_H

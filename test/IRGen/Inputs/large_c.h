@@ -78,3 +78,19 @@ typedef union {
         unsigned char cnt;
     } out;
 } union_t;
+
+
+typedef enum {
+  TYPE1,
+  TYPE2,
+  TYPE3
+} member_type_t;
+
+typedef unsigned char uuid_t[16];
+typedef struct {
+  member_type_t member_type;
+  union {
+    uuid_t uuid;
+    unsigned x;
+  } member_value;
+} member_id_t;

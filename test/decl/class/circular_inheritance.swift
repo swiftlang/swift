@@ -1,18 +1,18 @@
 // RUN: %target-typecheck-verify-swift
 
-class Left // expected-error {{'Left' inherits from itself}} expected-note {{through reference here}}
+class Left // expected-error {{'Left' inherits from itself}}
     : Right.Hand { // expected-note {{through reference here}}
   class Hand {}
 }
 
-class Right // expected-note {{through reference here}} expected-note{{class 'Right' declared here}}
+class Right // expected-note {{through class 'Right' declared here}}
   : Left.Hand { // expected-note {{through reference here}}
   class Hand {}
 }
 
 class C : B { } // expected-error{{'C' inherits from itself}}
-class B : A { } // expected-note{{class 'B' declared here}}
-class A : C { } // expected-note{{class 'A' declared here}}
+class B : A { } // expected-note{{through class 'B' declared here}}
+class A : C { } // expected-note{{through class 'A' declared here}}
 
 class TrivialCycle : TrivialCycle {} // expected-error{{'TrivialCycle' inherits from itself}}
 protocol P : P {} // expected-error {{protocol 'P' refines itself}}
@@ -26,13 +26,13 @@ class Outer {
   class Inner : Outer {}
 }
 
-class Outer2 // expected-error {{'Outer2' inherits from itself}} expected-note  {{through reference here}}
+class Outer2 // expected-error {{'Outer2' inherits from itself}}
     : Outer2.Inner { // expected-note {{through reference here}}
 
   class Inner {}
 }
 
-class Outer3 // expected-error {{'Outer3' inherits from itself}} expected-note  {{through reference here}}
+class Outer3 // expected-error {{'Outer3' inherits from itself}}
     : Outer3.Inner<Int> { // expected-note {{through reference here}}
   class Inner<T> {}
 }

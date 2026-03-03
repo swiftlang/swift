@@ -1,0 +1,39 @@
+// RUN: %target-sil-opt -sil-print-function-isolation-info -enable-objc-interop -enable-sil-verify-all=true %s | %target-sil-opt -sil-print-function-isolation-info -enable-objc-interop -enable-sil-verify-all=true | %FileCheck %s
+
+// REQUIRES: asserts
+
+// CHECK: // func_with_caller_isolation_inheriting
+// CHECK: // Isolation: caller_isolation_inheriting
+// CHECK: sil [isolation "caller_isolation_inheriting"] @func_with_caller_isolation_inheriting : $@convention(thin) () -> () {
+sil [isolation "caller_isolation_inheriting"] @func_with_caller_isolation_inheriting : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK: // func_with_global_actor_isolation
+// CHECK: // Isolation: global_actor. type: <null>
+// CHECK: sil [isolation "global_actor"] @func_with_global_actor_isolation : $@convention(thin) () -> () {
+sil [isolation "global_actor"] @func_with_global_actor_isolation : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK: // func_with_actor_instance_isolation
+// CHECK: // Isolation: actor_instance
+// CHECK: sil [isolation "actor_instance"] @func_with_actor_instance_isolation : $@convention(thin) () -> () {
+sil [isolation "actor_instance"] @func_with_actor_instance_isolation : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK: // func_with_nonisolated_isolation
+// CHECK: // Isolation: nonisolated
+// CHECK: sil [isolation "nonisolated"] @func_with_nonisolated_isolation : $@convention(thin) () -> () {
+sil [isolation "nonisolated"] @func_with_nonisolated_isolation : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}

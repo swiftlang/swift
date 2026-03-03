@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-typecheck-verify-swift
 
 // rdar://100872195 (error: 'move' can only be applied to a local binding ('let', 'var', or parameter) , error: Can not use feature when experimental move only is disabled!)
 //

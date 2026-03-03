@@ -11,12 +11,11 @@
 //===----------------------------------------------------------------------===//
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-build-swift %t/main.swift -o %t/Mirror -Xfrontend -disable-availability-checking
+// RUN: %target-build-swift %t/main.swift -o %t/Mirror -target %target-swift-5.9-abi-triple
 // RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
 
 // REQUIRES: executable_test
-// REQUIRES: shell
 // REQUIRES: reflection
 
 // rdar://96439408

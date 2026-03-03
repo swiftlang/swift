@@ -1,6 +1,7 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5 -plugin-path %swift-plugin-dir
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
+// https://github.com/swiftlang/swift/issues/79255
 
 import SwiftUI
 

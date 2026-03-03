@@ -72,4 +72,19 @@ public:
   using MyUsing = TemplatedType<T>;
 };
 
+struct ClassWithStaticAssert {
+  int x, y;
+  static_assert(true);
+};
+
+struct ClassWithStaticAssert2 {
+  static_assert(true);
+  int x, y;
+};
+
+struct ClassWithConstexprStatic {
+  int x;
+  static constexpr int y = 0;
+};
+
 #endif

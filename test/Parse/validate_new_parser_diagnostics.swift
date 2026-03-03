@@ -1,5 +1,5 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ParserValidation
 
 // Checks that skipping function bodies doesn't cause the new parser validation
 // to fail. This can currently be the case because the new parser doesn't

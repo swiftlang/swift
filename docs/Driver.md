@@ -167,7 +167,7 @@ The output file map accepts other entries, but they should not be considered
 stable. Please stick to what's shown here.
 
 (Note: In the example output file map above, all of the per-file outputs are
-being emitted to the same directory. [#42949](https://github.com/apple/swift/issues/42949)
+being emitted to the same directory. [#42949](https://github.com/swiftlang/swift/issues/42949)
 covers adding a flag that would infer this behavior given a directory path.)
 
 
@@ -284,8 +284,8 @@ past that, so:
      import later.
 
      If you want debugging that's more than `-gline-tables-only`, this is the
-     only supported way to do it today [apple/llvm-project#4588](https://github.com/apple/llvm-project/issues/4588)
-     and [#45265](https://github.com/apple/swift/issues/45265) are aimed at
+     only supported way to do it today [swiftlang/llvm-project#4588](https://github.com/swiftlang/llvm-project/issues/4588)
+     and [#45265](https://github.com/swiftlang/swift/issues/45265) are aimed at
      improving on this). On the plus side, this mode doesn't strictly need an
      output file map if you give up incremental builds.
 
@@ -302,7 +302,7 @@ _Can I link all the object files together in the same binary, even if they came
 from multiple modules?_
 
 This is not currently supported, and debugging probably won't work (see
-[apple/llvm-project#4588](https://github.com/apple/llvm-project/issues/4588) and
-[#45265](https://github.com/apple/swift/issues/45265) for more details).
+[swiftlang/llvm-project#4588](https://github.com/swiftlang/llvm-project/issues/4588) and
+[#45265](https://github.com/swiftlang/swift/issues/45265) for more details).
 However, if you are using `-gnone` or `-gline-tables-only`, the worst you will
 suffer is more symbols being visible than are strictly necessary.

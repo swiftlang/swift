@@ -5,7 +5,7 @@
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -swift-version 5 | %FileCheck -check-prefix=CHECK-5 %s
 
-// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/custom-modules  -swift-version 5 -D TEST -verify
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/custom-modules  -swift-version 5 -D TEST -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 
@@ -17,7 +17,7 @@ func requiresConformance(_: B_RequiresConformance<B_ConformsToProto>) {}
 func requiresConformance(_: B_RequiresConformance<C_RelyOnConformanceImpl.Assoc>) {}
 
 class Sub: Base {} // okay
-class Impl: Proto {} // expected-error {{type 'Impl' does not conform to protocol 'Proto'}}
+class Impl: Proto {} // expected-error {{type 'Impl' does not conform to protocol 'Proto'}} expected-note {{add stubs for conformance}}
 
 #else // TEST
 

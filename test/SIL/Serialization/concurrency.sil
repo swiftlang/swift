@@ -1,0 +1,36 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name basic2
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o - -module-name basic2 | %FileCheck %s
+
+// TODO: We need to make it so that we do another trip through serialization. We
+// cannot do this today since when we serialize sib into another sib file, we
+// seem to lose the import of _Concurrency.
+
+import Builtin
+import Swift
+import _Concurrency
+
+// REQUIRES: concurrency
+
+// CHECK-LABEL: sil [ossa] @test_cast_implicitactor_to_opaqueisolation : $@convention(thin) (@guaranteed Builtin.ImplicitActor) -> @owned Optional<any Actor> {
+// CHECK: implicitactor_to_opaqueisolation_cast {{%.*}} : $Builtin.ImplicitActor
+// CHECK: } // end sil function 'test_cast_implicitactor_to_opaqueisolation'
+sil [ossa] @test_cast_implicitactor_to_opaqueisolation : $@convention(thin) (@guaranteed Builtin.ImplicitActor) -> @owned Optional<any Actor> {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor):
+  %1 = implicitactor_to_opaqueisolation_cast %0 : $Builtin.ImplicitActor
+  %2 = copy_value %1 : $Optional<any Actor>
+  return %2 : $Optional<any Actor>
+}
+
+// CHECK-LABEL: sil [ossa] @test_implicitactor_to_opaqueisolation_on_unowned : $@convention(thin) () -> @owned Optional<any Actor> {
+// CHECK: implicitactor_to_opaqueisolation_cast {{%.*}} : $Builtin.ImplicitActor
+// CHECK: } // end sil function 'test_implicitactor_to_opaqueisolation_on_unowned'
+sil [ossa] @test_implicitactor_to_opaqueisolation_on_unowned : $@convention(thin) () -> @owned Optional<any Actor> {
+bb0:
+  %0 = enum $Optional<any Actor>, #Optional.none!enumelt
+  %1 = unchecked_value_cast %0 : $Optional<any Actor> to $Builtin.ImplicitActor
+  %2 = implicitactor_to_opaqueisolation_cast %1 : $Builtin.ImplicitActor
+  %3 = copy_value %2 : $Optional<any Actor>
+  return %3 : $Optional<any Actor>
+}

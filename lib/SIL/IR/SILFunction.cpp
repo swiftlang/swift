@@ -13,12 +13,13 @@
 #define DEBUG_TYPE "sil-function"
 
 #include "swift/SIL/SILFunction.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/CFG.h"
@@ -101,7 +102,7 @@ SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      ArrayRef<Type> typeErasedParams,
                                      SILFunction *target, Identifier spiGroup,
                                      const ModuleDecl *spiModule,
-                                     AvailabilityContext availability)
+                                     AvailabilityRange availability)
     : kind(kind), exported(exported), specializedSignature(specializedSig),
       unerasedSpecializedSignature(unerasedSpecializedSig),
       typeErasedParams(typeErasedParams.begin(), typeErasedParams.end()),
@@ -117,7 +118,7 @@ SILSpecializeAttr::create(SILModule &M, GenericSignature specializedSig,
                           bool exported, SpecializationKind kind,
                           SILFunction *target, Identifier spiGroup,
                           const ModuleDecl *spiModule,
-                          AvailabilityContext availability) {
+                          AvailabilityRange availability) {
   auto erasedSpecializedSig =
       SILSpecializeAttr::buildTypeErasedSignature(specializedSig,
                                                   typeErasedParams);
@@ -193,6 +194,14 @@ SILFunction *SILFunction::create(
   else
     M.functions.push_back(fn);
 
+  auto iter = M.pendingSpecializeAttrs.find(name);
+  if (iter != M.pendingSpecializeAttrs.end()) {
+    for (auto *attr : iter->second) {
+      fn->addSpecializeAttr(attr);
+    }
+    M.pendingSpecializeAttrs.erase(iter);
+  }
+
   return fn;
 }
 
@@ -205,6 +214,7 @@ static BridgedFunction::CopyEffectsFn copyEffectsFunction = nullptr;
 static BridgedFunction::GetEffectInfoFn getEffectInfoFunction = nullptr;
 static BridgedFunction::GetMemBehaviorFn getMemBehvaiorFunction = nullptr;
 static BridgedFunction::ArgumentMayReadFn argumentMayReadFunction = nullptr;
+static BridgedFunction::IsDeinitBarrierFn isDeinitBarrierFunction = nullptr;
 
 SILFunction::SILFunction(
     SILModule &Module, SILLinkage Linkage, StringRef Name,
@@ -217,7 +227,7 @@ SILFunction::SILFunction(
     IsRuntimeAccessible_t isRuntimeAccessible)
     : SwiftObjectHeader(functionMetatype), Module(Module),
       index(Module.getNewFunctionIndex()),
-      Availability(AvailabilityContext::alwaysAvailable()) {
+      Availability(AvailabilityRange::alwaysAvailable()) {
   init(Linkage, Name, LoweredType, genericEnv, isBareSILFunction, isTrans,
        serializedKind, entryCount, isThunk, classSubclassScope, inlineStrategy, E,
        DebugScope, isDynamic, isExactSelfClass, isDistributed,
@@ -247,7 +257,7 @@ void SILFunction::init(
   this->LoweredType = LoweredType;
   this->SpecializationInfo = nullptr;
   this->EntryCount = entryCount;
-  this->Availability = AvailabilityContext::alwaysAvailable();
+  this->Availability = AvailabilityRange::alwaysAvailable();
   this->Bare = isBareSILFunction;
   this->Transparent = isTrans;
   this->SerializedKind = serializedKind;
@@ -266,8 +276,9 @@ void SILFunction::init(
   this->ForceEnableLexicalLifetimes = DoNotForceEnableLexicalLifetimes;
   this->UseStackForPackMetadata = DoUseStackForPackMetadata;
   this->HasUnsafeNonEscapableResult = false;
-  this->HasResultDependsOnSelf = false;
   this->IsPerformanceConstraint = false;
+  this->NeedBreakInfiniteLoops = false;
+  this->NeedCompleteLifetimes = false;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -433,6 +444,15 @@ bool SILFunction::hasForeignBody() const {
   return SILDeclRef::isClangGenerated(getClangNode());
 }
 
+void SILFunction::setAsmName(StringRef value) {
+  AsmName = value;
+
+  if (!value.empty()) {
+    // Update the function-by-asm-name-table.
+    getModule().FunctionByAsmNameTable.insert({AsmName, this});
+  }
+}
+
 const SILFunction *SILFunction::getOriginOfSpecialization() const {
   if (!isSpecialization())
     return nullptr;
@@ -490,7 +510,7 @@ bool SILFunction::shouldOptimize() const {
   return getEffectiveOptimizationMode() != OptimizationMode::NoOptimization;
 }
 
-Type SILFunction::mapTypeIntoContext(Type type) const {
+Type SILFunction::mapTypeIntoEnvironment(Type type) const {
   assert(!type->hasPrimaryArchetype());
 
   if (GenericEnv) {
@@ -498,13 +518,12 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
     // type, which might contain element archetypes, if it was the interface type
     // of a closure or local variable.
     if (type->hasElementArchetype())
-      return GenericEnv->mapTypeIntoContext(type);
+      return GenericEnv->mapTypeIntoEnvironment(type);
 
     // Otherwise, assume we have an interface type for the "combined" captured
     // environment.
     return type.subst(MapIntoLocalArchetypeContext(GenericEnv, CapturedEnvs),
-                      LookUpConformanceInModule(Module.getSwiftModule()),
-                      SubstFlags::AllowLoweredTypes |
+                      LookUpConformanceInModule(),
                       SubstFlags::PreservePackExpansionLevel);
   }
 
@@ -512,14 +531,14 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
   return type;
 }
 
-SILType SILFunction::mapTypeIntoContext(SILType type) const {
+SILType SILFunction::mapTypeIntoEnvironment(SILType type) const {
   assert(!type.hasPrimaryArchetype());
 
   if (GenericEnv) {
     auto genericSig = GenericEnv->getGenericSignature().getCanonicalSignature();
     return type.subst(Module,
                       MapIntoLocalArchetypeContext(GenericEnv, CapturedEnvs),
-                      LookUpConformanceInModule(Module.getSwiftModule()),
+                      LookUpConformanceInModule(),
                       genericSig,
                       SubstFlags::PreservePackExpansionLevel);
   }
@@ -528,14 +547,14 @@ SILType SILFunction::mapTypeIntoContext(SILType type) const {
   return type;
 }
 
-SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
+SILType GenericEnvironment::mapTypeIntoEnvironment(SILModule &M,
                                                SILType type) const {
   assert(!type.hasPrimaryArchetype());
 
   auto genericSig = getGenericSignature().getCanonicalSignature();
   return type.subst(M,
                     QueryInterfaceTypeSubstitutions(this),
-                    LookUpConformanceInModule(M.getSwiftModule()),
+                    LookUpConformanceInModule(),
                     genericSig,
                     SubstFlags::PreservePackExpansionLevel);
 }
@@ -543,6 +562,28 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
 bool SILFunction::isNoReturnFunction(TypeExpansionContext context) const {
   return SILType::getPrimitiveObjectType(getLoweredFunctionType())
       .isNoReturnFunction(getModule(), context);
+}
+
+bool SILFunction::hasNonUniqueDefinition() const {
+  // Non-uniqueness is a property of the Embedded linkage model.
+  if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  // If this function is the entrypoint, it is unique.
+  if (getName() == getASTContext().getEntryPointFunctionName())
+    return false;
+
+  // If this is for a declaration, ask it.
+  if (auto declRef = getDeclRef()) {
+    return declRef.hasNonUniqueDefinition();
+  }
+
+  // If this function is from a different module than the one we are emitting
+  // code for, then it must have a non-unique definition.
+  if (getParentModule() != getModule().getSwiftModule())
+    return true;
+
+  return false;
 }
 
 ResilienceExpansion SILFunction::getResilienceExpansion() const {
@@ -558,8 +599,24 @@ ResilienceExpansion SILFunction::getResilienceExpansion() const {
           : ResilienceExpansion::Maximal);
 }
 
+SILTypeProperties
+SILFunction::getTypeProperties(AbstractionPattern orig, Type subst) const {
+  return getModule().Types.getTypeProperties(orig, subst,
+                                             TypeExpansionContext(*this));
+}
+
+SILTypeProperties SILFunction::getTypeProperties(Type subst) const {
+  return getModule().Types.getTypeProperties(subst,
+                                             TypeExpansionContext(*this));
+}
+
+SILTypeProperties SILFunction::getTypeProperties(SILType type) const {
+  return getModule().Types.getTypeProperties(type,
+                                             TypeExpansionContext(*this));
+}
+
 const TypeLowering &
-SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) {
+SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) const {
   return getModule().Types.getTypeLowering(orig, subst,
                                            TypeExpansionContext(*this));
 }
@@ -611,7 +668,8 @@ bool SILFunction::isWeakImported(ModuleDecl *module) const {
 
   // For imported functions check the Clang declaration.
   if (ClangNodeOwner)
-    return ClangNodeOwner->getClangDecl()->isWeakImported();
+    return ClangNodeOwner->getClangDecl()->isWeakImported(
+        getASTContext().LangOpts.getMinPlatformVersion());
 
   // For native functions check a flag on the SILFunction
   // itself.
@@ -625,7 +683,7 @@ bool SILFunction::isWeakImported(ModuleDecl *module) const {
     return false;
 
   auto deploymentTarget =
-      AvailabilityContext::forDeploymentTarget(getASTContext());
+      AvailabilityRange::forDeploymentTarget(getASTContext());
 
   if (getASTContext().LangOpts.WeakLinkAtTarget)
     return !Availability.isSupersetOf(deploymentTarget);
@@ -920,8 +978,6 @@ bool SILFunction::hasName(const char *Name) const {
  Checks if this (callee) function body can be inlined into the caller
  by comparing their SerializedKind_t values. 
  
- If the \p assumeFragileCaller is true, the caller must be serialized,
- in which case the callee needs to be serialized also to be inlined.
  If both callee and caller are not_serialized, the callee can be inlined
  into the caller during SIL inlining passes even if it (and the caller)
  might contain private symbols. If this callee is serialized_for_pkg, it
@@ -934,22 +990,13 @@ Callee  serialized_for_pkg  |      ok        |       ok           |    no
         serialized          |      ok        |       ok           |    ok
 
 */
-bool SILFunction::canBeInlinedIntoCaller(
-      std::optional<SerializedKind_t> callerSerializedKind,
-      bool assumeFragileCaller) const {
-  // If the \p assumeFragileCaller is true, the caller must
-  // be serialized, so return true only if the callee is also
-  // serialized.
-  if (assumeFragileCaller)
-    return isSerialized();
-                                           
+bool SILFunction::canBeInlinedIntoCaller(SerializedKind_t callerSerializedKind) const {
   switch (getSerializedKind()) {
     // If both callee and caller are not_serialized, the callee
     // can be inlined into the caller during SIL inlining passes
     // even if it (and the caller) might contain private symbols.
     case IsNotSerialized:
-      return callerSerializedKind.has_value() &&
-             callerSerializedKind.value() == IsNotSerialized;
+      return callerSerializedKind == IsNotSerialized;
 
     // If Package-CMO is enabled, we serialize package, public,
     // and @usableFromInline decls as [serialized_for_package].
@@ -962,8 +1009,7 @@ bool SILFunction::canBeInlinedIntoCaller(
     // for this callee's body to be inlined into the caller.
     // It can however be referenced by [serialized] caller.
     case IsSerializedForPackage:
-      return callerSerializedKind.has_value() &&
-             callerSerializedKind.value() != IsSerialized;
+      return callerSerializedKind != IsSerialized;
     case IsSerialized:
       return true;
   }
@@ -972,16 +1018,18 @@ bool SILFunction::canBeInlinedIntoCaller(
 
 /// Returns true if this function can be referenced from a fragile function
 /// body.
-bool SILFunction::hasValidLinkageForFragileRef(
-       std::optional<SerializedKind_t> callerSerializedKind,
-       bool assumeFragileCaller) const {
+bool SILFunction::hasValidLinkageForFragileRef(SerializedKind_t callerSerializedKind) const {
   // Fragile functions can reference 'static inline' functions imported
   // from C.
   if (hasForeignBody())
     return true;
 
+  // The call site of this function must have checked that
+  // caller.isAnySerialized() is true, as indicated by the
+  // function name itself (contains 'ForFragileRef').
+  assert(callerSerializedKind != IsNotSerialized);
   // If we can inline it, we can reference it.
-  if (canBeInlinedIntoCaller(callerSerializedKind, assumeFragileCaller))
+  if (canBeInlinedIntoCaller(callerSerializedKind))
     return true;
 
   // If the containing module has been serialized already, we no longer
@@ -999,6 +1047,21 @@ bool SILFunction::hasValidLinkageForFragileRef(
   // If it has a package linkage at this point, package CMO must
   // have been enabled, so opt in for visibility.
   return hasPublicOrPackageVisibility(getLinkage(), /*includePackage*/ true);
+}
+
+bool SILFunction::isSwiftRuntimeFunction(
+    StringRef name, const ModuleDecl *module) {
+  if (!name.starts_with("swift_") && !name.starts_with("_swift_"))
+    return false;
+
+  return !module ||
+      module->getName().str() == "Swift" ||
+      module->getName().str() == "_Concurrency";
+}
+
+bool SILFunction::isSwiftRuntimeFunction() const {
+  return isSwiftRuntimeFunction(asmName(), getParentModule()) ||
+    isSwiftRuntimeFunction(getName(), getParentModule());
 }
 
 bool
@@ -1021,6 +1084,18 @@ SILFunction::isPossiblyUsedExternally() const {
   if (markedAsUsed())
     return true;
 
+  // If this function is exposed to a foreign language, it can be used
+  // externally (by that language).
+  if (auto decl = getDeclRef().getDecl()) {
+    if (SILDeclRef::declExposedToForeignLanguage(decl))
+      return true;
+  }
+
+  // If this function was explicitly placed in a section or given a WebAssembly
+  // export, it can be used externally.
+  if (!Section.empty() || !WasmExportName.empty())
+    return true;
+
   if (shouldBePreservedForDebugger())
     return true;
 
@@ -1029,6 +1104,11 @@ SILFunction::isPossiblyUsedExternally() const {
   // has to be kept alive to emit opaque type metadata descriptor.
   if (markedAsAlwaysEmitIntoClient() &&
       hasOpaqueResultTypeWithAvailabilityConditions())
+    return true;
+
+  // All Swift runtime functions can be used externally.
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      isSwiftRuntimeFunction())
     return true;
 
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
@@ -1178,7 +1258,8 @@ void BridgedFunction::registerBridging(SwiftMetatype metatype,
             CopyEffectsFn copyEffectsFn,
             GetEffectInfoFn effectInfoFn,
             GetMemBehaviorFn memBehaviorFn,
-            ArgumentMayReadFn argumentMayReadFn) {
+            ArgumentMayReadFn argumentMayReadFn,
+            IsDeinitBarrierFn isDeinitBarrierFn) {
   functionMetatype = metatype;
   initFunction = initFn;
   destroyFunction = destroyFn;
@@ -1188,6 +1269,7 @@ void BridgedFunction::registerBridging(SwiftMetatype metatype,
   getEffectInfoFunction = effectInfoFn;
   getMemBehvaiorFunction = memBehaviorFn;
   argumentMayReadFunction = argumentMayReadFn;
+  isDeinitBarrierFunction = isDeinitBarrierFn;
 }
 
 std::pair<const char *, int>  SILFunction::
@@ -1287,6 +1369,13 @@ bool SILFunction::argumentMayRead(Operand *argOp, SILValue addr) {
     return true;
 
   return argumentMayReadFunction({this}, {argOp}, {addr});
+}
+
+bool SILFunction::isDeinitBarrier() {
+  if (!isDeinitBarrierFunction)
+    return true;
+
+  return isDeinitBarrierFunction({this});
 }
 
 SourceFile *SILFunction::getSourceFile() const {

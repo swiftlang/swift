@@ -11,12 +11,12 @@ class CopyableClass : NSCopying {
   }
 }
 
-@NSCopying  // expected-error {{@NSCopying may only be used on 'var' declarations}}}}
+@NSCopying  // expected-error {{@NSCopying may only be used on 'var' declarations}}
 func copyFunction() {}
 
 @NSCopying   // expected-error {{@NSCopying may only be used on 'var' declarations}}
 struct CopyingStruct  {
-  @NSCopying var x : CopyableClass   // expected-error {{@NSCopying may only be used on properties in classes}}
+  @NSCopying var x : CopyableClass   // expected-error {{'@NSCopying' may only be used on properties in classes}}
 }
 
 class CopyingClassTest {
@@ -27,11 +27,11 @@ class CopyingClassTest {
   @NSCopying weak var p1w : CopyableClass?
 
   // These are not.
-  @NSCopying let invalidLet : CopyableClass   // expected-error {{@NSCopying requires property to be mutable}}
-  @NSCopying var computed : CopyableClass { get {} set {} }  // expected-error {{@NSCopying is only valid on stored properties}}
+  @NSCopying let invalidLet : CopyableClass   // expected-error {{'@NSCopying' requires property to be mutable}}
+  @NSCopying var computed : CopyableClass { get {} set {} }  // expected-error {{'@NSCopying' is only valid on stored properties}}
 
-  @NSCopying var notClass : Int  // expected-error {{@NSCopying is only valid with types that conform to the NSCopying protocol}}
-  @NSCopying var x : NotCopyable    // expected-error {{@NSCopying is only valid with types that conform to the NSCopying protocol}}
+  @NSCopying var notClass : Int  // expected-error {{'@NSCopying' is only valid with types that conform to the NSCopying protocol}}
+  @NSCopying var x : NotCopyable    // expected-error {{'@NSCopying' is only valid with types that conform to the NSCopying protocol}}
 
   init() {}
   

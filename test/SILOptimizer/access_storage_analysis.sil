@@ -103,12 +103,12 @@ bb0(%0 : ${ var Int }, %1 : $Int):
 }
 
 // CHECK-LABEL: @writeIdentifiedBox
-// CHECK: [read] Box   %1 = alloc_box ${ var Int }
+// CHECK: [modify] Box   %1 = alloc_box ${ var Int }
 sil @writeIdentifiedBox : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %2 = project_box %1 : ${ var Int }, 0
-  %3 = begin_access [read] [dynamic] %2 : $*Int
+  %3 = begin_access [modify] [dynamic] %2 : $*Int
   store %0 to %3 : $*Int
   end_access %3 : $*Int
   %6 = tuple ()
@@ -398,7 +398,7 @@ bb0(%0 : $C):
 sil @writeIdentifiedNestedClass : $@convention(thin) (@guaranteed C, Int) -> () {
 bb0(%0 : $C, %1 : $Int):
   %2 = ref_element_addr %0 : $C, #C.property
-  %3 = begin_access [read] [dynamic] %2 : $*Int
+  %3 = begin_access [modify] [dynamic] %2 : $*Int
   %4 = begin_access [modify] [dynamic] %3 : $*Int
   store %1 to %4 : $*Int
   end_access %4 : $*Int
@@ -690,7 +690,7 @@ bb3(%7 : $Builtin.RawPointer):
   return %10 : $Int64
 }
 
-// Test storage for SIL global variable declations.
+// Test storage for SIL global variable declarations.
 
 sil_global hidden @testGlobal : $Builtin.Int64
 
@@ -710,4 +710,89 @@ bb0:
   %6 = load %5 : $*Builtin.Int64
   end_access %5 : $*Builtin.Int64
   return %6 : $Builtin.Int64
+}
+
+// CHECK:      @test_harmless_regardless_of_type_pod
+// CHECK-NEXT: @test_harmless_regardless_of_type_ref
+// CHECK-NEXT: @test_harmless_typedependent
+// CHECK-NEXT: @test_not_harmless_typedependent
+// CHECK-NEXT:   unidentified accesses: modify
+// CHECK-NEXT: @test_not_harmless_typedependent_2
+// CHECK-NEXT:   unidentified accesses: modify
+// CHECK-NEXT: @test_not_harmless_typedependent_3
+// CHECK-NEXT:   unidentified accesses: modify
+// CHECK-NEXT: @test_not_harmless_typedependent_4
+// CHECK-NEXT:   unidentified accesses: modify
+// CHECK-NEXT: @test_not_harmless_typedependent_5
+// CHECK-NEXT:   unidentified accesses: modify
+
+sil hidden [transparent] @test_harmless_regardless_of_type_pod : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin UInt8.Type
+  %4 = builtin "copyArray"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %5 = builtin "takeArrayFrontToBack"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %6 = builtin "takeArrayBackToFront"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %7 = builtin "takeArrayNoAlias"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+
+sil hidden [transparent] @test_harmless_regardless_of_type_ref : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin C.Type
+  %4 = builtin "copyArray"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %5 = builtin "takeArrayFrontToBack"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %6 = builtin "takeArrayBackToFront"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %7 = builtin "takeArrayNoAlias"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+
+sil hidden [transparent] @test_harmless_typedependent : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin UInt8.Type
+  %8 = builtin "assignCopyArrayNoAlias"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %9 = builtin "assignCopyArrayFrontToBack"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %10 = builtin "assignCopyArrayBackToFront"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %11 = builtin "assignTakeArray"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %12 = builtin "destroyArray"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+
+sil hidden [transparent] @test_not_harmless_typedependent : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin C.Type
+  %8 = builtin "assignCopyArrayNoAlias"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+
+sil hidden [transparent] @test_not_harmless_typedependent_2 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin C.Type
+  %9 = builtin "assignCopyArrayFrontToBack"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+sil hidden [transparent] @test_not_harmless_typedependent_3 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin C.Type
+  %10 = builtin "assignCopyArrayBackToFront"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+sil hidden [transparent] @test_not_harmless_typedependent_4 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin C.Type
+  %11 = builtin "assignTakeArray"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+sil hidden [transparent] @test_not_harmless_typedependent_5 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin C.Type
+  %12 = builtin "destroyArray"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
 }

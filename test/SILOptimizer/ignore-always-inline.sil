@@ -19,10 +19,10 @@ bb0:
 
 sil @foobar : $@convention(thin) () -> ()
 
-// callee is "expensive" enough to not get inlined unless [always_inline] is used
-// REGULAR: sil [always_inline] [Osize] @callee
-// IGNORED: sil [always_inline] [Osize] @callee
-sil [always_inline] [Osize] @callee : $@convention(thin) () -> () {
+// callee is "expensive" enough to not get inlined unless [heuristic_always_inline] is used
+// REGULAR: sil [heuristic_always_inline] [Osize] @callee
+// IGNORED: sil [heuristic_always_inline] [Osize] @callee
+sil [heuristic_always_inline] [Osize] @callee : $@convention(thin) () -> () {
 bb0:
   %d1 = function_ref @foobar : $@convention(thin) () -> ()
   apply %d1() : $@convention(thin) () -> ()

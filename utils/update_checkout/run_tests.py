@@ -24,13 +24,13 @@ MODULE_DIR = os.path.abspath(os.path.dirname(__file__))
 UTILS_DIR = os.path.abspath(os.path.join(MODULE_DIR, os.pardir))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Add the swift/utils directory to the Python path.
     sys.path.append(UTILS_DIR)
 
     # Create temp directory and export it for the test suite.
     temp_dir = tempfile.mkdtemp()
-    os.environ['UPDATECHECKOUT_TEST_WORKSPACE_DIR'] = temp_dir
+    os.environ["UPDATECHECKOUT_TEST_WORKSPACE_DIR"] = temp_dir
 
     # Discover all tests for the module.
     module_tests = unittest.defaultTestLoader.discover(MODULE_DIR)

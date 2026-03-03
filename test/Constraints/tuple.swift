@@ -269,7 +269,7 @@ class Dinner {}
 
 func microwave() -> Dinner? {
   let d: Dinner? = nil
-  return (n: d) // expected-error{{cannot convert return expression of type '(n: Dinner?)' to return type 'Dinner?'}}
+  return (n: d) // expected-error{{cannot convert return expression of type '(n: Dinner?)' to return type 'Dinner'}}
 }
 
 func microwave() -> Dinner {
@@ -335,32 +335,12 @@ tuple = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int
 
 var optionalTuple: (Int, Int)?
 var optionalTuple2: (Int64, Int)? = (bignum, 1) 
-var optionalTuple3: (UInt64, Int)? = (bignum, 1) // expected-error {{cannot convert value of type '(Int64, Int)' to specified type '(UInt64, Int)?'}}
+var optionalTuple3: (UInt64, Int)? = (bignum, 1) // expected-error {{cannot convert value of type '(Int64, Int)' to specified type '(UInt64, Int)'}}
 
 optionalTuple = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int)' to type '(Int, Int)'}}
 // Optional to Optional
 optionalTuple = optionalTuple2 // expected-error {{cannot assign value of type '(Int64, Int)?' to type '(Int, Int)?'}}
-
-func testTupleLabelMismatchFuncConversion(fn1: @escaping ((x: Int, y: Int)) -> Void,
-                                          fn2: @escaping () -> (x: Int, Int)) {
-  // Warn on mismatches
-  let _: ((a: Int, b: Int)) -> Void = fn1 // expected-warning {{tuple conversion from '(a: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
-  let _: ((x: Int, b: Int)) -> Void = fn1 // expected-warning {{tuple conversion from '(x: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
-
-  let _: () -> (y: Int, Int) = fn2 // expected-warning {{tuple conversion from '(x: Int, Int)' to '(y: Int, Int)' mismatches labels}}
-  let _: () -> (y: Int, k: Int) = fn2 // expected-warning {{tuple conversion from '(x: Int, Int)' to '(y: Int, k: Int)' mismatches labels}}
-
-  // Attempting to shuffle has always been illegal here
-  let _: () -> (y: Int, x: Int) = fn2 // expected-error {{cannot convert value of type '() -> (x: Int, Int)' to specified type '() -> (y: Int, x: Int)'}}
-
-  // Losing labels is okay though.
-  let _: () -> (Int, Int) = fn2
-
-  // Gaining labels also okay.
-  let _: ((x: Int, Int)) -> Void = fn1
-  let _: () -> (x: Int, y: Int) = fn2
-  let _: () -> (Int, y: Int) = fn2
-}
+// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('(Int64, Int)' and '(Int, Int)') are expected to be equal}}
 
 func testTupleLabelMismatchKeyPath() {
   // FIXME: The warning should be upgraded to an error for key paths.

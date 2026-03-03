@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -D M -emit-module -module-name M -parse-as-library -o %t %s
-// RUN: %target-typecheck-verify-swift -I %t
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t
 
 #if M
 

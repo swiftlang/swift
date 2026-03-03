@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -sil-verify-all -primary-file %s -emit-sil -o - -verify | %FileCheck %s
-// RUN: %target-swift-frontend -sil-verify-all -primary-file %s -emit-sil -o - -verify
+// RUN: %target-swift-frontend -sil-verify-all -primary-file %s -Xllvm -sil-print-types -emit-sil -o - -verify | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-all -primary-file %s -Xllvm -sil-print-types -emit-sil -o - -verify
 
 // These tests are deliberately shallow, because I do not want to depend on the
 // specifics of SIL generation, which might change for reasons unrelated to this
@@ -203,3 +203,14 @@ func switchLoopWithPartialApplyCaller() {
       print(error)
   }
 }
+
+private class Cl {
+  func foo<E: Error>(_ e: E.Type) throws(E) {
+  }
+}
+
+
+private func devirtualizeClassMethodWithTypedThrow<E: Error>(_ x: Cl, e: E.Type) {
+  try! x.foo(e)
+}
+

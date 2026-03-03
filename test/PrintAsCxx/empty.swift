@@ -27,7 +27,6 @@
 // CHECK-NEXT:  #if defined(__cplusplus)
 // CHECK-NEXT:  #include <cstdint>
 // CHECK-NEXT:  #include <cstddef>
-// CHECK-NEXT:  #include <cstdbool>
 // CHECK-NEXT:  #include <cstring>
 // CHECK-NEXT:  #include <stdlib.h>
 // CHECK-NEXT:  #include <new>
@@ -94,6 +93,7 @@
 // CHECK-NEXT:  #if __has_feature(objc_modules)
 
 // CHECK-LABEL: #if defined(__OBJC__)
+// CHECK-EMPTY:
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #if __has_attribute(external_source_symbol)
 // CHECK-NEXT:  # pragma clang attribute pop

@@ -2,7 +2,7 @@
 // RUN: %target-build-swift %s -parse-as-library %import-static-libdispatch -Onone -g -o %t/StaticBacktracer
 // RUN: %target-codesign %t/StaticBacktracer
 // RUN: /usr/bin/ldd %backtracer-static | %FileCheck %s --check-prefix LIBS
-// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no,swift-backtrace=%backtracer-static %target-run %t/StaticBacktracer 2>&1 || true) | %FileCheck %s
+// RUN: not --crash env SWIFT_BACKTRACE=enable=yes,cache=no,swift-backtrace=%backtracer-static %target-run %t/StaticBacktracer 2>&1 | %FileCheck %s
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
@@ -52,7 +52,7 @@ struct StaticBacktracer {
 // CHECK-NEXT: 4 [ra]          0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in StaticBacktracer at {{.*}}/StaticBacktracer.swift:16:3
 // CHECK-NEXT: 5 [ra]          0x{{[0-9a-f]+}} static StaticBacktracer.main() + {{[0-9]+}} in StaticBacktracer at {{.*}}/StaticBacktracer.swift:40:5
 // CHECK-NEXT: 6 [ra] [system] 0x{{[0-9a-f]+}} static StaticBacktracer.$main() + {{[0-9]+}} in StaticBacktracer at {{.*}}/<compiler-generated>
-// CHECK-NEXT: 7 [ra] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in StaticBacktracer at {{.*}}/StaticBacktracer.swift
+// CHECK-NEXT: 7 [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in StaticBacktracer at {{.*}}/StaticBacktracer.swift
 
 // CHECK: Registers:
 

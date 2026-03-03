@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 typealias IntegerLiteralType = Int32
 
@@ -44,7 +44,7 @@ struct meters : ExpressibleByIntegerLiteral {
   }
 }
 
-struct supermeters : ExpressibleByIntegerLiteral { // expected-error{{type 'supermeters' does not conform to protocol 'ExpressibleByIntegerLiteral'}}
+struct supermeters : ExpressibleByIntegerLiteral { // expected-error{{type 'supermeters' does not conform to protocol 'ExpressibleByIntegerLiteral'}} expected-note {{add stubs for conformance}}
   var value : meters
 
   typealias IntegerLiteralType = meters // expected-note{{possibly intended match 'supermeters.IntegerLiteralType' (aka 'meters') does not conform to '_ExpressibleByBuiltinIntegerLiteral'}}

@@ -8,7 +8,7 @@
 // RUN: %target-swift-frontend -runtime-compatibility-version none -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=NO-FORCE-LOAD %s
 
 // Doesn't autolink compatibility library because target OS doesn't need it
-// RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.24 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=NO-FORCE-LOAD %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx99.99 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=NO-FORCE-LOAD %s
 
 // Only autolinks 5.1 compatibility library because target OS has 5.1
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.15 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD-51 %s
@@ -23,9 +23,9 @@
 // RUN: %target-swift-frontend -runtime-compatibility-version 5.0 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD %s
 // RUN: %target-swift-frontend -runtime-compatibility-version 5.1 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD-51 %s
 // RUN: %target-swift-frontend -runtime-compatibility-version 5.5 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD-55 %s
-// RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.24 -runtime-compatibility-version 5.0 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD %s
-// RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.24 -runtime-compatibility-version 5.1 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD-51 %s
-// RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.24 -runtime-compatibility-version 5.5 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD-55 %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx99.99 -runtime-compatibility-version 5.0 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx99.99 -runtime-compatibility-version 5.1 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD-51 %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx99.99 -runtime-compatibility-version 5.5 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD-55 %s
 
 public func foo() {}
 

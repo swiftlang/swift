@@ -11,7 +11,7 @@ extension TestAddEquatable {
 }
 
 extension TestAddEquatable: Equatable {
-    static func == (lhs: TestAddEquatable, rhs: TestAddEquatable) -> Bool {
+    static func == (lhs: borrowing TestAddEquatable, rhs: borrowing TestAddEquatable) -> Bool {
         return lhs.property == rhs.property &&
                lhs.prop == rhs.prop &&
                lhs.pr == rhs.pr

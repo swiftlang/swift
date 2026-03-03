@@ -145,6 +145,10 @@ public:
       return idx < subLocations.size() && subLocations.test(idx);
     }
 
+    bool selfBitRepresentsUnknownSubFields() const {
+      return numFieldsNotCoveredBySubfields > 0;
+    }
+
   private:
     friend class MemoryLocations;
 

@@ -21,7 +21,7 @@ public struct LazyDropWhileSequence<Base: Sequence> {
   @usableFromInline // lazy-performance
   internal let _predicate: (Element) -> Bool
 
-  /// Create an instance with elements `transform(x)` for each element
+  /// Create an instance with elements `predicate(x)` for each element
   /// `x` of base.
   @inlinable // lazy-performance
   internal init(_base: Base, predicate: @escaping (Element) -> Bool) {

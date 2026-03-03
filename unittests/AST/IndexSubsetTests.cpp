@@ -253,15 +253,14 @@ TEST(IndexSubset, Lowering) {
             TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
         C.TheEmptyTupleType)),
     IndexSubset::get(C, 3, {0, 1, 2}));
-  // (T, ((T, T)), (T, T), T) -> ()
+  // (T, (T, T), (T, T), T) -> ()
   EXPECT_EQ(
     autodiff::getLoweredParameterIndices(
       IndexSubset::get(C, 4, {0, 1, 3}),
       FunctionType::get({
           FunctionType::Param(C.TheAnyType),
           FunctionType::Param(
-              ParenType::get(C,
-                  TupleType::get({C.TheAnyType, C.TheAnyType}, C))),
+            TupleType::get({C.TheAnyType, C.TheAnyType}, C)),
           FunctionType::Param(
             TupleType::get({C.TheAnyType, C.TheAnyType}, C)),
           FunctionType::Param(C.TheAnyType)},

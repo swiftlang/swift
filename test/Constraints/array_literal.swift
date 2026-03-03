@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -target %target-swift-5.1-abi-triple
 
 struct IntList : ExpressibleByArrayLiteral {
   typealias Element = Int
@@ -391,5 +391,40 @@ struct TestMultipleOverloadedInits {
   var x: Double
   func foo() {
     let _ = [Float(x), Float(x), Float(x), Float(x)]
+  }
+}
+
+do {
+  struct Section {
+    var rows: [Row<Any>]?
+  }
+
+  struct Row<T> {
+      init(value: T?) {}
+  }
+
+  struct Asset {
+    var orientation: Int32
+  }
+
+  func test(asset: Asset) -> [Section] {
+    return [
+      Section(rows: [
+        Row(value: String(describing: asset.orientation)) // Ok
+      ])
+    ]
+  }
+}
+
+// Make sure that subtyping works with empty literals.
+do {
+  class A {}
+
+  class B: A {}
+
+  func takesSequence<S>(_: S, _: S) where S: Sequence, S.Element: Sequence, S.Element.Element == A.Type {}
+
+  func test() {
+    takesSequence([[B.self]], [])
   }
 }

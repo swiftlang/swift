@@ -22,6 +22,8 @@
 #include "swift/Remote/MemoryReader.h"
 
 struct MemoryReaderImpl {
+  uint8_t PointerSize;
+
   // Opaque pointer passed to all the callback functions.
   void *reader_context;
 
@@ -40,6 +42,14 @@ namespace remote {
 class CMemoryReader final : public MemoryReader {
   MemoryReaderImpl Impl;
 
+  // Check to see if an address has bits outside the ptrauth mask. This suggests
+  // that we're likely failing to strip a signed pointer when reading from it.
+  bool hasSignatureBits(RemoteAddress address) {
+    uint64_t addressData = address.getRawAddress();
+    uint64_t mask = getPtrAuthMask().value_or(~uint64_t(0));
+    return addressData != (addressData & mask);
+  }
+
 public:
   CMemoryReader(MemoryReaderImpl Impl) : Impl(Impl) {
     assert(this->Impl.queryDataLayout && "No queryDataLayout implementation");
@@ -56,15 +66,16 @@ public:
   RemoteAddress getSymbolAddress(const std::string &name) override {
     auto addressData = Impl.getSymbolAddress(Impl.reader_context,
                                              name.c_str(), name.size());
-    return RemoteAddress(addressData);
+    return RemoteAddress(addressData, RemoteAddress::DefaultAddressSpace);
   }
 
   uint64_t getStringLength(RemoteAddress address) {
-    return Impl.getStringLength(Impl.reader_context,
-                                address.getAddressData());
+    assert(!hasSignatureBits(address));
+    return Impl.getStringLength(Impl.reader_context, address.getRawAddress());
   }
 
   bool readString(RemoteAddress address, std::string &dest) override {
+    assert(!hasSignatureBits(address));
     auto length = getStringLength(address);
     if (length == 0) {
       // A length of zero unfortunately might mean either that there's a zero
@@ -83,21 +94,23 @@ public:
   }
 
   ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
-      void *FreeContext;
-      auto Ptr = Impl.readBytes(Impl.reader_context, address.getAddressData(), size,
-                                &FreeContext);
+    assert(!hasSignatureBits(address));
+    void *FreeContext;
+    auto Ptr = Impl.readBytes(Impl.reader_context, address.getRawAddress(),
+                              size, &FreeContext);
 
-      auto Free = Impl.free;
-      if (Free == nullptr)
-        return ReadBytesResult(Ptr, [](const void *) {});
-      
-      auto ReaderContext = Impl.reader_context;
-      auto freeLambda = [=](const void *Ptr) { Free(ReaderContext, Ptr, FreeContext); };
-      return ReadBytesResult(Ptr, freeLambda);
+    auto Free = Impl.free;
+    if (Free == nullptr)
+      return ReadBytesResult(Ptr, [](const void *) {});
+
+    auto ReaderContext = Impl.reader_context;
+    auto freeLambda = [=](const void *Ptr) {
+      Free(ReaderContext, Ptr, FreeContext);
+    };
+    return ReadBytesResult(Ptr, freeLambda);
   }
 };
-
-}
-}
+} // namespace remote
+} // namespace swift
 
 #endif

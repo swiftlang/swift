@@ -13,6 +13,8 @@
 #ifndef SILGEN_H
 #define SILGEN_H
 
+#define SWIFT_INCLUDED_IN_SILGEN_SOURCES
+
 #include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "swift/AST/ASTContext.h"
@@ -28,6 +30,7 @@
 namespace swift {
   class SILBasicBlock;
   class ForeignAsyncConvention;
+  class SymbolSource;
 
 namespace Lowering {
   class TypeConverter;
@@ -83,9 +86,8 @@ public:
   /// Set of delayed conformances that have already been forced.
   llvm::DenseSet<NormalProtocolConformance *> forcedConformances;
 
-  /// The conformance for any DistributedActor to the Actor protocol,
-  /// used only by the `distributedActorAsAnyActor` builtin.
-  NormalProtocolConformance *distributedActorAsActorConformance = nullptr;
+  /// Imported noncopyable types that we have seen.
+  llvm::DenseSet<NominalTypeDecl *> importedNontrivialNoncopyableTypes;
 
   size_t anonymousSymbolCounter = 0;
 
@@ -127,6 +129,12 @@ public:
   void operator=(SILGenModule const &) = delete;
 
   ASTContext &getASTContext() { return M.getASTContext(); }
+
+  /// Main entry point.
+  void emitSourceFile(SourceFile *sf);
+
+  /// Lazy entry point for Feature::LazyImmediate.
+  void emitSymbolSource(SymbolSource Source);
 
   llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>> FileIDsByFilePath;
 
@@ -263,6 +271,7 @@ public:
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
+  void visitUsingDecl(UsingDecl *) {}
 
   // Emitted as part of its storage.
   void visitAccessorDecl(AccessorDecl *ad) {}
@@ -270,8 +279,6 @@ public:
   void visitFuncDecl(FuncDecl *fd);
   void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td) {}
-  void visitIfConfigDecl(IfConfigDecl *icd);
-  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD);
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
@@ -279,6 +286,8 @@ public:
   void visitMissingDecl(MissingDecl *d);
   void visitMacroDecl(MacroDecl *d);
   void visitMacroExpansionDecl(MacroExpansionDecl *d);
+
+  void visitImportedNontrivialNoncopyableType(NominalTypeDecl *nominal);
 
   // Same as AbstractStorageDecl::visitEmittedAccessors, but skips over skipped
   // (unavailable) decls.
@@ -332,6 +341,10 @@ public:
 
   /// Emits the backing initializer for a property with an attached wrapper.
   void emitPropertyWrapperBackingInitializer(VarDecl *var);
+
+  /// Emits an init accessor that contains a call to the backing storage
+  /// initializer for a property with an attached property wrapper
+  void emitPropertyWrappedFieldInitAccessor(VarDecl *var);
 
   /// Emits argument generators, including default argument generators and
   /// property wrapper argument generators, for the given parameter list.
@@ -388,6 +401,10 @@ public:
   /// Emit the default witness table for a resilient protocol.
   void emitDefaultWitnessTable(ProtocolDecl *protocol);
 
+  void emitDefaultOverrideTable(ClassDecl *decl);
+
+  SILFunction *emitDefaultOverride(SILDeclRef replacement, SILDeclRef original);
+
   /// Emit the self-conformance witness table for a protocol.
   void emitSelfConformanceWitnessTable(ProtocolDecl *protocol);
 
@@ -419,24 +436,17 @@ public:
   /// Is the self method of the given nonmutating method passed indirectly?
   bool isNonMutatingSelfIndirect(SILDeclRef method);
 
-  SILDeclRef getAccessorDeclRef(AccessorDecl *accessor,
-                                ResilienceExpansion expansion);
+  SILDeclRef getFuncDeclRef(FuncDecl *funcDecl, ResilienceExpansion expansion);
 
   bool canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
                                            ResilienceExpansion expansion);
 
-  KeyPathPatternComponent
-  emitKeyPathComponentForDecl(SILLocation loc,
-                              GenericEnvironment *genericEnv,
-                              ResilienceExpansion expansion,
-                              unsigned &baseOperand,
-                              bool &needsGenericContext,
-                              SubstitutionMap subs,
-                              AbstractStorageDecl *storage,
-                              ArrayRef<ProtocolConformanceRef> indexHashables,
-                              CanType baseTy,
-                              DeclContext *useDC,
-                              bool forPropertyDescriptor);
+  KeyPathPatternComponent emitKeyPathComponentForDecl(
+      SILLocation loc, GenericEnvironment *genericEnv,
+      ResilienceExpansion expansion, unsigned &baseOperand,
+      bool &needsGenericContext, SubstitutionMap subs, ValueDecl *decl,
+      ArrayRef<ProtocolConformanceRef> indexHashables, CanType baseTy,
+      DeclContext *useDC, bool forPropertyDescriptor, bool isApplied = false);
 
   /// Emit all differentiability witnesses for the given function, visiting its
   /// `@differentiable` and `@derivative` attributes.
@@ -515,14 +525,10 @@ public:
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();
 
-  /// Retrieve the _Concurrency._asyncLetStart intrinsic.
-  FuncDecl *getAsyncLetStart();
   /// Retrieve the _Concurrency._asyncLetGet intrinsic.
   FuncDecl *getAsyncLetGet();
   /// Retrieve the _Concurrency._asyncLetGetThrowing intrinsic.
   FuncDecl *getAsyncLetGetThrowing();
-  /// Retrieve the _Concurrency._asyncLetFinish intrinsic.
-  FuncDecl *getFinishAsyncLet();
 
   /// Retrieve the _Concurrency._taskFutureGet intrinsic.
   FuncDecl *getTaskFutureGet();
@@ -556,8 +562,21 @@ public:
   FuncDecl *getAsyncMainDrainQueue();
   /// Retrieve the _Concurrency._swiftJobRun intrinsic.
   FuncDecl *getSwiftJobRun();
+  /// Retrieve the _Concurrency._deinitOnExecutor intrinsic.
+  FuncDecl *getDeinitOnExecutor();
+  /// Retrieve the _Concurrency._deinitOnExecutorMainActorBackDeploy intrinsic.
+  FuncDecl *getDeinitOnExecutorMainActorBackDeploy();
   // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
   FuncDecl *getExit();
+
+  /// Get the configured ExecutorFactory type.
+  Type getConfiguredExecutorFactory();
+
+  /// Get the DefaultExecutorFactory type.
+  Type getDefaultExecutorFactory();
+
+  /// Get the swift_createExecutors function.
+  FuncDecl *getCreateExecutors();
 
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
                                              KeyPathTypeKind typeKind);
@@ -588,27 +607,19 @@ public:
   void emitLazyConformancesForType(NominalTypeDecl *NTD);
 
   /// Mark a protocol conformance as used, so we know we need to emit it if
-  /// it's in our TU.
-  void useConformance(ProtocolConformanceRef conformance);
+  /// it's in our TU. The SILInstruction is printed for debugging purposes if
+  /// the conformance turns out to be invalid.
+  void useConformance(SILInstruction *inst, ProtocolConformanceRef conformance);
 
   /// Mark protocol conformances from the given type as used.
-  void useConformancesFromType(CanType type);
+  void useConformancesFromType(SILInstruction *inst, CanType type);
 
   /// Mark protocol conformances from the given set of substitutions as used.
-  void useConformancesFromSubstitutions(SubstitutionMap subs);
+  void useConformancesFromSubstitutions(SILInstruction *inst, SubstitutionMap subs);
 
   /// Mark _ObjectiveCBridgeable conformances as used for any imported types
   /// mentioned by the given type.
-  void useConformancesFromObjectiveCType(CanType type);
-
-  /// Retrieve a protocol conformance to the `Actor` protocol for a
-  /// distributed actor type that is described via a substitution map for
-  /// the generic signature `<T: DistributedActor>`.
-  ///
-  /// The protocol conformance is a special one that is currently
-  /// only used by the `distributedActorAsAnyActor` builtin.
-  ProtocolConformanceRef
-  getDistributedActorAsActorConformance(SubstitutionMap subs);
+  void useConformancesFromObjectiveCType(SILInstruction *inst, CanType type);
 
   /// Make a note of a member reference expression, which allows us
   /// to ensure that the conformance above is emitted wherever it
@@ -636,6 +647,12 @@ private:
 
   /// Emit the deallocator for a class that uses the objc allocator.
   void emitObjCAllocatorDestructor(ClassDecl *cd, DestructorDecl *dd);
+
+  /// Emit the actual body of deallocator.
+  /// If deinit is isolated, function should be an isolated deallocator, an
+  /// actual deallocator is just a thunk that switches executors. If deinit is
+  /// isolated, function should be the deallocator itself.
+  void emitDeallocatorImpl(SILDeclRef constant, SILFunction *f);
 };
  
 } // end namespace Lowering

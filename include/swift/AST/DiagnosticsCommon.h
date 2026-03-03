@@ -24,6 +24,13 @@
 #include "swift/Config.h"
 
 namespace swift {
+  class AccessorDecl;
+  class ConstructorDecl;
+  class MacroDecl;
+  class SubscriptDecl;
+  class SwitchStmt;
+  class TypeAliasDecl;
+
   template<typename ...ArgTypes>
   struct Diag;
 
@@ -48,6 +55,7 @@ namespace swift {
   } // end namespace detail
 
   enum class StaticSpellingKind : uint8_t;
+  enum class ForeignLanguage : uint8_t;
 
   namespace diag {
 
@@ -56,10 +64,10 @@ namespace swift {
     using DeclAttribute = const DeclAttribute *;
 
   // Declare common diagnostics objects with their appropriate types.
-#define DIAG(KIND,ID,Options,Text,Signature) \
-    extern detail::DiagWithArguments<void Signature>::type ID;
-#define FIXIT(ID, Text, Signature) \
-    extern detail::StructuredFixItWithArguments<void Signature>::type ID;
+#define DIAG(KIND, ID, Group, Options, Text, Signature)                    \
+      extern detail::DiagWithArguments<void Signature>::type ID;
+#define FIXIT(ID, Text, Signature)                                         \
+      extern detail::StructuredFixItWithArguments<void Signature>::type ID;
 #include "DiagnosticsCommon.def"
   } // end namespace diag
 } // end namespace swift

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s
 
 // Protocols with superclass-constrained Self.
@@ -46,12 +46,14 @@ extension ProtoRefinesClass {
 
     // CHECK:      [[SELF:%.*]] = copy_value %3 : $Self
     // CHECK-NEXT: [[UPCAST:%.*]] = upcast [[SELF]] : $Self to $Generic<Int>
+    // CHECK-NEXT: ignored_use
     // CHECK-NEXT: destroy_value [[UPCAST]] : $Generic<Int>
     let _: Generic<Int> = self
 
     // CHECK:      [[SELF:%.*]] = copy_value %3 : $Self
     // CHECK-NEXT: [[UPCAST:%.*]] = upcast [[SELF]] : $Self to $Generic<Int>
     // CHECK-NEXT: [[UPCAST2:%.*]] = upcast [[UPCAST]] : $Generic<Int> to $Concrete
+    // CHECK-NEXT: ignored_use
     // CHECK-NEXT: destroy_value [[UPCAST2]] : $Concrete
     let _: Concrete = self
 
@@ -59,6 +61,7 @@ extension ProtoRefinesClass {
     // CHECK-NEXT: [[SELF:%.*]] = copy_value %3 : $Self
     // CHECK-NEXT: [[ADDR:%.*]] = init_existential_addr [[BOX]] : $*any BaseProto, $Self
     // CHECK-NEXT: store [[SELF]] to [init] [[ADDR]] : $*Self
+    // CHECK-NEXT: ignored_use
     // CHECK-NEXT: destroy_addr [[BOX]] : $*any BaseProto
     // CHECK-NEXT: dealloc_stack [[BOX]] : $*any BaseProto
     let _: BaseProto = self
@@ -206,6 +209,7 @@ func useProtocolWithClassInits1(_ t: ProtocolWithClassInits.Type) {
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]<Int>([[UPCAST]])
   // CHECK-NEXT: [[CAST:%.*]] = unchecked_ref_cast [[RESULT]] : $ClassWithInits<Int> to $@opened("{{.*}}", any ProtocolWithClassInits) Self
   // CHECK-NEXT: [[EXISTENTIAL:%.*]] = init_existential_ref [[CAST]] : $@opened("{{.*}}", any ProtocolWithClassInits) Self : $@opened("{{.*}}", any ProtocolWithClassInits) Self, $any ProtocolWithClassInits
+  // CHECK-NEXT: ignored_use
   // CHECK-NEXT: destroy_value [[EXISTENTIAL]]
   let _: ProtocolWithClassInits = t.init(requiredInit: ())
 }

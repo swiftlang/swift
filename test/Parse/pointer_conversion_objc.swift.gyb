@@ -14,13 +14,10 @@
 %{
 if OPT_KIND == 'Optional':
   suffix='?'
-  diag_suffix='?'
 elif OPT_KIND == 'ImplicitlyUnwrappedOptional':
   suffix='!'
-  diag_suffix='?'
 else:
   suffix=''
-  diag_suffix=''
 }%
 
 class C {}
@@ -36,8 +33,8 @@ func takesAutoreleasingPointer(_ x: AutoreleasingUnsafeMutablePointer<C>${suffix
 
 func pointerArgumentsObjC(ap: AutoreleasingUnsafeMutablePointer<Int>,
                           afp: AutoreleasingUnsafeMutablePointer<Float>) {
-  takesMutablePointer(ap) // expected-error{{cannot convert value of type 'AutoreleasingUnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<Int>${diag_suffix}'}}
-  takesMutableVoidPointer(ap) // expected-error{{cannot convert value of type 'AutoreleasingUnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutableRawPointer${diag_suffix}'}}
+  takesMutablePointer(ap) // expected-error{{cannot convert value of type 'AutoreleasingUnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<Int>'}}
+  takesMutableVoidPointer(ap) // expected-error{{cannot convert value of type 'AutoreleasingUnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutableRawPointer'}}
   takesConstPointer(ap)
   takesConstVoidPointer(ap)
   takesConstVoidPointer(afp)
@@ -55,17 +52,17 @@ func autoreleasingPointerArguments(p: UnsafeMutablePointer<Int>,
   // expected-error@-2 {{'nil' is not compatible with expected argument type}}
 % end
 
-  takesAutoreleasingPointer(p) // expected-error{{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>${diag_suffix}'}}
-  takesAutoreleasingPointer(cp) // expected-error{{cannot convert value of type 'UnsafePointer<Int>' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>${diag_suffix}'}}
+  takesAutoreleasingPointer(p) // expected-error{{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>'}}
+  takesAutoreleasingPointer(cp) // expected-error{{cannot convert value of type 'UnsafePointer<Int>' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>'}}
   takesAutoreleasingPointer(ap)
 
   var c: C = C()
   takesAutoreleasingPointer(&c)
-  takesAutoreleasingPointer(c) // expected-error{{cannot convert value of type 'C' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>${diag_suffix}'}}
+  takesAutoreleasingPointer(c) // expected-error{{cannot convert value of type 'C' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>'}}
   var d: D = D()
   takesAutoreleasingPointer(&d) // expected-error{{cannot convert value of type 'AutoreleasingUnsafeMutablePointer<D>' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>'}}
   // expected-note@-1 {{arguments to generic parameter 'Pointee' ('D' and 'C') are expected to be equal}}
-  takesAutoreleasingPointer(d) // expected-error{{cannot convert value of type 'D' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>${diag_suffix}'}}
+  takesAutoreleasingPointer(d) // expected-error{{cannot convert value of type 'D' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>'}}
   var cc: [C] = [C(), C()]
   var dd: [D] = [D(), D()]
   takesAutoreleasingPointer(&cc) // expected-error{{cannot convert value of type 'AutoreleasingUnsafeMutablePointer<[C]>' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>'}}

@@ -1,7 +1,7 @@
 // RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s | %FileCheck %s
 
-struct Foo { // CHECK: [[@LINE]]:8 | struct/Swift | Foo | [[Foo_USR:.*]] | Def | rel: 0
-  init() {} // CHECK: [[@LINE]]:3 | constructor/Swift | init() | [[Foo_init_USR:.*]] | Def,RelChild | rel: 1
+struct Foo { // CHECK: [[@LINE]]:8 | struct(internal)/Swift | Foo | [[Foo_USR:.*]] | Def | rel: 0
+  init() {} // CHECK: [[@LINE]]:3 | constructor(internal)/Swift | init() | [[Foo_init_USR:.*]] | Def,RelChild | rel: 1
 
   static func bar() -> Self {
     .init() // CHECK: [[@LINE]]:6 | constructor/Swift | init() | [[Foo_init_USR]] | Ref,Call,RelCall,RelCont | rel: 1
@@ -14,8 +14,8 @@ struct Foo { // CHECK: [[@LINE]]:8 | struct/Swift | Foo | [[Foo_USR:.*]] | Def |
   }
 }
 
-final class Final { // CHECK: [[@LINE]]:13 | class/Swift | Final | [[Final_USR:.*]] | Def | rel: 0
-  init() {} // CHECK: [[@LINE]]:3 | constructor/Swift | init() | [[Final_init_USR:.*]] | Def,RelChild | rel: 1
+final class Final { // CHECK: [[@LINE]]:13 | class(internal)/Swift | Final | [[Final_USR:.*]] | Def | rel: 0
+  init() {} // CHECK: [[@LINE]]:3 | constructor(internal)/Swift | init() | [[Final_init_USR:.*]] | Def,RelChild | rel: 1
 
   static func foo() -> Self {
     .init() // CHECK: [[@LINE]]:6 | constructor/Swift | init() | [[Final_init_USR]] | Ref,Call,RelCall,RelCont | rel: 1
@@ -28,8 +28,8 @@ final class Final { // CHECK: [[@LINE]]:13 | class/Swift | Final | [[Final_USR:.
   }
 }
 
-class Bar { // CHECK: [[@LINE]]:7 | class/Swift | Bar | [[Bar_USR:.*]] | Def | rel: 0
-  required init() {} // CHECK: [[@LINE]]:12 | constructor/Swift | init() | [[Bar_init_USR:.*]] | Def,RelChild | rel: 1
+class Bar { // CHECK: [[@LINE]]:7 | class(internal)/Swift | Bar | [[Bar_USR:.*]] | Def | rel: 0
+  required init() {} // CHECK: [[@LINE]]:12 | constructor(internal)/Swift | init() | [[Bar_init_USR:.*]] | Def,RelChild | rel: 1
 
   static func foo() -> Self {
     .init() // CHECK: [[@LINE]]:6 | constructor/Swift | init() | [[Bar_init_USR]] | Ref,Call,RelCall,RelCont | rel: 1
@@ -45,8 +45,8 @@ class Bar { // CHECK: [[@LINE]]:7 | class/Swift | Bar | [[Bar_USR:.*]] | Def | r
 
 class Baz: Bar {}
 
-protocol Proto { // CHECK: [[@LINE]]:10 | protocol/Swift | Proto | [[Proto_USR:.*]] | Def | rel: 0
-  init() // CHECK: [[@LINE]]:3 | constructor/Swift | init() | [[Proto_init_USR:.*]] | Def,RelChild | rel: 1
+protocol Proto { // CHECK: [[@LINE]]:10 | protocol(internal)/Swift | Proto | [[Proto_USR:.*]] | Def | rel: 0
+  init() // CHECK: [[@LINE]]:3 | constructor(internal)/Swift | init() | [[Proto_init_USR:.*]] | Def,RelChild | rel: 1
 }
 
 extension Proto {

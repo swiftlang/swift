@@ -12,7 +12,7 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
-#define SWIFT_TARGET_LIBRARY_NAME swiftRuntime
+#define SWIFT_TARGET_LIBRARY_NAME swiftRuntimeCore
 
 #include "../../stdlib/public/CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Casting.h"
@@ -55,14 +55,14 @@ namespace  {
 
 struct OverrideSection {
   uintptr_t version;
-  
+
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
 #include "../../stdlib/public/CompatibilityOverride/CompatibilityOverrideRuntime.def"
 };
 
 OverrideSection RuntimeOverrides
-    __attribute__((section("__DATA," COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntime))) = {
+    __attribute__((section("__DATA," COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntimeCore))) = {
         0,
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   name ## Override,

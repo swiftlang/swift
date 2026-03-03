@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -target %target-cpu-apple-macosx10.15 -swift-version 5
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
@@ -9,8 +9,7 @@ struct MyView: View {
 
   var body: some View {
     Table(self.data) {
-      // expected-error@-1 {{missing argument for parameter #1 in call}}
-      // expected-error@-2 {{cannot infer return type of empty closure}} {{23-23=<#result#>}}
+      // expected-error@-1 {{expected expression of type 'Columns' in result builder 'TableColumnBuilder'}} {{23-23=<#T##Columns#>}}
     }
   }
 }

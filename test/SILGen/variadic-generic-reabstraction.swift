@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 func takesVariadicFunction<each T>(function: (repeat each T) -> Int) {}
 func takesVariadicOwnedFunction<each T>(function: (repeat __owned each T) -> Int) {}

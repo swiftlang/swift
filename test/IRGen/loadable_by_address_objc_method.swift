@@ -25,5 +25,5 @@ test()
 
 
 // SIL: sil hidden @$s31loadable_by_address_objc_method4testyyF : $@convention(thin) () -> () {
-// SIL: [[C:%.*]] = convert_function {{.*}} : $@convention(objc_method) (SamplesType, @opened({{.*}}, any P) Self) -> SamplesType to $@convention(objc_method) (@in_guaranteed SamplesType, @opened({{.*}}, any P) Self) -> @out SamplesType
+// SIL: [[C:%.*]] = convert_function {{.*}} to $@convention(objc_method) (@in_guaranteed SamplesType, @opened({{.*}}, any P) Self) -> @out SamplesType
 // SIL:             partial_apply [callee_guaranteed] [[C]]({{.*}}) : $@convention(objc_method) (@in_guaranteed SamplesType, @opened({{.*}}, any P) Self) -> @out SamplesType

@@ -1,9 +1,12 @@
-// RUN: %target-swift-frontend -target armv7-apple-none-macho -Xcc -D__MACH__ -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
-// RUN: %target-swift-frontend -target arm64-apple-none-macho -Xcc -D__MACH__ -Xcc -D__arm64__ -Xcc -D__APPLE__ -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
+// RUN: %target-swift-frontend -target armv7-apple-none-macho -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
+// RUN: %target-swift-frontend -target arm64-apple-none-macho -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
+// UNSUPPORTED: CPU=wasm32
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=ARM
+// REQUIRES: embedded_stdlib_cross_compiling
+// REQUIRES: swift_feature_Embedded
 
 // https://github.com/apple/swift/issues/73249
 // UNSUPPORTED: OS=windows-msvc
@@ -29,4 +32,4 @@ struct ShippingOptions: MyOptionSet {
 var s = ShippingOptions(rawValue: 42)
 print(s.isEmpty)
 
-// CHECK: define {{.*}}i32 @main(i32 %0, ptr %1)
+// CHECK: define {{.*}}i32 @{{_*}}main{{.*}}(i32 %0, ptr %1)

@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature BuiltinModule) | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_BuiltinModule
 
 // Execute an unaligned load of SIMD16<UInt8> which conforms to a protocol derived from BitwiseCopyable.
 

@@ -1,10 +1,12 @@
 // RUN: %target-typecheck-verify-swift
 
-#if 0  // expected-error {{'0' is not a valid conditional compilation expression, use 'false'}} {{5-6=false}}
+#if 0  // expected-error {{'0' is not a valid conditional compilation expression, use 'false'}}
+// expected-note@-1{{replace with Boolean literal 'false'}}{{5-6=false}}
   let x = 1
 #endif
 
-#if 1  // expected-error {{'1' is not a valid conditional compilation expression, use 'true'}} {{5-6=true}}
+#if 1  // expected-error {{'1' is not a valid conditional compilation expression, use 'true'}}
+// expected-note@-1{{replace with Boolean literal 'true'}}{{5-6=true}}
   let x = 1
 #endif
 

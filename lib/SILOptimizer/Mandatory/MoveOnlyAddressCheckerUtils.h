@@ -18,6 +18,7 @@
 namespace swift {
 
 class PostOrderAnalysis;
+class DeadEndBlocksAnalysis;
 
 namespace siloptimizer {
 
@@ -39,6 +40,7 @@ struct MoveOnlyAddressChecker {
   borrowtodestructure::IntervalMapAllocator &allocator;
   DominanceInfo *domTree;
   PostOrderAnalysis *poa;
+  DeadEndBlocksAnalysis *deadEndBlocksAnalysis;
 
   /// \returns true if we changed the IR. To see if we emitted a diagnostic, use
   /// \p diagnosticEmitter.getDiagnosticCount().

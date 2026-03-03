@@ -103,4 +103,9 @@ ReferenceTestSuite.test("const reference to template") {
   expectEqual(53, ref.pointee)
 }
 
+ReferenceTestSuite.test("rvalue reference of trivial type") {
+  setStaticIntRvalueRef(consuming: 2)
+  expectEqual(2, getStaticInt())
+}
+
 runAllTests()

@@ -12,7 +12,7 @@
 
 import SIL
 
-extension CopyValueInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension CopyValueInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if fromValue.ownership == .none {
       uses.replaceAll(with: fromValue, context)

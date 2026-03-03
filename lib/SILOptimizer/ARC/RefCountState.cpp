@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "RefCountState.h"
 #include "RCStateTransition.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
@@ -485,7 +486,7 @@ void BottomUpRefCountState::checkAndResetKnownSafety(
     return;
   // If the VisitingRC and VisitedRC do not alias, they cannot be incorrectly
   // paired.
-  if (AA->isNoAlias(VisitingRC, VisitedRC))
+  if (!AA->mayAlias(VisitingRC, VisitedRC))
     return;
   LLVM_DEBUG(llvm::dbgs() << "Clearing KnownSafe for: ");
   LLVM_DEBUG(VisitedRC->dump());
@@ -912,7 +913,7 @@ void TopDownRefCountState::checkAndResetKnownSafety(
     return;
   // If the VisitingRC and VisitedRC do not alias, they cannot be incorrectly
   // paired.
-  if (AA->isNoAlias(VisitingRC, VisitedRC))
+  if (!AA->mayAlias(VisitingRC, VisitedRC))
     return;
   LLVM_DEBUG(llvm::dbgs() << "Clearing KnownSafe for: ");
   LLVM_DEBUG(VisitedRC->dump());

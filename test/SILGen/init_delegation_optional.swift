@@ -2,8 +2,8 @@
 // optionals, or else we do not discern the difference between a failure and a
 // constructed value. Run in compatibility modes that disable and enable
 // the flattening to verify this.
-// RUN: %target-swift-emit-silgen %s -swift-version 5 | %FileCheck %s
-// RUN: %target-swift-emit-silgen %s -swift-version 4.2 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -swift-version 4.2 | %FileCheck %s
 
 extension Optional {
   init(nonFailable1: ()) {
@@ -369,7 +369,7 @@ extension Optional where Wrapped == Optional<Bool> {
     // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[MARKED_SELF_LIFETIME]]
     // CHECK: [[RESULT_ADDR:%[0-9]+]] = alloc_stack $Optional<Optional<Bool>>
     // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$sSq24init_delegation_optionalE12nonFailable1xSgyt_tcfC
-    // CHECK-NEXT: apply [[DELEG_INIT]]<Bool?>([[RESULT_ADDR]], [[SELF_META]])
+    // CHECK-NEXT: apply [[DELEG_INIT]]<Optional<Bool>>([[RESULT_ADDR]], [[SELF_META]])
     // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [trivial] [[RESULT_ADDR]]
     // CHECK-NEXT: assign [[RESULT]] to [[PB]]
     // CHECK-NEXT: dealloc_stack [[RESULT_ADDR]]

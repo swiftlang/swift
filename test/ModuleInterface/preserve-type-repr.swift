@@ -5,7 +5,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/External.swiftinterface) -module-name External
 
 // -- Check output with -module-interface-preserve-types-as-written.
-// RUN: %target-swift-emit-module-interface(%t/Preserve.swiftinterface) %s -module-name PreferTypeRepr -module-interface-preserve-types-as-written -I %t
+// RUN: %target-swift-emit-module-interface(%t/Preserve.swiftinterface) %s -module-name PreferTypeRepr -disable-module-selectors-in-module-interface -module-interface-preserve-types-as-written -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/Preserve.swiftinterface) -module-name PreferTypeRepr -I %t
 // RUN: %FileCheck --check-prefixes=CHECK,PREFER %s < %t/Preserve.swiftinterface
 
@@ -26,13 +26,13 @@ public struct GenericToy<T> {
 import External
 
 // PREFER: extension Toy
-// DONTPREFER: extension External.Toy
+// DONTPREFER: extension External::Toy
 extension Toy {
     public static var new: Toy { Toy() }
 }
 
 // PREFER: extension GenericToy {
-// DONTPREFER: extension External.GenericToy {
+// DONTPREFER: extension External::GenericToy {
 extension GenericToy {
     public static var new: GenericToy<T> { GenericToy() }
 }
@@ -40,14 +40,15 @@ extension GenericToy {
 public protocol Pet {}
 
 // PREFER: public struct Parrot : Pet {
-// DONTPREFER: public struct Parrot : PreferTypeRepr.Pet {
+// DONTPREFER: public struct Parrot : PreferTypeRepr::Pet {
 // CHECK-NEXT: }
 public struct Parrot: Pet {}
 
-// CHECK: public struct Ex<T> where T : PreferTypeRepr.Pet {
+// PREFER: public struct Ex<T> where T : PreferTypeRepr.Pet {
+// DONTPREFER: public struct Ex<T> where T : PreferTypeRepr::Pet {
 public struct Ex<T: Pet> {
   // PREFER: public var hasCeasedToBe: Bool {
-  // DONTPREFER: public var hasCeasedToBe: Swift.Bool {
+  // DONTPREFER: public var hasCeasedToBe: Swift::Bool {
   // CHECK: get
   // CHECK-NEXT: }
   public var hasCeasedToBe: Bool { false }
@@ -60,14 +61,14 @@ public struct Ex<T: Pet> {
 public struct My<T> {}
 
 // PREFER: extension My where T : PreferTypeRepr.Pet
-// DONTPREFER: extension PreferTypeRepr.My where T : PreferTypeRepr.Pet
+// DONTPREFER: extension PreferTypeRepr::My where T : PreferTypeRepr::Pet
 extension My where T: Pet {
   // PREFER: public func isPushingUpDaisies() -> String
-  // DONTPREFER: public func isPushingUpDaisies() -> Swift.String
+  // DONTPREFER: public func isPushingUpDaisies() -> Swift::String
   public func isPushingUpDaisies() -> String { "" }
 }
 
 // PREFER: public func isNoMore(_ pet: Ex<Parrot>) -> Bool
-// DONTPREFER: public func isNoMore(_ pet: PreferTypeRepr.Ex<PreferTypeRepr.Parrot>) -> Swift.Bool
+// DONTPREFER: public func isNoMore(_ pet: PreferTypeRepr::Ex<PreferTypeRepr::Parrot>) -> Swift::Bool
 public func isNoMore(_ pet: Ex<Parrot>) -> Bool {}
 #endif

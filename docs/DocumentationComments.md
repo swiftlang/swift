@@ -5,7 +5,7 @@ comments utilize a full-fledged [CommonMark] parser library (known as [swift-cma
 the Swift projects), which is rendered in Xcode QuickHelp.
 
 [CommonMark]: http://commonmark.org
-[cmark]: https://github.com/apple/swift-cmark
+[cmark]: https://github.com/swiftlang/swift-cmark
 
 Swift Markup syntax is *exactly* CommonMark, *by design*, not only for its
 straightforward implementation and completeness but also in the spirit of

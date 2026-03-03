@@ -88,8 +88,7 @@ Inserter::shouldInsertMarkersForInstruction(SILInstruction *inst) {
     // SIL.  As a result, stack nesting is unable to properly nest async lets
     // with on-stack pack metadata.  rdar://109850951
     if (bi->getBuiltinKind() ==
-            BuiltinValueKind::StartAsyncLetWithLocalBuffer ||
-        bi->getBuiltinKind() == BuiltinValueKind::StartAsyncLet)
+            BuiltinValueKind::StartAsyncLetWithLocalBuffer)
       return Inserter::FindResult::Unhandleable;
     LLVM_FALLTHROUGH;
   }

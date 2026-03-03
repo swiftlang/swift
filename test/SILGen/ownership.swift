@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib -module-name Swift -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib -module-name Swift -parse-as-library %s | %FileCheck %s
 
 protocol Error {}
 

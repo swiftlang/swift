@@ -54,7 +54,7 @@
 // RUN: %swiftc_driver -sdk "" -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi -enable-bridging-pch -import-objc-header %S/Inputs/bridging-header.h %s | %FileCheck -check-prefix=ZIPPERED-VARIANT-PCH %s
 // ZIPPERED-VARIANT-PCH: bin/swift
 // ZIPPERED-VARIANT-PCH: -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi
-// ZIPPERED_VARIANT-PCH  -emit-pch
+// ZIPPERED_VARIANT-PCH:  -emit-pch
 // ZIPPERED-VARIANT-PCH: bin/swift
 // ZIPPERED-VARIANT-PCH: -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi
 // ZIPPERED-VARIANT-PCH: bin/ld
@@ -78,7 +78,7 @@
 // RUN: %swiftc_driver -sdk "" -sdk "" -driver-print-jobs -target x86_64-apple-ios13.1-macabi -target-variant x86_64-apple-macosx10.14 -enable-bridging-pch -import-objc-header %S/Inputs/bridging-header.h %s | %FileCheck -check-prefix=REVERSE-ZIPPERED-VARIANT-PCH %s
 // REVERSE-ZIPPERED-VARIANT-PCH: bin/swift
 // REVERSE-ZIPPERED-VARIANT-PCH: -target x86_64-apple-ios13.1-macabi -target-variant x86_64-apple-macosx10.14
-// REVERSE-ZIPPERED_VARIANT-PCH  -emit-pch
+// REVERSE-ZIPPERED_VARIANT-PCH:  -emit-pch
 // REVERSE-ZIPPERED-VARIANT-PCH: bin/swift
 // REVERSE-ZIPPERED-VARIANT-PCH: -target x86_64-apple-ios13.1-macabi -target-variant x86_64-apple-macosx10.14
 // REVERSE-ZIPPERED-VARIANT-PCH: bin/ld
@@ -104,19 +104,19 @@
 // Check reading the SDKSettings.json from an SDK and using it to map Catalyst
 // SDK version information.
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi -sdk %S/Inputs/MacOSX10.15.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_ZIPPERED %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi -sdk %S/Inputs/MacOSX10.15.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_ZIPPERED %s
 // MACOS_10_15_ZIPPERED: -target-sdk-version 10.15
 // MACOS_10_15_ZIPPERED: -target-variant-sdk-version 13.1
 // MACOS_10_15_ZIPPERED: -platform_version macos 10.14.0 10.15.0
 // MACOS_10_15_ZIPPERED: -platform_version mac-catalyst 13.1.0 13.1.0
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi -sdk %S/Inputs/MacOSX10.15.4.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4_ZIPPERED %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi -sdk %S/Inputs/MacOSX10.15.4.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4_ZIPPERED %s
 // MACOS_10_15_4_ZIPPERED: -target-sdk-version 10.15.4
 // MACOS_10_15_4_ZIPPERED: -target-variant-sdk-version 13.4
 // MACOS_10_15_4_ZIPPERED: -platform_version macos 10.14.0 10.15.4
 // MACOS_10_15_4_ZIPPERED: -platform_version mac-catalyst 13.1.0 13.4.0
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target-variant x86_64-apple-macosx10.14 -target x86_64-apple-ios13.1-macabi -sdk %S/Inputs/MacOSX10.15.4.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4_REVERSE_ZIPPERED %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target-variant x86_64-apple-macosx10.14 -target x86_64-apple-ios13.1-macabi -sdk %S/Inputs/MacOSX10.15.4.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4_REVERSE_ZIPPERED %s
 // MACOS_10_15_4_REVERSE_ZIPPERED: -target-sdk-version 13.4
 // MACOS_10_15_4_REVERSE_ZIPPERED: -target-variant-sdk-version 10.15.4
 // MACOS_10_15_4_REVERSE_ZIPPERED: -platform_version mac-catalyst 13.1.0 13.4.0

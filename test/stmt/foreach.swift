@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -disable-typo-correction
 
 // Bad containers and ranges
 struct BadContainer1 {
@@ -26,7 +26,7 @@ func bad_containers_3(bc: BadContainer3) {
 
 struct BadIterator1 {}
 
-struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}}
+struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}} expected-note {{add stubs for conformance}}
   typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'BadContainer4.Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> BadIterator1 { }
 }
@@ -340,4 +340,69 @@ do {
       let x = e1 // Ok
     }
   }
+}
+
+// https://github.com/apple/swift/issues/73207
+do {
+  func test(_ levels: [Range<Int>]) {
+    for (i, leaves): (Int, Range<Int>) in levels[8 ..< 15].enumerated() { // Ok
+      _ = i
+      _ = leaves
+    }
+  }
+}
+
+protocol PSeq: Sequence where Self.Element: P {}
+
+protocol HasPSeq {
+  associatedtype X: PSeq
+  func pseq() -> X
+}
+
+// Make sure we can type-check the existential erasure in this case.
+func testExistentialElementErasure(_ x: any HasPSeq) {
+  for _ in x.pseq() {}
+}
+
+struct IntIter: IteratorProtocol {
+  func next() -> Int? { nil }
+}
+protocol IntSeq: Sequence where Iterator == IntIter {}
+
+func testExistentialWithConcreteIter(_ xs: any IntSeq) {
+  for x in xs {
+    let _: Int = x
+  }
+}
+
+// Make sure the bodies still type-check okay if the preamble is invalid.
+func testInvalidPreamble() {
+  func takesAutoclosure(_ x: @autoclosure () -> Int) -> Int { 0 }
+
+  for _ in undefined { // expected-error {{cannot find 'undefined' in scope}}
+    let a = takesAutoclosure(0) // Fine
+  }
+  for x in undefined { // expected-error {{cannot find 'undefined' in scope}}
+    let b: Int = x  // No type error, `x` is invalid.
+    _ = "" as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
+  }
+}
+
+func testFlatMap() {
+  struct S {
+    var ys: [Int]
+  }
+  func foo(_ xs: [S]) {
+    // Make sure we pick the flattening overload instead of the compactMap
+    // compatibility overload.
+    for x in xs.flatMap({ $0.ys }) {
+      let _: Int = x
+    }
+  }
+}
+
+func testInvalidContainerNotInScope(){
+  for x in (a,b) {} // expected-error {{for-in loop requires '(_, _)' to conform to 'Sequence'}}
+  // expected-error@-1 {{cannot find 'a' in scope}} 
+  // expected-error@-2 {{cannot find 'b' in scope}}
 }

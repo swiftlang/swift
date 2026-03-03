@@ -25,11 +25,15 @@ static constexpr size_t exceedsSlab = slabCapacity + 16;
 
 static Metadata SlabMetadata;
 
+struct SlabAllocatorConfiguration {
+  bool enableSlabAllocator() { return true; }
+};
+
 TEST(StackAllocatorTest, withPreallocatedSlab) {
 
   char firstSlab[firstSlabBufferCapacity];
-  StackAllocator<slabCapacity, &SlabMetadata> allocator(
-      firstSlab, firstSlabBufferCapacity);
+  StackAllocator<slabCapacity, &SlabMetadata, SlabAllocatorConfiguration>
+      allocator(firstSlab, firstSlabBufferCapacity);
 
   char *mem1 = (char *)allocator.alloc(fitsIntoFirstSlab);
   EXPECT_EQ(allocator.getNumAllocatedSlabs(), 0);
@@ -74,7 +78,8 @@ TEST(StackAllocatorTest, withoutPreallocatedSlab) {
 
   constexpr size_t slabCapacity = 256;
 
-  StackAllocator<slabCapacity, &SlabMetadata> allocator;
+  StackAllocator<slabCapacity, &SlabMetadata, SlabAllocatorConfiguration>
+      allocator;
 
   size_t fitsIntoSlab = slabCapacity - 16;
   size_t twoFitIntoSlab = slabCapacity / 2 - 32;

@@ -40,10 +40,9 @@ public struct AddExtensionMacro: ExtensionMacro {
     conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
-    let typeName = declaration.declGroupName
     return protocols.map {
       ("""
-      extension \(typeName): \($0) {
+      extension \(type.trimmed): \($0) {
         struct _Extension_\($0): \($0) {}
       }
       """ as DeclSyntax)
@@ -61,15 +60,6 @@ extension DeclSyntaxProtocol {
         } else if let funcDecl = self.as(FunctionDeclSyntax.self) {
             return funcDecl.name.trimmed
         } else if let structDecl = self.as(StructDeclSyntax.self) {
-            return structDecl.name.trimmed
-        }
-        fatalError("Not implemented")
-    }
-}
-
-extension DeclGroupSyntax {
-    var declGroupName: TokenSyntax {
-        if let structDecl = self.as(StructDeclSyntax.self) {
             return structDecl.name.trimmed
         }
         fatalError("Not implemented")

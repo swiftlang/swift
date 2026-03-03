@@ -3,8 +3,9 @@
 
 import CenumsNSOptions
 
-// CHECK: typealias NSBinarySearchingOptions = UInt
-// CHECK-NEXT: struct NSBinarySearchingOptions : OptionSet, @unchecked Sendable {
+// CHECK-NOT: typealias NSBinarySearchingOptions = UInt
+
+// CHECK: struct NSBinarySearchingOptions : OptionSet, @unchecked Sendable {
 // CHECK-NEXT:   init(rawValue: UInt)
 // CHECK-NEXT:   let rawValue: UInt
 // CHECK-NEXT:   typealias RawValue = UInt

@@ -1,0 +1,1270 @@
+// RUN: %target-sil-opt -swift-version 6 -enable-sil-verify-all %s -mark-never-written-mutable-closure-boxes-as-immutable | %FileCheck %s
+
+import Swift
+import SwiftShims
+import Builtin
+
+////////////////////////
+// MARK: Declarations //
+////////////////////////
+
+class C : @unchecked Sendable {}
+sil @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+class NonSendable {}
+
+////////////////////////
+// MARK: Simple Tests //
+////////////////////////
+
+// CHECK-LABEL: sil private [ossa] @simple_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'simple_callee'
+sil private [ossa] @simple_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  %1 = project_box %0, 0
+  debug_value %1, var, name "c", argno 1, expr op_deref
+  %3 = begin_access [read] [unknown] %1
+  %4 = load_weak %3
+  end_access %3
+  %6 = alloc_stack $Optional<C>
+  store %4 to [init] %6
+  %8 = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9 = apply %8<C?>(%6) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %6
+  dealloc_stack %6
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK-LABEL: sil [ossa] @simple_caller : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'simple_caller'
+sil [ossa] @simple_caller : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+  destroy_value %3
+
+  %f = function_ref @simple_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %pa = partial_apply [callee_guaranteed] %f(%0c) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil private [ossa] @simple_callee_two : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'simple_callee_two'
+sil private [ossa] @simple_callee_two : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %0a : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  %1 = project_box %0, 0
+  debug_value %1, var, name "c", argno 1, expr op_deref
+  %3 = begin_access [read] [unknown] %1
+  %4 = load_weak %3
+  end_access %3
+  %6 = alloc_stack $Optional<C>
+  store %4 to [init] %6
+  %8 = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9 = apply %8<C?>(%6) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %6
+  dealloc_stack %6
+
+  %1a = project_box %0a, 0
+  debug_value %1a, var, name "c", argno 1, expr op_deref
+  %3a = begin_access [read] [unknown] %1a
+  %4a = load_weak %3a
+  end_access %3a
+  %6a = alloc_stack $Optional<C>
+  store %4a to [init] %6a
+  %8a = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9a = apply %8a<C?>(%6a) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %6a
+  dealloc_stack %6a
+
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK-LABEL: sil [ossa] @simple_caller_two_same : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'simple_caller_two_same'
+sil [ossa] @simple_caller_two_same : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+  %0a = alloc_box ${ var @sil_weak Optional<C> }
+  %1a = begin_borrow [lexical] %0a
+  %2a = project_box %1a, 0
+  store_weak %3 to [init] %2a
+  destroy_value %3
+
+  %f = function_ref @simple_callee_two : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %0ac = copy_value %0a
+  %pa = partial_apply [callee_guaranteed] %f(%0c, %0ac) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+  end_borrow %1a
+  destroy_value %0a
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil private [ossa] @simple_callee_two_one_write : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'simple_callee_two_one_write'
+sil private [ossa] @simple_callee_two_one_write : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %0a : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  %1 = project_box %0, 0
+  debug_value %1, var, name "c", argno 1, expr op_deref
+  %3 = begin_access [read] [unknown] %1
+  %4 = load_weak %3
+  end_access %3
+  %6 = alloc_stack $Optional<C>
+  store %4 to [init] %6
+  %8 = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9 = apply %8<C?>(%6) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %6
+  dealloc_stack %6
+
+  %1a = project_box %0a, 0
+  debug_value %1a, var, name "c", argno 1, expr op_deref
+  %3a = begin_access [read] [unknown] %1a
+  %4a = load_weak %3a
+  end_access %3a
+  %4w = begin_access [modify] [unknown] %1a
+  %enum = enum $Optional<C>, #Optional.none
+  store_weak %enum to %4w
+  end_access %4w
+  %6a = alloc_stack $Optional<C>
+  store %4a to [init] %6a
+  %8a = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9a = apply %8a<C?>(%6a) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %6a
+  dealloc_stack %6a
+
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK-LABEL: sil [ossa] @simple_caller_two_one_write : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK-NOT: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'simple_caller_two_one_write'
+sil [ossa] @simple_caller_two_one_write : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+  %0a = alloc_box ${ var @sil_weak Optional<C> }
+  %1a = begin_borrow [lexical] %0a
+  %2a = project_box %1a, 0
+  store_weak %3 to [init] %2a
+  destroy_value %3
+
+  %f = function_ref @simple_callee_two_one_write : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %0ac = copy_value %0a
+  %pa = partial_apply [callee_guaranteed] %f(%0c, %0ac) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+  end_borrow %1a
+  destroy_value %0a
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil private [ossa] @simple_callee_two_two_write : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'simple_callee_two_two_write'
+sil private [ossa] @simple_callee_two_two_write : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %0a : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  %1 = project_box %0, 0
+  debug_value %1, var, name "c", argno 1, expr op_deref
+  %3 = begin_access [read] [unknown] %1
+  %4 = load_weak %3
+  end_access %3
+  %4w = begin_access [modify] [unknown] %1
+  %enum = enum $Optional<C>, #Optional.none
+  store_weak %enum to %4w
+  end_access %4w
+
+  %6 = alloc_stack $Optional<C>
+  store %4 to [init] %6
+  %8 = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9 = apply %8<C?>(%6) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %6
+  dealloc_stack %6
+
+  %1a = project_box %0a, 0
+  debug_value %1a, var, name "c", argno 1, expr op_deref
+  %3a = begin_access [read] [unknown] %1a
+  %4a = load_weak %3a
+  end_access %3a
+  %6a = alloc_stack $Optional<C>
+  store %4a to [init] %6a
+  %8a = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9a = apply %8a<C?>(%6a) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %6a
+  dealloc_stack %6a
+
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK-LABEL: sil [ossa] @simple_caller_two_two_write : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'simple_caller_two_two_write'
+sil [ossa] @simple_caller_two_two_write : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+  %0a = alloc_box ${ var @sil_weak Optional<C> }
+  %1a = begin_borrow [lexical] %0a
+  %2a = project_box %1a, 0
+  store_weak %3 to [init] %2a
+  destroy_value %3
+
+  %f = function_ref @simple_callee_two_two_write : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %0ac = copy_value %0a
+  %pa = partial_apply [callee_guaranteed] %f(%0c, %0ac) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+  end_borrow %1a
+  destroy_value %0a
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+/// We do not specialize in this case since our value is non-Sendable. We only transform if our value is actually Sendable.
+// CHECK-LABEL: sil private [ossa] @simple_callee_nonsendable : $@convention(thin) (@guaranteed { var @sil_weak Optional<NonSendable> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<NonSendable> }):
+// CHECK: } // end sil function 'simple_callee_nonsendable'
+sil private [ossa] @simple_callee_nonsendable : $@convention(thin) (@guaranteed { var @sil_weak Optional<NonSendable> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<NonSendable> }):
+  %1 = project_box %0, 0
+  debug_value %1, var, name "c", argno 1, expr op_deref
+  %3 = begin_access [read] [unknown] %1
+  %4 = load_weak %3
+  end_access %3
+  %6 = alloc_stack $Optional<NonSendable>
+  store %4 to [init] %6
+  %8 = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9 = apply %8<NonSendable?>(%6) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %6
+  dealloc_stack %6
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK-LABEL: sil [ossa] @simple_caller_nonsendable : $@convention(thin) (@owned NonSendable) -> () {
+// CHECK: alloc_box ${ var @sil_weak Optional<NonSendable> }
+// CHECK-NOT: [inferred_immutable]
+// CHECK: } // end sil function 'simple_caller_nonsendable'
+sil [ossa] @simple_caller_nonsendable : $@convention(thin) (@owned NonSendable) -> () {
+bb0(%arg : @owned $NonSendable):
+  %0 = alloc_box ${ var @sil_weak Optional<NonSendable> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<NonSendable>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+  destroy_value %3
+
+  %f = function_ref @simple_callee_nonsendable : $@convention(thin) (@guaranteed { var @sil_weak Optional<NonSendable> }) -> ()
+  %0c = copy_value %0
+  %pa = partial_apply [callee_guaranteed] %f(%0c) : $@convention(thin) (@guaranteed { var @sil_weak Optional<NonSendable> }) -> ()
+  destroy_value %pa
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+//////////////////////////////
+// MARK: Indirect Out Tests //
+//////////////////////////////
+
+// These tests validate that we pattern match known patterns of indirect out
+// parameters. We do not need to consider full generics since only class types
+// and class bound archetypes can be made weak.
+
+// CHECK-LABEL: sil private [ossa] @indirect_out_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> @out Optional<C> {
+// CHECK: bb0(%0 : $*Optional<C>, %1 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'indirect_out_callee'
+sil private [ossa] @indirect_out_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> @out Optional<C> {
+bb0(%result : $*Optional<C>, %0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  %1 = project_box %0, 0
+  debug_value %1, var, name "c", argno 1, expr op_deref
+  %3 = begin_access [read] [unknown] %1
+  %4 = load_weak %3
+  end_access %3
+  %6 = alloc_stack $Optional<C>
+  store %4 to [init] %6
+  %8 = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9 = apply %8<C?>(%6) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  copy_addr [take] %6 to [init] %result
+  dealloc_stack %6
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK-LABEL: sil [ossa] @indirect_out_caller : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'indirect_out_caller'
+sil [ossa] @indirect_out_caller : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+  destroy_value %3
+
+  %f = function_ref @indirect_out_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> @out Optional<C>
+  %0c = copy_value %0
+  %pa = partial_apply [callee_guaranteed] %f(%0c) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> @out Optional<C>
+  destroy_value %pa
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @closure_escapes_caller : $@convention(thin) (@owned C) -> @owned @callee_guaranteed () -> () {
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'closure_escapes_caller'
+sil [ossa] @closure_escapes_caller : $@convention(thin) (@owned C) -> @owned @callee_guaranteed () -> () {
+bb0(%arg : @owned $C):
+  %box = alloc_box ${ var @sil_weak Optional<C> }
+  %box_b = begin_borrow [lexical] %box
+  %box_p = project_box %box_b, 0
+  %arg_opt = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %arg_opt to [init] %box_p
+  destroy_value %arg_opt
+
+  %fn = function_ref @simple_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  %box_c = copy_value %box
+  %closure = partial_apply [callee_guaranteed] %fn(%box_c) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+
+  end_borrow %box_b
+  destroy_value %box
+
+  return %closure : $@callee_guaranteed () -> ()
+}
+
+/////////////////////////////////
+// MARK: Interesting CallGraph //
+/////////////////////////////////
+
+// CHECK-LABEL: sil [ossa] @chained_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'chained_callee'
+sil [ossa] @chained_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  debug_value %0, var, name "c", argno 1, expr op_deref
+  %2 = function_ref @simple_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  %1 = copy_value %0
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %3
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @simple_chained_caller : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'simple_chained_caller'
+sil [ossa] @simple_chained_caller : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+  destroy_value %3
+
+  %f = function_ref @chained_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %pa = partial_apply [callee_guaranteed] %f(%0c) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Test 1: chained_read_all_with_intermediate_write
+// callee_1 writes to box #2, callee_2 reads from all boxes
+// Expected: box #1 and #3 convert to let, box #2 stays var
+
+// CHECK-LABEL: sil private [ossa] @chained_callee_2_read_all_with_intermediate_write : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'chained_callee_2_read_all_with_intermediate_write'
+sil private [ossa] @chained_callee_2_read_all_with_intermediate_write : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  // Read from box #1
+  %3 = project_box %0, 0
+  %4 = begin_access [read] [unknown] %3
+  %5 = load_weak %4
+  end_access %4
+  %7 = alloc_stack $Optional<C>
+  store %5 to [init] %7
+  %9 = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %10 = apply %9<C?>(%7) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %7
+  dealloc_stack %7
+
+  // Read from box #2
+  %13 = project_box %1, 0
+  %14 = begin_access [read] [unknown] %13
+  %15 = load_weak %14
+  end_access %14
+  %17 = alloc_stack $Optional<C>
+  store %15 to [init] %17
+  %19 = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %20 = apply %19<C?>(%17) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %17
+  dealloc_stack %17
+
+  // Read from box #3
+  %23 = project_box %2, 0
+  %24 = begin_access [read] [unknown] %23
+  %25 = load_weak %24
+  end_access %24
+  %27 = alloc_stack $Optional<C>
+  store %25 to [init] %27
+  %29 = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %30 = apply %29<C?>(%27) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %27
+  dealloc_stack %27
+
+  %33 = tuple ()
+  return %33 : $()
+}
+
+// CHECK-LABEL: sil private [ossa] @chained_callee_1_read_all_with_intermediate_write : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'chained_callee_1_read_all_with_intermediate_write'
+sil private [ossa] @chained_callee_1_read_all_with_intermediate_write : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  // Read from box #1
+  %3 = project_box %0, 0
+  %4 = begin_access [read] [unknown] %3
+  %5 = load_weak %4
+  end_access %4
+  %7 = alloc_stack $Optional<C>
+  store %5 to [init] %7
+  %9 = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %10 = apply %9<C?>(%7) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %7
+  dealloc_stack %7
+
+  // Write to box #2
+  %13 = project_box %1, 0
+  %14 = begin_access [modify] [unknown] %13
+  %15 = enum $Optional<C>, #Optional.none
+  store_weak %15 to %14
+  end_access %14
+
+  // Read from box #3
+  %18 = project_box %2, 0
+  %19 = begin_access [read] [unknown] %18
+  %20 = load_weak %19
+  end_access %19
+  %22 = alloc_stack $Optional<C>
+  store %20 to [init] %22
+  %24 = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %25 = apply %24<C?>(%22) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %22
+  dealloc_stack %22
+
+  // Form closure to callee_2
+  %28 = function_ref @chained_callee_2_read_all_with_intermediate_write : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %29 = copy_value %0
+  %30 = copy_value %1
+  %31 = copy_value %2
+  %32 = partial_apply [callee_guaranteed] %28(%29, %30, %31) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %32
+  %34 = tuple ()
+  return %34 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @chained_caller_read_all_with_intermediate_write : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'chained_caller_read_all_with_intermediate_write'
+sil [ossa] @chained_caller_read_all_with_intermediate_write : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  // Create 3 boxes
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+
+  %0a = alloc_box ${ var @sil_weak Optional<C> }
+  %1a = begin_borrow [lexical] %0a
+  %2a = project_box %1a, 0
+  store_weak %3 to [init] %2a
+
+  %0b = alloc_box ${ var @sil_weak Optional<C> }
+  %1b = begin_borrow [lexical] %0b
+  %2b = project_box %1b, 0
+  store_weak %3 to [init] %2b
+
+  destroy_value %3
+
+  // Form closure
+  %f = function_ref @chained_callee_1_read_all_with_intermediate_write : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %0ac = copy_value %0a
+  %0bc = copy_value %0b
+  %pa = partial_apply [callee_guaranteed] %f(%0c, %0ac, %0bc) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+
+  end_borrow %1b
+  destroy_value %0b
+  end_borrow %1a
+  destroy_value %0a
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Test 2: chained_write_to_first_param
+// callee_1 only forms closure, callee_2 writes to box #1
+// Expected: box #1 stays var, boxes #2 and #3 convert to let
+
+// CHECK-LABEL: sil private [ossa] @chained_callee_2_write_to_first_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'chained_callee_2_write_to_first_param'
+sil private [ossa] @chained_callee_2_write_to_first_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  // Write to box #1
+  %3 = project_box %0, 0
+  %4 = begin_access [modify] [unknown] %3
+  %5 = enum $Optional<C>, #Optional.none
+  store_weak %5 to %4
+  end_access %4
+
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil private [ossa] @chained_callee_1_write_to_first_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'chained_callee_1_write_to_first_param'
+sil private [ossa] @chained_callee_1_write_to_first_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  // Form closure to callee_2
+  %3 = function_ref @chained_callee_2_write_to_first_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %4 = copy_value %0
+  %5 = copy_value %1
+  %6 = copy_value %2
+  %7 = partial_apply [callee_guaranteed] %3(%4, %5, %6) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %7
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @chained_caller_write_to_first_param : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'chained_caller_write_to_first_param'
+sil [ossa] @chained_caller_write_to_first_param : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+
+  %0a = alloc_box ${ var @sil_weak Optional<C> }
+  %1a = begin_borrow [lexical] %0a
+  %2a = project_box %1a, 0
+  store_weak %3 to [init] %2a
+
+  %0b = alloc_box ${ var @sil_weak Optional<C> }
+  %1b = begin_borrow [lexical] %0b
+  %2b = project_box %1b, 0
+  store_weak %3 to [init] %2b
+
+  destroy_value %3
+
+  %f = function_ref @chained_callee_1_write_to_first_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %0ac = copy_value %0a
+  %0bc = copy_value %0b
+  %pa = partial_apply [callee_guaranteed] %f(%0c, %0ac, %0bc) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+
+  end_borrow %1b
+  destroy_value %0b
+  end_borrow %1a
+  destroy_value %0a
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Test 3: chained_write_to_second_param
+// callee_1 only forms closure, callee_2 writes to box #2
+// Expected: boxes #1 and #3 convert to let, box #2 stays var
+
+// CHECK-LABEL: sil private [ossa] @chained_callee_2_write_to_second_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'chained_callee_2_write_to_second_param'
+sil private [ossa] @chained_callee_2_write_to_second_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  // Write to box #2
+  %3 = project_box %1, 0
+  %4 = begin_access [modify] [unknown] %3
+  %5 = enum $Optional<C>, #Optional.none
+  store_weak %5 to %4
+  end_access %4
+
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil private [ossa] @chained_callee_1_write_to_second_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'chained_callee_1_write_to_second_param'
+sil private [ossa] @chained_callee_1_write_to_second_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  // Form closure to callee_2
+  %3 = function_ref @chained_callee_2_write_to_second_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %4 = copy_value %0
+  %5 = copy_value %1
+  %6 = copy_value %2
+  %7 = partial_apply [callee_guaranteed] %3(%4, %5, %6) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %7
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @chained_caller_write_to_second_param : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'chained_caller_write_to_second_param'
+sil [ossa] @chained_caller_write_to_second_param : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+
+  %0a = alloc_box ${ var @sil_weak Optional<C> }
+  %1a = begin_borrow [lexical] %0a
+  %2a = project_box %1a, 0
+  store_weak %3 to [init] %2a
+
+  %0b = alloc_box ${ var @sil_weak Optional<C> }
+  %1b = begin_borrow [lexical] %0b
+  %2b = project_box %1b, 0
+  store_weak %3 to [init] %2b
+
+  destroy_value %3
+
+  %f = function_ref @chained_callee_1_write_to_second_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %0ac = copy_value %0a
+  %0bc = copy_value %0b
+  %pa = partial_apply [callee_guaranteed] %f(%0c, %0ac, %0bc) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+
+  end_borrow %1b
+  destroy_value %0b
+  end_borrow %1a
+  destroy_value %0a
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Test 4: chained_write_to_third_param
+// callee_1 only forms closure, callee_2 writes to box #3
+// Expected: boxes #1 and #2 convert to let, box #3 stays var
+
+// CHECK-LABEL: sil private [ossa] @chained_callee_2_write_to_third_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'chained_callee_2_write_to_third_param'
+sil private [ossa] @chained_callee_2_write_to_third_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  // Write to box #3
+  %3 = project_box %2, 0
+  %4 = begin_access [modify] [unknown] %3
+  %5 = enum $Optional<C>, #Optional.none
+  store_weak %5 to %4
+  end_access %4
+
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil private [ossa] @chained_callee_1_write_to_third_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'chained_callee_1_write_to_third_param'
+sil private [ossa] @chained_callee_1_write_to_third_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  // Form closure to callee_2
+  %3 = function_ref @chained_callee_2_write_to_third_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %4 = copy_value %0
+  %5 = copy_value %1
+  %6 = copy_value %2
+  %7 = partial_apply [callee_guaranteed] %3(%4, %5, %6) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %7
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @chained_caller_write_to_third_param : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'chained_caller_write_to_third_param'
+sil [ossa] @chained_caller_write_to_third_param : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+
+  %0a = alloc_box ${ var @sil_weak Optional<C> }
+  %1a = begin_borrow [lexical] %0a
+  %2a = project_box %1a, 0
+  store_weak %3 to [init] %2a
+
+  %0b = alloc_box ${ var @sil_weak Optional<C> }
+  %1b = begin_borrow [lexical] %0b
+  %2b = project_box %1b, 0
+  store_weak %3 to [init] %2b
+
+  destroy_value %3
+
+  %f = function_ref @chained_callee_1_write_to_third_param : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %0ac = copy_value %0a
+  %0bc = copy_value %0b
+  %pa = partial_apply [callee_guaranteed] %f(%0c, %0ac, %0bc) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+
+  end_borrow %1b
+  destroy_value %0b
+  end_borrow %1a
+  destroy_value %0a
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Test 5: chained_write_to_first_and_second
+// callee_1 only forms closure, callee_2 writes to boxes #1 and #2
+// Expected: boxes #1 and #2 stay var, box #3 converts to let
+
+// CHECK-LABEL: sil private [ossa] @chained_callee_2_write_to_first_and_second : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'chained_callee_2_write_to_first_and_second'
+sil private [ossa] @chained_callee_2_write_to_first_and_second : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  // Write to box #1
+  %3 = project_box %0, 0
+  %4 = begin_access [modify] [unknown] %3
+  %5 = enum $Optional<C>, #Optional.none
+  store_weak %5 to %4
+  end_access %4
+
+  // Write to box #2
+  %8 = project_box %1, 0
+  %9 = begin_access [modify] [unknown] %8
+  %10 = enum $Optional<C>, #Optional.none
+  store_weak %10 to %9
+  end_access %9
+
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil private [ossa] @chained_callee_1_write_to_first_and_second : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'chained_callee_1_write_to_first_and_second'
+sil private [ossa] @chained_callee_1_write_to_first_and_second : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  // Form closure to callee_2
+  %3 = function_ref @chained_callee_2_write_to_first_and_second : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %4 = copy_value %0
+  %5 = copy_value %1
+  %6 = copy_value %2
+  %7 = partial_apply [callee_guaranteed] %3(%4, %5, %6) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %7
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @chained_caller_write_to_first_and_second : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'chained_caller_write_to_first_and_second'
+sil [ossa] @chained_caller_write_to_first_and_second : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+
+  %0a = alloc_box ${ var @sil_weak Optional<C> }
+  %1a = begin_borrow [lexical] %0a
+  %2a = project_box %1a, 0
+  store_weak %3 to [init] %2a
+
+  %0b = alloc_box ${ var @sil_weak Optional<C> }
+  %1b = begin_borrow [lexical] %0b
+  %2b = project_box %1b, 0
+  store_weak %3 to [init] %2b
+
+  destroy_value %3
+
+  %f = function_ref @chained_callee_1_write_to_first_and_second : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %0ac = copy_value %0a
+  %0bc = copy_value %0b
+  %pa = partial_apply [callee_guaranteed] %f(%0c, %0ac, %0bc) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+
+  end_borrow %1b
+  destroy_value %0b
+  end_borrow %1a
+  destroy_value %0a
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Test 6: chained_write_to_all_params
+// callee_1 only forms closure, callee_2 writes to all boxes
+// Expected: all boxes stay var (no conversion)
+
+// CHECK-LABEL: sil private [ossa] @chained_callee_2_write_to_all_params : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'chained_callee_2_write_to_all_params'
+sil private [ossa] @chained_callee_2_write_to_all_params : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  // Write to box #1
+  %3 = project_box %0, 0
+  %4 = begin_access [modify] [unknown] %3
+  %5 = enum $Optional<C>, #Optional.none
+  store_weak %5 to %4
+  end_access %4
+
+  // Write to box #2
+  %8 = project_box %1, 0
+  %9 = begin_access [modify] [unknown] %8
+  %10 = enum $Optional<C>, #Optional.none
+  store_weak %10 to %9
+  end_access %9
+
+  // Write to box #3
+  %13 = project_box %2, 0
+  %14 = begin_access [modify] [unknown] %13
+  %15 = enum $Optional<C>, #Optional.none
+  store_weak %15 to %14
+  end_access %14
+
+  %18 = tuple ()
+  return %18 : $()
+}
+
+// CHECK-LABEL: sil private [ossa] @chained_callee_1_write_to_all_params : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'chained_callee_1_write_to_all_params'
+sil private [ossa] @chained_callee_1_write_to_all_params : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  // Form closure to callee_2
+  %3 = function_ref @chained_callee_2_write_to_all_params : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %4 = copy_value %0
+  %5 = copy_value %1
+  %6 = copy_value %2
+  %7 = partial_apply [callee_guaranteed] %3(%4, %5, %6) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %7
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @chained_caller_write_to_all_params : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK-NOT: [inferred_immutable]
+// CHECK: } // end sil function 'chained_caller_write_to_all_params'
+sil [ossa] @chained_caller_write_to_all_params : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+
+  %0a = alloc_box ${ var @sil_weak Optional<C> }
+  %1a = begin_borrow [lexical] %0a
+  %2a = project_box %1a, 0
+  store_weak %3 to [init] %2a
+
+  %0b = alloc_box ${ var @sil_weak Optional<C> }
+  %1b = begin_borrow [lexical] %0b
+  %2b = project_box %1b, 0
+  store_weak %3 to [init] %2b
+
+  destroy_value %3
+
+  %f = function_ref @chained_callee_1_write_to_all_params : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %0ac = copy_value %0a
+  %0bc = copy_value %0b
+  %pa = partial_apply [callee_guaranteed] %f(%0c, %0ac, %0bc) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+
+  end_borrow %1b
+  destroy_value %0b
+  end_borrow %1a
+  destroy_value %0a
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+/////////////////////////////////////////////
+// MARK: Caller Writes Multiple Times     //
+/////////////////////////////////////////////
+
+// Test that we do NOT mark a box as immutable when the caller writes to it multiple times.
+// This ensures we don't accidentally pattern match unexpected cases.
+
+// CHECK-LABEL: sil [ossa] @simple_caller_write_twice : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK-NOT: [inferred_immutable]
+// CHECK: } // end sil function 'simple_caller_write_twice'
+sil [ossa] @simple_caller_write_twice : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+
+  // First write
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+
+  // Second write
+  %none = enum $Optional<C>, #Optional.none
+  store_weak %none to %2
+
+  destroy_value %3
+
+  %f = function_ref @simple_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %pa = partial_apply [callee_guaranteed] %f(%0c) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simple_caller_write_three_times : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK-NOT: [inferred_immutable]
+// CHECK: } // end sil function 'simple_caller_write_three_times'
+sil [ossa] @simple_caller_write_three_times : $@convention(thin) (@owned C, @owned C) -> () {
+bb0(%arg1 : @owned $C, %arg2 : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+
+  // First write
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg1
+  store_weak %3 to [init] %2
+  destroy_value %3
+
+  // Second write
+  %4 = enum $Optional<C>, #Optional.some!enumelt, %arg2
+  store_weak %4 to %2
+  destroy_value %4
+
+  // Third write
+  %none = enum $Optional<C>, #Optional.none
+  store_weak %none to %2
+
+  %f = function_ref @simple_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %pa = partial_apply [callee_guaranteed] %f(%0c) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simple_caller_conditional_write : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK-NOT: [inferred_immutable]
+// CHECK: } // end sil function 'simple_caller_conditional_write'
+sil [ossa] @simple_caller_conditional_write : $@convention(thin) (@owned C, @owned C) -> () {
+bb0(%arg1 : @owned $C, %arg2 : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+
+  // First write
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg1
+  store_weak %3 to [init] %2
+  destroy_value %3
+
+  // Conditional write
+  cond_br undef, bb_write, bb_no_write
+
+bb_write:
+  %4 = enum $Optional<C>, #Optional.some!enumelt, %arg2
+  store_weak %4 to %2
+  destroy_value %4
+  br bb_cont
+
+bb_no_write:
+  destroy_value %arg2
+  br bb_cont
+
+bb_cont:
+  %f = function_ref @simple_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %pa = partial_apply [callee_guaranteed] %f(%0c) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Test with multiple boxes where one is written multiple times
+// CHECK-LABEL: sil [ossa] @caller_two_boxes_one_multiple_writes : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK-NOT: [inferred_immutable]
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'caller_two_boxes_one_multiple_writes'
+sil [ossa] @caller_two_boxes_one_multiple_writes : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  // Box 1: written multiple times (should NOT be marked immutable)
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+
+  // Second write to box 1
+  %none = enum $Optional<C>, #Optional.none
+  store_weak %none to %2
+
+  // Box 2: written only once (should be marked immutable)
+  %0a = alloc_box ${ var @sil_weak Optional<C> }
+  %1a = begin_borrow [lexical] %0a
+  %2a = project_box %1a, 0
+  store_weak %3 to [init] %2a
+  destroy_value %3
+
+  %f = function_ref @simple_callee_two : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %0ac = copy_value %0a
+  %pa = partial_apply [callee_guaranteed] %f(%0c, %0ac) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+  end_borrow %1a
+  destroy_value %0a
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Test with loop containing multiple writes
+// CHECK-LABEL: sil [ossa] @simple_caller_write_in_loop : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK-NOT: [inferred_immutable]
+// CHECK: } // end sil function 'simple_caller_write_in_loop'
+sil [ossa] @simple_caller_write_in_loop : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+
+  %zero = integer_literal $Builtin.Int64, 0
+  %ten = integer_literal $Builtin.Int64, 10
+  br bb_loop(%zero : $Builtin.Int64)
+
+bb_loop(%i : $Builtin.Int64):
+  // Write in loop
+  store_weak %3 to %2
+
+  %one = integer_literal $Builtin.Int64, 1
+  %next = builtin "add_Int64"(%i : $Builtin.Int64, %one : $Builtin.Int64) : $Builtin.Int64
+  %cmp = builtin "cmp_slt_Int64"(%next : $Builtin.Int64, %ten : $Builtin.Int64) : $Builtin.Int1
+  cond_br %cmp, bb_latch, bb_exit
+
+bb_latch:
+  br bb_loop(%next : $Builtin.Int64)
+
+bb_exit:
+  destroy_value %3
+
+  %f = function_ref @simple_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %pa = partial_apply [callee_guaranteed] %f(%0c) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+/////////////////
+// MARK: Loops //
+/////////////////
+
+// CHECK-LABEL: sil [ossa] @callee_with_closure_in_loop : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @inferredImmutable @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'callee_with_closure_in_loop'
+sil [ossa] @callee_with_closure_in_loop : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%box : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  %zero = integer_literal $Builtin.Int64, 0
+  %ten = integer_literal $Builtin.Int64, 10
+  br bb_loop(%zero : $Builtin.Int64)
+
+bb_loop(%i : $Builtin.Int64):
+  // Read weak box in loop
+  %addr = project_box %box, 0
+  %val = load_weak %addr : $*@sil_weak Optional<C>
+  destroy_value %val
+
+  %one = integer_literal $Builtin.Int64, 1
+  %next = builtin "add_Int64"(%i : $Builtin.Int64, %one : $Builtin.Int64) : $Builtin.Int64
+  %cmp = builtin "cmp_slt_Int64"(%next : $Builtin.Int64, %ten : $Builtin.Int64) : $Builtin.Int1
+  cond_br %cmp, bb_latch, bb_exit
+
+bb_latch:
+  br bb_loop(%next : $Builtin.Int64)
+
+bb_exit:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_callee_with_closure_in_loop : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box [inferred_immutable] ${ var @sil_weak Optional<C> }
+// CHECK: } // end sil function 'caller_callee_with_closure_in_loop'
+sil [ossa] @caller_callee_with_closure_in_loop : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+  destroy_value %3
+
+  %f = function_ref @callee_with_closure_in_loop : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %pa = partial_apply [callee_guaranteed] %f(%0c) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+///////////////////////////////
+// MARK: Caller With Diamond //
+///////////////////////////////
+
+// We do not handle this case since whenever we would generate a diamond, SILGen
+// should load_weak the value. We do not generally phi the values themselves.
+// CHECK-LABEL: sil [ossa] @callee_with_diamond_1 : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: } // end sil function 'callee_with_diamond_1'
+sil [ossa] @callee_with_diamond_1 : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%box1 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }, %box2 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  cond_br undef, bb_lhs, bb_rhs
+
+bb_lhs:
+  br bb_cont(%box1 : ${ var @sil_weak Optional<C> })
+
+bb_rhs:
+  br bb_cont(%box2 : ${ var @sil_weak Optional<C> })
+
+bb_cont(%box : @guaranteed ${ var @sil_weak Optional<C> }):
+  %boxBorrow = borrowed %box from (%box1, %box2)
+  %addr = project_box %boxBorrow, 0
+  %val = load_weak %addr : $*@sil_weak Optional<C>
+  destroy_value %val
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_callee_with_diamond_1 : $@convention(thin) (@owned C) -> () {
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK: alloc_box ${ var @sil_weak Optional<C> }
+// CHECK-NOT: [inferred_immutable]
+// CHECK: } // end sil function 'caller_callee_with_diamond_1'
+sil [ossa] @caller_callee_with_diamond_1 : $@convention(thin) (@owned C) -> () {
+bb0(%arg : @owned $C):
+  %0 = alloc_box ${ var @sil_weak Optional<C> }
+  %1 = begin_borrow [lexical] %0
+  %2 = project_box %1, 0
+  %3 = enum $Optional<C>, #Optional.some!enumelt, %arg
+  store_weak %3 to [init] %2
+  %0a = alloc_box ${ var @sil_weak Optional<C> }
+  %1a = begin_borrow [lexical] %0a
+  %2a = project_box %1a, 0
+  store_weak %3 to [init] %2a
+  destroy_value %3
+
+  %f = function_ref @callee_with_diamond_1 : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  %0c = copy_value %0
+  %0ac = copy_value %0a
+  %pa = partial_apply [callee_guaranteed] %f(%0c, %0ac) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %pa
+  end_borrow %1a
+  destroy_value %0a
+  end_borrow %1
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}

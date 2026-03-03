@@ -1,3 +1,5 @@
+// UNSUPPORTED: OS=freebsd
+
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 

@@ -12,8 +12,10 @@
 
 #include "swift/IDE/CodeCompletionResult.h"
 #include "CodeCompletionDiagnostics.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
 
@@ -48,6 +50,10 @@ CodeCompletionMacroRoles swift::ide::getCompletionMacroRoles(const Decl *D) {
   if (macroRoles.contains(MacroRole::Peer)) {
     roles |= CodeCompletionMacroRole::AttachedDecl;
   }
+  if (macroRoles.contains(MacroRole::Body) ||
+      macroRoles.contains(MacroRole::Preamble)) {
+    roles |= CodeCompletionMacroRole::AttachedFunction;
+  }
 
   return roles;
 }
@@ -63,6 +69,9 @@ swift::ide::getCompletionMacroRoles(OptionSet<CustomAttributeKind> kinds) {
   }
   if (kinds.contains(CustomAttributeKind::DeclMacro)) {
     roles |= CodeCompletionMacroRole::AttachedDecl;
+  }
+  if (kinds.contains(CustomAttributeKind::FunctionMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedFunction;
   }
   return roles;
 }
@@ -88,6 +97,9 @@ swift::ide::getCompletionMacroRoles(CodeCompletionFilter filter) {
   if (filter.contains(CodeCompletionFilterFlag::AttachedDeclMacro)) {
     roles |= CodeCompletionMacroRole::AttachedDecl;
   }
+  if (filter.contains(CodeCompletionFilterFlag::AttachedFunctionMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedFunction;
+  }
   return roles;
 }
 
@@ -112,6 +124,9 @@ swift::ide::getCompletionFilter(CodeCompletionMacroRoles roles) {
   if (roles.contains(CodeCompletionMacroRole::AttachedDecl)) {
     filter |= CodeCompletionFilterFlag::AttachedDeclMacro;
   }
+  if (roles.contains(CodeCompletionMacroRole::AttachedFunction)) {
+    filter |= CodeCompletionFilterFlag::AttachedFunctionMacro;
+  }
   return filter;
 }
 
@@ -121,7 +136,8 @@ ContextFreeCodeCompletionResult *
 ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
     CodeCompletionResultSink &Sink, CodeCompletionResultKind Kind,
     CodeCompletionString *CompletionString,
-    CodeCompletionOperatorKind KnownOperatorKind, NullTerminatedStringRef BriefDocComment,
+    CodeCompletionOperatorKind KnownOperatorKind,
+    NullTerminatedStringRef BriefDocComment,
     CodeCompletionResultType ResultType,
     ContextFreeNotRecommendedReason NotRecommended,
     CodeCompletionDiagnosticSeverity DiagnosticSeverity,
@@ -137,11 +153,10 @@ ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
   }
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       Kind, /*AssociatedKind=*/0, KnownOperatorKind, /*MacroRoles=*/{},
-      /*IsSystem=*/false, /*HasAsyncAlternative=*/false,
-      CompletionString,
+      /*IsSystem=*/false, /*HasAsyncAlternative=*/false, CompletionString,
       /*ModuleName=*/"", BriefDocComment,
-      /*AssociatedUSRs=*/{}, ResultType, NotRecommended, DiagnosticSeverity,
-      DiagnosticMessage,
+      /*AssociatedUSRs=*/{}, /*SwiftUSR=*/"", ResultType, NotRecommended,
+      DiagnosticSeverity, DiagnosticMessage,
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
       NameForDiagnostics);
 }
@@ -159,8 +174,8 @@ ContextFreeCodeCompletionResult::createKeywordResult(
       CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
       CodeCompletionOperatorKind::None, /*MacroRoles=*/{},
       /*IsSystem=*/false, /*HasAsyncAlternative=*/false, CompletionString,
-      /*ModuleName=*/"", BriefDocComment,
-      /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
+      /*ModuleName=*/"", BriefDocComment, /*AssociatedUSRs=*/{},
+      /*SwiftUSR=*/"", ResultType, ContextFreeNotRecommendedReason::None,
       CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
       /*NameForDiagnostics=*/"");
@@ -177,11 +192,10 @@ ContextFreeCodeCompletionResult::createLiteralResult(
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Literal, static_cast<uint8_t>(LiteralKind),
       CodeCompletionOperatorKind::None, /*MacroRoles=*/{},
-      /*IsSystem=*/false, /*HasAsyncAlternative=*/false,
-      CompletionString,
-      /*ModuleName=*/"",
-      /*BriefDocComment=*/"",
-      /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
+      /*IsSystem=*/false, /*HasAsyncAlternative=*/false, CompletionString,
+      /*ModuleName=*/"", /*BriefDocComment=*/"",
+      /*AssociatedUSRs=*/{}, /*SwiftUSR=*/"", ResultType,
+      ContextFreeNotRecommendedReason::None,
       CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
       /*NameForDiagnostics=*/"");
@@ -208,7 +222,7 @@ ContextFreeCodeCompletionResult::createDeclResult(
     const Decl *AssociatedDecl, bool HasAsyncAlternative,
     NullTerminatedStringRef ModuleName, NullTerminatedStringRef BriefDocComment,
     ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
-    CodeCompletionResultType ResultType,
+    NullTerminatedStringRef SwiftUSR, CodeCompletionResultType ResultType,
     ContextFreeNotRecommendedReason NotRecommended,
     CodeCompletionDiagnosticSeverity DiagnosticSeverity,
     NullTerminatedStringRef DiagnosticMessage) {
@@ -220,8 +234,8 @@ ContextFreeCodeCompletionResult::createDeclResult(
       CodeCompletionResultKind::Declaration,
       static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
       CodeCompletionOperatorKind::None, getCompletionMacroRoles(AssociatedDecl),
-      getDeclIsSystem(AssociatedDecl), HasAsyncAlternative,
-      CompletionString, ModuleName, BriefDocComment, AssociatedUSRs, ResultType,
+      getDeclIsSystem(AssociatedDecl), HasAsyncAlternative, CompletionString,
+      ModuleName, BriefDocComment, AssociatedUSRs, SwiftUSR, ResultType,
       NotRecommended, DiagnosticSeverity, DiagnosticMessage,
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
       /*NameForDiagnostics=*/getDeclNameForDiagnostics(AssociatedDecl, Sink));
@@ -296,13 +310,12 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
   case DeclKind::TopLevelCode:
-  case DeclKind::IfConfig:
-  case DeclKind::PoundDiagnostic:
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::OpaqueType:
   case DeclKind::BuiltinTuple:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     llvm_unreachable("not expecting such a declaration result");
   case DeclKind::Module:
     return CodeCompletionDeclKind::Module;
@@ -423,11 +436,23 @@ ContextFreeCodeCompletionResult::calculateContextualTypeRelation(
 
 // MARK: - CodeCompletionResult
 
+const Decl *CodeCompletionResult::getAssociatedDecl() const {
+  if (auto *Ctx = DeclOrCtx.dyn_cast<ASTContext *>()) {
+    auto SwiftUSR = ContextFree.getSwiftUSR();
+    if (SwiftUSR.empty())
+      return nullptr;
+
+    DeclOrCtx = Demangle::getDeclForUSR(*Ctx, SwiftUSR);
+  }
+
+  return DeclOrCtx.dyn_cast<const Decl *>();
+}
+
 CodeCompletionResult *
 CodeCompletionResult::withFlair(CodeCompletionFlair NewFlair,
                                 CodeCompletionResultSink &Sink) const {
   return new (*Sink.Allocator)
-      CodeCompletionResult(ContextFree, SemanticContext, NewFlair,
+      CodeCompletionResult(ContextFree, DeclOrCtx, SemanticContext, NewFlair,
                            NumBytesToErase, TypeDistance, NotRecommended);
 }
 
@@ -436,9 +461,9 @@ CodeCompletionResult::withContextFreeResultSemanticContextAndFlair(
     const ContextFreeCodeCompletionResult &NewContextFree,
     SemanticContextKind NewSemanticContext, CodeCompletionFlair NewFlair,
     CodeCompletionResultSink &Sink) const {
-  return new (*Sink.Allocator)
-      CodeCompletionResult(NewContextFree, NewSemanticContext, NewFlair,
-                           NumBytesToErase, TypeDistance, NotRecommended);
+  return new (*Sink.Allocator) CodeCompletionResult(
+      NewContextFree, DeclOrCtx, NewSemanticContext, NewFlair, NumBytesToErase,
+      TypeDistance, NotRecommended);
 }
 
 std::pair<CodeCompletionDiagnosticSeverity, NullTerminatedStringRef>

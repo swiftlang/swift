@@ -124,9 +124,9 @@ public:
     return MethodEntry.Witness;
   }
 
-  static WitnessTableEntry forAssociatedType(AssociatedType ty) {
+  static WitnessTableEntry forAssociatedType(AssociatedTypeDecl *assocType) {
     WitnessTableEntry entry(WitnessKind::AssociatedTypeKind);
-    entry.AssociatedTypeEntry = {ty.getAssociation()};
+    entry.AssociatedTypeEntry = {assocType};
     return entry;
   }
   
@@ -134,9 +134,8 @@ public:
     return Kind == WitnessKind::AssociatedTypeKind;
   }
 
-  bool matchesAssociatedType(AssociatedType assocType) const {
-    return isAssociatedType() &&
-           AssociatedTypeEntry.Association == assocType.getAssociation();
+  bool matchesAssociatedType(AssociatedTypeDecl *assocType) const {
+    return isAssociatedType() && AssociatedTypeEntry.Association == assocType;
   }
 
   AssociatedTypeDecl *getAssociatedType() const {
@@ -223,14 +222,20 @@ class ProtocolInfo final :
 
   ProtocolInfo(ArrayRef<WitnessTableEntry> table, ProtocolInfoKind kind)
       : NumTableEntries(table.size()), Kind(kind) {
-    std::uninitialized_copy(table.begin(), table.end(),
-                            getTrailingObjects<WitnessTableEntry>());
+    std::uninitialized_copy(table.begin(), table.end(), getTrailingObjects());
   }
 
   static std::unique_ptr<ProtocolInfo> create(ArrayRef<WitnessTableEntry> table,
                                               ProtocolInfoKind kind);
 
 public:
+  void operator delete(void *ptr) {
+    const auto *pThis = static_cast<ProtocolInfo *>(ptr);
+    const size_t count = pThis->NumTableEntries;
+    const size_t size = totalSizeToAlloc<WitnessTableEntry>(count);
+    ::operator delete(ptr, size);
+  }
+
   /// The number of witness slots in a conformance to this protocol;
   /// in other words, the size of the table in words.
   unsigned getNumWitnesses() const {
@@ -243,7 +248,7 @@ public:
   /// The addresses of the entries in this array can be passed to
   /// getBaseWitnessIndex/getNonBaseWitnessIndex, below.
   ArrayRef<WitnessTableEntry> getWitnessEntries() const {
-    return {getTrailingObjects<WitnessTableEntry>(), NumTableEntries};
+    return getTrailingObjects(NumTableEntries);
   }
 
   /// Given the address of a witness entry from this PI for a base protocol
@@ -293,7 +298,7 @@ public:
   /// Return the witness index for the type metadata access function
   /// for the given associated type.
   WitnessIndex getAssociatedTypeIndex(IRGenModule &IGM,
-                                      AssociatedType assocType) const;
+                                      AssociatedTypeDecl *assocType) const;
 
   /// Return the witness index for the protocol witness table access
   /// function for the given associated protocol conformance.

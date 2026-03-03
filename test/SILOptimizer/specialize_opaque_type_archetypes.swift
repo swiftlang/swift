@@ -2,9 +2,9 @@
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_2.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -enable-library-evolution -module-name External2 -emit-module -emit-module-path %t/External2.swiftmodule
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_4.swift -I %t -enable-library-evolution -module-name External3 -emit-module -emit-module-path %t/External3.swiftmodule
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -I %t -enable-library-evolution -module-name External2 -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -emit-module -o - | %target-sil-opt -module-name External2 | %FileCheck --check-prefix=RESILIENT %s
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -I %t -enable-library-evolution -module-name External2 -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -emit-module -o - | %target-sil-opt -sil-print-types -module-name External2 | %FileCheck --check-prefix=RESILIENT %s
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -Xllvm -sil-print-types -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -Xllvm -sil-print-types -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: swift_in_compiler
 
@@ -364,10 +364,10 @@ public func testResilientInlinableProperty2() {
 }
 
 // CHECK-LABEL: sil @$s1A035testResilientInlinablePropertyCallsbC0yyF : $@convention(thin) () -> () {
-// CHECK:   [[CONTAINTER:%.*]] = alloc_stack [var_decl] $ResilientContainer2
+// CHECK:   [[CONTAINER:%.*]] = alloc_stack [var_decl] $ResilientContainer2
 // CHECK:   [[RES:%.*]] = alloc_stack $Int64
 // CHECK:   [[FUN:%.*]] = function_ref @$s9External319ResilientContainer2V023inlineablePropertyCallsB10InlineableQrvg
-// CHECK:  apply [[FUN]]([[RES]], [[CONTAINTER]])
+// CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
 public func testResilientInlinablePropertyCallsResilientInlinable() {
   let r = ResilientContainer2()
   useP(r.inlineablePropertyCallsResilientInlineable.myValue3())
@@ -377,15 +377,15 @@ public func testResilientInlinablePropertyCallsResilientInlinable() {
 // RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : $Int, {{%[^,]+}} : @_eagerMove $
 // RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlFSi_Tgq5'
 
-// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF : {{.*}} {
+// RESILIENT-LABEL: sil [serialized] [canonical] [ossa] @$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF : {{.*}} {
 // RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : $*T, {{%[^,]+}} : @_eagerMove $
 // RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF'
 
-// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV26eagerMoveInlineableContextyyF : $@convention(method) (@in_guaranteed ResilientContainer) -> () {
+// RESILIENT-LABEL: sil [serialized] [canonical] [ossa] @$s9External218ResilientContainerV26eagerMoveInlineableContextyyF : $@convention(method) (@in_guaranteed ResilientContainer) -> () {
 // RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove $
 // RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV26eagerMoveInlineableContextyyF'
 
-// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV17inlineableContextyyF
+// RESILIENT-LABEL: sil [serialized] [canonical] [ossa] @$s9External218ResilientContainerV17inlineableContextyyF
 // RESILIENT:  [[RES:%.*]] = alloc_stack [var_decl] $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
 // RESILIENT:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV16computedPropertyQrvg
 // RESILIENT:  apply [[FUN]]([[RES]], %0)
@@ -421,12 +421,12 @@ struct PAEM : P4EM {
 // CHECK:   apply [[F]]([[V]])
 
 // CHECK-64-LABEL: sil hidden @$s1A2PAV4testyyF : $@convention(method) (PA) -> ()
-// CHECK-64:   [[V:%.*]] = integer_literal $Builtin.Int64, 5
-// CHECK-64:   [[I:%.*]] = struct $Int64 ([[V]] : $Builtin.Int64)
-// CHECK-64:   [[F:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
-// CHECK-64:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
-// CHECK-64:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
-
+// CHECK-64:         [[V:%.*]] = integer_literal $Builtin.Int64, 5
+// CHECK-64-DAG:     [[I:%.*]] = struct $Int64 ([[V]] : $Builtin.Int64)
+// CHECK-64-DAG:     [[F:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
+// CHECK-64:         apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
+// CHECK-64:         apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
+// CHECK-64:       } // end sil function '$s1A2PAV4testyyF'
 @inline(never)
 func testIt<T>(cl: (Int64) throws -> T) {
  do {

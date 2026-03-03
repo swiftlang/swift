@@ -1,11 +1,12 @@
 // REQUIRES: swift_swift_parser, asserts
+// REQUIRES: swift_feature_CodeItemMacros
 
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature CodeItemMacros -module-name MacrosTest
 
 @expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 // expected-note@-1 3{{'stringify' declared here}}
 // expected-warning@-2{{external macro implementation type}}
-// expected-warning@-3{{@expression has been removed in favor of @freestanding(expression)}}{{1-12=@freestanding(expression)}}
+// expected-warning@-3{{'@expression' has been removed in favor of '@freestanding(expression)'}}{{1-12=@freestanding(expression)}}
 @freestanding(expression) macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
 // expected-warning@-1{{external macro definitions are now written using #externalMacro}}
 // expected-warning@-2{{external macro implementation type}}
@@ -195,8 +196,8 @@ struct MyStruct<T: MyProto> {
 
 struct SomeType {
   #genericUnary<Equatable>(0 as Hashable)
-  // expected-error@-1{{use of protocol 'Equatable' as a type must be written 'any Equatable'}}
-  // expected-error@-2{{use of protocol 'Hashable' as a type must be written 'any Hashable'}}
+  // expected-warning@-1{{use of protocol 'Equatable' as a type must be written 'any Equatable'}}
+  // expected-warning@-2{{use of protocol 'Hashable' as a type must be written 'any Hashable'}}
   // expected-error@-3{{external macro implementation type}}
 }
 
@@ -220,3 +221,23 @@ struct SomeType {
 macro multipleFreestandingRoles<T>(_: T) -> Void = #externalMacro(module: "A", type: "B")
 // expected-warning@-1{{external macro implementation type}}
 // expected-error@-2{{macro can only have a single freestanding role}}
+
+@_documentation(visibility: private)
+@attached(peer)
+macro Foo() = #externalMacro(module: "ThisMacroModuleDoesNotExist", type: "ThisMacroTypeDoesNotExist")
+// expected-warning@-1{{external macro implementation type}}
+
+
+@available(SwiftStdlib 5.1, *)
+func someGlobalNext(
+  isolation actor: isolated (any Actor)? = #isolated // expected-error{{no macro named 'isolated'}}
+) async throws {
+  fatalError()
+}
+
+// This is testing if the definition is actually checked. The error means the '#externalMacro' was correctly parsed and checked.
+#if true
+@available(*, unavailable)
+#endif
+@freestanding(expression) public macro MacroWithIfConfigAttr() = #externalMacro(module: "ThisMacroModuleDoesNotExist", type: "ThisMacroTypeDoesNotExist")
+// expected-warning@-1{{external macro implementation type 'ThisMacroModuleDoesNotExist.ThisMacroTypeDoesNotExist'}}

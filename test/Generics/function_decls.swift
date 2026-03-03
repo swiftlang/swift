@@ -24,7 +24,7 @@ public class A<X> {
   public func f11<T, U>(x: X, y: T) {} //expected-error{{generic parameter 'U' is not used in function signature}}
 }
 
-struct G<T> {} // expected-note {{generic type 'G' declared here}}
+struct G<T> {} // expected-note {{generic struct 'G' declared here}}
 
 struct GG<T, U> {}
 
@@ -95,4 +95,17 @@ func boo<T1, T2:Q, T3:Q, T4:Q, T5:Q, T6:Q> (x: T6)
 // Therefore we should reject this declaration.
 //expected-error@+1{{generic parameter 'U' is not used in function signature}}
 func baz<U:P>(_ d: U.A) {
+}
+
+
+// https://github.com/swiftlang/swift/issues/50917
+extension Collection {
+  subscript<C: Collection>(i i: Index, j j: C.Index) -> C.Element where Element == C {
+    return self[i][j]
+  }
+
+  subscript<C: Collection>(ii i: Index, jj j: C.Index) -> C.Element {
+  // expected-error@-1 {{generic parameter 'C' is not used in function signature}}
+    fatalError()
+  }
 }

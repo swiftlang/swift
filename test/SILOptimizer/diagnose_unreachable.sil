@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -update-borrowed-from -diagnose-unreachable -sil-print-debuginfo | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnose-unreachable -sil-print-debuginfo | %FileCheck %s
 
 import Builtin
 import Swift
@@ -528,15 +528,16 @@ bb3:
 // CHECK: } // end sil function 'eliminate_end_borrow_when_propagating_bb_args'
 sil [ossa] @eliminate_end_borrow_when_propagating_bb_args : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
-  %0a = begin_borrow %0 : $Builtin.NativeObject
-  br bb1(%0a : $Builtin.NativeObject)
+  %1 = begin_borrow %0
+  br bb1(%1)
 
-bb1(%1 : @guaranteed $Builtin.NativeObject):
-  %2 = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  apply %2(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  end_borrow %1 : $Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
+bb1(%3 : @reborrow $Builtin.NativeObject):
+  %4 = borrowed %3 from (%0)
+  %5 = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %4
+  %8 = tuple ()
+  return %8
 }
 
 // CHECK-LABEL: sil @constant_fold_switch_enum_addr : $@convention(thin) (Int) -> Int {
@@ -801,17 +802,19 @@ enum EnumWithB {
 // CHECK-LABEL: } // end sil function 'testEliminatePropagateBeginBorrowGuaranteedPhiAfterSwitch'
 sil hidden [ossa] @testEliminatePropagateBeginBorrowGuaranteedPhiAfterSwitch : $@convention(method) (@owned B) -> () {
 bb0(%0 : @owned $B):
-  %1 = begin_borrow %0 : $B
-  br bb1(%1 : $B)
+  %1 = begin_borrow %0
+  br bb1(%1)
 
-bb1(%2 : @guaranteed $B):
-  br bb3(%2 : $B)
+bb1(%3 : @reborrow $B):
+  %4 = borrowed %3 from (%0)
+  br bb2(%4)
 
-bb3(%3 : @guaranteed $B):
-  %99 = tuple ()
-  end_borrow %3 : $B
-  destroy_value %0 : $B
-  return %99 : $()
+bb2(%6 : @reborrow $B):
+  %7 = borrowed %6 from (%0)
+  %8 = tuple ()
+  end_borrow %7
+  destroy_value %0
+  return %8
 }
 
 // Make sure we do not look for end_borrow when looking at a switch_enum, switch_enum.
@@ -840,14 +843,16 @@ bb3(%4 : @guaranteed $B):
 // CHECK-LABEL: } // end sil function 'testPropagateGuaranteedPhi'
 sil hidden [ossa] @testPropagateGuaranteedPhi : $@convention(method) (@guaranteed B) -> () {
 bb0(%0 : @guaranteed $B):
-  %0a = begin_borrow %0 : $B
-  br bb1(%0a : $B)
+  %1 = begin_borrow %0
+  br bb1(%1)
 
-bb1(%1 : @guaranteed $B):
-  br bb2(%1 : $B)
+bb1(%3 : @reborrow $B):
+  %4 = borrowed %3 from (%0)
+  br bb2(%4)
 
-bb2(%2 : @guaranteed $B):
-  %99 = tuple ()
-  end_borrow %2 : $B
-  return %99 : $()
+bb2(%6 : @reborrow $B):
+  %7 = borrowed %6 from (%0)
+  %8 = tuple ()
+  end_borrow %7
+  return %8
 }

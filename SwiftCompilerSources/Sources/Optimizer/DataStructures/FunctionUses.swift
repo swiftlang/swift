@@ -45,7 +45,7 @@ struct FunctionUses {
     var hasUnknownUses: Bool
 
     init(of function: Function) {
-      self.hasUnknownUses = function.isPossiblyUsedExternally || function.isAvailableExternally
+      self.hasUnknownUses = function.isPossiblyUsedExternally || function.isDefinedExternally
     }
 
     mutating func insert(_ inst: Instruction, _ uses: inout [Use]) {
@@ -128,22 +128,22 @@ struct FunctionUses {
 
     for vTable in context.vTables {
       for entry in vTable.entries {
-        markUnknown(entry.function)
+        markUnknown(entry.implementation)
       }
     }
 
     for witnessTable in context.witnessTables {
       for entry in witnessTable.entries {
-        if entry.kind == .Method, let f = entry.methodFunction {
-          markUnknown(f)
+        if case .method(_, let witness) = entry, let witness {
+          markUnknown(witness)
         }
       }
     }
 
     for witnessTable in context.defaultWitnessTables {
       for entry in witnessTable.entries {
-        if entry.kind == .Method, let f = entry.methodFunction {
-          markUnknown(f)
+        if case .method(_, let witness) = entry, let witness {
+          markUnknown(witness)
         }
       }
     }
@@ -160,5 +160,24 @@ struct FunctionUses {
 
   private mutating func markUnknown(_ function: Function) {
     uses[function, default: FirstUse(of: function)].hasUnknownUses = true
+  }
+}
+
+//===--------------------------------------------------------------------===//
+//                              Tests
+//===--------------------------------------------------------------------===//
+
+let functionUsesTest = ModuleTest("function-uses") {
+    (context: ModulePassContext) in
+
+  var functionUses = FunctionUses()
+  functionUses.collect(context: context)
+
+  for function in context.functions {
+    let uses = functionUses.getUses(of: function)
+
+    print("Uses of \(function.name)")
+    print(uses)
+    print("End function \(function.name)\n")
   }
 }

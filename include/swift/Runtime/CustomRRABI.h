@@ -59,6 +59,11 @@ namespace swift {
 template <typename Ret, typename Param>
 Param returnTypeHelper(Ret (*)(Param)) {}
 
+#if SWIFT_REFCOUNT_CC_PRESERVEMOST
+template <typename Ret, typename Param>
+Param returnTypeHelper(SWIFT_REFCOUNT_CC Ret (*)(Param)) {}
+#endif
+
 #if defined(__LP64__) || defined(_LP64)
 #define REGISTER_SUBSTITUTION_PREFIX ""
 #define REGISTER_PREFIX "x"

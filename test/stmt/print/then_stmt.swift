@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -print-ast -enable-experimental-feature ThenStatements %s 2>&1 | %FileCheck %s
 
-// Required for experimental features
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ThenStatements
 
 func foo() -> Int {
   if .random() {

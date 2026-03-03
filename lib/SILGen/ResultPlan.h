@@ -18,6 +18,7 @@
 #include "Initialization.h"
 #include "ManagedValue.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILLocation.h"
 #include <memory>
@@ -64,8 +65,10 @@ public:
     return std::nullopt;
   }
 
-  virtual ManagedValue emitForeignAsyncCompletionHandler(
-      SILGenFunction &SGF, AbstractionPattern origFormalType, SILLocation loc) {
+  virtual ManagedValue
+  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
+                                    AbstractionPattern origFormalType,
+                                    ManagedValue self, SILLocation loc) {
     return {};
   }
 };

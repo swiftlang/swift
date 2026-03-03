@@ -87,6 +87,26 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
   ReleaseSRWLockExclusive(&handle);
 }
 
+// .. Recursive mutex support ................................................
+
+using recursive_mutex_handle = SWIFT_CRITICAL_SECTION;
+
+inline void recursive_mutex_init(recursive_mutex_handle &handle,
+                                 bool checked = false) {
+  InitializeCriticalSection(&handle);
+}
+
+inline void recursive_mutex_destroy(recursive_mutex_handle &handle) {
+  DeleteCriticalSection(&handle);
+}
+
+inline void recursive_mutex_lock(recursive_mutex_handle &handle) {
+  EnterCriticalSection(&handle);
+}
+inline void recursive_mutex_unlock(recursive_mutex_handle &handle) {
+  LeaveCriticalSection(&handle);
+}
+
 // .. ConditionVariable support ..............................................
 
 struct cond_handle {

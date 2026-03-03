@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-lexical-lifetimes %s -mem2reg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-lexical-lifetimes %s -mem2reg | %FileCheck %s
 
 import Builtin
 import Swift
@@ -1099,6 +1099,7 @@ bb7:
   br bb6
 
 bb8(%err : @owned $Error):
+  destroy_value [dead_end] %err
   unreachable
 }
 

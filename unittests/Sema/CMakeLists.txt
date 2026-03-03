@@ -4,6 +4,7 @@ add_swift_unittest(swiftSemaTests
   BindingInferenceTests.cpp
   ConstraintGenerationTests.cpp
   ConstraintSimplificationTests.cpp
+  ConstraintSystemDumpTests.cpp
   UnresolvedMemberLookupTests.cpp
   PlaceholderTypeInferenceTests.cpp
   SolutionFilteringTests.cpp
@@ -12,6 +13,8 @@ add_swift_unittest(swiftSemaTests
 target_link_libraries(swiftSemaTests
   PRIVATE
     swiftAST
+    swiftClangImporter
+    swiftSIL
     swiftSema
     swiftSerialization)
 

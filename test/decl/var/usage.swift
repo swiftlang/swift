@@ -237,9 +237,22 @@ func testForceValueExpr() {
 func testBuildConfigs() {
   let abc = 42    // no warning.
   var mut = 18    // no warning.
+  let other = 15  // no warning?
+  var othermut = 15  // no warning
 #if false
   mut = abc    // These uses prevent abc/mut from being unused/unmutated.
 #endif
+#if compiler(>=10.0)
+  othermut = other    // This use prevents other/othermut from being unused/unmutated
+#endif
+}
+
+func postfixSuppression() -> Int {
+  let x = 10 // used to have warning: ... 'x' was never used...
+  return 5
+     #if FLAG
+     .modifier(x)
+     #endif
 }
 
 // same as above, but with a guard statement
@@ -549,4 +562,25 @@ func testUselessCastWithInvalidParam(foo: Any?) -> Int {
   class Foo { }
   if let bar = foo as? Foo { return 42 } // expected-warning {{value 'bar' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{20-23=is}}
   else { return 54 }
+}
+
+// https://github.com/swiftlang/swift/issues/72811
+func testEnumeratedForLoop(a: [Int]) {
+  for var (b, c) in a.enumerated() {  // expected-warning {{variable 'b' was never mutated; consider changing the pattern to 'case (..., let b, ...)'}}
+    c = b
+    let _ = c
+  }
+}
+
+// https://github.com/swiftlang/swift/issues/79555
+final class A {
+  var x: () -> Void {
+    { [weak self] in // Used to warn: variable 'self' was written to, but never read
+      #if NOT_PROCESSED
+      self?.f()
+      #endif
+    }
+  }
+
+ func f() {}
 }

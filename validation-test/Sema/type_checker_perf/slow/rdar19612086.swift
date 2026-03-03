@@ -1,5 +1,8 @@
-// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=50000 -solver-enable-prune-disjunctions
 // REQUIRES: tools-release,no_asan
+
+// Invalid expression: There is no + overload for Stringly
+
 struct Stringly {
   init(string: String) {}
   init(format: String, _ args: Any...) {}

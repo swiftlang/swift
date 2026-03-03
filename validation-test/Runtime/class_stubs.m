@@ -4,7 +4,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-library -emit-module -o %t/libfirst.dylib -emit-objc-header-path %t/first.h %S/Inputs/class-stubs-from-objc/first.swift -Xlinker -install_name -Xlinker @executable_path/libfirst.dylib -enable-library-evolution
 // RUN: %target-build-swift -emit-library -o %t/libsecond.dylib -emit-objc-header-path %t/second.h -I %t %S/Inputs/class-stubs-from-objc/second.swift -Xlinker -install_name -Xlinker @executable_path/libsecond.dylib -lfirst -L %t -target %target-next-stable-abi-triple
-// RUN: cp %S/Inputs/class-stubs-from-objc/module.map %t/
+// RUN: cp %S/Inputs/class-stubs-from-objc/module.modulemap %t/
 // RUN: xcrun -sdk %sdk %clang %s -I %t -L %t -fmodules -fobjc-arc -o %t/main -lfirst -lsecond -target %target-next-stable-abi-triple
 // RUN: %target-codesign %t/main %t/libfirst.dylib %t/libsecond.dylib
 // RUN: %target-run %t/main %t/libfirst.dylib %t/libsecond.dylib

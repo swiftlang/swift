@@ -179,6 +179,8 @@ return 42 // expected-error {{return invalid outside of a func}}
 
 return // expected-error {{return invalid outside of a func}}
 
+return VoidReturn1() // expected-error {{return invalid outside of a func}}
+
 func NonVoidReturn1() -> Int {
   _ = 0
   return // expected-error {{non-void function should return a value}}
@@ -476,7 +478,7 @@ func r25178926(_ a : Type) {
   switch a { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.Bar'}}
   case .Foo, .Bar where 1 != 100:
-    // expected-warning @-1 {{'where' only applies to the second pattern match in this case}}
+    // expected-warning @-1 {{'where' only applies to the second pattern match in this 'case'}}
     // expected-note @-2 {{disambiguate by adding a line break between them if this is desired}} {{14-14=\n       }}
     // expected-note @-3 {{duplicate the 'where' on both patterns to check both patterns}} {{12-12= where 1 != 100}}
     break
@@ -498,8 +500,37 @@ func r25178926(_ a : Type) {
   switch a { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.Foo'}}
   // expected-note@-2 {{missing case: '.Bar'}}
+  // expected-note@-3 {{add missing cases}}
   case .Foo where 1 != 100, .Bar where 1 != 100:
     break
+  }
+}
+
+func testAmbiguousWhereInCatch() {
+  protocol P1 {}
+  protocol P2 {}
+  func throwingFn() throws {}
+  do {
+    try throwingFn()
+  } catch is P1, is P2 where .random() {
+    // expected-warning @-1 {{'where' only applies to the second pattern match in this 'catch'}}
+    // expected-note @-2 {{disambiguate by adding a line break between them if this is desired}} {{18-18=\n          }}
+    // expected-note @-3 {{duplicate the 'where' on both patterns to check both patterns}} {{16-16= where .random()}}
+  } catch {
+
+  }
+  do {
+    try throwingFn()
+  } catch is P1,
+          is P2 where .random() {
+  } catch {
+
+  }
+  do {
+    try throwingFn()
+  } catch is P1 where .random(), is P2 where .random() {
+  } catch {
+
   }
 }
 
@@ -531,6 +562,9 @@ func bad_if() {
   if (x: false) {} // expected-error {{cannot convert value of type '(x: Bool)' to expected condition type 'Bool'}}
   if (x: 1) {} // expected-error {{cannot convert value of type '(x: Int)' to expected condition type 'Bool'}}
   if nil {} // expected-error {{'nil' is not compatible with expected condition type 'Bool'}}
+  if undefined {} // expected-error {{cannot find 'undefined' in scope}}
+  if [undefined] {} // expected-error {{cannot find 'undefined' in scope}}
+  // expected-error@-1 {{cannot convert value of type '[Element]' to expected condition type 'Bool'}}
 }
 
 // Typo correction for loop labels

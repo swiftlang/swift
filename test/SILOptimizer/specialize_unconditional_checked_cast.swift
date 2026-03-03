@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name specialize_unconditional_checked_cast -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil -o - -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name specialize_unconditional_checked_cast -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-print-types -emit-sil -o - -O %s | %FileCheck %s
 
 //////////////////
 // Declarations //
@@ -141,7 +141,7 @@ ArchetypeToConcreteConvertUInt8(t: f)
 // CHECK-LABEL: sil shared [noinline] {{.*}}@$s37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC{{[_0-9a-zA-Z]*}}FAA1DC_Tg5 : $@convention(thin) (@guaranteed D) -> @owned C {
 // CHECK: bb0([[ARG:%.*]] : $D):
 // CHECK:   [[UPCAST:%.*]] = upcast [[ARG]] : $D to $C
-// CHECK:   strong_retain [[ARG]]
+// CHECK:   strong_retain [[UPCAST]]
 // CHECK:   return [[UPCAST]]
 // CHECK: } // end sil function '$s37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC{{[_0-9a-zA-Z]*}}FAA1DC_Tg5'
 
@@ -374,7 +374,7 @@ ExistentialToArchetype(o: o, t: o)
 // value cast. We could do the promotion, but the optimizer would need
 // to insert the Optional unwrapping logic before the cast.
 //
-// CHECK-LABEL: sil shared [noinline] @$s37specialize_unconditional_checked_cast15genericDownCastyq_x_q_mtr0_lFAA1CCSg_AA1DCTgm5 : $@convention(thin) (@guaranteed Optional<C>) -> @owned D {
+// CHECK-LABEL: sil shared [noinline] @$s37specialize_unconditional_checked_cast15genericDownCastyq_x_q_mtr0_lFAA1CCSg_AA1DCTt1g5 : $@convention(thin) (@guaranteed Optional<C>) -> @owned D {
 // CHECK: bb0(%0 : $Optional<C>):
 // CHECK-DAG: [[STACK_D:%[0-9]+]] = alloc_stack $D
 // CHECK-DAG: [[STACK_C:%[0-9]+]] = alloc_stack $Optional<C>

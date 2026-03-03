@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules %s -import-underlying-module -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules %s -import-underlying-module -verify -verify-ignore-unrelated
 
 import CoreCooling
 
@@ -66,5 +66,5 @@ func testCF(_ fridge: CCRefrigerator) {
   CCRefrigeratorOpenMaybeDoSomething(fridge) // okay
   CCRefrigeratorOpenMaybeDoSomething(nil) // okay
 
-  CCRefrigeratorOpenMaybeDoSomething(5) // expected-error{{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator?'}}
+  CCRefrigeratorOpenMaybeDoSomething(5) // expected-error{{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator'}}
 }

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -loadable-address -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -loadable-address -enable-sil-verify-all %s | %FileCheck %s
 
 // REQUIRES: PTRSIZE=64
 // REQUIRES: OS=macosx
@@ -83,9 +83,7 @@ unwind:
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[CORO:%.*]] = function_ref @test_yield_big : $@yield_once @convention(thin) () -> @yields @in_guaranteed BigStruct
 // CHECK-NEXT:    ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[CORO]]()
-//   TODO: this isn't very efficient
-// CHECK-NEXT:    [[T0:%.*]] = load [[ADDR]] : $*BigStruct
-// CHECK-NEXT:    store [[T0]] to [[TEMP]] : $*BigStruct
+// CHECK-NEXT:   copy_addr [take] [[ADDR]] to [init] [[TEMP]] : $*BigStruct
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[USE:%.*]] = function_ref @use_big_struct : $@convention(thin) (@in_guaranteed BigStruct) -> ()
 // CHECK-NEXT:    apply [[USE]]([[TEMP]])

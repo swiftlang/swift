@@ -75,12 +75,26 @@ void SILVTable::updateVTableCache(const Entry &entry) {
   M.VTableEntryCache[{this, entry.getMethod()}] = entry;
 }
 
+void SILVTable::replaceEntries(ArrayRef<Entry> newEntries) {
+  auto entries = getMutableEntries();
+  ASSERT(newEntries.size() <= entries.size());
+  for (Entry &entry : getMutableEntries()) {
+    entry.getImplementation()->decrementRefCount();
+    removeFromVTableCache(entry);
+  }
+  for (unsigned i = 0; i < newEntries.size(); ++i) {
+    entries[i] = newEntries[i];
+    entries[i].getImplementation()->incrementRefCount();
+    updateVTableCache(entries[i]);
+  }
+  NumEntries = newEntries.size();
+}
+
 SILVTable::SILVTable(ClassDecl *c, SILType classType,
                      SerializedKind_t serialized, ArrayRef<Entry> entries)
     : Class(c), classType(classType), SerializedKind(serialized),
       NumEntries(entries.size()) {
-  std::uninitialized_copy(entries.begin(), entries.end(),
-                          getTrailingObjects<Entry>());
+  std::uninitialized_copy(entries.begin(), entries.end(), getTrailingObjects());
 
   // Bump the reference count of functions referenced by this table.
   for (const Entry &entry : getEntries()) {

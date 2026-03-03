@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Cleanup.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -24,6 +25,9 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Platform.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -34,6 +38,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <iterator>
 
 using namespace swift;
@@ -72,6 +77,7 @@ static void copyOrInitPackExpansionInto(SILGenFunction &SGF,
     SGF.Cleanups.forwardCleanup(componentCleanup);
 
   SGF.emitDynamicPackLoop(loc, formalPackType, componentIndex, openedEnv,
+                          []() -> SILBasicBlock * { return nullptr; },
                           [&](SILValue indexWithinComponent,
                               SILValue packExpansionIndex,
                               SILValue packIndex) {
@@ -309,7 +315,7 @@ splitSingleBufferIntoTupleElements(SILGenFunction &SGF, SILLocation loc,
     if (eltCleanup.isValid())
       splitCleanups.push_back(eltCleanup);
 
-    buf.emplace_back(eltInit.release());
+    buf.emplace_back(std::move(eltInit));
   }
 
   return buf;
@@ -365,6 +371,43 @@ void TemporaryInitialization::finishInitialization(SILGenFunction &SGF) {
   SingleBufferInitialization::finishInitialization(SGF);
   if (Cleanup.isValid())
     SGF.Cleanups.setCleanupState(Cleanup, CleanupState::Active);
+}
+
+StoreBorrowInitialization::StoreBorrowInitialization(SILValue address)
+    : address(address) {
+  assert(isa<AllocStackInst>(address) ||
+         isa<MarkUnresolvedNonCopyableValueInst>(address) &&
+             "invalid destination for store_borrow initialization!?");
+}
+
+void StoreBorrowInitialization::copyOrInitValueInto(SILGenFunction &SGF,
+                                                    SILLocation loc,
+                                                    ManagedValue mv,
+                                                    bool isInit) {
+  auto value = mv.getValue();
+  auto &lowering = SGF.getTypeLowering(value->getType());
+  if (lowering.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
+    llvm::report_fatal_error(
+        "Attempting to store_borrow an address-only value!?");
+  }
+  if (value->getType().isAddress()) {
+    value = SGF.emitManagedLoadBorrow(loc, value).getValue();
+  }
+  if (!isInit) {
+    value = lowering.emitCopyValue(SGF.B, loc, value);
+  }
+  storeBorrow = SGF.emitManagedStoreBorrow(loc, value, address);
+}
+
+SILValue StoreBorrowInitialization::getAddress() const {
+  if (storeBorrow) {
+    return storeBorrow.getValue();
+  }
+  return address;
+}
+
+ManagedValue StoreBorrowInitialization::getManagedAddress() const {
+  return storeBorrow;
 }
 
 namespace {
@@ -433,7 +476,7 @@ public:
     Var->print(llvm::errs());
     llvm::errs() << "\n";
     if (isActive()) {
-      auto loc = SGF.VarLocs[Var];
+      auto &loc = SGF.VarLocs[Var];
       assert((loc.box || loc.value) && "One of box or value should be set");
       if (loc.box) {
         llvm::errs() << "Box: " << loc.box << "\n";
@@ -520,7 +563,11 @@ public:
 
     // If our instance type is not already @moveOnly wrapped, and it's a
     // no-implicit-copy parameter, wrap it.
-    if (!isNoImplicitCopy && !instanceType->isNoncopyable()) {
+    //
+    // Unless the function is using ManualOwnership, which checks for
+    // no-implicit-copies using a different mechanism.
+    if (!isNoImplicitCopy && instanceType->isCopyable() &&
+        !SGF.B.hasManualOwnershipAttr()) {
       if (auto *pd = dyn_cast<ParamDecl>(decl)) {
         isNoImplicitCopy = pd->isNoImplicitCopy();
         isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
@@ -536,7 +583,7 @@ public:
       }
     }
 
-    const bool isCopyable = isNoImplicitCopy || !instanceType->isNoncopyable();
+    const bool isCopyable = isNoImplicitCopy || instanceType->isCopyable();
 
     auto boxType = SGF.SGM.Types.getContextBoxTypeForCapture(
         decl, instanceType, SGF.F.getGenericEnvironment(),
@@ -562,6 +609,16 @@ public:
       Box = SGF.B.createMarkUnresolvedReferenceBindingInst(
           decl, Box, MarkUnresolvedReferenceBindingInst::Kind::InOut);
 
+    // If we are from a capture list, then the variable that we are creating is
+    // just a temporary used to initialize the value in the closure caller. We
+    // want to treat that as a temporary. The actual var decl is represented in
+    // the closure using a function parameter. So leave the value as a
+    // temporary.
+    auto isFromVarDecl = IsFromVarDecl_t::IsFromVarDecl;
+    if (decl->isCaptureList()) {
+      isFromVarDecl = IsNotFromVarDecl;
+    }
+
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
       auto loweredType = SGF.getTypeLowering(decl->getTypeInContext()).getLoweredType();
       auto lifetime = SGF.F.getLifetime(decl, loweredType);
@@ -573,7 +630,7 @@ public:
       // requires one.
       Box =
           SGF.B.createBeginBorrow(decl, Box, IsLexical_t(lifetime.isLexical()),
-                                  DoesNotHavePointerEscape, IsFromVarDecl);
+                                  DoesNotHavePointerEscape, isFromVarDecl);
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
@@ -625,7 +682,8 @@ public:
     /// decl to.
     assert(SGF.VarLocs.count(decl) == 0 && "Already emitted the local?");
 
-    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(Addr, Box);
+    SGF.VarLocs[decl] = SILGenFunction::VarLoc(Addr,
+      SILAccessEnforcement::Dynamic, Box);
 
     SingleBufferInitialization::finishInitialization(SGF);
     assert(!DidFinish &&
@@ -638,6 +696,71 @@ public:
 } // end anonymous namespace
 
 namespace {
+
+static void deallocateAddressable(SILGenFunction &SGF,
+                SILLocation l,
+                const SILGenFunction::AddressableBuffer::State &state,
+                CleanupState cleanupState) {
+  // Only delete the value if the variable was active on this path.
+  // The stack slot exists within the variable scope regardless, so always
+  // needs to be cleaned up.
+  bool active = isActiveCleanupState(cleanupState);
+  if (active) {
+    SGF.B.createEndBorrow(l, state.storeBorrow);
+  }
+  SGF.B.createDeallocStack(l, state.allocStack);
+  if (active
+      && state.reabstraction
+      && !state.reabstraction->getType().isTrivial(SGF.F)) {
+    SGF.B.createDestroyValue(l, state.reabstraction);
+  }
+}
+
+/// Cleanup to deallocate the addressable buffer for a parameter or let
+/// binding.
+class DeallocateLocalVariableAddressableBuffer : public Cleanup {
+  ValueDecl *vd;
+  CleanupHandle destroyVarHandle;
+public:
+  DeallocateLocalVariableAddressableBuffer(ValueDecl *vd,
+                                           CleanupHandle destroyVarHandle)
+    : vd(vd), destroyVarHandle(destroyVarHandle) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    auto addressableBuffer = SGF.getAddressableBufferInfo(vd);
+    if (!addressableBuffer) {
+      return;
+    }
+    
+    // Reflect the state of the variable's original cleanup.
+    CleanupState cleanupState = CleanupState::Active;
+    if (destroyVarHandle.isValid()) {
+      cleanupState = SGF.Cleanups.getCleanup(destroyVarHandle).getState();
+    }
+
+    if (auto *state = addressableBuffer->getState()) {
+      // The addressable buffer was already forced, so clean up now.
+      deallocateAddressable(SGF, l, *state, cleanupState);
+    } else {
+      // Remember this insert location in case we need to force the addressable
+      // buffer later.
+      SILInstruction *marker = SGF.B.createTuple(l, {});
+      addressableBuffer->cleanupPoints.push_back({marker, cleanupState});
+    }
+  }
+
+  void dump(SILGenFunction &SGF) const override {
+#ifndef NDEBUG
+    llvm::errs() << "DeallocateLocalVariableAddressableBuffer\n"
+                 << "State:" << getState() << "\n"
+                 << "Decl: ";
+    vd->print(llvm::errs());
+    llvm::errs() << "\n";
+#endif
+  }
+};
+
 /// Initialize a writeback buffer that receives the value of a 'let'
 /// declaration.
 class LetValueInitialization : public Initialization {
@@ -716,17 +839,23 @@ public:
       if (isUninitialized)
         address = SGF.B.createMarkUninitializedVar(vd, address);
       DestroyCleanup = SGF.enterDormantTemporaryCleanup(address, *lowering);
-      SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
-    } else if (!lowering->isTrivial()) {
-      // Push a cleanup to destroy the let declaration.  This has to be
-      // inactive until the variable is initialized: if control flow exits the
-      // before the value is bound, we don't want to destroy the value.
-      SGF.Cleanups.pushCleanupInState<DestroyLocalVariable>(
-                                                    CleanupState::Dormant, vd);
-      DestroyCleanup = SGF.Cleanups.getTopCleanup();
-    } else {
-      DestroyCleanup = CleanupHandle::invalid();
+
+      // N.B. We do not register the address in VarLocs yet so that the capture-
+      // before-definition machinery will diagnose such cases.
     }
+    // Push a cleanup to destroy the let declaration.  This has to be
+    // inactive until the variable is initialized: if control flow exits
+    // before the value is bound, we don't want to destroy the value.
+    //
+    // Cleanups are required for all lexically scoped variables to delimit
+    // the variable scope, even if the cleanup does nothing.
+    SGF.Cleanups.pushCleanupInState<DestroyLocalVariable>(
+      CleanupState::Dormant, vd);
+    DestroyCleanup = SGF.Cleanups.getTopCleanup();
+
+    // If the binding has an addressable buffer forced, it should be cleaned
+    // up at this scope.
+    SGF.enterLocalVariableAddressableBufferScope(vd, DestroyCleanup);
   }
 
   ~LetValueInitialization() override {
@@ -771,50 +900,26 @@ public:
                                             SplitCleanups);
   }
 
-  /// This is a helper method for bindValue that handles any changes to the
-  /// value needed for lexical lifetime or no implicit copy purposes.
+  /// This is a helper method for bindValue that creates a scopes operation for
+  /// the lexical variable lifetime and handles any changes to the value needed
+  /// for move-only values.
   SILValue getValueForLexicalLifetimeBinding(SILGenFunction &SGF,
                                              SILLocation PrologueLoc,
                                              SILValue value, bool wasPlusOne) {
-    // If we have none...
-    if (value->getOwnershipKind() == OwnershipKind::None) {
-      // Then check if we have a pure move only type. In that case, we need to
-      // insert a no implicit copy
-      if (value->getType().isMoveOnly(/*orWrapped=*/false)) {
-        value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
-        return SGF.B.createMarkUnresolvedNonCopyableValueInst(
-            PrologueLoc, value,
-            MarkUnresolvedNonCopyableValueInst::CheckKind::
-                ConsumableAndAssignable);
-      }
-
-      // If we have a no implicit copy trivial type, wrap it in the move only
-      // wrapper and mark it as needing checking by the move checker.
-      if (vd->isNoImplicitCopy() && value->getType().isTrivial(SGF.F)) {
-        value =
-            SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
-        value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
-        return SGF.B.createMarkUnresolvedNonCopyableValueInst(
-            PrologueLoc, value,
-            MarkUnresolvedNonCopyableValueInst::CheckKind::
-                ConsumableAndAssignable);
-      }
-
-      if (!value->getType().isTrivial(SGF.F)) {
-        // A value without ownership of non-trivial type, e.g. Optional<K>.none.
-        // Mark that it is from a VarDecl.
-        return SGF.B.createMoveValue(PrologueLoc, value, IsNotLexical,
-                                     DoesNotHavePointerEscape, IsFromVarDecl);
-      }
-
+    // TODO: emitPatternBindingInitialization creates fake local variables for
+    // metatypes within function_conversion expressions that operate on static
+    // functions. Creating SIL local variables for all these is impractical and
+    // undesirable. We need a better way of representing these "capture_list"
+    // locals in a way that doesn't produce SIL locals. For now, bypassing
+    // metatypes mostly avoids the issue, but it's not robust and doesn't allow
+    // SIL-level analysis of real metatype variables.
+    if (isa<MetatypeType>(value->getType().getASTType())) {
       return value;
     }
 
-    // Otherwise, we need to perform some additional processing. First, if we
-    // have an owned moveonly value that had a cleanup, then create a move_value
-    // that acts as a consuming use of the value. The reason why we want this is
-    // even if we are only performing a borrow for our lexical lifetime, we want
-    // to ensure that our defs see this initialization as consuming this value.
+    // Preprocess an owned moveonly value that had a cleanup. Even if we are
+    // only performing a borrow for our lexical lifetime, this ensures that
+    // defs see this initialization as consuming this value.
     if (value->getOwnershipKind() == OwnershipKind::Owned &&
         value->getType().isMoveOnlyWrapped()) {
       assert(wasPlusOne);
@@ -825,50 +930,35 @@ public:
       value =
           SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(PrologueLoc, value);
     }
-
-    // If we still have a trivial thing, just return that.
-    if (value->getType().isTrivial(SGF.F))
-      return value;
-
-    // Check if we have a move only type. In that case, we perform a lexical
-    // move and insert a mark_unresolved_non_copyable_value.
-    //
-    // We do this before the begin_borrow "normal" path below since move only
-    // types do not have no implicit copy attr on them.
-    if (value->getOwnershipKind() == OwnershipKind::Owned &&
-        value->getType().isMoveOnly(/*orWrapped=*/false)) {
-      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
-      return SGF.B.createMarkUnresolvedNonCopyableValueInst(
-          PrologueLoc, value,
-          MarkUnresolvedNonCopyableValueInst::CheckKind::
-              ConsumableAndAssignable);
-    }
-
-    // If we have a no implicit copy lexical, emit the instruction stream so
-    // that the move checker knows to check this variable.
-    if (vd->isNoImplicitCopy()) {
-      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical,
-                                    DoesNotHavePointerEscape, IsFromVarDecl);
-      value =
-          SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
-      return SGF.B.createMarkUnresolvedNonCopyableValueInst(
-          PrologueLoc, value,
-          MarkUnresolvedNonCopyableValueInst::CheckKind::
-              ConsumableAndAssignable);
-    }
-
-    // Otherwise, if we do not have a no implicit copy variable, just follow
-    // the "normal path".
-
     auto isLexical =
         IsLexical_t(SGF.F.getLifetime(vd, value->getType()).isLexical());
-
-    if (value->getOwnershipKind() == OwnershipKind::Owned)
-      return SGF.B.createMoveValue(PrologueLoc, value, isLexical,
-                                   DoesNotHavePointerEscape, IsFromVarDecl);
-
-    return SGF.B.createBeginBorrow(PrologueLoc, value, isLexical,
-                                   DoesNotHavePointerEscape, IsFromVarDecl);
+    switch (value->getOwnershipKind()) {
+    case OwnershipKind::None:
+    case OwnershipKind::Owned:
+      value = SGF.B.createMoveValue(PrologueLoc, value, isLexical,
+                                    DoesNotHavePointerEscape, IsFromVarDecl);
+      break;
+    case OwnershipKind::Guaranteed:
+      value = SGF.B.createBeginBorrow(PrologueLoc, value, isLexical,
+                                      DoesNotHavePointerEscape, IsFromVarDecl);
+      break;
+    case OwnershipKind::Unowned:
+    case OwnershipKind::Any:
+      llvm_unreachable("unexpected ownership");
+    }
+    if (vd->isNoImplicitCopy()) {
+      value =
+          SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
+      // fall-through to the owned move-only case...
+    }
+    if (value->getType().isMoveOnly(/*orWrapped=*/true)
+        && value->getOwnershipKind() == OwnershipKind::Owned) {
+      value = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+        PrologueLoc, value,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::
+        ConsumableAndAssignable);
+    }
+    return value;
   }
 
   void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne,
@@ -883,7 +973,8 @@ public:
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule()))
       value = getValueForLexicalLifetimeBinding(SGF, loc, value, wasPlusOne);
 
-    SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
+    SGF.VarLocs[vd] = SILGenFunction::VarLoc(value,
+                                             SILAccessEnforcement::Unknown);
 
     // Emit a debug_value[_addr] instruction to record the start of this value's
     // lifetime, if permitted to do so.
@@ -928,7 +1019,17 @@ public:
   void finishInitialization(SILGenFunction &SGF) override {
     assert(!DidFinish &&
            "called LetValueInit::finishInitialization twice!");
-    assert(SGF.VarLocs.count(vd) && "Didn't bind a value to this let!");
+
+    if (address) {
+      // We should have delayed registration to detect forward-declared
+      // captures.
+      assert(!SGF.VarLocs.count(vd) && "Should not have bound the let yet!");
+      SGF.VarLocs[vd] =
+          SILGenFunction::VarLoc(address, SILAccessEnforcement::Unknown);
+    } else {
+      // We should have already registered the variable in the non-address case.
+      assert(SGF.VarLocs.count(vd) && "Didn't bind a value to this let!");
+    }
 
     // Deactivate any cleanups we made when splitting the tuple.
     for (auto cleanup : SplitCleanups)
@@ -977,21 +1078,44 @@ public:
 } // end anonymous namespace
 
 namespace {
-/// Abstract base class for refutable pattern initializations.
-class RefutablePatternInitialization : public Initialization {
+struct RefutablePatternInitInfo {
   /// This is the label to jump to if the pattern fails to match.
   JumpDest failureDest;
+
+  /// PGO counter for the number of times the true branch is taken.
+  ProfileCounter numTrueTaken;
+
+  /// PGO counter for the number of times the false branch is taken.
+  ProfileCounter numFalseTaken;
+
+  /// A location to use for the initialization instead of the location provided
+  /// from the expression.
+  std::optional<SILLocation> customInitLoc;
+};
+
+/// Abstract base class for refutable pattern initializations.
+class RefutablePatternInitialization : public Initialization {
+  RefutablePatternInitInfo initInfo;
+
 public:
-  RefutablePatternInitialization(JumpDest failureDest)
-    : failureDest(failureDest) {
-    assert(failureDest.isValid() &&
+  RefutablePatternInitialization(RefutablePatternInitInfo initInfo)
+      : initInfo(initInfo) {
+    ASSERT(initInfo.failureDest.isValid() &&
            "Refutable patterns can only exist in failable conditions");
   }
 
-  JumpDest getFailureDest() const { return failureDest; }
+  const RefutablePatternInitInfo &getInitInfo() const { return initInfo; }
+
+  JumpDest getFailureDest() const { return initInfo.failureDest; }
+
+  virtual void copyOrInitValueIntoImpl(SILGenFunction &SGF, SILLocation loc,
+                                       ManagedValue value, bool isInit) = 0;
 
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                           ManagedValue value, bool isInit) override = 0;
+                           ManagedValue value, bool isInit) override final {
+    auto initLoc = initInfo.customInitLoc.value_or(loc);
+    copyOrInitValueIntoImpl(SGF, initLoc, value, isInit);
+  }
 
   void bindVariable(SILLocation loc, VarDecl *var, ManagedValue value,
                     CanType formalValueType, SILGenFunction &SGF) {
@@ -999,7 +1123,6 @@ public:
     InitializationPtr init = SGF.emitInitializationForVarDecl(var, var->isLet());
     RValue(SGF, loc, formalValueType, value).forwardInto(SGF, loc, init.get());
   }
-
 };
 } // end anonymous namespace
 
@@ -1007,17 +1130,18 @@ namespace {
 class ExprPatternInitialization : public RefutablePatternInitialization {
   ExprPattern *P;
 public:
-  ExprPatternInitialization(ExprPattern *P, JumpDest patternFailDest)
-    : RefutablePatternInitialization(patternFailDest), P(P) {}
+  ExprPatternInitialization(ExprPattern *P, RefutablePatternInitInfo initInfo)
+      : RefutablePatternInitialization(initInfo), P(P) {}
 
-  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                           ManagedValue value, bool isInit) override;
+  void copyOrInitValueIntoImpl(SILGenFunction &SGF, SILLocation loc,
+                               ManagedValue value, bool isInit) override;
 };
 } // end anonymous namespace
 
-void ExprPatternInitialization::
-copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                    ManagedValue value, bool isInit) {
+void ExprPatternInitialization::copyOrInitValueIntoImpl(SILGenFunction &SGF,
+                                                        SILLocation loc,
+                                                        ManagedValue value,
+                                                        bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
 
   FullExpr scope(SGF.Cleanups, CleanupLocation(P));
@@ -1037,7 +1161,10 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
 
   SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
   auto falseBB = SGF.Cleanups.emitBlockForCleanups(getFailureDest(), loc);
-  SGF.B.createCondBranch(loc, i1Value, contBB, falseBB);
+
+  auto &initInfo = getInitInfo();
+  SGF.B.createCondBranch(loc, i1Value, contBB, falseBB, initInfo.numTrueTaken,
+                         initInfo.numFalseTaken);
 
   SGF.B.setInsertionPoint(contBB);
 }
@@ -1049,21 +1176,22 @@ class EnumElementPatternInitialization : public RefutablePatternInitialization {
 public:
   EnumElementPatternInitialization(EnumElementDecl *ElementDecl,
                                    InitializationPtr &&subInitialization,
-                                   JumpDest patternFailDest)
-    : RefutablePatternInitialization(patternFailDest), ElementDecl(ElementDecl),
-      subInitialization(std::move(subInitialization)) {}
-    
-  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                           ManagedValue value, bool isInit) override {
+                                   RefutablePatternInitInfo initInfo)
+      : RefutablePatternInitialization(initInfo), ElementDecl(ElementDecl),
+        subInitialization(std::move(subInitialization)) {}
+
+  void copyOrInitValueIntoImpl(SILGenFunction &SGF, SILLocation loc,
+                               ManagedValue value, bool isInit) override {
     assert(isInit && "Only initialization is supported for refutable patterns");
-    emitEnumMatch(value, ElementDecl, subInitialization.get(), getFailureDest(),
+    emitEnumMatch(value, ElementDecl, subInitialization.get(), getInitInfo(),
                   loc, SGF);
   }
 
   static void emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
-                            Initialization *subInit, JumpDest FailureDest,
-                            SILLocation loc, SILGenFunction &SGF);
-  
+                            Initialization *subInit,
+                            RefutablePatternInitInfo initInfo, SILLocation loc,
+                            SILGenFunction &SGF);
+
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
       subInitialization->finishInitialization(SGF);
@@ -1119,7 +1247,11 @@ static EnumElementDecl *getOppositeBinaryDecl(const SILGenFunction &SGF,
 
 void EnumElementPatternInitialization::emitEnumMatch(
     ManagedValue value, EnumElementDecl *eltDecl, Initialization *subInit,
-    JumpDest failureDest, SILLocation loc, SILGenFunction &SGF) {
+    RefutablePatternInitInfo initInfo, SILLocation loc, SILGenFunction &SGF) {
+
+  auto failureDest = initInfo.failureDest;
+  auto trueCount = initInfo.numTrueTaken;
+  auto falseCount = initInfo.numFalseTaken;
 
   // Create all of the blocks early so we can maintain a consistent ordering
   // (and update less tests). Break this at your fingers parallel.
@@ -1154,11 +1286,12 @@ void EnumElementPatternInitialization::emitEnumMatch(
   bool inferredBinaryEnum = false;
   if (auto *otherDecl = getOppositeBinaryDecl(SGF, eltDecl)) {
     inferredBinaryEnum = true;
-    switchBuilder.addCase(otherDecl, defaultBlock, nullptr, handler);
+    switchBuilder.addCase(otherDecl, defaultBlock, nullptr, handler,
+                          falseCount);
   } else {
     switchBuilder.addDefaultCase(
         defaultBlock, nullptr, handler,
-        SwitchEnumBuilder::DefaultDispatchTime::BeforeNormalCases);
+        SwitchEnumBuilder::DefaultDispatchTime::BeforeNormalCases, falseCount);
   }
 
   // Always insert the some case at the front of the list. In the default case,
@@ -1238,8 +1371,8 @@ void EnumElementPatternInitialization::emitEnumMatch(
         CanType substEltTy =
             value.getType()
                 .getASTType()
-                ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), eltDecl,
-                                  eltDecl->getArgumentInterfaceType())
+                ->getTypeOfMember(eltDecl,
+                                  eltDecl->getPayloadInterfaceType())
                 ->getCanonicalType();
 
         AbstractionPattern origEltTy =
@@ -1252,7 +1385,8 @@ void EnumElementPatternInitialization::emitEnumMatch(
         // Pass the +1 value down into the sub initialization.
         subInit->copyOrInitValueInto(SGF, loc, mv, /*is an init*/ true);
         expr.exitAndBranch(loc);
-      });
+      },
+      trueCount);
 
   std::move(switchBuilder).emit();
 
@@ -1281,13 +1415,13 @@ class IsPatternInitialization : public RefutablePatternInitialization {
 public:
   IsPatternInitialization(IsPattern *pattern,
                           InitializationPtr &&subInitialization,
-                          JumpDest patternFailDest)
-  : RefutablePatternInitialization(patternFailDest), pattern(pattern),
-    subInitialization(std::move(subInitialization)) {}
-    
-  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                           ManagedValue value, bool isInit) override;
-  
+                          RefutablePatternInitInfo initInfo)
+      : RefutablePatternInitialization(initInfo), pattern(pattern),
+        subInitialization(std::move(subInitialization)) {}
+
+  void copyOrInitValueIntoImpl(SILGenFunction &SGF, SILLocation loc,
+                               ManagedValue value, bool isInit) override;
+
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
       subInitialization->finishInitialization(SGF);
@@ -1295,9 +1429,10 @@ public:
 };
 } // end anonymous namespace
 
-void IsPatternInitialization::
-copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                    ManagedValue value, bool isInit) {
+void IsPatternInitialization::copyOrInitValueIntoImpl(SILGenFunction &SGF,
+                                                      SILLocation loc,
+                                                      ManagedValue value,
+                                                      bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
   
   // Try to perform the cast to the destination type, producing an optional that
@@ -1312,9 +1447,9 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
 
   // Now that we have our result as an optional, we can use an enum projection
   // to do all the work.
-  EnumElementPatternInitialization::
-  emitEnumMatch(value, SGF.getASTContext().getOptionalSomeDecl(),
-                subInitialization.get(), getFailureDest(), loc, SGF);
+  EnumElementPatternInitialization::emitEnumMatch(
+      value, SGF.getASTContext().getOptionalSomeDecl(), subInitialization.get(),
+      getInitInfo(), loc, SGF);
 }
 
 namespace {
@@ -1322,17 +1457,18 @@ class BoolPatternInitialization : public RefutablePatternInitialization {
   BoolPattern *pattern;
 public:
   BoolPatternInitialization(BoolPattern *pattern,
-                            JumpDest patternFailDest)
-    : RefutablePatternInitialization(patternFailDest), pattern(pattern) {}
+                            RefutablePatternInitInfo initInfo)
+      : RefutablePatternInitialization(initInfo), pattern(pattern) {}
 
-  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                           ManagedValue value, bool isInit) override;
+  void copyOrInitValueIntoImpl(SILGenFunction &SGF, SILLocation loc,
+                               ManagedValue value, bool isInit) override;
 };
 } // end anonymous namespace
 
-void BoolPatternInitialization::
-copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                    ManagedValue value, bool isInit) {
+void BoolPatternInitialization::copyOrInitValueIntoImpl(SILGenFunction &SGF,
+                                                        SILLocation loc,
+                                                        ManagedValue value,
+                                                        bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
 
   // Extract the i1 from the Bool struct.
@@ -1345,10 +1481,52 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
 
   if (!pattern->getValue())
     std::swap(trueBB, falseBB);
-  SGF.B.createCondBranch(loc, i1Value, trueBB, falseBB);
+
+  auto &initInfo = getInitInfo();
+  SGF.B.createCondBranch(loc, i1Value, trueBB, falseBB, initInfo.numTrueTaken,
+                         initInfo.numFalseTaken);
   SGF.B.setInsertionPoint(contBB);
 }
 
+namespace {
+/// An initialization for a borrowing pattern binding (if let, if case, etc.)
+/// This handles borrowing similar to switch statement borrowing patterns.
+class BorrowBindingInitialization : public Initialization {
+  Pattern *pattern;
+  VarDecl *var;
+
+public:
+  BorrowBindingInitialization(Pattern *pattern, VarDecl *var)
+      : pattern(pattern), var(var) {
+    ASSERT(var->getIntroducer() == VarDecl::Introducer::Borrowing);
+  }
+
+  bool isBorrow() override { return true; }
+
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue value, bool isInit) override {
+
+    auto bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+        pattern, value,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
+        MarkUnresolvedNonCopyableValueInst::IsStrict);
+
+    SGF.VarLocs[var] = SILGenFunction::VarLoc(bindValue.getValue(),
+                                              SILAccessEnforcement::Unknown);
+
+    // Emit debug info for the borrowed noncopyable binding.
+    if (EmitDebugValueOnInit) {
+      RegularLocation VarLoc(var);
+      SILDebugVariable DbgVar(var->getName().str(), var->isLet(), /*ArgNo=*/0);
+      SGF.B.emitDebugDescription(VarLoc, bindValue.getValue(), DbgVar);
+    }
+  }
+
+  void finishInitialization(SILGenFunction &SGF) override {
+    // Nothing special needed
+  }
+};
+} // end anonymous namespace
 
 namespace {
 
@@ -1364,15 +1542,15 @@ struct InitializationForPattern
 {
   SILGenFunction &SGF;
 
-  /// This is the place that should be jumped to if the pattern fails to match.
-  /// This is invalid for irrefutable pattern initializations.
-  JumpDest patternFailDest;
-
+  RefutablePatternInitInfo initInfo;
   bool generateDebugInfo = true;
 
   InitializationForPattern(SILGenFunction &SGF, JumpDest patternFailDest,
-                           bool generateDebugInfo)
-      : SGF(SGF), patternFailDest(patternFailDest),
+                           bool generateDebugInfo, ProfileCounter numTrueTaken,
+                           ProfileCounter numFalseTaken,
+                           std::optional<SILLocation> customInitLoc)
+      : SGF(SGF),
+        initInfo({patternFailDest, numTrueTaken, numFalseTaken, customInitLoc}),
         generateDebugInfo(generateDebugInfo) {}
 
   // Paren, Typed, and Var patterns are noops, just look through them.
@@ -1385,11 +1563,14 @@ struct InitializationForPattern
   InitializationPtr visitBindingPattern(BindingPattern *P) {
     return visit(P->getSubPattern());
   }
+  InitializationPtr visitOpaquePattern(OpaquePattern *P) {
+    return visit(P->getSubPattern());
+  }
 
   // AnyPatterns (i.e, _) don't require any storage. Any value bound here will
   // just be dropped.
   InitializationPtr visitAnyPattern(AnyPattern *P) {
-    return InitializationPtr(new BlackHoleInitialization());
+    return InitializationPtr(new BlackHoleInitialization(P->isBorrowing()));
   }
 
   // Bind to a named pattern by creating a memory location and initializing it
@@ -1399,6 +1580,11 @@ struct InitializationForPattern
       // Unnamed parameters don't require any storage. Any value bound here will
       // just be dropped.
       return InitializationPtr(new BlackHoleInitialization());
+    }
+
+    if (P->getDecl()->getIntroducer() == VarDecl::Introducer::Borrowing) {
+      return InitializationPtr(
+          new BorrowBindingInitialization(P, P->getDecl()));
     }
 
     return SGF.emitInitializationForVarDecl(P->getDecl(), P->getDecl()->isLet(),
@@ -1419,30 +1605,28 @@ struct InitializationForPattern
     InitializationPtr subInit;
     if (auto *subP = P->getSubPattern())
       subInit = visit(subP);
-    auto *res = new EnumElementPatternInitialization(P->getElementDecl(),
-                                                     std::move(subInit),
-                                                     patternFailDest);
+    auto *res = new EnumElementPatternInitialization(
+        P->getElementDecl(), std::move(subInit), initInfo);
     return InitializationPtr(res);
   }
   InitializationPtr visitOptionalSomePattern(OptionalSomePattern *P) {
     InitializationPtr subInit = visit(P->getSubPattern());
-    auto *res = new EnumElementPatternInitialization(P->getElementDecl(),
-                                                     std::move(subInit),
-                                                     patternFailDest);
+    auto *res = new EnumElementPatternInitialization(
+        P->getElementDecl(), std::move(subInit), initInfo);
     return InitializationPtr(res);
   }
   InitializationPtr visitIsPattern(IsPattern *P) {
     InitializationPtr subInit;
     if (auto *subP = P->getSubPattern())
       subInit = visit(subP);
-    return InitializationPtr(new IsPatternInitialization(P, std::move(subInit),
-                                                         patternFailDest));
+    return InitializationPtr(
+        new IsPatternInitialization(P, std::move(subInit), initInfo));
   }
   InitializationPtr visitBoolPattern(BoolPattern *P) {
-    return InitializationPtr(new BoolPatternInitialization(P, patternFailDest));
+    return InitializationPtr(new BoolPatternInitialization(P, initInfo));
   }
   InitializationPtr visitExprPattern(ExprPattern *P) {
-    return InitializationPtr(new ExprPatternInitialization(P, patternFailDest));
+    return InitializationPtr(new ExprPatternInitialization(P, initInfo));
   }
 };
 
@@ -1463,7 +1647,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable,
     assert(SILDebugClient && "Debugger client doesn't support SIL");
     SILValue SV = SILDebugClient->emitLValueForVariable(vd, B);
 
-    VarLocs[vd] = SILGenFunction::VarLoc::get(SV);
+    VarLocs[vd] = VarLoc(SV, SILAccessEnforcement::Dynamic);
     return InitializationPtr(new KnownAddressInitialization(SV));
   }
 
@@ -1474,7 +1658,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable,
   // If this is a 'let' initialization for a copyable non-global, set up a let
   // binding, which stores the initialization value into VarLocs directly.
   if (forceImmutable && vd->getDeclContext()->isLocalContext() &&
-      !isa<ReferenceStorageType>(varType) && !varType->isNoncopyable())
+      !isa<ReferenceStorageType>(varType) && varType->isCopyable())
     return InitializationPtr(new LetValueInitialization(vd, *this));
 
   // If the variable has no initial value, emit a mark_uninitialized instruction
@@ -1494,7 +1678,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable,
     if (isUninitialized)
       addr = B.createMarkUninitializedVar(loc, addr);
 
-    VarLocs[vd] = SILGenFunction::VarLoc::get(addr);
+    VarLocs[vd] = VarLoc(addr, SILAccessEnforcement::Dynamic);
     Result = InitializationPtr(new KnownAddressInitialization(addr));
   } else {
     std::optional<MarkUninitializedInst::Kind> uninitKind;
@@ -1582,38 +1766,41 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD, unsigned idx,
     return nullptr;
   };
 
-  auto emitInitializer = [&](Expr *initExpr, VarDecl *var, bool forLocalContext,
-                             InitializationPtr &initialization) {
-    // If an initial value expression was specified by the decl, emit it into
-    // the initialization.
-    FullExpr Scope(Cleanups, CleanupLocation(initExpr));
+  auto *initExpr = PBD->getExecutableInit(idx);
 
-    if (forLocalContext) {
-      if (auto *orig = var->getOriginalWrappedProperty()) {
-        if (auto *initExpr = getWrappedValueExpr(var)) {
-          auto value = emitRValue(initExpr);
-          emitApplyOfPropertyWrapperBackingInitializer(
-            PBD, orig, getForwardingSubstitutionMap(), std::move(value))
-            .forwardInto(*this, SILLocation(PBD), initialization.get());
-          return;
-        }
-      }
-    }
+  // If we do not have an explicit initialization expression, just mark the
+  // initialization as unfinished for DI to resolve.
+  if (!initExpr) {
+    return initialization->finishUninitialized(*this);
+  }
 
+  // In case of a borrowing binding, we do not want the scope to be limited to
+  // this function.
+  if (initialization.get()->isBorrow()) {
     emitExprInto(initExpr, initialization.get());
-  };
+    return;
+  }
+
+  // Otherwise, an initial value expression was specified by the decl... emit it
+  // into the initialization.
+  FullExpr Scope(Cleanups, CleanupLocation(initExpr));
 
   auto *singleVar = PBD->getSingleVar();
-  if (auto *Init = PBD->getExecutableInit(idx)) {
-    // If an initial value expression was specified by the decl, emit it into
-    // the initialization.
-    bool isLocalVar =
-        singleVar && singleVar->getDeclContext()->isLocalContext();
-    emitInitializer(Init, singleVar, isLocalVar, initialization);
-  } else {
-    // Otherwise, mark it uninitialized for DI to resolve.
-    initialization->finishUninitialized(*this);
+  bool isLocalSingleVar =
+      singleVar && singleVar->getDeclContext()->isLocalContext();
+  if (isLocalSingleVar) {
+    if (auto *orig = singleVar->getOriginalWrappedProperty()) {
+      if (auto *initExpr = getWrappedValueExpr(singleVar)) {
+        auto value = emitRValue(initExpr);
+        emitApplyOfPropertyWrapperBackingInitializer(
+            PBD, orig, getForwardingSubstitutionMap(), std::move(value))
+            .forwardInto(*this, SILLocation(PBD), initialization.get());
+        return;
+      }
+    }
   }
+
+  emitExprInto(initExpr, initialization.get());
 }
 
 void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD,
@@ -1634,12 +1821,15 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   if (D->getAttrs().hasAttribute<CustomAttr>()) {
     // Emit the property wrapper backing initializer if necessary.
     auto initInfo = D->getPropertyWrapperInitializerInfo();
-    if (initInfo.hasInitFromWrappedValue())
+    if (initInfo.hasInitFromWrappedValue()) {
       SGM.emitPropertyWrapperBackingInitializer(D);
+      // For local context emission
+      SGM.emitPropertyWrappedFieldInitAccessor(D);
+    }
   }
 
   // Emit lazy and property wrapper backing storage.
-  D->visitAuxiliaryDecls([&](VarDecl *var) {
+  D->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *var) {
     if (auto *patternBinding = var->getParentPatternBinding())
       visitPatternBindingDecl(patternBinding);
 
@@ -1659,55 +1849,9 @@ void SILGenFunction::visitMacroExpansionDecl(MacroExpansionDecl *D) {
     else if (auto *stmt = node.dyn_cast<Stmt *>())
       emitStmt(stmt);
     else
-      visit(node.get<Decl *>());
+      visit(cast<Decl *>(node));
   });
 }
-
-/// Emit literals for the major, minor, and subminor components of the version
-/// and return a tuple of SILValues for them.
-static std::tuple<SILValue, SILValue, SILValue>
-emitVersionLiterals(SILLocation loc, SILGenBuilder &B, ASTContext &ctx,
-                    llvm::VersionTuple Vers) {
-  unsigned major = Vers.getMajor();
-  unsigned minor =
-      (Vers.getMinor().has_value() ? Vers.getMinor().value() : 0);
-  unsigned subminor =
-      (Vers.getSubminor().has_value() ? Vers.getSubminor().value() : 0);
-
-  SILType wordType = SILType::getBuiltinWordType(ctx);
-
-  SILValue majorValue = B.createIntegerLiteral(loc, wordType, major);
-  SILValue minorValue = B.createIntegerLiteral(loc, wordType, minor);
-  SILValue subminorValue = B.createIntegerLiteral(loc, wordType, subminor);
-
-  return std::make_tuple(majorValue, minorValue, subminorValue);
-}
-
-/// Emit a check that returns 1 if the running OS version is in
-/// the specified version range and 0 otherwise. The returned SILValue
-/// (which has type Builtin.Int1) represents the result of this check.
-SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
-                                                 const VersionRange &range) {
-  // Emit constants for the checked version range.
-  SILValue majorValue;
-  SILValue minorValue;
-  SILValue subminorValue;
-  std::tie(majorValue, minorValue, subminorValue) =
-      emitVersionLiterals(loc, B, getASTContext(), range.getLowerEndpoint());
-
-  // Emit call to _stdlib_isOSVersionAtLeast(major, minor, patch)
-  FuncDecl *versionQueryDecl =
-      getASTContext().getIsOSVersionAtLeastDecl();
-  assert(versionQueryDecl);
-
-  auto silDeclRef = SILDeclRef(versionQueryDecl);
-  SILValue availabilityGTEFn = emitGlobalFunctionRef(
-      loc, silDeclRef, getConstantInfo(getTypeExpansionContext(), silDeclRef));
-
-  SILValue args[] = {majorValue, minorValue, subminorValue};
-  return B.createApply(loc, availabilityGTEFn, SubstitutionMap(), args);
-}
-
 
 /// Emit the boolean test and/or pattern bindings indicated by the specified
 /// stmt condition.  If the condition fails, control flow is transferred to the
@@ -1715,13 +1859,32 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
 /// condition has matched and any bound variables are in scope.
 ///
 void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
-                                       SILLocation loc,
+                                       Stmt *parentStmt,
                                        ProfileCounter NumTrueTaken,
                                        ProfileCounter NumFalseTaken) {
+  // FIXME: The PGO counters here will be inaccurate when we have multiple
+  // conditions.
 
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
-  
+
+  ASSERT(parentStmt);
+  auto loc = SILLocation(parentStmt);
+
+  // If this is the implicit continue loop for a for-each statement, we
+  // want to treat the location of the condition (e.g the implicit `next()`
+  // unwrap) as being the explicit location of the loop header for debug info.
+  // This ensures that stepping-over in a loop includes the header.
+  std::optional<SILLocation> customInitLoc;
+  if (auto *WS = dyn_cast<WhileStmt>(parentStmt)) {
+    if (auto *FES = WS->getParentForEach()) {
+      if (!FES->isImplicit() && FES->getContinueTarget() == WS) {
+        loc.markExplicit();
+        customInitLoc.emplace(loc);
+      }
+    }
+  }
+
   for (const auto &elt : Cond) {
     SILLocation booleanTestLoc = loc;
     SILValue booleanTestValue;
@@ -1732,20 +1895,28 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
           // scope ends. The cleanup location loc isn't the perfect source location
           // but it's close enough.
           B.getSILGenFunction().enterDebugScope(loc, /*isBindingScope=*/true);
-        InitializationPtr initialization =
-          emitPatternBindingInitialization(elt.getPattern(), FalseDest);
+          InitializationPtr initialization = emitPatternBindingInitialization(
+              elt.getPattern(), FalseDest, /*debugInfo*/ true, NumTrueTaken,
+              NumFalseTaken, customInitLoc);
 
-      // Emit the initial value into the initialization.
-      FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
-      emitExprInto(elt.getInitializer(), initialization.get(), loc);
-      // Pattern bindings handle their own tests, we don't need a boolean test.
-      continue;
+          if (initialization->isBorrow()) {
+            emitExprInto(elt.getInitializer(), initialization.get(), loc);
+            continue;
+          }
+
+          // Emit the initial value into the initialization.
+          FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
+          emitExprInto(elt.getInitializer(), initialization.get(), loc);
+          // Pattern bindings handle their own tests, we don't need a boolean
+          // test.
+          continue;
     }
 
     case StmtConditionElement::CK_Boolean: { // Handle boolean conditions.
       auto *expr = elt.getBoolean();
       // Evaluate the condition as an i1 value (guaranteed by Sema).
       FullExpr Scope(Cleanups, CleanupLocation(expr));
+      FormalEvaluationScope EvalScope(*this);
       booleanTestValue = emitRValue(expr).forwardAsSingleValue(*this, expr);
       booleanTestValue = emitUnwrapIntegerResult(expr, booleanTestValue);
       booleanTestLoc = expr;
@@ -1753,34 +1924,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     }
 
     case StmtConditionElement::CK_Availability: {
-      // Check the running OS version to determine whether it is in the range
-      // specified by elt.
-      PoundAvailableInfo *availability = elt.getAvailability();
-      VersionRange OSVersion = availability->getAvailableRange();
-      
-      // The OS version might be left empty if availability checking was
-      // disabled. Treat it as always-true in that case.
-      assert(!OSVersion.isEmpty()
-             || getASTContext().LangOpts.DisableAvailabilityChecking);
-        
-      if (OSVersion.isEmpty() || OSVersion.isAll()) {
-        // If there's no check for the current platform, this condition is
-        // trivially true  (or false, for unavailability).
-        SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
-        bool value = !availability->isUnavailability();
-        booleanTestValue = B.createIntegerLiteral(loc, i1, value);
-      } else {
-        booleanTestValue = emitOSVersionRangeCheck(loc, OSVersion);
-        if (availability->isUnavailability()) {
-          // If this is an unavailability check, invert the result
-          // by emitting a call to Builtin.xor_Int1(lhs, -1).
-          SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
-          SILValue minusOne = B.createIntegerLiteral(loc, i1, -1);
-          booleanTestValue =
-            B.createBuiltinBinaryFunction(loc, "xor", i1, i1,
-                                          {booleanTestValue, minusOne});
-        }
-      }
+      booleanTestValue = emitIfAvailableQuery(loc, elt.getAvailability());
       break;
     }
 
@@ -1824,8 +1968,8 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     // on success we fall through to a new block.
     auto FailBB = Cleanups.emitBlockForCleanups(FalseDest, loc);
     SILBasicBlock *ContBB = createBasicBlock();
-    B.createCondBranch(booleanTestLoc, booleanTestValue, ContBB, FailBB,
-                       NumTrueTaken, NumFalseTaken);
+    B.createCondBranch(customInitLoc.value_or(booleanTestLoc), booleanTestValue,
+                       ContBB, FailBB, NumTrueTaken, NumFalseTaken);
 
     // Finally, emit the continue block and keep emitting the rest of the
     // condition.
@@ -1834,9 +1978,20 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
 }
 
 InitializationPtr SILGenFunction::emitPatternBindingInitialization(
-    Pattern *P, JumpDest failureDest, bool generateDebugInfo) {
+    Pattern *P, JumpDest failureDest, bool generateDebugInfo,
+    ProfileCounter numTrueTaken, ProfileCounter numFalseTaken,
+    std::optional<SILLocation> customInitLoc) {
+  // We only currently support PGO for single top-level refutable patterns
+  // since we don't track counters for individual refutable bits.
+  if (!P->getSemanticsProvidingPattern()->isSingleRefutablePattern(
+          /*allowIsPatternCoercion*/ false)) {
+    numTrueTaken = ProfileCounter();
+    numFalseTaken = ProfileCounter();
+  }
   auto init =
-      InitializationForPattern(*this, failureDest, generateDebugInfo).visit(P);
+      InitializationForPattern(*this, failureDest, generateDebugInfo,
+                               numTrueTaken, numFalseTaken, customInitLoc)
+          .visit(P);
   init->setEmitDebugValueOnInit(generateDebugInfo);
   return init;
 }
@@ -2009,7 +2164,7 @@ InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(
 }
 
 /// Create an Initialization for an uninitialized temporary.
-std::unique_ptr<TemporaryInitialization>
+TemporaryInitializationPtr
 SILGenFunction::emitTemporary(SILLocation loc, const TypeLowering &tempTL) {
   SILValue addr = emitTemporaryAllocation(loc, tempTL.getLoweredType());
   if (addr->getType().isMoveOnly())
@@ -2019,7 +2174,7 @@ SILGenFunction::emitTemporary(SILLocation loc, const TypeLowering &tempTL) {
   return useBufferAsTemporary(addr, tempTL);
 }
 
-std::unique_ptr<TemporaryInitialization>
+TemporaryInitializationPtr
 SILGenFunction::emitFormalAccessTemporary(SILLocation loc,
                                           const TypeLowering &tempTL) {
   SILValue addr = emitTemporaryAllocation(loc, tempTL.getLoweredType());
@@ -2029,16 +2184,16 @@ SILGenFunction::emitFormalAccessTemporary(SILLocation loc,
         MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
   CleanupHandle cleanup =
       enterDormantFormalAccessTemporaryCleanup(addr, loc, tempTL);
-  return std::unique_ptr<TemporaryInitialization>(
+  return TemporaryInitializationPtr(
       new TemporaryInitialization(addr, cleanup));
 }
 
 /// Create an Initialization for an uninitialized buffer.
-std::unique_ptr<TemporaryInitialization>
+TemporaryInitializationPtr
 SILGenFunction::useBufferAsTemporary(SILValue addr,
                                      const TypeLowering &tempTL) {
   CleanupHandle cleanup = enterDormantTemporaryCleanup(addr, tempTL);
-  return std::unique_ptr<TemporaryInitialization>(
+  return TemporaryInitializationPtr(
                                     new TemporaryInitialization(addr, cleanup));
 }
 
@@ -2146,29 +2301,41 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
 
   assert(VarLocs.count(vd) && "var decl wasn't emitted?!");
 
-  auto loc = VarLocs[vd];
+  auto emitEndBorrow = [this, silLoc](SILValue value){
+    if (value->getOwnershipKind() == OwnershipKind::None) {
+      B.createExtendLifetime(silLoc, value);
+    } else {
+      B.createEndBorrow(silLoc, value);
+    }
+  };
+
+  auto emitDestroy = [this, silLoc](SILValue value){
+    if (value->getOwnershipKind() == OwnershipKind::None) {
+      B.createExtendLifetime(silLoc, value);
+    } else {
+      B.emitDestroyValueOperation(silLoc, value);
+    }
+  };
 
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
-  if (loc.box) {
+  if (auto boxValue = VarLocs[vd].box) {
     if (!getASTContext().SILOpts.supportsLexicalLifetimes(getModule())) {
-      B.emitDestroyValueOperation(silLoc, loc.box);
+      emitDestroy(boxValue);
       return;
     }
 
-    if (auto *bbi = dyn_cast<BeginBorrowInst>(loc.box)) {
-      B.createEndBorrow(silLoc, bbi);
-      B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-      return;
+    if (auto *bbi = dyn_cast<BeginBorrowInst>(boxValue)) {
+      emitEndBorrow(bbi);
+      boxValue = bbi->getOperand();
     }
-
-    B.emitDestroyValueOperation(silLoc, loc.box);
+    emitDestroy(boxValue);
     return;
   }
 
   // For 'let' bindings, we emit a release_value or destroy_addr, depending on
   // whether we have an address or not.
-  SILValue Val = loc.value;
+  SILValue Val = VarLocs[vd].value;
 
   if (Val->getType().isAddress()) {
     B.createDestroyAddr(silLoc, Val);
@@ -2176,11 +2343,14 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   }
 
   if (!getASTContext().SILOpts.supportsLexicalLifetimes(getModule())) {
-    B.emitDestroyValueOperation(silLoc, Val);
+    emitDestroy(Val);
     return;
   }
 
-  if (Val->getOwnershipKind() == OwnershipKind::None) {
+  // If no variable scope was emitted, then we might not have a defining
+  // instruction.
+  if (!Val.getDefiningInstruction()) {
+    emitDestroy(Val);
     return;
   }
 
@@ -2188,62 +2358,218 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // + begin_borrow. In either case we just need to end the lifetime of the
   // begin_borrow's operand.
   if (auto *bbi = dyn_cast<BeginBorrowInst>(Val.getDefiningInstruction())) {
-    B.createEndBorrow(silLoc, bbi);
-    B.emitDestroyValueOperation(silLoc, bbi->getOperand());
+    emitEndBorrow(bbi);
+    emitDestroy(bbi->getOperand());
     return;
   }
 
   if (auto *mvi = dyn_cast<MoveValueInst>(Val.getDefiningInstruction())) {
-    B.emitDestroyValueOperation(silLoc, mvi);
+    emitDestroy(mvi);
     return;
   }
 
-  if (auto *mvi = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
+  // Handle BeginBorrow and MoveValue before bailing-out on trivial values.
+  if (Val->getOwnershipKind() == OwnershipKind::None) {
+    return;
+  }
+
+  if (auto *mark = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
           Val.getDefiningInstruction())) {
-    if (mvi->hasMoveCheckerKind()) {
-      if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
+    if (mark->hasMoveCheckerKind()) {
+      if (auto *cvi = dyn_cast<CopyValueInst>(mark->getOperand())) {
         if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
-          if (bbi->isLexical()) {
-            B.emitDestroyValueOperation(silLoc, mvi);
-            B.createEndBorrow(silLoc, bbi);
-            B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-            return;
-          }
+          emitDestroy(mark);
+          emitEndBorrow(bbi);
+          emitDestroy(bbi->getOperand());
+          return;
         }
       }
 
       if (auto *copyToMove = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
-              mvi->getOperand())) {
-        if (auto *move = dyn_cast<MoveValueInst>(copyToMove->getOperand())) {
-          if (move->isLexical()) {
-            B.emitDestroyValueOperation(silLoc, mvi);
-            return;
-          }
+              mark->getOperand())) {
+        if (copyToMove->getOperand()->isFromVarDecl()) {
+          emitDestroy(mark);
+          return;
         }
       }
 
-      if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(mvi->getOperand())) {
+      if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(mark->getOperand())) {
         if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
-          if (bbi->isLexical()) {
-            B.emitDestroyValueOperation(silLoc, mvi);
-            B.createEndBorrow(silLoc, bbi);
-            B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-            return;
-          }
+          emitDestroy(mark);
+          emitEndBorrow(bbi);
+          emitDestroy(bbi->getOperand());
+          return;
         }
       }
 
       // Handle trivial arguments.
-      if (auto *move = dyn_cast<MoveValueInst>(mvi->getOperand())) {
-        if (move->isLexical()) {
-          B.emitDestroyValueOperation(silLoc, mvi);
-          return;
-        }
+      if (isa<MoveValueInst>(mark->getOperand())) {
+        emitDestroy(mark);
+        return;
       }
     }
-  }
-
+  }  
   llvm_unreachable("unhandled case");
+}
+
+void
+SILGenFunction::enterLocalVariableAddressableBufferScope(VarDecl *decl,
+                                                         CleanupHandle destroyCleanup) {
+  auto marker = B.createTuple(decl, {});
+  AddressableBuffers[decl].insertPoint = marker;
+  Cleanups.pushCleanup<DeallocateLocalVariableAddressableBuffer>(decl, destroyCleanup);
+}
+
+static bool isFullyAbstractedLowering(SILGenFunction &SGF,
+                                      Type formalType, SILType loweredType) {
+  return SGF.getLoweredType(AbstractionPattern::getOpaque(), formalType)
+            .getASTType()
+    == loweredType.getASTType();
+}
+
+static bool isNaturallyFullyAbstractedType(SILGenFunction &SGF,
+                                           Type formalType) {
+  return isFullyAbstractedLowering(SGF, formalType, SGF.getLoweredType(formalType));
+}
+
+SILValue
+SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
+                                             SILLocation curLoc,
+                                             ValueOwnership ownership) {
+  // For locals, we might be able to retroactively produce a local addressable
+  // representation. 
+  auto foundVarLoc = VarLocs.find(decl);
+  if (foundVarLoc == VarLocs.end()) {
+    // If it's not local, is it at least a global stored variable?
+    if (decl->isGlobalStorage()) {
+      // Is the global immutable?
+      if (!decl->isLet()) {
+        return SILValue();
+      }
+    
+      // Does the storage naturally have a fully abstracted representation?
+      if (!isNaturallyFullyAbstractedType(*this, decl->getTypeInContext())) {
+        return SILValue();
+      }
+
+      // We can get the stable address via the addressor.
+      return emitGlobalVariableRef(curLoc, decl, std::nullopt).getUnmanagedValue();
+    }
+    return SILValue();
+  }
+  
+  auto value = foundVarLoc->second.value;
+  auto access = foundVarLoc->second.access;
+  auto *state = getAddressableBufferInfo(decl)->getState();
+  
+  SILType fullyAbstractedTy = getLoweredType(AbstractionPattern::getOpaque(),
+                                     decl->getTypeInContext()->getRValueType());
+  
+  // Check whether the bound value is inherently suitable for addressability.
+  // It must already be in memory and fully abstracted.
+  if (value->getType().isAddress()
+      && isFullyAbstractedLowering(*this, decl->getTypeInContext()->getRValueType(),
+                                   value->getType())) {
+    SILValue address = value;
+    // Begin an access if the address is mutable.
+    if (access != SILAccessEnforcement::Unknown) {
+      address = B.emitBeginAccess(curLoc, address,
+        ownership == ValueOwnership::InOut ? SILAccessKind::Modify
+                                           : SILAccessKind::Read,
+        access);
+    }
+    return address;
+  }
+  
+  // We can't retroactively introduce a reabstracted representation for a
+  // mutable binding (since we would now have two mutable memory locations
+  // representing the same value).
+  if (access != SILAccessEnforcement::Unknown) {
+    return SILValue();
+  }
+  
+  assert(ownership == ValueOwnership::Shared);
+  
+  // Check whether the in-memory representation has already been forced.
+  if (state) {
+    return state->storeBorrow;
+  }
+  
+  // Otherwise, force the addressable representation.
+  SILValue reabstraction, allocStack, storeBorrow;
+  {
+    SavedInsertionPointRAII save(B);
+    auto *addressableBuffer = getAddressableBufferInfo(decl);
+
+    assert(addressableBuffer
+           && addressableBuffer->insertPoint
+           && "didn't find an insertion point for the addressable buffer");
+    B.setInsertionPoint(addressableBuffer->insertPoint);
+    auto allocStackTy = fullyAbstractedTy;
+    if (value->getType().isMoveOnlyWrapped()) {
+      allocStackTy = allocStackTy.addingMoveOnlyWrapper();
+    }
+    allocStack = B.createAllocStack(decl,
+                                allocStackTy,
+                                std::nullopt,
+                                DoesNotHaveDynamicLifetime,
+                                IsNotLexical,
+                                IsNotFromVarDecl,
+                                DoesNotUseMoveableValueDebugInfo,
+                                /*skipVarDeclAssert*/ true);
+  }
+  {
+    SavedInsertionPointRAII save(B);
+    if (isa<ParamDecl>(decl)) {
+      B.setInsertionPoint(allocStack->getNextInstruction());
+    } else if (auto inst = value->getDefiningInstruction()) {
+      B.setInsertionPoint(inst->getParent(), std::next(inst->getIterator()));
+    } else if (auto arg = dyn_cast<SILArgument>(value)) {
+      if (auto farg = dyn_cast<SILFunctionArgument>(value);
+          farg && farg->isClosureCapture()) {
+        B.setInsertionPoint(allocStack->getNextInstruction());
+      } else {
+        B.setInsertionPoint(arg->getParent()->begin());
+      }
+    } else {
+      llvm_unreachable("unexpected value source!");
+    }
+    auto declarationLoc = value->getDefiningInsertionPoint()->getLoc();
+    
+    // Reabstract if necessary.
+    auto newValue = value;
+    reabstraction = SILValue();
+    if (newValue->getType().getASTType() != fullyAbstractedTy.getASTType()){
+      auto reabstracted = emitSubstToOrigValue(curLoc,
+        ManagedValue::forBorrowedRValue(value),
+        AbstractionPattern::getOpaque(),
+        decl->getTypeInContext()->getCanonicalType(),
+        SGFContext());
+      reabstraction = reabstracted.forward(*this);
+      newValue = reabstraction;
+    }
+    storeBorrow = B.createStoreBorrow(declarationLoc, newValue, allocStack);
+  }
+  
+  // Record the addressable representation.
+  auto *addressableBuffer = getAddressableBufferInfo(decl);
+  auto *newState
+    = new AddressableBuffer::State(reabstraction, allocStack, storeBorrow);
+  addressableBuffer->stateOrAlias = newState;
+
+  // Emit cleanups on any paths where we previously would have cleaned up
+  // the addressable representation if it had been forced earlier.
+  decltype(addressableBuffer->cleanupPoints) cleanupPoints;
+  cleanupPoints.swap(addressableBuffer->cleanupPoints);
+  
+  for (auto &cleanupPoint : cleanupPoints) {
+    SavedInsertionPointRAII insertCleanup(B, cleanupPoint.inst);
+    deallocateAddressable(*this, cleanupPoint.inst->getLoc(), *newState,
+                          cleanupPoint.state);
+    cleanupPoint.inst->eraseFromParent();
+  }
+  
+  return storeBorrow;
 }
 
 void BlackHoleInitialization::performPackExpansionInitialization(
@@ -2257,18 +2583,36 @@ void BlackHoleInitialization::performPackExpansionInitialization(
 
 void BlackHoleInitialization::copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                                                   ManagedValue value, bool isInit) {
-  // Normally we do not do anything if we have a black hole
-  // initialization... but if we have a move only object, insert a move value.
-  if (!value.getType().isMoveOnly())
+  // If we do not have a noncopyable type, just insert an ignored use.
+  // Similarly, if we have a borrowed noncopyable type, insert an ignored use.
+  if (!value.getType().isMoveOnly() || isBorrowing) {
+    SGF.B.createIgnoredUse(loc, value.getValue());
     return;
+  }
 
-  // If we have an address, then this will create a new temporary allocation
-  // which will trigger the move checker. If we have an object though, we need
-  // to insert an extra move_value to make sure the object checker behaves
-  // correctly.
+  // If we have a noncopyable type, we need to do a little more work to satisfy
+  // the move checkers. If we have an address, then this will create a new
+  // temporary allocation which will trigger the move checker...
   value = value.ensurePlusOne(SGF, loc);
-  if (value.getType().isAddress())
+  if (value.getType().isAddress()) {
+    SGF.B.createIgnoredUse(loc, value.getValue());
     return;
+  }
 
+  // If we have an object though, we need to insert an extra move_value to make
+  // sure the object checker behaves correctly.
   value = SGF.B.createMoveValue(loc, value);
+  SGF.B.createIgnoredUse(loc, value.getValue());
+}
+
+SILGenFunction::AddressableBuffer::~AddressableBuffer() {
+  if (insertPoint) {
+    insertPoint->eraseFromParent();
+  }
+  for (auto &cleanupPoint : cleanupPoints) {
+    cleanupPoint.inst->eraseFromParent();
+  }
+  if (auto state = stateOrAlias.dyn_cast<State*>()) {
+    delete state;
+  }
 }

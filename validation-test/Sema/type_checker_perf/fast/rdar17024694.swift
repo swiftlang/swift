@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000
 // REQUIRES: tools-release,no_asan
 
 _ = (2...100).reversed().filter({ $0 % 11 == 0 }).map {

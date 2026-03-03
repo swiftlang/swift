@@ -5,12 +5,13 @@ public struct S {}
 @available(*, unavailable)
 public struct ImplicitInitStruct {
   // CHECK-LABEL: sil hidden {{.*}} @$s4Test18ImplicitInitStructVACycfC
-  // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
+  // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         return
   // CHECK:       } // end sil function '$s4Test18ImplicitInitStructVACycfC'
 }
 
+// CHECK-LABEL: sil{{.*}}@$s4Test23testImplicitConstructoryyF
 @available(*, unavailable)
 public func testImplicitConstructor() {
   // Force s4Test18ImplicitInitStructVACycfC to be emitted.
@@ -54,8 +55,7 @@ public struct ExplicitInitStruct {
 func foo() {}
 
 @available(*, unavailable)
-@_moveOnly
-struct MoveOnlyStruct {
+struct MoveOnlyStruct: ~Copyable {
   // CHECK-LABEL: sil{{.*}}@$s4Test14MoveOnlyStructVfD
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -Osize -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_union.h -c -o %t/t.o 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend %s -Osize -Xllvm -sil-print-types -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_union.h -c -o %t/t.o 2>&1 | %FileCheck %s
 
 public func test1(_ s: some_struct) -> some_struct {
   var copy = s

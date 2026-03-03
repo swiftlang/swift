@@ -19,6 +19,7 @@
 #include "Context.h"
 #include "OwnershipPhiOperand.h"
 #include "Transforms.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
@@ -174,11 +175,11 @@ bool swift::semanticarc::tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) {
       std::function<Operand *(const Context::ConsumingOperandState)> lambda =
         [&](const Context::ConsumingOperandState &state) -> Operand * {
             unsigned opNum = state.operandNumber;
-            if (state.parent.is<SILBasicBlock *>()) {
-              SILBasicBlock *block = state.parent.get<SILBasicBlock *>();
+            if (isa<SILBasicBlock *>(state.parent)) {
+              SILBasicBlock *block = cast<SILBasicBlock *>(state.parent);
               return &block->getTerminator()->getAllOperands()[opNum];
             }
-            SILInstruction *inst = state.parent.get<SILInstruction *>();
+            SILInstruction *inst = cast<SILInstruction *>(state.parent);
             return &inst->getAllOperands()[opNum];
         };
       auto operandsTransformed = makeTransformRange(pair.second, lambda);
@@ -211,7 +212,11 @@ bool swift::semanticarc::tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) {
     SmallVector<std::pair<SILValue, unsigned>, 8> incomingValueUpdates;
     for (auto introducer : ownedValueIntroducers) {
       SILValue v = introducer.value;
-      OwnershipLiveRange lr(v);
+      SmallVector<std::pair<Operand *, SILValue>, 4> extraConsumes;
+      for (auto op : incomingValueOperandList) {
+        extraConsumes.push_back({op.getOperand(), op.getOriginal()});
+      }
+      OwnershipLiveRange lr(v, extraConsumes);
 
       // For now, we only handle copy_value for simplicity.
       //
@@ -267,7 +272,7 @@ bool swift::semanticarc::tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) {
   }
 
   if (madeChange)
-    updateBorrowedFrom(ctx.pm, &ctx.fn);
+    updateAllGuaranteedPhis(ctx.pm, &ctx.fn);
 
   return madeChange;
 }

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -emit-module -o %t/empty.swiftmodule %S/../Inputs/empty.swift
 // RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -emit-module -o %t/emptyButWithLibraryEvolution.swiftmodule %S/../Inputs/empty.swift -enable-library-evolution
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s %S/Inputs/imports-other.swift -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -I %S/Inputs/imports-clang-modules/ -I %t -verify
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s %S/Inputs/imports-other.swift -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -I %S/Inputs/imports-clang-modules/ -I %t -verify -swift-version 5 -enable-library-evolution
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -I %S/Inputs/imports-clang-modules/ -I %t
 // RUN: %FileCheck -implicit-check-not BAD %s < %t.swiftinterface
 

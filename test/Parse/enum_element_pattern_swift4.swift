@@ -9,10 +9,13 @@ enum E {
 
   static func testE(e: E) {
     switch e {
-    case A<UndefinedTy>(): // expected-error {{cannot specialize a non-generic definition}}
+    case A<UndefinedTy>(): // expected-error {{cannot find type 'UndefinedTy' in scope}}
     // expected-note@-1 {{while parsing this '<' as a type parameter bracket}}
+    // expected-error@-2 {{cannot specialize non-generic type 'E'}}
+    // expected-error@-3 {{enum case 'A' has no associated values}}
       break
-    case B<Int>(): // expected-error {{cannot specialize a non-generic definition}} expected-note {{while parsing this '<' as a type parameter bracket}}
+    case B<Int>(): // expected-error {{cannot specialize non-generic type 'E'}}
+    // expected-error@-1 {{enum case 'B' has no associated values}}
       break
     default:
       break;
@@ -22,10 +25,13 @@ enum E {
 
 func testE(e: E) {
   switch e {
-  case E.A<UndefinedTy>(): // expected-error {{cannot specialize a non-generic definition}}
+  case E.A<UndefinedTy>(): // expected-error {{cannot find type 'UndefinedTy' in scope}}
   // expected-note@-1 {{while parsing this '<' as a type parameter bracket}}
+  // expected-error@-2 {{cannot specialize non-generic type 'E'}}
+  // expected-error@-3 {{enum case 'A' has no associated values}}
     break
-  case E.B<Int>(): // expected-error {{cannot specialize a non-generic definition}} expected-note {{while parsing this '<' as a type parameter bracket}}
+  case E.B<Int>(): // expected-error {{cannot specialize non-generic type 'E'}}
+  // expected-error@-1 {{enum case 'B' has no associated values}}
     break
   case .C(): // expected-error {{pattern with associated values does not match enum case 'C'}}
              // expected-note@-1 {{remove associated values to make the pattern match}} {{10-12=}} 

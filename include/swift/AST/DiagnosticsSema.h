@@ -21,7 +21,6 @@
 #include "swift/AST/DiagnosticsCommon.h"
 
 namespace swift {
-  class SwitchStmt;
   namespace diag {
 
     /// Describes the kind of requirement in a protocol.
@@ -33,10 +32,10 @@ namespace swift {
     };
 
   // Declare common diagnostics objects with their appropriate types.
-#define DIAG(KIND,ID,Options,Text,Signature) \
-    extern detail::DiagWithArguments<void Signature>::type ID;
-#define FIXIT(ID,Text,Signature) \
-    extern detail::StructuredFixItWithArguments<void Signature>::type ID;
+#define DIAG(KIND, ID, Group, Options, Text, Signature)                    \
+      extern detail::DiagWithArguments<void Signature>::type ID;
+#define FIXIT(ID, Text, Signature)                                         \
+      extern detail::StructuredFixItWithArguments<void Signature>::type ID;
 #include "DiagnosticsSema.def"
   }
 }

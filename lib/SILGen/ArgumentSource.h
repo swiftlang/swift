@@ -22,6 +22,7 @@
 #ifndef SWIFT_LOWERING_ARGUMENTSOURCE_H
 #define SWIFT_LOWERING_ARGUMENTSOURCE_H
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "RValue.h"
 #include "LValue.h"
@@ -222,7 +223,7 @@ public:
     return Storage.get<LValueStorage>(StoredKind).Loc;
   }
 
-  Expr *findStorageReferenceExprForBorrow() &&;
+  Expr *findStorageReferenceExprForBorrow(SILModule &M) &&;
   Expr *findStorageReferenceExprForMoveOnly(SILGenFunction &SGF,
                                       StorageReferenceOperationKind refKind) &&;
   Expr *findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) &&;

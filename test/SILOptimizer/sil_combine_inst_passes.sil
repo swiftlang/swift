@@ -8,6 +8,11 @@ import SwiftShims
 
 class Buffer {}
 
+struct NCWithoutDeinit: ~Copyable {
+  var a: Bool
+  var b: Int
+}
+
 sil_global @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 
 // CHECK-LABEL: sil [ossa] @remove_end_begin_cow_pair
@@ -146,5 +151,34 @@ bb0:
   strong_release %2 : $__ContiguousArrayStorageBase
   strong_release %0 : $_ContiguousArrayStorage<Int>
   return %16 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @test_dead_borrowed_from
+// CHECK:         borrowed {{.*}} from
+// CHECK:       } // end sil function 'test_dead_borrowed_from'
+sil [ossa] @test_dead_borrowed_from : $@convention(thin) (@guaranteed Buffer, @guaranteed Buffer) -> () {
+bb0(%0 : @guaranteed $Buffer, %1 : @guaranteed $Buffer):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Buffer)
+
+bb2:
+  br bb3(%1 : $Buffer)
+
+bb3(%9 : @guaranteed $Buffer):
+  %10 = borrowed %9 : $Buffer from (%1 : $Buffer)
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_non_copyable_destructure
+// CHECK:         (%1, %2) = destructure_struct %0
+// CHECK:       } // end sil function 'dont_remove_non_copyable_destructure'
+sil [ossa] @dont_remove_non_copyable_destructure : $@convention(thin) (@owned NCWithoutDeinit) -> () {
+bb0(%0 : @owned $NCWithoutDeinit):
+  (%1, %2) = destructure_struct %0
+  %r = tuple ()
+  return %r
 }
 

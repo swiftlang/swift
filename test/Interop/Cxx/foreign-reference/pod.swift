@@ -114,6 +114,16 @@ PODTestSuite.test("RefHoldingPairPtr") {
   expectEqual(x.test(), 41)
 }
 
+PODTestSuite.test("ValueHoldingPairRef") {
+  let x = ValueHoldingPairRef()
+  expectEqual(x.pair.test(), 1)
+
+  let pair2 = IntPair.create()
+  pair2.b = 123
+  expectEqual(x.sub(pair2), -121)
+  expectEqual(x.max(pair2).test(), pair2.test())
+}
+
 PODTestSuite.test("StructHoldingPair") {
   var x = StructHoldingPair(pair: IntPair.create())
   expectEqual(x.pair.test(), 1)

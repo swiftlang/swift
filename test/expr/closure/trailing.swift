@@ -56,8 +56,7 @@ func notLiterals() {
   // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
   // expected-error@-2 {{closure expression is unused}} expected-note@-2 {{did you mean to use a 'do' statement?}} {{15-15=do }}
   _ = [42] {}
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{closure expression is unused}} expected-note@-2 {{did you mean to use a 'do' statement?}} {{12-12=do }}
+  // expected-error@-1 {{cannot call value of non-function type '[Int]'}}
   _ = (6765, 10946, 17711) {}
   // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
   // expected-error@-2 {{closure expression is unused}} expected-note@-2 {{did you mean to use a 'do' statement?}} {{28-28=do }}
@@ -487,4 +486,118 @@ func rdar92521618() {
 
   if let _ = { foo {} }() {}
   guard let _ = { foo {} }() else { return }
+}
+
+// Argument matching never binds trailing closure arguments to
+// defaulted/variadic parameters of non-function type.
+do {
+  // Trailing closure not considered fulfilled by 'arg'.
+  // Note: Used to crash.
+  do {
+    func variadic(arg: Int...) {} // expected-note@:10 {{'variadic(arg:)' declared here}}{{none}}
+    func defaulted(arg: Int = 0) {}
+
+    let _ = variadic { return () }
+    // expected-error@-1:22 {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}{{none}}
+    let _ = defaulted { return () }
+    // expected-error@-1:23 {{extra trailing closure passed in call}}{{none}}
+  }
+  // Trailing closure considered fulfilled by 'x' instead of 'arg'.
+  do {
+    func variadic(arg: Int..., x: String) {} // expected-note@:10 {{'variadic(arg:x:)' declared here}}{{none}}
+    func defaulted(arg: Int = 0, x: String) {} // expected-note@:10 {{'defaulted(arg:x:)' declared here}}{{none}}
+
+    let _ = variadic { return () }
+    // expected-error@-1:22 {{trailing closure passed to parameter of type 'String' that does not accept a closure}}{{none}}
+    let _ = defaulted { return () }
+    // expected-error@-1:23 {{trailing closure passed to parameter of type 'String' that does not accept a closure}}{{none}}
+  }
+  // Trailing closure considered fulfilled by 'arg'; has function type.
+  do {
+    func variadic(arg: ((Int) -> Void)...) {}
+    func defaulted(arg: ((Int) -> Void) = { _ in }) {}
+
+    let _ = variadic { return () }
+    // expected-error@-1:22 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}}{{23-23= _ in}}
+    let _ = defaulted { return () }
+    // expected-error@-1:23 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}}{{24-24= _ in}}
+  }
+}
+
+extension Array {
+  init(_ makeElement: () -> Element) {
+    self = [makeElement()]
+  }
+}
+
+extension Dictionary {
+  init?(_ makeElement: () -> (key: Key, value: Value)?) {
+    guard let (key, value) = makeElement() else { return nil }
+    self = [key: value]
+  }
+}
+
+extension Dictionary {
+  func callAsFunction(_ closure: (Self) -> Void) -> Self {
+    closure(self)
+    return self
+  }
+}
+
+func testTrailingClosureCollectionInits() {
+  _ = [String] { "foo" }
+  _ = [String].init { "foo" }
+  
+  _ = [String: Int] { (key: "foo", value: 42) }
+  _ = [String: Int].init { (key: "foo", value: 42) }
+  
+  _ = [String]
+  { "foo" }
+  
+  var foo = "foo"
+  _ = [foo] // expected-error {{cannot call value of non-function type '[String]'}}
+  { "bar" }
+  
+  if let bar = [String: Int] { (key: "foo", value: 42) } { // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+    print(bar)
+  }
+  
+  if let bar = [String: Int]({ (key: "foo", value: 42) }) {
+    print(bar)
+  }
+  
+  var myArray: Array? = [100]
+  _ = if let myArray: [Int] { "foo" } else { "var" }
+  
+  let myDict = ["foo": 42]
+  _ = if myDict == ["foo": 42] {
+    (key: "foo", value: 42)
+  } else {
+    (key: "bar", value: 43)
+  }
+
+  // Array doesn't has a `callAsFunction` defined in this file.
+  _ = [1] { return [1] } // expected-error {{cannot call value of non-function type '[Int]'}}
+
+  _ = [1] // expected-error {{cannot call value of non-function type '[Int]'}}
+  { return [1] }
+  
+  var didSetAfterArrayLiteral = [42] {
+    didSet {
+      print(didSetAfterArrayLiteral)
+    }
+  }
+
+  didSetAfterArrayLiteral[0] += 1
+  
+  // Dictionary does has a `callAsFunction` defined in this file.
+  let dictionaryCallAsFunction = [41: 0] { print($0) }
+
+  var didSetAfterDictionaryLiteral = [42: 0] {
+    didSet {
+      print(didSetAfterDictionaryLiteral)
+    }
+  }
+
+  didSetAfterDictionaryLiteral[42] = 1
 }

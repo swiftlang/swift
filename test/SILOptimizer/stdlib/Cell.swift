@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -O -emit-sil -disable-availability-checking %s -enable-builtin-module -enable-experimental-feature RawLayout | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil -disable-availability-checking %s -enable-builtin-module -enable-experimental-feature RawLayout | %FileCheck %s
+
+// REQUIRES: swift_feature_RawLayout
 
 import Builtin
 
@@ -18,7 +20,7 @@ public struct Cell<T: ~Copyable>: ~Copyable {
 
   // CHECK-LABEL: sil {{.*}} @$s4CellAAVAARi_zrlEyAByxGxcfC : $@convention(method) <T where T : ~Copyable> (@in T, @thin Cell<T>.Type) -> @out Cell<T> {
   // CHECK:       bb0({{%.*}} : $*Cell<T>, [[VALUE:%.*]] : $*T, {{%.*}} : $@thin Cell<T>.Type):
-  // CHECK:         {{%.*}} = builtin "zeroInitializer"<Cell<T>>([[SELF:%.*]] : $*Cell<T>) : $()
+  // CHECK:         {{%.*}} = builtin "prepareInitialization"([[SELF:%.*]] : $*Cell<T>) : $()
   // CHECK-NEXT:    [[RAW_LAYOUT_ADDR:%.*]] = builtin "addressOfRawLayout"<Cell<T>>([[SELF]] : $*Cell<T>) : $Builtin.RawPointer
   // CHECK-NEXT:    [[POINTER:%.*]] = struct $UnsafeMutablePointer<T> ([[RAW_LAYOUT_ADDR]] : $Builtin.RawPointer)
   //                Calling 'UnsafeMutablePointer<T>.initialize(to:)'

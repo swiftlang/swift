@@ -3,8 +3,8 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/lib-templates/* %t/
 
-// RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDIRECT_FIRST
-// RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDIRECT_SECOND
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDIRECT_FIRST
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDIRECT_SECOND
 
 #if DIRECT_FIRST
 import ThinLibrary

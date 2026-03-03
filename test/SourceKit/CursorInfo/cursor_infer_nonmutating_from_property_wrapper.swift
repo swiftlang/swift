@@ -14,4 +14,4 @@ func test() {
     }
 }
 
-// CHECK: <Declaration>@<Type usr="s:46cursor_infer_nonmutating_from_property_wrapper5StateV">State</Type> var myState: &lt;&lt;error type&gt;&gt; { get nonmutating set }</Declaration>
+// CHECK: <Declaration>@<Type usr="s:46cursor_infer_nonmutating_from_property_wrapper5StateV">State</Type> var myState: _ { get nonmutating set }</Declaration>

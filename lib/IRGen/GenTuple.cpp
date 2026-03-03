@@ -20,10 +20,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/Mangler.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -254,18 +257,20 @@ namespace {
   public:
     // FIXME: Spare bits between tuple elements.
     LoadableTupleTypeInfo(ArrayRef<TupleFieldInfo> fields,
+                          FieldsAreABIAccessible_t areFieldsABIAccessible,
                           unsigned explosionSize,
                           llvm::Type *ty,
                           Size size, SpareBitVector &&spareBits,
                           Alignment align,
                           IsTriviallyDestroyable_t isTriviallyDestroyable,
                           IsCopyable_t isCopyable,
-                          IsFixedSize_t alwaysFixedSize)
-      : TupleTypeInfoBase(fields, explosionSize,
+                          IsFixedSize_t alwaysFixedSize,
+                          IsABIAccessible_t isABIAccessible)
+      : TupleTypeInfoBase(fields, explosionSize, areFieldsABIAccessible,
                           ty, size, std::move(spareBits), align,
                           isTriviallyDestroyable,
                           isCopyable,
-                          alwaysFixedSize)
+                          alwaysFixedSize, isABIAccessible)
       {}
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -317,15 +322,18 @@ namespace {
   {
   public:
     // FIXME: Spare bits between tuple elements.
-    FixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields, llvm::Type *ty,
+    FixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields,
+                       FieldsAreABIAccessible_t areFieldsABIAccessible,
+                       llvm::Type *ty,
                        Size size, SpareBitVector &&spareBits, Alignment align,
                        IsTriviallyDestroyable_t isTriviallyDestroyable,
                        IsBitwiseTakable_t isBT,
                        IsCopyable_t isCopyable,
-                       IsFixedSize_t alwaysFixedSize)
-      : TupleTypeInfoBase(fields, ty, size, std::move(spareBits), align,
+                       IsFixedSize_t alwaysFixedSize,
+                       IsABIAccessible_t isABIAccessible)
+      : TupleTypeInfoBase(fields, areFieldsABIAccessible, ty, size, std::move(spareBits), align,
                           isTriviallyDestroyable, isBT, isCopyable,
-                          alwaysFixedSize)
+                          alwaysFixedSize, isABIAccessible)
     {}
 
     TypeLayoutEntry
@@ -462,27 +470,35 @@ namespace {
       : RecordTypeBuilder(IGM), TheTuple(theTuple) {}
 
     FixedTupleTypeInfo *createFixed(ArrayRef<TupleFieldInfo> fields,
+                                    FieldsAreABIAccessible_t areFieldsABIAccessible,
                                     StructLayout &&layout) {
-      return FixedTupleTypeInfo::create(fields, layout.getType(),
+      IsABIAccessible_t isABIAccessible = IsABIAccessible_t(areFieldsABIAccessible);
+      return FixedTupleTypeInfo::create(fields, areFieldsABIAccessible,
+                                        layout.getType(),
                                         layout.getSize(),
                                         std::move(layout.getSpareBits()),
                                         layout.getAlignment(),
                                         layout.isTriviallyDestroyable(),
                                         layout.isBitwiseTakable(),
                                         layout.isCopyable(),
-                                        layout.isAlwaysFixedSize());
+                                        layout.isAlwaysFixedSize(),
+                                        isABIAccessible);
     }
 
     LoadableTupleTypeInfo *createLoadable(ArrayRef<TupleFieldInfo> fields,
+                                          FieldsAreABIAccessible_t areFieldsABIAccessible,
                                           StructLayout &&layout,
                                           unsigned explosionSize) {
-      return LoadableTupleTypeInfo::create(fields, explosionSize,
+      IsABIAccessible_t isABIAccessible = IsABIAccessible_t(areFieldsABIAccessible);
+      return LoadableTupleTypeInfo::create(fields, areFieldsABIAccessible,
+                                           explosionSize,
                                            layout.getType(), layout.getSize(),
                                            std::move(layout.getSpareBits()),
                                            layout.getAlignment(),
                                            layout.isTriviallyDestroyable(),
                                            layout.isCopyable(),
-                                           layout.isAlwaysFixedSize());
+                                           layout.isAlwaysFixedSize(),
+                                           isABIAccessible);
     }
 
     NonFixedTupleTypeInfo *createNonFixed(ArrayRef<TupleFieldInfo> fields,
@@ -523,7 +539,7 @@ const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
     auto *bitwiseCopyableProtocol =
         IGM.getSwiftModule()->getASTContext().getProtocol(
             KnownProtocolKind::BitwiseCopyable);
-    if (bitwiseCopyableProtocol && IGM.getSwiftModule()->checkConformance(
+    if (bitwiseCopyableProtocol && checkConformance(
                                        tuple, bitwiseCopyableProtocol)) {
       return BitwiseCopyableTypeInfo::create(IGM.OpaqueTy, IsABIAccessible);
     }
@@ -630,8 +646,7 @@ Address irgen::projectTupleElementAddressByDynamicIndex(IRGenFunction &IGF,
     result = tupleOffset;
   }
 
-  auto *gep =
-      IGF.emitByteOffsetGEP(tuple.getAddress(), result, IGF.IGM.OpaqueTy);
+  auto *gep = IGF.emitByteOffsetGEP(tuple.getAddress(), result);
   auto elementAddress = Address(gep, IGF.IGM.OpaqueTy,
                                 IGF.IGM.getPointerAlignment());
   return IGF.Builder.CreateElementBitCast(elementAddress,
@@ -659,7 +674,12 @@ llvm::Constant *irgen::getTupleLabelsString(IRGenModule &IGM,
   for (auto &elt : type->getElements()) {
     if (elt.hasName()) {
       hasLabels = true;
-      buffer.append(elt.getName().str());
+      Identifier name = elt.getName();
+      if (name.mustAlwaysBeEscaped()) {
+        Mangle::Mangler::appendRawIdentifierForRuntime(name.str(), buffer);
+      } else {
+        buffer.append(name.str());
+      }
     }
 
     // Each label is space-terminated.

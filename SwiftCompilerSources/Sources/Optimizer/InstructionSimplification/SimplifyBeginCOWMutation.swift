@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BeginCOWMutationInst : Simplifyable, SILCombineSimplifyable {
+extension BeginCOWMutationInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
     /// The buffer of an empty Array/Set/Dictionary singleton is known to be not
@@ -65,8 +65,8 @@ private extension BeginCOWMutationInst {
       return
     }
     let builder = Builder(before: self, location: location, context)
-    let zero = builder.createIntegerLiteral(0, type: uniquenessResult.type);
-    uniquenessResult.uses.replaceAll(with: zero, context)
+    let falseLiteral = builder.createBoolLiteral(false)
+    uniquenessResult.uses.replaceAll(with: falseLiteral, context)
   }
 
   func optimizeEmptyBeginEndPair(_ context: SimplifyContext) -> Bool {
@@ -86,8 +86,7 @@ private extension BeginCOWMutationInst {
 
     for use in buffer.uses.ignoreDebugUses {
       let endCOW = use.instruction as! EndCOWMutationInst
-      endCOW.uses.replaceAll(with: instance, context)
-      context.erase(instruction: endCOW)
+      endCOW.replace(with: instance, context)
     }
     context.erase(instructionIncludingDebugUses: self)
     return true

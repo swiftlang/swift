@@ -4,6 +4,7 @@
 
 - (nonnull instancetype)init;
 
+@property (readonly) int letProperty1;
 @property (assign) int implProperty;
 
 - (void)mainMethod:(int)param;

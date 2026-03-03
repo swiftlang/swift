@@ -1,5 +1,3 @@
-import SwiftOnoneSupport
-
 public class PublicClass {
 }
 
@@ -17,148 +15,132 @@ public func publicFunc()
 
 [
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
     key.offset: 0,
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 26,
-    key.length: 6
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 33,
+    key.offset: 7,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 39,
+    key.offset: 13,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 56,
+    key.offset: 30,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 63,
+    key.offset: 37,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 70,
+    key.offset: 44,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 87,
+    key.offset: 61,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 94,
+    key.offset: 68,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 98,
+    key.offset: 72,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 111,
+    key.offset: 85,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 117,
+    key.offset: 91,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 128,
+    key.offset: 102,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 135,
+    key.offset: 109,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 140,
+    key.offset: 114,
     key.length: 12
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 158,
+    key.offset: 132,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 167,
+    key.offset: 141,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 174,
+    key.offset: 148,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 179,
+    key.offset: 153,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 187,
+    key.offset: 161,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 195,
+    key.offset: 169,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 202,
+    key.offset: 176,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 207,
+    key.offset: 181,
     key.length: 10
   }
 ]
 [
   {
-    key.kind: source.lang.swift.ref.module,
-    key.offset: 7,
-    key.length: 17,
-    key.is_system: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 111,
+    key.offset: 85,
     key.length: 3,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 158,
+    key.offset: 132,
     key.length: 3,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 187,
+    key.offset: 161,
     key.length: 3,
     key.is_system: 1
   }
@@ -168,15 +150,15 @@ public func publicFunc()
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "PublicClass",
-    key.offset: 33,
+    key.offset: 7,
     key.length: 21,
-    key.nameoffset: 39,
+    key.nameoffset: 13,
     key.namelength: 11,
-    key.bodyoffset: 52,
+    key.bodyoffset: 26,
     key.bodylength: 1,
     key.attributes: [
       {
-        key.offset: 26,
+        key.offset: 0,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -186,15 +168,15 @@ public func publicFunc()
     key.kind: source.lang.swift.decl.struct,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "SomeValue",
-    key.offset: 63,
+    key.offset: 37,
     key.length: 130,
-    key.nameoffset: 70,
+    key.nameoffset: 44,
     key.namelength: 9,
-    key.bodyoffset: 81,
+    key.bodyoffset: 55,
     key.bodylength: 111,
     key.attributes: [
       {
-        key.offset: 56,
+        key.offset: 30,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -204,16 +186,16 @@ public func publicFunc()
         key.kind: source.lang.swift.decl.var.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "publicValue",
-        key.offset: 94,
+        key.offset: 68,
         key.length: 28,
         key.typename: "Int",
-        key.nameoffset: 98,
+        key.nameoffset: 72,
         key.namelength: 11,
-        key.bodyoffset: 116,
+        key.bodyoffset: 90,
         key.bodylength: 5,
         key.attributes: [
           {
-            key.offset: 87,
+            key.offset: 61,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -223,14 +205,14 @@ public func publicFunc()
         key.kind: source.lang.swift.decl.function.method.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "publicMethod()",
-        key.offset: 135,
+        key.offset: 109,
         key.length: 26,
         key.typename: "Int",
-        key.nameoffset: 140,
+        key.nameoffset: 114,
         key.namelength: 14,
         key.attributes: [
           {
-            key.offset: 128,
+            key.offset: 102,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -240,13 +222,13 @@ public func publicFunc()
         key.kind: source.lang.swift.decl.function.method.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "init(public:)",
-        key.offset: 174,
+        key.offset: 148,
         key.length: 17,
-        key.nameoffset: 174,
+        key.nameoffset: 148,
         key.namelength: 17,
         key.attributes: [
           {
-            key.offset: 167,
+            key.offset: 141,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -255,10 +237,10 @@ public func publicFunc()
           {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "public",
-            key.offset: 179,
+            key.offset: 153,
             key.length: 11,
             key.typename: "Int",
-            key.nameoffset: 179,
+            key.nameoffset: 153,
             key.namelength: 6
           }
         ]
@@ -269,13 +251,13 @@ public func publicFunc()
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "publicFunc()",
-    key.offset: 202,
+    key.offset: 176,
     key.length: 17,
-    key.nameoffset: 207,
+    key.nameoffset: 181,
     key.namelength: 12,
     key.attributes: [
       {
-        key.offset: 195,
+        key.offset: 169,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }

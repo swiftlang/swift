@@ -66,6 +66,8 @@
 
 // CHECK: func nonTrailing(_ a: Int32 = cxxDefaultArg, _ b: Int32 = cxxDefaultArg) -> Int32
 
+// CHECK: func takesUnnamedParam(_: Int32 = cxxDefaultArg) -> Int32
+
 // CHECK: struct InvalidStruct<NoDefinition> {
 // CHECK:   func invalidDefaultExprMethod(_ x: Base<NoDefinition>)
 // CHECK: }

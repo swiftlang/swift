@@ -107,6 +107,29 @@ enum class PrintStructureKind {
   FunctionParameterType,
 };
 
+/// ---------------------------------
+/// MARK: inverse filtering functors
+
+/// An inverse filter is just a function-object. Use one of the functors below
+/// to create such a filter.
+using InverseFilter = std::function<bool(const InverseRequirement &)>;
+
+/// Include all of them!
+class AllInverses {
+public:
+  bool operator()(const InverseRequirement &) const { return true; }
+};
+
+/// Only prints inverses on generic parameters defined in the specified
+/// generic context.
+class InversesAtDepth {
+  std::optional<unsigned> includedDepth;
+public:
+  InversesAtDepth(GenericContext *level);
+  bool operator()(const InverseRequirement &) const;
+};
+/// ---------------------------------
+
 /// An abstract class used to print an AST.
 class ASTPrinter {
   unsigned CurrentIndentation = 0;
@@ -215,6 +238,9 @@ public:
   ASTPrinter &operator<<(QuotedString s);
 
   ASTPrinter &operator<<(unsigned long long N);
+
+  static void getUUIDStringForPrinting(UUID uuid, llvm::SmallVectorImpl<char> &out);
+
   ASTPrinter &operator<<(UUID UU);
 
   ASTPrinter &operator<<(Identifier name);
@@ -270,7 +296,8 @@ public:
   void printEscapedStringLiteral(StringRef str);
 
   void printName(Identifier Name,
-                 PrintNameContext Context = PrintNameContext::Normal);
+                 PrintNameContext Context = PrintNameContext::Normal,
+                 bool IsSpecializedCxxType = false);
 
   void setIndent(unsigned NumSpaces) {
     CurrentIndentation = NumSpaces;
@@ -341,6 +368,29 @@ public:
     return printedClangDecl.insert(d).second;
   }
 
+  /// Print lifetimeDependence as a SIL lifetime attribute, attached to a
+  /// parameter or result of a function.
+  void printSILLifetimeDependence(
+      std::optional<LifetimeDependenceInfo> lifetimeDependence) {
+    if (!lifetimeDependence.has_value()) {
+      return;
+    }
+    *this << lifetimeDependence->getString();
+  }
+
+  void printLifetimeDependenceAt(
+      ArrayRef<LifetimeDependenceInfo> lifetimeDependencies, unsigned index) {
+    if (auto lifetimeDependence =
+            getLifetimeDependenceFor(lifetimeDependencies, index)) {
+      printSILLifetimeDependence(*lifetimeDependence);
+    }
+  }
+
+  /// Print lifetimeDependence as a Swift lifetime attribute.
+  void
+  printSwiftLifetimeDependence(LifetimeDependenceInfo const &lifetimeDependence,
+                               ArrayRef<AnyFunctionType::Param> params);
+
 private:
   virtual void anchor();
 };
@@ -373,7 +423,8 @@ public:
 void printContext(raw_ostream &os, DeclContext *dc);
 
 bool printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
-                          Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS);
+                          Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS,
+                          bool withExplicitObjCAttr = false);
 
 /// Print a keyword or punctuator directly by its kind.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, tok keyword);
@@ -401,13 +452,14 @@ StringRef getAccessorKindString(AccessorKind value);
 /// may be called multiple times if the declaration uses suppressible
 /// features.
 void printWithCompatibilityFeatureChecks(ASTPrinter &printer,
-                                         PrintOptions &options,
+                                         const PrintOptions &options,
                                          Decl *decl,
                                          llvm::function_ref<void()> printBody);
 
-/// Determine whether we need to escape the given keyword within the
-/// given context, by wrapping it in backticks.
-bool escapeKeywordInContext(StringRef keyword, PrintNameContext context);
+/// Determine whether we need to escape the given name within the given
+/// context, by wrapping it in backticks.
+bool escapeIdentifierInContext(Identifier name, PrintNameContext context,
+                               bool isSpecializedCxxType = false);
 
 } // namespace swift
 

@@ -27,6 +27,9 @@ runAllTests()
 #elseif os(WASI)
   import WASILibc
   typealias CGFloat = Double
+#elseif canImport(Android)
+  import Android
+  typealias CGFloat = Double
 #elseif os(Windows)
   import CRT
   #if arch(x86_64) || arch(arm64)
@@ -169,6 +172,46 @@ func test_varArgs6() {
 }
 test_varArgs6()
 
+func test_varArgs7() {
+#if canImport(Darwin) && arch(arm64)
+  let canTest = if #available(SwiftStdlib 6.2, *) { true } else { false }
+#else
+  // va_list is more complicated on other targets so that behavior is not the
+  // same, skip the test by doing a fake print of the expected output. Also
+  // skip the test if we're testing against an older runtime without the fix.
+  let canTest = false
+#endif
+
+  if canTest {
+    // Test a workaround for format specifiers and no arguments. We supply eight
+    // words of zeroed memory to give this predictable behavior.
+    my_printf("No parameters: %ld %ld %ld %ld %ld %ld %ld %ld\n")
+  } else {
+    my_printf("No parameters: 0 0 0 0 0 0 0 0\n")
+  }
+  // CHECK: No parameters: 0 0 0 0 0 0 0 0
+}
+test_varArgs7()
+
+func test_varArgs8() {
+  // Check with vsnprintf as well just in case to make sure it works with C APIs
+  // imported from actual libc headers. Why checks with vprintf above are not enough?
+  // ClangImporter respects the vprintf interface re-defined in LibcShims.h but it could
+  // be slightly different than the one in platform libc on some platforms, including WASI.
+  // (e.g. wasi-libc defines `int vprintf(const char *__restrict, __isoc_va_list);` where
+  // `__isoc_va_list` is `typedef __builtin_va_list __isoc_va_list;`, but LibcShims.h aliases
+  // __builtin_va_list as `va_list`.)
+  // https://github.com/swiftlang/swift/issues/72398
+  let string = withUnsafeTemporaryAllocation(of: CChar.self, capacity: 512) { buffer in
+    withVaList([CInt(123)]) { args in
+      _ = vsnprintf(buffer.baseAddress!, buffer.count, "%d", args)
+    }
+    return String(cString: buffer.baseAddress!)
+  }
+  print(string)
+  // CHECK: 123
+}
+test_varArgs8()
 
 // CHECK: done.
 my_printf("done.")

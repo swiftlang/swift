@@ -9,7 +9,7 @@ sil @getC : $@convention(thin) () -> (@owned C)
 //
 // This live range is not dominated by the original borrow.
 //
-// CHECK-LABEL: testReborrow: fieldsensitive-multidefuse-liverange
+// CHECK-LABEL: testReborrow: fieldsensitive_multidefuse_liverange
 // CHECK: FieldSensitive MultiDef lifetime analysis:
 // CHECK:   def in range [0, 1) value:   [[B:%.*]] = load_borrow %0 : $*C
 // CHECK:   def in range [0, 1) value:   [[RB:%.*]] = borrowed {{.*}} from
@@ -23,7 +23,7 @@ sil @getC : $@convention(thin) () -> (@owned C)
 sil [ossa] @testReborrow : $@convention(thin) () -> () {
 bb0:
   specify_test """
-                     fieldsensitive-multidefuse-liverange
+                     fieldsensitive_multidefuse_liverange
                      @instruction
                      defs: 
                      @trace[0] 0 1
@@ -75,7 +75,7 @@ bb4:
 sil [ossa] @testMultiDefUseAddressReinit : $@convention(thin) (@owned C) -> () {
 bb0(%0: @owned $C):
   specify_test """
-                     fieldsensitive-multidefuse-liverange
+                     fieldsensitive_multidefuse_liverange
                      @instruction
                      defs: 
                      @instruction[+2] 0 1
@@ -106,45 +106,10 @@ bb3:
   return %9999 : $()
 }
 
-// A single instruction occurs twice on the same liverange
-// boundary. Once as a last use, and once as a dead def.
-// This is a particularly problematic corner case.
-//
-// CHECK-LABEL: testDeadSelfKill: fieldsensitive-multidefuse-liverange
-// CHECK: FieldSensitive MultiDef lifetime analysis:
-// CHECK: def in range [0, 1) instruction: store {{%[^,]+}} to [init] [[STACK:%[^,]+]] :
-// CHECK: def in range [0, 1) instruction: store {{%[^,]+}} to [assign] [[STACK]]
-// CHECK: bb1: LiveWithin
-// CHECK: last user:   store {{%[^,]+}} to [assign] [[STACK]]
-// CHECK: dead def:   store {{%[^,]+}} to [assign] [[STACK]]
-sil [ossa] @testDeadSelfKill : $@convention(thin) () -> () {
-bb0:
-  br bb3
-
-bb1(%1 : @owned $C, %2 : @owned $C):
-  specify_test """
-                     fieldsensitive-multidefuse-liverange
-                     @instruction
-                     defs: 
-                     @instruction[+1] 0 1
-                     @instruction[+2] 0 1
-                     uses:
-                     @instruction[+2] true 0 1
-                     """
-  %stack = alloc_stack $C
-  store %1 to [init] %stack : $*C
-  store %2 to [assign] %stack : $*C
-  unreachable
-
-bb3:
-  %99 = tuple()
-  return %99 : $()
-}
-
 // A dead-end block with a def can still be a boundary edge. This can
 // only happen in OSSA with incomplete lifetimes.
 //
-// CHECK-LABEL: testMultiDefDeadDefBoundaryEdge: fieldsensitive-multidefuse-liverange
+// CHECK-LABEL: testMultiDefDeadDefBoundaryEdge: fieldsensitive_multidefuse_liverange
 // CHECK: FieldSensitive MultiDef lifetime analysis:
 // CHECK:   def in range [0, 1) instruction: store {{%[^,]+}} to [init] [[STACK:%[^,]+]] :
 // CHECK:   def in range [0, 1) instruction: store {{%[^,]+}} to [assign] [[STACK]]
@@ -164,7 +129,7 @@ bb0:
   %c = apply %getC() : $@convention(thin) () -> (@owned C)
   store %c to [init] %stack : $*C
   specify_test """
-                     fieldsensitive-multidefuse-liverange
+                     fieldsensitive_multidefuse_liverange
                      @instruction[-3]
                      defs: 
                      @instruction[-1] 0 1

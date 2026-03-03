@@ -1,0 +1,753 @@
+// RUN: %target-sil-opt %s -test-runner -o /dev/null | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class List {
+  var x: Int64
+  let next: List
+}
+
+struct S {
+  var l: List
+  var y: Int64
+}
+
+struct TwoInts {
+  var a: Int64
+  var b: Int64
+}
+
+struct Ptr {
+  var p: Int64
+}
+
+struct VectorStruct {
+  var a: Builtin.FixedArray<100, Int64>
+}
+
+class C {}
+
+sil @_getC : $@convention(thin) () -> @owned C
+
+// CHECK-LABEL: Accesses for readIdentifiedArg
+// CHECK-NEXT: Value: %0 = argument of bb0 : $*Int64
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Int64
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT: End accesses for readIdentifiedArg
+sil [ossa] @readIdentifiedArg : $@convention(thin) (@in Int64) -> Int64 {
+bb0(%0 : $*Int64):
+  specify_test "access_path"
+  %res = load [trivial] %0 : $*Int64
+  return %res : $Int64
+}
+
+// CHECK-LABEL: Accesses for writeIdentifiedArg
+// CHECK-NEXT: Value: %0 = argument of bb0 : $*Int64
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Int64
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT: End accesses for writeIdentifiedArg
+sil [ossa] @writeIdentifiedArg : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  specify_test "access_path"
+  %2 = integer_literal $Builtin.Int64, 42
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to [trivial] %0 : $*Int64
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: Accesses for writeToHead
+// CHECK-NEXT: Value:   %7 = begin_access [modify] [dynamic] %6 : $*Int64
+// CHECK-NEXT:   Scope:   %7 = begin_access [modify] [dynamic] %6 : $*Int64
+// CHECK-NEXT:   Base: class -   %6 = ref_element_addr %5 : $List, #List.x
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $S
+// CHECK-NEXT:     Path: "s0.c0"
+// CHECK-NEXT: End accesses for writeToHead
+sil [ossa] @writeToHead : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  specify_test "access_path"
+  debug_value %0 : $S, let, name "s", argno 1
+  %2 = struct_extract %0 : $S, #S.l
+  %3 = integer_literal $Builtin.Int64, 10
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = begin_borrow [lexical] %2 : $List
+  %6 = ref_element_addr %5 : $List, #List.x
+  %7 = begin_access [modify] [dynamic] %6 : $*Int64
+  store %4 to [trivial] %7 : $*Int64
+  end_access %7 : $*Int64
+  end_borrow %5 : $List
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: Accesses for storeToArgs
+// CHECK-NEXT: Value:   %6 = begin_access [modify] [dynamic] %5 : $*Int64
+// CHECK-NEXT:   Scope:   %6 = begin_access [modify] [dynamic] %5 : $*Int64
+// CHECK-NEXT:   Base: class -   %5 = ref_element_addr %0 : $List, #List.x
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $List
+// CHECK-NEXT:     Path: "c0"
+// CHECK-NEXT: Value:   %14 = begin_access [modify] [dynamic] %13 : $*Int64
+// CHECK-NEXT:   Scope:   %14 = begin_access [modify] [dynamic] %13 : $*Int64
+// CHECK-NEXT:   Base: class -   %13 = ref_element_addr %1 : $List, #List.x
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage: %1 = argument of bb0 : $List
+// CHECK-NEXT:     Path: "c0"
+// CHECK-NEXT: End accesses for storeToArgs
+sil [ossa] @storeToArgs : $@convention(thin) (@guaranteed List, @guaranteed List) -> () {
+bb0(%0 : @guaranteed $List, %1 : @guaranteed $List):
+  specify_test "access_path"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = integer_literal $Builtin.Int64, 10
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = ref_element_addr %0 : $List, #List.x
+  %6 = begin_access [modify] [dynamic] %5 : $*Int64
+  store %4 to [trivial] %6 : $*Int64
+  end_access %6 : $*Int64
+  %9 = tuple ()
+  br bb3
+
+bb2:
+  %11 = integer_literal $Builtin.Int64, 20
+  %12 = struct $Int64 (%11 : $Builtin.Int64)
+  %13 = ref_element_addr %1 : $List, #List.x
+  %14 = begin_access [modify] [dynamic] %13 : $*Int64
+  store %12 to [trivial] %14 : $*Int64
+  end_access %14 : $*Int64
+  %17 = tuple ()
+  br bb3
+
+bb3:
+  %19 = tuple ()
+  return %19 : $()
+}
+
+// CHECK-LABEL: Accesses for storeMaybeLocalPhi
+// CHECK-NEXT: Value:   %10 = begin_access [modify] [dynamic] %9 : $*Int64
+// CHECK-NEXT:   Scope:   %10 = begin_access [modify] [dynamic] %9 : $*Int64
+// CHECK-NEXT:   Base: class -   %9 = ref_element_addr %6 : $List, #List.x
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage:   %4 = alloc_ref $List
+// CHECK-NEXT:     Path: "c0"
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $List
+// CHECK-NEXT:     Path: "c0"
+// CHECK-NEXT: End accesses for storeMaybeLocalPhi
+sil @storeMaybeLocalPhi : $@convention(thin) (@guaranteed List) -> () {
+bb0(%0 : $List):
+  specify_test "access_path"
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $List
+  br bb3(%0 : $List)
+
+bb2:
+  %4 = alloc_ref $List
+  br bb3(%4 : $List)
+
+
+bb3(%6 : $List):
+  %7 = integer_literal $Builtin.Int64, 20
+  %8 = struct $Int64 (%7 : $Builtin.Int64)
+  %9 = ref_element_addr %6 : $List, #List.x
+  %10 = begin_access [modify] [dynamic] %9 : $*Int64
+  store %8 to %10 : $*Int64
+  end_access %10 : $*Int64
+  %13 = tuple ()
+  strong_release %6 : $List
+  %15 = tuple ()
+  return %15 : $()
+}
+
+
+// CHECK-LABEL: Accesses for testStructPhiCommon
+// CHECK-NEXT: Value:   %8 = pointer_to_address %7 : $Builtin.RawPointer to $*Int64
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Ptr
+// CHECK-NEXT:   Path: "s0"
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT: End accesses for testStructPhiCommon
+sil [ossa] @testStructPhiCommon : $@convention(thin) (@inout Ptr) -> () {
+bb0(%0 : $*Ptr):
+  specify_test "access_path"
+  %2 = struct_element_addr %0 : $*Ptr, #Ptr.p
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = address_to_pointer %2 : $*Int64 to $Builtin.RawPointer
+  br bb3(%3 : $Builtin.RawPointer)
+
+bb2:
+  %5 = address_to_pointer %2 : $*Int64 to $Builtin.RawPointer
+  br bb3(%5 : $Builtin.RawPointer)
+
+bb3(%6 : $Builtin.RawPointer):
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Int64
+  %8 = integer_literal $Builtin.Int64, 2
+  %9 = struct $Int64 (%8 : $Builtin.Int64)
+  store %9 to [trivial] %7 : $*Int64
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: Accesses for testStructPhiDivergent
+// CHECK-NEXT: Value:   %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int64 // user: %13
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: pointer - %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int64 // user: %13
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT: End accesses for testStructPhiDivergent
+sil [ossa] @testStructPhiDivergent : $@convention(thin) (@inout Ptr) -> () {
+bb0(%0 : $*Ptr):
+  specify_test "access_path"
+  %1 = alloc_stack $Ptr
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = struct_element_addr %1 : $*Ptr, #Ptr.p
+  %4 = address_to_pointer %3 : $*Int64 to $Builtin.RawPointer
+  br bb3(%4 : $Builtin.RawPointer)
+
+bb2:
+  %6 = struct_element_addr %0 : $*Ptr, #Ptr.p
+  %7 = address_to_pointer %6 : $*Int64 to $Builtin.RawPointer
+  br bb3(%7 : $Builtin.RawPointer)
+
+
+bb3(%9 : $Builtin.RawPointer):
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int64
+  %11 = integer_literal $Builtin.Int64, 2
+  %12 = struct $Int64 (%11 : $Builtin.Int64)
+  store %12 to [trivial] %10 : $*Int64
+  dealloc_stack %1 : $*Ptr
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// CHECK-LABEL: Accesses for readIdentifiedBoxArg
+// CHECK-NEXT: Value:   %2 = begin_access [read] [dynamic] %1 : $*Int64
+// CHECK-NEXT:   Scope:   %2 = begin_access [read] [dynamic] %1 : $*Int64
+// CHECK-NEXT:   Base: box -   %1 = project_box %0 : ${ var Int64 }, 0
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : ${ var Int64 }
+// CHECK-NEXT:     Path: "c0"
+// CHECK-NEXT: End accesses for readIdentifiedBoxArg
+sil [ossa] @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int64 }) -> Int64 {
+bb0(%0 : @guaranteed ${ var Int64 }):
+  specify_test "access_path"
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %5 = begin_access [read] [dynamic] %1 : $*Int64
+  %6 = load [trivial] %5 : $*Int64
+  end_access %5 : $*Int64
+  return %6 : $Int64
+}
+
+
+class A {
+  var prop0: Int64
+}
+class B : A {
+  var prop1: Int64
+  var prop2: Int64
+}
+
+// CHECK-LABEL: Accesses for testNonUniquePropertyIndex
+// CHECK-NEXT: Value:   %2 = ref_element_addr %1 : $B, #B.prop1
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: class -   %2 = ref_element_addr %1 : $B, #B.prop1
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage:   %1 = alloc_ref $B
+// CHECK-NEXT:     Path: "c1"
+// CHECK-NEXT: Value:   %5 = ref_element_addr %4 : $A, #A.prop0
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: class -   %5 = ref_element_addr %4 : $A, #A.prop0
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage:   %1 = alloc_ref $B
+// CHECK-NEXT:     Path: "c0"
+// CHECK-NEXT: End accesses for testNonUniquePropertyIndex
+sil @testNonUniquePropertyIndex : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  specify_test "access_path"
+  %1 = alloc_ref $B
+  %2 = ref_element_addr %1 : $B, #B.prop1
+  store %0 to %2 : $*Int64
+  %4 = upcast %1 : $B to $A
+  %5 = ref_element_addr %4 : $A, #A.prop0
+  store %0 to %5 : $*Int64
+  %99 = tuple ()
+  return %99 : $()
+}
+
+struct MySwiftArrayBodyStorage {
+  @_hasStorage var count : Int64
+}
+
+struct MyArrayBody {
+  @_hasStorage var _storage : MySwiftArrayBodyStorage
+}
+
+class MyContiguousArrayStorageBase {
+  @_hasStorage var countAndCapacity : MyArrayBody
+}
+
+struct _MyBridgeStorage {
+  @_hasStorage var rawValue : Builtin.BridgeObject
+}
+
+struct _MyArrayBuffer<T> {
+  @_hasStorage var _storage : _MyBridgeStorage
+}
+
+
+struct MyArray<T> {
+  @_hasStorage var _buffer : _MyArrayBuffer<T>
+}
+
+// CHECK-LABEL: Accesses for testRefTailAndStruct0
+// CHECK-NEXT: Value:   %8 = struct_element_addr %7 : $*Int64, #Int64._value // user: %9
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: class -   %5 = ref_element_addr [immutable] %4 : $MyContiguousArrayStorageBase, #MyContiguousArrayStorageBase.countAndCapacity
+// CHECK-NEXT:   Path: "s0.s0.s0"
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $MyArray<String>
+// CHECK-NEXT:     Path: "s0.s0.s0.c0.s0.s0.s0"
+// CHECK-NEXT: Value:   %11 = struct_element_addr %10 : $*String, #String._guts
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: tail -   %4 = unchecked_ref_cast %3 : $Builtin.BridgeObject to $MyContiguousArrayStorageBase
+// CHECK-NEXT:   Path: "s0"
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $MyArray<String>
+// CHECK-NEXT:     Path: "s0.s0.s0.ct.s0"
+// CHECK-NEXT: Value:   %10 = ref_tail_addr [immutable] %4 : $MyContiguousArrayStorageBase, $String
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: tail -   %4 = unchecked_ref_cast %3 : $Builtin.BridgeObject to $MyContiguousArrayStorageBase
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $MyArray<String>
+// CHECK-NEXT:     Path: "s0.s0.s0.ct"
+// CHECK-NEXT: End accesses for testRefTailAndStruct0
+sil hidden [noinline] @testRefTailAndStruct0 : $@convention(thin) (@owned MyArray<String>) -> () {
+bb0(%0 : $MyArray<String>):
+  specify_test "access_path"
+  %1 = struct_extract %0 : $MyArray<String>, #MyArray._buffer
+  %2 = struct_extract %1 : $_MyArrayBuffer<String>, #_MyArrayBuffer._storage
+  %3 = struct_extract %2 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+  %4 = unchecked_ref_cast %3 : $Builtin.BridgeObject to $MyContiguousArrayStorageBase
+  %5 = ref_element_addr [immutable] %4 : $MyContiguousArrayStorageBase, #MyContiguousArrayStorageBase.countAndCapacity
+  %6 = struct_element_addr %5 : $*MyArrayBody, #MyArrayBody._storage
+  %7 = struct_element_addr %6 : $*MySwiftArrayBodyStorage, #MySwiftArrayBodyStorage.count
+  %8 = struct_element_addr %7 : $*Int64, #Int64._value
+  %9 = load %8 : $*Builtin.Int64
+  %10 = ref_tail_addr [immutable] %4 : $MyContiguousArrayStorageBase, $String
+  %11 = struct_element_addr %10 : $*String, #String._guts
+  %12 = load %11 : $*_StringGuts
+  %13 = load %10 : $*String
+  %14 = tuple ()
+  return %14 : $()
+}
+
+sil @yieldTwoAddresses : $@yield_once @convention(thin) () -> (@yields @in_guaranteed String, @yields @in_guaranteed Int64)
+
+// CHECK-LABEL: Accesses for testBeginApply
+// CHECK-NEXT: Value: (**%1**, %2, %3) = begin_apply %0() : $@yield_once @convention(thin) () -> (@yields @in_guaranteed String, @yields @in_guaranteed Int64) // user: %4
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: yield - (**%1**, %2, %3) = begin_apply %0() : $@yield_once @convention(thin) () -> (@yields @in_guaranteed String, @yields @in_guaranteed Int64) // user: %4
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:    no Storage paths
+// CHECK-NEXT: Value: (%1, **%2**, %3) = begin_apply %0() : $@yield_once @convention(thin) () -> (@yields @in_guaranteed String, @yields @in_guaranteed Int64) // user: %5
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: yield - (%1, **%2**, %3) = begin_apply %0() : $@yield_once @convention(thin) () -> (@yields @in_guaranteed String, @yields @in_guaranteed Int64) // user: %5
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:    no Storage paths
+// CHECK-NEXT:  End accesses for testBeginApply
+sil @testBeginApply : $@convention(thin) () -> () {
+bb0:
+  specify_test "access_path"
+  %0 = function_ref @yieldTwoAddresses : $@yield_once @convention(thin) () -> (@yields @in_guaranteed String, @yields @in_guaranteed Int64)
+  (%1, %2, %3) = begin_apply %0() : $@yield_once @convention(thin) () -> (@yields @in_guaranteed String, @yields @in_guaranteed Int64)
+  %4 = load %1 : $*String
+  %5 = load %2 : $*Int64
+  end_apply %3 as $()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+
+sil_global @global1 : $Int64
+sil_global @global2 : $Int64
+sil_global @somePointer : $Builtin.RawPointer
+
+sil [global_init] [ossa] @addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  specify_test "access_path"
+  %0 = global_addr @global1 : $*Int64
+  %1 = address_to_pointer %0 : $*Int64 to $Builtin.RawPointer
+  return %1 : $Builtin.RawPointer
+}
+
+sil [global_init] [ossa] @external_addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer
+
+sil [global_init] [ossa] @wrong_addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  specify_test "access_path"
+  %0 = global_addr @somePointer : $*Builtin.RawPointer
+  %1 = load [trivial] %0 : $*Builtin.RawPointer
+  return %1 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: Accesses for testSimpleGlobal
+// CHECK-NEXT:  Value:   %0 = global_addr @global1 : $*Int64
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: global - @global1
+// CHECK-NEXT:    Path: ""
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT:  End accesses for testSimpleGlobal
+sil [ossa] @testSimpleGlobal : $@convention(thin) () -> Int64 {
+bb0:
+  specify_test "access_path"
+  %0 = global_addr @global1 : $*Int64
+  %1 = load [trivial] %0 : $*Int64
+  return %1 : $Int64
+}
+
+// CHECK-LABEL: Accesses for testGlobalViaAddressor
+// CHECK-NEXT:  Value:   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: global - @global1
+// CHECK-NEXT:    Path: ""
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT:  End accesses for testGlobalViaAddressor
+sil [ossa] @testGlobalViaAddressor : $@convention(thin) () -> Int64 {
+bb0:
+  specify_test "access_path"
+  %0 = function_ref @addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+  %3 = load [trivial] %2 : $*Int64
+  return %3 : $Int64
+}
+
+// CHECK-LABEL: Accesses for testGlobalViaUnknwonAddressor
+// CHECK-NEXT:  Value:   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: pointer -   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+// CHECK-NEXT:    Path: ""
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT:  End accesses for testGlobalViaUnknwonAddressor
+sil [ossa] @testGlobalViaUnknwonAddressor : $@convention(thin) () -> Int64 {
+bb0:
+  specify_test "access_path"
+  %0 = function_ref @external_addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+  %3 = load [trivial] %2 : $*Int64
+  return %3 : $Int64
+}
+
+// CHECK-LABEL: Accesses for testGlobalViaWrongAddressor
+// CHECK-NEXT:  Value:   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: pointer -   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+// CHECK-NEXT:    Path: ""
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT:  End accesses for testGlobalViaWrongAddressor
+sil [ossa] @testGlobalViaWrongAddressor : $@convention(thin) () -> Int64 {
+bb0:
+  specify_test "access_path"
+  %0 = function_ref @wrong_addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+  %3 = load [trivial] %2 : $*Int64
+  return %3 : $Int64
+}
+
+sil @coro : $@yield_once @convention(thin) () -> @yields @inout Int64
+
+sil @_isDistinct : $@convention(thin) <T1, T2> (@inout T1, @inout T2) -> ()
+sil @_isNotDistinct : $@convention(thin) <T1, T2> (@inout T1, @inout T2) -> ()
+
+// CHECK-LABEL: Accesses for testAccessBaseAliasing
+// CHECK-NEXT: End accesses for testAccessBaseAliasing
+sil @testAccessBaseAliasing : $@convention(thin) (@inout Int64, @inout_aliasable Int64, @inout_aliasable Int64, Builtin.RawPointer, Builtin.RawPointer, @guaranteed B, @guaranteed B, @guaranteed { var Int64, var Int64 }, @guaranteed { var Int64, var Int64 }) -> () {
+bb0(%inoutArg : $*Int64, %aliasableArg1 : $*Int64, %aliasableArg2 : $*Int64, %3 : $Builtin.RawPointer, %4 : $Builtin.RawPointer, %5 : $B, %6 : $B, %7 : ${ var Int64, var Int64 }, %8 : ${ var Int64, var Int64 }):
+  specify_test "access_path"
+  %pointer1 = pointer_to_address %3 : $Builtin.RawPointer to $*Int64
+  %pointer2 = pointer_to_address %4 : $Builtin.RawPointer to $*Int64
+
+  %stack1 = alloc_stack $Int64
+  %stack2 = alloc_stack $Int64
+
+  %20 = alloc_ref $B
+  %21 = alloc_ref $B
+  %prop1OfClassArg1 = ref_element_addr %5 : $B, #B.prop1
+  %prop1OfClassArg2 = ref_element_addr %6 : $B, #B.prop1
+  %prop2OfClassArg2 = ref_element_addr %6 : $B, #B.prop2
+  %prop1OfLocalClass1 = ref_element_addr %20 : $B, #B.prop1
+  %prop1OfLocalClass2 = ref_element_addr %21 : $B, #B.prop1
+  %prop2OfLocalClass2 = ref_element_addr %21 : $B, #B.prop2
+  %tailOfClassArg1 = ref_tail_addr %5 : $B, $Int64
+  %tailOfClassArg2 = ref_tail_addr %6 : $B, $Int64
+  %tailOfLocalClass1 = ref_tail_addr %20 : $B, $Int64
+  %tailOfLocalClass2 = ref_tail_addr %21 : $B, $Int64
+
+  %30 = alloc_box ${ var Int64, var Int64 }
+  %31 = alloc_box ${ var Int64, var Int64 }
+  %field0OfBoxArg1 = project_box %7 : ${ var Int64, var Int64 }, 0
+  %field0OfBoxArg2 = project_box %8 : ${ var Int64, var Int64 }, 0
+  %field1OfBoxArg2 = project_box %8 : ${ var Int64, var Int64 }, 1
+  %field0OfLocalBox1 = project_box %30 : ${ var Int64, var Int64 }, 0
+  %field0OfLocalBox2 = project_box %31 : ${ var Int64, var Int64 }, 0
+  %field1OfLocalBox2 = project_box %31 : ${ var Int64, var Int64 }, 1
+
+  %global1 = global_addr @global1 : $*Int64
+  %global2 = global_addr @global2 : $*Int64
+
+  %50 = function_ref @coro : $@yield_once @convention(thin) () -> @yields @inout Int64
+  (%yield1, %52) = begin_apply %50() : $@yield_once @convention(thin) () -> @yields @inout Int64
+  end_apply %52 as $()
+  (%yield2, %55) = begin_apply %50() : $@yield_once @convention(thin) () -> @yields @inout Int64
+  end_apply %55 as $()
+
+  %isDistinct = function_ref @_isDistinct : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %isNotDistinct = function_ref @_isNotDistinct : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Function arguments
+  %101 = apply %isDistinct<Int64, Int64>(%inoutArg, %aliasableArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %102 = apply %isNotDistinct<Int64, Int64>(%aliasableArg1, %aliasableArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Pointers
+  %103 = apply %isNotDistinct<Int64, Int64>(%pointer1, %pointer2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Stack allocations
+  %104 = apply %isNotDistinct<Int64, Int64>(%stack1, %stack1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %105 = apply %isDistinct<Int64, Int64>(%stack1, %stack2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Classes
+  %121 = apply %isNotDistinct<Int64, Int64>(%prop1OfClassArg1, %prop1OfClassArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %122 = apply %isDistinct<Int64, Int64>(%prop1OfClassArg1, %prop2OfClassArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %123 = apply %isNotDistinct<Int64, Int64>(%prop1OfLocalClass1, %prop1OfLocalClass1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %124 = apply %isDistinct<Int64, Int64>(%prop1OfLocalClass1, %prop1OfLocalClass2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %125 = apply %isDistinct<Int64, Int64>(%prop1OfLocalClass1, %prop2OfLocalClass2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %126 = apply %isDistinct<Int64, Int64>(%prop1OfLocalClass1, %prop1OfClassArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Tail elements
+  %127 = apply %isNotDistinct<Int64, Int64>(%tailOfClassArg1, %tailOfClassArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %128 = apply %isDistinct<Int64, Int64>(%tailOfClassArg1, %tailOfLocalClass1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %129 = apply %isDistinct<Int64, Int64>(%tailOfLocalClass1, %tailOfLocalClass2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %130 = apply %isNotDistinct<Int64, Int64>(%tailOfLocalClass1, %tailOfLocalClass1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Boxes
+  %131 = apply %isNotDistinct<Int64, Int64>(%field0OfBoxArg1, %field0OfBoxArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %132 = apply %isDistinct<Int64, Int64>(%field0OfBoxArg1, %field1OfBoxArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %133 = apply %isNotDistinct<Int64, Int64>(%field0OfLocalBox1, %field0OfLocalBox1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %134 = apply %isDistinct<Int64, Int64>(%field0OfLocalBox1, %field0OfLocalBox2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %135 = apply %isDistinct<Int64, Int64>(%field0OfLocalBox1, %field1OfLocalBox2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %136 = apply %isDistinct<Int64, Int64>(%field0OfLocalBox1, %field0OfBoxArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Globals
+  %140 = apply %isNotDistinct<Int64, Int64>(%global1, %global1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %141 = apply %isDistinct<Int64, Int64>(%global1, %global2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Yields
+  %145 = apply %isNotDistinct<Int64, Int64>(%yield1, %yield1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %146 = apply %isNotDistinct<Int64, Int64>(%yield1, %yield2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Function arguments vs others
+  %150 = apply %isNotDistinct<Int64, Int64>(%inoutArg, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %151 = apply %isNotDistinct<Int64, Int64>(%aliasableArg1, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %152 = apply %isDistinct<Int64, Int64>(%inoutArg, %stack1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %153 = apply %isDistinct<Int64, Int64>(%aliasableArg1, %stack1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %154 = apply %isDistinct<Int64, Int64>(%inoutArg, %prop1OfClassArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %155 = apply %isNotDistinct<Int64, Int64>(%aliasableArg1, %prop1OfClassArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %156 = apply %isDistinct<Int64, Int64>(%inoutArg, %prop1OfLocalClass1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %157 = apply %isDistinct<Int64, Int64>(%aliasableArg1, %prop1OfLocalClass1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %158 = apply %isDistinct<Int64, Int64>(%inoutArg, %tailOfClassArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %159 = apply %isDistinct<Int64, Int64>(%aliasableArg1, %tailOfLocalClass1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %160 = apply %isDistinct<Int64, Int64>(%inoutArg, %field0OfBoxArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %161 = apply %isNotDistinct<Int64, Int64>(%aliasableArg1, %field0OfBoxArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %162 = apply %isDistinct<Int64, Int64>(%inoutArg, %field0OfLocalBox1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %163 = apply %isDistinct<Int64, Int64>(%aliasableArg1, %field0OfLocalBox1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %164 = apply %isNotDistinct<Int64, Int64>(%inoutArg, %yield1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %165 = apply %isNotDistinct<Int64, Int64>(%aliasableArg1, %yield2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Classes vs others
+  %170 = apply %isNotDistinct<Int64, Int64>(%prop1OfClassArg1, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %171 = apply %isNotDistinct<Int64, Int64>(%prop1OfLocalClass1, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %172 = apply %isDistinct<Int64, Int64>(%prop1OfClassArg1, %stack1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %173 = apply %isDistinct<Int64, Int64>(%prop1OfClassArg1, %tailOfClassArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %174 = apply %isDistinct<Int64, Int64>(%prop1OfClassArg1, %field0OfBoxArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %175 = apply %isDistinct<Int64, Int64>(%prop1OfClassArg1, %global1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %176 = apply %isNotDistinct<Int64, Int64>(%prop1OfClassArg1, %yield1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Tail elements vs others
+  %180 = apply %isNotDistinct<Int64, Int64>(%tailOfClassArg1, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %181 = apply %isNotDistinct<Int64, Int64>(%tailOfLocalClass1, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %182 = apply %isDistinct<Int64, Int64>(%tailOfClassArg1, %stack1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %183 = apply %isDistinct<Int64, Int64>(%tailOfClassArg1, %field0OfBoxArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %184 = apply %isDistinct<Int64, Int64>(%tailOfClassArg1, %global1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %185 = apply %isNotDistinct<Int64, Int64>(%tailOfClassArg1, %yield1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Yields vs others
+  %190 = apply %isNotDistinct<Int64, Int64>(%yield1, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %191 = apply %isNotDistinct<Int64, Int64>(%yield1, %stack1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  dealloc_stack %stack2 : $*Int64
+  dealloc_stack %stack1 : $*Int64
+  %200 = tuple ()
+  return %200 : $()
+}
+
+// CHECK-LABEL: Accesses for testAccessPathAliasing
+// CHECK-NEXT: End accesses for testAccessPathAliasing
+sil @testAccessPathAliasing : $@convention(thin) (@inout TwoInts) -> () {
+bb0(%twoInts: $*TwoInts):
+  specify_test "access_path"
+  %a = struct_element_addr %twoInts : $*TwoInts, #TwoInts.a
+  %b = struct_element_addr %twoInts : $*TwoInts, #TwoInts.b
+
+  %isDistinct = function_ref @_isDistinct : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %isNotDistinct = function_ref @_isNotDistinct : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  %10 = apply %isNotDistinct<TwoInts, TwoInts>(%twoInts, %twoInts) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %11 = apply %isNotDistinct<TwoInts, Int64>(%twoInts, %a) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %12 = apply %isNotDistinct<Int64, TwoInts>(%b, %twoInts) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %13 = apply %isDistinct<Int64, Int64>(%a, %b) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // More complex paths are tested in the unit test for `SmallProjectionPath.mayOverlap`.
+
+  %200 = tuple ()
+  return %200 : $()
+}
+
+// CHECK-LABEL: Accesses for storeBorrow
+// CHECK: Value:   [[SB:%.*]] = store_borrow %0 to [[DEST:%.*]] : $*C
+// CHECK:   Scope: base
+// CHECK:   Base: storeBorrow -   [[SB]] = store_borrow %0 to [[DEST]] : $*C
+// CHECK:   Path: ""
+// CHECK:    no Storage paths
+// CHECK-LABEL: End accesses for storeBorrow
+sil [ossa] @storeBorrow : $@convention(thin) (@guaranteed C) -> @owned C {
+bb0(%0 : @guaranteed $C):
+  specify_test "access_path"
+  %1 = alloc_stack $C
+  %2 = store_borrow %0 to %1 : $*C
+  %3 = function_ref @_getC : $@convention(thin) () -> @owned C
+  %4 = apply %3() : $@convention(thin) () -> @owned C
+  %5 = mark_dependence [unresolved] %4 : $C on %2 : $*C
+  %6 = load [copy] %2 : $*C
+  destroy_value %5 : $C
+  end_borrow %2 : $*C
+  dealloc_stack %1 : $*C
+  return %6 : $C
+}
+
+// CHECK-LABEL: Accesses for indexAddr
+// CHECK:       Value:   %6 = index_addr %3 : $*Int64, %4 : $Builtin.Word
+// CHECK:       Scope: base
+// CHECK:       Base: tail - %0 = argument of bb0 : $C
+// CHECK:       Path: "i4"
+// CHECK:         Storage: %0 = argument of bb0 : $C
+// CHECK:         Path: "ct.i4"
+// CHECK:          Value:   %7 = index_addr %3 : $*Int64, %5 : $Builtin.Word
+// CHECK:       Scope: base
+// CHECK:       Base: tail - %0 = argument of bb0 : $C
+// CHECK:       Path: "i5"
+// CHECK:         Storage: %0 = argument of bb0 : $C
+// CHECK:         Path: "ct.i5"
+// CHECK:          Value:   %8 = index_addr %3 : $*Int64, %1 : $Builtin.Word
+// CHECK:       Scope: base
+// CHECK:       nonconst-base: tail - %0 = argument of bb0 : $C
+// CHECK:       nonconst-path: "i*"
+// CHECK:       const-base: index -   %8 = index_addr %3 : $*Int64, %1 : $Builtin.Word
+// CHECK:       const-path: ""
+// CHECK:         Storage: %0 = argument of bb0 : $C
+// CHECK:         Path: "ct.i*"
+// CHECK:          Value:   %10 = struct_element_addr %9 : $*Int64, #Int64._value
+// CHECK:       Scope: base
+// CHECK:       nonconst-base: tail - %0 = argument of bb0 : $C
+// CHECK:       nonconst-path: "i*.s0"
+// CHECK:       const-base: index -   %9 = index_addr %3 : $*Int64, %2 : $Builtin.Word
+// CHECK:       const-path: "s0"
+// CHECK:         Storage: %0 = argument of bb0 : $C
+// CHECK:         Path: "ct.i*.s0"
+// CHECK-LABEL: End accesses for indexAddr
+sil @indexAddr : $@convention(thin) (@guaranteed C, Builtin.Word, Builtin.Word) -> () {
+bb0(%0 : $C, %1 : $Builtin.Word, %2 : $Builtin.Word):
+  specify_test "access_path"
+  %3 = ref_tail_addr %0 : $C, $Int64
+  %4 = integer_literal $Builtin.Word, 4
+  %5 = integer_literal $Builtin.Word, 5
+
+  %6 = index_addr %3 : $*Int64, %4 : $Builtin.Word
+  %7 = index_addr %3 : $*Int64, %5 : $Builtin.Word
+  %8 = index_addr %3 : $*Int64, %1 : $Builtin.Word
+  %9 = index_addr %3 : $*Int64, %2 : $Builtin.Word
+  %10 = struct_element_addr %9 : $*Int64, #Int64._value
+
+  %20 = load %6 : $*Int64
+  %21 = load %7 : $*Int64
+  %22 = load %8 : $*Int64
+  %23 = load %10 : $*Builtin.Int64
+
+  %isDistinct = function_ref @_isDistinct : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %isNotDistinct = function_ref @_isNotDistinct : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  apply %isDistinct<Int64, Int64>(%6, %7) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  apply %isNotDistinct<Int64, Int64>(%3, %6) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  apply %isNotDistinct<Int64, Int64>(%3, %8) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  apply %isNotDistinct<Int64, Builtin.Int64>(%3, %10) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  apply %isNotDistinct<Int64, Int64>(%6, %8) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  apply %isNotDistinct<Int64, Int64>(%8, %9) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  apply %isNotDistinct<Int64, Builtin.Int64>(%8, %10) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  %200 = tuple ()
+  return %200 : $()
+}
+
+// CHECK-LABEL: Accesses for mark_dependence
+// CHECK:       Value:   %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Int64 // user: %5
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: class  -   %1 = ref_element_addr %0 : $List, #List.x
+// CHECK-NEXT:    Path: ""
+// CHECK-NEXT:      Storage: %0 = argument of bb0 : $List
+// CHECK-NEXT:      Path: "c0"
+// CHECK-LABEL: End accesses for mark_dependence
+sil [ossa] @mark_dependence : $@convention(thin) (@guaranteed List) -> Int64 {
+bb0(%0 : @guaranteed $List):
+  specify_test "access_path"
+  %1 = ref_element_addr %0, #List.x
+  %2 = address_to_pointer %1 to $Builtin.RawPointer
+  %3 = mark_dependence %2 on %0
+  %4 = pointer_to_address %3 to [strict] $*Int64
+  %6 = load [trivial] %4 : $*Int64
+  return %6 : $Int64
+}
+
+// CHECK-LABEL: Accesses for vectors
+// CHECK:       Value:   %4 = index_addr %2 : $*Int64, %3 : $Builtin.Int64
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: argument - %0 = argument of bb0 : $*VectorStruct
+// CHECK-NEXT:    Path: "s0.b.i5"
+// CHECK-NEXT:     no Storage paths
+// CHECK-LABEL: End accesses for vectors
+sil [ossa] @vectors : $@convention(thin) (@in_guaranteed VectorStruct) -> Int64 {
+bb0(%0 : $*VectorStruct):
+  specify_test "access_path"
+  %1 = struct_element_addr %0, #VectorStruct.a
+  %2 = vector_base_addr %1
+  %3 = integer_literal $Builtin.Int64, 5
+  %4 = index_addr %2, %3
+  %5 = load [trivial] %4
+  return %5
+}
+

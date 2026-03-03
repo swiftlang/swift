@@ -38,6 +38,9 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
                                            __swift_size_t nitems);
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_stdlib_fputs_stderr(const char *str);
+
 // General utilities <stdlib.h>
 // Memory management functions
 static inline void _swift_stdlib_free(void *_Nullable ptr) {
@@ -60,8 +63,11 @@ static inline __swift_size_t _swift_stdlib_strlen_unsigned(const unsigned char *
 SWIFT_READONLY
 static inline int _swift_stdlib_memcmp(const void *s1, const void *s2,
                                        __swift_size_t n) {
+#if defined(__APPLE__)
+  // Darwin defines memcmp with optional pointers, preserve the same type here.
+  extern int memcmp(const void * _Nullable, const void * _Nullable, __swift_size_t);
 // FIXME: Is there a way to identify Glibc specifically?
-#if (defined(__gnu_linux__) || defined(__ANDROID__)) && !defined(__musl__)
+#elif (defined(__gnu_linux__) || defined(__ANDROID__)) && !defined(__musl__)
   extern int memcmp(const void * _Nonnull, const void * _Nonnull, __swift_size_t);
 #else
   extern int memcmp(const void * _Null_unspecified, const void * _Null_unspecified, __swift_size_t);
@@ -170,11 +176,16 @@ long double _stdlib_squareRootl(long double _self) {
 // Apple's math.h does not declare lgamma_r() etc by default, but they're
 // unconditionally exported by libsystem_m.dylib in all OS versions that
 // support Swift development; we simply need to provide declarations here.
-#if defined(__APPLE__)
+// In the macOS 15.0, iOS 18.0, et al SDKs, math.h unconditionally declares
+// lgamma_r() when building for Swift. Detect those SDKs by checking for a
+// header which was added in those versions. (Redeclaring the function
+// would cause an error where `lgamma_r` is ambiguous between the SDK
+// `_math.lgamma_r` and this `SwiftShims.lgamma_r`.)
+#if defined(__APPLE__) && !__has_include(<_modules/_math_h.h>)
 float lgammaf_r(float x, int *psigngam);
 double lgamma_r(double x, int *psigngam);
 long double lgammal_r(long double x, int *psigngam);
-#endif // defined(__APPLE__)
+#endif // defined(__APPLE__) && !__has_include(<_modules/_math_h.h>)
 
 #ifdef __cplusplus
 } // extern "C"

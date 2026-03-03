@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -access-enforcement-release %s -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -access-enforcement-release %s -enable-sil-verify-all | %FileCheck %s
 //
 // Test the AccessEnforcementReleaseSinking pass in isolation.
 // This ensures that no upstream passes have removed SIL-level access markers
@@ -234,7 +234,7 @@ sil @closureThatModifiesCapture: $@convention(thin) ({ var Builtin.Int64 }) -> (
 sil [reabstraction_thunk] @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
 sil [reabstraction_thunk] @withoutActuallyEscapingThunk : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 
-// The Copy release cannot be moved below the is_escaping_closure check.
+// The Copy release cannot be moved below the destroy_not_escaped_closure.
 //
 // CHECK-LABEL: sil @testSinkAfterEscapingClosureCheck : $@convention(thin) (@guaranteed IntWrapper) -> () {
 // CHECK: bb0(%0 : $IntWrapper):
@@ -243,7 +243,7 @@ sil [reabstraction_thunk] @withoutActuallyEscapingThunk : $@convention(thin) (@n
 // CHECK: [[F:%.*]] = function_ref @takesNoEscapeBlockClosure : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
 // CHECK: apply [[F]]([[COPY]]) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
 // CHECK: strong_release [[COPY]] : $@convention(block) @noescape () -> ()
-// CHECK: is_escaping_closure
+// CHECK: destroy_not_escaped_closure
 // CHECK: cond_fail
 // CHECK: end_access [[BA]] : $*Builtin.Int64
 // CHECK-LABEL: } // end sil function 'testSinkAfterEscapingClosureCheck'
@@ -271,7 +271,7 @@ bb0(%0 : $IntWrapper):
   %f = function_ref @takesNoEscapeBlockClosure : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
   %call = apply %f(%copyblock) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
   strong_release %copyblock : $@convention(block) @noescape () -> ()
-  %isescape = is_escaping_closure %md : $@callee_guaranteed () -> ()
+  %isescape = destroy_not_escaped_closure %md : $@callee_guaranteed () -> ()
   cond_fail %isescape : $Builtin.Int1
   end_access %ba : $*Builtin.Int64
   destroy_addr %blockaddr : $*@callee_guaranteed() -> ()

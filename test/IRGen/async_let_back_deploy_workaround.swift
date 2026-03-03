@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir -target %target-cpu-apple-macos99.99 %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-sans-workaround %s
-// RUN: %target-swift-frontend -emit-ir -target %target-cpu-apple-macos12.3 %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-with-workaround %s
+// RUN: %target-swift-frontend -emit-ir -target %target-swift-5.7-abi-triple %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-sans-workaround %s
+// RUN: %target-swift-frontend -emit-ir -target %target-swift-5.6-abi-triple %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-with-workaround %s
 
 // REQUIRES: OS=macosx
 // UNSUPPORTED: CPU=arm64e

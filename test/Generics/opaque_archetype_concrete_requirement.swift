@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -disable-availability-checking -debug-generic-signatures -enable-requirement-machine-opaque-archetypes 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen %s -disable-availability-checking -enable-requirement-machine-opaque-archetypes
+// RUN: %target-swift-frontend -typecheck -verify %s -target %target-swift-5.1-abi-triple -debug-generic-signatures -enable-requirement-machine-opaque-archetypes 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -target %target-swift-5.1-abi-triple -enable-requirement-machine-opaque-archetypes
 
 protocol P1 {
   associatedtype T : P2

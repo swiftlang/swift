@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/redundant_conformance_A.swift
 // RUN: %target-swift-frontend -emit-module -o %t -I %t %S/Inputs/redundant_conformance_B.swift
-// RUN: %target-typecheck-verify-swift -I %t
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t
 
 import redundant_conformance_A
 import redundant_conformance_B
@@ -86,3 +86,10 @@ class Class3 {
 class SomeMockClass: Class3.ProviderThree { // okay
   var someInt: Int = 5
 }
+
+
+class ImplicitCopyable {}
+
+class InheritImplicitCopyable: ImplicitCopyable, Copyable {}
+// expected-warning@-1 {{redundant conformance of 'InheritImplicitCopyable' to protocol 'Copyable'}}
+// expected-note@-2 {{'InheritImplicitCopyable' inherits conformance to protocol 'Copyable' from superclass here}}
