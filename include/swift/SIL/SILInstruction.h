@@ -132,6 +132,8 @@ class SILType;
 class SILArgument;
 class SILPhiArgument;
 class SILUndef;
+class StackAllocation;
+class StackDeallocation;
 class Stmt;
 class StringLiteralExpr;
 class ValueDecl;
@@ -873,8 +875,9 @@ public:
   /// instruction.
   bool isAllocatingStack() const;
 
-  /// The stack allocation produced by the instruction, if any.
-  SILValue getStackAllocation() const;
+  /// Return the kind of stack allocation instruction this is, or std::nullopt
+  /// if it is not a stack allocation instruction.
+  std::optional<StackAllocation> getStackAllocation() const;
 
   /// Returns the kind of stack memory that should be allocated. There are
   /// certain (unfortunate) situations in which "stack" allocations may become
@@ -888,6 +891,10 @@ public:
   /// Returns true if this is the deallocation of a stack allocating instruction.
   /// The first operand must be the allocating instruction.
   bool isDeallocatingStack() const;
+
+  /// Return the kind of stack deallocation instruction this is, or
+  /// std::nullopt if it is not a stack deallocation instruction.
+  std::optional<StackDeallocation> getStackDeallocation() const;
 
   /// Whether IRGen lowering of this instruction may result in emitting packs of
   /// metadata or witness tables.

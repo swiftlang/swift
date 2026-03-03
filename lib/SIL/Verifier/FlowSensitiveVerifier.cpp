@@ -15,6 +15,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/StackAllocation.h"
 
 using namespace swift;
 using namespace swift::silverifier;
@@ -326,14 +327,14 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
         }
       }
 
-      if (i.isAllocatingStack()) {
+      if (auto allocation = i.getStackAllocation()) {
         // Nested stack allocations are pushed on the stack. Non-nested stack
         // allocations are treated as active ops so that we can at least
         // verify their joint post-dominance.
         if (i.isStackAllocationNested()) {
-          state.Stack.push_back(i.getStackAllocation());
+          state.Stack.push_back(allocation->getValue());
         } else {
-          state.handleScopeInst(i.getStackAllocation());
+          state.handleScopeInst(allocation->getValue());
         }
 
         // Also track begin_apply's token as an ActiveOp so we can also verify
