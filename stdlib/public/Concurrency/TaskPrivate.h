@@ -1519,7 +1519,10 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
       Flags.task_isFuture(), Flags.task_isGroupChildTask(),
       Flags.task_isAsyncLetTask());
 
-  swift_task_enqueue(this, newExecutor);
+  // Even though we are not in the "enqueue stealer" path, this
+  // may still enqueue a stealer because we may have previously
+  // run from a stealer and the original Task is still enqueued.
+  swift_task_enqueueSelfOrStealer(this, newExecutor, false);
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 
