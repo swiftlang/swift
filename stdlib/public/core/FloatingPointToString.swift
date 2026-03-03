@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2018-2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2018-2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,53 +12,88 @@
 //
 // Converts floating-point types to "optimal" text formats.
 //
-// The "optimal" form is one with a minimum number of significant
-// digits which will parse to exactly the original value.  This form
-// is ideal for JSON serialization and general printing where you
-// don't have specific requirements on the number of significant
-// digits.
+// The "optimal" form is one with a minimum number of significant digits which
+// will parse to exactly the original value.  This form is ideal for JSON
+// serialization, logging, debugging, and any general printing where you don't
+// have specific UI requirements.
+//
+// Because it doesn't have to support an arbitrary number of output
+// digits, this format can be generated _much_ faster than the
+// `printf` `%e`/`%f`/`%g` forms, which makes it even more ideal for
+// JSON, logging, and general output.
 //
 //===---------------------------------------------------------------------===//
 ///
-/// For binary16, this code uses a simple approach that is normally
-/// implemented with variable-length arithmetic.  However, due to the
-/// limited range of binary16, this can be implemented with only
-/// 32-bit integer arithmetic.
+/// This code has used a variety of different algorithms over the years, all
+/// generating exactly identical output.  The current implementation starts
+/// with a floating-point value `s * 2^e` where s and e are both integers.  We
+/// compute
+/// ```
+///   p = ceil(e * log10(2))
+/// ```
+/// and then do a fixed-precision multiply
+/// ```
+///   (s + 1/2) * 2^e * 10^-p
+/// ```
+/// with different rounding depending on whether the original
+/// `s` is even or odd.
 ///
-/// For other formats, we use a modified form of the Grisu2
-/// algorithm from Florian Loitsch; "Printing Floating-Point Numbers
-/// Quickly and Accurately with Integers", 2010.
+/// * About 40% of the time, the integer portion of this last value is
+///   precisely the integer significand of the optimal base-10
+///   representation we want.  We only need to convert this integer to
+///   digits with a fast integer conversion algorithm, such as the
+///   one below based on work by Paul Khuong.
+///
+/// * The remaining 60% of the time, we need to generate a single
+///   additional digit (with correct rounding).
+///
+/// The description above omits many key details, of course.  A more complete
+/// description appears in the extensive comments for the Float32 implementation
+/// below.  (The Float64 implementation uses the same approach, only with fewer
+/// comments.  The Float16 and Float80/Float128 implementations have not yet
+/// been updated to use this new algorithm.)
+///
+/// The implementation draws inspiration from the following papers:
+///
+/// ------------
+/// Raffaello Guilietti; "The Schubfach way to render doubles", 2021.
+/// Published online.
+///
+/// Credit: Guilietti computes the power-of-10 scaling factor based on
+/// the width of the rounding interval in order to obtain a
+/// nearly-final result from the initial scaling, avoiding the need
+/// for per-digit iteration.
+/// ------------
+/// Florian Loitsch; "Printing Floating-Point Numbers Quickly and
+/// Accurately with Integers", 2010.
 /// https://doi.org/10.1145/1806596.1806623
 ///
-/// Some of the Grisu2 modifications were suggested by the "Errol
-/// paper": Marc Andrysco, Ranjit Jhala, Sorin Lerner; "Printing
-/// Floating-Point Numbers: A Faster, Always Correct Method", 2016.
+/// Credit: Our test for whether the initial digits give us a value in
+/// the rounding interval is from Loitsch' Grisu algorithm.
+/// ------------
+/// Marc Andrysco, Ranjit Jhala, Sorin Lerner; "Printing Floating-Point
+/// Numbers: A Faster, Always Correct Method", 2016.
 /// https://doi.org/10.1145/2837614.2837654
-/// In particular, the Errol paper explored the impact of higher-precision
-/// fixed-width arithmetic on Grisu2 and showed a way to rapidly test
-/// the correctness of Grisu-style algorithms.
 ///
-/// A few further improvements were inspired by the Ryu algorithm
-/// from Ulf Anders; "Ryū: fast float-to-string conversion", 2018.
-/// https://doi.org/10.1145/3296979.3192369
+/// Credit: Andrysco, Jhala, and Lerner explored the impact of
+/// higher precision arithmetic on Grisu-style algorithms and
+/// provided a robust way to test implementations of such algorithms
+/// for correctness.
+/// ------------
+/// TODO: Cite vitaut's exploration of Schubfach variants?
 ///
-/// The full algorithm is extensively commented in the Float64 version
-/// below; refer to that for details.
-///
-/// In summary, this implementation is:
+/// In short, this implementation is:
 ///
 /// * Fast.  It uses only fixed-width integer arithmetic and has
-///   constant memory requirements.  For double-precision values on
-///   64-bit processors, it is competitive with Ryu. For double-precision
-///   values on 32-bit processors, and higher-precision values on all
-///   processors, it is considerably faster.
+///   constant memory requirements.
 ///
-/// * Always Accurate. Except for NaNs, converting the decimal form
-///   back to binary will always yield an equal value. For the IEEE
-///   754 formats, the round trip will produce exactly the same bit
-///   pattern in memory. This assumes, of course, that the conversion
-///   from text to binary uses a correctly-rounded algorithm such as
-///   Clinger 1990 or Eisel-Lemire 2021.
+/// * Always Round-trip Accurate. Except for NaNs, converting the
+///   decimal form back to binary will always yield an equal
+///   value. For the IEEE 754 formats, the round trip will produce
+///   exactly the same bit pattern in memory. (This assumes, of course,
+///   that the conversion from text to binary uses a correctly-rounded
+///   algorithm such as Clinger 1990, Eisel-Lemire 2021, or that
+///   used in FloatingPointFromString.swift.)
 ///
 /// * Always Short.  This always selects an accurate result with the
 ///   minimum number of significant digits.
@@ -81,40 +116,26 @@
 ///   form for fractional values bigger than 10^-4; always write at
 ///   least 2 digits for an exponent.
 /// * Apart from the above, we do prefer shorter output.
-
+///
 /// Note: If you want to compare performance of this implementation
 /// versus some others, keep in mind that this implementation does
-/// deliberately sacrifice some performance.  Any attempt to compare
-/// the performance of this implementation to others should
-/// try to compensate for the following:
+/// deliberately sacrifice some performance to achieve other goals.
+/// Any attempt to compare the performance of this implementation
+/// to others should consider the following:
 /// * The output ergonomics described above do take some time.
-///   It would be faster to always emit the form "123456e-78"
-//    (See `finishFormatting()`)
+///   It would be faster to always emit an integer significand
+///   followed by an exponent (e.g., "123456e-78").
 /// * The implementations in published papers generally include
 ///   large tables with every power of 10 computed out.  We've
 ///   factored these tables down to conserve code size, which
 ///   requires some additional work to reconstruct the needed power
-///   of 10. (See the `intervalContainingPowerOf10_*` functions)
-
-///
-/// This Swift implementation was ported from an earlier C version;
-/// the output is exactly the same in all cases.
-/// A few notes on the Swift transcription:
-/// * We use MutableSpan<UTF8.CodeUnit> and MutableRawSpan to
-///   identify blocks of working memory.
-/// * We use unsafe/unchecked operations extensively, supported by
-///   several years of analysis and testing of the original C
-///   implementation to ensure that no unsafety actually occurs.  For
-///   Float32, that testing was exhaustive -- we verified all 4
-///   billion possible Float32 values.
-/// * The Swift code uses an idiom of building up to 8 digit characters
-///   in a UInt64 and then writing the whole block to memory.
-/// * The Swift version is slightly faster than the C version;
-///   mostly thanks to various minor algorithmic tweaks that were
-///   found during the translation process.
+///   of 10. (See the `_powerOf10_*()` functions)
+/// * Compare code size as well as performance.  Our Float64
+///   implementation here is a little over 3kiB compiled, _including_
+///   the supporting data tables.  (Most published implementations
+///   require twice that just for their supporting tables.)
 ///
 // ----------------------------------------------------------------------------
-
 
 // ================================================================
 //
@@ -184,6 +205,7 @@ public func _float16ToStringImpl(
 // with "0" characters, e.g., via
 // `InlineArray<32,UTF8.CodeUnit>(repeating:0x30)`
 
+// TODO: Adopt the new algorithm used by Float32/64.
 @available(SwiftStdlib 5.3, *)
 internal func _Float16ToASCII(
   value f: Float16,
@@ -339,25 +361,15 @@ internal func _Float16ToASCII(
     }
 
     // Step 5: Emit the integer part
-    let text = _intToEightDigits(UInt32(intPart))
+    let text = _intToEightDecimalDigits(UInt32(intPart))
     unsafe buffer.storeBytes(
-      of: text,
+      of: text + 0x3030303030303030,
       toUncheckedByteOffset: nextDigit,
       as: UInt64.self)
     nextDigit &+= 8
 
     // Skip leading zeros
-    if intPart < 10 {
-      firstDigit &+= 7
-    } else if intPart < 100 {
-      firstDigit &+= 6
-    } else if intPart < 1000 {
-      firstDigit &+= 5
-    } else if intPart < 10000 {
-      firstDigit &+= 4
-    } else {
-      firstDigit &+= 3
-    }
+    firstDigit &+= text.trailingZeroBitCount / 8
 
     // After the integer part comes a period...
     unsafe buffer.storeBytes(
@@ -466,219 +478,275 @@ internal func _float32ToStringImpl(
 }
 
 // Convert a Float32 to an optimal ASCII representation.
-// See notes above for comments on the output format here.
-// See _Float64ToASCII for comments on the algorithm.
 // Inputs:
 // * `value`: Float32 input
 // * `buffer`: Buffer to place the result
 // Returns: Range of bytes within `buffer` that contain the result
 //
-// Buffer must be at least 32 bytes long and must be pre-filled
+// Buffer must be at least 20 bytes long and must be pre-filled
 // with "0" characters, e.g., via
 // `InlineArray<32,UTF8.CodeUnit>(repeating:0x30)`
 internal func _Float32ToASCII(
   value f: Float32,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
 ) -> Range<Int> {
-  // Note: The algorithm here is the same as for Float64, only
-  // with narrower arithmetic.  Refer to `_Float64ToASCII` for
-  // more detailed comments and explanation.
-
   // We need a MutableRawSpan in order to use wide store/load operations
-  // TODO: Tune this limit down to the actual minimum we need here
   // TODO: `assert` that the buffer is filled with 0x30 bytes (in debug builds)
-  precondition(utf8Buffer.count >= 32)
+  assert(utf8Buffer.count >= 20)
   var buffer = unsafe utf8Buffer.mutableBytes
+
+  let significandBitCount = Float.significandBitCount + 1 // 24
+  let exponentBias = (1 << (Float.exponentBitCount - 1)) - 2 + significandBitCount // 126 + 24
+  let binaryExponent: Int
+  let significand: Float.RawSignificand
 
   // Step 1: Handle the special cases, decompose the input
 
-  let binaryExponent: Int
-  let significand: Float.RawSignificand
-  let exponentBias = (1 << (Float.exponentBitCount - 1)) - 2 // 126
-  if (f.exponentBitPattern == 0xff) {
-    if (f.isInfinite) {
-      return _infinity(buffer: &buffer, sign: f.sign)
-    } else { // f.isNaN
-      let quietBit =
-        (f.significandBitPattern >> (Float.significandBitCount - 1)) & 1
-      let payloadMask = UInt32(1 << (Float.significandBitCount - 2)) - 1
-      let payload32 = f.significandBitPattern & payloadMask
-      return nan_details(
-        buffer: &buffer,
-        sign: f.sign,
-        quiet: quietBit != 0,
-        payloadHigh: 0,
-        payloadLow: UInt64(truncatingIfNeeded:payload32))
-    }
-  } else if (f.exponentBitPattern == 0) {
-    if (f.isZero) {
-      return _zero(buffer: &buffer, sign: f.sign)
-    } else { // f.isSubnormal
-      binaryExponent = 1 - exponentBias
-      significand = f.significandBitPattern &<< Float.exponentBitCount
+  // Use a single branch to test for exponents of 0x00 or 0xff
+  if UInt8(truncatingIfNeeded: f.exponentBitPattern) &+ 1 < 2 {
+    if f.exponentBitPattern == 0 {
+      if (f.isZero) {
+        return _zero(buffer: &buffer, sign: f.sign)
+      } else { // f.isSubnormal
+        significand = f.significandBitPattern
+        binaryExponent = 1 &- exponentBias
+      }
+    } else { // f.exponentBitPattern == 0xff
+      if (f.isInfinite) {
+        return _infinity(buffer: &buffer, sign: f.sign)
+      } else { // f.isNaN
+        let quietBit =
+          (f.significandBitPattern >> (Float.significandBitCount - 1)) & 1
+        let payloadMask = UInt32(1 << (Float.significandBitCount - 2)) - 1
+        let payload32 = f.significandBitPattern & payloadMask
+        return nan_details(
+          buffer: &buffer,
+          sign: f.sign,
+          quiet: quietBit != 0,
+          payloadHigh: 0,
+          payloadLow: UInt64(truncatingIfNeeded:payload32))
+      }
     }
   } else {
+    // Normal
+    let implicitBit = Float.RawSignificand(1) << Float.significandBitCount
+    significand = f.significandBitPattern &+ implicitBit
     binaryExponent = Int(f.exponentBitPattern) &- exponentBias
-    significand =
-      ((f.significandBitPattern &+ (1 << Float.significandBitCount))
-         &<< Float.exponentBitCount)
   }
 
-  // Step 2: Determine the exact unscaled target interval
+  // Step 2: Compute the base 10 exponent to match the rounding interval
 
-  let halfUlp: Float.RawSignificand = 1 << (Float.exponentBitCount - 1)
-  let quarterUlp = halfUlp >> 1
-  let upperMidpointExact =
-    significand &+ halfUlp
-  let lowerMidpointExact =
-    significand &- ((f.significandBitPattern == 0) ? quarterUlp : halfUlp)
-  let isOddSignificand = ((f.significandBitPattern & 1) != 0)
+  // Following Schubfach, let RI = the width of the rounding interval
+  // Compute base10Power such that
+  //    10^base10Power > RI > 10^(base10Power - 1)
+  // This guarantees:
+  // * AT MOST one multiple of 10^base10Power in our rounding interval
+  //   So if we find one, it's unique and we're done!
+  // * AT LEAST one multiple of 10^(base10Power-1) in that interval.
+  //   So if we don't find a multiple of 10^base10Power, then
+  //   we're certain to find a solution with just one more digit.
 
-  // Step 3: Estimate the base 10 exponent
+  // In the common case where RI = 2^e exactly, this implies that:
+  //    base10Power = ceiling(e * log10(2))
+  // For an exact power of 2, the rounding interval is 25% narrower, so
+  //    base10Power = ceiling(e * log10(2) + log10(0.75))
+  let powerOf2Adjust = f.significandBitPattern == 0 ? Int64(-536607787) : Int64(0)
+  let rawBase10Power = Int64(binaryExponent) &* 1292913986 &+ powerOf2Adjust
+  let roundedBase10Power = (rawBase10Power &+ 0xffffffff) >> 32
+  var base10Power = Int(truncatingIfNeeded: roundedBase10Power)
 
-  var base10Exponent = decimalExponentFor2ToThe(binaryExponent)
+  // Step 3: Look up power-of-10 scale factor
 
-  // Step 4: Compute power-of-10 scale factor
+  // To obtain a binary floating-point value for the power of 10, look
+  // up the significand in a table and compute the corresponding
+  // exponent.  The power of 10 is then:
+  //     powerOfTenRoundedDown * 2^powerOfTenExponent
+  let powerOfTenRoundedDown = powersOf10_Float32[33 &- base10Power]
+  let powerOfTenExponent = binaryExponentFor10ToThe(0 &- base10Power)
 
-  var powerOfTenRoundedDown: UInt64 = 0
-  var powerOfTenRoundedUp: UInt64 = 0
+  // Step 4: Scale the interval (with rounding)
+  // We compute `u` the upper bound of the rounding interval and
+  // `delta` the width, both scaled by 10^(-base10Power)
 
-  let bulkFirstDigits = 1
-  let powerOfTenExponent = _intervalContainingPowerOf10_Binary32(
-    p: -base10Exponent &+ bulkFirstDigits &- 1,
-    lower: &powerOfTenRoundedDown,
-    upper: &powerOfTenRoundedUp)
-  let extraBits = binaryExponent &+ powerOfTenExponent
-
-  // Step 5: Scale the interval (with rounding)
-
-  // Experimentally, 11 is as large as we can go here without
-  // introducing errors.
-  // We need 7 to generate 2 digits at a time below.
-  // 11 should allow us to generate 3 digits at a time, but
-  // that doesn't seem to be any faster.
-  let integerBits = 11
+  // After scaling, we'll use a 26.38 fixed-point format
+  let integerBits = 26
   let fractionBits = 64 - integerBits
-  var u: UInt64
-  var l: UInt64
-  if isOddSignificand {
-    // Narrow the interval (odd significand)
-    let u1 = _multiply64x32RoundingDown(
-      powerOfTenRoundedDown,
-      upperMidpointExact)
-    u = u1 >> (integerBits - extraBits)
-    let l1 = _multiply64x32RoundingUp(
-      powerOfTenRoundedUp,
-      lowerMidpointExact)
-    let bias = UInt64((1 &<< (integerBits &- extraBits)) &- 1)
-    l = (l1 &+ bias) >> (integerBits &- extraBits)
-  } else {
-    // Widen the interval (even significand)
-    let u1 = _multiply64x32RoundingUp(
-      powerOfTenRoundedUp,
-      upperMidpointExact)
-    let bias = UInt64((1 &<< (integerBits &- extraBits)) &- 1)
-    u = (u1 &+ bias) >> (integerBits &- extraBits)
-    let l1 = _multiply64x32RoundingDown(
-      powerOfTenRoundedDown,
-      lowerMidpointExact)
-    l = l1 >> (integerBits &- extraBits)
+  let fractionMask: UInt64 = (1 << fractionBits) - 1
+  let mask32 = UInt64(UInt32.max)
+
+  // Find the unscaled exact upper limit of the rounding interval
+  let halfUlp: Float.RawSignificand = 1 << (Float.exponentBitCount - 1)
+  let unscaledUpperLimit = (significand &<< Float.exponentBitCount) &+ halfUlp
+
+  // If the significand is even, we want to widen the interval by rounding up
+  // the upper midpoint and increasing delta.  Conversely if the significand is
+  // odd.  This ensures that the exact endpoints of the rounding interval are
+  // handled correctly.
+  let widenInterval = 1 &- UInt64(f.significandBitPattern & 1)
+  let upperPowerOfTen = powerOfTenRoundedDown &+ widenInterval
+
+  // Scale the upper limit
+  // This is basically a 32-bit by 64-bit multiply, keeping
+  // the top 64 bits of the 96-bit result, with a small
+  // alignment to absorb the residual binary exponent:
+  let u0 = ((upperPowerOfTen & mask32) &* UInt64(unscaledUpperLimit))
+  let umask = widenInterval &* mask32
+  let u1 = (u0 &+ umask) >> 32
+  let u2 = u1 &+ (upperPowerOfTen >> 32) &* UInt64(unscaledUpperLimit)
+  let extraBits = ((integerBits &- significandBitCount)
+                     &- (binaryExponent &+ powerOfTenExponent))
+  // Conditionally round the final result up
+  let ubias = umask & ((1 &<< extraBits) &- 1)
+  let u = (u2 &+ ubias) >> extraBits
+
+  // Compute the width of the scaled rounding interval
+  // In the regular non-power-of-two case, the un-scaled rounding interval
+  // has width 1, so we just need to align the powerOfTen estimate
+  let deltaShift = extraBits &+ significandBitCount
+  var delta = powerOfTenRoundedDown >> deltaShift
+  // In the power-of-two case, we need to account for the asymmetric interval
+  if f.significandBitPattern == 0 {
+    delta &-= delta >> 2
   }
+  // Widen/narrow the interval if the value has an even/odd significand
+  // This ensures that the endpoints of the rounding interval are considered
+  // only when the value has an even significand
+  delta &+= 4 &* widenInterval &- 2
 
-  // Step 6: Align first digit, adjust exponent
+  // Step 5: Emit most of the decimal digits into the destination buffer
 
-  while u < (UInt64(1) &<< fractionBits) {
-    base10Exponent &-= 1
-    l &*= 10
-    u &*= 10
-  }
-
-  // Step 7: Generate decimal digits into the destination buffer
+  // firstDigit starts at 6 to give us room to insert an initial minus
+  // sign and/or leading zeros.  This is used by the ergonomic formatting
+  // logic done in `finishFormatting()`.
 
   var t = u
-  var delta = u &- l
-  let fractionMask: UInt64 = (1 << fractionBits) - 1
+  var firstDigit = 6
+  var nextDigit = firstDigit
 
-  // Overwrite the first digit at index 7:
-  let firstDigit = 7
-  let digit = (t >> fractionBits) &+ 0x30
+  let base10Significand = UInt32(truncatingIfNeeded: t >> fractionBits)
   t &= fractionMask
-  unsafe buffer.storeBytes(
-    of: UInt8(truncatingIfNeeded: digit),
-    toUncheckedByteOffset: firstDigit,
-    as: UInt8.self)
-  var nextDigit = firstDigit &+ 1
 
-  // Generate 2 digits at a time...
-  while (delta &* 10) < ((t &* 10) & fractionMask) {
-    delta &*= 100
-    t &*= 100
-    let d12 = Int(truncatingIfNeeded: t >> fractionBits)
-    let text = unsafe asciiDigitTable[unchecked: d12]
-    unsafe buffer.storeBytes(
-      of: text,
-      toUncheckedByteOffset: nextDigit,
-      as: UInt16.self)
-    nextDigit &+= 2
-    t &= fractionMask
-  }
+  // Convert the digits we have so far and write them out...
+  let digits = _intToEightDecimalDigits(base10Significand)
+  buffer.storeBytes(
+    of: digits + 0x3030303030303030,
+    toByteOffset: firstDigit,
+    as: UInt64.self)
+  nextDigit &+= 8
 
-  // ... and a final single digit, if necessary
-  if delta < t {
-    delta &*= 10
+  // Trim leading zero digits
+  // (Little-endian assumption means that the _trailing_
+  // zero digits in `digits` are the most-significant ones.)
+  firstDigit &+= digits.trailingZeroBitCount / 8
+
+  // Step 6: Compute one more decimal digit if necessary
+
+  // So far, we've computed
+  //    base10Significand * 10^base10Power
+  // Because of how we computed base10Power above,
+  // there are exactly three cases here:
+  // A: Our value is in the rounding interval and we're essentially done.
+  // B: We need another digit and the rounding interval is symmetric
+  // C: We need another digit and the rounding interval is asymmetric
+
+  // Intuitively: `delta` is the width of the rounding interval,
+  // `t` is the distance from the value we've computed so far
+  // to our current target value.
+  if delta >= t {
+    // Step 6, Case A: We have a value that lies within the rounding
+    // interval, and it's a multiple of 10^base10Power.  As described
+    // earlier, there can only be one such. This is the fast case.
+
+    // Experimentally, ~39% of all inputs get here.
+
+    // We only need to trim trailing zeros
+    let trailingZeros = digits.leadingZeroBitCount / 8
+    nextDigit &-= trailingZeros
+    base10Power &+= trailingZeros
+    // No final-digit adjustment is needed
+  } else if f.significandBitPattern != 0 {
+    // Step 6, Case B: We need another digit, the interval is symmetric
+    // Experimentally, ~61% of all inputs get here.  This is common and
+    // worth spending time to optimize.
+
+    // Adjust `t` to measure the distance from the value we've computed so
+    // far to the actual float value (instead of the upper endpoint)
+    // This is `t -= delta/2; t *= 10` reordered to reduce precision loss
     t &*= 10
-    let text = 0x30 + UInt8(truncatingIfNeeded: t >> fractionBits)
-    unsafe buffer.storeBytes(
-      of: text,
-      toUncheckedByteOffset: nextDigit,
+    t &-= delta &* 5
+    // Multiplication by 10 above magnified the possible error, so
+    // round away the last 6 bits.  This also puts us in 32.32 form.
+    let lastAccurateBit = UInt64(1) << 6
+    t = (t &+ (lastAccurateBit >> 1)) >> 6
+
+    var digit = UInt8(truncatingIfNeeded: t >> 32)
+    let t32 = UInt32(truncatingIfNeeded: t)
+
+    // `t` is the scaled distance from our current base-10 value to
+    // the actual binary target value. `digit` is the closest
+    // base-10 digit _below_ our target.  If `t` is bigger than 1/2,
+    // then the digit _above_ the target is actually closer:
+    let oneHalf = UInt32(1) << 31
+    digit &+= UInt8(truncatingIfNeeded: t32 >> 31)
+    if t32 == oneHalf { // If t is exactly 1/2, round even
+      digit &= ~1
+    }
+    buffer.storeBytes(
+      of: digit &+ 0x30,
+      toByteOffset: nextDigit,
       as: UInt8.self)
     nextDigit &+= 1
+    base10Power &-= 1
+  } else {
+    // Step 6, Case C: We need another digit, the interval is not symmetric
+    // This only applies to some exact powers of 2.  For example, only 121
+    // Float32 values hit this path.
+
+    // The actual target is 2/3 from the top of the interval,
+    // which requires adjusting the interval width and the target.
+    delta &*= 10
+    t &*= 10
+    t &-= delta
+    delta /= 3
+    t &+= delta
+    let lastAccurateBit = UInt64(1) << 6
+    t = (t &+ (lastAccurateBit >> 1)) & ~(lastAccurateBit &- 1)
+    var digit = UInt8(truncatingIfNeeded: t >> fractionBits)
     t &= fractionMask
+
+    if delta < t {
+      // Because the interval is not symmetric, our current value
+      // (below the target) might be outside of the interval.  If this
+      // happens, we know the value above the target must be within
+      // it.
+      digit += 1
+    } else {
+      let oneHalf = UInt64(1) << (fractionBits - 1)
+      digit &+= UInt8(truncatingIfNeeded: t >> (fractionBits - 1))
+      if t == oneHalf { // If t is exactly 1/2, round even
+        digit &= ~1
+      }
+    }
+    buffer.storeBytes(
+      of: digit &+ 0x30,
+      toByteOffset: nextDigit,
+      as: UInt8.self)
+    nextDigit &+= 1
+    base10Power &-= 1
   }
 
-  // Adjust the final digit to be closer to the original value
+  // Step 7: Finish formatting
   let isBoundary = (f.significandBitPattern == 0)
-  if delta > t &+ (1 << fractionBits) {
-    let skew: UInt64
-    if isBoundary {
-      skew = delta &- delta / 3 &- t
-    } else {
-      skew = delta / 2 &- t
-    }
-    let one = UInt64(1) << (64 - integerBits)
-    let lastAccurateBit = UInt64(1) << 24
-    let fractionMask = (one - 1) & ~(lastAccurateBit - 1)
-    let oneHalf = one >> 1
-    var lastDigit = unsafe buffer.unsafeLoad(
-      fromUncheckedByteOffset: nextDigit &- 1,
-      as: UInt8.self)
-    if ((skew &+ (lastAccurateBit >> 1)) & fractionMask) == oneHalf {
-      // Skew is integer + 1/2, round even after adjustment
-      let adjust = skew >> (64 - integerBits)
-      lastDigit &-= UInt8(truncatingIfNeeded: adjust)
-      lastDigit &= ~1
-    } else {
-      // Round nearest
-      let adjust = (skew &+ oneHalf) >> (64 - integerBits)
-      lastDigit &-= UInt8(truncatingIfNeeded: adjust)
-    }
-    unsafe buffer.storeBytes(
-      of: lastDigit,
-      toUncheckedByteOffset: nextDigit &- 1,
-      as: UInt8.self)
-  }
-
-  // Step 8: Finish formatting
   let forceExponential =
-    ((binaryExponent > 25)
-       || (binaryExponent == 25 && !isBoundary))
+    ((binaryExponent > 1)
+       || (binaryExponent == 1 && !isBoundary))
   return _finishFormatting(
     buffer: &buffer,
     sign: f.sign,
     firstDigit: firstDigit,
     nextDigit: nextDigit,
     forceExponential: forceExponential,
-    base10Exponent: base10Exponent)
+    base10Power: base10Power)
 }
 
 // ================================================================
@@ -717,9 +785,8 @@ internal func _float64ToStringImpl(
 }
 
 // Convert a Float64 to an optimal ASCII representation.
-// See notes above for comments on the output format here.
-// The algorithm is extensively commented inline; the comments
-// at the top of this source file give additional context.
+// See the Float32 implementation for extensive comments
+// explaining the algorithm.
 // Inputs:
 // * `value`: Float64 input
 // * `buffer`: Buffer to place the result
@@ -732,453 +799,189 @@ internal func _Float64ToASCII(
   value d: Float64,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
 ) -> Range<Int> {
-  // We need a MutableRawSpan in order to use wide store/load operations
-  precondition(utf8Buffer.count >= 32)
+  assert(utf8Buffer.count >= 32)
   var buffer = unsafe utf8Buffer.mutableBytes
 
-  //
-  // Step 1: Handle the special cases, decompose the input
-  //
+  let significandBitCount = Double.significandBitCount + 1 // 53
+  let exponentBias = 1022 + 53
   let binaryExponent: Int
   let significand: Double.RawSignificand
-  let exponentBias = 1022 // (1 << (Double.exponentBitCount - 1)) - 2
 
-  if (d.exponentBitPattern == 0x7ff) {
-    if (d.isInfinite) {
-      return _infinity(buffer: &buffer, sign: d.sign)
-    } else { // d.isNaN
-      let quietBit =
-        (d.significandBitPattern >> (Double.significandBitCount - 1)) & 1
-      let payloadMask = (UInt64(1) &<< (Double.significandBitCount - 2)) - 1
-      let payload64 = d.significandBitPattern & payloadMask
-      return nan_details(
-        buffer: &buffer,
-        sign: d.sign,
-        quiet: quietBit != 0,
-        payloadHigh: 0,
-        payloadLow: UInt64(truncatingIfNeeded:payload64))
-    }
-  } else if (d.exponentBitPattern == 0) {
-    if (d.isZero) {
-      return _zero(buffer: &buffer, sign: d.sign)
-    } else { // d.isSubnormal
-      binaryExponent = 1 - exponentBias
-      significand = d.significandBitPattern &<< Double.exponentBitCount
+  // Step 1: Handle the special cases, decompose the input
+
+  // Use a single branch to test for exponents of 0x00 or 0x7ff
+  if ((UInt16(truncatingIfNeeded: d.exponentBitPattern) &+ 1) & 0x7ff) < 2 {
+    if d.exponentBitPattern == 0 {
+      if (d.isZero) {
+        return _zero(buffer: &buffer, sign: d.sign)
+      } else { // d.isSubnormal
+        significand = d.significandBitPattern
+        binaryExponent = 1 &- exponentBias
+      }
+    } else { // d.exponentBitPattern == 0xff
+      if (d.isInfinite) {
+        return _infinity(buffer: &buffer, sign: d.sign)
+      } else { // d.isNaN
+        let quietBit =
+          (d.significandBitPattern >> (Double.significandBitCount - 1)) & 1
+        let payloadMask = UInt64(1 << (Double.significandBitCount - 2)) - 1
+        let payload64 = d.significandBitPattern & payloadMask
+        return nan_details(
+          buffer: &buffer,
+          sign: d.sign,
+          quiet: quietBit != 0,
+          payloadHigh: 0,
+          payloadLow: payload64
+        )
+      }
     }
   } else {
+    // Normal
+    let implicitBit = Double.RawSignificand(1) << Double.significandBitCount
+    significand = d.significandBitPattern &+ implicitBit
     binaryExponent = Int(d.exponentBitPattern) &- exponentBias
-    significand =
-      ((d.significandBitPattern &+ (1 << Double.significandBitCount))
-         &<< Double.exponentBitCount)
   }
-  // The input has been decomposed as significand * 2^binaryExponent,
-  // where `significand` is a 64-bit fraction with the binary
-  // point at the far left.
 
-  // Step 2: Determine the exact unscaled target interval
+  // Step 2: Compute the base 10 exponent to match the rounding interval
 
-  // Grisu-style algorithms construct the shortest decimal digit
-  // sequence within a specific interval.  To build the appropriate
-  // interval, we start by computing the midpoints between this
-  // floating-point value and the adjacent ones.  Note that this
-  // step is an exact computation.
+  let powerOf2Adjust = d.significandBitPattern == 0 ? Int64(-536607787) : Int64(0)
+  let rawBase10Power = Int64(binaryExponent) &* 1292913986 &+ powerOf2Adjust
+  let roundedBase10Power = (rawBase10Power &+ 0xffffffff) >> 32
+  var base10Power = Int(truncatingIfNeeded: roundedBase10Power)
 
-  let halfUlp: Double.RawSignificand = 1 << (Double.exponentBitCount - 1)
-  let quarterUlp = halfUlp >> 1
-  let upperMidpointExact = significand &+ halfUlp
-  let lowerMidpointExact =
-    significand &- ((d.significandBitPattern == 0) ? quarterUlp : halfUlp)
-  let isOddSignificand = ((d.significandBitPattern & 1) != 0)
-
-  // Step 3: Estimate the base 10 exponent
-
-  // Grisu algorithms are based in part on a simple technique for
-  // generating a base-10 form for a binary floating-point number.
-  // Start with a binary floating-point number `f * 2^e` and then
-  // estimate the decimal exponent `p`. You can then rewrite your
-  // original number as:
-  //
-  // ```
-  //     f * 2^e * 10^-p * 10^p
-  // ```
-  //
-  // The last term is part of our output, and a good estimate for
-  // `p` will ensure that `2^e * 10^-p` is close to 1.  Multiplying
-  // the first three terms then yields a fraction suitable for
-  // producing the decimal digits.  Here we use a very fast estimate
-  // of `p` that is never off by more than 1; we'll have
-  // opportunities later to correct any error.
-
-  var base10Exponent = decimalExponentFor2ToThe(binaryExponent)
-
-  // Step 4: Compute power-of-10 scale factor
-
-  // Compute `10^-p` to 128-bit precision.  We generate
-  // both over- and under-estimates to ensure we can exactly
-  // bound the later use of these values.
-  // The `powerOfTenRounded{Up,Down}` values are 128-bit
-  // pure fractions with the decimal point at the far left.
+  // Step 3: Look up power-of-10 scale factor
 
   var powerOfTenRoundedDown: _UInt128 = 0
-  var powerOfTenRoundedUp: _UInt128 = 0
+  let powerOfTenExponent = _powerOf10_Binary64(p: 0 &- base10Power,
+                                               significand: &powerOfTenRoundedDown)
 
-  // Note the extra factor of 10^bulkFirstDigits -- that will give
-  // us a headstart on digit generation later on.  (In contrast, Ryu
-  // uses an extra factor of 10^17 here to get all the digits up
-  // front, but then has to back out any extra digits.  Doing that
-  // with a 17-digit value requires 64-bit division, which is the
-  // root cause of Ryu's poor performance on 32-bit processors.  We
-  // also might have to back out extra digits if 7 is too many, but
-  // will only need 32-bit division in that case.)
+  // Step 4: Scale the interval (with rounding)
 
-  let bulkFirstDigits = 7
-  let bulkFirstDigitFactor: UInt32 = 1000000 // 10^(bulkFirstDigits - 1)
+  // After scaling, we'll use a 64.64 fixed-point format
+  let integerBits = 64
+  let fractionBits = 128 - integerBits
+  let fractionMask: _UInt128 = (1 << fractionBits) - 1
 
-  let powerOfTenExponent = _intervalContainingPowerOf10_Binary64(
-    p: -base10Exponent &+ bulkFirstDigits &- 1,
-    lower: &powerOfTenRoundedDown,
-    upper: &powerOfTenRoundedUp)
+  // Find the unscaled exact upper limit of the rounding interval
+  let halfUlp: Double.RawSignificand = 1 << (Double.exponentBitCount - 1)
+  let unscaledUpperLimit = (significand &<< Double.exponentBitCount) &+ halfUlp
 
-  let extraBits = binaryExponent + powerOfTenExponent
+  // If the significand is even, we want to widen the interval
+  let widenInterval = _UInt128(_low: 1 &- (d.significandBitPattern & 1),
+                              _high: 0)
+  let upperPowerOfTen = powerOfTenRoundedDown &+ widenInterval * 2
 
-  // Step 5: Scale the interval (with rounding)
+  // Scale the upper limit
+  let u0 = _UInt128(upperPowerOfTen._low) &* _UInt128(unscaledUpperLimit)
+  let umask = widenInterval &* _UInt128(UInt64.max)
+  let u1 = _UInt128((u0 &+ _UInt128(umask))._high)
+  let u2 = u1 &+ _UInt128(upperPowerOfTen._high) &* _UInt128(unscaledUpperLimit)
+  let extraBits = ((integerBits &- significandBitCount)
+                     &- (binaryExponent &+ powerOfTenExponent))
+  let ubias = umask & ((1 &<< extraBits) &- 1)
+  let u = (u2 &+ ubias) >> extraBits
 
-  // As mentioned above, the final digit generation works
-  // with an interval, so we actually apply the scaling
-  // to the upper and lower midpoint values separately.
-
-  // As part of the scaling here, we'll switch from a pure
-  // fraction with zero bit integer portion and 128-bit fraction
-  // to a fixed-point form with 32 bits in the integer portion.
-
-  let integerBits = 32
-  let roundingBias =
-    _UInt128((1 &<< UInt64(truncatingIfNeeded: integerBits &- extraBits)) &- 1)
-  var u: _UInt128
-  var l: _UInt128
-  if isOddSignificand {
-    // Case A: Narrow the interval (odd significand)
-
-    // Loitsch' original Grisu2 always rounds so as to narrow the
-    // interval.  Since our digit generation will select a value
-    // within the scaled interval, narrowing the interval
-    // guarantees that we will find a digit sequence that converts
-    // back to the original value.
-
-    // This ensures accuracy but, as explained in Loitsch' paper,
-    // this carries a risk that there will be a shorter digit
-    // sequence outside of our narrowed interval that we will
-    // miss. This risk obviously gets lower with increased
-    // precision, but it wasn't until the Errol paper that anyone
-    // had a good way to test whether a particular implementation
-    // had sufficient precision. That paper shows a way to enumerate
-    // the worst-case numbers; those numbers that are extremely close
-    // to the mid-points between adjacent floating-point values.
-    // These are the values that might sit just outside of the
-    // narrowed interval. By testing these values, we can verify
-    // the correctness of our implementation.
-
-    // Multiply out the upper midpoint, rounding down...
-    let u1 = _multiply128x64RoundingDown(
-      powerOfTenRoundedDown,
-      upperMidpointExact)
-    // Account for residual binary exponent and adjust
-    // to the fixed-point format
-    u = u1 >> (integerBits - extraBits)
-
-    // Conversely for the lower midpoint...
-    let l1 = _multiply128x64RoundingUp(
-      powerOfTenRoundedUp,
-      lowerMidpointExact)
-    l = (l1 + roundingBias) >> (integerBits - extraBits)
-  } else {
-    // Case B: Widen the interval (even significand)
-
-    // As explained in Errol Theorem 6, in certain cases there is
-    // a short decimal representation at the exact boundary of the
-    // scaled interval.  When such a number is converted back to
-    // binary, it will get rounded to the adjacent even
-    // significand.
-
-    // So when the significand is even, we round so as to widen
-    // the interval in order to ensure that the exact midpoints
-    // are considered.  Of couse, this ensures that we find a
-    // short result but carries a risk of selecting a result
-    // outside of the exact scaled interval (which would be
-    // inaccurate).
-    // (This technique of rounding differently for even/odd significands
-    // seems to be new; I've not seen it described in any of the
-    // papers on floating-point printing.)
-
-    // The same testing approach described above (based on results
-    // in the Errol paper) also applies
-    // to this case.
-
-    let u1 = _multiply128x64RoundingUp(
-      powerOfTenRoundedUp,
-      upperMidpointExact)
-    u = (u1 &+ roundingBias) >> (integerBits - extraBits)
-    let l1 = _multiply128x64RoundingDown(
-      powerOfTenRoundedDown,
-      lowerMidpointExact)
-    l = l1 >> (integerBits - extraBits)
+  // Compute the width of the scaled rounding interval
+  var delta = powerOfTenRoundedDown >> (extraBits &+ significandBitCount)
+  if d.significandBitPattern == 0 {
+    delta &-= delta >> 2
   }
+  delta &+= 6 &* widenInterval &- 3
 
-  // Step 6: Align the first digit, adjust exponent
+  // Step 5: Emit most of the decimal digits into the destination buffer
 
-  // Calculations above used an estimate for the power-of-ten scale.
-  // Here, we compensate for any error in that estimate by testing
-  // whether we have the expected number of digits in the integer
-  // portion and correcting as necessary.  This also serves to
-  // prune leading zeros from subnormals.
-
-  // Except for subnormals, this loop never runs more than once.
-  // For subnormals, this might run as many as 16 times.
-  let minimumU = _UInt128(bulkFirstDigitFactor) << (128 - integerBits)
-  while u < minimumU {
-    base10Exponent -= 1
-    l &*= 10
-    u &*= 10
-  }
-
-  // Step 7: Produce decimal digits
-
-  // One standard approach generates digits for the scaled upper and
-  // lower boundaries and stops at the first digit that
-  // differs. For example, note that 0.1234 is the shortest decimal
-  // between u = 0.123456 and l = 0.123345.
-
-  // Grisu optimizes this by generating digits for the upper bound
-  // (multiplying by 10 to isolate each digit) while simultaneously
-  // scaling the interval width `delta`.  As we remove each digit
-  // from the upper bound, the remainder is the difference between
-  // the base-10 value generated so far and the true upper bound.
-  // When that remainder is less than the scaled width of the
-  // interval, we know the current digits specify a value within the
-  // target interval.
-
-  // The logic below actually blends three different digit-generation
-  // strategies:
-  // * The first digits are already in the integer portion of the
-  //   fixed-point value, thanks to the `bulkFirstDigits` factor above.
-  //   We can just break those down and write them out.
-  // * If we generated too many digits, we use a Ryu-inspired technique
-  //   to backtrack.
-  // * If we generated too few digits (the usual case), we use an
-  //   optimized form of the Grisu2 method to produce the remaining
-  //   values.
-
-  //
-  // Generate digits and build the output.
-  //
-
-  // Generate digits for `t` with interval width `delta = u - l`
-  // As above, these are fixed-point with 32-bit integer, 96-bit fraction
   var t = u
-  var delta = u &- l
-  let fractionMask = (_UInt128(1) << 96) - 1
+  var firstDigit = 6
+  var nextDigit = firstDigit
 
-  var nextDigit = 5
-  var firstDigit = nextDigit
-
-  // Our initial scaling gave us the first 7 digits already:
-  let d12345678 = UInt32(truncatingIfNeeded: t._high >> 32)
+  let base10Significand = UInt64(truncatingIfNeeded: t >> fractionBits)
   t &= fractionMask
 
+  // Convert the digits we have so far and write them out...
+  let digits = _intToSixteenDecimalDigits(base10Significand)
+  let zeros = _UInt128(
+    _low: 0x3030303030303030,
+    _high: 0x3030303030303030)
+  buffer.storeBytes(
+    of: digits + zeros,
+    toByteOffset: firstDigit,
+    as: _UInt128.self)
+  nextDigit &+= 16
+
+  // Trim leading zero digits
+  firstDigit &+= digits.trailingZeroBitCount / 8
+
+  // Step 6: Compute one more decimal digit if necessary
+
   if delta >= t {
-    // Oops!  We have too many digits.  Back out the extra ones to
-    // get the right answer.  This is similar to Ryu, but since
-    // we've only produced seven digits, we only need 32-bit
-    // arithmetic here.  (Ryu needs 64-bit arithmetic to back out
-    // digits, which severely compromises performance on 32-bit
-    // processors.  The same problem occurs with Ryu for 128-bit
-    // floats on 64-bit processors.)
-    // A few notes:
-    // * Our target hardware always supports 32-bit hardware division,
-    //   so this should be reasonably fast.
-    // * For small integers (like "2.0"), Ryu would have to back out 16
-    //   digits; we only have to back out 6.
-    // * Very few double-precision values actually need fewer than 7
-    //   digits.  So this is rarely used except in workloads that
-    //   specifically use double for small integers.
+    // Step 6, Case A: We have a value that lies within the interval
+    // We only need to trim trailing zeros
+    let trailingZeros = digits.leadingZeroBitCount / 8
+    nextDigit &-= trailingZeros
+    base10Power &+= trailingZeros
+    // No final-digit adjustment is needed
+  } else if d.significandBitPattern != 0 {
+    // Step 6, Case B: We need another digit, the interval is symmetric
+    t &*= 10
+    t &-= delta &* 5
+    let lastAccurateBit = _UInt128(1) << 6
+    t = (t &+ (lastAccurateBit >> 1)) & ~(lastAccurateBit &- 1)
 
-    // Why this is critical for performance: In order to use the
-    // 8-digits-at-a-time optimization below, we need at least 30
-    // bits in the integer part of our fixed-point format above.
-    // If we only use bulkDigits = 1, that leaves only 128 - 30 =
-    // 98 bit accuracy for our scaling step, which isn't enough
-    // (experiments suggest that binary64 needs ~110 bits for
-    // correctness).  So we have to use a large bulkDigits value
-    // to make full use of the 128-bit scaling above, which forces
-    // us to have some form of logic to handle the case of too
-    // many digits.  The alternatives are either to use >128 bit
-    // arithmetic, or to back up and repeat the original scaling
-    // with bulkDigits = 1.
+    var digit = UInt8(truncatingIfNeeded: t >> fractionBits)
+    t &= fractionMask
 
-    let uHigh = u._high
-    let lHigh = (l &+ _UInt128(UInt64.max))._high
-    let tHigh: UInt64
-    if d.significand == 0 {
-      tHigh = (uHigh &+ lHigh &* 2) / 3
-    } else {
-      tHigh = (uHigh &+ lHigh) / 2
+    let oneHalf = UInt64(1) << (fractionBits - 1)
+    digit &+= UInt8(truncatingIfNeeded: t >> (fractionBits - 1))
+    if t == oneHalf { // If t is exactly 1/2, round even
+      digit &= ~1
     }
-    var u0 = UInt32(truncatingIfNeeded: uHigh >> (64 - integerBits))
-    var l0 = UInt32(truncatingIfNeeded: lHigh >> (64 - integerBits))
-    if lHigh & ((1 << (64 - integerBits)) - 1) != 0 {
-      l0 &+= 1
-    }
-    var t0 = UInt32(truncatingIfNeeded: tHigh >> (64 - integerBits))
-    var t0digits = 8
-
-    var u1 = u0 / 10
-    var l1 = (l0 &+ 9) / 10
-    var trailingZeros = (t == 0)
-    var droppedDigit = UInt32(
-      truncatingIfNeeded: ((tHigh &* 10) >> (64 - integerBits)) % 10)
-    while u1 >= l1 && u1 != 0 {
-      u0 = u1
-      l0 = l1
-      trailingZeros = trailingZeros && (droppedDigit == 0)
-      droppedDigit = t0 % 10
-      t0 /= 10
-      t0digits -= 1
-      u1 = u0 / 10
-      l1 = (l0 &+ 9) / 10
-    }
-    // Correct the final digit
-    if droppedDigit > 5 || (droppedDigit == 5 && !trailingZeros) { // > 0.5000
-      t0 &+= 1
-    } else if droppedDigit == 5 && trailingZeros { // == 0.5000
-      t0 &+= 1
-      t0 &= ~1
-    }
-    // t0 has t0digits digits.  Write them out
-    let text = _intToEightDigits(t0)
     buffer.storeBytes(
-      of: text,
+      of: digit &+ 0x30,
       toByteOffset: nextDigit,
-      as: UInt64.self)
-    nextDigit &+= 8
-    // Skip the leading zeros
-    firstDigit &+= 9 - t0digits
+      as: UInt8.self)
+    nextDigit &+= 1
+    base10Power &-= 1
   } else {
-    // Our initial scaling did not produce too many digits.  The
-    // `d12345678` value holds the first 7 digits (plus a leading
-    // zero).  The remainder of this algorithm is basically just a
-    // heavily-optimized variation of Grisu2.
+    // Step 6, Case C: We need another digit, the interval is not symmetric
+    delta &*= 10
+    t &*= 10
+    t &-= delta
+    delta /= 3
+    t &+= delta
+    let lastAccurateBit = _UInt128(1) << 6
+    t = (t &+ (lastAccurateBit >> 1)) & ~(lastAccurateBit &- 1)
+    var digit = UInt8(truncatingIfNeeded: t >> fractionBits)
+    t &= fractionMask
 
-    // Write out exactly 8 digits, assuming little-endian.
-    let chars = _intToEightDigits(d12345678)
-    unsafe buffer.storeBytes(
-      of: chars,
-      toUncheckedByteOffset: nextDigit,
-      as: UInt64.self)
-    nextDigit &+= 8
-    firstDigit &+= 1
-
-    // >90% of random binary64 values need at least 15 digits.
-    // We have seven so there's probably at least 8 more, which
-    // we can grab all at once.
-    let TenToTheEighth = 100000000 as _UInt128 // 10^(15-bulkFirstDigits)
-    let d0 = delta * TenToTheEighth
-    var t0 = t * TenToTheEighth
-    // The integer part of t0 is the next 8 digits
-    let next8Digits = UInt32(truncatingIfNeeded: t0._high >> 32)
-    t0 &= fractionMask
-    if d0 < t0 {
-      // We got 8 more digits! (So number is at least 15 digits)
-      // Write them out:
-      let chars = _intToEightDigits(next8Digits)
-      unsafe buffer.storeBytes(
-        of: chars,
-        toUncheckedByteOffset: nextDigit,
-        as: UInt64.self)
-      nextDigit &+= 8
-      t = t0
-      delta = d0
-    }
-
-    // Generate remaining digits one at a time, following Grisu:
-    while (delta < t) {
-      delta &*= 10
-      t &*= 10
-      unsafe buffer.storeBytes(
-        of: UInt8(truncatingIfNeeded: t._high >> 32) &+ 0x30,
-        toUncheckedByteOffset: nextDigit,
-        as: UInt8.self)
-      nextDigit &+= 1
-      t &= fractionMask
-    }
-
-    // Adjust the final digit to be closer to the original value.
-    // This accounts for the fact that sometimes there is more than
-    // one shortest digit sequence.
-
-    // For example, consider how the above would work if you had the
-    // value 0.1234 and computed u = 0.1257, l = 0.1211.  The above
-    // digit generation works with `u`, so produces 0.125.  But the
-    // values 0.122, 0.123, and 0.124 are just as short and 0.123 is
-    // therefore the best choice, since it's closest to the original
-    // value.
-
-    // We know delta and t are both less than 10.0 here, so we can
-    // shed some excess integer bits to simplify the following:
-    let adjustIntegerBits = 4 // Integer bits for "adjust" phase
-    let deltaHigh64 = UInt64(
-      truncatingIfNeeded: delta >> (64 - integerBits + adjustIntegerBits))
-    let tHigh64 = UInt64(
-      truncatingIfNeeded: t >> (64 - integerBits + adjustIntegerBits))
-
-    let one = UInt64(1) << (64 - adjustIntegerBits)
-    let adjustFractionMask = one - 1
-    let oneHalf = one >> 1
-    if deltaHigh64 >= tHigh64 &+ one {
-      // The `skew` is the difference between our
-      // computed digits and the original exact value.
-      var skew: UInt64
-      if (d.significandBitPattern == 0) {
-        skew = deltaHigh64 &- deltaHigh64 / 3 &- tHigh64
-      } else {
-        skew = deltaHigh64 / 2 &- tHigh64
+    if delta < t {
+      digit += 1
+    } else {
+      let oneHalf = UInt64(1) << (fractionBits - 1)
+      digit &+= UInt8(truncatingIfNeeded: t >> (fractionBits - 1))
+      if t == oneHalf { // If t is exactly 1/2, round even
+        digit &= ~1
       }
-
-      var lastDigit = unsafe buffer.unsafeLoad(
-        fromUncheckedByteOffset: nextDigit - 1,
-        as: UInt8.self)
-
-      // We use the `skew` to figure out whether there's
-      // a better base-10 value than our current one.
-      if (skew & adjustFractionMask) == oneHalf {
-        // Difference is an integer + exactly 1/2, so ...
-        let adjust = skew >> (64 - adjustIntegerBits)
-        lastDigit &-= UInt8(truncatingIfNeeded: adjust)
-        // ... we round the last digit even.
-        lastDigit &= ~1
-      } else {
-        let adjust = (skew + oneHalf) >> (64 - adjustIntegerBits)
-        lastDigit &-= UInt8(truncatingIfNeeded: adjust)
-      }
-      buffer.storeBytes(
-        of: lastDigit,
-        toByteOffset: nextDigit - 1,
-        as: UInt8.self)
     }
+    buffer.storeBytes(
+      of: digit &+ 0x30,
+      toByteOffset: nextDigit,
+      as: UInt8.self)
+    nextDigit &+= 1
+    base10Power &-= 1
   }
 
-  // Step 8: Finalize formatting by rearranging
-  // the digits and filling in decimal points,
-  // exponents, and zero padding.
+  // Step 7: Finish formatting
   let isBoundary = (d.significandBitPattern == 0)
   let forceExponential =
-    ((binaryExponent > 54) || (binaryExponent == 54 && !isBoundary))
+    ((binaryExponent > 1)
+       || (binaryExponent == 1 && !isBoundary))
   return _finishFormatting(
     buffer: &buffer,
     sign: d.sign,
     firstDigit: firstDigit,
     nextDigit: nextDigit,
     forceExponential: forceExponential,
-    base10Exponent: base10Exponent)
+    base10Power: base10Power)
 }
 
 
@@ -1361,7 +1164,7 @@ internal func _Float128ToASCII(
   // TODO:  Write Me!
 
   // Note: All the interesting parts are already implemented in _backend_256bit(...),
-  // so this can easily be implemented someday by just copyihng _Float80ToASCII
+  // so this can easily be implemented someday by just copying _Float80ToASCII
   // and making the obvious changes.  (See the introductory parts of
   // _Float64ToASCII for the structure common to all IEEE 754 formats.)
 }
@@ -1393,6 +1196,8 @@ internal func _Float128ToASCII(
 // implementation. That variation offers surprisingly reasonable
 // performance overall.
 //
+// TODO: Overhaul this to use the same algorithm as the new
+// Float32 and Float64 version.
 // ================================================================
 
 #if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
@@ -1409,13 +1214,13 @@ fileprivate func _backend_256bit(
 ) -> Range<Int> {
 
   // Step 3: Estimate the base 10 exponent
-  var base10Exponent = decimalExponentFor2ToThe(binaryExponent)
+  var base10Power = decimalExponentFor2ToThe(binaryExponent)
 
   // Step 4: Compute a power-of-10 scale factor
   var powerOfTenRoundedDown = _UInt256()
   var powerOfTenRoundedUp = _UInt256()
   let powerOfTenExponent = _intervalContainingPowerOf10_Binary128(
-    p: -base10Exponent,
+    p: -base10Power,
     lower: &powerOfTenRoundedDown,
     upper: &powerOfTenRoundedUp)
   let extraBits = binaryExponent &+ powerOfTenExponent
@@ -1447,7 +1252,7 @@ fileprivate func _backend_256bit(
 
   // Step 6: Align first digit, adjust exponent
   while u.high._high < (UInt64(1) << high64FractionBits) {
-    base10Exponent &-= 1
+    base10Power &-= 1
     l.multiply(by: UInt32(10))
     u.multiply(by: UInt32(10))
   }
@@ -1466,7 +1271,7 @@ fileprivate func _backend_256bit(
   nextDigit &+= 1
 
   // It would be nice to generate 8 digits at a time and take
-  // advantage of intToEightDigits, but our integer portion has only
+  // advantage of intToEightDecimalDigits, but our integer portion has only
   // 14 bits.  We can't make that bigger without either sacrificing
   // too much precision for correct Float128 or folding the first
   // digits into the scaling (as we do with Double) which would
@@ -1552,7 +1357,7 @@ fileprivate func _backend_256bit(
     firstDigit: firstDigit,
     nextDigit: nextDigit,
     forceExponential: forceExponential,
-    base10Exponent: base10Exponent)
+    base10Power: base10Power)
 }
 #endif
 
@@ -1567,7 +1372,7 @@ fileprivate func _backend_256bit(
 // `finishFormatting` converts this into the final text form,
 // inserting decimal points, minus signs, exponents, etc, as
 // necessary.  To minimize the work here, this assumes that there are
-// at least 5 unused bytes at the beginning of `buffer` before
+// at least 6 unused bytes at the beginning of `buffer` before
 // `firstDigit` and that all unused bytes are filled with `"0"` (0x30)
 // characters.
 
@@ -1577,7 +1382,7 @@ fileprivate func _finishFormatting(
   firstDigit: Int,
   nextDigit: Int,
   forceExponential: Bool,
-  base10Exponent: Int
+  base10Power: Int
 ) -> Range<Int> {
   // Performance note: This could be made noticeably faster by
   // writing the output consistently in exponential form with no
@@ -1587,7 +1392,8 @@ fileprivate func _finishFormatting(
   var nextDigit = nextDigit
 
   let digitCount = nextDigit &- firstDigit
-  if base10Exponent < -4 || forceExponential {
+  var p = base10Power &+ digitCount &- 1
+  if p < -4 || forceExponential {
     // Exponential form: "-1.23456789e+123"
     // Rewrite "123456789" => "1.23456789" by moving the first
     // digit to the left one byte and overwriting a period.
@@ -1598,7 +1404,7 @@ fileprivate func _finishFormatting(
         fromUncheckedByteOffset: firstDigit,
         as: UInt8.self)
       unsafe buffer.storeBytes(
-        of: 0x2e,
+        of: 0x2e, // "."
         toUncheckedByteOffset: firstDigit,
         as: UInt8.self)
       firstDigit &-= 1
@@ -1613,56 +1419,56 @@ fileprivate func _finishFormatting(
       toUncheckedByteOffset: nextDigit,
       as: UInt8.self)
     nextDigit &+= 1
-    var e = base10Exponent
-    let expSign: UInt8
-    if base10Exponent < 0 {
-      expSign = 0x2d // "-"
-      e = 0 &- e
+    let powerSign: UInt8
+    if p < 0 {
+      powerSign = 0x2d // "-"
+      p = 0 &- p
     } else {
-      expSign = 0x2b // "+"
+      powerSign = 0x2b // "+"
     }
     unsafe buffer.storeBytes(
-      of: expSign,
+      of: powerSign,
       toUncheckedByteOffset: nextDigit,
       as: UInt8.self)
     nextDigit &+= 1
-    if e > 99 {
-      if e > 999 {
-        let d = asciiDigitTable[e / 100]
+    if p > 99 {
+      if p > 999 {
+        let d = asciiDigitTable[p / 100]
         unsafe buffer.storeBytes(
           of: d,
           toUncheckedByteOffset: nextDigit,
           as: UInt16.self)
         nextDigit &+= 2
       } else {
-        let d = 0x30 &+ UInt8(truncatingIfNeeded: (e / 100))
+        let d = 0x30 &+ UInt8(truncatingIfNeeded: (p / 100))
         unsafe buffer.storeBytes(
           of: d,
           toUncheckedByteOffset: nextDigit,
           as: UInt8.self)
         nextDigit &+= 1
       }
-      e = e % 100
+      p = p % 100
     }
-    let d = unsafe asciiDigitTable[unchecked: e]
+    // For historical reasons, exponents are always at least 2 digits
+    let d = unsafe asciiDigitTable[unchecked: p]
     buffer.storeBytes(
       of: d,
       toByteOffset: nextDigit,
       as: UInt16.self)
     nextDigit &+= 2
-    } else if base10Exponent < 0 {
+  } else if p < 0 {
     // "-0.000123456789"
-    // We need up to 5 leading characters before the digits.
+    // We need up to 6 leading characters before the digits.
     // Note that the formatters above all insert extra leading "0" characters
     // to the beginning of the buffer, so we don't need to memset() here,
     // just back up the start to include them...
-    firstDigit &+= base10Exponent - 1
+    firstDigit &+= p &- 1
     // ... and then overwrite a decimal point to get "0." at the beginning
     buffer.storeBytes(
       of: 0x2e, // "."
       toByteOffset: firstDigit &+ 1,
       as: UInt8.self)
-  } else if base10Exponent &+ 1 < digitCount {
+  } else if p &+ 1 < digitCount {
     // "123456.789"
     // We move the first digits forward one position
     // so we can insert a decimal point in the middle.
@@ -1670,7 +1476,7 @@ fileprivate func _finishFormatting(
     // more than one digit around in the buffer.
     // TODO: Find out how to use C memmove() here
     firstDigit &-= 1
-    for i in 0...(base10Exponent &+ 1) {
+    for i in 0...(p &+ 1) {
       let t = unsafe buffer.unsafeLoad(
         fromUncheckedByteOffset: firstDigit &+ i &+ 1,
         as: UInt8.self)
@@ -1680,17 +1486,17 @@ fileprivate func _finishFormatting(
         as: UInt8.self)
     }
     buffer.storeBytes(
-      of: 0x2e,
-      toByteOffset: firstDigit &+ base10Exponent &+ 1,
+      of: 0x2e, // "."
+      toByteOffset: firstDigit &+ p &+ 1,
       as: UInt8.self)
   } else {
     // "12345678900.0"
     // Fill trailing zeros, put ".0" at the end
     // so the result is obviously floating-point.
     // Remember buffer was initialized with "0"
-    nextDigit = firstDigit &+ base10Exponent &+ 3
+    nextDigit = firstDigit &+ p &+ 3
     buffer.storeBytes(
-      of: 0x2e,
+      of: 0x2e, // "."
       toByteOffset: nextDigit &- 2,
       as: UInt8.self)
   }
@@ -1774,6 +1580,7 @@ fileprivate let hexdigits: _InlineArray<16, UInt8> = [
   0x38, 0x39, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66
 ]
 
+// Emit up to 16 hex digits, pruning leading zeros
 fileprivate func _hexWithoutLeadingZeros(
   buffer: inout MutableRawSpan,
   offset: inout Int,
@@ -1794,6 +1601,7 @@ fileprivate func _hexWithoutLeadingZeros(
   }
 }
 
+// Emit exactly 16 hex digits
 fileprivate func _hexWithLeadingZeros(
   buffer: inout MutableRawSpan,
   offset: inout Int,
@@ -1857,14 +1665,14 @@ fileprivate func nan_details(
   return 0..<i
 }
 
-// Convert an integer less than 10^8 into exactly 8 ASCII digits in a
-// UInt64.  Assuming little-endian, the resulting UInt64 can be stored
-// directly to memory.
+// Convert an integer less than 10^8 into exactly 8 decimal digits in a
+// UInt64.  Assuming little-endian, you can add 0x3030303030303030 and
+// store the result directly to memory to get an ASCII decimal.
 //
 // This implementation is based on work by Paul Khuong:
 // https://pvk.ca/Blog/2017/12/22/appnexus-common-framework-its-out-also-how-to-print-integers-faster/
 @inline(__always)
-fileprivate func _intToEightDigits(_ n: UInt32) -> UInt64 {
+fileprivate func _intToEightDecimalDigits(_ n: UInt32) -> UInt64 {
   // Break into two numbers of 4 decimal digits each
   let div8 = n / 10000
   let mod8 = n &- div8 &* 10000
@@ -1882,68 +1690,25 @@ fileprivate func _intToEightDigits(_ n: UInt32) -> UInt64 {
   let mod2 = pairs &- 10 &* div2
   let singles = div2 | (mod2 &<< 8)
 
-  // Convert 8 digits to ASCII characters
-  return singles &+ 0x3030303030303030
+  return singles
+}
+
+@inline(__always)
+fileprivate func _intToSixteenDecimalDigits(_ n: UInt64) -> _UInt128 {
+  let hi8 = n / 100000000
+  let lo8 = n &- hi8 * 100000000
+
+  return _UInt128(
+    _low: _intToEightDecimalDigits(UInt32(truncatingIfNeeded: hi8)),
+    _high: _intToEightDecimalDigits(UInt32(truncatingIfNeeded: lo8))
+  )
 }
 
 // ================================================================
 //
 // Arithmetic Helpers
 //
-// The code above works with fixed-point values.  Standard
-// addition/subtraction/comparison works fine, but we need rounding
-// control when multiplying such values.
-//
-// For exmaple, `multiply128x64RoundingDown` multiplies a 0.128
-// fixed-point value by a 0.64 fixed-point fraction, returning a 0.128
-// value that's been rounded down from the exact 192-bit result.
-//
 // ================================================================
-
-@inline(__always)
-fileprivate func _multiply64x32RoundingDown(
-  _ lhs: UInt64,
-  _ rhs: UInt32
-) -> UInt64 {
-  let mask32 = UInt64(UInt32.max)
-  let t = ((lhs & mask32) * UInt64(rhs)) >> 32
-  return t + (lhs >> 32) * UInt64(rhs)
-}
-
-@inline(__always)
-fileprivate func _multiply64x32RoundingUp(
-  _ lhs: UInt64,
-  _ rhs: UInt32
-) -> UInt64 {
-  let mask32 = UInt64(UInt32.max)
-  let t = (((lhs & mask32) * UInt64(rhs)) + mask32) >> 32
-  return t + (lhs >> 32) * UInt64(rhs)
-}
-
-@inline(__always)
-fileprivate func _multiply128x64RoundingDown(
-  _ lhs: _UInt128,
-  _ rhs: UInt64
-) -> _UInt128 {
-  let lhsHigh = _UInt128(truncatingIfNeeded: lhs._high)
-  let lhsLow = _UInt128(truncatingIfNeeded: lhs._low)
-  let rhs128 = _UInt128(truncatingIfNeeded: rhs)
-  return (lhsHigh &* rhs128) &+ ((lhsLow &* rhs128) >> 64)
-}
-
-@inline(__always)
-fileprivate func _multiply128x64RoundingUp(
-  _ lhs: _UInt128,
-  _ rhs: UInt64
-) -> _UInt128 {
-  let lhsHigh = _UInt128(truncatingIfNeeded: lhs._high)
-  let lhsLow = _UInt128(truncatingIfNeeded: lhs._low)
-  let rhs128 = _UInt128(truncatingIfNeeded: rhs)
-  let h = lhsHigh &* rhs128
-  let l = lhsLow &* rhs128
-  let bias = (_UInt128(1) << 64) &- 1
-  return h + ((l &+ bias) &>> 64)
-}
 
 // Custom 256-bit unsigned integer type, with various arithmetic
 // helpers as methods.
@@ -2111,38 +1876,14 @@ fileprivate struct _UInt256 {
 // ================================================================
 
 @inline(__always)
-fileprivate func _intervalContainingPowerOf10_Binary32(
+fileprivate func _powerOf10_Binary64(
   p: Int,
-  lower: inout UInt64,
-  upper: inout UInt64
-) -> Int {
-  if p >= 0 {
-    let base = powersOf10_Exact128[p &* 2 &+ 1]
-    lower = base
-    if p < 28 {
-      upper = base
-    } else {
-      upper = base &+ 1
-    }
-  } else {
-    let base = powersOf10_negativeBinary32[p &+ 40]
-    lower = base
-    upper = base &+ 1
-  }
-  return binaryExponentFor10ToThe(p)
-}
-
-@inline(__always)
-fileprivate func _intervalContainingPowerOf10_Binary64(
-  p: Int,
-  lower: inout _UInt128,
-  upper: inout _UInt128
+  significand: inout _UInt128
 ) -> Int {
   if p >= 0 && p <= 55 {
     let upper64 = powersOf10_Exact128[p &* 2 &+ 1]
     let lower64 = powersOf10_Exact128[p &* 2]
-    upper = _UInt128(_low: lower64, _high: upper64)
-    lower = upper
+    significand = _UInt128(_low: lower64, _high: upper64)
     return binaryExponentFor10ToThe(p)
   }
 
@@ -2154,16 +1895,14 @@ fileprivate func _intervalContainingPowerOf10_Binary64(
   let baseExponent = binaryExponentFor10ToThe(p &- extraPower)
 
   if extraPower == 0 {
-    lower = _UInt128(_low: baseLow, _high: baseHigh)
-    upper = lower &+ 1
+    significand = _UInt128(_low: baseLow, _high: baseHigh)
     return baseExponent
   } else {
     let extra = powersOf10_Exact128[extraPower &* 2 &+ 1]
-    lower = ((_UInt128(truncatingIfNeeded:baseHigh)
-                &* _UInt128(truncatingIfNeeded:extra))
-               &+ ((_UInt128(truncatingIfNeeded:baseLow)
-                      &* _UInt128(truncatingIfNeeded:extra)) &>> 64))
-    upper = lower &+ 2
+    significand = ((_UInt128(truncatingIfNeeded:baseHigh)
+                      &* _UInt128(truncatingIfNeeded:extra))
+                     &+ ((_UInt128(truncatingIfNeeded:baseLow)
+                            &* _UInt128(truncatingIfNeeded:extra)) &>> 64))
     return baseExponent &+ binaryExponentFor10ToThe(extraPower)
   }
 }
@@ -2178,31 +1917,24 @@ fileprivate func decimalExponentFor2ToThe(_ p: Int) -> Int {
   return Int((Int64(p) &* 20201781) >> 26)
 }
 
-// Each of the constant values here have an implicit binary point at
-// the extreme left and when not exact, are rounded _down_ from the
-// exact values.  For example, the first row of the first table says
-// that:
+// Each of the constant values here have an implicit binary point at the extreme
+// left and when not exact, are rounded _down_ from the exact values.  For
+// example, the first row of the powersOf10_Binary64 table below says that:
 //
-//   0x0.8b61313bbabce2c6 x 2^-132
+//   0x0.95fe7e07c91efafa3931b850df08e738 x 2^-1328
 //
-// is the result of rounding down the exact binary value of 10^-40 to
-// 64 significant bits.  The logic above uses these tables to compute
+// is the result of rounding down the exact binary value of 10^-400 to
+// 128 significant bits.  The logic above uses these tables to compute
 // bounds for the exact value of the power of 10.
 
 // Note the binary exponent is not stored; it is computed by the
 // `binaryExponentFor10ToThe(p)` function.
 
-// This covers the negative powers of 10 for Float32.
-// Positive powers of 10 come from the next table below.
-// Table size: 320 bytes
-fileprivate let powersOf10_negativeBinary32: _InlineArray<_, UInt64> = [
-  0x8b61313bbabce2c6, // x 2^-132 ~= 10^-40
-  0xae397d8aa96c1b77, // x 2^-129 ~= 10^-39
-  0xd9c7dced53c72255, // x 2^-126 ~= 10^-38
-  0x881cea14545c7575, // x 2^-122 ~= 10^-37
-  0xaa242499697392d2, // x 2^-119 ~= 10^-36
-  0xd4ad2dbfc3d07787, // x 2^-116 ~= 10^-35
-  0x84ec3c97da624ab4, // x 2^-112 ~= 10^-34
+// ## powersOf10_Float32
+
+// Complete table suitable for Float32 conversion.
+
+fileprivate let powersOf10_Float32: _InlineArray<_, UInt64> = [
   0xa6274bbdd0fadd61, // x 2^-109 ~= 10^-33
   0xcfb11ead453994ba, // x 2^-106 ~= 10^-32
   0x81ceb32c4b43fcf4, // x 2^-102 ~= 10^-31
@@ -2236,7 +1968,60 @@ fileprivate let powersOf10_negativeBinary32: _InlineArray<_, UInt64> = [
   0x83126e978d4fdf3b, // x 2^-9 ~= 10^-3
   0xa3d70a3d70a3d70a, // x 2^-6 ~= 10^-2
   0xcccccccccccccccc, // x 2^-3 ~= 10^-1
+  0x8000000000000000, // x 2^1 == 10^0 exactly
+  0xa000000000000000, // x 2^4 == 10^1 exactly
+  0xc800000000000000, // x 2^7 == 10^2 exactly
+  0xfa00000000000000, // x 2^10 == 10^3 exactly
+  0x9c40000000000000, // x 2^14 == 10^4 exactly
+  0xc350000000000000, // x 2^17 == 10^5 exactly
+  0xf424000000000000, // x 2^20 == 10^6 exactly
+  0x9896800000000000, // x 2^24 == 10^7 exactly
+  0xbebc200000000000, // x 2^27 == 10^8 exactly
+  0xee6b280000000000, // x 2^30 == 10^9 exactly
+  0x9502f90000000000, // x 2^34 == 10^10 exactly
+  0xba43b74000000000, // x 2^37 == 10^11 exactly
+  0xe8d4a51000000000, // x 2^40 == 10^12 exactly
+  0x9184e72a00000000, // x 2^44 == 10^13 exactly
+  0xb5e620f480000000, // x 2^47 == 10^14 exactly
+  0xe35fa931a0000000, // x 2^50 == 10^15 exactly
+  0x8e1bc9bf04000000, // x 2^54 == 10^16 exactly
+  0xb1a2bc2ec5000000, // x 2^57 == 10^17 exactly
+  0xde0b6b3a76400000, // x 2^60 == 10^18 exactly
+  0x8ac7230489e80000, // x 2^64 == 10^19 exactly
+  0xad78ebc5ac620000, // x 2^67 == 10^20 exactly
+  0xd8d726b7177a8000, // x 2^70 == 10^21 exactly
+  0x878678326eac9000, // x 2^74 == 10^22 exactly
+  0xa968163f0a57b400, // x 2^77 == 10^23 exactly
+  0xd3c21bcecceda100, // x 2^80 == 10^24 exactly
+  0x84595161401484a0, // x 2^84 == 10^25 exactly
+  0xa56fa5b99019a5c8, // x 2^87 == 10^26 exactly
+  0xcecb8f27f4200f3a, // x 2^90 == 10^27 exactly
+  0x813f3978f8940984, // x 2^94 ~= 10^28
+  0xa18f07d736b90be5, // x 2^97 ~= 10^29
+  0xc9f2c9cd04674ede, // x 2^100 ~= 10^30
+  0xfc6f7c4045812296, // x 2^103 ~= 10^31
+  0x9dc5ada82b70b59d, // x 2^107 ~= 10^32
+  0xc5371912364ce305, // x 2^110 ~= 10^33
+  0xf684df56c3e01bc6, // x 2^113 ~= 10^34
+  0x9a130b963a6c115c, // x 2^117 ~= 10^35
+  0xc097ce7bc90715b3, // x 2^120 ~= 10^36
+  0xf0bdc21abb48db20, // x 2^123 ~= 10^37
+  0x96769950b50d88f4, // x 2^127 ~= 10^38
+  0xbc143fa4e250eb31, // x 2^130 ~= 10^39
+  0xeb194f8e1ae525fd, // x 2^133 ~= 10^40
+  0x92efd1b8d0cf37be, // x 2^137 ~= 10^41
+  0xb7abc627050305ad, // x 2^140 ~= 10^42
+  0xe596b7b0c643c719, // x 2^143 ~= 10^43
+  0x8f7e32ce7bea5c6f, // x 2^147 ~= 10^44
+  0xb35dbf821ae4f38b, // x 2^150 ~= 10^45
+  0xe0352f62a19e306e, // x 2^153 ~= 10^46
+  0x8c213d9da502de45, // x 2^157 ~= 10^47
+  0xaf298d050e4395d6, // x 2^160 ~= 10^48
+  0xdaf3f04651d47b4c, // x 2^163 ~= 10^49
+  0x88d8762bf324cd0f, // x 2^167 ~= 10^50
 ]
+
+// ## powersOf10_Exact128
 
 // All the powers of 10 that can be represented exactly
 // in 128 bits, represented as binary floating-point values
@@ -2244,8 +2029,6 @@ fileprivate let powersOf10_negativeBinary32: _InlineArray<_, UInt64> = [
 // with 128 bit significands.
 
 // This table is used in four places:
-// * The high order 64 bits are used for positive powers of 10
-//   when converting Float32.
 // * The full 128-bit value is used for 10^0 through 10^55 for Float64.
 // * The first 28 entries are combined with the next table for
 //   all other Float64 values.
@@ -2313,6 +2096,8 @@ fileprivate let powersOf10_Exact128: _InlineArray<_, UInt64> = [
   0xfff4b4e3f741cf6d, 0xd0cf4b50cfe20765, // x 2^183 == 10^55 exactly
 ]
 
+// ## powersOf10_Binary64
+
 // Every 28th power of 10 across the full range of Double.
 // Combined with a 64-bit exact power of 10 from the previous
 // table, this lets us reconstruct a 128-bit lower bound for
@@ -2357,6 +2142,8 @@ fileprivate let powersOf10_Binary64: _InlineArray<_, UInt64> = [
   0xcca845ab2beafa9a, 0xc2dfe19c8c055535, // x 2^1183 ~= 10^356
   0x1027fff56784f444, 0xc4c5e310aef8aa17, // x 2^1276 ~= 10^384
 ]
+
+// ## powersOf10_Binary128
 
 // Needed by 80- and 128-bit formatters above
 
