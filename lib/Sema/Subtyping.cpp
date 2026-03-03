@@ -347,6 +347,9 @@ swift::constraints::isLikelyExactMatch(Type lhs, Type rhs) {
 
 ConversionBehavior
 swift::constraints::getConversionBehavior(Type type) {
+  if (type->is<BuiltinType>())
+    return ConversionBehavior::None;
+
   if (type->is<StructType>()) {
     if (type->isAnyHashable())
       return ConversionBehavior::AnyHashable;
