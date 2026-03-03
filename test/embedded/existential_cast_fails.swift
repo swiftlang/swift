@@ -5,25 +5,25 @@
 // RUN: %target-build-swift -DT1 -enable-experimental-feature Embedded \
 // RUN:  -parse-as-library -Xlinker %t/unbuffered-putchar.o \
 // RUN:  -enable-experimental-feature EmbeddedExistentials \
-// RUN:  -wmo -runtime-compatibility-version none %s  -o %t/t1.out
+// RUN:  -wmo -runtime-compatibility-version none %s  -o %t/t1.out %target-embedded-posix-shim
 // RUN: %target-not-crash %target-run %t/t1.out 2>&1 | %FileCheck %s --check-prefix=CHECK-T1
 
 // RUN: %target-build-swift -DT2 -enable-experimental-feature Embedded \
 // RUN:  -parse-as-library -Xlinker %t/unbuffered-putchar.o \
 // RUN:  -enable-experimental-feature EmbeddedExistentials \
-// RUN:  -wmo -runtime-compatibility-version none %s  -o %t/t2.out
+// RUN:  -wmo -runtime-compatibility-version none %s  -o %t/t2.out %target-embedded-posix-shim
 // RUN: %target-not-crash %target-run %t/t2.out 2>&1 | %FileCheck %s --check-prefix=CHECK-T2
 
 // RUN: %target-build-swift -DT3 -enable-experimental-feature Embedded \
 // RUN:  -parse-as-library -Xlinker %t/unbuffered-putchar.o \
 // RUN:  -enable-experimental-feature EmbeddedExistentials \
-// RUN:  -wmo -runtime-compatibility-version none %s  -o %t/t3.out
+// RUN:  -wmo -runtime-compatibility-version none %s  -o %t/t3.out %target-embedded-posix-shim
 // RUN: %target-not-crash %target-run %t/t3.out 2>&1 | %FileCheck %s --check-prefix=CHECK-T3
 
 // RUN: %target-build-swift -DT4 -enable-experimental-feature Embedded \
 // RUN:  -parse-as-library -Xlinker %t/unbuffered-putchar.o \
 // RUN:  -enable-experimental-feature EmbeddedExistentials \
-// RUN:  -wmo -runtime-compatibility-version none %s  -o %t/t4.out
+// RUN:  -wmo -runtime-compatibility-version none %s  -o %t/t4.out %target-embedded-posix-shim
 // RUN: %target-not-crash %target-run %t/t4.out 2>&1 | %FileCheck %s --check-prefix=CHECK-T4
 
 // REQUIRES: swift_test_mode_optimize_none
