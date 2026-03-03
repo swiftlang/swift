@@ -347,86 +347,161 @@ swift::constraints::isLikelyExactMatch(Type lhs, Type rhs) {
 
 ConversionBehavior
 swift::constraints::getConversionBehavior(Type type) {
-  if (type->is<StructType>()) {
-    if (type->isAnyHashable())
-      return ConversionBehavior::AnyHashable;
-    else if (type->isString())
-      return ConversionBehavior::String;
-    else if (type->isDouble() || type->isCGFloat())
-      return ConversionBehavior::Double;
-    else if (type->getAnyPointerElementType())
-      return ConversionBehavior::Pointer;
+  auto canType = type->getCanonicalType();
+  auto &ctx = canType->getASTContext();
 
-    return ConversionBehavior::None;
-  }
+  auto containsParameterPacks = [&]() -> bool {
+    if (canType->hasParameterPack())
+      return true;
 
-  if (auto *structTy = type->getAs<BoundGenericStructType>()) {
-    if (auto eltTy = structTy->getArrayElementType()) {
-      return ConversionBehavior::Array;
-    } else if (ConstraintSystem::isDictionaryType(structTy)) {
-      return ConversionBehavior::Dictionary;
-    } else if (ConstraintSystem::isSetType(structTy)) {
-      return ConversionBehavior::Set;
-    } else if (type->getAnyPointerElementType()) {
-      return ConversionBehavior::Pointer;
+    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+    canType->getTypeVariables(referencedTypeVars);
+    for (auto *typeVar : referencedTypeVars) {
+      if (typeVar->getImpl().isPackExpansion())
+        return true;
     }
 
+    return false;
+  };
+
+  switch (canType->getKind()) {
+  #define TYPE(id, parent)
+  #define BUILTIN_TYPE(id, parent) case TypeKind::id: return ConversionBehavior::None;
+  #define SUGARED_TYPE(id, parent) case TypeKind::id: llvm_unreachable("");
+
+  #include "swift/AST/TypeNodes.def"
+  #undef BUILTIN_TYPE
+  #undef SUGARED_TYPE
+  #undef TYPE
+
+  case TypeKind::Struct: {
+    auto structTy = cast<StructType>(canType);
+    auto *decl = structTy->getDecl();
+
+    if (decl == ctx.getAnyHashableDecl())
+      return ConversionBehavior::AnyHashable;
+    else if (decl == ctx.getStringDecl())
+      return ConversionBehavior::String;
+    else if (decl == ctx.getDoubleDecl() ||
+             decl == ctx.getCGFloatDecl())
+      return ConversionBehavior::Double;
+    else if (decl == ctx.getUnsafeRawPointerDecl() ||
+             decl == ctx.getUnsafeMutableRawPointerDecl())
+      return ConversionBehavior::Pointer;
+
     return ConversionBehavior::None;
   }
 
-  if (auto *enumTy = type->getAs<BoundGenericEnumType>()) {
-    if (enumTy->getOptionalObjectType())
+  case TypeKind::BoundGenericStruct: {
+    auto structTy = cast<BoundGenericStructType>(canType);
+    auto *decl = structTy->getDecl();
+
+    if (decl == ctx.getArrayDecl())
+      return ConversionBehavior::Array;
+    else if (decl == ctx.getDictionaryDecl())
+      return ConversionBehavior::Dictionary;
+    else if (decl == ctx.getSetDecl())
+      return ConversionBehavior::Set;
+    else if (decl == ctx.getUnsafePointerDecl() ||
+             decl == ctx.getUnsafeMutablePointerDecl() ||
+             decl == ctx.getAutoreleasingUnsafeMutablePointerDecl())
+      return ConversionBehavior::Pointer;
+
+    return ConversionBehavior::None;
+  }
+
+  case TypeKind::Class:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::DynamicSelf:
+    return ConversionBehavior::Class;
+
+  case TypeKind::Enum:
+    return ConversionBehavior::None;
+
+  case TypeKind::BoundGenericEnum: {
+    auto enumTy = cast<BoundGenericEnumType>(canType);
+    if (enumTy->getDecl() == ctx.getOptionalDecl())
       return ConversionBehavior::Optional;
 
     return ConversionBehavior::None;
   }
 
-  if (type->is<ClassType>() ||
-      type->is<BoundGenericClassType>() ||
-      type->is<DynamicSelfType>())
-    return ConversionBehavior::Class;
-
-  if (type->is<EnumType>() ||
-      type->is<BuiltinType>() || type->is<ArchetypeType>())
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::PackArchetype:
+  case TypeKind::OpaqueTypeArchetype:
+  case TypeKind::ExistentialArchetype:
+  case TypeKind::ElementArchetype:
     return ConversionBehavior::None;
 
-  if (type->is<MetatypeType>())
+  case TypeKind::Metatype:
     return ConversionBehavior::Metatype;
 
-  if (type->is<InOutType>())
+  case TypeKind::ExistentialMetatype:
+    return ConversionBehavior::ExistentialMetatype;
+
+  case TypeKind::InOut:
     return ConversionBehavior::InOut;
 
-  if (type->is<LValueType>())
+  case TypeKind::LValue:
     return ConversionBehavior::LValue;
 
-  if (type->isVoid())
-    return ConversionBehavior::None;
-
-  // We only support tuples and function parameter lists with a known length
-  // for now.
-  if (type->is<TupleType>() || type->is<FunctionType>()) {
-    if (type->hasParameterPack())
+  case TypeKind::Tuple: {
+    auto tupleTy = cast<TupleType>(canType);
+    if (tupleTy->getNumElements() == 0)
+      return ConversionBehavior::None;
+    if (containsParameterPacks())
       return ConversionBehavior::Unknown;
+    return ConversionBehavior::Tuple;
+  }
 
-    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
-    type->getTypeVariables(referencedTypeVars);
-    for (auto *typeVar : referencedTypeVars) {
-      if (typeVar->getImpl().isPackExpansion())
-        return ConversionBehavior::Unknown;
-    }
-
-    if (type->is<TupleType>())
-      return ConversionBehavior::Tuple;
+  case TypeKind::Function: {
+    if (containsParameterPacks())
+      return ConversionBehavior::Unknown;
     return ConversionBehavior::Function;
   }
 
-  if (type->is<ExistentialType>())
+  case TypeKind::Existential:
     return ConversionBehavior::Existential;
 
-  if (type->is<ExistentialMetatypeType>())
-    return ConversionBehavior::ExistentialMetatype;
+  case TypeKind::Protocol:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::ParameterizedProtocol:
+    // FIXME: Arrange it so that these are always wrapped in an
+    // ExistentialType.
+    return ConversionBehavior::Existential;
 
-  return ConversionBehavior::Unknown;
+  case TypeKind::Error:
+  case TypeKind::Placeholder:
+  case TypeKind::UnboundGeneric:
+  case TypeKind::Pack:
+  case TypeKind::PackExpansion:
+  case TypeKind::PackElement:
+  case TypeKind::TypeVariable:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+  case TypeKind::Module:
+  case TypeKind::Join:
+  case TypeKind::Meet:
+    return ConversionBehavior::Unknown;
+
+  case TypeKind::WeakStorage:
+  case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
+  case TypeKind::BuiltinTuple:
+  case TypeKind::GenericFunction:
+  case TypeKind::SILFunction:
+  case TypeKind::SILBlockStorage:
+  case TypeKind::SILBox:
+  case TypeKind::SILMoveOnlyWrapped:
+  case TypeKind::SILPack:
+  case TypeKind::SILToken:
+  case TypeKind::ErrorUnion:
+  case TypeKind::Integer:
+    ABORT([&](llvm::raw_ostream &out) {
+      out << "Unusual type spotted in constraint system:\n";
+      canType->dump(out);
+    });
+  }
 }
 
 bool swift::constraints::hasProperSubtypes(Type type) {
