@@ -2469,14 +2469,33 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   Type type;
   AllowedBindingKind kind;
   if (first->getAs<TypeVariableType>() == TypeVar) {
-    // Upper bound for this type variable.
+    // Upper bound for this type variable:
+    //
+    // $T0 conv Foo
     type = second;
     kind = AllowedBindingKind::Subtypes;
   } else if (second->getAs<TypeVariableType>() == TypeVar) {
-    // Lower bound for this type variable.
+    // Lower bound for this type variable:
+    //
+    // Foo conv $T0
     type = first;
     kind = AllowedBindingKind::Supertypes;
   } else {
+    // Infer a binding from `inout $T <convertible to> Unsafe*Pointer<...>?`.
+    //
+    // This has to be a Fallback binding, because if $T is later bound to
+    // an Array type, more conversion possibilities appear.
+    if (first->is<InOutType>() &&
+        first->getInOutObjectType()->getAs<TypeVariableType>() == TypeVar) {
+      if (auto pointeeTy = second->lookThroughAllOptionalTypes()
+                               ->getAnyPointerElementType()) {
+        if (!pointeeTy->isTypeVariableOrMember()) {
+          return PotentialBinding(pointeeTy, AllowedBindingKind::Fallback,
+                                  constraint);
+        }
+      }
+    }
+
     // If the left-hand side of a relational constraint is a
     // type variable representing a closure type, let's delay
     // attempting any bindings related to any type variables
@@ -2491,31 +2510,43 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       }
     }
 
-    // Check whether both this type and another type variable are
-    // inferable.
-    SmallPtrSet<TypeVariableType *, 4> typeVars;
-    findInferableTypeVars(first, typeVars);
-    findInferableTypeVars(second, typeVars);
+    // Now, consider constraints of the form:
+    //
+    // $T.A conv ...
+    // ... conv $T.A
+    auto *firstTypeVar = first->getDependentMemberRoot()->getAs<TypeVariableType>();
+    auto *secondTypeVar = second->getDependentMemberRoot()->getAs<TypeVariableType>();
 
-    if (typeVars.erase(TypeVar)) {
-      for (auto *typeVar : typeVars) {
-        recordAdjacentVar(typeVar, constraint);
-      }
+    if (!firstTypeVar && !secondTypeVar) {
+      // This constraint will simplify into smaller constraints.
+      // Don't record anything.
+      return std::nullopt;
     }
 
-    // Infer a binding from `inout $T <convertible to> Unsafe*Pointer<...>?`.
+    // The remaining case is that our type variable appears somewhere
+    // inside the constraint.
     //
-    // This has to be a Fallback binding, because if $T is later bound to
-    // an Array type, more conversion possibilities appear.
-    if (first->is<InOutType>() &&
-        first->getInOutObjectType()->isEqual(TypeVar)) {
-      if (auto pointeeTy = second->lookThroughAllOptionalTypes()
-                               ->getAnyPointerElementType()) {
-        if (!pointeeTy->isTypeVariableOrMember()) {
-          return PotentialBinding(pointeeTy, AllowedBindingKind::Fallback,
-                                  constraint);
-        }
-      }
+    // Eg, if we're currently looking at $T0, we must record adjacency to $T1
+    // because once $T1 is bound, we might get a more precise supertype bound
+    // for $T0:
+    //
+    // $T1 conv [$T0]
+    // $T1.A conv [$T0]
+    if (firstTypeVar) {
+      SmallPtrSet<TypeVariableType *, 2> typeVars;
+      findInferableTypeVars(second, typeVars);
+      if (typeVars.erase(TypeVar))
+        recordAdjacentVar(firstTypeVar, constraint);
+
+    // The other direction:
+    //
+    // [$T0] conv $T1
+    // [$T0] conv $T1.A
+    } else if (secondTypeVar) {
+      SmallPtrSet<TypeVariableType *, 2> typeVars;
+      findInferableTypeVars(first, typeVars);
+      if (typeVars.erase(TypeVar))
+        recordAdjacentVar(secondTypeVar, constraint);
     }
 
     return std::nullopt;
