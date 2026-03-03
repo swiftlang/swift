@@ -3491,7 +3491,7 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
     return nullptr;
 
   auto cxxRecordSemanticsKind = evaluateOrDefault(
-      ctx.evaluator, CxxRecordSemantics({clangType, ctx, &ImporterImpl}), {});
+      ctx.evaluator, CxxRecordSemantics({clangType, ctx}), {});
   switch (cxxRecordSemanticsKind) {
   case CxxRecordSemanticsKind::Value:
   case CxxRecordSemanticsKind::Reference:

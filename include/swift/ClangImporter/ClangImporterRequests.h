@@ -471,11 +471,9 @@ enum class CxxRecordSemanticsKind {
 struct CxxRecordSemanticsDescriptor final {
   const clang::RecordDecl *decl;
   ASTContext &ctx;
-  ClangImporter::Implementation *importerImpl;
 
-  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl, ASTContext &ctx,
-                               ClangImporter::Implementation *importerImpl)
-      : decl(decl), ctx(ctx), importerImpl(importerImpl) {}
+  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl, ASTContext &ctx)
+      : decl(decl), ctx(ctx) {}
 
   friend llvm::hash_code hash_value(const CxxRecordSemanticsDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
