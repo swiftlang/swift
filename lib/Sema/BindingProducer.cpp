@@ -23,6 +23,28 @@ using namespace swift;
 using namespace constraints;
 using namespace inference;
 
+static bool callHasClosureWithResultBuilderBodyFix(ConstraintSystem &cs,
+                                                   Expr *anchorExpr) {
+  auto *applyExpr = dyn_cast_or_null<ApplyExpr>(cs.getParentExpr(anchorExpr));
+  if (!applyExpr)
+    return false;
+
+  for (auto argument : *applyExpr->getArgs()) {
+    auto *closure =
+        dyn_cast<ClosureExpr>(argument.getExpr()->getValueProvidingExpr());
+    if (!closure)
+      continue;
+
+    auto *closureLoc = cs.getConstraintLocator(closure);
+    if (cs.hasFixFor(closureLoc, FixKind::IgnoreInvalidResultBuilderBody) ||
+        cs.hasFixFor(closureLoc,
+                     FixKind::IgnoreResultBuilderWithReturnStmts))
+      return true;
+  }
+
+  return false;
+}
+
 // Given a possibly-Optional type, return the direct superclass of the
 // (underlying) type wrapped in the same number of optional levels as
 // type.
@@ -463,6 +485,11 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
   unsigned defaultImpact = 1;
 
   if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
+    if (auto *anchorExpr = getAsExpr(dstLocator->getAnchor())) {
+      if (callHasClosureWithResultBuilderBodyFix(cs, anchorExpr))
+        return std::nullopt;
+    }
+
     // If it is representative for a key path root, let's emit a more
     // specific diagnostic.
     auto *keyPathRoot =
