@@ -1927,13 +1927,18 @@ static PlatformKind getPlatformFromDomainOrIdentifier(
 
 ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
     llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions,
-    bool &ParsedUnrecognizedPlatformName) {
+    bool &WasEmpty) {
   // Check for availability macros first.
   if (peekAvailabilityMacroName()) {
     SmallVector<AvailabilitySpec *, 4> Specs;
     ParserStatus MacroStatus = parseAvailabilityMacro(Specs);
     if (MacroStatus.isError())
       return MacroStatus;
+
+    if (Specs.size() == 1 && Specs.front()->isWildcard()) {
+      WasEmpty = true;
+      return makeParserSuccess();
+    }
 
     for (auto *Spec : Specs) {
       auto Platform =
@@ -1962,7 +1967,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
   // Parse the platform name.
   StringRef platformText = Tok.getText();
   auto MaybePlatform = platformFromString(platformText);
-  ParsedUnrecognizedPlatformName = ParsedUnrecognizedPlatformName || !MaybePlatform.has_value();
+  WasEmpty = WasEmpty || !MaybePlatform.has_value();
   SourceLoc PlatformLoc = Tok.getLoc();
   consumeToken();
 
@@ -2025,7 +2030,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
   SourceLoc RightLoc;
   ParserStatus Status;
   bool SuppressLaterDiags = false;
-  bool ParsedUnrecognizedPlatformName = false;
+  bool EmptyPlatformAndVersions = false;
   llvm::SmallVector<PlatformAndVersion, 4> PlatformAndVersions;
 
   {
@@ -2048,7 +2053,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
             Status, tok::r_paren, LeftLoc, RightLoc,
             /*AllowSepAfterLast=*/false, [&]() -> ParserStatus {
               return parsePlatformVersionInList(AtAttrName, PlatformAndVersions,
-                                                ParsedUnrecognizedPlatformName);
+                                                EmptyPlatformAndVersions);
             });
       } while (Result == ParseListItemResult::Continue);
     }
@@ -2062,7 +2067,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
     return false;
   }
 
-  if (PlatformAndVersions.empty() && !ParsedUnrecognizedPlatformName) {
+  if (PlatformAndVersions.empty() && !EmptyPlatformAndVersions) {
     diagnose(Loc, diag::attr_availability_need_platform_version, AtAttrName);
     return false;
   }
@@ -3442,7 +3447,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     StringRef AttrName = "@_originallyDefinedIn";
     bool SuppressLaterDiags = false;
-    bool ParsedUnrecognizedPlatformName = false;
+    bool EmptyPlatformAndVersions = false;
     if (parseList(tok::r_paren, LeftLoc, RightLoc,
                   /*AllowSepAfterLast=*/false,
                   diag::originally_defined_in_missing_rparen,
@@ -3484,7 +3489,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       // Parse 'OSX 13.13'.
       case NextSegmentKind::PlatformVersion: {
         ParserStatus ListItemStatus = parsePlatformVersionInList(
-            AttrName, PlatformAndVersions, ParsedUnrecognizedPlatformName);
+            AttrName, PlatformAndVersions, EmptyPlatformAndVersions);
         if (ListItemStatus.isErrorOrHasCompletion())
           SuppressLaterDiags = true;
         return ListItemStatus;
@@ -3499,7 +3504,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    if (PlatformAndVersions.empty() && !ParsedUnrecognizedPlatformName) {
+    if (PlatformAndVersions.empty() && !EmptyPlatformAndVersions) {
       diagnose(AtLoc, diag::attr_availability_need_platform_version, AttrName);
       return makeParserSuccess();
     }

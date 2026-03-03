@@ -1304,7 +1304,7 @@ validateAvailabilitySpecList(Parser &P,
     }
   }
 
-  if (WildcardSpecLoc)
+  if (WildcardSpecLoc && Specs.size() > 1)
     P.diagnose(*WildcardSpecLoc, diag::attr_availability_wildcard_in_macro);
 }
 

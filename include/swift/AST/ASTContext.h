@@ -925,6 +925,8 @@ public:
   // runtime version.
 #define FEATURE(N, V)                                                          \
   inline AvailabilityRange get##N##Availability() const {                      \
+    if (LangOpts.hasFeature(Feature::Embedded))                                \
+      return AvailabilityRange::alwaysAvailable();                             \
     return getSwiftAvailability V;                                             \
   }                                                                            \
   inline AvailabilityRange get##N##RuntimeAvailability() const {               \

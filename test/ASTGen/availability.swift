@@ -6,7 +6,8 @@
 // DEFINE:   -define-availability '_iOS54:iOS 54.0' \
 // DEFINE:   -define-availability '_macOS51_0:macOS 51.0' \
 // DEFINE:   -define-availability '_myProject 1.0:macOS 51.0' \
-// DEFINE:   -define-availability '_myProject 2.5:macOS 52.5'
+// DEFINE:   -define-availability '_myProject 2.5:macOS 52.5' \
+// DEFINE:   -define-availability "_emptyMacro:*"
 
 // RUN: %target-swift-frontend-dump-parse \
 // RUN:   %{availability} \
@@ -42,6 +43,9 @@ func testMacroNameOnly() {}
 
 @available(_myProject 2.5, *)
 func testMacroWithVersion() {}
+
+@available(_emptyMacro, *)
+func testEmptyMacro() {}
 
 @_specialize(exported: true, availability: _iOS54Aligned, *; where T == Int)
 func testSpecialize<T>(arg: T) -> T {}
