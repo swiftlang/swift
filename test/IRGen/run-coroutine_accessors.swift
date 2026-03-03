@@ -101,8 +101,8 @@
 @available(SwiftStdlib 9999, *)
 public protocol ResilientWrapping {
   associatedtype Wrapped
-  var wrapped: Wrapped { read set }
-  var wrapped2: Wrapped { read set }
+  var wrapped: Wrapped { yielding borrow set }
+  var wrapped2: Wrapped { yielding borrow set }
 }
 @available(SwiftStdlib 9999, *)
 extension ResilientWrapping {
@@ -285,7 +285,7 @@ struct Stringgg : Mutatable {
 @available(SwiftStdlib 9999, *)
 protocol Wrapping {
   associatedtype Wrapped
-  var wrapped: Wrapped { read set }
+  var wrapped: Wrapped { yielding borrow set }
 }
 
 @available(SwiftStdlib 9999, *)

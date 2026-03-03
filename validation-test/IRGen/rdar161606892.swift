@@ -1,5 +1,10 @@
 // RUN: %target-swift-frontend %s -target %target-swift-5.9-abi-triple -emit-irgen | %IRGenFileCheck %s
 
+
+// This test seems to want to verify the function attributes.
+
+// CHECK: swift_storeEnumTagSinglePayloadGeneric
+
 // CHECK: Attrs: noinline nounwind{{$}}
 // CHECK-NEXT: define {{.*}}@"$s13rdar1616068921PVMa"
 
