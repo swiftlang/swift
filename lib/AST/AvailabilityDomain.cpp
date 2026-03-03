@@ -474,17 +474,16 @@ getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
   return Mapping->mapDeprecatedObsoletedAvailabilityVersion(Version);
 }
 
-AvailabilityDomainAndRange AvailabilityDomain::getRemappedDomainAndRange(
-    const llvm::VersionTuple &version, AvailabilityVersionKind versionKind,
-    const ASTContext &ctx) const {
-  auto remappedDomain = getRemappedDomainOrNull(ctx);
-  if (!remappedDomain)
-    return {*this, AvailabilityRange{version}};
+AvailabilityRange AvailabilityDomain::getRemappedRange(
+    AvailabilityDomain toDomain, const llvm::VersionTuple &version,
+    AvailabilityVersionKind versionKind, const ASTContext &ctx) const {
+  // Precondition: The target domain inherits from this domain.
+  DEBUG_ASSERT(contains(toDomain));
 
-  if (getPlatformKind() == PlatformKind::anyAppleOS)
-    return {*remappedDomain, AvailabilityRange{version}};
-
-  if (getPlatformKind() == PlatformKind::iOS) {
+  // Currently, the only visionOS requires remapping versions from iOS.
+  if (getPlatformKind() == PlatformKind::iOS &&
+      AvailabilityDomain::forPlatform(PlatformKind::visionOS)
+          .contains(toDomain)) {
     std::optional<clang::VersionTuple> remappedVersion;
     switch (versionKind) {
     case AvailabilityVersionKind::Introduced:
@@ -500,10 +499,24 @@ AvailabilityDomainAndRange AvailabilityDomain::getRemappedDomainAndRange(
     }
 
     if (remappedVersion)
-      return {*remappedDomain, AvailabilityRange{*remappedVersion}};
+      return AvailabilityRange(*remappedVersion);
   }
 
-  return {*this, AvailabilityRange{version}};
+  // If there isn't a special remapping rule, the default remapping is to keep
+  // the version as-is and we know this is valid because the target domain
+  // inherits from this domain.
+  return AvailabilityRange{version};
+}
+
+AvailabilityDomainAndRange AvailabilityDomain::getRemappedDomainAndRange(
+    const llvm::VersionTuple &version, AvailabilityVersionKind versionKind,
+    const ASTContext &ctx) const {
+  auto remappedDomain = getRemappedDomainOrNull(ctx);
+  if (!remappedDomain)
+    return {*this, AvailabilityRange{version}};
+
+  return {*remappedDomain,
+          getRemappedRange(*remappedDomain, version, versionKind, ctx)};
 }
 
 bool IsCustomAvailabilityDomainPermanentlyEnabled::evaluate(
