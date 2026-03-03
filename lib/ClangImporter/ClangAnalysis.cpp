@@ -210,10 +210,6 @@ bool importer::diagnoseForeignReferenceType(
   if (info.isValid())
     return true;
 
-  if (!Impl.DiagnosedCxxRefDecls.insert(decl).second)
-    // Already diagnosed this decl. No need to emit diagnostics again.
-    return false;
-
   // If the result was invalid, we need to run the underlying check again, but
   // this time with ClangImporter::Implemention in order to emit diagnostics.
   // This slow path does redundant work but only for invalid decls.

@@ -469,10 +469,6 @@ public:
   std::unordered_set<ImportDiagnostic, ImportDiagnosticHasher>
       CollectedDiagnostics;
 
-  // Keeps track of `clang::RecordDecl`s where diagnostics have already been
-  // emitted due to failed SWIFT_SHARED_REFERENCE inference.
-  std::unordered_set<const clang::RecordDecl *> DiagnosedCxxRefDecls;
-
   // Tracks which function templates have already had a diagnostic emitted,
   // to avoid duplicate diagnostics across instantiations.
   llvm::DenseSet<std::pair<const clang::FunctionDecl *, DiagID>>
@@ -2241,8 +2237,6 @@ getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
 }
 
 /// Emit diagnostics related to foreign reference types for \a decl.
-///
-/// This operation is idempotent.
 bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
                                   ClangImporter::Implementation &Impl);
 
