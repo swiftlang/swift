@@ -854,7 +854,10 @@ public:
   ///
   /// \param typeVariables This vector is populated with the set of
   /// type variables referenced by this type.
-  void getTypeVariables(SmallPtrSetImpl<TypeVariableType *> &typeVariables);
+  /// \param skipDependentMemberTypes If true, skip type variables that
+  /// appear in the base types of dependent member types.
+  void getTypeVariables(SmallPtrSetImpl<TypeVariableType *> &typeVariables,
+                        bool skipDependentMemberTypes=false);
 
 public:
   /// If the receiver is a `DependentMemberType`, returns its root. Otherwise,

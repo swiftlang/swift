@@ -595,22 +595,31 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
 }
 
 void TypeBase::getTypeVariables(
-    SmallPtrSetImpl<TypeVariableType *> &typeVariables) {
+    SmallPtrSetImpl<TypeVariableType *> &typeVariables,
+    bool skipDependentMemberTypes) {
   // If we know we don't have any type variables, we're done.
   if (!hasTypeVariable())
     return;
 
   class Walker : public TypeWalker {
     SmallPtrSetImpl<TypeVariableType *> &typeVariables;
+    bool skipDependentMemberTypes;
 
   public:
-    explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVariables)
-        : typeVariables(typeVariables) {}
+    explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVariables,
+                    bool skipDependentMemberTypes)
+        : typeVariables(typeVariables),
+          skipDependentMemberTypes(skipDependentMemberTypes) {}
 
     Action walkToTypePre(Type ty) override {
       // Skip children that don't contain type variables.
       if (!ty->hasTypeVariable())
         return Action::SkipNode;
+
+      // Skip dependent member types if instructed to do so.
+      if (skipDependentMemberTypes)
+        if (ty->is<DependentMemberType>())
+          return Action::SkipNode;
 
       if (auto tv = dyn_cast<TypeVariableType>(ty.getPointer())) {
         typeVariables.insert(tv);
@@ -620,11 +629,8 @@ void TypeBase::getTypeVariables(
     }
   };
 
-  Walker walker(typeVariables);
+  Walker walker(typeVariables, skipDependentMemberTypes);
   Type(this).walk(walker);
-
-  assert((!typeVariables.empty() || hasError()) &&
-         "Did not find type variables!");
 }
 
 Type TypeBase::getDependentMemberRoot() {
