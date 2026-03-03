@@ -1,5 +1,62 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
+// Originally from rdar://35088384:
+//
+// This used to crash in Xcode 9 GM, and fails with a diagnostic in more
+// recent swift-4.0-branch builds, because we incorrectly infer the type
+// of the array literal as [Any].
+
+do {
+  protocol Command {}
+
+  struct Cut: Command {}
+  struct Copy: Command {}
+  struct Paste: Command {}
+
+  let _ = Array<any Command>([Cut(), Copy(), Paste()])
+  let _ = Array<(any Command)?>([Cut(), Copy(), Paste()])
+  let _ = Array<any Command.Type>([Cut.self, Copy.self, Paste.self])
+  let _ = Array<(any Command.Type)?>([Cut.self, Copy.self, Paste.self])
+}
+
+// This expression first appeared in test/embedded/dict-init.swift.
+// Test some variations.
+do {
+  let _ = Dictionary(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+  let _ = Dictionary<Int, String>(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+  let _ = Dictionary<Double, String>(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+  let _ = Dictionary<Int, StaticString>(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+  let _ = Dictionary<Double, StaticString>(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+
+  let _ = Dictionary.init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+  let _ = Dictionary<Int, String>.init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+  let _ = Dictionary<Double, String>.init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+  let _ = Dictionary<Int, StaticString>.init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+  let _ = Dictionary<Double, StaticString>.init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+
+  let _: Dictionary = .init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+  let _: Dictionary<Int, String> = .init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+  let _: Dictionary<Double, String> = .init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+  let _: Dictionary<Int, StaticString> = .init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+  let _: Dictionary<Double, StaticString> = .init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+}
+
+// rdar://problem/38159133
+// https://github.com/apple/swift/issues/49673
+// Swift 4.1 Xcode 9.3b4 regression
+
+protocol P_38159133 {}
+
+do {
+  class Super {}
+  class A: Super, P_38159133 {}
+  class B: Super, P_38159133 {}
+
+  func rdar38159133(_ a: A?, _ b: B?) {
+    let _: [P_38159133] = [a, b].compactMap { $0 } // Ok
+  }
+}
+
 // Tests for a special form of inference where we have both a
 // subtype and a supertype binding for a type variable, and the
 // subtype binding contains a type variable but the supertype
