@@ -389,7 +389,7 @@ namespace {
       // Fixed array regions are implied to be addressable-for-dependencies,
       // since the developer probably wants to be able to form Spans etc.
       // over them.
-      props.setAddressableForDependencies();
+      props.setDefinitelyAddressableForDependencies();
       
       // If the size isn't a known literal, then the layout is also dependent,
       // so make it address-only. If the size is massive, also treat it as
@@ -428,13 +428,15 @@ namespace {
       // pointer to the value in memory), BitwiseCopyable, and non-Escapable.
       // However, if the layout of the referent is unknown or abstracted, then
       // we don't necessarily know which layout `Borrow` uses, so treat `Borrow`
-      // as address-only. Raw layout types are always known to be passed
-      // indirectly though, so for those we can treat it as the trivial pointer
-      // representation.
+      // as address-only. Known raw layout types and known addressable for
+      // dependencies types are always known to be passed indirectly though, so
+      // for those we can treat it as the trivial pointer representation.
       auto referentProps = classifyType(origReferent, referentType, TC,
                                         Expansion);
 
-      if (referentProps.isFixedABI() || referentProps.isOrContainsRawLayout()) {
+      if (referentProps.isFixedABI() ||
+          referentProps.definitelyIsOrContainsRawLayout() ||
+          referentProps.definitelyIsAddressableForDependencies()) {
         return SILTypeProperties::forTrivial();
       } else {
         return SILTypeProperties::forTrivialOpaque();
@@ -2517,13 +2519,15 @@ namespace {
       // pointer to the value in memory), BitwiseCopyable, and non-Escapable.
       // However, if the layout of the referent is unknown or abstracted, then
       // we don't necessarily know which layout `Borrow` uses, so treat `Borrow`
-      // as address-only. Raw layout types are always known to be passed
-      // indirectly though, so for those we can treat it as the trivial pointer
-      // representation.
+      // as address-only. Known raw layout types and known addressable for
+      // dependencies types are always known to be passed indirectly though, so
+      // for those we can treat it as the trivial pointer representation.
       auto referentProps = classifyType(origReferent, referentType, TC,
                                         Expansion);
 
-      if (referentProps.isFixedABI() || referentProps.isOrContainsRawLayout()) {
+      if (referentProps.isFixedABI() ||
+          referentProps.definitelyIsOrContainsRawLayout() ||
+          referentProps.definitelyIsAddressableForDependencies()) {
         return handleTrivial(borrowType);
       } else {
         return handleAddressOnly(borrowType,
@@ -2595,7 +2599,7 @@ namespace {
       }
 
       if (D->isCxxNonTrivial()) {
-        properties.setAddressableForDependencies();
+        properties.setDefinitelyAddressableForDependencies();
         properties.setAddressOnly();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
@@ -2611,7 +2615,7 @@ namespace {
           // Treat imported C structs and unions as addressable-for-dependencies
           // so that Swift lifetime dependencies are more readily interoperable
           // with pointers in C used for similar purposes.
-          properties.setAddressableForDependencies();
+          properties.setDefinitelyAddressableForDependencies();
         }
       }
 
@@ -2629,9 +2633,9 @@ namespace {
 
       // If the type has raw storage, it is move-only and address-only.
       if (auto rawLayout = D->getAttrs().getAttribute<RawLayoutAttr>()) {
-        properties.setHasRawLayout();
+        properties.setDefinitelyHasRawLayout();
         properties.setAddressOnly();
-        properties.setAddressableForDependencies();
+        properties.setDefinitelyAddressableForDependencies();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
 
@@ -2661,7 +2665,7 @@ namespace {
       }
       
       if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
-        properties.setAddressableForDependencies();
+        properties.setDefinitelyAddressableForDependencies();
       }
 
       auto subMap = structType->getContextSubstitutionMap();
@@ -2744,7 +2748,7 @@ namespace {
         return handleAddressOnly(enumType, properties);
 
       if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
-        properties.setAddressableForDependencies();
+        properties.setDefinitelyAddressableForDependencies();
       }
 
       // [is_or_contains_pack_unsubstituted] Visit the elements of the
@@ -5650,6 +5654,8 @@ void TypeLowering::print(llvm::raw_ostream &os) const {
      << BOOL(Properties.isAddressableForDependencies()) << ".\n"
      << "hasOnlyDefaultDeinit: "
      << BOOL(Properties.mayHaveCustomDeinit() == HasOnlyDefaultDeinit) << ".\n"
+     << "definitelyIsAddressableForDependencies: " << BOOL(Properties.definitelyIsAddressableForDependencies()) << ".\n"
+     << "definitelyIsOrContainsRawLayout: " << BOOL(Properties.definitelyIsOrContainsRawLayout()) << ".\n"
      << "\n";
 }
 
