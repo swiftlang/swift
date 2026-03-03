@@ -1671,6 +1671,8 @@ function Build-CMakeProject {
 
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
+          # Skip compiler ID detection: avoids compiling+scanning a multi-MB test binary on every configure.
+          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_ID "Apple"
 
           [string[]] $SwiftFlags = @();
 
@@ -1787,6 +1789,8 @@ function Build-CMakeProject {
           }
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
+          # Skip compiler ID detection: avoids compiling+scanning a multi-MB test binary on every configure.
+          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_ID "Apple"
 
           [string[]] $SwiftFlags = @()
 

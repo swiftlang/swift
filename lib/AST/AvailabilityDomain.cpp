@@ -664,13 +664,6 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
     return std::nullopt;
   }
 
-  if (domain->getPlatformKind() == PlatformKind::anyAppleOS &&
-      !ctx.LangOpts.hasFeature(Feature::AnyAppleOSAvailability)) {
-    diags.diagnose(loc, diag::availability_domain_requires_feature, *domain,
-                   "AnyAppleOSAvailability");
-    return std::nullopt;
-  }
-
   // Use of the 'Swift' domain requires the 'SwiftRuntimeAvailability' feature.
   if (!hasSwiftRuntimeAvailability && domain->isStandaloneSwiftRuntime()) {
     diags.diagnose(loc, diag::availability_domain_requires_feature, *domain,

@@ -5,6 +5,33 @@
 
 ## Swift (next)
 
+* To simplify writing cross-platform code for Apple platforms while adopting
+  new APIs, availability on macOS, iOS, tvOS, watchOS, and visionOS can now be
+  specified implicitly using `anyAppleOS` for operating system versions starting
+  with `26.0`:
+
+  ```swift
+  @available(anyAppleOS 26.0, *)
+  func functionAvailableOnVersion26() {
+    // ...
+  }
+
+  if #available(anyAppleOS 26.0, *) {
+    // Executes on macOS 26, iOS 26, watchOS 26, tvOS 26, and visionOS 26.
+    functionAvailableOnVersion26()
+  }
+  ```
+
+  If availability for a specific platform is specified simultaneously with
+  `anyAppleOS`, availability for the specific platform takes precedence when
+  building for that platform:
+
+  ```swift
+  if #available(anyAppleOS 26.0, macOS 26.4, *) {
+    // Executes on macOS 26.4 and version 26 of all other Apple OSes.
+  }
+  ```
+
 * [SE-0504][]:
   Introduced Task Cancellation Shields which temporarily prevent the observation of task
   cancellation in a given scope. This functionality is intended for use with cleanup actions which

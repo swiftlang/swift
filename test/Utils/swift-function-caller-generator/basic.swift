@@ -15,6 +15,9 @@ func baz(_ z: Span<CInt>) -> Span<CInt>
 @_lifetime(`func`: copy `func`)
 func qux(_ func: inout MutableSpan<CInt>)
 
+@available(*, unavailable)
+func unavailable(x: Int) -> Int
+
 //--- out.swift.expected
 import Test
 
