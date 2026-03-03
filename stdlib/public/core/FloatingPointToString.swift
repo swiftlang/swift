@@ -1361,6 +1361,7 @@ fileprivate func _backend_256bit(
       as: UInt8.self)
   }
 
+  base10Power &-= (nextDigit &- firstDigit) &- 1
   return _finishFormatting(
     buffer: &buffer,
     sign: sign,
