@@ -1,0 +1,37 @@
+// RUN: %target-sil-opt -sil-print-debuginfo -mem2reg -verify %s | %FileCheck %s
+
+// Check that SILMem2Reg uses the debug scope of the replaced instruction (not
+// the AllocStackInst's scope) when salvaging debug info from an empty tuple.
+
+// See rdar://171023691
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// Scope of the alloc stack.
+sil_scope 1 { loc "outer.swift":10:5 parent @testMem2RegInlinedScope : $@convention(thin) () -> () }
+// Scope of the inlined callee — parent is a *different* function entirely.
+sil_scope 2 { loc "inner.swift":3:3 parent @inlinedCallee : $@convention(thin) () -> () }
+// Inlined-at scope: scope 2 inlined at scope 1.
+sil_scope 3 { loc "inner.swift":3:3 parent 2 inlined_at 1 }
+
+sil @testMem2RegInlinedScope : $@convention(thin) () -> () {
+bb0:
+  // AllocStack has the outer scope (scope 1).
+  %0 = alloc_stack $(), var, name "result", loc "outer.swift":10:9, scope 1
+
+  // CHECK-LABEL: sil @testMem2RegInlinedScope
+  // CHECK-NOT: alloc_stack
+  // CHECK: debug_value {{.*}} loc "inner.swift":3:5, scope 3
+  // CHECK: return
+
+  // This loaded value should stay in the inlined scope and not be changed
+  // to load 1.
+  %1 = load %0 : $*(), loc "inner.swift":3:5, scope 3
+
+  dealloc_stack %0 : $*()
+  %2 = tuple ()
+  return %2 : $()
+}
