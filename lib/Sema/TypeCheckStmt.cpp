@@ -3440,7 +3440,7 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
 }
 
 bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
-                                       bool isAsync) {
+                                       bool isAsync, SourceLoc loc) {
   if (!ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {
     return false;
   }
@@ -3449,7 +3449,9 @@ bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
     return false;
   }
 
-  if (!ctx.getProtocol(KnownProtocolKind::BorrowingSequence)) {
+  auto *borrowingSeqProto =
+      ctx.getProtocol(KnownProtocolKind::BorrowingSequence);
+  if (!borrowingSeqProto) {
     return false;
   }
 
@@ -3462,10 +3464,19 @@ bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
   // Fall back to Sequence if no conformance to BorrowingSequence is found.
   // This ensures that we maintain Sequence as the minimal required
   // conformance.
-  if (!lookupConformance(
-          seqTy, ctx.getProtocol(KnownProtocolKind::BorrowingSequence))) {
+  auto seqConformanceRef = lookupConformance(seqTy, borrowingSeqProto);
+  if (seqConformanceRef.isInvalid()) {
     return false;
   }
+
+  if (auto *conformance = seqConformanceRef.getConcrete()) {
+    auto protoAvail = AvailabilityContext::forDeclSignature(borrowingSeqProto);
+    auto *dc = conformance->getDeclContext();
+    auto availability = AvailabilityContext::forLocation(loc, dc);
+    if (!availability.isContainedIn(protoAvail))
+      return false;
+  }
+
   return true;
 }
 
@@ -3501,7 +3512,8 @@ public:
         (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
       return nullptr;
 
-    isBorrowing = shouldUseBorrowingSequence(ctx, seqType, isAsync);
+    isBorrowing = shouldUseBorrowingSequence(ctx, seqType, isAsync,
+                                             sequence->getStartLoc());
 
     sequenceProto =
         isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
