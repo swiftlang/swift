@@ -144,6 +144,9 @@ extension Executor {
   /// Executors that implement SchedulingExecutor should provide their
   /// own copy of this method, which will allow the compiler to avoid a
   /// potentially expensive runtime cast.
+  #if !os(Windows)
+  @_weakLinked
+  #endif
   @available(StdlibDeploymentTarget 6.3, *)
   public var asSchedulingExecutor: (any SchedulingExecutor)? {
     return self as? SchedulingExecutor
@@ -168,6 +171,9 @@ extension Executor {
   #if os(WASI) || !$Embedded
   // This defaults to `false` so that existing third-party Executor
   // implementations will work as expected.
+  #if !os(Windows)
+  @_weakLinked
+  #endif
   @available(StdlibDeploymentTarget 6.3, *)
   public var isMainExecutor: Bool { false }
   #endif // os(WASI) || !$Embedded
