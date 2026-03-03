@@ -1110,6 +1110,100 @@ public:
     return job->Flags.getKind() == JobKind::TaskStealer;
   }
 };
+
+/// Enqueue this task on the provided executor either directly or with a
+/// stealer. This must be called rather than swift_task_enqueue in case
+/// the Task is already directly enqueued. This may only be called when
+/// TaskStatus is locked or otherwise no concurrent calls may be made
+static inline void
+swift_task_enqueueSelfOrStealer(AsyncTask *task, SerialExecutorRef newExecutor,
+                         bool updateStealerExclusionValue) {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  SWIFT_TASK_DEBUG_LOG("Starting enqueue for %p on %p",
+                       (void*)task, (void*)newExecutor.getIdentity());
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
+  // This is safe to access because we either have the
+  // status locked or aren't dependent on an executor
+  auto needsStealer = oldStatus.isIntrusivelyLinked();
+  // Async let tasks allocate within their parent's allocator so they may
+  // not outlive their parent which is possible if a stealer is introduced
+  auto allowsStealer = !task->Flags.task_isAsyncLetTask();
+
+  // needsStealer implies allowsStealer
+  SWIFT_TASK_DEBUG_LOG("needsStealer: %d, allowsStealer: %d",
+                       needsStealer, allowsStealer);
+  assert(!needsStealer || allowsStealer);
+
+  ActiveTaskStatus newStatus = oldStatus;
+  // It shouldn't be possible to race here (i.e. none of the values we are
+  // modifying should be modified elsewhere, only different parts of the
+  // status could be modified)
+  do {
+    newStatus = oldStatus;
+    if (updateStealerExclusionValue) {
+      auto currentStealerExclusionValue = oldStatus.getStealerExclusionValue();
+      auto newStealerExclusionValue = currentStealerExclusionValue;
+      if (__builtin_add_overflow(currentStealerExclusionValue, 1,
+                                 &newStealerExclusionValue) ||
+          newStealerExclusionValue > 0xF) {
+        assert(false && "Somehow overflowed stealer exclusion value");
+      }
+      SWIFT_TASK_DEBUG_LOG("Updating exclusion value from %d to %d",
+                           currentStealerExclusionValue, newStealerExclusionValue);
+
+      newStatus = newStatus.withStealerExclusionValue(newStealerExclusionValue);
+    }
+
+    if (!oldStatus.isIntrusivelyLinked()) {
+      newStatus = newStatus.withEnqueued();
+      needsStealer = false;
+    } else {
+      needsStealer = true;
+    }
+
+    SWIFT_TASK_DEBUG_LOG(
+        "Needs to update based on %d || %d. Needs stealer %d. Exclusion value is %d",
+        updateStealerExclusionValue, !oldStatus.isIntrusivelyLinked(), needsStealer,
+        newStatus.getStealerExclusionValue());
+    // This can always be relaxed because it only needs to be read
+    // either by a thread syncronizing with the status lock or someone
+    // reading the stealer which we will later publish on this thread.
+  } while ((updateStealerExclusionValue || !oldStatus.isIntrusivelyLinked()) &&
+           !task->_private()._status().compare_exchange_weak(
+               oldStatus, newStatus,
+               /*success*/ std::memory_order_relaxed,
+               /*failure*/ std::memory_order_relaxed));
+
+  SWIFT_TASK_DEBUG_LOG("Update value: %d, needsStealer: %d",
+                       updateStealerExclusionValue, needsStealer);
+
+  if (needsStealer) {
+    // It is safe to read LocalStealerExclusionValue here becuase it can only
+    // be written to by this function which can not be called concurrently.
+    if (task->_private().LocalStealerExclusionValue ==
+            newStatus.getStealerExclusionValue() - 1) {
+      // This balances with the release in taskInvokeWithExclusionValue
+      // since enqueuing a stealer means that the direct enqueue
+      // may live after the Task completes. We only add a retain
+      // the first time we add a stealer and decrement it once the
+      // direct enqueue discovers that it was not able to run.
+      swift_retain(task);
+    }
+
+    auto *stealer = swift_cxx_newObject<AsyncTaskStealer>(
+        task, static_cast<JobPriority>(newStatus.getStoredPriority()),
+        newStatus.getStealerExclusionValue());
+    SWIFT_TASK_DEBUG_LOG(
+        "Enqueuing stealer %p at priority %#x with exclusion value %d",
+        (void*)stealer, newStatus.getStoredPriority(), stealer->ExclusionValue);
+    swift_task_enqueue(stealer, newExecutor);
+  } else {
+    task->_private().LocalStealerExclusionValue = newStatus.getStealerExclusionValue();
+    swift_task_enqueue(task, newExecutor);
+  }
+#else
+  swift_task_enqueue(task, newExecutor);
+#endif
 }
 
 /// TODO (rokhinip): We need the handoff of the thread to the next executor to
