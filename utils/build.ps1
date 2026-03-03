@@ -2321,12 +2321,18 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
         -Path $RuntimeBinaryCache\bin\swiftCore.dll `
         -Destination "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\site-packages\lldb"
 
-      # Runtime dependencies of repl_swift.exe
+      # Runtime dependencies of repl_swift.exe (release and debug swiftrt for Windows ABI)
       $SwiftRTSubdir = "lib\swift\windows"
-      Write-Host "Copying '$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir'"
+      $SwiftRTArchDir = "$SwiftRTSubdir\$($Platform.Architecture.LLVMName)"
+      $SwiftRTDestDir = "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTArchDir"
+      Write-Host "Copying '$RuntimeBinaryCache\$SwiftRTArchDir\swiftrt.obj' and 'swiftrtd.obj' to '$SwiftRTDestDir'"
+      New-Item -ItemType Directory -Force -Path $SwiftRTDestDir | Out-Null
       Copy-Item `
-        -Path "$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj" `
-        -Destination "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir"
+        -Path "$RuntimeBinaryCache\$SwiftRTArchDir\swiftrt.obj" `
+        -Destination $SwiftRTDestDir
+      Copy-Item `
+        -Path "$RuntimeBinaryCache\$SwiftRTArchDir\swiftrtd.obj" `
+        -Destination $SwiftRTDestDir
       Write-Host "Copying '$RuntimeBinaryCache\bin\swiftCore.dll' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin'"
       Copy-Item `
         -Path "$RuntimeBinaryCache\bin\swiftCore.dll" `

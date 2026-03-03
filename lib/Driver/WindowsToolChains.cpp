@@ -152,7 +152,14 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
     SmallString<128> swiftrtPath = SharedResourceDirPath;
     llvm::sys::path::append(swiftrtPath,
                             swift::getMajorArchitectureName(getTriple()));
-    llvm::sys::path::append(swiftrtPath, "swiftrt.obj");
+    // Windows does not provide a stable ABI between debug and release; use
+    // swiftrtd.obj for debug runtime variants to avoid _ITERATOR_DEBUG_LEVEL
+    // mismatches.
+    bool useDebugSwiftRT =
+        context.OI.RuntimeVariant == OutputInfo::MSVCRuntime::MultiThreadedDebug ||
+        context.OI.RuntimeVariant == OutputInfo::MSVCRuntime::MultiThreadedDebugDLL;
+    llvm::sys::path::append(swiftrtPath,
+                           useDebugSwiftRT ? "swiftrtd.obj" : "swiftrt.obj");
     Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
   }
 
