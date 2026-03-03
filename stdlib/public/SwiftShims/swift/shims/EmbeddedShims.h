@@ -19,7 +19,6 @@
 
 #include "SwiftStddef.h"
 #include "Visibility.h"
-#include <stddef.h>
 
 #if __has_feature(nullability)
 #pragma clang assume_nonnull begin
