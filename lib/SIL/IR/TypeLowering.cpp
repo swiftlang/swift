@@ -2588,6 +2588,8 @@ namespace {
 
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
+      auto subMap = structType->getContextSubstitutionMap();
+
       // Bail out if the struct layout relies on itself.
       TypeConverter::LowerAggregateTypeRAII loweringStruct(TC, structType);
       if (loweringStruct.IsInfinite) {
@@ -2643,7 +2645,8 @@ namespace {
         // either a scalar like type or an array like type. If the like type is
         // non-fixed abi, then this type is also non-fixed abi.
         if (!rawLayout->getSizeAndAlignment()) {
-          auto likeType = rawLayout->getResolvedLikeType(D)->getCanonicalType();
+          auto likeType = rawLayout->getResolvedLikeType(D)
+              .subst(subMap)->getCanonicalType();
           auto origLikeType = AbstractionPattern(
               D->getGenericSignature().getCanonicalSignature(), likeType);
           auto likeTypeProps = classifyType(origLikeType, likeType, TC,
@@ -2667,8 +2670,6 @@ namespace {
       if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
         properties.setDefinitelyAddressableForDependencies();
       }
-
-      auto subMap = structType->getContextSubstitutionMap();
 
       // Classify the type according to its stored properties.
       for (auto field : D->getStoredProperties()) {
