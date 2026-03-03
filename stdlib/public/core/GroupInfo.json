@@ -285,5 +285,29 @@
   ],
   "Result": [
     "Result.swift"
+  ],
+  "RigidArray": [
+    "RigidArray.swift",
+    "RigidArray+Append.swift",
+    "RigidArray+Container.swift",
+    "RigidArray+Descriptions.swift",
+    "RigidArray+Equatable.swift",
+    "RigidArray+Hashable.swift",
+    "RigidArray+Initializers.swift",
+    "RigidArray+Insertions.swift",
+    "RigidArray+Removals.swift",
+    "RigidArray+Replacements.swift"
+  ],
+  "UniqueArray": [
+    "UniqueArray.swift",
+    "UniqueArray+Append.swift",
+    "UniqueArray+Container.swift",
+    "UniqueArray+Descriptions.swift",
+    "UniqueArray+Equatable.swift",
+    "UniqueArray+Hashable.swift",
+    "UniqueArray+Initializers.swift",
+    "UniqueArray+Insertions.swift",
+    "UniqueArray+Removals.swift",
+    "UniqueArray+Replacements.swift"
   ]
 }

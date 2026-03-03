@@ -139,6 +139,19 @@ add_library(swiftCore
   REPL.swift
   Result.swift
   Reverse.swift
+
+  # RigidArray sources
+  RigidArray/RigidArray.swift
+  RigidArray/RigidArray+Append.swift
+  RigidArray/RigidArray+Container.swift
+  RigidArray/RigidArray+Descriptions.swift
+  RigidArray/RigidArray+Equatable.swift
+  RigidArray/RigidArray+Hashable.swift
+  RigidArray/RigidArray+Initializers.swift
+  RigidArray/RigidArray+Insertions.swift
+  RigidArray/RigidArray+Removals.swift
+  RigidArray/RigidArray+Replacements.swift
+
   Runtime.swift
   RuntimeFunctionCounters.swift
   SipHash.swift
@@ -209,6 +222,19 @@ add_library(swiftCore
   UnicodeScalarProperties.swift
   CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
   UnicodeSPI.swift
+
+  # UniqueArray sources
+  UniqueArray/UniqueArray.swift
+  UniqueArray/UniqueArray+Append.swift
+  UniqueArray/UniqueArray+Container.swift
+  UniqueArray/UniqueArray+Descriptions.swift
+  UniqueArray/UniqueArray+Equatable.swift
+  UniqueArray/UniqueArray+Hashable.swift
+  UniqueArray/UniqueArray+Initializers.swift
+  UniqueArray/UniqueArray+Insertions.swift
+  UniqueArray/UniqueArray+Removals.swift
+  UniqueArray/UniqueArray+Replacements.swift
+
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift

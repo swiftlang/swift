@@ -148,6 +148,19 @@ split_embedded_sources(
   EMBEDDED Repeat.swift
   EMBEDDED Result.swift
   EMBEDDED Reverse.swift
+
+  # RigidArray sources
+  EMBEDDED RigidArray/RigidArray.swift
+  EMBEDDED RigidArray/RigidArray+Append.swift
+  EMBEDDED RigidArray/RigidArray+Container.swift
+  EMBEDDED RigidArray/RigidArray+Descriptions.swift
+  EMBEDDED RigidArray/RigidArray+Equatable.swift
+  EMBEDDED RigidArray/RigidArray+Hashable.swift
+  EMBEDDED RigidArray/RigidArray+Initializers.swift
+  EMBEDDED RigidArray/RigidArray+Insertions.swift
+  EMBEDDED RigidArray/RigidArray+Removals.swift
+  EMBEDDED RigidArray/RigidArray+Replacements.swift
+
   EMBEDDED Runtime.swift
     NORMAL RuntimeFunctionCounters.swift
   EMBEDDED Sendable.swift
@@ -215,6 +228,19 @@ split_embedded_sources(
     NORMAL ThreadLocalStorage.swift
   EMBEDDED UInt128.swift
   EMBEDDED UIntBuffer.swift
+
+  # UniqueArray sources
+  EMBEDDED UniqueArray/UniqueArray.swift
+  EMBEDDED UniqueArray/UniqueArray+Append.swift
+  EMBEDDED UniqueArray/UniqueArray+Container.swift
+  EMBEDDED UniqueArray/UniqueArray+Descriptions.swift
+  EMBEDDED UniqueArray/UniqueArray+Equatable.swift
+  EMBEDDED UniqueArray/UniqueArray+Hashable.swift
+  EMBEDDED UniqueArray/UniqueArray+Initializers.swift
+  EMBEDDED UniqueArray/UniqueArray+Insertions.swift
+  EMBEDDED UniqueArray/UniqueArray+Removals.swift
+  EMBEDDED UniqueArray/UniqueArray+Replacements.swift
+
   EMBEDDED UTF16.swift
   EMBEDDED UTF32.swift
   EMBEDDED UTF8.swift
