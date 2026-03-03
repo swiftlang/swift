@@ -7071,12 +7071,12 @@ ArtificialMainKind Decl::getArtificialMainKind() const {
 }
 
 bool Decl::canSupportBorrowAccessors() const {
-  if (isa<StructDecl>(this)) {
+  if (isa<StructDecl>(this) || isa<EnumDecl>(this) || isa<ClassDecl>(this)) {
     return true;
   }
   if (auto *extension = dyn_cast<ExtensionDecl>(this)) {
     auto *extendedNominal = extension->getExtendedNominal();
-    if (extendedNominal && isa<StructDecl>(extendedNominal)) {
+    if (extendedNominal && extendedNominal->canSupportBorrowAccessors()) {
       return true;
     }
   }

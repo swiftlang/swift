@@ -39,17 +39,6 @@ struct Struct {
   }
 }
 
-extension Klass {
-  var i: Int {
-    borrow { // expected-error{{a 'borrow' accessor is unsupported here}}
-      return 0
-    }
-    mutate { // expected-error{{a 'mutate' accessor is unsupported here}}
-      return &_i
-    }
-  }
-}
-
 extension Struct {
   var i: Int {
     borrow {
@@ -82,7 +71,7 @@ protocol P {
 }
 
 public protocol Q {
-  var id: NonTrivial { borrow mutate } // expected-note{{protocol requires property 'id' with type 'NonTrivial'}} // expected-note{{}} // expected-note{{}} // expected-note{{}} // expected-note{{}}
+  var id: NonTrivial { borrow mutate } // expected-note{{protocol requires property 'id' with type 'NonTrivial'}} // expected-note{{}} // expected-note{{}} // expected-note{{}}
 
 }
 
@@ -216,9 +205,5 @@ struct S10 {
       return _i
     }
   }
-}
-
-final class C : Q { // expected-error {{type 'C' does not conform to protocol 'Q'}} // expected-note{{add stubs for conformance}}
-  var id: NonTrivial = NonTrivial(k: Klass()) // expected-error{{borrow/mutate protocol requirements can only be witnessed in a struct}}
 }
 

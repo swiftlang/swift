@@ -121,20 +121,3 @@ var i_accessor: Int {
   }
 }
 
-class KlassWrapper {
-  var _k: Klass
-
-  init(_ k: Klass) {
-    self._k = k
-  }
-
-  var k: Klass {
-    borrow {// expected-error{{a 'borrow' accessor is unsupported here}}
-      return _k
-    }
-    mutate {// expected-error{{a 'mutate' accessor is unsupported here}}
-      return &_k
-    }
-  }
-}
-
