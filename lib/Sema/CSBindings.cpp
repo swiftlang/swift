@@ -519,7 +519,11 @@ bool BindingSet::involvesTypeVariables() const {
       TypeVar->getImpl().canBindToPack())
     return true;
 
-  if (!Info.AdjacentVars.empty())
+  if (!Info.AdjacentVars.empty() ||
+      !Info.SubtypeOf.empty() ||
+      !Info.SubtypeDelay.empty() ||
+      !Info.SupertypeOf.empty() ||
+      !Info.SupertypeDelay.empty())
     return true;
 
   // This is effectively a no-op right now since bindings are re-computed
@@ -3271,7 +3275,8 @@ void PotentialBindings::retract(Constraint *constraint) {
 
   LLVM_DEBUG(
     llvm::dbgs() << Constraints.size() << " " << Bindings.size() << " "
-                 << AdjacentVars.size() << " " << DelayedBy.size() << " "
+                 << AdjacentVars.size() << " " << SubtypeDelay.size() << " "
+                 << SupertypeDelay.size() << " " << DelayedBy.size() << " "
                  << LValueOf.size() << " " << SubtypeOf.size() << " "
                  << SupertypeOf.size() << " " << EquivalentTo.size() << "\n");
 
@@ -3343,10 +3348,12 @@ void PotentialBindings::reset() {
     ASSERT(Bindings.empty());
     ASSERT(DelayedBy.empty());
     ASSERT(AdjacentVars.empty());
+    ASSERT(EquivalentTo.empty());
     ASSERT(LValueOf.empty());
     ASSERT(SubtypeOf.empty());
+    ASSERT(SubtypeDelay.empty());
     ASSERT(SupertypeOf.empty());
-    ASSERT(EquivalentTo.empty());
+    ASSERT(SupertypeDelay.empty());
   }
 
   TypeVar = nullptr;
@@ -3371,6 +3378,12 @@ void PotentialBindings::printVars(llvm::raw_ostream &out, unsigned indent,
         [&out]() { out << ", "; });
   };
 
+  if (!EquivalentTo.empty()) {
+    out << "[equivalent to: ";
+    printVars(EquivalentTo);
+    out << "] ";
+  }
+
   if (!AdjacentVars.empty()) {
     out << "[adjacent to: ";
     printVars(AdjacentVars);
@@ -3383,15 +3396,21 @@ void PotentialBindings::printVars(llvm::raw_ostream &out, unsigned indent,
     out << "] ";
   }
 
+  if (!SupertypeDelay.empty()) {
+    out << "[supertype delayed by: ";
+    printVars(SupertypeDelay);
+    out << "] ";
+  }
+
   if (!SubtypeOf.empty()) {
     out << "[subtype of: ";
     printVars(SubtypeOf);
     out << "] ";
   }
 
-  if (!EquivalentTo.empty()) {
-    out << "[equivalent to: ";
-    printVars(SubtypeOf);
+  if (!SubtypeDelay.empty()) {
+    out << "[subtype delayed by: ";
+    printVars(SubtypeDelay);
     out << "] ";
   }
 }
