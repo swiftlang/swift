@@ -768,6 +768,9 @@ private:
   SubsumeBindingResult subsumeBinding(const PotentialBinding &binding,
                                       const PotentialBinding &existing);
 
+  void inferTransitiveKeyPathBindingFrom(const PotentialBinding &binding,
+                                         TypeVariableType *keyPathTy);
+
   void addDefault(Constraint *constraint);
 
   StringRef getLiteralBindingKind(LiteralBindingKind K) const {
