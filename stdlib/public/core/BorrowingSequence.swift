@@ -170,29 +170,6 @@ extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyab
   public func _customContainsEquatableElement(_ element: borrowing Element) -> Bool? { nil }
 }
 
-// FIXME: Elminate these overloads once Sequence is reparented, they break ambiguity for
-// types that conform to both BorrowingSequence and Sequence or Collection.
-
-@available(SwiftStdlib 6.4, *)
-extension Sequence where Self: BorrowingSequence {
-  @available(SwiftStdlib 6.4, *)
-  @inlinable
-  public var underestimatedCount: Int { 0 }
-  @available(SwiftStdlib 6.4, *)
-  @inlinable
-  public func _customContainsEquatableElement(_ element: Element) -> Bool? { nil }
-}
-
-@available(SwiftStdlib 6.4, *)
-extension Collection where Self: BorrowingSequence {
-  @available(SwiftStdlib 6.4, *)
-  @inlinable
-  public var underestimatedCount: Int { 0 }
-  @available(SwiftStdlib 6.4, *)
-  @inlinable
-  public func _customContainsEquatableElement(_ element: Element) -> Bool? { nil }
-}
-
 @available(SwiftStdlib 6.4, *)
 @frozen
 public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIteratorProtocol {
@@ -218,7 +195,7 @@ public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIte
 }
 
 @available(SwiftStdlib 6.4, *)
-extension Sequence where Self: BorrowingSequence {
+extension Sequence { /* where Element: Copyable */
   @available(SwiftStdlib 6.4, *)
   @_disfavoredOverload
   @_transparent
