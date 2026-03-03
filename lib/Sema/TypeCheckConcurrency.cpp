@@ -7117,6 +7117,8 @@ static bool checkSendableInstanceStorage(
 
     /// Handle a stored property.
     bool operator()(VarDecl *property, Type propertyType) override {
+      auto [propertyForDiagnostics, propertyTypeForDiagnostics] =
+          getPropertyForDiagnostics(property, propertyType);
       ActorIsolation isolation = getActorIsolation(property);
 
       // 'nonisolated' properties are always okay in 'Sendable' types because
@@ -7137,9 +7139,9 @@ static bool checkSendableInstanceStorage(
           auto preconcurrency =
               check == SendableCheck::ImpliedByPreconcurrencyProtocol;
           if (behavior != DiagnosticBehavior::Ignore) {
-            property
+            propertyForDiagnostics
                 ->diagnose(diag::concurrent_value_class_mutable_property,
-                           property->getName(), nominal)
+                           propertyForDiagnostics->getName(), nominal)
                 .limitBehaviorWithPreconcurrency(behavior, preconcurrency);
           }
           invalid = invalid || (behavior == DiagnosticBehavior::Unspecified);
@@ -7151,7 +7153,8 @@ static bool checkSendableInstanceStorage(
         }
       }
 
-      return checkSendabilityOfMemberType(property, propertyType);
+      return checkSendabilityOfMemberType(
+          propertyForDiagnostics, propertyTypeForDiagnostics);
     }
 
     /// Handle an enum associated value.
@@ -7160,6 +7163,20 @@ static bool checkSendableInstanceStorage(
     }
 
   private:
+    std::pair<VarDecl *, Type> getPropertyForDiagnostics(VarDecl *property,
+                                                         Type propertyType) {
+      if (!property->isLazyStorageProperty())
+        return {property, propertyType};
+
+      auto *originalProperty = property->getOriginalVarForBackingStorage();
+      if (!originalProperty)
+        return {property, propertyType};
+
+      auto originalPropertyType =
+          dc->mapTypeIntoEnvironment(originalProperty->getValueInterfaceType());
+      return {originalProperty, originalPropertyType};
+    }
+
     bool checkSendabilityOfMemberType(ValueDecl *member, Type memberType) {
       SendableCheckContext context(dc, check);
       diagnoseNonSendableTypes(
