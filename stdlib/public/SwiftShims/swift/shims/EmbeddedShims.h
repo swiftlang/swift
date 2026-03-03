@@ -171,7 +171,7 @@ _swift_embedded_initialize_box(void *metadata, void *newObjectAddr, void *oldObj
 }
 
 typedef struct {
-  void *inlineBuffer[3];
+  void * _Nullable inlineBuffer[3];
   void *metadata;
 } ExistentialValue;
 
@@ -263,7 +263,7 @@ _swift_embedded_error_destroy(SWIFT_CONTEXT void *object);
 // Layout: [superclassMetadata=null, destroy=_swift_embedded_error_destroy, ivarDestroyer=null]
 // This is static per-TU; only swift_allocError (in EmbeddedRuntime.swift) ever stores it in
 // error boxes, so metadata-pointer identity is never compared across TUs.
-static void *_swift_embedded_error_metadata_storage[3] = {
+static void * _Nullable _swift_embedded_error_metadata_storage[3] = {
   NULL,
   (void *)_swift_embedded_error_destroy,
   NULL,
