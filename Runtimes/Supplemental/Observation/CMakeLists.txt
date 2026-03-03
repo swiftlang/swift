@@ -109,10 +109,7 @@ set_target_properties(swiftObservation PROPERTIES
 # FIXME: We should split out the parts that are needed by the runtime to avoid
 # pulling in headers from the compiler.
 target_include_directories(swiftObservation PRIVATE
-  "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/include"
-  # For `swift/runtime/CMakeConfig.h`, which should be generated
-  # by the Core build system.
-  "${${PROJECT_NAME}_PATH_TO_SWIFT_RUNTIME_HEADERS}")
+  "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/include")
 target_link_libraries(swiftObservation PRIVATE
   swiftShims
   swiftCore

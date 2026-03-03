@@ -18,7 +18,6 @@
 #define SWIFT_RUNTIME_CONFIG_H
 
 #include "swift/Basic/Compiler.h"
-#include "swift/Runtime/CMakeConfig.h"
 
 /// SWIFT_RUNTIME_WEAK_IMPORT - Marks a symbol for weak import.
 #if (__has_attribute(weak_import))
