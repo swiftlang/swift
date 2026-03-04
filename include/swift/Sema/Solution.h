@@ -306,6 +306,8 @@ struct PotentialThrowSite {
 
   /// The locator that specifies where the throwing operation occurs.
   ConstraintLocator *locator;
+
+  void print(SourceManager *sm, llvm::raw_ostream &out) const;
 };
 
 /// Describes what happened when a result builder transform was applied
