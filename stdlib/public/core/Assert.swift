@@ -82,7 +82,7 @@ public func assert(
 ///   execution in a debuggable state after printing `message`.
 ///
 /// * In `-O` builds (the default for Xcode's Release configuration): If
-///   `condition` evaluates to `false`, stop program execution.
+///   `condition` evaluates to `false`, stop program execution after printing `message`.
 ///
 /// * In `-Ounchecked` builds, `condition` is not evaluated, but the optimizer
 ///   may assume that it *always* evaluates to `true`. Failure to satisfy that
@@ -108,16 +108,9 @@ public func precondition(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
-  // Only check in debug and release mode. In release mode just trap.
-  if _isDebugAssertConfiguration() {
-    if !_fastPath(condition()) {
-      _assertionFailure("Precondition failed", message(), file: file, line: line,
-        flags: _fatalErrorFlags())
-    }
-  } else if _isReleaseAssertConfiguration() {
-    let error = !condition()
-    Builtin.condfail_message(error._value,
-      StaticString("precondition failure").unsafeRawPointer)
+  if !_fastPath(condition()) {
+    _assertionFailure("Precondition failed", message(), file: file, line: line,
+                      flags: _fatalErrorFlags())
   }
 }
 
@@ -210,7 +203,7 @@ public func assertionFailure(
 ///   printing `message`.
 ///
 /// * In `-O` builds (the default for Xcode's Release configuration), stops
-///   program execution.
+///   program execution after printing `message`.
 ///
 /// * In `-Ounchecked` builds, the optimizer may assume that this function is
 ///   never called. Failure to satisfy that assumption is a serious
@@ -231,14 +224,8 @@ public func preconditionFailure(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
-  // Only check in debug and release mode.  In release mode just trap.
-  if _isDebugAssertConfiguration() {
-    _assertionFailure("Fatal error", message(), file: file, line: line,
-      flags: _fatalErrorFlags())
-  } else if _isReleaseAssertConfiguration() {
-    Builtin.condfail_message(true._value,
-      StaticString("precondition failure").unsafeRawPointer)
-  }
+  _assertionFailure("Fatal error", message(), file: file, line: line,
+                    flags: _fatalErrorFlags())
   _conditionallyUnreachable()
 }
 
@@ -311,23 +298,16 @@ public func fatalError(
 /// Library precondition checks.
 ///
 /// Library precondition checks are enabled in debug mode and release mode. When
-/// building in fast mode they are disabled.  In release mode they don't print
-/// an error message but just trap. In debug mode they print an error message
+/// building in fast mode they are disabled. They print an error message
 /// and abort.
 @usableFromInline @_transparent
 internal func _precondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
-  // Only check in debug and release mode. In release mode just trap.
-  if _isDebugAssertConfiguration() {
-    if !_fastPath(condition()) {
-      _assertionFailure("Fatal error", message, file: file, line: line,
-        flags: _fatalErrorFlags())
-    }
-  } else if _isReleaseAssertConfiguration() {
-    let error = !condition()
-    Builtin.condfail_message(error._value, message.unsafeRawPointer)
+  if !_fastPath(condition()) {
+    _assertionFailure("Fatal error", message, file: file, line: line,
+                      flags: _fatalErrorFlags())
   }
 }
 
