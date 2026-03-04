@@ -5789,8 +5789,26 @@ public:
       printField(conformance->getSourceKind(), Label::optional("source_kind"));
       printFlag(conformance->isRetroactive(), "retroactive");
       printIsolation(conformance->getIsolation());
-      if (!Writer.isParsable())
+
+      if (Writer.isParsable() && isTypeChecked()) {
+        // Print the decl context that declares the conformance, which should
+        // always be a type or extension declaration. Print the module as well,
+        // since an extension decl USR won't actually contain this if the
+        // module containing the conformance is different than the modules
+        // containing the type and the protocol.
+        printRecArbitrary([&](Label label) {
+          printHead("conformance_context", ASTNodeColor, label);
+          DeclContext *DC = conformance->getDeclContext();
+          if (auto *D = DC->getAsDecl()) {
+            printField(declUSR(D), Label::always("decl"));
+          }
+          printField(DC->getParentModule()->getRealName(),
+                     Label::always("module"));
+          printFoot();
+        }, Label::always("context"));
+      } else {
         printFlag(!shouldPrintDetails, "<details printed above>");
+      }
     };
 
     switch (conformance->getKind()) {
@@ -5803,7 +5821,6 @@ public:
           printFlag(normal->isPreconcurrencyEffectful(),
                     "effectful_preconcurrency");
         }
-        printFlag(normal->isRetroactive(), "retroactive");
         printFlag(normal->isUnchecked(), "unchecked");
         if (normal->getExplicitSafety() != ExplicitSafety::Unspecified)
           printField(normal->getExplicitSafety(), Label::always("safety"));
@@ -5811,7 +5828,6 @@ public:
         if (!shouldPrintDetails)
           break;
 
-        // Maybe print information about the conforming context?
         if (normal->isLazilyLoaded()) {
           printFlag("lazy");
         } else {
