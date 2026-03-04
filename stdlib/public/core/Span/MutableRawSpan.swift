@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -118,6 +118,7 @@ extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
   @lifetime(&elements)
+  @unsafe
   public init<Element: BitwiseCopyable>(
     _elements elements: inout MutableSpan<Element>
   ) {
@@ -128,6 +129,26 @@ extension MutableRawSpan {
                  : count &* MemoryLayout<Element>.stride
     )
     self = unsafe _overrideLifetime(span, mutating: &elements)
+  }
+
+  /// Mutate the elements of a typed span as raw bytes.
+  @_lifetime(&mutableSpan)
+  init<Element: ConvertibleFromRawBytes & ConvertibleToRawBytes>(
+    mutating mutableSpan: inout MutableSpan<Element>
+  ) {
+    unsafe self = Self.init(_elements: &mutableSpan)
+  }
+
+  /// Convert a typed span to a raw span.
+  @_lifetime(copy span)
+  init<Element: ConvertibleToRawBytes>(_ span: consuming MutableSpan<Element>) {
+    unsafe self = _overrideLifetime(
+      Self.init(
+        _unchecked: span._pointer,
+        byteCount: span._count &* MemoryLayout<Element>.stride
+      ),
+      copying: span
+    )
   }
 }
 
@@ -145,6 +166,52 @@ extension MutableRawSpan {
   @_alwaysEmitIntoClient
   public var byteOffsets: Range<Int> {
     unsafe Range(_uncheckedBounds: (0, byteCount))
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableRawSpan {
+  // SILOptimizer looks for fixed_storage.check_index semantics
+  // for bounds checking optimizations.
+  @_semantics("fixed_storage.check_index")
+  @_alwaysEmitIntoClient @inline(__always)
+  internal func _checkIndex(_ position: Int) {
+    _precondition(byteOffsets.contains(position), "Index out of bounds")
+  }
+
+  /// Accesses the byte at the specified offset in the span.
+  ///
+  /// - Parameter byteOffset: The offset of the byte to access. `byteOffset`
+  ///     must be greater or equal to zero, and less than `byteCount`.
+  subscript(_ byteOffset: Int) -> UInt8 {
+    get {
+      _checkIndex(byteOffset)
+      return unsafe self[unchecked: byteOffset]
+    }
+    set {
+      _checkIndex(byteOffset)
+      unsafe self[unchecked: byteOffset] = newValue
+    }
+  }
+
+  /// Accesses the byte at the specified offset in the span.
+  ///
+  /// This subscript does not validate `byteOffset`. Using this subscript
+  /// with an invalid `byteOffset` results in undefined behaviour.
+  ///
+  /// - Parameter byteOffset: The offset of the byte to access. `byteOffset`
+  ///     must be greater or equal to zero, and less than `count`.
+  @unsafe
+  subscript(unchecked byteOffset: Int) -> UInt8 {
+    get {
+      unsafe unsafeLoad(fromUncheckedByteOffset: byteOffset, as: UInt8.self)
+    }
+    set {
+      unsafe storeBytes(
+        of: newValue, toUncheckedByteOffset: byteOffset, as: UInt8.self
+      )
+    }
   }
 }
 
@@ -335,6 +402,61 @@ extension MutableRawSpan {
     unsafe _start().loadUnaligned(fromByteOffset: offset, as: T.self)
   }
 
+  /// Returns a value constructed from the raw memory at the specified offset.
+  ///
+  /// The range of bytes required to construct a value of type `T` starting at
+  /// `offset` must be completely within the span.
+  /// `offset` is not required to be aligned for `T`.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset from the beginning of this span, in bytes.
+  ///     `offset` must be nonnegative. The default is zero.
+  ///   - type: The type of the instance to create.
+  /// - Returns: A new value of type `T`, read from `offset`.
+  @_alwaysEmitIntoClient
+  func load<T: ConvertibleFromRawBytes>(
+    fromByteOffset offset: Int = 0,
+    as: T.Type = T.self
+  ) -> T {
+    unsafe unsafeLoadUnaligned(fromByteOffset: offset, as: T.self)
+  }
+
+  /// Returns a value constructed from the raw memory at the specified offset.
+  ///
+  /// The range of bytes required to construct a value of type `T` starting at
+  /// `offset` must be completely within the span.
+  /// `offset` is not required to be aligned for `T`.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset from the beginning of this span, in bytes.
+  ///     `offset` must be nonnegative. The default is zero.
+  ///   - type: The type of the instance to create.
+  ///   - byteOrder: The order in which the bytes should be decoded.
+  /// - Returns: A new value of type `T`, read from `offset`.
+  @_alwaysEmitIntoClient
+  func load<T: ConvertibleFromRawBytes & FixedWidthInteger>(
+    fromByteOffset offset: Int = 0,
+    as: T.Type = T.self,
+    _ byteOrder: ByteOrder
+  ) -> T {
+    switch byteOrder {
+    case .bigEndian:
+      load(fromByteOffset: offset, as: T.self).bigEndian
+    case .littleEndian:
+      load(fromByteOffset: offset, as: T.self).littleEndian
+    }
+  }
+
+  /// Stores a value's bytes to the specified offset into the span's memory.
+  ///
+  /// The range of bytes required to store a value of `T` starting at
+  /// byte offset `offset` must be completely within the span.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - offset: The offset in bytes into the buffer pointer's memory to begin
+  ///     writing bytes from the value. The default is zero.
+  ///   - type: The type of the instance to store.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func storeBytes<T: BitwiseCopyable>(
@@ -348,6 +470,20 @@ extension MutableRawSpan {
     unsafe storeBytes(of: value, toUncheckedByteOffset: offset, as: type)
   }
 
+  /// Stores a value's bytes to the specified offset into the span's memory.
+  ///
+  /// The range of bytes required to store a value of `T` starting at
+  /// byte offset `offset` must be completely within the span.
+  ///
+  /// This is an unsafe operation. This function does not validate the bounds
+  /// of the memory access, and failure to meet the preconditions
+  /// above may result in undefined behaviour.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - offset: The offset in bytes into the buffer pointer's memory to begin
+  ///     writing bytes from the value. The default is zero.
+  ///   - type: The type of the instance to store.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
@@ -355,6 +491,55 @@ extension MutableRawSpan {
     of value: T, toUncheckedByteOffset offset: Int, as type: T.Type
   ) {
     unsafe _start().storeBytes(of: value, toByteOffset: offset, as: type)
+  }
+
+  /// Stores a value's bytes to the specified offset into the span's memory.
+  ///
+  /// The range of bytes required to store a value of `T` starting at
+  /// byte offset `offset` must be completely within the span.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - offset: The offset in bytes into the buffer pointer's memory to begin
+  ///     writing bytes from the value. The default is zero.
+  ///   - type: The type of the instance to store.
+  ///   - byteOrder: The order in which the bytes will be encoded to the span.
+  @_alwaysEmitIntoClient
+  mutating func storeBytes<
+    T: ConvertibleToRawBytes & BitwiseCopyable & FixedWidthInteger
+  >(
+    of value: T,
+    toByteOffset offset: Int = 0,
+    as type: T.Type,
+    _ byteOrder: ByteOrder
+  ) {
+    switch byteOrder {
+    case .bigEndian:
+      storeBytes(of: value.bigEndian, toByteOffset: offset, as: T.self)
+    case .littleEndian:
+      storeBytes(of: value.littleEndian, toByteOffset: offset, as: T.self)
+    }
+  }
+
+  /// Stores a value's bytes repeatedly into this span's memory.
+  ///
+  /// There must be at least `count * MemoryLayout<T>.stride` bytes
+  /// available in the span.
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The value to store as raw bytes.
+  ///   - count: The number of copies of `value` to append to this span.
+  ///   - type: The type of the instance to store.
+  mutating func storeBytes<T: BitwiseCopyable>(
+    repeating repeatedValue: T, count: Int, as type: T.Type
+  ) {
+    _precondition(
+      count*MemoryLayout<T>.stride <= _count,
+      "Span cannot contain every element"
+    )
+    unsafe _start().withMemoryRebound(to: T.self, capacity: count) {
+      unsafe $0.update(repeating: repeatedValue, count: count)
+    }
   }
 }
 
