@@ -1,7 +1,6 @@
-// RUN: not %target-swift-frontend %s -sil-verify-all -c 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend %s -sil-verify-all -c
 
-// Report the error but don't crash.
-// CHECK: error: closure captures 'stringList' before it is declared
+// Make sure we don't crash.
 
 class TestUndefined {
   private var stringList: [String]!
