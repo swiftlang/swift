@@ -265,6 +265,18 @@ void unsignedLiteral(int * __counted_by(2u) p);
 // expected-diagnose-note@+1{{no bounds or lifetime information found}}
 void longLiteral(int * __counted_by(2l) p);
 
+// expected-diagnose-remark@+10{{ignoring __counted_by attribute}}
+// expected-diagnose-note@+9{{count parameter contains unsupported expression kind UnaryOperator}}
+// expected-diagnose-remark@+8{{added safe interop wrapper}}
+// expected-macro-expansion@+7:108{{
+//   expected-macro-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+//   expected-macro-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func oneIgnoredOneUnignored(_ len1: UnsafeMutablePointer<Int32>!, _ p1: UnsafeMutablePointer<Int32>!, _ p2: UnsafeMutableBufferPointer<Int32>) {|}}
+//   expected-macro-remark@3{{macro content: |    let len2 = Int32(exactly: p2.count)!|}}
+//   expected-macro-remark@4{{macro content: |    return unsafe oneIgnoredOneUnignored(len1, p1, len2, p2.baseAddress!)|}}
+//   expected-macro-remark@5{{macro content: |}|}}
+// }}
+void oneIgnoredOneUnignored(int * len1, int * __counted_by(*len1) p1, int len2, int * __counted_by(len2) p2);
+
 // expected-diagnose-remark@+11{{added safe interop wrapper}}
 // expected-macro-expansion@+10:43{{
 //   expected-macro-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
@@ -313,7 +325,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: dc40e34e2ead0c5c89061ff84e7ecb31d97f258952fb2ff356304ee00b98cb00
+// GENERATED-HASH: 9eae98fc72dd60263d6faad327ecd37248f46330bd811e2446b77eafbf925e7c
 import Test
 
 func call_simple(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!) {
@@ -424,6 +436,10 @@ func call_longLiteral(_ p: UnsafeMutablePointer<Int32>!) {
   return unsafe longLiteral(p)
 }
 
+func call_oneIgnoredOneUnignored(_ len1: UnsafeMutablePointer<Int32>!, _ p1: UnsafeMutablePointer<Int32>!, _ len2: Int32, _ p2: UnsafeMutablePointer<Int32>!) {
+  return unsafe oneIgnoredOneUnignored(len1, p1, len2, p2)
+}
+
 func call_hexLiteral(_ p: UnsafeMutablePointer<Int32>!) {
   return unsafe hexLiteral(p)
 }
@@ -486,6 +502,10 @@ func call_octalLiteral(_ p: UnsafeMutablePointer<Int32>!) {
 
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_offBySome(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {
   return unsafe offBySome(len, offset, p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_oneIgnoredOneUnignored(_ len1: UnsafeMutablePointer<Int32>!, _ p1: UnsafeMutablePointer<Int32>!, _ p2: UnsafeMutableBufferPointer<Int32>) {
+  return unsafe oneIgnoredOneUnignored(len1, p1, p2)
 }
 
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_returnPointer(_ len: Int32) -> UnsafeMutableBufferPointer<Int32> {
