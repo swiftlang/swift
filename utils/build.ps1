@@ -4618,7 +4618,7 @@ if (-not $IsCrossCompiling) {
 }
 
 if ($SmokeTest) {
-  Record-OperationTiming $HostPlatform "Run-SmokeTests" {
+  Record-OperationTime $HostPlatform "Run-SmokeTests" {
     Run-SmokeTests $HostPlatform
   }
 }
