@@ -221,7 +221,7 @@ SWIFT_ALWAYS_INLINE
 static inline
 void taskInvokeWithExclusionValue(AsyncTask *task,
                                   uint8_t allowedStealerExclusionValue,
-                                  AsyncTask:: InvokeFlags invokeFlags) {
+                                  AsyncTask::InvokeFlags invokeFlags = AsyncTask::InvokeFlags::None) {
   // Update the task status to say that it's running on the current
   // thread.  If the task suspends somewhere, it should update the
   // task status appropriately; we don't need to update it afterwards.
@@ -265,7 +265,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
 #endif
 
   if (auto task = dyn_cast<AsyncTask>(job)) {
-    taskInvokeWithExclusionValue(task, task->_private().LocalStealerExclusionValue, 0);
+    taskInvokeWithExclusionValue(task, task->_private().LocalStealerExclusionValue);
   } else {
     // There's no extra bookkeeping to do for simple jobs besides swapping in
     // the voucher.

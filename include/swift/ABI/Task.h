@@ -427,8 +427,9 @@ public:
   /// The methods below are how a task switches from one state to another.
 
   enum InvokeFlags : uint32_t {
+    None = 0x00,
     InvokedFromStealer = 0x01,
-  }
+  };
   /// Flag that this task is now running. This can update the priority
   /// stored in the job flags if the priority has been escalated.
   ///
@@ -459,7 +460,7 @@ public:
   /// executor or the caller of Task.immediate). When flagAsRunning succeeds,
   /// Dispatch is the default executor, and priority escalation is enabled,
   /// this value must be passed to swift_dispatch_thread_reset_override_self.
-  std::pair<bool, uint32_t> flagAsRunningFromEnqueued(uint8_t allowedExclusionValue, InvokeFlags invokeFlags);
+  std::pair<bool, uint32_t> flagAsRunningFromEnqueued(uint8_t allowedExclusionValue, InvokeFlags invokeFlags = InvokeFlags::None);
 
   /// This variant of flagAsRunning may be called if you are resumming
   /// immediately after suspending. That is, you are on the same thread,
@@ -468,7 +469,7 @@ public:
   /// cleanup work. This is intended for situations such as awaiting
   /// where you may mark yourself as suspended but find out during
   /// atomic state update that you may actually resume immediately.
-  void flagAsRunningFromSuspended(InvokeFlags invokeFlags);
+  void flagAsRunningFromSuspended(InvokeFlags invokeFlags = InvokeFlags::None);
 
   /// Flag that this task is now suspended with information about what it is
   /// waiting on.

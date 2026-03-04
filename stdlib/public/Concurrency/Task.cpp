@@ -133,7 +133,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
                            waitingTask, this);
       _swift_tsan_acquire(static_cast<Job *>(this));
       if (suspendedWaiter) {
-        waitingTask->flagAsRunningFromSuspended(0);
+        waitingTask->flagAsRunningFromSuspended();
       }
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
@@ -1678,7 +1678,7 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
   // we try to tail-call.
   } while (false);
 #else
-  task->flagAsRunningFromSuspended(0);
+  task->flagAsRunningFromSuspended();
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 
   if (context->isExecutorSwitchForced())

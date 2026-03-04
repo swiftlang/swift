@@ -1169,7 +1169,7 @@ inline void AsyncTask::flagAsRunningFromSuspended([[maybe_unused]] InvokeFlags i
   if (!oldStatus.hasTaskDependency()) {
     assert(_private().dependencyRecord == nullptr);
     [[maybe_unused]]
-    uint32_t opaque = taskFlagAsRunningWithoutDependency(*this, true);
+    uint32_t opaque = taskFlagAsRunningWithoutDependency(*this, invokeFlags);
     // In this function, we should always see zero
     assert(opaque == 0);
     return;
@@ -1235,7 +1235,7 @@ inline std::pair<bool, uint32_t> AsyncTask::flagAsRunningFromEnqueued(uint8_t al
     assert(oldStatus.getStealerExclusionValue() == allowedExclusionValue);
 #endif
     SWIFT_TASK_DEBUG_LOG("flagAsRunningFromEnqueued succeeds for %p with no dependency record", this);
-    return {true, taskFlagAsRunningWithoutDependency(*this, true)};
+    return {true, taskFlagAsRunningWithoutDependency(*this, invokeFlags)};
   }
 
   // In this case, we were enqueued so we may
