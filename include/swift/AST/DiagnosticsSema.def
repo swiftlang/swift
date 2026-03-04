@@ -7703,9 +7703,8 @@ GROUPED_ERROR(property_wrapper_ambiguous_enclosing_self_subscript,PropertyWrappe
       "property wrapper type %0 has multiple enclosing-self subscripts %1",
       (Type, DeclName))
 GROUPED_ERROR(property_wrapper_enclosing_self_subscript_keypath_type,PropertyWrappers,none,
-      "parameter %0 of enclosing-self subscript should have either "
-      "'WritableKeyPath<...>' or 'ReferenceWritableKeyPath<...>' type "
-      "(got %1)",
+      "parameter %0 of enclosing-self subscript should have read-only or "
+      "writable key path type (got %1)",
       (Identifier, Type))
 GROUPED_ERROR(property_wrapper_dynamic_self_type,PropertyWrappers,none,
       "property wrapper %select{wrapped value|projected value}0 cannot have "
