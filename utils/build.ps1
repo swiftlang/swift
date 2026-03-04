@@ -2321,7 +2321,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
         -Path $RuntimeBinaryCache\bin\swiftCore.dll `
         -Destination "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\site-packages\lldb"
 
-      # Runtime dependencies of repl_swift.exe (release and debug swiftrt for Windows ABI)
+      # Runtime dependencies of repl_swift.exe
       $SwiftRTSubdir = "lib\swift\windows"
       $SwiftRTArchDir = "$SwiftRTSubdir\$($Platform.Architecture.LLVMName)"
       $SwiftRTDestDir = "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTArchDir"
