@@ -1471,6 +1471,26 @@ final class MainActorInit: Sendable {
   func f() {}
 }
 
+final class Exponentiator: Sendable {
+  @MainActor
+  var numbers: [Int]
+
+  init(_ numbers: [Int]) {
+    self.numbers = numbers
+  }
+
+  @MainActor
+  lazy var squared: [Int] = {
+    numbers.map { $0 * $0 }
+  }()
+
+  // expected-warning@+2 {{stored property 'cubed' of 'Sendable'-conforming class 'Exponentiator' is mutable; this is an error in the Swift 6 language mode}}
+  // expected-warning@+1 {{main actor-isolated default value in a nonisolated context}}
+  lazy var cubed: [Int] = {
+    zip(squared, numbers).map { $0 * $1 }
+  }()
+}
+
 actor DunkTracker {
   private var lebron: Int?
   private var curry: Int? // expected-note {{property declared here}}
