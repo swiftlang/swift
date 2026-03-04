@@ -3350,6 +3350,7 @@ function Write-PlatformInfoPlist([OS] $OS) {
     $Settings.DefaultProperties.SWIFTC_FLAGS = @( "-use-ld=lld" )
   }
 
+  Write-Host -BackgroundColor DarkRed -ForegroundColor White "info.plist location: $(Get-PlatformRoot $OS)\Info.plist"
   Write-PList -Settings $Settings -Path "$(Get-PlatformRoot $OS)\Info.plist"
 }
 
@@ -4132,12 +4133,18 @@ function Build-Inspect([Hashtable] $Platform) {
 }
 
 function Build-DocC() {
+  $SwiftPMArguments = @(
+    "--verbose"
+  )
+
   Build-SPMProject `
     -Action Build `
     -Src $SourceCache\swift-docc `
     -Bin $(Get-ProjectBinaryCache $BuildPlatform DocC) `
     -Platform $BuildPlatform `
-    --product docc
+    --product docc `
+    @SwiftPMArguments
+
 }
 
 function Test-PackageManager() {
