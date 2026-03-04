@@ -84,6 +84,12 @@ bool useLegacySwiftObjCHashing();
 SWIFT_RUNTIME_STDLIB_SPI
 bool swift_bincompat_useLegacyNonCrashingExecutorChecks();
 
+/// Determine the behavior of bridged async functions (from obj-c),
+/// newer runtimes are able to use `Task.immediate` while older runtimes use plain `Task.init`
+/// which incurs additional scheduling overhead / delay.
+SWIFT_RUNTIME_STDLIB_SPI
+bool swift_bincompat_useTaskImmediateForInTaskForBridgedAsyncMethodMode();
+
 } // namespace bincompat
 
 } // namespace runtime

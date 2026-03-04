@@ -1159,6 +1159,14 @@ extension Task where Failure == Error {
 
 #if _runtime(_ObjC)
 
+private enum RunTaskForBridgedAsyncMethodMode: Int {
+  case None = 0
+  case _reserved_TaggedPointer = 0x1
+  case _reserved_TaggedPointer2 = 0x2
+  case _reserved_TaggedPointer3 = 0x4
+  case Immediate = 0x8
+}
+
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 /// Intrinsic used by SILGen to launch a task for bridging a Swift async method
 /// which was called through its ObjC-exported completion-handler-based API.
@@ -1167,7 +1175,8 @@ extension Task where Failure == Error {
 @usableFromInline
 internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owned @Sendable @escaping () async -> Void) {
 #if compiler(>=5.6)
-  if #available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *) {
+  if #available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *),
+    _swift_task_RunTaskForBridgedAsyncMethodMode() & RunTaskForBridgedAsyncMethodMode.Immediate.rawValue > 0 {
     Task.immediate(operation: body)
   } else {
     Task(operation: body)
@@ -1180,6 +1189,11 @@ internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owne
 #endif
 }
 #endif
+
+@available(SwiftStdlib 6.2, *)
+@usableFromInline
+@_silgen_name("swift_task_RunTaskForBridgedAsyncMethodMode")
+internal func _swift_task_RunTaskForBridgedAsyncMethodMode() -> Int
 
 #endif
 

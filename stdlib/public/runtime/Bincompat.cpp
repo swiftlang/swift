@@ -307,6 +307,18 @@ bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
 #endif
 }
 
+bool swift_bincompat_useTaskImmediateForInTaskForBridgedAsyncMethodMode() {
+#if BINARY_COMPATIBILITY_APPLE
+  switch (isAppAtLeastFall2025()) {
+  case oldOS: return true; // Legacy behavior on old OS
+  case oldApp: return true; // Legacy behavior for old apps
+  case newApp: return false; // New behavior for new apps
+  }
+#else
+  return false; // Always use the new behavior on non-Apple OSes
+#endif
+}
+
 } // namespace bincompat
 
 } // namespace runtime
