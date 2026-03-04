@@ -114,6 +114,8 @@
   (by enqueueing on the global pool before calling the async target), and can improve performance
   and ordering predictability of calling async code through these bridged APIs.
 
+  This is only in effect if the minimum deployment target of an application on apple platforms is later than Fall 2025 (excluding Fall 2025). This is in order to ensure consistent concurrency behavior of the app, regardless of platform it is running on. Once the app raises the minimum deployment target, it will get the new and improved behavior.
+
 * The raw span accessor properties of `Span` and `MutableSpan` (`bytes` and
   `mutableBytes`) as well as the two generic `append()` methods of
   `OutputRawSpan` are newly marked with `@unsafe`. These changes are corrections

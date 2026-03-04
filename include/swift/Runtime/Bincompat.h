@@ -84,6 +84,12 @@ bool useLegacySwiftObjCHashing();
 SWIFT_RUNTIME_STDLIB_SPI
 bool swift_bincompat_useLegacyNonCrashingExecutorChecks();
 
+/// Returns true if bridged async functions (from ObjC) should use the legacy
+/// `Task.init` behavior. Returns false if the app's deployment target is
+/// Fall 2025+, meaning `Task.immediate` can be used instead.
+SWIFT_RUNTIME_STDLIB_SPI
+bool swift_bincompat_useLegacyTaskForBridgedAsyncMethod();
+
 } // namespace bincompat
 
 } // namespace runtime

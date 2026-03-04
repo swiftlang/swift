@@ -72,6 +72,27 @@ static enum sdk_test isAppAtLeastFall2024() {
     const dyld_build_version_t fall_2024_os_versions = {0xffffffff, 0x007e80000};
     return isAppAtLeast(fall_2024_os_versions);
 }
+
+// Like isAppAtLeast, but checks the minimum deployment target (minos) rather
+// than SDK version. Use this when behavior should be gated on what OS versions
+// the app claims to support, so it behaves consistently across all of them.
+static enum sdk_test isMinosAtLeast(dyld_build_version_t version) {
+  if (__builtin_available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *)) {
+    // Query the minimum deployment target of the currently-running executable
+    if (dyld_program_minos_at_least(version)) {
+      return newApp;
+    } else {
+      return oldApp;
+    }
+  }
+  // Older Apple OS lack the ability to test the deployment target
+  return oldOS;
+}
+
+static enum sdk_test isMinosAtLeastFall2025() {
+    const dyld_build_version_t fall_2025_os_versions = {0xffffffff, 0x007e90000};
+    return isMinosAtLeast(fall_2025_os_versions);
+}
 #endif
 
 static _SwiftStdlibVersion binCompatVersionOverride = { 0 };
@@ -301,6 +322,23 @@ bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
   case oldOS: return true; // Legacy behavior on old OS
   case oldApp: return true; // Legacy behavior for old apps
   case newApp: return false; // New behavior for new apps
+  }
+#else
+  return false; // Always use the new behavior on non-Apple OSes
+#endif
+}
+
+// Returns true if bridged async methods (from ObjC) should use the legacy
+// Task.init behavior. Returns false (= use Task.immediate) when the app's
+// minimum deployment target is >= Fall 2025 (macOS 26, iOS 26, etc.).
+// Gated on minos rather than SDK version so the app behaves consistently
+// across all OS versions it supports.
+bool swift_bincompat_useLegacyTaskForBridgedAsyncMethod() {
+#if BINARY_COMPATIBILITY_APPLE
+  switch (isMinosAtLeastFall2025()) {
+  case oldOS: return true; // Legacy behavior on old OS
+  case oldApp: return true; // Legacy behavior for old deployment targets
+  case newApp: return false; // New behavior for apps targeting Fall 2025+
   }
 #else
   return false; // Always use the new behavior on non-Apple OSes

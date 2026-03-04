@@ -66,6 +66,10 @@ SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations();
 // Concurrency library can call.
 SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyIsCurrentExecutorLegacyModeOverride();
 
+// Wrapper around SWIFT_BRIDGED_ASYNC_METHOD_MODE_OVERRIDE that the
+// Concurrency library can call.
+SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyBridgedAsyncMethodModeOverride();
+
 // Wrapper around SWIFT_DEBUG_ENABLE_TASK_SLAB_ALLOCATOR that the Concurrency
 // library can call.
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableTaskSlabAllocator();
