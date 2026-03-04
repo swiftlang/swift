@@ -7254,9 +7254,6 @@ static bool isDependentMemberTypeWithBaseThatContainsUnresolvedPackExpansions(
 
 ConstraintSystem::ImpliedResultConversionKind
 ConstraintSystem::getImpliedResultConversionKind(ConstraintLocator *locator) {
-  if (locator->isLastElement<LocatorPathElt::ClosureResult>())
-    return ImpliedResultConversionKind::ToVoid;
-
   if (locator->isLastElement<LocatorPathElt::ClosureBody>() ||
       locator->isForContextualType(CTP_ReturnStmt) ||
       locator->isForContextualType(CTP_ClosureResult) ||
