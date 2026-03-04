@@ -141,30 +141,6 @@ extension UniqueArray where Element: ~Copyable {
     _ensureFreeCapacity(items.count)
     _storage.insert(moving: &items, at: index)
   }
-
-  /// Inserts the elements of a given array into the given position in this
-  /// array by moving them between the containers. On return, the input array
-  /// becomes empty, but it is not destroyed, and it preserves its original
-  /// storage capacity.
-  ///
-  /// If the array does not have sufficient capacity to hold all elements,
-  /// then this reallocates storage to extend its capacity, using a geometric
-  /// growth rate.
-  ///
-  /// - Parameters:
-  ///    - items: An array whose contents to move into `self`.
-  ///
-  /// - Complexity: O(`self.count` + `items.count`)
-  @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
-  public mutating func insert(
-    moving items: inout RigidArray<Element>,
-    at index: Int
-  ) {
-    // FIXME: Avoid moving the subsequent elements twice.
-    _ensureFreeCapacity(items.count)
-    _storage.insert(moving: &items, at: index)
-  }
 }
 
 @available(SwiftStdlib 6.4, *)

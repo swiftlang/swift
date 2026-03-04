@@ -170,36 +170,6 @@ extension RigidArray where Element: ~Copyable {
       count = 0
     }
   }
-
-  /// Inserts the elements of a given array into the given position in this
-  /// array by moving them between the containers. On return, the input array
-  /// becomes empty, but it is not destroyed, and it preserves its original
-  /// storage capacity.
-  ///
-  /// All existing elements at or following the specified position are moved to
-  /// make room for the new items.
-  ///
-  /// If the capacity of the array isn't sufficient to accommodate the new
-  /// elements, then this method triggers a runtime error.
-  ///
-  /// - Parameters:
-  ///    - items: An array whose contents to move into `self`.
-  ///    - index: The position at which to insert the new items.
-  ///       `index` must be a valid index in the array.
-  ///
-  /// - Complexity: O(`count` + `items.count`)
-  @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
-  public mutating func insert(
-    moving items: inout RigidArray<Element>,
-    at index: Int
-  ) {
-    // FIXME: Remove this in favor of a generic algorithm over consumable containers
-    guard !items.isEmpty else { return }
-    items.edit { source in
-      self.insert(moving: &source, at: index)
-    }
-  }
 }
 
 @available(SwiftStdlib 6.4, *)
