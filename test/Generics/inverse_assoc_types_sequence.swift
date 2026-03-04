@@ -83,13 +83,13 @@ public protocol Seq<Element>: ~Copyable {
   __consuming func makeIterator() -> Iterator
 
   // The ***new hotness***
-  associatedtype BorrowingIterator: BorrowingIterProto = OldIteratorAdapter<Iterator>
-  	  where BorrowingIterator.Element == Element,
-  	        BorrowingIterator: ~Copyable,
-  	        BorrowingIterator: ~Escapable
+  associatedtype BorrowingIter: BorrowingIterProto = OldIteratorAdapter<Iterator>
+  	  where BorrowingIter.Element == Element,
+  	        BorrowingIter: ~Copyable,
+  	        BorrowingIter: ~Escapable
 
   @_lifetime(borrow self)
-  borrowing func makeBorrowingIterator() -> BorrowingIterator
+  borrowing func makeBorrowingIter() -> BorrowingIter
 
   // Less interesting parts of Seq are below
 
@@ -126,12 +126,12 @@ public protocol Seq<Element>: ~Copyable {
 //
 //     88 | extension Seq where Self: ~Copyable, Self.Element: ~Copyable {
 //     89 |   public var underestimatedCount: Int {
-//        |              `- note: candidate exactly matches [with Element = Array<Element>.Element, BorrowingIterator = OldIteratorAdapter<Array<Element>.Iterator>]
+//        |              `- note: candidate exactly matches [with Element = Array<Element>.Element, BorrowingIter = OldIteratorAdapter<Array<Element>.Iterator>]
 //
 //
 //      1 | protocol Se@uence {
 //      2 | @inlinable public var underestimatedCount: Int { get }}
-//        |                       `- note: candidate exactly matches [with Element = Array<Element>.Element, BorrowingIterator = OldIteratorAdapter<Array<Element>.Iterator>]
+//        |                       `- note: candidate exactly matches [with Element = Array<Element>.Element, BorrowingIter = OldIteratorAdapter<Array<Element>.Iterator>]
 //
 //
 // Provide defaults for some of the less common requirements,
@@ -173,24 +173,24 @@ extension Seq where Self.Iterator == Self, Self.Element: ~Copyable {
 }
 
 // FIXME: There's a few protocol design issues here in providing the following extension...
-// 1. Seq requires Escapable, so it cannot be == Self.BorrowingIterator, which is ~Escapable, so
+// 1. Seq requires Escapable, so it cannot be == Self.BorrowingIter, which is ~Escapable, so
 //    we can't provide this convenience unless `Seq` doesn't require Escapable too.
 //
 // 2. When trying to provide this when Self: Escapable, we get an error about copying Self when
 //    returning. We need a borrowed return version of this method to avoid that copy!
 //
-// extension Seq where Self.BorrowingIterator == Self, Self: ~Copyable, Self.Element: ~Copyable {
+// extension Seq where Self.BorrowingIter == Self, Self: ~Copyable, Self.Element: ~Copyable {
 //   /// Returns a borrowing iterator over the elements of this seq.
-//   borrowing func makeBorrowingIterator() -> Self {
+//   borrowing func makeBorrowingIter() -> Self {
 //     return self
 //   }
 // }
 
-// We can provide a `makeBorrowingIterator` if they're using `OldIteratorAdapter`
-extension Seq where BorrowingIterator == OldIteratorAdapter<Iterator> {
-  public borrowing func makeBorrowingIterator() -> BorrowingIterator {
+// We can provide a `makeBorrowingIter` if they're using `OldIteratorAdapter`
+extension Seq where BorrowingIter == OldIteratorAdapter<Iterator> {
+  public borrowing func makeBorrowingIter() -> BorrowingIter {
     let s = copy self
-    return BorrowingIterator(s.makeIterator())
+    return BorrowingIter(s.makeIterator())
   }
 }
 
@@ -198,7 +198,7 @@ extension Seq where BorrowingIterator == OldIteratorAdapter<Iterator> {
 
 extension Seq where Self: ~Copyable, Self.Element: ~Copyable {
   borrowing func forborrow(_ f: (borrowing Self.Element) -> Void) {
-    var iter = makeBorrowingIterator()
+    var iter = makeBorrowingIter()
      while true {
       let span = iter.nextSpan(maximumCount: 32)
       if span.count <= 0 { break }
@@ -246,7 +246,7 @@ func forconsume2<S, E>(_ seq: S, _ f: (consuming E) -> Void)
 
 func forborrow2<S, E>(_ seq: borrowing S, _ f: (borrowing E) -> Void)
   where S: Seq, S: ~Copyable, E: ~Copyable, S.Element == E {
-  var iter = seq.makeBorrowingIterator()
+  var iter = seq.makeBorrowingIter()
    while true {
     let span = iter.nextSpan(maximumCount: 32)
     if span.count <= 0 { break }
@@ -285,10 +285,10 @@ public struct SpanIterator<Element: ~Copyable>: BorrowingIterProto, ~Escapable {
 
 extension InlineArray: Seq where Element: ~Copyable {
   public typealias Iterator = NeverIterator<Element>
-  public typealias BorrowingIterator = SpanIterator<Element>
+  public typealias BorrowingIter = SpanIterator<Element>
 
   @_lifetime(borrow self)
-  public borrowing func makeBorrowingIterator() -> BorrowingIterator {
+  public borrowing func makeBorrowingIter() -> BorrowingIter {
     return SpanIterator(self.span)
   }
 }

@@ -4,31 +4,27 @@
 
 // CHECK:     struct SimpleNonCopyableSequence : ~Copyable, CxxBorrowingSequence {
 // CHECK:       typealias Element = ConstIterator.Pointee
-// CHECK:       typealias _Element = ConstIterator.Pointee
 // CHECK:       typealias RawIterator = ConstIterator
-// CHECK:       typealias _BorrowingIterator = CxxBorrowingIterator<SimpleNonCopyableSequence>
+// CHECK:       typealias BorrowingIterator = CxxBorrowingIterator<SimpleNonCopyableSequence>
 // CHECK-NOT-TODO:   typealias Iterator
 // CHECK:     }
 
 // CHECK:     struct SimpleConditionallyCopyableSequence<CInt> : CxxConvertibleToCollection, CxxBorrowingSequence {
 // CHECK:       typealias Element = ConstIterator.Pointee
-// CHECK:       typealias _Element = ConstIterator.Pointee
 // CHECK:       typealias RawIterator = ConstIterator
-// CHECK:       typealias _BorrowingIterator = CxxBorrowingIterator<SimpleConditionallyCopyableSequence<CInt>>
+// CHECK:       typealias BorrowingIterator = CxxBorrowingIterator<SimpleConditionallyCopyableSequence<CInt>>
 // CHECK:       typealias Iterator = CxxIterator<SimpleConditionallyCopyableSequence<CInt>>
 // CHECK:     }
 
 // CHECK:     struct SimpleConditionallyCopyableSequence<NonCop> : ~Copyable, CxxBorrowingSequence {
 // CHECK:       typealias Element = ConstIterator.Pointee
-// CHECK:       typealias _Element = ConstIterator.Pointee
 // CHECK:       typealias RawIterator = ConstIterator
-// CHECK:       typealias _BorrowingIterator = CxxBorrowingIterator<SimpleConditionallyCopyableSequence<NonCop>>
+// CHECK:       typealias BorrowingIterator = CxxBorrowingIterator<SimpleConditionallyCopyableSequence<NonCop>>
 // CHECK-NOT-TODO:   typealias Iterator
 // CHECK:     }
 
 // CHECK: struct NonReferenceDereferenceOperatorSequence : ~Copyable {
 // CHECK:   typealias Element = NonReferenceDereferenceOperator.Pointee
-// CHECK:   typealias _Element = NonReferenceDereferenceOperator.Pointee
 // CHECK:   typealias RawIterator = NonReferenceDereferenceOperator
 // CHECK:   typealias Iterator = CxxIterator<NonReferenceDereferenceOperatorSequence>
 // CHECK: }
