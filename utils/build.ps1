@@ -4251,6 +4251,17 @@ if ($Clean) {
   Remove-Item -Force -Recurse -Path "$BinaryCache\1" -ErrorAction Ignore
   Remove-Item -Force -Recurse -Path "$BinaryCache\5" -ErrorAction Ignore
   Remove-Item -Force -Recurse -Path (Get-InstallDir $HostPlatform) -ErrorAction Ignore
+
+  $KnownPlatforms.Values | Where-Object {
+    switch ($_.OS) {
+      Windows { $Windows }
+      Android { $Android }
+      default { $false }
+    }
+  } | ForEach-Object {
+    Remove-Item -Force -Recurse -Path (Get-ProjectBinaryCache $_ ClangBuiltins) -ErrorAction Ignore
+    Remove-Item -Force -Recurse -Path (Get-ProjectBinaryCache $_ ClangRuntime) -ErrorAction Ignore
+  }
 }
 
 if (-not $SkipBuild) {
