@@ -10,7 +10,7 @@ class SplitFileTarget:
         self.lines = lines
         self.name = name
 
-    def copyFrom(self, source):
+    def copyFrom(self, source, leading_lines=False):
         lines_before = self.lines[: self.slice_start_idx + 1]
         self.lines = self.lines[self.slice_start_idx + 1 :]
         slice_end_idx = None
@@ -23,7 +23,11 @@ class SplitFileTarget:
         else:
             lines_after = []
         with open(source, "r") as f:
-            new_lines = lines_before + f.readlines() + lines_after
+            source_lines = f.readlines()
+        if leading_lines:
+            # Strip the leading blank lines added by split-file --leading-lines
+            source_lines = source_lines[self.slice_start_idx + 1 :]
+        new_lines = lines_before + source_lines + lines_after
         with open(self.test_path, "w") as f:
             for l in new_lines:
                 f.write(l)
@@ -40,12 +44,15 @@ class SplitFileTarget:
                 continue
             start_idx = split.index("split-file")
             split = split[start_idx:]
-            if len(split) < 3:
+            # Skip flags like --leading-lines
+            leading_lines = "--leading-lines" in split
+            args = [s for s in split[1:] if not s.startswith("-")]
+            if len(args) < 2:
                 continue
-            p = unquote(split[1].strip())
+            p = unquote(args[0].strip())
             if not test_path.samefile(p):
                 continue
-            return unquote(split[2].strip())
+            return (unquote(args[1].strip()), leading_lines)
         return None
 
     @staticmethod
@@ -85,15 +92,16 @@ def unquote(s):
 
 def propagate_split_files(test_path, updated_files, commands):
     test_path = pathlib.Path(test_path)
-    split_target_dir = SplitFileTarget.get_target_dir(commands, test_path)
-    if not split_target_dir:
+    result = SplitFileTarget.get_target_dir(commands, test_path)
+    if not result:
         return updated_files
+    split_target_dir, leading_lines = result
 
     new = []
     for file in updated_files:
         target = SplitFileTarget.create(file, commands, test_path, split_target_dir)
         if target:
-            target.copyFrom(file)
+            target.copyFrom(file, leading_lines)
             new.append(str(target))
         else:
             new.append(file)
