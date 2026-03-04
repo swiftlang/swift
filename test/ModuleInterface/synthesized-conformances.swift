@@ -27,6 +27,41 @@ public enum HasRawValueAndAvailability: Int {
   // CHECK-DAG: }
 } // CHECK: {{^}$}}
 
+// CHECK-LABEL: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK-NEXT: public struct HasNestedTypesAndAvailability {
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+public struct HasNestedTypesAndAvailability {
+  // CHECK-LABEL: public enum HasRawValue : Swift::Int {
+  public enum HasRawValue: Int {
+    // CHECK-NEXT: case a
+    case a
+  }
+
+  // CHECK-LABEL: @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+  // CHECK-NEXT: public enum HasRawValueAndRefinedAvailability : Swift::Int {
+  @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+  public enum HasRawValueAndRefinedAvailability: Int {
+    // CHECK-NEXT: case a
+    case a
+  }
+
+  // CHECK-LABEL: @available(visionOS 2.1, iOS 18, *)
+  // CHECK-NEXT: public enum HasRawValueAndVisionOSAvailabilityFirst : Swift::Int {
+  @available(visionOS 2.1, iOS 18, *)
+  public enum HasRawValueAndVisionOSAvailabilityFirst: Int {
+    // CHECK-NEXT: case a
+    case a
+  }
+
+  // CHECK-LABEL: @available(anyAppleOS 26, *)
+  // CHECK-NEXT: public enum HasRawValueAndAnyAppleOSAvailability : Swift::Int {
+  @available(anyAppleOS 26, *)
+  public enum HasRawValueAndAnyAppleOSAvailability: Int {
+    // CHECK-NEXT: case a
+    case a
+  }
+}
+
 @objc public enum ObjCEnum: Int32 {
   case a, b = 5, c
 }
@@ -68,6 +103,34 @@ extension NoRawValueWithExplicitHashable : Hashable {
 // CHECK-NEXT: extension synthesized::HasRawValueAndAvailability : Swift::Hashable {}
 // CHECK: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
 // CHECK-NEXT: extension synthesized::HasRawValueAndAvailability : Swift::RawRepresentable {}
+
+// CHECK: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValue : Swift::Equatable {}
+// CHECK: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValue : Swift::Hashable {}
+// CHECK: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValue : Swift::RawRepresentable {}
+
+// CHECK: @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndRefinedAvailability : Swift::Equatable {}
+// CHECK: @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndRefinedAvailability : Swift::Hashable {}
+// CHECK: @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndRefinedAvailability : Swift::RawRepresentable {}
+
+// CHECK: @available(macOS 10.15, watchOS 6, tvOS 13, visionOS 2.1, iOS 18, *)
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndVisionOSAvailabilityFirst : Swift::Equatable {}
+// CHECK: @available(macOS 10.15, watchOS 6, tvOS 13, visionOS 2.1, iOS 18, *)
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndVisionOSAvailabilityFirst : Swift::Hashable {}
+// CHECK: @available(macOS 10.15, watchOS 6, tvOS 13, visionOS 2.1, iOS 18, *)
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndVisionOSAvailabilityFirst : Swift::RawRepresentable {}
+
+// CHECK: @available(anyAppleOS 26, *)
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndAnyAppleOSAvailability : Swift::Equatable {}
+// CHECK: @available(anyAppleOS 26, *)
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndAnyAppleOSAvailability : Swift::Hashable {}
+// CHECK: @available(anyAppleOS 26, *)
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndAnyAppleOSAvailability : Swift::RawRepresentable {}
 
 // CHECK: extension synthesized::ObjCEnum : Swift::Equatable {}
 // CHECK: extension synthesized::ObjCEnum : Swift::Hashable {}
