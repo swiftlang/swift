@@ -498,6 +498,13 @@ private:
           commandline.push_back("-read-legacy-type-info-path=" +
                                 scanner.remapPath(legacyLayoutPath));
       }
+      // const-gather-protocols-file
+      StringRef ConstProtocolFile = instance.getInvocation()
+                                        .getSearchPathOptions()
+                                        .ConstGatherProtocolListFilePath;
+      if (!ConstProtocolFile.empty())
+        tracker->trackFile(ConstProtocolFile);
+
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return diagnoseCASFSCreationError(root.takeError());
