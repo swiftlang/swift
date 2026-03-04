@@ -39,3 +39,59 @@
 /// A protocol for types whose memory can safely be written as or read from
 /// raw bytes.
 public typealias FullyInhabited = ConvertibleToRawBytes & ConvertibleFromRawBytes
+
+extension UInt8:   ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+extension Int8:    ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+extension UInt16:  ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+extension Int16:   ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+extension UInt32:  ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+extension Int32:   ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+extension UInt64:  ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+extension Int64:   ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+extension UInt:    ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+extension Int:     ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+
+@available(SwiftStdlib 6.0, *)
+extension UInt128: ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+@available(SwiftStdlib 6.0, *)
+extension Int128:  ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+
+//extension Float16: ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+extension Float32: ConvertibleToRawBytes, ConvertibleFromRawBytes {} // `Float`
+extension Float64: ConvertibleToRawBytes, ConvertibleFromRawBytes {} // `Double`
+
+@available(StdlibDeploymentTarget 5.7, *)
+extension Duration: ConvertibleToRawBytes, ConvertibleFromRawBytes {}
+
+@available(SwiftStdlib 6.2, *)
+extension InlineArray: ConvertibleToRawBytes where Element: ConvertibleToRawBytes {}
+@available(SwiftStdlib 6.2, *)
+extension InlineArray: ConvertibleFromRawBytes where Element: ConvertibleFromRawBytes {}
+
+extension CollectionOfOne: ConvertibleToRawBytes where Element: ConvertibleToRawBytes {}
+extension CollectionOfOne: ConvertibleFromRawBytes where Element: ConvertibleFromRawBytes {}
+
+extension ClosedRange: ConvertibleToRawBytes where Bound: ConvertibleToRawBytes {}
+extension Range: ConvertibleToRawBytes where Bound: ConvertibleToRawBytes {}
+extension IndexingIterator: ConvertibleToRawBytes
+  where Elements: ConvertibleToRawBytes, Elements.Index: ConvertibleToRawBytes {}
+
+extension PartialRangeFrom: ConvertibleToRawBytes where Bound: ConvertibleToRawBytes {}
+extension PartialRangeFrom.Iterator: ConvertibleToRawBytes
+  where Bound: ConvertibleToRawBytes {}
+extension PartialRangeThrough: ConvertibleToRawBytes where Bound: ConvertibleToRawBytes {}
+extension PartialRangeUpTo: ConvertibleToRawBytes where Bound: ConvertibleToRawBytes {}
+
+extension Bool: ConvertibleToRawBytes {}
+extension ObjectIdentifier: ConvertibleToRawBytes {}
+
+extension UnsafePointer: ConvertibleToRawBytes {}
+extension UnsafeMutablePointer: ConvertibleToRawBytes {}
+extension UnsafeRawPointer: ConvertibleToRawBytes {}
+extension UnsafeMutableRawPointer: ConvertibleToRawBytes {}
+extension OpaquePointer: ConvertibleToRawBytes {}
+
+extension UnsafeBufferPointer: ConvertibleToRawBytes {}
+extension UnsafeMutableBufferPointer: ConvertibleToRawBytes {}
+extension UnsafeRawBufferPointer: ConvertibleToRawBytes {}
+extension UnsafeMutableRawBufferPointer: ConvertibleToRawBytes {}
