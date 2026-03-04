@@ -287,7 +287,7 @@ open class DefaultSymbolLocator: SymbolLocator {
       image: image,
       uuid: uuid,
       age: age,
-      paths: findPeCoffSymbolPaths(image: image)) {
+      paths: findImagePaths(image: image)) {
 
       peImage = peCoff.result
     } else {
