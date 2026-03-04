@@ -1645,7 +1645,7 @@ extension BinaryInteger {
   internal func _description(radix: Int, uppercase: Bool) -> String {
     _precondition(radix >= 2 && radix <= 36, "Radix must be between 2 and 36")
 
-    if _fastPath(bitWidth <= 64 || magnitude < UInt64.max) {
+    if _fastPath(bitWidth <= 64 || magnitude <= UInt64.max) {
       if radix >= 10 {
         var buffer = _InlineArray<21, UTF8.CodeUnit>(repeating: 0x30)
         var span = buffer.mutableSpan
