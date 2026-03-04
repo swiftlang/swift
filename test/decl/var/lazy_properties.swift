@@ -177,15 +177,15 @@ class ReferenceSelfInLazyProperty : BaseClass {
 
 class ReferenceStaticInLazyProperty {
   lazy var refs1 = i
-  // expected-error@-1 {{static member 'i' cannot be used on instance of type 'ReferenceStaticInLazyProperty'}}
+  // expected-error@-1 {{static member 'i' can only be used on the type 'ReferenceStaticInLazyProperty', not on the instance self}}
   lazy var refs2 = f()
-  // expected-error@-1 {{static member 'f' cannot be used on instance of type 'ReferenceStaticInLazyProperty'}}
+  // expected-error@-1 {{static member 'f' can only be used on the type 'ReferenceStaticInLazyProperty', not on the instance self}}
 
   lazy var trefs1: Int = i
-  // expected-error@-1 {{static member 'i' cannot be used on instance of type 'ReferenceStaticInLazyProperty'}}
+  // expected-error@-1 {{static member 'i' can only be used on the type 'ReferenceStaticInLazyProperty', not on the instance self}}
 
   lazy var trefs2: Int = f()
-  // expected-error@-1 {{static member 'f' cannot be used on instance of type 'ReferenceStaticInLazyProperty'}}
+  // expected-error@-1 {{static member 'f' can only be used on the type 'ReferenceStaticInLazyProperty', not on the instance self}}
 
   static var i = 42
   static func f() -> Int { return 0 }
