@@ -264,7 +264,7 @@ class ActiveAllocation {
   llvm::PointerIntPair<SILInstruction*, 2, AllocationStatus> valueAndStatus;
 
 public:
-  ActiveAllocation(SILInstruction *value)
+  explicit ActiveAllocation(SILInstruction *value)
     : valueAndStatus(value, AllocationStatus::Allocated) {}
 
   SILInstruction *getValue() const {
@@ -470,18 +470,32 @@ void State::collectAllocationsAbove(SILInstruction *alloc,
   auto stack = ArrayRef(allocations);
   assert(!stack.empty());
   for (size_t i = stack.size() - 1; true; --i) {
-    if (stack[i] == alloc) break;
-    set.insert(stack[i].getValue());
+    // If we reach the target allocation, we've processed all the
+    // allocations above it, so we're done.
+    if (stack[i].getValue() == alloc) break;
+
+    // Add the allocation to the set unless it's flagged as already
+    // deallocated.
+    if (stack[i].getStatus() != AllocationStatus::DeallocatedOutOfOrder) {
+#ifndef NDEBUG
+      auto sa = stack[i].getValue()->getStackAllocation();
+      assert(sa && !isUnreorderableAllocation(*sa));
+#endif
+      set.insert(stack[i].getValue());
+    }
+
     assert(i != 0 && "didn't find allocation in stack");
   }
 }
 
 /// Pop and emit deallocations for any allocations on top of the
-/// active allocations stack that are pending deallocation.
+/// active allocations stack that are pending deallocation. Also pop
+/// allocations in the deallocated-out-of-order state, but do not
+/// emit them.
 ///
 /// This operation is called whenever we pop an allocation; it
 /// restores the invariant that the top of the stack is never in a
-/// pending state.
+/// pending or deallocated-out-of-order state.
 static void emitPendingDeallocations(State &state,
                                      SILInstruction *insertAfterDealloc,
                                      bool &madeChanges) {
@@ -650,7 +664,7 @@ StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
       if (auto alloc = I->getStackAllocation()) {
         // Only handle nested stack allocations.
         if (I->isStackAllocationNested() == StackAllocationIsNested)
-          state.allocations.push_back(I);
+          state.allocations.emplace_back(I);
         continue;
       }
 
@@ -710,10 +724,11 @@ StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
         auto status = entry.getStatus();
         assert(isAllocatedOrUndeallocatable(status));
 
-        // If the allocation has allocated status but cannot be reordered,
-        // mark the allocation as deallocated out of order, then add all
-        // the allocations above it to the allocated-out-of-order set.
-        // Do not remove the allocation itself.
+        // If the allocation has allocated status but its deallocation
+        // cannot be reordered, mark the allocation as deallocated out
+        // of order, then add all the allocations above it to the
+        // allocated-out-of-order set. Do not remove the deallocation.
+        //
         // FIXME: We really need to do this even for allocations with
         // undeallocatable status. The problem is that we'd need to collect
         // the *union* of the active allocations on entry to this dead-end

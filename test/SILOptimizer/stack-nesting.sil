@@ -360,3 +360,57 @@ bb0(%cond: $Builtin.Int1):
   %ret = tuple ()
   return %ret : $()
 }
+
+// Make sure we don't panic when there's still an already-deallocated
+// async let on the state stack.
+// CHECK-LABEL: sil [ossa] @test_two_async_lets :
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK:         [[PTR:%.*]] = address_to_pointer [[A]] to $Builtin.RawPointer
+// CHECK-NEXT:    [[LET1:%.*]] = builtin "startAsyncLetWithLocalBuffer"<Int>({{%.*}}, {{%.*}}, [[PTR]])
+// CHECK-NEXT:    [[LET2:%.*]] = builtin "startAsyncLetWithLocalBuffer"<Int>({{%.*}}, {{%.*}}, [[PTR]])
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:    builtin "finishAsyncLet"([[LET2]], [[PTR]])
+// CHECK-NEXT:    builtin "finishAsyncLet"([[LET1]], [[PTR]])
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 4
+// CHECK-LABEL: // end sil function 'test_two_async_lets'
+sil [ossa] @test_two_async_lets : $@convention(thin) @async (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+
+  // Reusing result pointers and passing nil as the scratch space are not
+  // actually legitimate at runtime, but it's convenient and doesn't affect
+  // what we're testing.
+  %fn = function_ref @async_let_helper : $@convention(thin) @Sendable @async () -> (@out Int, @error any Error)
+  %async_let_fn = thin_to_thick_function %fn to $@Sendable @async () -> (@out Int, @error any Error)
+  %scratch = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+  %resultPtr = address_to_pointer %a to $Builtin.RawPointer
+
+  %al1 = builtin "startAsyncLetWithLocalBuffer"<Int>(%scratch, %fn, %resultPtr) : $Builtin.RawPointer
+  %al2 = builtin "startAsyncLetWithLocalBuffer"<Int>(%scratch, %fn, %resultPtr) : $Builtin.RawPointer
+
+  integer_literal $Builtin.Int32, 2
+
+  %b = alloc_stack $Int
+  %c = alloc_stack $Int
+  dealloc_stack %c
+
+  integer_literal $Builtin.Int32, 3
+
+  %out2 = builtin "finishAsyncLet"(%al2, %resultPtr) : $()
+  %out1 = builtin "finishAsyncLet"(%al1, %resultPtr) : $()
+
+  dealloc_stack %b
+  dealloc_stack %a
+  integer_literal $Builtin.Int32, 4
+  %ret = tuple ()
+  return %ret : $()
+}
