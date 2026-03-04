@@ -24,6 +24,8 @@
 
 #include <inttypes.h>
 
+#pragma pack(push, 1)
+
 namespace swift {
 namespace runtime {
 
@@ -408,6 +410,8 @@ struct pe_symbol {
 
 } // namespace runtime
 } // namespace swift
+
+#pragma pack(pop)
 
 #endif // SWIFT_PE_COFF_H_
 
