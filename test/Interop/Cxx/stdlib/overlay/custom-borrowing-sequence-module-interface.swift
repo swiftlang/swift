@@ -28,3 +28,31 @@
 // CHECK:   typealias RawIterator = NonReferenceDereferenceOperator
 // CHECK:   typealias Iterator = CxxIterator<NonReferenceDereferenceOperatorSequence>
 // CHECK: }
+
+// CHECK: struct NonInlineDereferenceOperatorSequence {
+// CHECK-NOT:   typealias Element
+// CHECK-NOT:   typealias RawIterator
+// CHECK-NOT:   typealias Iterator
+// CHECK: }
+
+// CHECK: struct NoConstDereferenceOperatorSequence {
+// CHECK-NOT:   typealias Element
+// CHECK-NOT:   typealias RawIterator
+// CHECK-NOT:   typealias Iterator
+// CHECK: }
+
+// CHECK: struct DifferentResultsDereferenceOperatorSequence : CxxConvertibleToCollection, CxxBorrowingSequence {
+// CHECK:   typealias Element = DifferentResultsDereferenceOperator.Pointee
+// CHECK:   typealias RawIterator = DifferentResultsDereferenceOperator
+// CHECK:   typealias BorrowingIterator = CxxBorrowingIterator<DifferentResultsDereferenceOperatorSequence>
+// CHECK:   typealias Iterator = CxxIterator<DifferentResultsDereferenceOperatorSequence>
+// CHECK: }
+
+// CHECK: struct ConstRACButNotBorrowingIteratorSequence : CxxRandomAccessCollection {
+// CHECK:   typealias Element = ConstRACButNotBorrowingIterator.Pointee
+// CHECK:   typealias RawIterator = ConstRACButNotBorrowingIterator
+// CHECK:   typealias Iterator = CxxIterator<ConstRACButNotBorrowingIteratorSequence>
+// CHECK:   typealias Index = Int
+// CHECK:   typealias Indices = Range<Int>
+// CHECK:   typealias SubSequence = Slice<ConstRACButNotBorrowingIteratorSequence>
+// CHECK: }

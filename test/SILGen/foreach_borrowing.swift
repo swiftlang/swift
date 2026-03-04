@@ -136,7 +136,7 @@ func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
   //     }
   //   }
 
-  // _makeBorrowingIterator() function_ref should be at "for" keyword location (172:3)
+  // makeBorrowingIterator() function_ref should be at "for" keyword location (172:3)
   // CHECK: [[MAKE_BORROWING_IT:%.*]] = function_ref @$ss4SpanVsRi_zrlE21makeBorrowingIterators0aD0VyxGyF {{.*}}, loc "{{.*}}":[[@LINE+31]]:3
   // CHECK: apply [[MAKE_BORROWING_IT]]{{.*}}, loc "{{.*}}":[[@LINE+30]]:18
 
