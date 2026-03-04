@@ -285,19 +285,27 @@ class WasmSwiftSDK(product.Product):
 
 
         if self.args.build_swift and self.args.build_swiftpm and self.args.install_swiftpm:
-            swift_run = os.path.join(self.install_toolchain_path(host_target), "bin", "swift-run")
+            swift_build = os.path.join(self.install_toolchain_path(host_target), "bin", "swift-build")
         else:
             swiftc_path = os.path.abspath(self.toolchain.swiftc)
             toolchain_path = os.path.dirname(os.path.dirname(swiftc_path))
-            swift_run = os.path.join(toolchain_path, 'bin', 'swift-run')
+            swift_build = os.path.join(toolchain_path, 'bin', 'swift-build')
 
         swift_version = os.environ.get('TOOLCHAIN_VERSION',
                                        'swift-DEVELOPMENT-SNAPSHOT')
-        run_args = [
-            swift_run,
+        build_args = [
+            swift_build,
             '--package-path', self.source_dir,
             '--build-path', self.build_dir,
-            'swift-sdk-generator',
+            '--product', 'swift-sdk-generator',
+        ]
+        env = dict(os.environ)
+        env['SWIFTCI_USE_LOCAL_DEPS'] = '1'
+        shell.call(build_args, env=env)
+
+        generator_path = os.path.join(self.build_dir, 'debug', 'swift-sdk-generator')
+        run_args = [
+            generator_path,
             'make-wasm-sdk',
             '--swift-version', swift_version,
         ]
