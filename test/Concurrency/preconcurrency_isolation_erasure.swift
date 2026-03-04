@@ -21,3 +21,9 @@ struct S {
   init(_: [Data<nonisolated(nonsending) @Sendable () async -> Void>]? = nil) {}
   // CHECK-LABEL: sil hidden [ossa] @$s32preconcurrency_isolation_erasure1SVyACSayAA4DataVyyyYacGGSgcfC
 }
+
+// CHECK: sil [ossa] @$s32preconcurrency_isolation_erasure17testIsolatedParam0B0yScA_pSgYi_tF
+@preconcurrency public func testIsolatedParam(isolation: isolated (any Actor)? = nil) {}
+
+// CHECK: sil [ossa] @$s32preconcurrency_isolation_erasure019testIsolatedParamInF02fnyyScA_pSgYiXE_tF
+@preconcurrency public func testIsolatedParamInParam(fn: (isolated (any Actor)?) -> Void) {}

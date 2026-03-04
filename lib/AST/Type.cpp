@@ -1006,8 +1006,16 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
     if (dropGlobalActor && extInfo.getGlobalActor())
       extInfo = extInfo.withoutIsolation();
 
-    if (dropIsolation)
-      extInfo = extInfo.withoutIsolation();
+    if (dropIsolation) {
+      // Special case for `isolated` parameters, because even though
+      // the isolation was dropped, the parameter itself was left with
+      // `isolated` bit set. `dropIsolation` is intended only for
+      // mangling of `@preconcurrency` declarations and isolated parameters
+      // don't contribute to the type so it's save to keep the original
+      // isolation here.
+      if (!extInfo.getIsolation().isParameter())
+        extInfo = extInfo.withoutIsolation();
+    }
 
     ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
     Type resultType = fnType->getResult();
