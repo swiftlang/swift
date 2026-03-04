@@ -243,7 +243,7 @@ let _: Int = try? optProducer?.produceInt() // expected-error {{cannot convert v
 let _: String = try? optProducer?.produceInt() // expected-error {{cannot convert value of type 'Int?' to specified type 'String'}}
 let _: Int?? = try? optProducer?.produceInt() // This was the expected type before Swift 5, but this still works; just adds more optional-ness
 
-let _: Int? = try? optProducer?.produceIntNoThrowing() // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+let _: Int? = try? optProducer?.produceIntNoThrowing() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{15-20=}}
 
 let _: Int? = (try? optProducer?.produceAny()) as? Int // good
 let _: Int? = try? optProducer?.produceAny() as? Int // good
@@ -272,4 +272,13 @@ class F<T> {
 
 func bar(_ a: F<Dummy>, _ b: F<Dummy>) {
   _ = (try? a.wait()) === (try? b.wait())
+}
+
+// Test fix-its for redundant try
+func nonThrowingFunc() -> Int? { return nil }
+
+func testRedundantTryFixit() {
+  _ = try nonThrowingFunc() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-11=}}
+  _ = try! nonThrowingFunc() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-12=}}
+  _ = try? nonThrowingFunc() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-12=}}
 }
