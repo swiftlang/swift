@@ -231,68 +231,6 @@ extension RigidArray where Element: ~Copyable {
 
 @available(SwiftStdlib 6.4, *)
 extension RigidArray where Element: ~Copyable {
-  /// Return a borrowing span over the maximal storage chunk following the
-  /// specified position in the array. The span provides direct read-only access
-  /// to all array elements in the range `index ..< count`.
-  ///
-  /// - Parameter index: A valid index in the array, including the end index.
-  ///
-  /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
-  @_lifetime(borrow self)
-  internal func span(after index: inout Int) -> Span<Element> {
-    _span(in: _contiguousSubrange(following: &index))
-  }
-
-  /// Return a borrowing span over the maximal storage chunk preceding the
-  /// specified position in the array. The span provides direct read-only access
-  /// to all array elements in the range `0 ..< index`.
-  ///
-  /// - Parameter index: A valid index in the array, including the end index.
-  ///
-  /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
-  @_lifetime(borrow self)
-  internal func span(before index: inout Int) -> Span<Element> {
-    _span(in: _contiguousSubrange(preceding: &index))
-  }
-}
-
-@available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
-  /// Return a mutable span over the maximal storage chunk following the
-  /// specified position in the array. The span provides direct mutating access
-  /// to all array elements in the range `index ..< count`.
-  ///
-  /// - Parameter index: A valid index in the array, including the end index.
-  ///
-  /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
-  @_lifetime(&self)
-  internal mutating func mutableSpan(
-    after index: inout Int
-  ) -> MutableSpan<Element> {
-    _mutableSpan(in: _contiguousSubrange(following: &index))
-  }
-
-  /// Return a mutable span over the maximal storage chunk preceding the specified
-  /// position in the array. The span provides direct mutating access to all
-  /// array elements in the range `0 ..< index`.
-  ///
-  /// - Parameter index: A valid index in the array, including the end index.
-  ///
-  /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
-  @_lifetime(&self)
-  public mutating func mutableSpan(
-    before index: inout Int
-  ) -> MutableSpan<Element> {
-    _mutableSpan(in: _contiguousSubrange(preceding: &index))
-  }
-}
-
-@available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
   /// Grow or shrink the capacity of a rigid array instance without discarding
   /// its contents.
   ///
