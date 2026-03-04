@@ -3014,3 +3014,54 @@ public struct CustomConditionCheckMacro: ExpressionMacro {
     return "\(literal: isSet)"
   }
 }
+
+public struct LexicalContextOuterMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      """
+      @LexicalContextInner
+      func generated() {}
+      """
+    ]
+  }
+}
+
+public struct LexicalContextInnerMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf decl: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    var types: [String] = []
+    for syntax in context.lexicalContext {
+      if let decl = syntax.as(StructDeclSyntax.self) {
+        types.append("struct \(decl.name.text)")
+      } else if let decl = syntax.as(ClassDeclSyntax.self) {
+        types.append("class \(decl.name.text)")
+      } else if let decl = syntax.as(EnumDeclSyntax.self) {
+        types.append("enum \(decl.name.text)")
+      } else if let decl = syntax.as(ExtensionDeclSyntax.self) {
+         types.append("extension \(decl.extendedType.trimmedDescription)")
+      } else if let decl = syntax.as(FunctionDeclSyntax.self) {
+         types.append("func \(decl.name.text)")
+      } else {
+        types.append("\(syntax.kind)")
+      }
+    }
+
+    context.diagnose(Diagnostic(
+      node: Syntax(node),
+      message: SimpleDiagnosticMessage(
+        message: "lexicalContext: \(types.joined(separator: " -> "))",
+        diagnosticID: MessageID(domain: "test", id: "lexicalContext"),
+        severity: .warning
+      )
+    ))
+
+    return []
+  }
+}
