@@ -1932,9 +1932,24 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
                                          StringRef openingQuotationMark,
                                          bool asNoun) const {
   switch (*this) {
-  case ActorIsolation::ActorInstance:
-    os << "actor" << (asNoun ? " isolation" : "-isolated");
+  case ActorIsolation::ActorInstance: {
+    // Try to get the specific actor instance name for better diagnostics
+    if (auto *actorVar = getActorInstance()) {
+      os << "'" << actorVar->getBaseIdentifier().str() << "'" 
+         << (asNoun ? " isolation" : "-isolated");
+    } else if (auto *actorExpr = getActorInstanceExpr()) {
+      // For expressions, we can't easily get a name, so fall back to generic
+      os << "actor" << (asNoun ? " isolation" : "-isolated");
+    } else {
+      // For self parameter or other cases
+      if (isActorInstanceForSelfParameter()) {
+        os << "'self'" << (asNoun ? " isolation" : "-isolated");
+      } else {
+        os << "actor" << (asNoun ? " isolation" : "-isolated");
+      }
+    }
     break;
+  }
 
   case ActorIsolation::CallerIsolationInheriting:
     os << "caller isolation inheriting"
