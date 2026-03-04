@@ -30,6 +30,8 @@ public struct S {
   }
 }
 
+var global_var = Klass()
+
 public struct Wrapper {
   var _k: Klass
   var _s: S
@@ -60,50 +62,50 @@ public struct Wrapper {
 
   var nested_get1: Klass {
     borrow {
-      return _s.get_k // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return _s.get_k // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
   }
 
   var nested_get2: Klass {
     borrow {
-      return s_get.borrow_k // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return s_get.borrow_k // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
   }
 
   var nested_get3: Int {
     borrow {
-      return _s.get_k.id  // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return _s.get_k.id  // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
   }
 
   var nested_get4: Int {
     borrow {
-      return s_get.borrow_k.id  // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return s_get.borrow_k.id  // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
   }
 
   var nested_read1: Klass {
     borrow {
-      return _s.read_k // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return _s.read_k // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
   }
 
   var nested_read2: Klass {
     borrow {
-      return s_read.read_k // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return s_read.read_k // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
   }
 
   var owned_value_direct: Klass {
     borrow {
-      return get_k() // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return get_k() // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
   }
 
   var owned_value_projected: Klass {
     borrow {
       let w = Wrapper(_k: Klass(), _s: S(_k: Klass()))
-      return w.k // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return w.k // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
   }
 
@@ -118,13 +120,25 @@ public struct Wrapper {
 
   var tuple_klass: (Klass, Klass) {
     borrow {
-      return (_k, _k) // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return (_k, _k) // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
   }
 
   var opt_klass: Klass? {
     borrow {
-      return _k // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return _k // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
+    }
+  }
+
+  var global_var_prop: Klass {
+    borrow {
+      return global_var // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
+    }
+  }
+
+  var class_var: Int {
+    borrow {
+      return _k.id // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
   }
 }
@@ -163,14 +177,14 @@ public struct GenWrapper<T> {
 
   var get_prop: T {
     borrow {
-      return _w.get_prop // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return _w.get_prop // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
 
     }
   }
 
   var read_prop: T {
     borrow {
-      return _w.read_prop // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return _w.read_prop // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
   }
 
@@ -185,13 +199,13 @@ public struct GenWrapper<T> {
 
   var tuple_prop: (T, T) {
     borrow {
-      return (_prop, _prop) // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return (_prop, _prop) // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
   }
 
   var opt_T: T? {
     borrow {
-      return _prop // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return _prop // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
 
     }
   }
@@ -231,14 +245,14 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 
   var nested_get: T {
     borrow {
-      return _w.get_prop // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return _w.get_prop // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
 
     }
   }
 
   var nested_read: T {
     borrow {
-      return _w.read_prop // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return _w.read_prop // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
 
     }
   }
@@ -254,7 +268,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 
   var opt_T: T? {
     borrow {
-      return _prop // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return _prop // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
   }
 }
@@ -267,10 +281,10 @@ struct ExampleWithLazyProp {
 
   var result: Int {
     mutating borrow {
-      return _cachedResult // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return _cachedResult // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
     }
     mutate {
-      return &_cachedResult // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+      return &_cachedResult // expected-error{{invalid return value from a mutate accessor}} // expected-note{{mutate accessors can return stored properties, computed properties with mutate accessors or global 'let' declarations}}
     }
   }
 

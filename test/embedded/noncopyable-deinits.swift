@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -c -I%t -parse-as-library %t/MyModule.swift -package-name P -o %t/MyModule.o -emit-module -emit-module-path %t/MyModule.swiftmodule -emit-empty-object-file
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -c -I%t %t/Main.swift -package-name P -o %t/Main.o
-// RUN: %target-clang %target-clang-resource-dir-opt %t/Main.o %t/MyModule.o -o %t/a.out
+// RUN: %target-clang %target-clang-resource-dir-opt %t/Main.o %t/MyModule.o %target-embedded-posix-shim -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test

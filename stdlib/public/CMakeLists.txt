@@ -152,6 +152,10 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING
       "Enable build of the embedded Swift standard library and runtime for cross-compiling targets"
       FALSE)
 
+option(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM
+       "Whether to build the Embedded Swift standard library using the hooks in swift/EmbeddedPlatform.h"
+       FALSE)
+
 set(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES "" CACHE STRING
     "List of extra target triples to build the embedded Swift standard library for")
 
@@ -328,6 +332,7 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
+  add_subdirectory(EmbeddedPlatform)
 
   if(SWIFT_BUILD_CLANG_OVERLAYS OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
     add_subdirectory(ClangOverlays)

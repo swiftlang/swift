@@ -5613,12 +5613,12 @@ public:
     if (F.getModule().getStage() >= SILStage::Canonical &&
         functionResultType.isAddress()) {
       auto base = getAccessBase(RI->getOperand());
-      require(!base->getType().isAddress()
-               || isa<SILFunctionArgument>(base)
-               || isa<DereferenceAddrBorrowInst>(base)
-               || isa<DereferenceBorrowAddrInst>(base)
-               || (isa<ApplyInst>(base)
-                   && cast<ApplyInst>(base)->hasAddressResult()),
+      require(!base->getType().isAddress() || isa<SILFunctionArgument>(base) ||
+                  isa<DereferenceAddrBorrowInst>(base) ||
+                  isa<DereferenceBorrowAddrInst>(base) ||
+                  (isa<ApplyInst>(base) &&
+                       cast<ApplyInst>(base)->hasAddressResult() ||
+                   isa<GlobalAddrInst>(base)),
               "unidentified address return");
     }
   }

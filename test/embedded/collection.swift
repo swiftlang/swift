@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-feature Extern -enable-experimental-feature Embedded -enforce-exclusivity=none %s -c -o %t/a.o
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
-// RUN: %target-clang %target-clang-resource-dir-opt %t/a.o %t/print.o -o %t/a.out
+// RUN: %target-clang %target-clang-resource-dir-opt %t/a.o %t/print.o %target-embedded-posix-shim -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler

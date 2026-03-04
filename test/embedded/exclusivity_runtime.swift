@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library %s -c -o %t/a.o -enforce-exclusivity=checked -enable-experimental-feature EmbeddedDynamicExclusivity
 
 // Single-threaded exclusivity checking implementation
-// RUN: %target-clang %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip -lswiftExclusivitySingleThreaded
+// RUN: %target-clang %t/a.o %target-embedded-posix-shim -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip -lswiftExclusivitySingleThreaded
 // RUN: %target-run %t/a.out 2>&1| %FileCheck %s
 
 // REQUIRES: executable_test

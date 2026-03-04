@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -Osize -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern %s -c -o %t/a.o
-// RUN: %target-clang %target-clang-resource-dir-opt %t/a.o -o %t/a.out -dead_strip %swift_obj_root/lib/swift/embedded/%module-target-triple/libswiftUnicodeDataTables.a
+// RUN: %target-clang %target-clang-resource-dir-opt %t/a.o %target-embedded-posix-shim -o %t/a.out -dead_strip %swift_obj_root/lib/swift/embedded/%module-target-triple/libswiftUnicodeDataTables.a
 // RUN: %llvm-nm --defined-only --format=just-symbols --demangle %t/a.out | sort | %FileCheck %s --check-prefix=EXCLUDES
 
 // REQUIRES: swift_in_compiler
