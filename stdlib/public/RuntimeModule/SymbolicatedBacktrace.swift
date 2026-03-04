@@ -434,7 +434,6 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     backtrace: Backtrace,
     images: ImageMap?,
     platform symbolicationPlatform: Backtrace.SymbolicationPlatform,
-    alternativeSymbolFilePaths: [String],
     options: Backtrace.SymbolicationOptions,
     symbolLocator: SymbolLocator = DefaultSymbolLocator.shared
   ) -> SymbolicatedBacktrace? {
