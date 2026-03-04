@@ -2836,49 +2836,49 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
     $OverlayBinaryCache = if ($Static) {
       Get-ProjectBinaryCache $Platform ExperimentalStaticOverlay
     } else {
-      Get-ProjectBinarycache $Platform ExperimentalDynamicOverlay
+      Get-ProjectBinaryCache $Platform ExperimentalDynamicOverlay
     }
 
     $StringProcessingBinaryCache = if ($Static) {
       Get-ProjectBinaryCache $Platform ExperimentalStaticStringProcessing
     } else {
-      Get-ProjectBinarycache $Platform ExperimentalDynamicStringProcessing
+      Get-ProjectBinaryCache $Platform ExperimentalDynamicStringProcessing
     }
 
     $SynchronizationBinaryCache = if ($Static) {
       Get-ProjectBinaryCache $Platform ExperimentalStaticSynchronization
     } else {
-      Get-ProjectBinarycache $Platform ExperimentalDynamicSynchronization
+      Get-ProjectBinaryCache $Platform ExperimentalDynamicSynchronization
     }
 
     $DistributedBinaryCache = if ($Static) {
       Get-ProjectBinaryCache $Platform ExperimentalStaticDistributed
     } else {
-      Get-ProjectBinarycache $Platform ExperimentalDynamicDistributed
+      Get-ProjectBinaryCache $Platform ExperimentalDynamicDistributed
     }
 
     $ObservationBinaryCache = if ($Static) {
       Get-ProjectBinaryCache $Platform ExperimentalStaticObservation
     } else {
-      Get-ProjectBinarycache $Platform ExperimentalDynamicObservation
+      Get-ProjectBinaryCache $Platform ExperimentalDynamicObservation
     }
 
     $DifferentiationBinaryCache = if ($Static) {
       Get-ProjectBinaryCache $Platform ExperimentalStaticDifferentiation
     } else {
-      Get-ProjectBinarycache $Platform ExperimentalDynamicDifferentiation
+      Get-ProjectBinaryCache $Platform ExperimentalDynamicDifferentiation
     }
 
     $VolatileBinaryCache = if ($Static) {
       Get-ProjectBinaryCache $Platform ExperimentalStaticVolatile
     } else {
-      Get-ProjectBinarycache $Platform ExperimentalDynamicVolatile
+      Get-ProjectBinaryCache $Platform ExperimentalDynamicVolatile
     }
 
     $RuntimeModuleBinaryCache = if ($Static) {
       Get-ProjectBinaryCache $Platform ExperimentalStaticRuntimeModule
     } else {
-      Get-ProjectBinarycache $Platform ExperimentalDynamicRuntimeModule
+      Get-ProjectBinaryCache $Platform ExperimentalDynamicRuntimeModule
     }
 
     Build-CMakeProject `
