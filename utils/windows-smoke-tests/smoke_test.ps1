@@ -5,6 +5,7 @@ Write-Host "Starting smoke test"
 Write-Host ""
 
 swift --version
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host ""
 
 $RepoUrl = "https://github.com/compnerd/swift-win32"
