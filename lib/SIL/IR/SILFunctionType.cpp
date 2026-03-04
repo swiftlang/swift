@@ -1456,6 +1456,14 @@ public:
   getIndirectSelfParameter(const AbstractionPattern &type) const = 0;
   virtual ParameterConvention
   getDirectSelfParameter(const AbstractionPattern &type) const = 0;
+  // Returns the convention for a parameter with explicit Owned ownership
+  // (e.g. `sending`). Defaults to Direct_Owned; ObjC conventions override
+  // to Direct_Unowned because objc_msgSend always delivers at +0.
+  virtual ParameterConvention
+  getDirectOwnedParameter(unsigned index, const AbstractionPattern &type,
+                          const TypeLowering &substTL) const {
+    return ParameterConvention::Direct_Owned;
+  }
   virtual ParameterConvention getPackParameter(unsigned index) const = 0;
 
   // Helpers that branch based on a value ownership.
@@ -1519,7 +1527,7 @@ public:
     case ValueOwnership::Shared:
       return ParameterConvention::Direct_Guaranteed;
     case ValueOwnership::Owned:
-      return ParameterConvention::Direct_Owned;
+      return getDirectOwnedParameter(index, type, substTL);
     }
     llvm_unreachable("unhandled ownership");
   }
@@ -2164,20 +2172,6 @@ private:
       convention = Convs.getDirect(ownership, forSelf, origParamIndex, origType,
                                    substTLConv);
       assert(!isIndirectFormalParameter(convention));
-    }
-
-    // ObjC methods deliver arguments at +0. When a `sending` parameter 
-    // promotes ownership to Owned, the thunk would receive `@owned` butt the 
-    // caller (objc_msgSend) passes +0, causing a double-free.
-    //
-    // Override to Direct_Unowned so the thunk emits a copy_value before
-    // forwarding to the Swift body.
-    if (origFlags.isSending() &&
-        ownership == ValueOwnership::Owned &&
-        convention == ParameterConvention::Direct_Owned &&
-        (Convs.getKind() == ConventionsKind::ObjCSelectorFamily ||
-         Convs.getKind() == ConventionsKind::ObjCMethod)) {
-      convention = ParameterConvention::Direct_Unowned;
     }
 
     addParameter(formalParamIndex, loweredType, convention, origFlags);
@@ -3870,6 +3864,15 @@ public:
     return getDirectCParameterConvention(Method->param_begin()[index]);
   }
 
+  // ObjC methods deliver all arguments at +0 via objc_msgSend.
+  // Swift-only ownership annotations like `sending` promote to
+  // ValueOwnership::Owned, but the ObjC caller doesn't know about them.
+  ParameterConvention getDirectOwnedParameter(
+      unsigned index, const AbstractionPattern &type,
+      const TypeLowering &substTL) const override {
+    return ParameterConvention::Direct_Unowned;
+  }
+
   ParameterConvention getPackParameter(unsigned index) const override {
     llvm_unreachable("objc methods do not have pack parameters");
   }
@@ -4420,6 +4423,13 @@ public:
   ParameterConvention getDirectParameter(unsigned index,
                                          const AbstractionPattern &type,
                                  const TypeLowering &substTL) const override {
+    return ParameterConvention::Direct_Unowned;
+  }
+
+  // ObjC methods deliver all arguments at +0 via objc_msgSend.
+  ParameterConvention getDirectOwnedParameter(
+      unsigned index, const AbstractionPattern &type,
+      const TypeLowering &substTL) const override {
     return ParameterConvention::Direct_Unowned;
   }
 

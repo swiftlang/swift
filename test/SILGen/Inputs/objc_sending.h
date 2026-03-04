@@ -1,4 +1,4 @@
-@import Foundation;
+@import ObjectiveC;
 
 #define SWIFT_SENDABLE __attribute__((swift_attr("@Sendable")))
 #define SWIFT_SENDING __attribute__((swift_attr("sending")))
