@@ -1,9 +1,8 @@
-
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/test.swiftmodule %t/test.swift -I %t -strict-memory-safety \
-// RUN:   -verify -verify-additional-file %t%{fs-sep}foo.h -verify-additional-file %t%{fs-sep}bar.h -verify-additional-file %t%{fs-sep}baz.h -verify-additional-file %t%{fs-sep}qux.h -Rmacro-expansions
+// RUN:   -verify -verify-additional-file %t%{fs-sep}foo.h -verify-additional-file %t%{fs-sep}bar.h -verify-additional-file %t%{fs-sep}baz.h -verify-additional-file %t%{fs-sep}qux.h -Rmacro-expansions -Rclang-importer
 
 // Macro expansions in foo.h do not have access to the definition of `struct qux`,
 // so don't attach macro on functions that use contain that type in foo.h.
@@ -16,22 +15,38 @@
 #define __counted_by(x) __attribute__((__counted_by__(x)))
 
 struct qux;
-// expected-note@+1{{'foo' declared here}}
+// expected-remark@+4{{did not add safe interop wrapper}}
+// expected-note@+3{{clang function signature refers to concrete type without importing owning module}}
+// expected-note@+2{{'foo' is in module Foo}}
+// expected-note@+1{{'foo' declared here}} // note: the "declared here" notes are related to the errors in test.swift, not the remarks
 void foo(struct qux *x, int * __counted_by(len) p, int len);
+// expected-remark@+4{{did not add safe interop wrapper}}
+// expected-note@+3{{clang function signature refers to concrete type without importing owning module}}
+// expected-note@+2{{'fooIndirect' is in module Foo}}
 // expected-note@+1{{'fooIndirect' declared here}}
 void fooIndirect(struct qux * * x, int * __counted_by(len) p, int len);
+// expected-remark@+4{{did not add safe interop wrapper}}
+// expected-note@+3{{clang function signature refers to concrete type without importing owning module}}
+// expected-note@+2{{'fooIndirectCompleteArray' is in module Foo}}
 // expected-note@+1{{'fooIndirectCompleteArray' declared here}}
 void fooIndirectCompleteArray(struct qux* (* x)[2], int * __counted_by(len) p, int len);
+// expected-remark@+4{{did not add safe interop wrapper}}
+// expected-note@+3{{clang function signature refers to concrete type without importing owning module}}
+// expected-note@+2{{'fooReturn' is in module Foo}}
 // expected-note@+1{{'fooReturn' declared here}}
 struct qux * fooReturn(int * __counted_by(len) p, int len);
 
 enum fwd_declared_enum : int;
+// expected-remark@+4{{did not add safe interop wrapper}}
+// expected-note@+3{{clang function signature refers to concrete type without importing owning module}}
+// expected-note@+2{{'testEnum' is in module Foo}}
 // expected-note@+1{{'testEnum' declared here}}
 void testEnum(enum fwd_declared_enum *x, int * __counted_by(len) p, int len);
 
 struct container_t {
   struct qux *item;
 };
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:6{{
 //   expected-note@1 5{{in expansion of macro '_SwiftifyImport' on global function 'fooWrapped' here}}
 // }}
@@ -48,9 +63,14 @@ typedef struct __attribute__((swift_attr("import_as_ref")))
 __attribute__((swift_attr("retain:foobar_retain")))
 __attribute__((swift_attr("release:foobar_release"))) foobar_t *foobar_ref;
 
+// expected-remark@+2{{did not add safe interop wrapper}}
+// expected-note@+1{{no bounds or lifetime information found}}
 void foobar_retain(foobar_ref x);
+// expected-remark@+2{{did not add safe interop wrapper}}
+// expected-note@+1{{no bounds or lifetime information found}}
 void foobar_release(foobar_ref x);
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:57{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func foobar(_ _foobar_param0: UnsafeMutableBufferPointer<Int32>, _ _foobar_param2: foobar_ref!) {|}}
@@ -69,6 +89,7 @@ void foobar(int * __counted_by(len), int len, foobar_ref);
 
 #define __counted_by(x) __attribute__((__counted_by__(x)))
 
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:59{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bar(_ x: UnsafeMutablePointer<qux>!, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -80,6 +101,7 @@ void foobar(int * __counted_by(len), int len, foobar_ref);
 //   expected-note@1 5{{in expansion of macro '_SwiftifyImport' on global function 'bar' here}}
 // }}
 void bar(struct qux *x, int * __counted_by(len) p, int len);
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:58{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func barReturn(_ p: UnsafeMutableBufferPointer<Int32>) -> UnsafeMutablePointer<qux>! {|}}
@@ -99,6 +121,7 @@ struct qux * barReturn(int * __counted_by(len) p, int len);
 #include "bar.h"
 
 struct qux;
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:59{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func baz(_ x: UnsafeMutablePointer<qux>!, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
@@ -110,6 +133,7 @@ struct qux;
 //   expected-note@1 5{{in expansion of macro '_SwiftifyImport' on global function 'baz' here}}
 // }}
 void baz(struct qux *x, int * __counted_by(len) p, int len);
+// expected-remark@+11{{added safe interop wrapper}}
 // expected-expansion@+10:58{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bazReturn(_ p: UnsafeMutableBufferPointer<Int32>) -> UnsafeMutablePointer<qux>! {|}}
@@ -126,8 +150,10 @@ struct qux * bazReturn(int * __counted_by(len) p, int len);
 //--- qux.h
 #pragma once
 
+// expected-note@+1 4{{'qux' is in module qux}}
 struct qux { int placeholder; };
 
+// expected-note@+1{{'fwd_declared_enum' is in module qux}}
 enum fwd_declared_enum : int {
   enum_member,
 };

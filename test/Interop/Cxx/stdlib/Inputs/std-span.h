@@ -80,54 +80,81 @@ struct CaptureByReference {
     ConstSpanOfInt x;
 };
 
+// expected-remark@+1{{added safe interop wrapper}}
 inline void funcWithSafeWrapper(ConstSpanOfInt s [[clang::noescape]]) {}
 
+// expected-experimental-remark@+2{{added safe interop wrapper}}
+// expected-default-remark@+1{{did not add safe interop wrapper}}
 inline ConstSpanOfInt funcWithSafeWrapper2(ConstSpanOfInt s
+                                           // expected-default-note@+1{{lifetimebound support is not yet stabilized}}
                                            [[clang::lifetimebound]]) {
   return s;
 }
 
+// expected-experimental-remark@+2{{added safe interop wrapper}}
+// expected-default-remark@+1{{did not add safe interop wrapper}}
 inline ConstSpanOfInt funcWithSafeWrapper3(const VecOfInt &v
+                                           // expected-default-note@+1{{lifetimebound support is not yet stabilized}}
                                            [[clang::lifetimebound]]) {
   return ConstSpanOfInt(v.data(), v.size());
 }
 
+// expected-note@+2{{implicit functions are ignored}}
+// expected-remark@+1{{did not add safe interop wrapper}}
 struct X {
+  // expected-remark@+1{{added safe interop wrapper}}
   inline void methodWithSafeWrapper(ConstSpanOfInt s [[clang::noescape]]) {}
+  // expected-remark@+1{{added safe interop wrapper}}
   SpanOfInt getMutable(ConstSpanOfInt s [[clang::noescape]]) [[clang::lifetimebound]];
 };
 
+// expected-default-note@+3{{'mixedFuncWithSafeWrapper1' declared here}}
+// expected-experimental-remark@+2{{added safe interop wrapper}}
+// expected-default-remark@+1{{did not add safe interop wrapper}}
 inline ConstSpanOfInt mixedFuncWithSafeWrapper1(const int * __counted_by(len) p
+                                           // expected-default-note@+1{{lifetimebound support is not yet stabilized}}
                                            [[clang::lifetimebound]], int len) {
   return ConstSpanOfInt(p, len);
 }
 
+// expected-experimental-remark@+2{{added safe interop wrapper}}
+// expected-default-remark@+1{{did not add safe interop wrapper}}
 inline const int * __counted_by(len) mixedFuncWithSafeWrapper2(const VecOfInt &v
+                                           // expected-default-note@+1{{lifetimebound support is not yet stabilized}}
                                            [[clang::lifetimebound]], int len) {
   if (v.size() <= len)
     return v.data();
   return nullptr;
 }
 
+// expected-remark@+1{{added safe interop wrapper}}
 inline void mixedFuncWithSafeWrapper3(ConstSpanOfInt s [[clang::noescape]],
                                       int * __counted_by(len) p, int len) {}
 
+// expected-remark@+1{{added safe interop wrapper}}
 inline void mixedFuncWithSafeWrapper4(ConstSpanOfInt s [[clang::noescape]],
                                       const int * __counted_by(len) p [[clang::noescape]], int len) {}
 
+// expected-remark@+1{{added safe interop wrapper}}
 inline void mixedFuncWithSafeWrapper5(ConstSpanOfInt s,
                                       const int * __counted_by(len) p [[clang::noescape]], int len) {}
 
+// expected-remark@+1{{added safe interop wrapper}}
 inline void mixedFuncWithSafeWrapper6(ConstSpanOfInt s,
                                       int * __counted_by(len) p, int len) {}
 
+// expected-remark@+1{{added safe interop wrapper}}
 inline ConstSpanOfInt mixedFuncWithSafeWrapper7(const int * __counted_by(len) p, int len) {
   return ConstSpanOfInt(p, len);
 }
 
+// expected-remark@+1{{added safe interop wrapper}}
 inline void FuncWithMutableSafeWrapper(SpanOfInt s [[clang::noescape]]) {}
 
+// expected-experimental-remark@+2{{added safe interop wrapper}}
+// expected-default-remark@+1{{did not add safe interop wrapper}}
 inline SpanOfInt FuncWithMutableSafeWrapper2(SpanOfInt s
+                                           // expected-default-note@+1{{lifetimebound support is not yet stabilized}}
                                            [[clang::lifetimebound]]) {
   return s;
 }
@@ -141,48 +168,77 @@ struct Y {
   inline void methodWithMutableSafeWrapper(SpanOfInt s [[clang::noescape]]) {}
 };
 
+// expected-default-note@+3{{'MixedFuncWithMutableSafeWrapper1' declared here}}
+// expected-experimental-remark@+2{{added safe interop wrapper}}
+// expected-default-remark@+1{{did not add safe interop wrapper}}
 inline SpanOfInt MixedFuncWithMutableSafeWrapper1(int * __counted_by(len) p
+                                           // expected-default-note@+1{{lifetimebound support is not yet stabilized}}
                                            [[clang::lifetimebound]], int len) {
   return SpanOfInt(p, len);
 }
 
+// expected-experimental-remark@+2{{added safe interop wrapper}}
+// expected-default-remark@+1{{did not add safe interop wrapper}}
 inline int * __counted_by(len) MixedFuncWithMutableSafeWrapper2(VecOfInt &v
+                                           // expected-default-note@+1{{lifetimebound support is not yet stabilized}}
                                            [[clang::lifetimebound]], int len) {
   if (v.size() <= len)
     return v.data();
   return nullptr;
 }
 
+// expected-remark@+1{{added safe interop wrapper}}
 inline void MixedFuncWithMutableSafeWrapper3(SpanOfInt s [[clang::noescape]],
                                       int * __counted_by(len) p, int len) {}
 
+// expected-remark@+1{{added safe interop wrapper}}
 inline void MixedFuncWithMutableSafeWrapper4(SpanOfInt s [[clang::noescape]],
                                       int * __counted_by(len) p [[clang::noescape]], int len) {}
 
+// expected-remark@+1{{added safe interop wrapper}}
 inline void MixedFuncWithMutableSafeWrapper5(SpanOfInt s,
                                       int * __counted_by(len) p [[clang::noescape]], int len) {}
 
+// expected-remark@+1{{added safe interop wrapper}}
 inline void MixedFuncWithMutableSafeWrapper6(SpanOfInt s,
                                       int * __counted_by(len) p, int len) {}
 
+// expected-remark@+1{{added safe interop wrapper}}
 inline SpanOfInt MixedFuncWithMutableSafeWrapper7(int * __counted_by(len) p, int len) {
   return SpanOfInt(p, len);
 }
 
 template <typename X>
+// expected-remark@+2{{did not add safe interop wrapper}}
+// expected-note@+1{{implicit functions are ignored}}
 struct S {};
 
+// expected-remark@+2{{did not add safe interop wrapper}}
+// expected-note@+1{{implicit functions are ignored}}
 struct SpanWithoutTypeAlias {
+  // expected-remark@+2{{did not add safe interop wrapper}}
+  // expected-note@+1{{template specialization cannot be represented in Swift syntax; try hiding it behind a typedef}}
   std::span<const int> bar() [[clang::lifetimebound]];
+  // expected-note@+2{{template specialization cannot be represented in Swift syntax; try hiding it behind a typedef}}
+  // expected-remark@+1{{did not add safe interop wrapper}}
   void foo(std::span<const int> s [[clang::noescape]]);
+  // expected-note@+2{{template specialization cannot be represented in Swift syntax; try hiding it behind a typedef}}
+  // expected-remark@+1{{did not add safe interop wrapper}}
   void otherTemplatedType(ConstSpanOfInt copy [[clang::noescape]], S<int>);
+  // expected-note@+2{{template specialization cannot be represented in Swift syntax; try hiding it behind a typedef}}
+  // expected-remark@+1{{did not add safe interop wrapper}}
   void otherTemplatedType2(ConstSpanOfInt copy [[clang::noescape]], S<int> *);
 };
 
 inline void func(ConstSpanOfInt copy [[clang::noescape]]) {}
+// expected-remark@+1{{added safe interop wrapper}}
 inline void mutableKeyword(SpanOfInt copy [[clang::noescape]]) {}
 
+// expected-note@+2{{template specialization cannot be represented in Swift syntax; try hiding it behind a typedef}}
+// expected-remark@+1{{did not add safe interop wrapper}}
 inline void spanWithoutTypeAlias(std::span<const int> s [[clang::noescape]]) {}
+// expected-note@+2{{template specialization cannot be represented in Swift syntax; try hiding it behind a typedef}}
+// expected-remark@+1{{did not add safe interop wrapper}}
 inline void mutableSpanWithoutTypeAlias(std::span<int> s [[clang::noescape]]) {}
 
 #define IMMORTAL_FRT                                                           \

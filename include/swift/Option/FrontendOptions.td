@@ -194,7 +194,7 @@ def expansion_remarks:  Flag<["-"], "Rmacro-expansions">,
   HelpText<"Show remarks for each line in macro expansions">;
 
 def clang_importer_remarks:  Flag<["-"], "Rclang-importer">,
-  HelpText<"Emit remarks on decisions taking while importing clang nodes">;
+  HelpText<"Emit remarks on decisions taken while importing clang nodes">;
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;

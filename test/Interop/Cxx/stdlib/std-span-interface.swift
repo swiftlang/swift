@@ -7,9 +7,11 @@
 // RUN: %FileCheck %s --match-full-lines --check-prefixes=CHECK,CHECK-LEGACY < %t/interface-lifetimebound.swift
 
 // Make sure we trigger typechecking and SIL diagnostics
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s -verify-additional-prefix default- -suppress-notes
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s \
+// RUN:   -verify-additional-prefix default- -Rclang-importer -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}std-span.h -verify-ignore-unrelated
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s \
+// RUN:   -verify-additional-prefix experimental- -Rclang-importer -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}std-span.h -verify-ignore-unrelated
 
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_Lifetimes
@@ -184,8 +186,9 @@ func callFuncWithMutableSafeWrapper2(_ span: inout MutableSpan<CInt>, ) {
 
 @_lifetime(span: copy span)
 func callMixedFuncWithMutableSafeWrapper1(_ span: inout MutableSpan<CInt>, ) {
-    // expected-default-error@+3{{missing argument for parameter #2 in call}}
-    // expected-default-error@+2{{cannot convert value of type 'UnsafeMutablePointer<MutableSpan<CInt>>' (aka 'UnsafeMutablePointer<MutableSpan<Int32>>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
+    // expected-default-error@+4{{missing argument for parameter #2 in call}}
+    // expected-default-error@+3{{cannot convert value of type 'UnsafeMutablePointer<MutableSpan<CInt>>' (aka 'UnsafeMutablePointer<MutableSpan<Int32>>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
+    // expected-default-note@+2{{arguments to generic parameter 'Pointee' ('MutableSpan<CInt>' (aka 'MutableSpan<Int32>') and 'Int32') are expected to be equal}}
     // expected-default-error@+1{{cannot convert value of type 'SpanOfInt'}}
     let _: MutableSpan<CInt> = MixedFuncWithMutableSafeWrapper1(&span)
 }

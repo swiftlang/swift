@@ -4,7 +4,7 @@
 
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs %t/succeed.swift
 // RUN: not %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs %t/fail.swift -dump-source-file-imports 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs %t/fail.swift -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B1.h -verify-ignore-macro-note
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs %t/fail.swift -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B1.h -verify-ignore-macro-note -Rclang-importer
 
 // Tests that we don't try to import modules that don't work well with Swift
 
@@ -43,8 +43,10 @@ module A1 {
 #define __sized_by(s) __attribute__((__sized_by__(s)))
 
 // We can use bar without C1 causing errors
+// expected-remark@+1{{added safe interop wrapper}}
 void bar(void * _Nonnull __sized_by(size), int size);
 // foo causes an error when we try to refer to c1_t from the '!swift' module C1
+// expected-remark@+1{{added safe interop wrapper}}
 c1_t foo(void * _Nonnull __sized_by(size), int size);
 /*
 expected-note@-2{{'foo' declared here}}
@@ -67,6 +69,10 @@ public func callUnsafe(_ p: UnsafeMutableRawPointer) {
 public func callSafe(_ p: UnsafeMutableRawBufferPointer) {
   let _ = foo(p) // expected-error{{cannot convert value of type 'UnsafeMutableRawBufferPointer' to expected argument type 'UnsafeMutableRawPointer'}}
                  // expected-error@-1{{missing argument}}
+}
+
+public func callBar(_ p: UnsafeMutableRawPointer) {
+  bar(p, 13)
 }
 
 //--- succeed.swift

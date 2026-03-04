@@ -174,6 +174,7 @@ uint8_t *__sized_by(size)  bytesized(int size, const uint8_t * p __sized_by(size
 // }}
 char *__sized_by(size) charsized(char * p __sized_by(size) __lifetimebound, int size);
 
+// expected-experimental-remark@+1{{ignoring lifetimebound attribute because return value is Escapable}}
 const uint16_t *__sized_by(size)  doublebytesized(uint16_t * p __sized_by(size) __lifetimebound, int size);
 
 //--- module.modulemap
