@@ -51,7 +51,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
     }
     
     // the cancellation of awaiting on willSet only ferries in resuming early
-    // it is the responsability of the caller to check if the task is actually
+    // it is the responsibility of the caller to check if the task is actually
     // cancelled after awaiting the willSet to act accordingly.
     static func cancel(_ state: _ManagedCriticalState<State>, id: Int) {
       state.withCriticalRegion { state in
@@ -89,7 +89,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
     // install a willChange continuation into the set of continuations
     // this must take a locally unique id (to the active calls of next)
     static func willChange(isolation iterationIsolation: isolated (any Actor)? = #isolation, state: _ManagedCriticalState<State>, id: Int) async {
-      return await withUnsafeContinuation { continuation in
+      return await withUnsafeContinuation(isolation: iterationIsolation) { continuation in
         state.withCriticalRegion { state in
           defer { state.dirty = false }
           switch state.continuations[id] {
