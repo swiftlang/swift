@@ -1339,12 +1339,13 @@ SILInstruction::getStackAllocation() const {
     // FIXME: BuiltinValueKind::StartAsyncLetWithLocalBuffer
     if (auto BK = BI->getBuiltinKind()) {
       switch (*BK) {
-#define BUILTIN_CASE(KIND)                                               \
-      case BuiltinValueKind::KIND:                                       \
+#define BUILTIN_CASE(ID, KIND)                                           \
+      case BuiltinValueKind::ID:                                         \
         return StackAllocation::getUnchecked(BI,                         \
                                     StackAllocationKind::Builtin##KIND);
-      BUILTIN_CASE(StackAlloc)
-      BUILTIN_CASE(UnprotectedStackAlloc)
+      BUILTIN_CASE(StackAlloc, StackAlloc)
+      BUILTIN_CASE(UnprotectedStackAlloc, UnprotectedStackAlloc)
+      BUILTIN_CASE(StartAsyncLetWithLocalBuffer, StartAsyncLet)
 #undef BUILTIN_CASE
 
       default:
@@ -1371,7 +1372,6 @@ void SILInstruction::setStackAllocationIsNested(
     StackAllocationIsNested_t nested) {
   assert(isAllocatingStack());
   if (auto ASI = dyn_cast<AllocStackInst>(this)) {
-    assert(nested == StackAllocationIsNested);
     ASI->setStackAllocationIsNested(nested);
   } else if (!nested) {
     llvm_unreachable("unimplemented");
@@ -1420,7 +1420,6 @@ SILInstruction::getStackDeallocation() const {
   }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
-    // FIXME: BuiltinValueKind::FinishAsyncLet
     if (auto BK = BI->getBuiltinKind()) {
       switch (*BK) {
       case BuiltinValueKind::StackDealloc: {
@@ -1434,6 +1433,12 @@ SILInstruction::getStackDeallocation() const {
                  *allocKind == BuiltinValueKind::StackAlloc
                    ? StackAllocationKind::BuiltinStackAlloc
                    : StackAllocationKind::BuiltinUnprotectedStackAlloc);
+      }
+
+      case BuiltinValueKind::FinishAsyncLet: {
+        auto alloc = StackDeallocation::getAllocationOperand(BI);
+        return StackDeallocation::getUnchecked(alloc, BI,
+                             StackAllocationKind::BuiltinStartAsyncLet);
       }
 
       default:

@@ -23,32 +23,41 @@
 namespace swift {
 
 enum class StackAllocationKind : uint8_t {
-  /// An AllocStackInst.
+  /// An AllocStackInst. The deallocation is a DeallocStackInst.
   AllocStack,
 
-  /// An AllocPackInst.
+  /// An AllocPackInst. The deallocation is a DeallocPackInst.
   AllocPack,
 
-  /// An AllocPackMetadataInst.
+  /// An AllocPackMetadataInst. The deallocation is a DeallocPackMetadataInst.
   AllocPackMetadata,
 
-  /// An on-stack AllocRefInst.
+  /// An on-stack AllocRefInst. The deallocation is DeallocStackRefInst.
   AllocRef,
 
-  /// An on-stack AllocRefDynamicInst.
+  /// An on-stack AllocRefDynamicInst. The deallocation is a
+  /// DeallocStackRefInst.
   AllocRefDynamic,
 
-  /// An on-stack PartialApplyInst outside of OSSA.
+  /// An on-stack PartialApplyInst outside of OSSA. The deallocation is a
+  /// DeallocStackInst.
   PartialApply,
 
-  /// A callee-allocated BeginApplyInst.
+  /// A callee-allocated BeginApplyInst. The deallocation is a
+  /// DeallocStackInst.
   CalleeAllocatedBeginApply,
 
-  /// A BuiltinInst for the StackAlloc builtin.
+  /// A BuiltinInst for the StackAlloc builtin. The deallocation is
+  /// a BuiltinInst for the StackDealloc builtin.
   BuiltinStackAlloc,
 
-  /// A BuiltinInst for the UnprotectedStackAlloc builtin.
+  /// A BuiltinInst for the UnprotectedStackAlloc builtin. The deallocation is
+  /// a BuiltinInst for the StackDealloc builtin.
   BuiltinUnprotectedStackAlloc,
+
+  /// A BuiltinInst for the StartAsyncLetWithLocalBuffer builtin. The
+  /// deallocation is a BuiltinInst for the FinishAsyncLet builtin.
+  BuiltinStartAsyncLet,
 };
 
 class StackAllocation {
