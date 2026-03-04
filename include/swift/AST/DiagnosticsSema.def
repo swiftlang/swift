@@ -6086,7 +6086,7 @@ ERROR(non_concurrent_type_member,none,
       (Type, bool, DeclName, const ValueDecl *, bool))
 ERROR(concurrent_value_class_mutable_property,none,
       "stored property %0 of 'Sendable'-conforming %kind1 is mutable",
-      (DeclName, const ValueDecl *))
+      (const ValueDecl *, const ValueDecl *))
 ERROR(concurrent_value_outside_source_file,none,
       "conformance to 'Sendable' must occur in the same source file as "
       "%kind0; use '@unchecked Sendable' for retroactive conformance",
