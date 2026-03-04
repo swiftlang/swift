@@ -1491,6 +1491,11 @@ final class Exponentiator: Sendable {
   }()
 }
 
+final class NumberHolder: Sendable {
+  // expected-warning@+1 {{stored property 'numbers' of 'Sendable'-conforming class 'NumberHolder' is mutable; this is an error in the Swift 6 language mode}}
+  lazy var numbers = [1, 2, 3]
+}
+
 actor DunkTracker {
   private var lebron: Int?
   private var curry: Int? // expected-note {{property declared here}}

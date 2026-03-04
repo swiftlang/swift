@@ -6309,16 +6309,6 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       };
   }
 
-  // If this declaration is lazy storage, it has the same isolation as the
-  // original variable. Use the evaluator to cache and avoid running
-  // addAttributesForActorIsolation on the original variable a second time,
-  // duplicating attributes.
-  if (auto var = dyn_cast<VarDecl>(value))
-    if (var->isLazyStorageProperty())
-      if (auto originalVar = var->getOriginalVarForBackingStorage())
-        return evaluateOrDefault(evaluator, ActorIsolationRequest{originalVar},
-                                 InferredActorIsolation::forUnspecified());
-
   auto isolationFromAttr = getIsolationFromAttributes(value);
   ASTContext &ctx = value->getASTContext();
 
@@ -6470,6 +6460,17 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   // non-accessor functions.
   if (auto accessor = dyn_cast<AccessorDecl>(value)) {
     return getInferredActorIsolation(accessor->getStorage());
+  }
+
+  // If this is a lazy storage property, use the actor isolation of its original
+  // variable, but ensure the actor attributes get attached to the storage.
+  if (auto var = dyn_cast<VarDecl>(value)) {
+    if (var->isLazyStorageProperty()) {
+      if (auto originalVar = var->getOriginalVarForBackingStorage()) {
+        auto inferred = getInferredActorIsolation(originalVar);
+        return {inferredIsolation(inferred.isolation), inferred.source};
+      }
+    }
   }
 
   // If this is a local function, inherit the actor isolation from its
