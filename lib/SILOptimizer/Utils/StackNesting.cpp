@@ -190,16 +190,17 @@ static void createDealloc(SILBuilder &B, SILLocation loc, SILInstruction *alloc)
     return;
   case StackAllocationKind::BuiltinStackAlloc:
   case StackAllocationKind::BuiltinUnprotectedStackAlloc: {
-    auto *bi = cast<BuiltinInst>(alloc);
     auto &ctx = alloc->getFunction()->getModule().getASTContext();
-
     auto identifier =
       ctx.getIdentifier(getBuiltinName(BuiltinValueKind::StackDealloc));
     B.createBuiltin(loc, identifier,
                     SILType::getEmptyTupleType(ctx),
-                    SubstitutionMap(), {bi});
+                    SubstitutionMap(), {allocation->getValue()});
     return;
   }
+  case StackAllocationKind::BuiltinStartAsyncLet:
+    llvm_unreachable("cannot insert finishAsyncLet builtin; not safely reorderable");
+    return;
   case StackAllocationKind::AllocPackMetadata:
     B.createDeallocPackMetadata(loc, allocation->getValue());
     return;
@@ -225,6 +226,10 @@ static bool isUnreorderableAllocation(StackAllocation allocation) {
   // is specifically the callee allocation, which *can* be reordered.
   case StackAllocationKind::CalleeAllocatedBeginApply:
     return false;
+
+  // The finish of an async let cannot be reordered across.
+  case StackAllocationKind::BuiltinStartAsyncLet:
+    return true;
   }
   llvm_unreachable("unknown stack allocation");
 }

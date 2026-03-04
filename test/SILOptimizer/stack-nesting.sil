@@ -309,3 +309,54 @@ bb0(%cond: $Builtin.Int1):
   %ret = tuple ()
   return %ret : $()
 }
+
+sil private @async_let_helper : $@convention(thin) @Sendable @async () -> (@out Int, @error any Error) {
+bb0(%out : $*Int):
+  unreachable
+}
+
+// b and c must be marked as non-nested
+// CHECK-LABEL: sil [ossa] @test_async_let_non_nested
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK:         [[PTR:%.*]] = address_to_pointer [[A]] to $Builtin.RawPointer
+// CHECK-NEXT:    [[LET:%.*]] = builtin "startAsyncLetWithLocalBuffer"<Int>({{%.*}}, {{%.*}}, [[PTR]])
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:    builtin "finishAsyncLet"([[LET]], [[PTR]])
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 4
+// CHECK-LABEL: // end sil function 'test_async_let_non_nested'
+sil [ossa] @test_async_let_non_nested : $@convention(thin) @async (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+
+  %fn = function_ref @async_let_helper : $@convention(thin) @Sendable @async () -> (@out Int, @error any Error)
+  %async_let_fn = thin_to_thick_function %fn to $@Sendable @async () -> (@out Int, @error any Error)
+  %scratch = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+  %resultPtr = address_to_pointer %a to $Builtin.RawPointer
+  %al = builtin "startAsyncLetWithLocalBuffer"<Int>(%scratch, %fn, %resultPtr) : $Builtin.RawPointer
+
+  integer_literal $Builtin.Int32, 2
+
+  %b = alloc_stack $Int
+  %c = alloc_stack $Int
+
+  dealloc_stack %b
+
+  integer_literal $Builtin.Int32, 3
+
+  %out = builtin "finishAsyncLet"(%al, %resultPtr) : $()
+
+  dealloc_stack %a
+  dealloc_stack %c
+  integer_literal $Builtin.Int32, 4
+  %ret = tuple ()
+  return %ret : $()
+}
