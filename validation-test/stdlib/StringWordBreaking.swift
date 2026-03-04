@@ -68,7 +68,7 @@ extension String {
   /// - Parameter i: A valid index addressing a word boundary within this
   ///    string.
   /// - Returns: The first word break strictly following `i` in the string.
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(SwiftStdlib 6.3, *)
   public func _wordIndex(before i: String.Index) -> String.Index {
     let i = self.unicodeScalars._index(roundingDown: i)
     var j = _wordIndex(somewhereAtOrBefore: unicodeScalars.index(before: i))
