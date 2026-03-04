@@ -3356,17 +3356,26 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   if (!attributes.empty())
     out << "] ";
 
+  if (!Protocols.empty()) {
+    out << "[protocols: ";
+    SmallVector<ProtocolDecl *, 2> protocols(Protocols.begin(), Protocols.end());
+    llvm::sort(protocols,
+               [](const ProtocolDecl *lhs, const ProtocolDecl *rhs) {
+                 return TypeDecl::compare(lhs, rhs) < 0;
+               });
+    interleave(protocols,
+               [&](const ProtocolDecl *proto) {
+                 out << proto->getName();
+               },
+               [&out]() { out << ", "; });
+    out << "] ";
+  }
+
   Info.printVars(out, indent, /*showVia=*/false);
 
   if (!ReferencedVars.empty()) {
     out << "[references: ";
-    SmallVector<TypeVariableType *> referencedVars(ReferencedVars.begin(),
-                                                   ReferencedVars.end());
-    llvm::sort(referencedVars,
-               [](const TypeVariableType *lhs, const TypeVariableType *rhs) {
-                   return lhs->getID() < rhs->getID();
-               });
-    interleave(referencedVars,
+    interleave(ReferencedVars,
                [&](auto *typeVar) {
                  out << typeVar->getString(PO);
                  if (typeVar->getImpl().getFixedType(/*record=*/nullptr))
