@@ -64,6 +64,12 @@ SWIFT_CONCURRENCY_HOOK(bool, swift_task_isMainExecutor, SerialExecutorRef);
 SWIFT_CONCURRENCY_HOOK(void, swift_task_donateThreadToGlobalExecutorUntil,
                        bool (*condition)(void *), void *context);
 
+SWIFT_CONCURRENCY_HOOK(bool, _swift_task_setTimeSpentRunningTracked,
+                       bool isTracked);
+
+SWIFT_CONCURRENCY_HOOK(bool, _swift_task_getTimeSpentRunning,
+                       AsyncTask *task, uint64_t *outNanoseconds);
+
 // .............................................................................
 
 #undef SWIFT_CONCURRENCY_HOOK

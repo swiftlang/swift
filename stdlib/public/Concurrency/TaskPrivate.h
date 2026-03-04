@@ -883,6 +883,11 @@ struct AsyncTask::PrivateStorage {
       }
     }
 
+    // If we were tracking time spent running, clear that now too.
+    if (SWIFT_UNLIKELY(isTimeSpentRunningTracked())) {
+      task->popTimeSpentRunningRecord();
+    }
+
     // Drain unlock the task and remove any overrides on thread as a
     // result of the task
     auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);

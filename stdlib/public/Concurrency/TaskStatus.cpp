@@ -877,6 +877,10 @@ static void performCancellationAction(ActiveTaskStatus status, TaskStatusRecord 
   case TaskStatusRecordKind::TaskName:
     break;
 
+  // Cancellation has no impact on the time a task spends running.
+  case TaskStatusRecordKind::TimeSpentRunning:
+    break;
+
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:
     break;
@@ -979,6 +983,9 @@ static void performEscalationAction(TaskStatusRecord *record,
     return;
   /// Task names don't matter to priority escalation.
   case TaskStatusRecordKind::TaskName:
+    return;
+  // Time spent running doesn't affect priority (outside the scheduler, anyway.)
+  case TaskStatusRecordKind::TimeSpentRunning:
     return;
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:
@@ -1105,6 +1112,59 @@ void TaskDependencyStatusRecord::performEscalationAction(
         this->DependentOn.Executor, this, oldPriority, newPriority);
       swift_executor_escalate(this->DependentOn.Executor, this->WaitingTask, newPriority);
       break;
+  }
+}
+
+/**************************************************************************/
+/*************************** TIME SPENT RUNNING ***************************/
+/**************************************************************************/
+
+void AsyncTask::pushTimeSpentRunningRecord(void) {
+  void *allocation = std::malloc(sizeof(class TimeSpentRunningStatusRecord));
+  auto record = ::new (allocation) TimeSpentRunningStatusRecord();
+
+  addStatusRecord(this, record,
+                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+                    return true; // always add the record
+                  });
+}
+
+void AsyncTask::popTimeSpentRunningRecord(void) {
+  if (auto record = popStatusRecordOfType<TimeSpentRunningStatusRecord>(this)) {
+    record->~TimeSpentRunningStatusRecord();
+    std::free(record);
+  }
+}
+
+__attribute__((cold)) uint64_t AsyncTask::getTimeSpentRunning(void) {
+  uint64_t result = 0;
+
+  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
+    for (auto record : status.records()) {
+      if (auto timeRecord = dyn_cast<TimeSpentRunningStatusRecord>(record)) {
+        result = timeRecord->TimeSpentRunning;
+        break;
+      }
+    }
+  });
+
+  return result;
+}
+
+void AsyncTask::ranForNanoseconds(uint64_t ns) {
+  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
+    for (auto record : status.records()) {
+      if (auto timeRecord = dyn_cast<TimeSpentRunningStatusRecord>(record)) {
+        timeRecord->TimeSpentRunning += ns;
+        break;
+      }
+    }
+  });
+
+  if (hasChildFragment()) {
+    if (auto parent = childFragment()->getParent()) {
+      parent->ranForNanoseconds(ns);
+    }
   }
 }
 
