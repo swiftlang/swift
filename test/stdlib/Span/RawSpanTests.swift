@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-stdlib-swift(-strict-memory-safety)
 
 // REQUIRES: executable_test
 
@@ -343,3 +343,67 @@ suite.test("RawSpan Sendability")
   let span = RawSpan(_unsafeBytes: buffer)
   send(span)
 }
+
+suite.test("RawSpan safe loading")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let array = ContiguousArray(repeating: UInt8.zero, count: 64)
+  let bytes = array.span.bytes
+
+  let u8: UInt8 = bytes.load()
+  expectEqual(u8, 0)
+
+  let i8: Int8 = bytes.load()
+  expectEqual(i8, 0)
+
+  let i64: Int64 = bytes.load(fromByteOffset: 37)
+  expectEqual(i64, 0)
+}
+
+suite.test("RawSpan safe loading bounds underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let array = ContiguousArray(repeating: UInt8.zero, count: 64)
+  let bytes = array.span.bytes
+
+  expectCrashLater()
+  _ = bytes.load(fromByteOffset: -1, as: Int64.self)
+}
+
+suite.test("RawSpan safe loading bounds overflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let array = ContiguousArray(repeating: UInt8.zero, count: 64)
+  let bytes = array.span.bytes
+
+  expectCrashLater()
+  _ = bytes.load(fromByteOffset: 59, as: Int64.self)
+}
+
+//suite.test("Typed Span")
+//.require(.stdlib_6_2).code {
+//  guard #available(SwiftStdlib 6.2, *) else { return }
+//
+//  let array = ContiguousArray(repeating: UInt128.zero, count: 32)
+//  let bytes = array.span.bytes
+
+//  let u8 = Span<UInt8>(viewing: bytes)
+//  expectEqual(u8[0], 0)
+//
+//  let i8 = Span<Int8>(viewing: bytes)
+//  expectEqual(i8[0], 0)
+
+//  let i8: Int8 = bytes.load()
+//  expectEqual(i8, 0)
+//
+//  let i64: Int64 = bytes.load(fromByteOffset: 59)
+//  expectEqual(i64, 0)
+//
+//  expectCrashLater()
+//  _ = bytes.load(fromByteOffset: 509, as: Int64.self)
+//}
