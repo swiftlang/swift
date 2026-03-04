@@ -1984,6 +1984,11 @@ ERROR(objc_implementation_sendability_mismatch,none,
       "type %2 declared by the header",
       (ValueDecl *, Type, Type))
 
+ERROR(objc_implementation_ownership_mismatch,none,
+      "%kind0 has a parameter ownership modifier that does not match "
+      "the declaration in the header",
+      (ValueDecl *))
+
 ERROR(objc_implementation_required_attr_mismatch,none,
       "%kind0 should%select{ not|}2 be 'required' to match %kindonly1 declared "
       "by the header",
