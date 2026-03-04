@@ -864,3 +864,15 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 }
+
+#if !SPAN_COMPATIBILITY_STUB
+@available(SwiftStdlib 6.4, *)
+extension MutableSpan: BorrowingSequence where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  @inlinable
+  @lifetime(borrow self)
+  public func makeBorrowingIterator() -> SpanIterator<Element> {
+    SpanIterator(self.span)
+  }
+}
+#endif

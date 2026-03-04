@@ -19,8 +19,8 @@ extension NoncopyableInt: Equatable {
 // CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing32testNonCopyableBorrowingSequence3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
 func testNonCopyableBorrowingSequence(seq: borrowing Span<NoncopyableInt>) {
   // With borrowing feature enabled, we expect makeBorrowingIterator and nextSpan to be called
-  // CHECK: = function_ref @$ss4SpanVsRi_zrlE22_makeBorrowingIteratorAByxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @owned Span<τ_0_0>
-  // CHECK: = function_ref @$ss4SpanVsRi_zrlE05_nextA012maximumCountAByxGSi_tF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @lifetime(copy 1) @inout Span<τ_0_0>) -> @lifetime(borrow 1) @owned Span<τ_0_0>
+  // CHECK: = function_ref @$ss4SpanVsRi_zrlE21makeBorrowingIterators0aD0VyxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @out SpanIterator<τ_0_0>
+  // CHECK: = function_ref @$ss12SpanIteratorVsRi_zrlE04nextA012maximumCounts0A0VyxGSi_tF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @lifetime(copy 1) @inout SpanIterator<τ_0_0>) -> @lifetime(borrow address_for_deps 1) @owned Span<τ_0_0>
   // CHECK: [[IS_EMPTY_CHECK:%.*]] = function_ref @$ss4SpanVsRi_zrlE7isEmptySbvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> Bool
   // CHECK: [[IS_EMPTY_CALL:%.*]] = apply [[IS_EMPTY_CHECK]]
   // CHECK: [[NOT_EMPTY:%.*]] = function_ref @$sSb1nopyS2bFZ : $@convention(method) (Bool, @thin Bool.Type) -> Bool
@@ -40,8 +40,8 @@ func testNonCopyableBorrowingSequence(seq: borrowing Span<NoncopyableInt>) {
 // CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing29testCopyableBorrowingSequence3seqys4SpanVySiG_tF : $@convention(thin) (@guaranteed Span<Int>) -> () {
 func testCopyableBorrowingSequence(seq: borrowing Span<Int>) {
   // With borrowing feature enabled, we expect makeBorrowingIterator and nextSpan to be called
-  // CHECK: = function_ref @$ss4SpanVsRi_zrlE22_makeBorrowingIteratorAByxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @owned Span<τ_0_0>
-  // CHECK: = function_ref @$ss4SpanVsRi_zrlE05_nextA012maximumCountAByxGSi_tF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @lifetime(copy 1) @inout Span<τ_0_0>) -> @lifetime(borrow 1) @owned Span<τ_0_0>
+  // CHECK: = function_ref @$ss4SpanVsRi_zrlE21makeBorrowingIterators0aD0VyxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @out SpanIterator<τ_0_0>
+  // CHECK: = function_ref @$ss12SpanIteratorVsRi_zrlE04nextA012maximumCounts0A0VyxGSi_tF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @lifetime(copy 1) @inout SpanIterator<τ_0_0>) -> @lifetime(borrow address_for_deps 1) @owned Span<τ_0_0>
   // CHECK: [[IS_EMPTY_CHECK:%.*]] = function_ref @$ss4SpanVsRi_zrlE7isEmptySbvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> Bool
   // CHECK: [[IS_EMPTY_CALL:%.*]] = apply [[IS_EMPTY_CHECK]]
   // CHECK: [[NOT_EMPTY:%.*]] = function_ref @$sSb1nopyS2bFZ : $@convention(method) (Bool, @thin Bool.Type) -> Bool
@@ -122,8 +122,8 @@ func testBreakTargetBorrowingSequence() {
 func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
   // Test that synthesized code has correct source locations for the borrowing foreach loop.
   // The borrowing foreach desugars to:
-  //   let $x$generator = seq._makeBorrowingIterator()
-  //   while case let $span = $x$generator._nextSpan(maximumCount: Int.max),
+  //   let $x$generator = seq.makeBorrowingIterator()
+  //   while case let $span = $x$generator.nextSpan(maximumCount: Int.max),
   //      !$span.isEmpty {
   //       let $i = 0
   //       let $count = $span.count
@@ -137,11 +137,11 @@ func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
   //   }
 
   // _makeBorrowingIterator() function_ref should be at "for" keyword location (172:3)
-  // CHECK: [[MAKE_BORROWING_IT:%.*]] = function_ref @$ss4SpanVsRi_zrlE22_makeBorrowingIteratorAByxGyF {{.*}}, loc "{{.*}}":[[@LINE+31]]:3
+  // CHECK: [[MAKE_BORROWING_IT:%.*]] = function_ref @$ss4SpanVsRi_zrlE21makeBorrowingIterators0aD0VyxGyF {{.*}}, loc "{{.*}}":[[@LINE+31]]:3
   // CHECK: apply [[MAKE_BORROWING_IT]]{{.*}}, loc "{{.*}}":[[@LINE+30]]:18
 
   // _nextSpan() function_ref should be at "for" keyword location
-  // CHECK: [[NEXT_SPAN:%.*]] = function_ref @$ss4SpanVsRi_zrlE05_nextA012maximumCountAByxGSi_tF {{.*}}, loc "{{.*}}":[[@LINE+27]]:3
+  // CHECK: [[NEXT_SPAN:%.*]] = function_ref @$ss12SpanIteratorVsRi_zrlE04nextA012maximumCounts0A0VyxGSi_tF {{.*}}, loc "{{.*}}":[[@LINE+27]]:3
   // CHECK: apply [[NEXT_SPAN]]{{.*}}, loc "{{.*}}":[[@LINE+26]]:3
 
   // $span debug_value should be at "for" keyword location
