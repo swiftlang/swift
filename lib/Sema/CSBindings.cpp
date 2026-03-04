@@ -3118,10 +3118,15 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   // in certain positions. To handle this correctly, we must not attempt
   // a Void binding too soon in this situation. Handle it like a fallback
   // instead of a real subtype relationship, since it isn't one.
-  if (kind == AllowedBindingKind::Subtypes && type->isVoid()) {
-    auto subkind = CS.getImpliedResultConversionKind(constraint->getLocator());
-    if (subkind == ConstraintSystem::ImpliedResultConversionKind::ToVoid) {
-      kind = AllowedBindingKind::Fallback;
+  if (kind == AllowedBindingKind::Subtypes) {
+    if (TypeVar->getImpl().getLocator()->isLastElement<LocatorPathElt::ClosureResult>() ||
+        CS.getImpliedResultConversionKind(constraint->getLocator())
+          == ConstraintSystem::ImpliedResultConversionKind::ToVoid) {
+      auto objectTy = type->lookThroughAllOptionalTypes();
+      if (objectTy->isVoid()) {
+        kind = AllowedBindingKind::Fallback;
+        type = objectTy;
+      }
     }
   }
 
