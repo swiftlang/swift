@@ -12,7 +12,7 @@ import CustomBorrowingSequence
 var CxxBorrowingSequenceTestSuite = TestSuite("CxxSequence")
 
 CxxBorrowingSequenceTestSuite.test("SimpleNonCopyableSequence as Swift.BorrowingSequence") {
-  guard #available(SwiftStdlib 6.3, *) else { return }
+  guard #available(SwiftStdlib 6.4, *) else { return }
 
   let seq = SimpleNonCopyableSequence()
   let arr : [Int32] = [2, 3, 4, 5]
@@ -31,7 +31,7 @@ CxxBorrowingSequenceTestSuite.test("SimpleNonCopyableSequence as Swift.Borrowing
 }
 
 CxxBorrowingSequenceTestSuite.test("SimpleNonCopArrayWrapper as Swift.BorrowingSequence") {
-  guard #available(SwiftStdlib 6.3, *) else { return }
+  guard #available(SwiftStdlib 6.4, *) else { return }
   let seq = SimpleNonCopArrayWrapper()
   let arr : [Int32] = [10, 20, 30, 40, 50]
 
@@ -49,7 +49,7 @@ CxxBorrowingSequenceTestSuite.test("SimpleNonCopArrayWrapper as Swift.BorrowingS
 }
 
 CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.BorrowingSequence") {
-  guard #available(SwiftStdlib 6.3, *) else { return }
+  guard #available(SwiftStdlib 6.4, *) else { return }
   let seq = ContiguousNonCopyableSequence()
   let arr : [Int32] = [10, 20, 30, 40, 50]
 
@@ -71,7 +71,7 @@ CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.Borro
 }
 
 CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.BorrowingSequence, with maximumCount") {
-  guard #available(SwiftStdlib 6.3, *) else { return }
+  guard #available(SwiftStdlib 6.4, *) else { return }
   let seq = ContiguousNonCopyableSequence()
   let arr : [Int32] = [10, 20, 30, 40, 50]
 
