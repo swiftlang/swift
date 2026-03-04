@@ -35,6 +35,13 @@ public protocol P {
 nonisolated public protocol Q: Sendable {
 }
 
+// CHECK: @_Concurrency::MainActor @preconcurrency public protocol IsolatedProto<T> {
+// CHECK:   associatedtype T
+// CHECK: }
+public protocol IsolatedProto<T> {
+  associatedtype T
+}
+
 // CHECK: @_Concurrency::MainActor @preconcurrency public struct S : A::P {
 public struct S: P {
   // CHECK: @_Concurrency::MainActor @preconcurrency public enum E : Swift::String {
@@ -60,8 +67,22 @@ public struct S: P {
     public init() {}
   }
   // CHECK: }
+
+  // CHECK: @_Concurrency::MainActor @preconcurrency public subscript(x: Swift::Int) -> Swift::Int {
+  public subscript(x: Int) -> Int {
+    // CHECK: get
+    get { x }
+    // CHECK: set
+    set { }
+  }
+  // CHECK: }
 }
 // CHECK: }
+
+// CHECK: @_Concurrency::MainActor @preconcurrency public func opaqueTest() -> some A::P
+public func opaqueTest() -> some P {
+  S()
+}
 
 // CHECK: public struct R : A::Q {
 public struct R: Q {
