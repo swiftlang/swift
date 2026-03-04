@@ -301,6 +301,7 @@ Func UnsafePointer.deallocate() has generic signature change from <Pointee> to <
 Func UnsafeRawBufferPointer.bindMemory(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeRawPointer.assumingMemoryBound(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeRawPointer.bindMemory(to:capacity:) has generic signature change from <T> to <T where T : ~Copyable>
+Func UnsafeRawPointer.load(fromByteOffset:as:) has generic signature change from <T> to <T where T : ~Escapable>
 Func swap(_:_:) has generic signature change from <T> to <T where T : ~Copyable>
 Func withExtendedLifetime(_:_:) has parameter 0 changing from Default to Shared
 Func withUnsafeBytes(of:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
