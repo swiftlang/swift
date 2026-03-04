@@ -89,6 +89,48 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
       addDefault(constraint);
   }
 
+  if (CS.getASTContext().TypeCheckerOpts.SolverEnableBindingOptimizations &&
+      !CS.shouldAttemptFixes() &&
+      Info.SupertypeOf.empty() &&
+      Info.SupertypeDelay.empty() &&
+      Info.AdjacentVars.empty() &&
+      !isDelayed()) {
+    unsigned count = 0;
+    std::optional<PotentialBinding> promoteBinding;
+
+    for (const auto binding : Bindings) {
+      if (binding.Kind == AllowedBindingKind::Supertypes) {
+        ++count;
+
+        if (llvm::all_of(Protocols, [&](ProtocolDecl *proto) {
+          return CS.lookupConformance(binding.BindingType, proto);
+        })) {
+          promoteBinding = binding;
+        }
+      }
+    }
+
+    if (count == 1 && promoteBinding.has_value()) {
+      promoteBinding->Kind = AllowedBindingKind::Exact;
+      addBinding(*promoteBinding);
+
+      // If this is a type variable representing closure result,
+      // which is on the right-side of some relational constraint
+      // let's have it try `Void` as well because there is an
+      // implicit conversion `() -> T` to `() -> Void` and this
+      // helps to avoid creating a thunk to support it.
+      // Avoid doing this is we already have a hole binding since
+      // introducing Void will just cause local solution ambiguities.
+      auto *locator = TypeVar->getImpl().getLocator();
+      if (locator->isLastElement<LocatorPathElt::ClosureResult>() &&
+          !promoteBinding->BindingType->isPlaceholder()) {
+        auto voidType = CS.getASTContext().TheEmptyTupleType;
+        addBinding(promoteBinding->withSameSource(
+            voidType, AllowedBindingKind::Fallback));
+      }
+    }
+  }
+
   ASSERT(!IsDirty);
 }
 

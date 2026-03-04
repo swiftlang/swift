@@ -342,3 +342,21 @@ func testClosureSendableDependence(_ x: NonSendable, _ fn: @Sendable () -> Void)
   func foo<T>(_ x: T, _ y: T) {}
   foo(GenericE.a.foo, { (x, 0).1 })
 }
+
+do {
+  struct Test {
+    static func fn() {}
+    static func otherFn() {}
+  }
+
+  // This shouldn't be ambiguous (@Sendable version should be preferred)
+  func fnRet(cond: Bool) -> () -> Void {
+    cond ? Test.fn : Test.otherFn
+  }
+
+  func forward<T>(_: T) -> T {
+  }
+
+  // This shouldn't be ambiguous (@Sendable version should be preferred)
+  let _: () -> Void = forward(Test.fn)
+}
