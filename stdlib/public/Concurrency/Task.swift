@@ -1159,12 +1159,13 @@ extension Task where Failure == Error {
 
 #if _runtime(_ObjC)
 
-private enum RunTaskForBridgedAsyncMethodMode: Int {
-  case None = 0
+@usableFromInline
+internal enum RunTaskForBridgedAsyncMethodMode: Int {
+  case legacy = 0
   case _reserved_TaggedPointer = 0x1
   case _reserved_TaggedPointer2 = 0x2
   case _reserved_TaggedPointer3 = 0x4
-  case Immediate = 0x8
+  case immediate = 0x8
 }
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -1176,7 +1177,7 @@ private enum RunTaskForBridgedAsyncMethodMode: Int {
 internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owned @Sendable @escaping () async -> Void) {
 #if compiler(>=5.6)
   if #available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *),
-    _swift_task_RunTaskForBridgedAsyncMethodMode() & RunTaskForBridgedAsyncMethodMode.Immediate.rawValue > 0 {
+    (_swift_task_RunTaskForBridgedAsyncMethodMode() & RunTaskForBridgedAsyncMethodMode.immediate.rawValue) > 0 {
     Task.immediate(operation: body)
   } else {
     Task(operation: body)

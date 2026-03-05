@@ -18,8 +18,6 @@
 #include "swift/Runtime/Concurrency.h"
 #include <atomic>
 #include <new>
-
-#include "../../../include/swift/Runtime/Concurrency.h"
 #if __has_feature(ptrauth_calls)
 #include <ptrauth.h>
 #endif
@@ -390,6 +388,8 @@ enum IsCurrentExecutorCheckMode : unsigned {
 namespace {
 using SwiftTaskIsCurrentExecutorOptions =
     OptionSet<swift_task_is_current_executor_flag>;
+using SwiftBridgedAsyncMethodOptions =
+    OptionSet<swift_task_run_task_for_bridged_async_method_flag>;
 }
 
 static void _swift_task_debug_dumpIsCurrentExecutorFlags(
@@ -416,8 +416,8 @@ static void _swift_task_debug_dumpBridgedAsyncMethodModeFlags(
     return;
   }
 
-  auto options = SwiftTaskIsCurrentExecutorOptions(flags);
-  if (options.contains(IsCurrentTaskExecutorFlag_Assert))
+  auto options = SwiftBridgedAsyncMethodOptions(flags);
+  if (options.contains(BridgedAsyncMethodFlag_TaskImmediate))
     SWIFT_TASK_DEBUG_LOG("%s swift_task_run_task_for_bridged_async_method_flag::%s",
                          hint, "TaskImmediate");
 }
