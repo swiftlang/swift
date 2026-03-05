@@ -23,7 +23,7 @@ func useEmAll(_ model: CCMagnetismModel) {
 // CHECK: function_ref @$sSo19CCRefrigeratorCloneySo0A3RefaSgADFTo : $@convention(c) (Optional<CCRefrigerator>) -> @autoreleased Optional<CCRefrigerator>
   let clone = CCRefrigeratorClone(managedFridge)
 
-// CHECK: function_ref @$sSo21CCRefrigeratorDestroyyySo0A3RefaSgFTo : $@convention(c) (@owned Optional<CCRefrigerator>) -> ()
+// CHECK: function_ref @$sSo21CCRefrigeratorDestroyyySo0A3RefaSgnFTo : $@convention(c) (@owned Optional<CCRefrigerator>) -> ()
   CCRefrigeratorDestroy(clone)
 
 // CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.refrigerator!foreign : (CCMagnetismModel) -> () -> Unmanaged<CCRefrigerator>?, $@convention(objc_method) (CCMagnetismModel) -> @unowned_inner_pointer Optional<Unmanaged<CCRefrigerator>>
@@ -41,7 +41,7 @@ func useEmAll(_ model: CCMagnetismModel) {
 // CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.setRefrigerator!foreign : (CCMagnetismModel) -> (CCRefrigerator?) -> (), $@convention(objc_method) (Optional<CCRefrigerator>, CCMagnetismModel) -> ()
   model.setRefrigerator(copy)
 
-// CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.giveRefrigerator!foreign : (CCMagnetismModel) -> (CCRefrigerator?) -> (), $@convention(objc_method) (@owned Optional<CCRefrigerator>, CCMagnetismModel) -> ()
+// CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.giveRefrigerator!foreign : (CCMagnetismModel) -> (consuming CCRefrigerator?) -> (), $@convention(objc_method) (@owned Optional<CCRefrigerator>, CCMagnetismModel) -> ()
   model.giveRefrigerator(copy)
 
   // rdar://16846555
