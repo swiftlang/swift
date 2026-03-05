@@ -63,9 +63,19 @@ func testReadMutateAccessors() {
   }
 }
 
+func testStaticMethod(
+  inPlace message: inout MutableRawSpan,
+  tag: RawSpan) {
+  GCM.open(inPlace: &message, tag: tag)
+  let propagatedMessage = GCM.propagate(message: message)
+  message = propagatedMessage
+}
+
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence10BufferViewVyACSW_SitcfC : $@convention(method) (UnsafeRawBufferPointer, Int, @thin BufferView.Type) -> @lifetime(borrow 0) @owned BufferView
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence6deriveyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> @lifetime(copy 0) @owned BufferView
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnF : $@convention(thin) (@owned BufferView) -> @lifetime(copy 0) @owned BufferView
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence15borrowAndCreateyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> @lifetime(copy 0) @owned BufferView
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence9ContainerV4viewAA10BufferViewVvg : $@convention(method) (@guaranteed Container) -> @lifetime(borrow 0) @owned BufferView
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence7WrapperV4viewAA10BufferViewVvr : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed BufferView
+// CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence3GCMV4open7inPlace3tagys14MutableRawSpanVz_s0kL0VtFZ : $@convention(method) (@lifetime(copy 0) @inout MutableRawSpan, @guaranteed RawSpan, @thin GCM.Type) -> ()
+// CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence3GCMV9propagate7messages14MutableRawSpanVAGn_tFZ : $@convention(method) (@owned MutableRawSpan, @thin GCM.Type) -> @lifetime(copy 0) @owned MutableRawSpan
