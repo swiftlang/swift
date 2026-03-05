@@ -3824,7 +3824,21 @@ extension DecodingError: CustomDebugStringConvertible {
       case .typeMismatch(let expectedType, let context):
         ("DecodingError.typeMismatch: expected value of type \(expectedType)", context)
       case .valueNotFound(let expectedType, let context):
-        ("DecodingError.valueNotFound: Expected value of type \(expectedType) but found null instead", context)
+        // Note: the value can be not-found for multiple reasons. Since we do
+        // not know the reason here, it is up to debug description that is 
+        // provided to the decoding context to provide more information.
+        // 
+        // The reasons that a value was not found may include:
+        // - Keyed decoding container: the value at the given key was null.
+        // - Unkeyed decoding container: we reached the end of the container
+        //   without finding the expected value.
+        //
+        // The doc comment for valueNotFound explicitly mentions that it
+        // is used when a null value is found where a non-optional value is
+        // expected. But in practice, for example in Foundation's JSONDecoder,
+        // it is also used in the unkeyed decoding container scenario mentioned
+        // above.
+        ("DecodingError.valueNotFound: Expected value of type \(expectedType)", context)
       case .keyNotFound(let expectedKey, let context):
         ("DecodingError.keyNotFound: Key '\(expectedKey._errorPresentationDescription())' not found in keyed decoding container", context)
       case .dataCorrupted(let context):
