@@ -1011,6 +1011,16 @@ namespace {
 
       {
         auto *requirement = cast<AbstractFunctionDecl>(func.getDecl());
+        // Check if it's a computed property accessor with a distributed thunk
+        if (auto *accessor = dyn_cast<AccessorDecl>(requirement)) {
+          auto *storage = accessor->getStorage();
+          if (auto *distributedThunk = storage->getDistributedThunk()) {
+            // This is an accessor with a distributed thunk, use the
+            // thunk when emitting distributed target accessor
+            requirement = distributedThunk;
+          }
+        }
+
         if (requirement->isDistributedThunk()) {
           // when thunk, because in protocol we want access of for the thunk
           IGM.emitDistributedTargetAccessor(requirement);
