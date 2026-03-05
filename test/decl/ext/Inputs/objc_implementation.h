@@ -160,6 +160,14 @@
 
 @end
 
+@interface ObjCClass (OwnershipTests)
+
+- (void)consumingMismatchMethod:(id)param;
+- (void)consumingMismatchMethod2:(__attribute__((ns_consumed)) id)param;
+- (void)consumingMethod:(__attribute__((ns_consumed)) id)param;
+
+@end
+
 @interface ObjCClass (TypeMatchOptionality)
 
 - (nullable id)nullableResultAndArg:(nullable id)arg;

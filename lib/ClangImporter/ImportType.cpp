@@ -2550,6 +2550,10 @@ ClangImporter::Implementation::importParameterType(
   bool isConsuming = false;
   bool isParamTypeImplicitlyUnwrapped = false;
 
+  if (param->hasAttr<clang::NSConsumedAttr>() ||
+      param->hasAttr<clang::CFConsumedAttr>())
+    isConsuming = true;
+
   if (paramIsCompletionHandler &&
       isSendableInferenceOnCompletionHandlerParameterAllowed(dc, parent)) {
     attrs |= ImportTypeAttr::DefaultsToSendable;
