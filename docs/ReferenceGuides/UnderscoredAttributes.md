@@ -614,7 +614,7 @@ func test(actor: isolated (any Actor)) {
 
 The attribute takes an optional modifier '`always`', which changes this behavior 
 and *always* captures the enclosing isolated context, rather than forcing developers
-to perform the explicit capture themselfes:
+to perform the explicit capture themselves:
 
 ```swift
 func test(actor: isolated (any Actor)) {
