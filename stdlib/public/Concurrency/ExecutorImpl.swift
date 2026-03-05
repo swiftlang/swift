@@ -24,12 +24,8 @@ import Swift
 @_silgen_name("swift_task_asyncMainDrainQueueImpl")
 internal func drainMainQueue() {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  if #available(StdlibDeploymentTarget 6.3, *) {
-    try! MainActor.executor.run()
-    _exit(result: 0)
-  } else {
-    fatalError("this should never happen")
-  }
+  try! MainActor.executor.run()
+  _exit(result: 0)
   #else
   fatalError("swift_task_asyncMainDrainQueue() not supported with task-to-thread")
   #endif
@@ -41,36 +37,24 @@ internal func donateToGlobalExecutor(
   condition: @convention(c) (_ ctx: UnsafeMutableRawPointer) -> CBool,
   context: UnsafeMutableRawPointer
 ) {
-  if #available(StdlibDeploymentTarget 6.3, *) {
-    if let runnableExecutor = Task.defaultExecutor as? RunLoopExecutor {
-      try! runnableExecutor.runUntil { unsafe Bool(condition(context)) }
-    } else {
-      fatalError("Global executor does not support thread donation")
-    }
+  if let runnableExecutor = Task.defaultExecutor as? RunLoopExecutor {
+    try! runnableExecutor.runUntil { unsafe Bool(condition(context)) }
   } else {
-    fatalError("this should never happen")
+    fatalError("Global executor does not support thread donation")
   }
 }
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_getMainExecutorImpl")
 internal func getMainExecutor() -> UnownedSerialExecutor {
-  if #available(StdlibDeploymentTarget 6.3, *) {
-    return unsafe _getMainExecutorAsSerialExecutor()
-  } else {
-    fatalError("this should never happen")
-  }
+  return unsafe _getMainExecutorAsSerialExecutor()
 }
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueMainExecutorImpl")
 internal func enqueueOnMainExecutor(job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  if #available(StdlibDeploymentTarget 6.3, *) {
-    MainActor.executor.enqueue(unownedJob)
-  } else {
-    fatalError("this should never happen")
-  }
+  MainActor.executor.enqueue(unownedJob)
   #else
   fatalError("swift_task_enqueueMainExecutor() not supported for task-to-thread")
   #endif
@@ -79,11 +63,7 @@ internal func enqueueOnMainExecutor(job unownedJob: UnownedJob) {
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueGlobalImpl")
 internal func enqueueOnGlobalExecutor(job unownedJob: UnownedJob) {
-  if #available(StdlibDeploymentTarget 6.3, *) {
-    Task.defaultExecutor.enqueue(unownedJob)
-  } else {
-    fatalError("this should never happen")
-  }
+  Task.defaultExecutor.enqueue(unownedJob)
 }
 
 #if !$Embedded
@@ -92,13 +72,9 @@ internal func enqueueOnGlobalExecutor(job unownedJob: UnownedJob) {
 internal func enqueueOnGlobalExecutor(delay: CUnsignedLongLong,
                                       job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  if #available(StdlibDeploymentTarget 6.3, *) {
-    Task.defaultExecutor.asSchedulingExecutor!.enqueue(ExecutorJob(unownedJob),
-                                                       after: .nanoseconds(delay),
-                                                       clock: .continuous)
-  } else {
-    fatalError("this should never happen")
-  }
+  Task.defaultExecutor.asSchedulingExecutor!.enqueue(ExecutorJob(unownedJob),
+                                                     after: .nanoseconds(delay),
+                                                     clock: .continuous)
   #else
   fatalError("swift_task_enqueueGlobalWithDelay() not supported for task-to-thread")
   #endif
@@ -115,27 +91,23 @@ internal func enqueueOnGlobalExecutor(seconds: CLongLong,
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   let delay = Duration.seconds(seconds) + Duration.nanoseconds(nanoseconds)
   let leeway = Duration.seconds(leewaySeconds) + Duration.nanoseconds(leewayNanoseconds)
-  if #available(StdlibDeploymentTarget 6.3, *) {
-    switch clock {
-      case _ClockID.suspending.rawValue:
-        Task.defaultExecutor.asSchedulingExecutor!.enqueue(
-          ExecutorJob(unownedJob),
-          after: delay,
-          tolerance: leeway,
-          clock: .suspending
-        )
-      case _ClockID.continuous.rawValue:
-        Task.defaultExecutor.asSchedulingExecutor!.enqueue(
-          ExecutorJob(unownedJob),
-          after: delay,
-          tolerance: leeway,
-          clock: .continuous
-        )
-      default:
-        fatalError("Unknown clock ID \(clock)")
-    }
-  } else {
-    fatalError("this should never happen")
+  switch clock {
+    case _ClockID.suspending.rawValue:
+      Task.defaultExecutor.asSchedulingExecutor!.enqueue(
+        ExecutorJob(unownedJob),
+        after: delay,
+        tolerance: leeway,
+        clock: .suspending
+      )
+    case _ClockID.continuous.rawValue:
+      Task.defaultExecutor.asSchedulingExecutor!.enqueue(
+        ExecutorJob(unownedJob),
+        after: delay,
+        tolerance: leeway,
+        clock: .continuous
+      )
+    default:
+      fatalError("Unknown clock ID \(clock)")
   }
   #else
   fatalError("swift_task_enqueueGlobalWithDeadline() not supported for task-to-thread")
