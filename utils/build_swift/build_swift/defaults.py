@@ -88,12 +88,13 @@ def _system_memory() -> int | None:
             with open("/proc/meminfo", "r") as file:
                 meminfo_data = file.read()
                 # Line to match "MemTotal: 239402943 kB"
-                matched = re.search(r"^MemTotal:\s+(\d+)\s+(\w*)?", meminfo_data)
+                matched = re.search(r"^MemTotal:\s+(\d+)\s*(\w*)?", meminfo_data)
                 if not matched:
                     return None
                 total_memory, meminfo_unit = matched.groups()
                 total_memory = int(total_memory)
                 unit_multiplier = {
+                    "b": 1,
                     "kb": 1024,
                     "mb": 1024 * 1024,
                     "gb": 1024 * 1024 * 1024,
