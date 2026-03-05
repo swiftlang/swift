@@ -4,6 +4,7 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++14)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++17)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20 -enable-experimental-feature BorrowingForLoop -DBORROWING_ITERATOR_PROTOCOL)
 
 // Also test this with a bridging header instead of the StdSet module.
 // RUN: %empty-directory(%t2)
@@ -13,6 +14,7 @@
 // RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-set-bridging-header.h -cxx-interoperability-mode=upcoming-swift)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_BorrowingForLoop
 //
 // Enable this everywhere once we have a solution for modularizing other C++ stdlibs: rdar://87654514
 // REQUIRES: OS=macosx || OS=linux-gnu
@@ -26,6 +28,12 @@ import CxxStdlib
 import Cxx
 
 var StdSetTestSuite = TestSuite("StdSet")
+
+// FIXME https://github.com/swiftlang/swift/issues/87260
+// Currently, `Sequence` doesn't conform to `BorrowingSequence`, which means that types like `Range` don't
+// automatically conform to `BorrowingSequence`. When we enable the experimental feature `BorrowingForLoop`,
+// all for-in loops use the new borrowing iterators, which means that all range iterations will be invalid.
+#if !BORROWING_ITERATOR_PROTOCOL
 
 StdSetTestSuite.test("iterate over Swift.Array") {
     let s = Array(initSetOfCInt())
@@ -182,5 +190,43 @@ StdSetTestSuite.test("UnorderedSetOfCInt.remove") {
     expectEqual(s.remove(2), nil)
     expectFalse(s.contains(2))
 }
+
+#else // !BORROWING_ITERATOR_PROTOCOL
+
+StdSetTestSuite.test("SetOfCInt Borrowing Iterators").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+
+    let s = initSetOfCInt()
+    expectTrue(s.contains(1))
+    expectFalse(s.contains(2))
+    expectTrue(s.contains(3))
+
+    let arr : [Int32] = [1, 3, 5]
+    var counter = 0
+    for el in s {
+        expectEqual(el, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+}
+
+StdSetTestSuite.test("MultisetOfCInt Borrowing Iterators").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+
+    let s = initMultisetOfCInt()
+    expectTrue(s.contains(2))
+    expectFalse(s.contains(3))
+    expectTrue(s.contains(4))
+
+    let arr : [Int32] = [2, 2, 4, 6]
+    var counter = 0
+    for el in s {
+        expectEqual(el, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 4)
+}
+
+#endif // !BORROWING_ITERATOR_PROTOCOL
 
 runAllTests()
