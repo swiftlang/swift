@@ -5,7 +5,8 @@
 // RUN: %target-build-swift -emit-library -c %S/Inputs/library.swift -o %t/linker/library.o
 // RUN: %target-build-swift %S/main.swift %t/linker/library.o -I %t/linker/ -L %t/linker/ -o %t/linker/main
 
-// RUN: %target-build-swift -g -emit-module -c %S/Inputs/library.swift -o %t/linker/library.o
+/// Provide explicit module output path so the module wrap job won't create the file name collision with output object file.
+// RUN: %target-build-swift -g -emit-module -c %S/Inputs/library.swift -o %t/linker/library.o -emit-module-path %t/linker/Lib.swiftmodule
 // RUN: %target-build-swift -g -emit-library -c %S/Inputs/library.swift -o %t/linker/library.o
 // RUN: %target-build-swift -g %S/main.swift %t/linker/library.o -I %t/linker/ -L %t/linker/ -o %t/linker/main
 

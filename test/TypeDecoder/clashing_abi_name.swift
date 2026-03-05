@@ -6,7 +6,7 @@
 // RUN: cd %t
 
 // RUN: %target-build-swift -emit-library -emit-module -parse-as-library -module-name Foo -module-abi-name Bar -g %t/Foo.swift 
-// RUN: %target-build-swift -emit-executable -I %t -L %t -lFoo -g -emit-module -module-name Bar -module-abi-name Bar %t/Bar.swift
+// RUN: %target-build-swift -emit-executable -I %t -L %t -lFoo -g -emit-module -module-name Bar -module-abi-name Bar %t/Bar.swift -o %t/Bar
 
 
 // RUN: sed -ne '/\/\/ *DEMANGLE-TYPE: /s/\/\/ *DEMANGLE-TYPE: *//p' < %s > %t/input
