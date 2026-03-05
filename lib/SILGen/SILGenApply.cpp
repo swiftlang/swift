@@ -3058,33 +3058,36 @@ static void emitDelayedArguments(SILGenFunction &SGF,
                          MutableArrayRef<SmallVector<ManagedValue, 4>> args) {
   assert(!delayedArgs.empty());
 
-  // If any of the delayed arguments are isolated default arguments,
-  // argument evaluation happens in the following order:
+  // Argument evaluation happens in the following order*:
   //
-  //   1. Left-to-right evalution of explicit r-value arguments
+  //   1. Left-to-right evaluation of explicit r-value arguments
   //   2. Left-to-right evaluation of formal access arguments
-  //   3. Hop to the callee's isolation domain
+  //   3. Hop to the callee's isolation domain (if needed)
   //   4. Left-to-right evaluation of default arguments
+  //
+  //  * One known exception to this is that implicitly-opened r-value existentials
+  //  will 'jump the queue' and be evaluated before 'regular' r-value arguments.
+  //  https://github.com/swiftlang/swift/issues/84678
+  //
+  // Default arguments are collected during the first pass over the delayed
+  // arguments, and emitted separately after a potential hop to the callee's
+  // isolation domain, which is needed for isolated default arguments.
 
-  // So, if any delayed arguments are isolated, all default arguments
-  // are collected during the first pass over the delayed arguments,
-  // and emitted separately after a hop to the callee's isolation domain.
-
+  // The isolation to use if the default arguments require it. This will be
+  // calculated as the `delayedArgs` are processed.
   std::optional<ActorIsolation> defaultArgIsolation;
-  for (auto &arg : delayedArgs) {
-    if (auto isolation = arg.getIsolation()) {
-      defaultArgIsolation = isolation;
-      break;
-    }
-  }
 
+  // The default arguments to be emitted after other kinds of delayed arguments.
   SmallVector<std::tuple<
-      /*delayedArgIt*/decltype(delayedArgs)::iterator,
-      /*siteArgsIt*/decltype(args)::iterator,
-      /*index*/size_t>, 2> isolatedArgs;
+                  /*delayedArgIt*/ decltype(delayedArgs)::iterator,
+                  /*siteArgsIt*/ decltype(args)::iterator,
+                  /*index*/ size_t>,
+              2>
+      defaultArgs;
 
+  // Holds inout arguments that were emitted. Currently used to detect 'simple'
+  // cases of storage aliasing.
   SmallVector<std::pair<SILValue, SILLocation>, 4> emittedInoutArgs;
-  auto delayedNext = delayedArgs.begin();
 
   // The assumption we make is that 'args' and 'delayedArgs' were built
   // up in parallel, with empty spots being dropped into 'args'
@@ -3096,7 +3099,9 @@ static void emitDelayedArguments(SILGenFunction &SGF,
   // remove or add elements to fill in the actual argument values.
   //
   // Note that this also begins the formal accesses in evaluation order.
-  for (auto argsIt = args.begin(); argsIt != args.end(); ++argsIt) {
+  for (auto [delayedNext, argsIt] =
+           std::tuple{delayedArgs.begin(), args.begin()};
+       argsIt != args.end(); ++argsIt) {
     auto &siteArgs = *argsIt;
     // NB: siteArgs.size() may change during iteration
     for (size_t i = 0; i < siteArgs.size(); ) {
@@ -3114,11 +3119,31 @@ static void emitDelayedArguments(SILGenFunction &SGF,
       assert(delayedNext != delayedArgs.end());
       auto &delayedArg = *delayedNext;
 
-      if (defaultArgIsolation && delayedArg.isDefaultArg()) {
-        isolatedArgs.push_back(std::make_tuple(delayedNext, argsIt, i));
+      // If we found a default argument, further delay it so it is emitted only
+      // after we've finished with formal accesses. This is done so that it is
+      // possible to make a call in which an implicitly opened existential is
+      // passed as a formal access parameter and the call contains default args
+      // that precede said parameter. e.g.
+      //
+      //  ```swift
+      //  let stream: any TextOuptputStream = ""
+      //  print("Hello, inout-implicitly-opened-existential!", to: &stream)
+      //  ```
+      //
+      // Additionally, this is done so that isolated default arguments will be
+      // evaluated in the correct isolation – an executor hop will be inserted
+      // before their emission if appropriate.
+      if (delayedArg.isDefaultArg()) {
+        // Record the argument for future emission.
+        defaultArgs.push_back(std::make_tuple(delayedNext, argsIt, i));
+
+        // Update our default argument isolation if necessary.
+        if (!defaultArgIsolation)
+          defaultArgIsolation = delayedArg.getIsolation();
+
         ++i;
         if (++delayedNext == delayedArgs.end()) {
-          goto done;
+          goto EmitDefaultArgs;
         } else {
           continue;
         }
@@ -3136,16 +3161,16 @@ static void emitDelayedArguments(SILGenFunction &SGF,
       }
 
       if (++delayedNext == delayedArgs.end())
-        goto done;
+        goto EmitDefaultArgs;
     }
   }
 
   llvm_unreachable("ran out of null arguments before we ran out of inouts");
 
-done:
+EmitDefaultArgs:
 
-  if (defaultArgIsolation) {
-    assert(!isolatedArgs.empty());
+  // TODO: verify the logic we want here
+  if (!defaultArgs.empty()) {
 
     // Only hop to the default arg isolation if the callee is async.
     // If we're in a synchronous function, the isolation has to match,
@@ -3158,8 +3183,8 @@ done:
     // do end up here for default argument generators and stored property
     // initializers. An alternative (and better) approach is to formally model
     // those generator functions as isolated.
-    if (SGF.F.isAsync()) {
-      auto &firstArg = *std::get<0>(isolatedArgs[0]);
+    if (defaultArgIsolation && SGF.F.isAsync()) {
+      auto &firstArg = *std::get<0>(defaultArgs[0]);
       auto loc = firstArg.getDefaultArgLoc();
 
       SILValue executor;
@@ -3187,7 +3212,7 @@ done:
       SGF.emitHopToTargetExecutor(loc, executor);
     }
 
-    // The index saved in isolatedArgs is the index where we're
+    // The index saved in deferredDefaultArgs is the index where we're
     // supposed to fill in the argument in siteArgs. It should point
     // to a single null element, which we will replace with zero or
     // more actual argument values. This replacement can invalidate
@@ -3199,11 +3224,11 @@ done:
     size_t indexAdjustment = 0;
     auto indexAdjustmentSite = args.begin();
 
-    for (auto &isolatedArg : isolatedArgs) {
-      auto &delayedArg = *std::get<0>(isolatedArg);
-      auto site = std::get<1>(isolatedArg);
+    for (auto &defaultArg : defaultArgs) {
+      auto &delayedArg = *std::get<0>(defaultArg);
+      auto site = std::get<1>(defaultArg);
       auto &siteArgs = *site;
-      size_t argIndex = std::get<2>(isolatedArg);
+      size_t argIndex = std::get<2>(defaultArg);
 
       // Apply the current index adjustment if we haven't changed
       // sites.
