@@ -233,8 +233,10 @@ public:
   explicit ReflectionContext(
       std::shared_ptr<MemoryReader> reader,
       remote::ExternalTypeRefCache *externalCache = nullptr,
-      reflection::DescriptorFinder *descriptorFinder = nullptr)
-      : super(std::move(reader), *this, externalCache, descriptorFinder) {}
+      reflection::DescriptorFinder *descriptorFinder = nullptr,
+      Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default)
+      : super(std::move(reader), *this, externalCache, descriptorFinder,
+              Flavor) {}
 
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;

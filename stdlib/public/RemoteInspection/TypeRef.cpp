@@ -1233,7 +1233,7 @@ std::optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
   auto global = Dem.createNode(Node::Kind::Global);
   global->addChild(node, Dem);
 
-  auto mangling = mangleNode(global, Mangle::ManglingFlavor::Default);
+  auto mangling = mangleNode(global, getManglingFlavor());
   if (!mangling.isSuccess())
     return {};
   return mangling.result();
@@ -1340,7 +1340,8 @@ public:
       parent = ThickenMetatype(Builder).visit(parent);
     }
     return BoundGenericTypeRef::create(Builder, BG->getMangledName(),
-                                       GenericParams, parent);
+                                       GenericParams, BG->getManglingFlavor(),
+                                       parent);
   }
 
   const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
@@ -1348,20 +1349,22 @@ public:
     for (auto Element : T->getElements())
       Elements.push_back(visit(Element));
     auto Labels = T->getLabels();
-    return TupleTypeRef::create(Builder, Elements, Labels);
+    return TupleTypeRef::create(Builder, Elements, Labels,
+                                T->getManglingFlavor());
   }
 
   const TypeRef *visitPackTypeRef(const PackTypeRef *P) {
     std::vector<const TypeRef *> Elements;
     for (auto Element : P->getElements())
       Elements.push_back(visit(Element));
-    return PackTypeRef::create(Builder, Elements);
+    return PackTypeRef::create(Builder, Elements, P->getManglingFlavor());
   }
 
   const TypeRef *visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
     auto *Pattern = visit(PE->getPattern());
     auto *Count = visit(PE->getCount());
-    return PackExpansionTypeRef::create(Builder, Pattern, Count);
+    return PackExpansionTypeRef::create(Builder, Pattern, Count,
+                                        PE->getManglingFlavor());
   }
 
   const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
@@ -1385,10 +1388,10 @@ public:
 
     auto SubstitutedResult = visit(F->getResult());
 
-    return FunctionTypeRef::create(Builder, SubstitutedParams,
-                                   SubstitutedResult, F->getFlags(), extFlags,
-                                   F->getDifferentiabilityKind(),
-                                   globalActorType, thrownErrorType);
+    return FunctionTypeRef::create(
+        Builder, SubstitutedParams, SubstitutedResult, F->getFlags(), extFlags,
+        F->getDifferentiabilityKind(), globalActorType, thrownErrorType,
+        F->getManglingFlavor());
   }
 
   const TypeRef *
@@ -1399,7 +1402,8 @@ public:
   const TypeRef *
   visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
     return ConstrainedExistentialTypeRef::create(Builder, CET->getBase(),
-                                                 CET->getRequirements());
+                                                 CET->getRequirements(),
+                                                 CET->getManglingFlavor());
   }
 
   const TypeRef *visitSymbolicExtendedExistentialTypeRef(
@@ -1409,7 +1413,8 @@ public:
 
   const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     return MetatypeTypeRef::create(Builder, visit(M->getInstanceType()),
-                                   /*WasAbstract=*/true);
+                                   /*WasAbstract=*/true,
+                                   M->getManglingFlavor());
   }
 
   const TypeRef *
@@ -1445,7 +1450,8 @@ public:
 #include "swift/AST/ReferenceStorage.def"
 
   const TypeRef *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
-    return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()));
+    return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()),
+                                 SB->getManglingFlavor());
   }
 
   const TypeRef *
@@ -1467,11 +1473,13 @@ public:
 
   const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
     return BuiltinFixedArrayTypeRef::create(Builder, visit(BA->getSizeType()),
-                                            visit(BA->getElementType()));
+                                            visit(BA->getElementType()),
+                                            BA->getManglingFlavor());
   }
 
   const TypeRef *visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
-    return BuiltinBorrowTypeRef::create(Builder, visit(BA->getReferentType()));
+    return BuiltinBorrowTypeRef::create(Builder, visit(BA->getReferentType()),
+                                        BA->getManglingFlavor());
   }
 };
 
@@ -1535,6 +1543,7 @@ public:
   const TypeRef *visitNominalTypeRef(const NominalTypeRef *N) {
     if (N->getParent())
       return NominalTypeRef::create(Builder, N->getMangledName(),
+                                    N->getManglingFlavor(),
                                     visit(N->getParent()));
     return N;
   }
@@ -1547,7 +1556,8 @@ public:
     for (auto Param : BG->getGenericParams())
       GenericParams.push_back(visit(Param));
     return BoundGenericTypeRef::create(Builder, BG->getMangledName(),
-                                       GenericParams, Parent);
+                                       GenericParams, BG->getManglingFlavor(),
+                                       Parent);
   }
 
   const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
@@ -1574,7 +1584,8 @@ public:
       return Elements[0];
     }
 
-    return TupleTypeRef::create(Builder, Elements, Labels);
+    return TupleTypeRef::create(Builder, Elements, Labels,
+                                T->getManglingFlavor());
   }
 
   const TypeRef *visitPackTypeRef(const PackTypeRef *P) {
@@ -1590,7 +1601,7 @@ public:
         Elements.push_back(visit(Element));
       }
     }
-    return PackTypeRef::create(Builder, Elements);
+    return PackTypeRef::create(Builder, Elements, P->getManglingFlavor());
   }
 
   const TypeRef *visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
@@ -1628,10 +1639,10 @@ public:
       // FIXME: fold Never / any Error to their canonical representations?
     }
 
-    return FunctionTypeRef::create(Builder, SubstitutedParams,
-                                   SubstitutedResult, flags, extFlags,
-                                   F->getDifferentiabilityKind(),
-                                   globalActorType, thrownErrorType);
+    return FunctionTypeRef::create(
+        Builder, SubstitutedParams, SubstitutedResult, flags, extFlags,
+        F->getDifferentiabilityKind(), globalActorType, thrownErrorType,
+        F->getManglingFlavor());
   }
 
   const TypeRef *
@@ -1651,7 +1662,8 @@ public:
     // represent the metatype at runtime as a value, even if the
     // metatype naturally has an empty representation.
     return MetatypeTypeRef::create(Builder, visit(M->getInstanceType()),
-                                   /*WasAbstract=*/true);
+                                   /*WasAbstract=*/true,
+                                   M->getManglingFlavor());
   }
 
   const TypeRef *
@@ -1694,8 +1706,8 @@ public:
         continue;
       constraints.emplace_back(*substReq);
     }
-    return ConstrainedExistentialTypeRef::create(Builder, CET->getBase(),
-                                                 constraints);
+    return ConstrainedExistentialTypeRef::create(
+        Builder, CET->getBase(), constraints, CET->getManglingFlavor());
   }
 
   const TypeRef *visitSymbolicExtendedExistentialTypeRef(
@@ -1716,7 +1728,8 @@ public:
       args.push_back(substArg);
     }
     return SymbolicExtendedExistentialTypeRef::create(
-        Builder, SEET->getProtocol(), reqs, args, SEET->getFlags());
+        Builder, SEET->getProtocol(), reqs, args, SEET->getFlags(),
+        SEET->getManglingFlavor());
   }
 
   const TypeRef *
@@ -1816,14 +1829,16 @@ public:
     return OP;
   }
 
-#define REF_STORAGE(Name, name, ...) \
+#define REF_STORAGE(Name, name, ...)                                           \
   const TypeRef *visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
-    return Name##StorageTypeRef::create(Builder, visit(US->getType())); \
+    return Name##StorageTypeRef::create(Builder, visit(US->getType()),         \
+                                        US->getManglingFlavor());              \
   }
 #include "swift/AST/ReferenceStorage.def"
 
   const TypeRef *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
-    return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()));
+    return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()),
+                                 SB->getManglingFlavor());
   }
 
   const TypeRef *
@@ -1843,9 +1858,9 @@ public:
 
     std::vector<llvm::ArrayRef<const TypeRef *>> newArgLists;
 
-    return OpaqueArchetypeTypeRef::create(Builder, O->getID(), O->getDescription(),
-                                          O->getOrdinal(),
-                                          newArgLists);
+    return OpaqueArchetypeTypeRef::create(Builder, O->getID(),
+                                          O->getDescription(), O->getOrdinal(),
+                                          newArgLists, O->getManglingFlavor());
   }
 
   const TypeRef *visitIntegerTypeRef(const IntegerTypeRef *I) {
@@ -1854,11 +1869,13 @@ public:
 
   const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
     return BuiltinFixedArrayTypeRef::create(Builder, visit(BA->getSizeType()),
-                                            visit(BA->getElementType()));
+                                            visit(BA->getElementType()),
+                                            BA->getManglingFlavor());
   }
 
   const TypeRef *visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
-    return BuiltinBorrowTypeRef::create(Builder, visit(BA->getReferentType()));
+    return BuiltinBorrowTypeRef::create(Builder, visit(BA->getReferentType()),
+                                        BA->getManglingFlavor());
   }
 };
 
