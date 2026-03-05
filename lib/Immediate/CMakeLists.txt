@@ -4,7 +4,6 @@ add_swift_host_library(swiftImmediate STATIC
   LLVM_LINK_COMPONENTS
     executionengine
     linker
-    mcjit
     orcjit
     orctargetprocess
     jitlink
