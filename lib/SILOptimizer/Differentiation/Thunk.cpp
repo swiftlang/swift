@@ -17,7 +17,10 @@
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
+
+#include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Differentiation/Common.h"
+#include "swift/SILOptimizer/Differentiation/TangentBuilder.h"
 
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Requirement.h"
