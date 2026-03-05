@@ -3,6 +3,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -71,18 +72,16 @@ checkForeignReferenceType(const clang::CXXRecordDecl *decl,
     }
 
     for (auto recBase : rec->bases()) {
-      auto *ty = recBase.getType()->getAs<clang::RecordType>();
-      if (!ty)
-        // inheriting from something that isn't a record?
+      auto *base = recBase.getType()->getAsCXXRecordDecl();
+      if (!base)
+        // It is possible to encounter clang::TemplateSpecializationType.
+        // In such cases, just bail and report this as an invalid value type
         return ForeignReferenceTypeInfo::Value(/*isValid=*/false);
 
-      auto *base = dyn_cast_or_null<clang::CXXRecordDecl>(
-          ty->getDecl()->getDefinition());
+      ASSERT(base->hasDefinition() && "base record should be complete");
+      base = base->getDefinition();
 
-      if (!base ||
-          (base->isDependentContext() && !base->isCurrentInstantiation(decl)))
-        // inheriting from a dependent type?
-        return ForeignReferenceTypeInfo::Value(/*isValid=*/false);
+      ASSERT(!base->isDependentContext() && "base should not be dependent");
 
       if (recBase.isVirtual()) {
         if (virtualBases.insert(base).second)
