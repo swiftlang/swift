@@ -536,20 +536,24 @@ public:
     // until the end of the function, so we store it inside ReadDataBuffer.
     // We do this so in both cases we can return a simple pointer.
     std::vector<MemoryReader::ReadBytesResult> ReadDataBuffer;
-    auto readData = [&](uint64_t Offset, uint64_t Size) -> const void * {
+    auto readFileData = [&](uint64_t FileOffset, uint64_t Size) -> const void * {
       if (FileBuffer.has_value()) {
         auto Buffer = FileBuffer.value();
-        if (Offset + Size > Buffer.allocatedSize())
+        if (FileOffset + Size > Buffer.allocatedSize())
           return nullptr;
-        return (const void *)((uint64_t)Buffer.base() + Offset);
+        return (const void *)((uint64_t)Buffer.base() + FileOffset);
       } else {
-        MemoryReader::ReadBytesResult Buf =
-            this->getReader().readBytes(ImageStart + Offset, Size);
-        if (!Buf)
-          return nullptr;
-        ReadDataBuffer.push_back(std::move(Buf));
-        return ReadDataBuffer.back().get();
+        return nullptr;
       }
+    };
+
+    auto readData = [&](uint64_t VirtualAddr, uint64_t Size) -> const void * {
+      MemoryReader::ReadBytesResult Buf =
+          this->getReader().readBytes(ImageStart + VirtualAddr, Size);
+      if (!Buf)
+        return nullptr;
+      ReadDataBuffer.push_back(std::move(Buf));
+      return ReadDataBuffer.back().get();
     };
 
     const void *Buf = readData(0, sizeof(typename T::Header));
@@ -619,7 +623,7 @@ public:
     typename T::Offset StrTabOffset = SecHdrStrTab->sh_offset;
     typename T::Size StrTabSize = SecHdrStrTab->sh_size;
 
-    auto StrTabBuf = readData(StrTabOffset, StrTabSize);
+    auto StrTabBuf = readFileData(StrTabOffset, StrTabSize);
     if (!StrTabBuf)
       return {};
     auto StrTab = reinterpret_cast<const char *>(StrTabBuf);
@@ -1121,7 +1125,8 @@ public:
   /// On success returns the ID of the newly registered Reflection Info.
   std::optional<uint32_t>
   addImage(RemoteAddress ImageStart,
-           llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
+           llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {},
+           std::optional<llvm::sys::MemoryBlock> FileBuffer = {}) {
     // Read the first few bytes to look for a magic header.
     auto Magic = this->getReader().readBytes(ImageStart, sizeof(uint32_t));
     if (!Magic)
@@ -1151,7 +1156,7 @@ public:
         && MagicBytes[1] == llvm::ELF::ElfMagic[1]
         && MagicBytes[2] == llvm::ELF::ElfMagic[2]
         && MagicBytes[3] == llvm::ELF::ElfMagic[3]) {
-      return readELF(ImageStart, std::optional<llvm::sys::MemoryBlock>(),
+      return readELF(ImageStart, FileBuffer,
                      PotentialModuleNames);
     }
 
