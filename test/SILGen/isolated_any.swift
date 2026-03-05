@@ -269,7 +269,7 @@ func testEraseAsyncNonIsolatedClosure() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test0A26EraseAsyncMainActorClosureyyF
 // CHECK:         // function_ref closure #1
-// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test0A26EraseAsyncMainActorClosureyyFyyYaYbcfU_ :
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test0A26EraseAsyncMainActorClosureyyFyyYaYbScMYccfU_ :
 // CHECK-NEXT:    [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[MAIN_ACTOR_SHARED_FN:%.*]] = function_ref @$sScM6sharedScMvgZ :

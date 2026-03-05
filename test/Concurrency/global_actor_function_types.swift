@@ -55,7 +55,7 @@ func testClosures(i: Int) async {
   let cl2 = { @SomeGlobalActor in
     await someSlowOperation()
   }
-  let _: Double = cl2 // expected-error{{cannot convert value of type '() async -> Int' to specified type 'Double'}}
+  let _: Double = cl2 // expected-error{{cannot convert value of type '@SomeGlobalActor () async -> Int' to specified type 'Double'}}
 
   let cl3 = { @SomeGlobalActor [i] in
     print(i + onSomeGlobalActor())
@@ -437,4 +437,22 @@ func testGlobalActorAutoclosure(_ x: HasMainActorFns) {
   takesMainActorFn(HasMainActorFns.staticFn)
   takesMainActorFn(HasMainActorFns.instanceFn(x))
   takesMainActorFn(x.instanceFn)
+}
+
+// rdar://169803154 - The constraint solver must honor an explicit global actor on
+// async closures, not just sync ones.  These should typecheck without errors or
+// actor-stripping warnings.
+func testAsyncMainActorClosurePreservesGlobalActor() {
+  // Sync @MainActor closure - always worked.
+  let _: @MainActor () -> Void = { @MainActor in }
+
+  // Async @MainActor closure - fixed by rdar://169803154.
+  let _: @MainActor () async -> Void = { @MainActor in }
+
+  // Explicitly annotated async @MainActor closure in Task.detached should compile
+  // cleanly; before the fix it would produce an unknown-pattern error because the
+  // constraint solver treated the closure as non-isolated despite the annotation.
+  _ = Task.detached { @MainActor in
+    await Task.yield()
+  }
 }
