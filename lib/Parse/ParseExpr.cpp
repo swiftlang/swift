@@ -63,7 +63,8 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
   }
 
   return parseExprSequence(Message, isExprBasic,
-                                /*forConditionalDirective*/false);
+                                /*forConditionalDirective*/false,
+                                /*isGenericArg*/false);
 }
 
 /// parseExprIs
@@ -190,7 +191,8 @@ ParserResult<Expr> Parser::parseExprArrow() {
 /// apply to everything to its right.
 ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
                                              bool isExprBasic,
-                                             bool isForConditionalDirective) {
+                                             bool isForConditionalDirective,
+                                             bool isGenericArgTypeExpr) {
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
   ParserStatus SequenceStatus;
@@ -201,7 +203,7 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
 
     // Parse a unary expression.
     ParserResult<Expr> Primary =
-      parseExprSequenceElement(Message, isExprBasic);
+      parseExprSequenceElement(Message, isExprBasic, isGenericArgTypeExpr);
     SequenceStatus |= Primary;
 
     if (SequenceStatus.hasCodeCompletion() && CodeCompletionCallbacks)
@@ -221,7 +223,9 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
 
     if (isForConditionalDirective && Tok.isAtStartOfLine())
       break;
-    
+
+    if (isGenericArgTypeExpr && isGenericArgumentExpressionDelimiter())
+      break;
 parse_operator:
     switch (Tok.getKind()) {
     case tok::oper_binary_spaced:
@@ -256,7 +260,8 @@ parse_operator:
       
       // Parse the middle expression of the ternary.
       ParserResult<Expr> middle = parseExprSequence(
-          diag::expected_expr_after_ternary_question, isExprBasic);
+          diag::expected_expr_after_ternary_question, isExprBasic,
+                                                    false, false);
       SequenceStatus |= middle;
       ParserStatus Status = middle;
       if (middle.isNull())
@@ -393,7 +398,8 @@ done:
 /// 'try' is not actually allowed at an arbitrary position of a
 /// sequence, but this isn't enforced until sequence-folding.
 ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
-                                                    bool isExprBasic) {
+                                                    bool isExprBasic,
+                                                    bool isGenericArgTypeExpr) {
   // Check whether the user mistyped "async" for "await", but only in cases
   // where we are sure that "async" would be ill-formed as an identifier.
   bool isReplaceableAsync = Tok.isContextualKeyword("async") &&
@@ -408,7 +414,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     Tok.setKind(tok::contextual_keyword);
     SourceLoc awaitLoc = consumeToken();
     ParserResult<Expr> sub =
-      parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);
+      parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic, isGenericArgTypeExpr);
     if (!sub.hasCodeCompletion() && !sub.isNull()) {
       if (auto anyTry = dyn_cast<AnyTryExpr>(sub.get())) {
         // "try" must precede "await".
@@ -436,7 +442,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     Tok.setKind(tok::contextual_keyword);
     SourceLoc unsafeLoc = consumeToken();
     ParserResult<Expr> sub =
-      parseExprSequenceElement(diag::expected_expr_after_unsafe, isExprBasic);
+      parseExprSequenceElement(diag::expected_expr_after_unsafe, isExprBasic, isGenericArgTypeExpr);
     if (!sub.hasCodeCompletion() && !sub.isNull()) {
       sub = makeParserResult(new (Context) UnsafeExpr(unsafeLoc, sub.get()));
     }
@@ -452,7 +458,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 
     SourceLoc consumeLoc = consumeToken();
     ParserResult<Expr> sub =
-        parseExprSequenceElement(diag::expected_expr_after_move, isExprBasic);
+        parseExprSequenceElement(diag::expected_expr_after_move, isExprBasic, isGenericArgTypeExpr);
     if (!sub.isNull()) {
       sub = makeParserResult(new (Context) ConsumeExpr(consumeLoc, sub.get()));
     }
@@ -467,7 +473,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 
     SourceLoc copyLoc = consumeToken();
     ParserResult<Expr> sub =
-        parseExprSequenceElement(diag::expected_expr_after_copy, isExprBasic);
+        parseExprSequenceElement(diag::expected_expr_after_copy, isExprBasic, isGenericArgTypeExpr);
     if (!sub.isNull()) {
       sub = makeParserResult(new (Context) CopyExpr(copyLoc, sub.get()));
     }
@@ -482,7 +488,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
         .fixItReplace(awaitLoc, "consume");
 
       ParserResult<Expr> sub =
-          parseExprSequenceElement(diag::expected_expr_after_move, isExprBasic);
+          parseExprSequenceElement(diag::expected_expr_after_move, isExprBasic, isGenericArgTypeExpr);
       if (!sub.hasCodeCompletion() && !sub.isNull()) {
         sub = makeParserResult(new (Context) ConsumeExpr(awaitLoc, sub.get()));
       }
@@ -493,7 +499,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       Tok.setKind(tok::contextual_keyword);
       SourceLoc awaitLoc = consumeToken();
       ParserResult<Expr> sub = parseExprSequenceElement(
-          diag::expected_expr_after_borrow, isExprBasic);
+          diag::expected_expr_after_borrow, isExprBasic, isGenericArgTypeExpr);
       if (!sub.hasCodeCompletion() && !sub.isNull()) {
         sub = makeParserResult(new (Context) BorrowExpr(awaitLoc, sub.get()));
       }
@@ -535,7 +541,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       !peekToken().isAtStartOfLine()) {
     SourceLoc loc = consumeToken();
     ParserResult<Expr> ref =
-        parseExprSequenceElement(diag::expected_expr_after_each, isExprBasic);
+        parseExprSequenceElement(diag::expected_expr_after_each, isExprBasic, isGenericArgTypeExpr);
     if (ref.isNull())
       return ref;
 
@@ -570,8 +576,8 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   }
 
   ParserResult<Expr> sub = hadTry
-      ? parseExprSequenceElement(message, isExprBasic)
-      : parseExprUnary(message, isExprBasic);
+      ? parseExprSequenceElement(message, isExprBasic, isGenericArgTypeExpr)
+      : parseExprUnary(message, isExprBasic, isGenericArgTypeExpr);
 
   if (hadTry && !sub.hasCodeCompletion() && !sub.isNull()) {
     switch (trySuffix ? trySuffix->getKind() : tok::NUM_TOKENS) {
@@ -619,7 +625,8 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 ///     operator-prefix expr-unary(Mode)
 ///     '&' expr-unary(Mode)
 ///
-ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
+ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic,
+                                          bool isGenericArgTypeExpr) {
   UnresolvedDeclRefExpr *Operator;
 
   // First check to see if we have the start of a regex literal `/.../`.
@@ -644,12 +651,12 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   switch (Tok.getKind()) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
-    return parseExprPostfix(Message, isExprBasic);
+    return parseExprPostfix(Message, isExprBasic, isGenericArgTypeExpr);
 
   case tok::amp_prefix: {
     SourceLoc Loc = consumeToken(tok::amp_prefix);
 
-    ParserResult<Expr> SubExpr = parseExprUnary(Message, isExprBasic);
+    ParserResult<Expr> SubExpr = parseExprUnary(Message, isExprBasic, isGenericArgTypeExpr);
     if (SubExpr.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>(SubExpr.getPtrOrNull());
     if (SubExpr.isNull())
@@ -690,7 +697,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   }
   }
 
-  ParserResult<Expr> SubExpr = parseExprUnary(Message, isExprBasic);
+  ParserResult<Expr> SubExpr = parseExprUnary(Message, isExprBasic, isGenericArgTypeExpr);
   ParserStatus Status = SubExpr;
   if (SubExpr.isNull())
     return Status;
@@ -737,7 +744,8 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
 
   if (!startsWithSymbol(Tok, '.')) {
     rootResult = parseExprPostfix(diag::expr_keypath_expected_expr,
-                                  /*isBasic=*/true);
+                                  /*isBasic=*/true,
+                                  /*isGenericArgTypeExpr=*/false);
     parseStatus = rootResult;
 
     if (rootResult.isParseErrorOrHasCompletion())
@@ -762,7 +770,8 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     // Inside a keypath's path, the period always behaves normally: the key path
     // behavior is only the separation between type and path.
     pathResult = parseExprPostfixSuffix(inner, /*isExprBasic=*/true,
-                                        /*periodHasKeyPathBehavior=*/false);
+                                        /*periodHasKeyPathBehavior=*/false,
+                                        /*isGenericArgTypeExpr=*/false);
     parseStatus |= pathResult;
   }
 
@@ -1242,7 +1251,8 @@ getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
 
 ParserResult<Expr>
 Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
-                               bool periodHasKeyPathBehavior) {
+                               bool periodHasKeyPathBehavior,
+                               bool isGenericArgTypeExpr) {
   // Handle suffix expressions.
   while (1) {
     // FIXME: Better recovery.
@@ -1329,7 +1339,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         // otherwise it will get parsed as a get-set clause on a variable
         // declared by `baseExpr.<complete>` which is clearly wrong.
         parseExprPostfixSuffix(makeParserResult(CCExpr), isExprBasic,
-                               periodHasKeyPathBehavior);
+                               periodHasKeyPathBehavior,
+                               isGenericArgTypeExpr);
 
         return makeParserCodeCompletionResult(CCExpr);
       }
@@ -1438,6 +1449,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (periodHasKeyPathBehavior && startsWithSymbol(Tok, '.'))
         break;
 
+      if (isGenericArgTypeExpr && isGenericArgumentExpressionDelimiter())
+        break;
+
       Expr *oper = parseExprOperator();
 
       Result = makeParserResult(
@@ -1496,7 +1510,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
             // '#elseif'/'#else' bodies might start with invalid tokens.
             if (isAtStartOfPostfixExprSuffix() || Tok.is(tok::pound_if)) {
               auto expr = parseExprPostfixSuffix(Result, isExprBasic,
-                                                 periodHasKeyPathBehavior);
+                                                 periodHasKeyPathBehavior,
+                                                 isGenericArgTypeExpr);
 
               if (isActive)
                 activeElements.push_back(expr.get());
@@ -1611,14 +1626,16 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 ///     expr-postfix(basic)
 ///     expr-trailing-closure
 ///
-ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
-  auto Result = parseExprPrimary(ID, isExprBasic);
+ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic,
+                                            bool isGenericArgTypeExpr) {
+  auto Result = parseExprPrimary(ID, isExprBasic, isGenericArgTypeExpr);
   // If we couldn't parse any expr, don't attempt to parse suffixes.
   if (Result.isNull())
     return Result;
 
   return parseExprPostfixSuffix(Result, isExprBasic,
-                                /*periodHasKeyPathBehavior=*/InSwiftKeyPath);
+                                /*periodHasKeyPathBehavior=*/InSwiftKeyPath,
+                                isGenericArgTypeExpr);
 }
 
 /// parseExprPrimary
@@ -1653,7 +1670,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 ///     expr-discard
 ///     expr-selector
 ///
-ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
+ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic,
+                                            bool isGenericArgTypeExpr) {
   switch (Tok.getKind()) {
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Tok.getText());
@@ -1753,7 +1771,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::kw_init:
   case tok::kw_Self:         // Self
   case tok::colon_colon:     // module selector with missing module name
-    return parseExprIdentifier(/*allowKeyword=*/true);
+    return parseExprIdentifier(/*allowKeyword=*/true,
+                               /*allowModuleSelector=*/true,
+                               isGenericArgTypeExpr);
 
   case tok::kw_Any: { // Any
     if (peekToken().is(tok::colon_colon))
@@ -2484,7 +2504,8 @@ ParserStatus Parser::parseFreestandingMacroExpansion(
 ///   expr-identifier:
 ///     unqualified-decl-name generic-args?
 ParserResult<Expr> Parser::parseExprIdentifier(bool allowKeyword,
-                                               bool allowModuleSelector) {
+                                               bool allowModuleSelector,
+                                               bool isGenericArgTypeExpr) {
   ParserStatus status;
   assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self,
                    tok::colon_colon) ||
@@ -2514,7 +2535,7 @@ ParserResult<Expr> Parser::parseExprIdentifier(bool allowKeyword,
   ///     lparen_following rparen lsquare_following rsquare lbrace rbrace
   ///     period_following comma semicolon
   ///
-  if (canParseAsGenericArgumentList()) {
+  if (canParseAsGenericArgumentList(isGenericArgTypeExpr)) {
     auto argStatus = parseGenericArguments(args, LAngleLoc, RAngleLoc);
     status |= argStatus;
     if (argStatus.isErrorOrHasCompletion())
