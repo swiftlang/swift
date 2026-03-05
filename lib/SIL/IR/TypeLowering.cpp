@@ -2645,10 +2645,10 @@ namespace {
         // either a scalar like type or an array like type. If the like type is
         // non-fixed abi, then this type is also non-fixed abi.
         if (!rawLayout->getSizeAndAlignment()) {
-          auto likeType = rawLayout->getResolvedLikeType(D)
-              .subst(subMap)->getCanonicalType();
+          auto likeType = rawLayout->getResolvedLikeType(D)->getCanonicalType();
           auto origLikeType = AbstractionPattern(
               D->getGenericSignature().getCanonicalSignature(), likeType);
+          likeType = likeType.subst(subMap)->getCanonicalType();
           auto likeTypeProps = classifyType(origLikeType, likeType, TC,
                                             Expansion);
 
