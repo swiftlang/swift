@@ -6397,8 +6397,15 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   SILBasicBlock *normalBB = createBasicBlock();
   B.createTryApply(loc, fn, subs, args, normalBB, errorBB);
 
-  // Emit the rethrow logic.
-  {
+  if (!F.getLoweredFunctionType()->hasErrorResult()) {
+    // Thunks to convert from throws(Never) to non-throwing functions
+    // can end up here. Since the callee cannot actually throw, emit
+    // an unreachable in the error branch.
+    ASSERT(silFnType->getErrorResult().getInterfaceType()->isNever());
+    B.emitBlock(errorBB);
+    B.createUnreachable(loc);
+  } else {
+    // Emit the rethrow logic.
     B.emitBlock(errorBB);
 
     Scope scope(Cleanups, CleanupLocation(loc));
