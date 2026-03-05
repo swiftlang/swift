@@ -1450,6 +1450,21 @@ private:
     return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
+  /// If the enum case is indirect, wrap the payload debug type in a
+  /// DW_TAG_reference_type to indicate the case stores a pointer to a
+  /// heap-allocated box rather than the payload directly.
+  llvm::DIType *wrapInReferenceTypeIfIndirect(llvm::DIType *PayloadDITy,
+                                              EnumElementDecl *ElemDecl,
+                                              EnumDecl *Decl) {
+    if (ElemDecl->isIndirect() || Decl->isIndirect()) {
+      unsigned PtrSizeInBits =
+          CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
+      return DBuilder.createReferenceType(llvm::dwarf::DW_TAG_reference_type,
+                                          PayloadDITy, PtrSizeInBits);
+    }
+    return PayloadDITy;
+  }
+
   /// Create debug information for an enum with no raw type.
   llvm::DICompositeType *createVariantType(CompletedDebugTypeInfo DbgTy,
                                            EnumDecl *Decl,
@@ -1491,10 +1506,14 @@ private:
               llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
               llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, MangledName);
         }
+        llvm::DIType *PayloadDITy = getOrCreateType(*ElemDbgTy);
+        PayloadDITy =
+            wrapInReferenceTypeIfIndirect(PayloadDITy, ElemDecl, Decl);
+
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(),
                                  getByteSize() *
                                      ElemDbgTy->getAlignment().getValue(),
-                                 TrackingDIType(getOrCreateType(*ElemDbgTy)));
+                                 TrackingDIType(PayloadDITy));
       } else {
         // A variant with no payload.
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(), 0,
@@ -1548,10 +1567,14 @@ private:
         PayloadTy = ElemDecl->getParentEnum()->mapTypeIntoEnvironment(PayloadTy);
         ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
             PayloadTy, IGM.getTypeInfoForUnlowered(PayloadTy), IGM);
+        llvm::DIType *PayloadDITy = getOrCreateType(*ElemDbgTy);
+        PayloadDITy =
+            wrapInReferenceTypeIfIndirect(PayloadDITy, ElemDecl, Decl);
+
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(),
                                  getByteSize() *
                                      ElemDbgTy->getAlignment().getValue(),
-                                 TrackingDIType(getOrCreateType(*ElemDbgTy)));
+                                 TrackingDIType(PayloadDITy));
       } else {
         // A variant with no payload.
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(), 0,
