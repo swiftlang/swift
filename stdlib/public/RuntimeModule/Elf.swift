@@ -1993,3 +1993,80 @@ public func testElfImageAt(path: String) -> Bool {
     return false
   }
 }
+
+// .. Fuzzing ...................................................................
+
+@_cdecl("swift_fuzz_elf_image")
+@available(Backtracing 6.2, *)
+public func fuzzElfImage(_ data: UnsafeRawPointer, _ size: Int) -> Int32 {
+  let buffer = UnsafeRawBufferPointer(start: data, count: size)
+  let source = ImageSource(unowned: buffer, isMappedImage: false)
+
+  if let image = try? Elf32Image(source: source) {
+    _exerciseElfImage(image)
+  }
+  if let image = try? Elf64Image(source: source) {
+    _exerciseElfImage(image)
+  }
+
+  return 0
+}
+
+@available(Backtracing 6.2, *)
+private func _exerciseElfImage<Traits: ElfTraits>(_ image: ElfImage<Traits>) {
+  _ = image.uuid
+  _ = image.debugLinkCRC
+  _ = image.ehFrameInfo
+  _ = image.imageName
+  _ = image.getSection(".text")
+  _ = image.getSection(".symtab")
+  _ = image.getSection(".strtab")
+  _ = image.getSection(".debug_info")
+  _ = image.getSection(".debug_line")
+  _ = image.getDebugLink()
+  _ = image.getDebugAltLink()
+  _ = image.getSectionAsString(".comment")
+  for _ in image.notes {}
+
+  // Symbol table: construction and merge
+  do {
+    if let symtab = ElfSymbolTable(image: image) {
+      if let symtab2 = ElfSymbolTable(image: image) {
+        _ = symtab.merged(with: symtab2)
+      }
+    }
+  }
+
+  // Collect addresses from the fuzzed image's own headers to exercise lookup
+  // paths with values that actually fall within the image's address ranges.
+  var addresses: [SymbolSource.Address] = [0]
+  for phdr in image.programHeaders where phdr.p_type == .PT_LOAD {
+    let vaddr = SymbolSource.Address(phdr.p_vaddr)
+    addresses.append(vaddr)
+    addresses.append(vaddr &+ SymbolSource.Address(phdr.p_memsz) / 2)
+  }
+  if let sections = image.sectionHeaders {
+    for shdr in sections where shdr.sh_addr != 0 {
+      addresses.append(SymbolSource.Address(shdr.sh_addr))
+    }
+  }
+
+  let symtab = ElfSymbolTable(image: image)
+  for addr in addresses {
+    _ = symtab?.lookupSymbol(address: Traits.Address(truncatingIfNeeded: addr))
+    _ = image.lookupSymbol(address: addr)
+    _ = image.sourceLocation(for: addr)
+    _ = image.inlineCallSites(at: addr)
+  }
+
+  // DWARF section access
+  _ = image.getDwarfSection(.debugInfo)
+  _ = image.getDwarfSection(.debugLine)
+  _ = image.getDwarfSection(.debugAbbrev)
+  _ = image.getDwarfSection(.debugStr)
+  _ = image.getDwarfSection(.debugRanges)
+  _ = image.getDwarfSection(.debugRngLists)
+  _ = image.getDwarfSection(.debugAddr)
+  _ = image.getDwarfSection(.debugStrOffsets)
+  _ = image.getDwarfSection(.debugLineStr)
+}

@@ -105,6 +105,11 @@ set(runtime_compile_flags
   "-Xcc;-I${SWIFT_STDLIB_SOURCE_DIR}/public/RuntimeModule/modules"
   "-disable-upcoming-feature;MemberImportVisibility")
 
+if(LLVM_USE_SANITIZE_COVERAGE)
+  list(APPEND runtime_compile_flags
+    "-sanitize=fuzzer")
+endif()
+
 ###TODO: Add these when we add static linking support
 #
 #list(APPEND runtime_compile_flags
