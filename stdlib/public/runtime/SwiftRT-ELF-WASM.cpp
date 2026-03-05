@@ -20,6 +20,8 @@
 
 #if defined(__ELF__)
 extern "C" const char __ehdr_start[] __attribute__((__weak__));
+extern "C" const char __start_swift5_tests[] __attribute__((__weak__));
+extern "C" const char __stop_swift5_tests[] __attribute__((__weak__));
 #endif
 
 #if SWIFT_ENABLE_BACKTRACING
@@ -71,8 +73,6 @@ DECLARE_SWIFT_SECTION(swift5_replace)
 DECLARE_SWIFT_SECTION(swift5_replac2)
 DECLARE_SWIFT_SECTION(swift5_accessible_functions)
 DECLARE_SWIFT_SECTION(swift5_runtime_attributes)
-
-DECLARE_SWIFT_SECTION(swift5_tests)
 }
 
 #undef DECLARE_SWIFT_SECTION
@@ -120,11 +120,28 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(swift5_mpenum),
       SWIFT_SECTION_RANGE(swift5_accessible_functions),
       SWIFT_SECTION_RANGE(swift5_runtime_attributes),
-      SWIFT_SECTION_RANGE(swift5_tests),
+      {},
   };
+
+  // If this image contains any test content, register that as well.
+  if (SWIFT_UNLIKELY(&__start_swift5_tests != nullptr)) {
+    sections.swift5_tests = SWIFT_SECTION_RANGE(swift5_tests);
+
+#if defined(__ELF__)
+    swift::TestContentSectionBounds sectionBounds {
+      baseAddress,
+      {
+        reinterpret_cast<uintptr_t>(__start_swift5_tests),
+        __stop_swift5_tests - __start_swift5_tests
+      }
+    };
+    swift_elf_registerTestContent(&sectionBounds);
+#endif
+  }
 
 #undef SWIFT_SECTION_RANGE
 
   swift_addNewDSOImage(&sections);
 }
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
+#endif

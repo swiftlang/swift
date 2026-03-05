@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,5 +21,58 @@
 #if defined(__ELF__)
 
 #include "ImageInspection.h"
+
+#include <algorithm>
+
+#include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Concurrent.h"
+#include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Heap.h"
+#include "swift/shims/MetadataSections.h"
+
+namespace swift {
+  static Lazy<ConcurrentReadableArray<TestContentSectionBounds>> registered;
+}
+
+void swift::swift_elf_registerTestContent(
+  const struct swift::TestContentSectionBounds *sectionBounds
+) {
+  swift::registered->push_back(*sectionBounds);
+}
+
+struct swift::TestContentSectionBounds *
+swift::swift_elf_copyAllTestContent(size_t *outCount) {
+  auto snapshot = swift::registered->snapshot();
+  auto count = snapshot.size();
+
+  auto result = reinterpret_cast<struct swift::TestContentSectionBounds *>(
+    swift_slowAlloc(
+      count * sizeof(struct swift::TestContentSectionBounds),
+      alignof(struct swift::TestContentSectionBounds) - 1
+    )
+  );
+  if (!result) {
+    swift::fatalError(0,
+      "Could not allocate space for an array containing %zu test content "
+      "section bounds structures", count);
+  }
+
+  // Copy the snapshot's contents into the resulting C array.
+  std::uninitialized_copy(std::begin(snapshot), std::end(snapshot), result);
+  *outCount = count;
+
+  // Fix up the base address on platforms where __ehdr_start isn't defined or
+  // has been stripped at link time.
+  std::for_each(result, result + count, [] (auto& sectionBounds) {
+    if (!sectionBounds.baseAddress) {
+      auto p = reinterpret_cast<const void *>(sectionBounds.swift5_tests.start);
+      if (auto info = swift::SymbolInfo::lookup(p)) {
+        sectionBounds.baseAddress = info->getBaseAddress();
+      }
+    }
+  });
+
+  return result;
+}
 
 #endif // defined(__ELF__)

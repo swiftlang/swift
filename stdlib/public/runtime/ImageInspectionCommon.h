@@ -86,6 +86,30 @@ void swift_enumerateAllMetadataSections(
   void *context
 );
 
+#if defined(__ELF__)
+namespace swift {
+  struct TestContentSectionBounds;
+};
+
+/// Register a test content section for use by Swift Testing.
+/// 
+/// \param sectionBounds A structure describing the test content section being
+///   registered.
+SWIFT_RUNTIME_EXPORT void swift_elf_registerTestContent(
+  const struct swift::TestContentSectionBounds *sectionBounds
+);
+
+/// Copy a C array containing the bounds of all known test content sections.
+///
+/// \param outCount On return, the number of elements in the resulting C array.
+///
+/// \returns  A C array containing structures that describe the bounds of all
+///   known test content sections. The caller is responsible for freeing this
+///   array with \c UnsafePointer.deallocate() or similar.
+SWIFT_RUNTIME_EXPORT struct swift::TestContentSectionBounds *
+swift_elf_copyAllTestContent(size_t *outCount);
+#endif
+
 #ifndef NDEBUG
 
 SWIFT_RUNTIME_EXPORT
