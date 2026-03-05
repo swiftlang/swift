@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SILOptimizer/Differentiation/Common.h"
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/AST/ASTMangler.h"
@@ -631,7 +632,7 @@ DifferentiationTransformer::createPrivateDifferentiabilityWitness(
       context.getModule(), SILLinkage::Private, originalFn,
       DifferentiabilityKind::Reverse, desiredParameterIndices,
       desiredResultIndices, derivativeConstrainedGenSig, /*jvp*/ nullptr,
-      /*vjp*/ nullptr, /*isSerialized*/ false);
+      /*vjp*/ nullptr, /*isSerialized*/ false, /* isDefault */ false);
   if (canonicalizeDifferentiabilityWitness(witness, invoker, IsNotSerialized))
     return nullptr;
 
@@ -782,6 +783,7 @@ DifferentiationTransformer::emitDerivativeFunctionReference(
       substMap = pai->getSubstitutionMap();
     else if (auto *ai = peerThroughFunctionConversions<ApplyInst>(original))
       substMap = ai->getSubstitutionMap();
+
     if (diagnoseUnsatisfiedRequirements(
             context, original->getType().castTo<SILFunctionType>(),
             minimalWitness->getDerivativeGenericSignature(), substMap, invoker,
@@ -814,48 +816,39 @@ DifferentiationTransformer::emitDerivativeFunctionReference(
   if (auto *witnessMethod =
           peerThroughFunctionConversions<WitnessMethodInst>(original)) {
     auto loc = witnessMethod->getLoc();
-    // See if we can derive derivatives for a method statically
-    auto [method, table] = lookUpFunctionInWitnessTable(
-        witnessMethod, SILModule::LinkingMode::LinkNormal);
-    if (method) {
-      auto *originalFn = method;
-      auto originalFnTy = method->getLoweredFunctionTypeInContext(
-          TypeExpansionContext(*original->getFunction()));
+    auto requirementDeclRef = witnessMethod->getMember();
+    auto *requirementDecl = requirementDeclRef.getAbstractFunctionDecl();
+    // If requirement declaration does not have any derivative function
+    // configurations, produce an error.
+    if (requirementDecl->getDerivativeFunctionConfigurations().empty()) {
+      context.emitNondifferentiabilityError(
+          original, invoker, diag::autodiff_protocol_member_not_differentiable);
+      return std::nullopt;
+    }
+    // Find the minimal derivative configuration: minimal parameter indices and
+    // corresponding derivative generic signature. If it does not exist, produce
+    // an error.
+    IndexSubset *minimalASTParamIndices = nullptr;
+    auto minimalConfig = findMinimalDerivativeConfiguration(
+        requirementDecl, desiredConfig.parameterIndices,
+        minimalASTParamIndices);
+    if (!minimalConfig) {
+      context.emitNondifferentiabilityError(
+          original, invoker,
+          diag::autodiff_member_subset_indices_not_differentiable);
+      return std::nullopt;
+    }
 
-      auto *minimalWitness = getOrCreateMinimalDifferentiabilitywitness(
-          originalFnTy, originalFn, desiredConfig.parameterIndices,
-          desiredConfig.resultIndices, original, invoker);
-
-      // All non-differentiability cases should be diagnosted
-      if (!minimalWitness)
-        return std::nullopt;
-
-      if (parentFn->isSerialized() &&
-          !hasPublicVisibility(minimalWitness->getLinkage())) {
-        enum { Inlinable = 0, DefaultArgument = 1 };
-        unsigned fragileKind = Inlinable;
-        // FIXME: This is not a very robust way of determining if the function
-        // is a default argument. Also, we have not exhaustively listed all the
-        // kinds of fragility.
-        if (parentFn->getLinkage() == SILLinkage::PublicNonABI)
-          fragileKind = DefaultArgument;
-        context.emitNondifferentiabilityError(
-            original, invoker, diag::autodiff_private_derivative_from_fragile,
-            fragileKind,
-            isa_and_nonnull<AbstractClosureExpr>(loc.getAsASTNode<Expr>()));
-        return std::nullopt;
-      }
-
+    if (auto *minimalWitness = context.getModule().loadDifferentiabilityWitness(
+            {requirementDeclRef.mangle(), DifferentiabilityKind::Reverse,
+             *minimalConfig})) {
       auto substMap = parentFn->getForwardingSubstitutionMap();
       if (auto *pai =
               peerThroughFunctionConversions<PartialApplyInst>(original))
-        substMap =
-            getWitnessMethodSubstitutions(context.getModule(), pai, originalFn,
-                                          witnessMethod->getConformance());
+        substMap = pai->getSubstitutionMap();
       else if (auto *ai = peerThroughFunctionConversions<ApplyInst>(original))
-        substMap =
-            getWitnessMethodSubstitutions(context.getModule(), ai, originalFn,
-                                          witnessMethod->getConformance());
+        substMap = ai->getSubstitutionMap();
+
       if (diagnoseUnsatisfiedRequirements(
               context, original->getType().castTo<SILFunctionType>(),
               minimalWitness->getDerivativeGenericSignature(), substMap,
@@ -885,30 +878,10 @@ DifferentiationTransformer::emitDerivativeFunctionReference(
               ->getSubstGenericSignature());
 
       return std::make_pair(convertedRef, minimalWitness->getConfig());
+    } else {
+      // TBD: We can continue only if the original function is @differentiable
     }
 
-    auto requirementDeclRef = witnessMethod->getMember();
-    auto *requirementDecl = requirementDeclRef.getAbstractFunctionDecl();
-    // If requirement declaration does not have any derivative function
-    // configurations, produce an error.
-    if (requirementDecl->getDerivativeFunctionConfigurations().empty()) {
-      context.emitNondifferentiabilityError(
-          original, invoker, diag::autodiff_protocol_member_not_differentiable);
-      return std::nullopt;
-    }
-    // Find the minimal derivative configuration: minimal parameter indices and
-    // corresponding derivative generic signature. If it does not exist, produce
-    // an error.
-    IndexSubset *minimalASTParamIndices = nullptr;
-    auto minimalConfig = findMinimalDerivativeConfiguration(
-        requirementDecl, desiredConfig.parameterIndices,
-        minimalASTParamIndices);
-    if (!minimalConfig) {
-      context.emitNondifferentiabilityError(
-          original, invoker,
-          diag::autodiff_member_subset_indices_not_differentiable);
-      return std::nullopt;
-    }
     // Emit a `witness_method` instruction for the derivative function.
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
@@ -995,15 +968,15 @@ static SILFunction *createEmptyVJP(ADContext &context,
                                    SerializedKind_t isSerialized) {
   auto original = witness->getOriginalFunction();
   auto config = witness->getConfig();
+  auto originalTy = original->getLoweredFunctionType();
+  auto &module = context.getModule();
+
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Creating VJP for " << getIRName(original) << ":\n\t";
-    s << "Original type: " << original->getLoweredFunctionType() << "\n\t";
+    s << "Original type: " << originalTy << "\n\t";
     s << "Config: " << config << "\n\t";
   });
-
-  auto &module = context.getModule();
-  auto originalTy = original->getLoweredFunctionType();
 
   // === Create an empty VJP. ===
   Mangle::DifferentiationMangler mangler(context.getASTContext());
@@ -1015,10 +988,10 @@ static SILFunction *createEmptyVJP(ADContext &context,
     vjpGenericEnv = vjpCanGenSig.getGenericEnvironment();
   auto vjpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
-      AutoDiffDerivativeFunctionKind::VJP,
-      module.Types, LookUpConformanceInModule(),
-      vjpCanGenSig,
-      /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
+      AutoDiffDerivativeFunctionKind::VJP, module.Types,
+      LookUpConformanceInModule(), vjpCanGenSig,
+      /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk,
+      /*origTypeOfAbstraction*/ CanType(), witness->isDefault());
 
   SILOptFunctionBuilder fb(context.getTransform());
   auto *vjp = fb.createFunction(
@@ -1040,15 +1013,15 @@ static SILFunction *createEmptyJVP(ADContext &context,
                                    SerializedKind_t isSerialized) {
   auto original = witness->getOriginalFunction();
   auto config = witness->getConfig();
+  auto originalTy = original->getLoweredFunctionType();
+  auto &module = context.getModule();
+
   LLVM_DEBUG({
     auto &s = getADDebugStream();
-    s << "Creating JVP for " << getIRName(original) << ":\n\t";
-    s << "Original type: " << original->getLoweredFunctionType() << "\n\t";
+    s << "Creating VJP for " << getIRName(original) << ":\n\t";
+    s << "Original type: " << originalTy << "\n\t";
     s << "Config: " << config << "\n\t";
   });
-
-  auto &module = context.getModule();
-  auto originalTy = original->getLoweredFunctionType();
 
   Mangle::DifferentiationMangler mangler(context.getASTContext());
   auto jvpName = mangler.mangleDerivativeFunction(
@@ -1059,10 +1032,10 @@ static SILFunction *createEmptyJVP(ADContext &context,
     jvpGenericEnv = jvpCanGenSig.getGenericEnvironment();
   auto jvpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
-      AutoDiffDerivativeFunctionKind::JVP,
-      module.Types, LookUpConformanceInModule(),
-      jvpCanGenSig,
-      /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
+      AutoDiffDerivativeFunctionKind::JVP, module.Types,
+      LookUpConformanceInModule(), jvpCanGenSig,
+      /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk,
+      /*origTypeOfAbstraction*/ CanType(), witness->isDefault());
 
   SILOptFunctionBuilder fb(context.getTransform());
   auto *jvp = fb.createFunction(
@@ -1142,6 +1115,14 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
   if (orig->getLinkage() == SILLinkage::HiddenExternal &&
       !orig->markedAsAlwaysEmitIntoClient())
     serializeFunctions = IsNotSerialized;
+
+  // VJP and JVP should match in terms of serialization, so if one is
+  // specified then the empty one should have the same serialization
+  // kind
+  if (auto *jvpFunc = witness->getJVP())
+    serializeFunctions = jvpFunc->getSerializedKind();
+  if (auto *vjpFunc = witness->getVJP())
+    serializeFunctions = vjpFunc->getSerializedKind();
 
   // If the JVP doesn't exist, need to synthesize it.
   if (!witness->getJVP()) {

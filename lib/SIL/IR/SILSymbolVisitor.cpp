@@ -528,15 +528,15 @@ public:
 
     for (const auto *derivativeAttr :
          AFD->getAttrs().getAttributes<DerivativeAttr>()) {
-      auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
-        derivativeAttr->getOriginalFunction(AFD->getASTContext()),
-        derivativeAttr->getParameterIndices());
-      addDerivativeConfiguration(
-          DifferentiabilityKind::Reverse,
-          derivativeAttr->getOriginalFunction(AFD->getASTContext()),
-          AutoDiffConfig(derivativeAttr->getParameterIndices(),
-                         resultIndices,
-                         AFD->getGenericSignature()));
+      for (auto *originaAFD :
+           derivativeAttr->getOriginalFunction(AFD->getASTContext())) {
+        auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
+            originaAFD, derivativeAttr->getParameterIndices());
+        addDerivativeConfiguration(
+            DifferentiabilityKind::Reverse, originaAFD,
+            AutoDiffConfig(derivativeAttr->getParameterIndices(), resultIndices,
+                           AFD->getGenericSignature()));
+      }
     }
 
     visitDefaultArguments(AFD, AFD->getParameters());

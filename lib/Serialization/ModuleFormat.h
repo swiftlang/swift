@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 987; // Serialize decl lifetimes instead of their their function types' lifetimes
+const uint16_t SWIFTMODULE_VERSION_MINOR = 988; // default requirement derivatives
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2519,12 +2519,17 @@ namespace decls_block {
       BCArray<IdentifierIDField> // properties
   >;
 
+  using DifferentiationParamIndicesLayout = BCRecordLayout<
+    DIFF_PARAM_INDICES,
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+  >;
+
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
     DifferentiabilityKindField, // Differentiability kind.
-    GenericSignatureIDField, // Derivative generic signature.
-    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+    GenericSignatureIDField // Derivative generic signature.
+    // Trailed by differentiation parameter indices' bitvector.
   >;
 
   using DerivativeDeclAttrLayout = BCRecordLayout<
@@ -2532,16 +2537,16 @@ namespace decls_block {
     BCFixed<1>, // Implicit flag.
     BCFixed<1>, // Has original accessor kind?
     AccessorKindField, // Original accessor kind.
-    DeclIDField, // Original function declaration.
     AutoDiffDerivativeFunctionKindField, // Derivative function kind.
-    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+    BCArray<DeclIDField> // Original function declarations
+    // Trailed by differentiation parameter indices' bitvector.
   >;
 
   using TransposeDeclAttrLayout = BCRecordLayout<
     Transpose_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
-    DeclIDField, // Original function declaration.
-    BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
+    DeclIDField // Original function declaration.
+    // Trailed by transposed parameter indices' bitvector.
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \

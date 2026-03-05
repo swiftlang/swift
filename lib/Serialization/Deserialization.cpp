@@ -3587,6 +3587,8 @@ public:
   /// offsets in \c customAttrOffsets.
   llvm::Error deserializeCustomAttrs();
 
+  IndexSubset *deserializeDifferentiableParamIndices();
+
   DeclNameRef deserializeDeclNameRefIfPresent() {
     using namespace decls_block;
 
@@ -5980,6 +5982,33 @@ llvm::Error DeclDeserializer::deserializeCustomAttrs() {
   return llvm::Error::success();
 }
 
+IndexSubset *DeclDeserializer::deserializeDifferentiableParamIndices() {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(MF.DeclTypeCursor);
+
+  llvm::BitstreamEntry entry =
+      MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return nullptr;
+
+  SmallVector<uint64_t, 8> scratch;
+  unsigned recordID =
+      MF.fatalIfUnexpected(MF.DeclTypeCursor.readRecord(entry.ID, scratch));
+  if (recordID != DIFF_PARAM_INDICES)
+    return nullptr;
+
+  lastRecordOffset.reset();
+
+  ArrayRef<uint64_t> paramIndices;
+  DifferentiationParamIndicesLayout::readRecord(scratch, paramIndices);
+
+  llvm::SmallBitVector parametersBitVector(paramIndices.size());
+  for (unsigned i : indices(paramIndices))
+    parametersBitVector[i] = paramIndices[i];
+  return IndexSubset::get(ctx, parametersBitVector);
+}
+
 llvm::Error DeclDeserializer::deserializeDeclCommon() {
   using namespace decls_block;
 
@@ -6383,20 +6412,17 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         bool isImplicit;
         uint64_t rawDiffKind;
         GenericSignatureID derivativeGenSigId;
-        ArrayRef<uint64_t> parameters;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, isImplicit, rawDiffKind, derivativeGenSigId,
-            parameters);
+            scratch, isImplicit, rawDiffKind, derivativeGenSigId);
+        auto *indices = deserializeDifferentiableParamIndices();
+        if (!indices)
+          return MF.diagnoseFatal();
 
         auto diffKind = getActualDifferentiabilityKind(rawDiffKind);
         if (!diffKind)
           return MF.diagnoseFatal();
         auto derivativeGenSig = MF.getGenericSignature(derivativeGenSigId);
-        llvm::SmallBitVector parametersBitVector(parameters.size());
-        for (unsigned i : indices(parameters))
-          parametersBitVector[i] = parameters[i];
-        auto *indices = IndexSubset::get(ctx, parametersBitVector);
         auto *diffAttr = DifferentiableAttr::create(
             ctx, isImplicit, SourceLoc(), SourceRange(), *diffKind,
             /*parsedParameters*/ {}, /*trailingWhereClause*/ nullptr);
@@ -6417,13 +6443,15 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         bool isImplicit;
         bool hasAccessorKind;
         uint64_t rawAccessorKind;
-        DeclID origDeclId;
+        ArrayRef<uint64_t> origDeclIds;
         uint64_t rawDerivativeKind;
-        ArrayRef<uint64_t> parameters;
 
         serialization::decls_block::DerivativeDeclAttrLayout::readRecord(
             scratch, isImplicit, hasAccessorKind, rawAccessorKind,
-            origDeclId, rawDerivativeKind, parameters);
+            rawDerivativeKind, origDeclIds);
+        auto *indices = deserializeDifferentiableParamIndices();
+        if (!indices)
+          return MF.diagnoseFatal();
 
         std::optional<AccessorKind> accessorKind = std::nullopt;
         if (hasAccessorKind) {
@@ -6437,10 +6465,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             getActualAutoDiffDerivativeFunctionKind(rawDerivativeKind);
         if (!derivativeKind)
           return MF.diagnoseFatal();
-        llvm::SmallBitVector parametersBitVector(parameters.size());
-        for (unsigned i : indices(parameters))
-          parametersBitVector[i] = parameters[i];
-        auto *indices = IndexSubset::get(ctx, parametersBitVector);
 
         auto origName = deserializeDeclNameRefIfPresent();
         DeclNameRefWithLoc origNameWithLoc{origName, DeclNameLoc(),
@@ -6450,7 +6474,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             DerivativeAttr::create(ctx, isImplicit, SourceLoc(), SourceRange(),
                                    /*baseType*/ nullptr, origNameWithLoc,
                                    indices);
-        derivativeAttr->setOriginalFunctionResolver(&MF, origDeclId);
+        derivativeAttr->setOriginalFunctionResolver(ctx, &MF, origDeclIds);
         derivativeAttr->setDerivativeKind(*derivativeKind);
         Attr = derivativeAttr;
         break;
@@ -6459,16 +6483,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       case decls_block::Transpose_DECL_ATTR: {
         bool isImplicit;
         DeclID origDeclId;
-        ArrayRef<uint64_t> parameters;
 
         serialization::decls_block::TransposeDeclAttrLayout::readRecord(
-            scratch, isImplicit, origDeclId, parameters);
+            scratch, isImplicit, origDeclId);
+        auto *indices = deserializeDifferentiableParamIndices();
+        if (!indices)
+          return MF.diagnoseFatal();
 
         auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
-        llvm::SmallBitVector parametersBitVector(parameters.size());
-        for (unsigned i : indices(parameters))
-          parametersBitVector[i] = parameters[i];
-        auto *indices = IndexSubset::get(ctx, parametersBitVector);
 
         auto origNameRef = deserializeDeclNameRefIfPresent();
         DeclNameRefWithLoc origName{origNameRef, DeclNameLoc(), std::nullopt};
