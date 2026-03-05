@@ -106,6 +106,12 @@ set(runtime_compile_flags
   "-disable-upcoming-feature;MemberImportVisibility"
   "-enable-experimental-feature;Reparenting")
 
+if(LLVM_USE_SANITIZE_COVERAGE)
+  list(APPEND runtime_compile_flags
+    "-sanitize=fuzzer"
+    "-DLLVM_USE_SANITIZE_COVERAGE")
+endif()
+
 ###TODO: Add these when we add static linking support
 #
 #list(APPEND runtime_compile_flags

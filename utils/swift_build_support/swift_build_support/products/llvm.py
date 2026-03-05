@@ -352,7 +352,7 @@ class LLVM(cmake_product.CMakeProduct):
                 f'RUNTIMES_{builtins_runtimes_target_for_darwin}_'
                 'COMPILER_RT_SANITIZERS_TO_BUILD',
                 'asan;dfsan;msan;hwasan;tsan;safestack;cfi;scudo_standalone;'
-                'ubsan_minimal;gwp_asan;nsan;asan_abi')
+                'ubsan_minimal;gwp_asan;nsan;asan_abi;fuzzer')
 
         if self.args.build_embedded_stdlib and system() == "Darwin":
             # Ask for Mach-O cross-compilation builtins (for Embedded Swift)
