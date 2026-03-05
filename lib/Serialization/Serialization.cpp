@@ -4186,6 +4186,21 @@ private:
     InlinableBodyTextLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, body);
   }
 
+  /// Issue a LifetimeDependenceInfoRequest, and serialize the requested
+  /// lifetime dependence info, if present.
+  template <typename D, typename = std::enable_if_t<std::disjunction<
+                            std::is_base_of<AbstractFunctionDecl, D>,
+                            std::is_same<EnumElementDecl, D>>::value>>
+  void writeLifetimeDependenciesIfNeeded(const D *decl) {
+    if (auto lifetimeDependencies = evaluateOrDefault(
+            S.M->getASTContext().evaluator,
+            LifetimeDependenceInfoRequest{
+                const_cast<ValueDecl *>(cast<ValueDecl>(decl))},
+            std::nullopt)) {
+      S.writeLifetimeDependencies(*lifetimeDependencies);
+    }
+  }
+
   static bool getNeedsNewTableEntry(const AbstractFunctionDecl *func) {
     if (isa_and_nonnull<ProtocolDecl>(func->getDeclContext()))
       return func->requiresNewWitnessTableEntry();
@@ -4973,13 +4988,7 @@ public:
     // Write the body parameters.
     writeParameterList(fn->getParameters());
 
-    auto fnType = ty->getAs<AnyFunctionType>();
-    if (fnType) {
-      auto lifetimeDependencies = fnType->getLifetimeDependencies();
-      if (!lifetimeDependencies.empty()) {
-        S.writeLifetimeDependencies(lifetimeDependencies);
-      }
-    }
+    writeLifetimeDependenciesIfNeeded(fn);
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
@@ -5116,13 +5125,7 @@ public:
     // Write the body parameters.
     writeParameterList(fn->getParameters());
 
-    auto fnType = ty->getAs<AnyFunctionType>();
-    if (fnType) {
-      auto lifetimeDependencies = fnType->getLifetimeDependencies();
-      if (!lifetimeDependencies.empty()) {
-        S.writeLifetimeDependencies(lifetimeDependencies);
-      }
-    }
+    writeLifetimeDependenciesIfNeeded(fn);
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
@@ -5176,13 +5179,7 @@ public:
     if (auto *PL = elem->getParameterList())
       writeParameterList(PL);
 
-    auto fnType = ty->getAs<AnyFunctionType>();
-    if (fnType) {
-      auto lifetimeDependencies = fnType->getLifetimeDependencies();
-      if (!lifetimeDependencies.empty()) {
-        S.writeLifetimeDependencies(lifetimeDependencies);
-      }
-    }
+    writeLifetimeDependenciesIfNeeded(elem);
   }
 
   void visitSubscriptDecl(const SubscriptDecl *subscript) {
@@ -5294,13 +5291,7 @@ public:
     writeGenericParams(ctor->getGenericParams());
     writeParameterList(ctor->getParameters());
 
-    auto fnType = ty->getAs<AnyFunctionType>();
-    if (fnType) {
-      auto lifetimeDependencies = fnType->getLifetimeDependencies();
-      if (!lifetimeDependencies.empty()) {
-        S.writeLifetimeDependencies(lifetimeDependencies);
-      }
-    }
+    writeLifetimeDependenciesIfNeeded(ctor);
 
     if (auto errorConvention = ctor->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);

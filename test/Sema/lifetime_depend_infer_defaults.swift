@@ -577,3 +577,9 @@ struct ImmortalAccessors {
 class ClassImmortalAccessor {
   static let staticNE = NE()
 }
+
+// Default immortal inference negative case
+// CHECK: @$s30lifetime_depend_infer_defaults26ImmortalEscapableAccessorsV7staticESivgZ : $@convention(method) (@thin ImmortalEscapableAccessors.Type) -> Int {
+struct ImmortalEscapableAccessors {
+  static let staticE = Int()
+}

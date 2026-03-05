@@ -1577,7 +1577,8 @@ protected:
   void inferAccessor(AccessorDecl *accessor) {
     if (!hasImplicitSelfParam()) {
       // Global accessors have no 'self'. Their result must be immortal.
-      depBuilder.inferImmortalResult();
+      if (isDiagnosedNonEscapable(resultTy))
+        depBuilder.inferImmortalResult();
       return;
     }
     bool nonEscapableSelf =
