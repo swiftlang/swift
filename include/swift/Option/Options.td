@@ -2341,6 +2341,10 @@ def cache_disable_replay:  Flag<["-"], "cache-disable-replay">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Skip loading the compilation result from cache">;
 
+def write_output_hash_xattr:  Flag<["-"], "write-output-hash-xattr">,
+  Flags<[FrontendOption, CacheInvariant]>,
+  HelpText<"When caching, write the output file's hash (as determined by the CAS hashing schema) as a file extended attribute.">;
+
 def cas_path: Separate<["-"], "cas-path">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Path to CAS">, MetaVarName<"<path>">;

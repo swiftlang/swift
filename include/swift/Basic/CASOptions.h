@@ -34,6 +34,10 @@ public:
   /// Skip replaying outputs from cache.
   bool CacheSkipReplay = false;
 
+  /// When using EnableCaching, write the output file's hash (as determined by
+  /// the CAS hashing schema) as a file extended attribute (xattr).
+  bool WriteOutputHashXAttr = false;
+
   /// Import modules from CAS.
   bool ImportModuleFromCAS = false;
 

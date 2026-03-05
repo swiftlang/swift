@@ -38,7 +38,8 @@ createSwiftCachingOutputBackend(
     llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
     llvm::cas::ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
-    const FrontendOptions &Opts, FrontendOptions::ActionType Action);
+    const FrontendOptions &Opts, FrontendOptions::ActionType Action,
+    bool WriteOutputHashXAttr);
 
 /// Replay the output of the compilation from cache.
 /// Return true if outputs are replayed, false otherwise.
@@ -48,7 +49,8 @@ bool replayCachedCompilerOutputs(llvm::cas::ObjectStore &CAS,
                                  DiagnosticEngine &Diag,
                                  const FrontendOptions &Opts,
                                  CachingDiagnosticsProcessor &CDP,
-                                 bool CacheRemarks, bool UseCASBackend);
+                                 bool CacheRemarks, bool UseCASBackend,
+                                 bool WriteOutputHashXAttr);
 
 /// Replay the output of the compilation from cache for one input file.
 /// Return true if outputs are replayed, false otherwise.
@@ -61,7 +63,8 @@ bool replayCachedCompilerOutputsForInput(llvm::cas::ObjectStore &CAS,
                                          llvm::vfs::OutputBackend &OutBackend,
                                          const FrontendOptions &Opts,
                                          CachingDiagnosticsProcessor &CDP,
-                                         bool CacheRemarks, bool UseCASBackend);
+                                         bool CacheRemarks, bool UseCASBackend,
+                                         bool WriteOutputHashXAttr);
 
 /// Load the cached compile result from cache.
 std::unique_ptr<llvm::MemoryBuffer> loadCachedCompileResultFromCacheKey(

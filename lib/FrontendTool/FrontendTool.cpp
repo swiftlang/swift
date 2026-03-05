@@ -1429,7 +1429,8 @@ static bool tryReplayCompilerResults(CompilerInstance &Instance) {
       *Instance.getCompilerBaseKey(), Instance.getDiags(),
       Instance.getInvocation().getFrontendOptions(), *CDP,
       Instance.getInvocation().getCASOptions().EnableCachingRemarks,
-      Instance.getInvocation().getIRGenOptions().UseCASBackend);
+      Instance.getInvocation().getIRGenOptions().UseCASBackend,
+      Instance.getInvocation().getCASOptions().WriteOutputHashXAttr);
 
   // If we didn't replay successfully, re-start capture.
   if (!replayed)
