@@ -4220,8 +4220,9 @@ function Check-DockerRequirements() {
       throw "Docker is not installed or not running"
     }
 
-    $dockerInfo = docker info 2>$null
+    $dockerInfo = docker info
     if ($dockerInfo -notmatch "OSType:\s*windows") {
+      Write-Host $dockerInfo
       throw "Docker is not configured for Windows containers."
     }
   } catch {
