@@ -19,7 +19,7 @@ import traceback
 from typing import Any, Dict, Hashable, Optional, List, Tuple, Union
 
 from .cli_arguments import CliArguments
-from .git_command import Git, GitException, is_any_repository_locked
+from .git_command import Git, GitException, is_any_repository_locked, is_commit_hash
 from .retry import exponential_retry
 from .runner_arguments import AdditionalSwiftSourcesArguments, UpdateArguments
 from .parallel_runner import ParallelRunner
@@ -528,26 +528,53 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
         print("Cloning '" + pool_args.repo_name + "'")
 
     if args.skip_history:
-        Git.run(
-            args.source_root,
-            [
-                "clone",
-                "--config",
-                "core.symlinks=true",
-                "--config",
-                "core.autocrlf=false",
-                "--recursive",
-                "--depth",
-                "1",
-                "--branch",
-                repo_branch,
-                remote,
-                repo_name,
-            ]
-            + (["--no-tags"] if skip_tags else []),
-            env=env,
-            echo=verbose,
-        )
+        if is_commit_hash(repo_branch):
+            Git.run(
+                args.source_root,
+                [
+                    "clone",
+                    "--config",
+                    "core.symlinks=true",
+                    "--config",
+                    "core.autocrlf=false",
+                    "--depth",
+                    "1",
+                    remote,
+                    repo_name,
+                ]
+                + (["--no-tags"] if skip_tags else []),
+                env=env,
+                echo=verbose,
+            )
+            repo_path = args.source_root.joinpath(repo_name)
+            Git.run(
+                repo_path,
+                ["fetch", "--depth", "1", "origin", repo_branch],
+                env=env,
+                echo=verbose,
+            )
+            Git.run(repo_path, ["checkout", repo_branch], env=env, echo=verbose)
+        else:
+            Git.run(
+                args.source_root,
+                [
+                    "clone",
+                    "--config",
+                    "core.symlinks=true",
+                    "--config",
+                    "core.autocrlf=false",
+                    "--recursive",
+                    "--depth",
+                    "1",
+                    "--branch",
+                    repo_branch,
+                    remote,
+                    repo_name,
+                ]
+                + (["--no-tags"] if skip_tags else []),
+                env=env,
+                echo=verbose,
+            )
     elif args.use_submodules:
         Git.run(
             args.source_root,
@@ -798,18 +825,15 @@ def validate_config(config: Dict[str, Any]):
                 seen[alias] = scheme_name
 
 
-def full_target_name(repo_path: Path, repository: str, target: str) -> str:
-    tag, _, _ = Git.run(repo_path, ["tag", "-l", target], fatal=True)
-    if tag == target:
-        return tag
-
+def full_target_name(repo_path: Path, remote: str, target: str) -> str:
     branch, _, _ = Git.run(repo_path, ["branch", "--list", target], fatal=True)
     branch = branch.replace("* ", "")
     if branch == target:
-        name = "%s/%s" % (repository, target)
+        name = "%s/%s" % (remote, target)
         return name
 
-    raise RuntimeError("Cannot determine if %s is a branch or a tag" % target)
+    # This is either a tag or commit hash -- we can use it as is
+    return target
 
 
 def skip_list_for_platform(config: Dict[str, Any], all_repos: bool) -> List[str]:

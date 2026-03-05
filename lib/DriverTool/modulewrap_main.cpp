@@ -190,21 +190,18 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   CASOptions CASOpts;
   SerializationOptions SerializationOpts;
-  std::optional<clang::DarwinSDKInfo> SDKInfo;
   LangOpts.Target = Invocation.getTargetTriple();
   LangOpts.EnableObjCInterop = Invocation.enableObjCInterop();
   ASTContext &ASTCtx = *ASTContext::get(
       LangOpts, TypeCheckOpts, SILOpts, SearchPathOpts, ClangImporterOpts,
       SymbolGraphOpts, CASOpts, SerializationOpts, SrcMgr, Instance.getDiags(),
-      SDKInfo, llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>());
+      llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>());
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
 
   IRGenOptions IRGenOpts;
-  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, &IRGenOpts,
-                                               "", nullptr, nullptr,
-                                               true),
-                         true);
+  ASTCtx.addModuleLoader(
+      ClangImporter::create(ASTCtx, &IRGenOpts, "", nullptr, true), true);
   ModuleDecl *M =
       ModuleDecl::createEmpty(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   std::unique_ptr<Lowering::TypeConverter> TC(

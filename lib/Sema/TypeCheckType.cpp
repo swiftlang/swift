@@ -24,12 +24,14 @@
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
+#include "LiteralExpressionFolding.h"
 
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -465,7 +467,8 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
         type, cast<TypeAliasDecl>(typeDecl), fromDC, options);
   };
 
-  if (!isSpecialized) {
+  if (!isSpecialized &&
+        !options.contains(TypeResolutionFlags::HasModuleSelector)) {
     // If we are referring to a type within its own context, and we have either
     // a generic type with no generic arguments or a non-generic type, use the
     // type within the context.
@@ -1281,9 +1284,25 @@ Type TypeResolution::applyUnboundGenericArguments(
 
     auto substTy = genericArgs[i];
 
-    // Ensure the value-ness of the argument matches the parameter.
-    if (ValueMatchVisitor::check(ctx, origTy, substTy, loc))
-      substTy = ErrorType::get(ctx);
+    // For parameter packs, check each element in the pack individually.
+    if (innerParams[i]->isParameterPack() &&
+        isa<PackType>(substTy.getPointer())) {
+      auto *packTy = substTy->castTo<PackType>();
+      bool hadError = false;
+      for (auto eltTy : packTy->getElementTypes()) {
+        // Look through pack expansions to the pattern type.
+        if (auto *expTy = eltTy->getAs<PackExpansionType>())
+          eltTy = expTy->getPatternType();
+        if (ValueMatchVisitor::check(ctx, origTy, eltTy, loc))
+          hadError = true;
+      }
+      if (hadError) {
+        substTy = ErrorType::get(ctx);
+      }
+    } else {
+      if (ValueMatchVisitor::check(ctx, origTy, substTy, loc))
+        substTy = ErrorType::get(ctx);
+    }
 
     // Enter the substitution.
     subs[paramTy] = substTy;
@@ -1799,6 +1818,59 @@ static void diagnoseGenericArgumentsOnSelf(const TypeResolution &resolution,
   }
 }
 
+/// Diagnose when this is one of the Borrow or Inout types, which currently require
+/// an experimental feature to use.
+static void diagnoseBorrowInoutType(TypeDecl *typeDecl, SourceLoc loc,
+                                    const DeclContext *dc) {
+  if (loc.isInvalid())
+    return;
+
+  if (!typeDecl->isStdlibDecl())
+    return;
+
+  ASTContext &ctx = typeDecl->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::BorrowInout))
+    return;
+
+  auto nameString = typeDecl->getName().str();
+  if (nameString != "Borrow" && nameString != "Inout")
+    return;
+
+  // Don't require this in the standard library or _Concurrency library.
+  auto module = dc->getParentModule();
+  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
+    return;
+
+  ctx.Diags.diagnose(loc, diag::borrow_inout_experimental, nameString);
+}
+
+/// Diagnose when this is one of the BorrowingSequence types, which currently require
+/// an experimental feature to use.
+static void diagnoseBorrowingSequenceType(TypeDecl *typeDecl, SourceLoc loc,
+                             const DeclContext *dc) {
+  if (loc.isInvalid())
+    return;
+
+  if (!typeDecl->isStdlibDecl())
+    return;
+
+  ASTContext &ctx = typeDecl->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::BorrowingSequence))
+    return;
+
+  auto nameString = typeDecl->getName().str();
+  if (nameString != "BorrowingSequence" && nameString != "BorrowingIteratorProtocol"
+      && nameString != "SpanIterator" && nameString != "BorrowingIteratorAdapter")
+    return;
+
+  // Don't require this in the standard library or _Concurrency library.
+  auto module = dc->getParentModule();
+  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
+    return;
+
+  ctx.Diags.diagnose(loc, diag::borrowingsequence_experimental, nameString);
+}
+
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
 /// \param silContext Used to look up generic parameters in SIL mode.
@@ -1913,6 +1985,9 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
+
+    diagnoseBorrowInoutType(currentDecl, repr->getLoc(), DC);
+    diagnoseBorrowingSequenceType(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
     return current;
@@ -2052,6 +2127,19 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
 
   // Short-circuiting.
   if (repr->isInvalid()) return ErrorType::get(ctx);
+  // Reject member type access only when the base is explicitly written as an
+  // opaque type, e.g. `(some P).T`.
+  auto *baseRepr = repr->getBase()->getWithoutParens();
+  if (isa<OpaqueReturnTypeRepr>(baseRepr) ||
+      isa<NamedOpaqueReturnTypeRepr>(baseRepr)) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      diags.diagnose(repr->getNameLoc(),
+                     diag::opaque_type_member_type,
+                     repr->getNameRef(), parentTy)
+          .highlight(parentRange);
+    }
+    return ErrorType::get(ctx);
+  }
 
   // If the parent is a type parameter, the member is a dependent member,
   // and we skip much of the work below.
@@ -2134,6 +2222,8 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
     member = memberTypes.back().Member;
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
+
+    diagnoseBorrowingSequenceType(member, repr->getLoc(), DC);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);
@@ -2382,8 +2472,9 @@ namespace {
     NeverNullType
     resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
                                      TypeResolutionOptions options);
-    NeverNullType resolveIntegerTypeRepr(IntegerTypeRepr *repr,
-                                         TypeResolutionOptions options);
+    NeverNullType resolveGenericArgumentExprTypeRepr(GenericArgumentExprTypeRepr *repr,
+                                                     DeclContext *dc,
+                                                     TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveInlineArrayType(InlineArrayTypeRepr *repr,
@@ -3060,8 +3151,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     return resolveLifetimeDependentTypeRepr(
         cast<LifetimeDependentTypeRepr>(repr), options);
 
-  case TypeReprKind::Integer:
-    return resolveIntegerTypeRepr(cast<IntegerTypeRepr>(repr), options);
+  case TypeReprKind::GenericArgumentExpr:
+    return resolveGenericArgumentExprTypeRepr(
+        cast<GenericArgumentExprTypeRepr>(repr), getDeclContext(), options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -4318,9 +4410,9 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   unsigned numIsolatedParams = countIsolatedParamsUpTo(repr, 2);
   if (!repr->isWarnedAbout() && numIsolatedParams > 1) {
     diagnose(repr->getLoc(), diag::isolated_parameter_duplicate_type)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
 
-    if (ctx.isLanguageModeAtLeast(6))
+    if (ctx.isLanguageModeAtLeast(LanguageMode::v6))
       return ErrorType::get(ctx);
     else
       repr->setWarned();
@@ -4333,7 +4425,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     if (globalActor && !globalActor->hasError() && !globalActorAttr->isInvalid()) {
       if (numIsolatedParams != 0) {
         diagnose(repr->getLoc(), diag::isolated_parameter_global_actor_type)
-            .warnUntilLanguageMode(6);
+            .warnUntilLanguageMode(LanguageMode::v6);
         globalActorAttr->setInvalid();
       } else if (isolatedAttr) {
         diagnose(repr->getLoc(), diag::isolated_attr_global_actor_type,
@@ -5250,7 +5342,13 @@ TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
 
   if (auto *unqualIdentTR = dyn_cast<UnqualifiedIdentTypeRepr>(repr)) {
     // The base component uses unqualified lookup.
-    result = resolveUnqualifiedIdentTypeRepr(resolution.withOptions(options),
+    auto newOpts = options;
+    if (unqualIdentTR->getNameRef().hasModuleSelector())
+      newOpts |= TypeResolutionFlags::HasModuleSelector;
+    else
+      newOpts -= TypeResolutionFlags::HasModuleSelector;
+
+    result = resolveUnqualifiedIdentTypeRepr(resolution.withOptions(newOpts),
                                              silContext, unqualIdentTR);
 
     if (result && result->isParameterPack() &&
@@ -5288,7 +5386,13 @@ TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
       return ErrorType::get(ctx);
     }
 
-    result = resolveQualifiedIdentTypeRepr(resolution.withOptions(options),
+    auto newOpts = options;
+    if (qualIdentTR->getNameRef().hasModuleSelector())
+      newOpts |= TypeResolutionFlags::HasModuleSelector;
+    else
+      newOpts -= TypeResolutionFlags::HasModuleSelector;
+
+    result = resolveQualifiedIdentTypeRepr(resolution.withOptions(newOpts),
                                            silContext, baseTy, qualIdentTR);
   }
 
@@ -5640,10 +5744,11 @@ TypeResolver::resolveInlineArrayType(InlineArrayTypeRepr *repr,
   auto argOptions = options.withoutContext().withContext(
       TypeResolverContext::ValueGenericArgument);
 
-  // It's possible the user accidentally wrote '[Int of 4]', correct that here.
   auto *countRepr = repr->getCount();
   auto *eltRepr = repr->getElement();
-  if (!isa<IntegerTypeRepr>(countRepr) && isa<IntegerTypeRepr>(eltRepr)) {
+  // It's possible the user accidentally wrote '[Int of 4]', correct that here.
+  if (!isa<GenericArgumentExprTypeRepr>(countRepr) &&
+      isa<GenericArgumentExprTypeRepr>(eltRepr)) {
     std::swap(countRepr, eltRepr);
     ctx.Diags
         .diagnose(countRepr->getStartLoc(), diag::inline_array_type_backwards)
@@ -5734,20 +5839,98 @@ TypeResolver::resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
   return resolveType(repr->getBase(), options);
 }
 
-NeverNullType
-TypeResolver::resolveIntegerTypeRepr(IntegerTypeRepr *repr,
-                                     TypeResolutionOptions options) {
-  if (!options.is(TypeResolverContext::ValueGenericArgument) &&
+static SourceLoc findClosureExpr(Expr *expr) {
+  class ClosureFinder : public ASTWalker {
+  public:
+    SourceLoc foundLoc = SourceLoc();
+    ClosureFinder()  {}
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (isa<AbstractClosureExpr>(E)) {
+        foundLoc = E->getLoc();
+        return Action::Stop();
+      }
+      return Action::Continue(E);
+    }
+  };
+  ClosureFinder closureFinder;
+  expr->walk(closureFinder);
+  return closureFinder.foundLoc;
+}
+
+NeverNullType TypeResolver::resolveGenericArgumentExprTypeRepr(
+    GenericArgumentExprTypeRepr *repr, DeclContext *dc,
+    TypeResolutionOptions options) {
+  if (!options.is(TypeResolverContext::ScalarGenericArgument) &&
+      !options.is(TypeResolverContext::VariadicGenericArgument) &&
+      !options.is(TypeResolverContext::ValueGenericArgument) &&
       !options.is(TypeResolverContext::SameTypeRequirement) &&
       !options.is(TypeResolverContext::RawLayoutAttr) &&
       !options.contains(TypeResolutionFlags::SILMode)) {
-    diagnoseInvalid(repr, repr->getLoc(),
-                    diag::integer_type_not_accepted);
+    diagnoseInvalid(repr, repr->getLoc(), diag::integer_type_not_accepted);
     return ErrorType::get(getASTContext());
   }
 
-  return IntegerType::get(repr->getValue(), (bool)repr->getMinusLoc(),
-                          getASTContext());
+  auto originalValueExpr = repr->getOriginalArgExpr();
+  auto failedToResolveValue = [&](Diag<> diagID,
+                                  SourceLoc specificLoc = SourceLoc()) {
+    auto diagnosticLoc = specificLoc ? specificLoc : repr->getLoc();
+    repr->setArgExpr(new (getASTContext()) ErrorExpr(
+        originalValueExpr->getSourceRange(), ErrorType::get(getASTContext()),
+        originalValueExpr));
+    diagnoseInvalid(repr, diagnosticLoc, diagID);
+    return ErrorType::get(getASTContext());
+  };
+
+  auto resolveIntegerLiteralExpr = [&](IntegerLiteralExpr *expr) {
+    repr->setArgExpr(expr);
+    return IntegerType::get(expr->getDigitsText(), expr->isNegative(),
+                            getASTContext());
+  };
+
+  // We expect there to only be an 'IntegerLiteralExpr' when the LiteralExpressions
+  // feature is not enabled.
+  if (!getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions)) {
+    if (auto litExpr = dyn_cast<IntegerLiteralExpr>(originalValueExpr))
+      return resolveIntegerLiteralExpr(litExpr);
+    else
+      return failedToResolveValue(diag::nonliteral_integer_generic_value);
+  }
+
+  // We have already attempted to resolve this TypeRepr
+  if (repr->failedToResolve())
+    return ErrorType::get(getASTContext());
+  else if (auto *typeExpr = repr->getAsResolvedTypeExpr())
+    return resolveType(typeExpr->getTypeRepr(), options);
+  else if (auto *intLitExpr = repr->getAsResolvedIntegerLiteralExpr())
+    return resolveIntegerLiteralExpr(intLitExpr);
+
+  // For now, crudely diagnose and reject
+  // any closures from appearing in these expressions.
+  if (auto closureLoc = findClosureExpr(originalValueExpr))
+    return failedToResolveValue(
+        diag::integer_generic_expr_closure_not_supported, closureLoc);
+
+  // Attempt to see if we can resolve the TypeExpr to a type
+  if (auto *simplifiedTyExpr =
+          TypeChecker::simplifyGenericArgumentTypeExpr(dc, originalValueExpr)) {
+    repr->setArgExpr(simplifiedTyExpr);
+    return resolveType(simplifiedTyExpr->getTypeRepr(), options);
+  }
+
+  // Attempt to type-check and constant-fold
+  // the value expression to an integer value (`IntegerLiteralExpr`)
+  if (originalValueExpr->getType().isNull() &&
+      !TypeChecker::typeCheckExpression(
+          originalValueExpr, dc,
+          /*contextualInfo=*/
+          {getASTContext().getIntType(), CTP_IntGenericParam}))
+    return failedToResolveValue(diag::nonliteral_integer_expr_generic_value);
+
+  if (auto foldedExpr = dyn_cast<IntegerLiteralExpr>(
+          foldLiteralExpression(originalValueExpr, &getASTContext())))
+    return resolveIntegerLiteralExpr(foldedExpr);
+  else
+    return failedToResolveValue(diag::nonliteral_integer_expr_generic_value);
 }
 
 NeverNullType
@@ -5870,7 +6053,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   if (doDiag && !options.contains(TypeResolutionFlags::SilenceErrors)) {
     // In language modes up to Swift 5, we allow `T!` in invalid position for
     // compatibility and downgrade the error to a warning.
-    const unsigned swiftLangModeForError = 5;
+    const auto languageModeForError = LanguageMode::v5;
 
     // If we are about to error, mark this node as invalid.
     // This is the only way to indicate that something went wrong without
@@ -5884,17 +6067,17 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     // Compiler should diagnose both `Int!` and `String!` as invalid,
     // but returning `ErrorType` from here would stop type resolution
     // after `Int!`.
-    if (ctx.isLanguageModeAtLeast(swiftLangModeForError)) {
+    if (ctx.isLanguageModeAtLeast(languageModeForError)) {
       repr->setInvalid();
     }
 
     Diag<> diagID = diag::iuo_deprecated_here;
-    if (ctx.isLanguageModeAtLeast(swiftLangModeForError)) {
+    if (ctx.isLanguageModeAtLeast(languageModeForError)) {
       diagID = diag::iuo_invalid_here;
     }
 
     diagnose(repr->getExclamationLoc(), diagID)
-        .warnUntilLanguageMode(swiftLangModeForError);
+        .warnUntilLanguageMode(languageModeForError);
 
     // Suggest a regular optional, but not when `T!` is the right-hand side of
     // a cast expression.
@@ -6758,7 +6941,7 @@ private:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
     case TypeReprKind::LifetimeDependent:
-    case TypeReprKind::Integer:
+    case TypeReprKind::GenericArgumentExpr:
     case TypeReprKind::CallerIsolated:
       return false;
     }

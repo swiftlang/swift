@@ -2029,6 +2029,17 @@ static ValueDecl *getFixLifetimeOperation(ASTContext &C, Identifier Id) {
   return builder.build(Id);
 }
 
+static ValueDecl *getMarkDependenceOperation(ASTContext &C, Identifier Id) {
+  // <T, V> (T, V) -> T
+  BuiltinFunctionBuilder builder(C, 2);
+  auto genericValueParam = makeGenericParam(0);
+  auto genericBaseParam = makeGenericParam(1);
+  builder.addParameter(genericValueParam);
+  builder.addParameter(genericBaseParam);
+  builder.setResult(genericValueParam);
+  return builder.build(Id);
+}
+
 static ValueDecl *getExtractElementOperation(ASTContext &Context, Identifier Id,
                                              Type FirstTy, Type SecondTy) {
   // (Vector<N, T>, Int32) -> T
@@ -2458,6 +2469,14 @@ static ValueDecl *getDereferenceBorrow(ASTContext &ctx, Identifier id) {
   builder.setResult(T);
 
   return builder.build(id);
+}
+
+static ValueDecl *getTaskCancellationShieldPush(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _int(1));
+}
+
+static ValueDecl *getTaskCancellationShieldPop(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
 }
 
 /// An array of the overloaded builtin kinds.
@@ -3283,6 +3302,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::FixLifetime:
     return getFixLifetimeOperation(Context, Id);
 
+  case BuiltinValueKind::MarkDependence:
+    return getMarkDependenceOperation(Context, Id);
+
   case BuiltinValueKind::CanBeObjCClass:
     return getCanBeObjCClassOperation(Context, Id);
       
@@ -3573,6 +3595,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::DereferenceBorrow:
     return getDereferenceBorrow(Context, Id);
+
+  case BuiltinValueKind::TaskCancellationShieldPush:
+    return getTaskCancellationShieldPush(Context, Id);
+
+  case BuiltinValueKind::TaskCancellationShieldPop:
+    return getTaskCancellationShieldPop(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

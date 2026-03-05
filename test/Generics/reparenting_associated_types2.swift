@@ -8,7 +8,7 @@
 public protocol BorrowingSeq<Element> {
   associatedtype Element
 }
-public protocol Seq {
+public protocol Seq: BorrowingSeq {
   associatedtype Element
 }
 extension Seq: @reparented BorrowingSeq {}

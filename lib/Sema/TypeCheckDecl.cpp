@@ -26,6 +26,7 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "LiteralExpressionFolding.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
@@ -314,7 +315,7 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
   if (D->getFormalAccess() == AccessLevel::Open) {
     auto &context = D->getASTContext();
     auto diagID = diag::implicitly_final_cannot_be_open;
-    if (!context.isLanguageModeAtLeast(5))
+    if (!context.isLanguageModeAtLeast(LanguageMode::v5))
       diagID = diag::implicitly_final_cannot_be_open_swift4;
     auto inFlightDiag = context.Diags.diagnose(D, diagID,
                                     static_cast<unsigned>(reason.value()));
@@ -413,7 +414,7 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
                         "actors")
               .fixItRemove(convenAttr->getLocation())
               .warnInSwiftInterface(dc)
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
 
         } else { // not an actor
           // Forbid convenience inits on Foreign CF types, as Swift does not yet
@@ -641,7 +642,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       // be delegating because, well, we don't know the layout.
       // A dynamic replacement is permitted to be non-delegating.
       if (NTD->isResilient() ||
-          (ctx.isLanguageModeAtLeast(5) &&
+          (ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
            !decl->getAttrs().getAttribute<DynamicReplacementAttr>())) {
         if (decl->getParentModule() != NTD->getParentModule())
           Kind = BodyInitKind::Delegating;
@@ -843,7 +844,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           if (VD->getFormalAccess() == AccessLevel::Open) {
             auto &context = decl->getASTContext();
             auto diagID = diag::implicitly_final_cannot_be_open;
-            if (!context.isLanguageModeAtLeast(5))
+            if (!context.isLanguageModeAtLeast(LanguageMode::v5))
               diagID = diag::implicitly_final_cannot_be_open_swift4;
             auto inFlightDiag =
               context.Diags.diagnose(decl, diagID,
@@ -877,6 +878,8 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
           case AccessorKind::Read:
           case AccessorKind::Modify:
+          case AccessorKind::YieldingBorrow:
+          case AccessorKind::YieldingMutate:
           case AccessorKind::Get:
           case AccessorKind::DistributedGet:
           case AccessorKind::Set:
@@ -1200,8 +1203,7 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
 }
 
 evaluator::SideEffect
-EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
-                               TypeResolutionStage stage) const {
+EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
   Type rawTy = ED->getRawType();
   if (!rawTy) {
     return std::make_tuple<>();
@@ -1231,7 +1233,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   llvm::SmallDenseMap<RawValueKey, RawValueSource, 8> uniqueRawValues;
 
   // Make the raw member accesses explicit.
-  auto uncheckedRawValueOf = [](EnumElementDecl *EED) -> LiteralExpr * {
+  auto uncheckedRawValueOf = [](EnumElementDecl *EED) -> Expr * {
     return EED->RawValueExpr;
   };
 
@@ -1264,28 +1266,35 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       }
       elt->setRawValueExpr(nextValue);
     }
-    prevValue = uncheckedRawValueOf(elt);
-    assert(prevValue && "continued without setting raw value of enum case");
 
-    switch (stage) {
-    case TypeResolutionStage::Structural:
-      // We're only interested in computing the complete set of raw values,
-      // so we can skip type checking.
-      continue;
-    default:
-      // Continue on to type check the raw value.
-      break;
+    auto value = uncheckedRawValueOf(elt);
+    {
+      if (TypeChecker::typeCheckExpression(
+              value, ED,
+              /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue})) {
+        checkEnumElementActorIsolation(elt, value);
+        TypeChecker::checkEnumElementEffects(elt, value);
+        if (auto *seqExpr = dyn_cast<SequenceExpr>(value))
+          value = TypeChecker::foldSequence(seqExpr, ED);
+        elt->setRawValueExpr(value);
+      }
     }
 
-    
-    {
-      Expr *exprToCheck = prevValue;
-      if (TypeChecker::typeCheckExpression(
-              exprToCheck, ED,
-              /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue})) {
-        checkEnumElementActorIsolation(elt, exprToCheck);
-        TypeChecker::checkEnumElementEffects(elt, exprToCheck);
-      }
+    bool literalExprEnabled =
+        ED->getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
+    // We must constant-fold the expression here to reduce it to
+    // a LiteralExpr so that:
+    // 1. We validate the expression *is* foldable down to a constant
+    // 2. We can use it to compute the next automatic raw value expression.
+    prevValue = literalExprEnabled
+                    ? dyn_cast<LiteralExpr>(
+                          foldLiteralExpression(value, &ED->getASTContext()))
+                    : dyn_cast<LiteralExpr>(value);
+    if (!prevValue) {
+      if (literalExprEnabled && value)
+        ED->getASTContext().Diags.diagnose(
+            value->getLoc(), diag::nonliteral_int_expr_enum_case_raw_value);
+      continue;
     }
 
     // If we didn't find a valid initializer (maybe the initial value was
@@ -1294,7 +1303,6 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       elt->setInvalid();
       continue;
     }
-
 
     // If the raw values of the enum case are fixed, then we trust our callers
     // to have set things up correctly.  This comes up with imported enums
@@ -2499,6 +2507,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     auto sig = AFD->getGenericSignature();
     bool hasSelf = AFD->hasImplicitSelfDecl();
+    bool isInstanceMethod = AFD->isInstanceMethod();
 
     AnyFunctionType::ExtInfoBuilder infoBuilder;
 
@@ -2552,8 +2561,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
           infoBuilder = infoBuilder.withSendingResult();
       }
 
-      // Lifetime dependencies only apply to the outer function type.
-      if (!hasSelf && lifetimeDependenceInfo.has_value()) {
+      // Lifetime dependencies only apply to the outer function type for
+      // instance methods.
+      if (lifetimeDependenceInfo.has_value() && !isInstanceMethod) {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
@@ -2573,7 +2583,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       auto selfParam = computeSelfParam(AFD);
       AnyFunctionType::ExtInfoBuilder selfInfoBuilder;
       maybeAddParameterIsolation(selfInfoBuilder, {selfParam});
-      if (lifetimeDependenceInfo.has_value()) {
+      if (lifetimeDependenceInfo.has_value() && isInstanceMethod) {
         selfInfoBuilder =
             selfInfoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
@@ -2723,13 +2733,9 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
       // or lazy type-checking, regular type-checking should go through the
       // StmtChecker and assign types before querying this, otherwise we could
       // end up double-type-checking.
-      //
-      // FIXME: We ought to be able to enable the following assert once we've
-      // fixed cases where we currently allow forward references to variables to
-      // kick interface type requests
-      // (https://github.com/swiftlang/swift/pull/85141).
-      // ASSERT(Context.SourceMgr.hasIDEInspectionTargetBuffer() ||
-      //        Context.TypeCheckerOpts.EnableLazyTypecheck);
+      ASSERT(Context.SourceMgr.hasIDEInspectionTargetBuffer() ||
+             Context.TypeCheckerOpts.EnableLazyTypecheck &&
+             "Querying VarDecl's type before type-checking parent stmt");
 
       // Try type checking parent control statement.
       if (auto condStmt = dyn_cast<LabeledConditionalStmt>(parentStmt)) {

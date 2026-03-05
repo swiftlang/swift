@@ -265,13 +265,32 @@ const {
     }
   }
 
+  // Allow references to hidden dependencies from `@c/objc @implementation`
+  // decl signatures.
+  if (getDeclContext()->isInObjCImplementationContext()) {
+    switch (originKind) {
+    case DisallowedOriginKind::None:
+    case DisallowedOriginKind::NonPublicImport:
+    case DisallowedOriginKind::InternalBridgingHeaderImport:
+    case DisallowedOriginKind::ImplementationOnly:
+    case DisallowedOriginKind::SPIOnly:
+      return DiagnosticBehavior::Ignore;
+    case DisallowedOriginKind::SPIImported:
+    case DisallowedOriginKind::SPILocal:
+    case DisallowedOriginKind::MissingImport:
+    case DisallowedOriginKind::FragileCxxAPI:
+    case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
+      break;
+    }
+  }
+
   // Exportability checking for non-library-evolution was introduced late,
   // downgrade errors to warnings by default.
   auto &ctx = DC->getASTContext();
   if (getExportedLevel() == ExportedLevel::ImplicitlyExported &&
       originKind != DisallowedOriginKind::ImplementationOnlyMemoryLayout &&
       !ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
-      !ctx.isLanguageModeAtLeast(7))
+      !ctx.isLanguageModeAtLeast(LanguageMode::future))
     return DiagnosticBehavior::Warning;
 
   return DiagnosticBehavior::Error;
@@ -1098,7 +1117,7 @@ static bool diagnosePotentialUnavailability(
     } else if (behaviorLimit >= DiagnosticBehavior::Warning) {
       err.limitBehavior(behaviorLimit);
     } else if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl)) {
-      err.warnUntilLanguageMode(6);
+      err.warnUntilLanguageMode(LanguageMode::v6);
     }
 
     // Direct a fixit to the error if an existing guard is nearly-correct
@@ -1797,7 +1816,8 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
                 shouldHideDomainNameForConstraintDiagnostic(constraint),
                 domainAndRange.getDomain(), EncodedMessage.Message)
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
-      .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6, 6);
+      .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6,
+                               LanguageMode::v6);
 
   switch (constraint.getReason()) {
   case AvailabilityConstraint::Reason::UnavailableUnconditionally:
@@ -2981,9 +3001,9 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
       diag.limitBehavior(DiagnosticBehavior::Warning);
     } else if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl)) {
       if (shouldWarnUntilFutureVersion()) {
-        diag.warnUntilFutureLanguageMode();
+        diag.warnUntilLanguageMode(LanguageMode::future);
       } else {
-        diag.warnUntilLanguageMode(6);
+        diag.warnUntilLanguageMode(LanguageMode::v6);
       }
     }
 
@@ -3007,9 +3027,9 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
                                    attr->Message);
     if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl)) {
       if (shouldWarnUntilFutureVersion()) {
-        diag.warnUntilFutureLanguageMode();
+        diag.warnUntilLanguageMode(LanguageMode::future);
       } else {
-        diag.warnUntilLanguageMode(6);
+        diag.warnUntilLanguageMode(LanguageMode::v6);
       }
     }
   }

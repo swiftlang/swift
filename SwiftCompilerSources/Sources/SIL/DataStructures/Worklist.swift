@@ -140,22 +140,48 @@ extension BasicBlockWorklist {
 }
 
 extension InstructionWorklist {
-  public mutating func pushPredecessors(of inst: Instruction, ignoring ignoreInst: Instruction? = nil) {
+  /// Pushes all predecessors of `inst` to the worklist, except `ignoreInst`.
+  /// If `inst` is the first instruction in its block, then the last instructions of all
+  /// predecessor blocks are pushed.
+  /// This is useful for implementing backward liverange analysis, where the `ignoreInst` marks the
+  /// end of the liverange.
+  /// To speed up iteration, whole basic blocks can be excluded by letting `isTransparent` return true.
+  /// When pushing the last instruction of such a block, all instructions of the block are skipped and
+  /// the first instruction is pushed again.
+  public mutating func pushPredecessors(of inst: Instruction,
+                                        ignoring ignoreInst: Instruction? = nil,
+                                        isTransparent: (BasicBlock) -> Bool = { _ in false }
+  ) {
     if let prev = inst.previous {
       if prev != ignoreInst {
         pushIfNotVisited(prev)
       }
     } else {
       for predBlock in inst.parentBlock.predecessors {
-        let termInst = predBlock.terminator
-        if termInst != ignoreInst {
-          pushIfNotVisited(termInst)
+        let lastInst = predBlock.instructions.last!
+        if lastInst != ignoreInst {
+          if isTransparent(predBlock) {
+            pushIfNotVisited(predBlock.instructions.first!)
+          } else {
+            pushIfNotVisited(lastInst)
+          }
         }
       }
     }
   }
 
-  public mutating func pushSuccessors(of inst: Instruction, ignoring ignoreInst: Instruction? = nil) {
+  /// Pushes all successors of `inst` to the worklist, except `ignoreInst`.
+  /// If `inst` is the last instruction in its block, i.e. the terminator, then the first instructions
+  /// of all successor blocks are pushed.
+  /// This is useful for implementing forward liverange analysis, where the `ignoreInst` marks the
+  /// end of the liverange.
+  /// To speed up iteration, whole basic blocks can be excluded by letting `isTransparent` return true.
+  /// When pushing the first instruction of such a block, all instructions of the block are skipped and
+  /// the last instruction is pushed again.
+  public mutating func pushSuccessors(of inst: Instruction,
+                                      ignoring ignoreInst: Instruction? = nil,
+                                      isTransparent: (BasicBlock) -> Bool = { _ in false }
+  ) {
     if let succ = inst.next {
       if succ != ignoreInst {
         pushIfNotVisited(succ)
@@ -164,7 +190,11 @@ extension InstructionWorklist {
       for succBlock in inst.parentBlock.successors {
         let firstInst = succBlock.instructions.first!
         if firstInst != ignoreInst {
-          pushIfNotVisited(firstInst)
+          if isTransparent(succBlock) {
+            pushIfNotVisited(succBlock.instructions.last!)
+          } else {
+            pushIfNotVisited(firstInst)
+          }
         }
       }
     }
@@ -231,5 +261,48 @@ public struct CrossFunctionValueWorklist {
 
   public func hasBeenPushed(_ value: Value) -> Bool {
     return pushedValues.contains(ObjectIdentifier(value))
+  }
+}
+
+//===--------------------------------------------------------------------===//
+//                              Tests
+//===--------------------------------------------------------------------===//
+
+let instructionWorklistTest = Test("instruction_worklist") {
+  function, arguments, context in
+
+  let backward = arguments.takeBool()
+
+  var worklist = InstructionWorklist(context)
+  defer { worklist.deinitialize() }
+
+  var endInst: Instruction? = nil
+
+  var transparentBlocks = BasicBlockSet(context)
+  defer { transparentBlocks.deinitialize() }
+
+  for inst in function.instructions {
+    if let sli = inst as? StringLiteralInst {
+      switch sli.value {
+      case "end":
+        assert(endInst == nil, "more than one ignore instruction")
+        endInst = sli
+      case "begin":
+        worklist.pushIfNotVisited(sli)
+      case "transparent":
+        transparentBlocks.insert(sli.parentBlock)
+      default:
+        break
+      }
+    }
+  }
+
+  while let inst = worklist.pop() {
+    print(inst)
+    if backward {
+      worklist.pushPredecessors(of: inst, ignoring: endInst, isTransparent: transparentBlocks.contains)
+    } else {
+      worklist.pushSuccessors(of: inst, ignoring: endInst, isTransparent: transparentBlocks.contains)
+    }
   }
 }

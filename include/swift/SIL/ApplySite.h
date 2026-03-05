@@ -170,6 +170,12 @@ public:
     FOREACH_IMPL_RETURN(getCalleeFunction());
   }
 
+  /// Gets the referenced function by looking through partial apply,
+  /// convert_function, and thin to thick function until we find a function_ref.
+  SILDeclRef getCalleeDeclRef() const {
+    FOREACH_IMPL_RETURN(getCalleeDeclRef());
+  }
+
   bool isCalleeDynamicallyReplaceable() const {
     FOREACH_IMPL_RETURN(isCalleeDynamicallyReplaceable());
   }

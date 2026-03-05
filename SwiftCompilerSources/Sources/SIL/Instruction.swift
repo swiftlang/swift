@@ -1129,6 +1129,17 @@ final public class InitEnumDataAddrInst : SingleValueInstruction, UnaryInstructi
 final public class UncheckedTakeEnumDataAddrInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
   public var `enum`: Value { operand.value }
   public var caseIndex: Int { bridged.UncheckedTakeEnumDataAddrInst_caseIndex() }
+
+  /// True, if this instruction invalidates the operand memory value.
+  /// This happens for certain enum kinds because the enum tag must be cleared before the payload may be used.
+  public var isDestructive: Bool { bridged.UncheckedTakeEnumDataAddrInst_isDestructive() }
+
+  /// True, if this instruction may invalidate the operand memory value.
+  public var mayBeDestructive: Bool {
+    return isDestructive ||
+           // We don't know the layout of resilient enums. So be conservative and assume they are destructive.
+           self.enum.type.nominal!.isResilient(in: parentFunction)
+  }
 }
 
 final public class SelectEnumInst : SingleValueInstruction {
@@ -2174,12 +2185,19 @@ final public class IgnoredUseInst : Instruction, UnaryInstruction {
 final public class ImplicitActorToOpaqueIsolationCastInst
   : SingleValueInstruction, UnaryInstruction {}
 
-final public class MakeBorrowInst
+public protocol MakeBorrowInstruction
   : SingleValueInstruction, UnaryInstruction {
+  var referent: Value { get }
+}
+
+extension MakeBorrowInstruction {
   public var referent: Value {
     operands[0].value
   }
 }
+
+final public class MakeBorrowInst 
+  : SingleValueInstruction, MakeBorrowInstruction, UnaryInstruction {}
 
 final public class DereferenceBorrowInst
   : SingleValueInstruction, UnaryInstruction {
@@ -2189,11 +2207,7 @@ final public class DereferenceBorrowInst
 }
 
 final public class MakeAddrBorrowInst
-  : SingleValueInstruction, UnaryInstruction {
-  public var referent: Value {
-    operands[0].value
-  }
-}
+  : SingleValueInstruction, MakeBorrowInstruction, UnaryInstruction {}
 
 final public class DereferenceAddrBorrowInst
   : SingleValueInstruction, UnaryInstruction {

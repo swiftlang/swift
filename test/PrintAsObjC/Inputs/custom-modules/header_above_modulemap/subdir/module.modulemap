@@ -1,0 +1,4 @@
+module EmitClangHeaderWithParentDir {
+  header "../header-above-modulemap.h"
+  export *
+}

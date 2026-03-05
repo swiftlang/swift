@@ -142,16 +142,15 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   // format
   OutputFormat::Text,
 
+  // inBacktracer
+  false,
+
   // swiftBacktracePath
   NULL,
 
   // outputPath
   NULL,
 };
-
-#ifdef _WIN32
-static bool flattenCommandLine(char *buffer, size_t buflen, const char **argv);
-#endif
 
 }
 }
@@ -349,6 +348,9 @@ BacktraceInitializer::BacktraceInitializer() {
 
   if (backtracing)
     _swift_parseBacktracingSettings(backtracing);
+
+  _swift_backtraceSettings.inBacktracer
+    = swift::runtime::environment::SWIFT_IS_BACKTRACING();
 
 #if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
   if (!_swift_backtraceSettings.swiftBacktracePath) {
@@ -894,6 +896,7 @@ _swift_parseBacktracingSettings(const char *settings)
 // write protected so they can't be manipulated by an attacker using a buffer
 // overrun.
 const char * const environmentVarsToPassThrough[] = {
+  "SWIFT_BACKTRACE",
   "PATH",
   "TERM",
   "LANG",
@@ -921,14 +924,30 @@ _swift_backtraceSetupEnvironment()
 
   std::memset(swiftBacktraceEnv, 0, sizeof(swiftBacktraceEnv));
 
-  // We definitely don't want this on in the swift-backtrace program
-  const char * const disable = "SWIFT_BACKTRACE=enable=no";
-  const size_t disableLen = std::strlen(disable) + 1;
-  std::memcpy(penv, disable, disableLen);
-  penv += disableLen;
-  remaining -= disableLen;
+  unsigned firstEnvVar = 0;
 
-  for (unsigned n = 0; n < BACKTRACE_MAX_ENV_VARS; ++n) {
+  // Remember that we're backtracing
+  const char * const backtracing = "SWIFT_IS_BACKTRACING=yes";
+  const size_t backtracingLen = std::strlen(backtracing) + 1;
+  std::memcpy(penv, backtracing, backtracingLen);
+  penv += backtracingLen;
+  remaining -= backtracingLen;
+
+  // If the backtracer itself crashes, ignore crashes in the backtracer that's
+  // backtracing the backtracer.  This means we'll get backtraces from the
+  // backtracer, but it won't go full-on recursive.
+  if (_swift_backtraceSettings.inBacktracer) {
+    const char * const disable = "SWIFT_BACKTRACE=enable=no";
+    const size_t disableLen = std::strlen(disable) + 1;
+    std::memcpy(penv, disable, disableLen);
+    penv += disableLen;
+    remaining -= disableLen;
+
+    // Skip the SWIFT_BACKTRACE settings from the user
+    firstEnvVar = 1;
+  }
+
+  for (unsigned n = firstEnvVar; n < BACKTRACE_MAX_ENV_VARS; ++n) {
     const char *name = environmentVarsToPassThrough[n];
     const char *value = getenv(name);
     if (!value)
@@ -1194,6 +1213,116 @@ trueOrFalse(OnOffTty oot) {
   return trueOrFalse(oot == OnOffTty::On);
 }
 
+#ifdef _WIN32
+// Convert an argument vector to an appropriately formatted flat command line.
+//
+// The rules for this are really odd; see
+//
+//   https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw
+//
+// for details.
+bool flattenCommandLine(char *buffer, size_t buflen, const char **argv) {
+  char *ptr = cmdline_buf;
+  char *end = cmdline_buf + sizeof(cmdline_buf);
+  const char **parg = backtracer_argv;
+
+#define PUT(ch)                                 \
+  do {                                          \
+    if (ptr == end)                             \
+      return false;                             \
+    *ptr++ = ch;                                \
+  } while(0)
+
+  while (*parg) {
+    const char *argument = *parg++;
+    int slashCount = 0;
+    bool quoted = false;
+
+    if (ptr > cmdline_buf) {
+      PUT(' ');
+    }
+
+    // Check if the argument contains spaces; if it does, we have to quote it
+    const char *pt2 = argument;
+    while (*pt2) {
+      char ch = *pt2++;
+      if (ch == ' ' || ch == '\t') {
+        quoted = true;
+        break;
+      }
+    }
+
+    if (quoted) {
+      PUT('"');
+    }
+
+    pt2 = argument;
+    while (*pt2) {
+      char ch = *pt2++;
+
+      switch (ch) {
+      case '\\':
+        ++slashCount;
+        break;
+      case '"':
+        {
+          char *pend = ptr + 2 * slashCount;
+          if (end - ptr < 2 * slashCount)
+            return false;
+          while (ptr < pend)
+            *ptr++ = '\\';
+          slashCount = 0;
+          PUT('\\');
+          PUT('"');
+        }
+        break;
+      default:
+        {
+          char *pend = ptr + slashCount;
+          if (end - ptr < slashCount)
+            return false;
+          while (ptr < pend)
+            *ptr++ = '\\';
+          slashCount = 0;
+          PUT(ch);
+        }
+        break;
+      }
+    }
+
+    if (slashCount) {
+      if (quoted) {
+        char *pend = ptr + 2 * slashCount;
+        if (end - ptr < 2 * slashCount)
+          return false;
+        while (ptr < pend)
+          *ptr++ = '\\';
+        PUT('"');
+      } else {
+        char *pend = ptr + slashCount;
+        if (end - ptr < slashCount)
+          return false;
+        while (ptr < pend)
+          *ptr++ = '\\';
+      }
+    } else if (quoted) {
+      PUT('"');
+    }
+
+    if (ptr == end)
+      return false;
+  }
+
+  PUT('\0');
+
+#undef PUT
+
+  return true;
+}
+
+#endif
+
+
 } // namespace
 #endif
 
@@ -1340,9 +1469,8 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   #ifdef _WIN32
   _swift_formatUnsigned(GetCurrentProcessId(), pid_buf);
   #endif
-#endif
 
-#if TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__linux__)
+  #if TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__linux__)
   // Set-up the environment array
   const char *env[BACKTRACE_MAX_ENV_VARS + 1];
 
@@ -1358,16 +1486,16 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   // SUSv3 says argv and envp are "completely constant" and that the reason
   // posix_spawn() et al use char * const * is for compatibility.
-#ifdef __linux__
+  #ifdef __linux__
   int ret = safe_spawn(&child, swiftBacktracePath, memserver_fd,
                        const_cast<char * const *>(backtracer_argv),
                        const_cast<char * const *>(env));
-#else
+  #else
   int ret = posix_spawn(&child, swiftBacktracePath,
                         nullptr, nullptr,
                         const_cast<char * const *>(backtracer_argv),
                         const_cast<char * const *>(env));
-#endif
+  #endif
   if (ret < 0)
     return false;
 
@@ -1382,7 +1510,7 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   return false;
 
-#elif defined(_WIN32)
+  #elif defined(_WIN32)
   HANDLE hOutput;
   if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
     hOutput = GetStdHandle(STD_ERROR_HANDLE);
@@ -1461,6 +1589,7 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   CloseHandle(processInfo.hProcess);
   return dwExitCode == 0;
+  #endif
 #endif
 }
 
@@ -1510,6 +1639,20 @@ _swift_displayCrashMessage(
 #else
   sys_fd_t fd = getOutputHandle();
 
+  if (_swift_backtraceSettings.inBacktracer) {
+    const char *in_backtracer;
+    if (_swift_backtraceSettings.color == OnOffTty::On) {
+      in_backtracer = " failed\n\n"
+        "\U0001F4A3\U0001F4A3 \033[91mBacktracer crashed during backtracing;"
+        " attempting to backtrace backtracer:\033[0m\n";
+    } else {
+      in_backtracer = " failed ***\n\n"
+        "*** Backtracer crashed during backtracing;"
+        " attempting to backtrace backtracer: ***\n";
+    }
+    sys_print(fd, in_backtracer);
+  }
+
   const char *intro;
   if (_swift_backtraceSettings.color == OnOffTty::On) {
     intro = "\n\U0001F4A3 \033[91mProgram crashed: ";
@@ -1551,116 +1694,6 @@ _swift_displayCrashMessage(
   sys_print(fd, outro);
 #endif
 }
-
-#ifdef _WIN32
-// Convert an argument vector to an appropriately formatted flat command line.
-//
-// The rules for this are really odd; see
-//
-//   https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw
-//
-// for details.
-static bool flattenCommandLine(char *buffer, size_t buflen,
-                               const char **argv) {
-  char *ptr = cmdline_buf;
-  char *end = cmdline_buf + sizeof(cmdline_buf);
-  const char **parg = backtracer_argv;
-
-#define PUT(ch)                                 \
-  do {                                          \
-    if (ptr == end)                             \
-      return false;                             \
-    *ptr++ = ch;                                \
-  } while(0)
-
-  while (*parg) {
-    const char *argument = *parg++;
-    int slashCount = 0;
-    bool quoted = false;
-
-    if (ptr > cmdline_buf) {
-      PUT(' ');
-    }
-
-    // Check if the argument contains spaces; if it does, we have to quote it
-    const char *pt2 = argument;
-    while (*pt2) {
-      char ch = *pt2++;
-      if (ch == ' ' || ch == '\t') {
-        quoted = true;
-        break;
-      }
-    }
-
-    if (quoted) {
-      PUT('"');
-    }
-
-    pt2 = argument;
-    while (*pt2) {
-      char ch = *pt2++;
-
-      switch (ch) {
-      case '\\':
-        ++slashCount;
-        break;
-      case '"':
-        {
-          char *pend = ptr + 2 * slashCount;
-          if (end - ptr < 2 * slashCount)
-            return false;
-          while (ptr < pend)
-            *ptr++ = '\\';
-          slashCount = 0;
-          PUT('\\');
-          PUT('"');
-        }
-        break;
-      default:
-        {
-          char *pend = ptr + slashCount;
-          if (end - ptr < slashCount)
-            return false;
-          while (ptr < pend)
-            *ptr++ = '\\';
-          slashCount = 0;
-          PUT(ch);
-        }
-        break;
-      }
-    }
-
-    if (slashCount) {
-      if (quoted) {
-        char *pend = ptr + 2 * slashCount;
-        if (end - ptr < 2 * slashCount)
-          return false;
-        while (ptr < pend)
-          *ptr++ = '\\';
-        PUT('"');
-      } else {
-        char *pend = ptr + slashCount;
-        if (end - ptr < slashCount)
-          return false;
-        while (ptr < pend)
-          *ptr++ = '\\';
-      }
-    } else if (quoted) {
-      PUT('"');
-    }
-
-    if (ptr == end)
-      return false;
-  }
-
-  PUT('\0');
-
-#undef PUT
-
-  return true;
-}
-
-#endif
 
 } // namespace backtrace
 } // namespace runtime

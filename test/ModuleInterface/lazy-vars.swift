@@ -12,13 +12,13 @@
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules -emit-module-interface-path - %t/TestResilient.swiftmodule -module-name TestResilient | %FileCheck %s
 
 // CHECK: @frozen public struct HasLazyVarsFixedLayout {
-// CHECK-NEXT: public var foo: Swift.Int {
+// CHECK-NEXT: public var foo: Swift::Int {
 // CHECK-NEXT:   mutating get
 // CHECK-NEXT:   set
 // CHECK-NEXT: }
-// CHECK: private var $__lazy_storage_$_foo: Swift.Int?
+// CHECK: private var $__lazy_storage_$_foo: Swift::Int?
 // CHECK-NOT: private var bar
-// CHECK: private var $__lazy_storage_$_bar: Swift.Int?
+// CHECK: private var $__lazy_storage_$_bar: Swift::Int?
 // CHECK-NEXT: }
 @frozen
 public struct HasLazyVarsFixedLayout {
@@ -27,13 +27,13 @@ public struct HasLazyVarsFixedLayout {
 }
 
 // CHECK: public struct HasLazyVars {
-// CHECK-NEXT: public var foo: Swift.Int {
+// CHECK-NEXT: public var foo: Swift::Int {
 // CHECK-NEXT:   mutating get
 // CHECK-NEXT:   set
 // CHECK-NEXT: }
-// NONRESILIENT: private var $__lazy_storage_$_foo: Swift.Int?
+// NONRESILIENT: private var $__lazy_storage_$_foo: Swift::Int?
 // CHECK-NOT: private var bar
-// NONRESILIENT: private var $__lazy_storage_$_bar: Swift.Int?
+// NONRESILIENT: private var $__lazy_storage_$_bar: Swift::Int?
 // CHECK-NEXT: }
 public struct HasLazyVars {
   public lazy var foo: Int = 0

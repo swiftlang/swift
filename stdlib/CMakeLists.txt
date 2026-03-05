@@ -11,7 +11,7 @@ project(swift-stdlib LANGUAGES C CXX)
 # being built on Windows.  Since we know that we only support `clang-cl` as the
 # compiler for the runtime due to the use of the Swift calling convention, we
 # simply override the CMake behaviour unconditionally.
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND MSVC AND CLANG_C_COMPILER_ID MATCHES Clang)
   set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-imsvc ")
   set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-imsvc ")
 else()
@@ -123,7 +123,7 @@ else()
   # everything and there are various places where we link runtime code with
   # code built by the host compiler. Disable sanitizers for the runtime for
   # now.
-  add_compile_options(-fno-sanitize=all)
+  add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-fno-sanitize=all>")
 endif()
 
 # Do not enforce checks for LLVM's ABI-breaking build settings.

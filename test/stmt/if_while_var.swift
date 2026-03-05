@@ -58,8 +58,8 @@ if case let optional? { _ = optional } // expected-error{{variable binding in a 
 if case let .some(optional) { _ = optional } // expected-error{{variable binding in a condition requires an initializer}}
 if case .some(let optional) { _ = optional } // expected-error{{variable binding in a condition requires an initializer}}
 
-if case let x? = nonOptionalStruct() { _ = x } // expected-error{{'?' pattern cannot match values of type 'NonOptionalStruct'}}
-if case let x? = nonOptionalEnum() { _ = x } // expected-error{{'?' pattern cannot match values of type 'NonOptionalEnum'}}
+if case let x? = nonOptionalStruct() { _ = x } // expected-error{{optional pattern '?' cannot match value of non-optional type 'NonOptionalStruct'}}
+if case let x? = nonOptionalEnum() { _ = x } // expected-error{{optional pattern '?' cannot match value of non-optional type 'NonOptionalEnum'}}
 
 if let x { _ = x } // expected-error{{cannot find 'x' in scope}}
 
@@ -114,7 +114,7 @@ if var x = opt {} // expected-warning {{value 'x' was defined but never used; co
 // <rdar://problem/20800015> Fix error message for invalid if-let
 let someInteger = 1
 if let y = someInteger { _ = y }  // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
-if case let y? = someInteger { _ = y }  // expected-error {{'?' pattern cannot match values of type 'Int'}}
+if case let y? = someInteger { _ = y }  // expected-error {{optional pattern '?' cannot match value of non-optional type 'Int'}}
 
 // Test multiple clauses on "if let".
 if let x = opt, let y = opt, x != y,

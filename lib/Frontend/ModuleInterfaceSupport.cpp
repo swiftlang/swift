@@ -452,19 +452,27 @@ class InheritedProtocolCollector {
       return cache.value();
 
     cache.emplace();
+
+    // Start with the decl itself and add its @available attributes to the list.
+    // Then do the same for each parent declaration, but skip adding new
+    // availability attributes if they would be superceded by an attribute on a
+    // nested declaration since those take precedence.
+    // FIXME: This is just approximating the effects of nested availability
+    // attributes for the same platform; formally they'd need to be merged.
+    llvm::SmallVector<SemanticAvailableAttr, 8> pendingAttrs;
     while (D) {
       for (auto nextAttr : D->getSemanticAvailableAttrs()) {
-        // FIXME: This is just approximating the effects of nested availability
-        // attributes for the same platform; formally they'd need to be merged.
-        // FIXME: [availability] This should compare availability domains.
-        bool alreadyHasMoreSpecificAttrForThisPlatform = llvm::any_of(
+        bool hasMoreSpecificAttribute = llvm::any_of(
             *cache, [nextAttr](SemanticAvailableAttr existingAttr) {
-              return existingAttr.getPlatform() == nextAttr.getPlatform();
+              return existingAttr.getDomain().contains(nextAttr.getDomain());
             });
-        if (alreadyHasMoreSpecificAttrForThisPlatform)
+        if (hasMoreSpecificAttribute)
           continue;
-        cache->push_back(nextAttr);
+        pendingAttrs.push_back(nextAttr);
       }
+
+      cache->append(pendingAttrs);
+      pendingAttrs.clear();
       D = D->getDeclContext()->getAsDecl();
     }
 
@@ -695,7 +703,7 @@ public:
     if (!printOptions.shouldPrint(nominal))
       return;
 
-    /// is this nominal specifically an 'actor' or 'distributed actor'?
+    // Is this nominal specifically an 'actor' or 'distributed actor'?
     bool anyActorClass = false;
     if (auto klass = dyn_cast<ClassDecl>(nominal)) {
       anyActorClass = klass->isAnyActor();

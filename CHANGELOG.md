@@ -5,6 +5,110 @@
 
 ## Swift (next)
 
+* The checking for illegal forward references to local variables is now consistent regardless of
+  whether the reference appears in a closure. Previously the type-checker could incorrectly permit
+  forward references within a closure that it would reject outside of the closure, however this
+  is not something that can be supported in general in the type-checker. In most cases this should
+  have no impact since such invalid references would have already been rejected by later diagnostic
+  passes in the compiler. However there are a couple of cases that were previously legal that are
+  now illegal.
+
+  These include:
+
+  - `lazy` local variables with initializers that forward reference a local variable in a closure,
+    or local variables with attached macros that relocate the initializer into an accessor, e.g:
+
+    ```swift
+    func foo() {
+      lazy var x = { y } // error: use of local variable 'y' before its declaration
+      let y = 0
+    }
+    ```
+
+    ```swift
+    func foo() {
+      @LazyLikeMacro var x = { y } // error: use of local variable 'y' before its declaration
+      let y = 0
+    }
+    ```
+
+  - Forward references to local computed variables from a closure, e.g:
+
+    ```swift
+    func foo() {
+      var x = { y } // error: use of local variable 'y' before its declaration
+      var y: Int { 0 }
+    }
+    ```
+
+  Both cases were already invalid if there was no closure involved. These are now consistently
+  rejected.
+
+  This then allows for consistent shadowing behavior inside and outside of closures, allowing the
+  following previously illegal case to become legal:
+
+  ```swift
+  struct S {
+    var x: Int
+    func foo() {
+      // Already legal, both refer to `self.x`
+      let y = x
+      let x = x
+
+      let z = x // Refers to the local var.
+    }
+    func bar() {
+      // Both previously illegal, now both refer to `self.x`.
+      let y = { x }()
+      let x: Int = { x }()
+
+      let z = x // Still refers to the local var.
+    }
+  }
+  ```
+
+* To simplify writing cross-platform code for Apple platforms while adopting
+  new APIs, availability on macOS, iOS, tvOS, watchOS, and visionOS can now be
+  specified implicitly using `anyAppleOS` for operating system versions starting
+  with `26.0`:
+
+  ```swift
+  @available(anyAppleOS 26.0, *)
+  func functionAvailableOnVersion26() {
+    // ...
+  }
+
+  if #available(anyAppleOS 26.0, *) {
+    // Executes on macOS 26, iOS 26, watchOS 26, tvOS 26, and visionOS 26.
+    functionAvailableOnVersion26()
+  }
+  ```
+
+  If availability for a specific platform is specified simultaneously with
+  `anyAppleOS`, availability for the specific platform takes precedence when
+  building for that platform:
+
+  ```swift
+  if #available(anyAppleOS 26.0, macOS 26.4, *) {
+    // Executes on macOS 26.4 and version 26 of all other Apple OSes.
+  }
+  ```
+
+* [SE-0504][]:
+  Introduced Task Cancellation Shields which temporarily prevent the observation of task
+  cancellation in a given scope. This functionality is intended for use with cleanup actions which
+  may otherwise not have run to completion (since their implementation may have been checking for
+  cancellation and returning early). It may also be used within `defer` blocks to conveniently
+  express such guaranteed-to-run-to-completion cleanups.
+
+  ```swift
+  Task.isCancelled // true
+  withTaskCancellationShield {
+    Task.isCancelled // false
+    cleanup() 
+  }
+  ```
+
 * Calling from Objective-C into into asynchronous Swift APIs will now attempt use `Task.immediate`
   instead of `Task` when available. This reduces the initial enqueue delay which Task would incur
   (by enqueueing on the global pool before calling the async target), and can improve performance
@@ -36,6 +140,8 @@
   applies when the memory is to later be used again as `Element`. In that case,
   the non-padding bytes of `Element` must allow every bit pattern to be
   permissible in a valid value of `Element`.
+
+## Swift 6.3
 
 * [SE-0491][]:
   You can now use a module selector to specify which module Swift should look inside to find a named declaration. A
@@ -10991,6 +11097,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0471]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
+[SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

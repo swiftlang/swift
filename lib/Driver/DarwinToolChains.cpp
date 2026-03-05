@@ -1023,7 +1023,7 @@ toolchains::Darwin::validateOutputInfo(DiagnosticEngine &diags,
   // If we have been provided with an SDK, go read the SDK information.
   if (!outputInfo.SDKPath.empty()) {
     auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
-        *llvm::vfs::getRealFileSystem(), outputInfo.SDKPath);
+        *llvm::vfs::createPhysicalFileSystem(), outputInfo.SDKPath);
     if (SDKInfoOrErr) {
       SDKInfo = *SDKInfoOrErr;
     } else {

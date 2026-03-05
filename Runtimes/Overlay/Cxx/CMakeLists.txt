@@ -19,6 +19,7 @@ add_library(swiftCxx STATIC
   CxxPair.swift
   CxxRandomAccessCollection.swift
   CxxSequence.swift
+  CxxBorrowingSequence.swift
   CxxSet.swift
   CxxSpan.swift
   CxxVector.swift
@@ -34,7 +35,8 @@ target_compile_options(swiftCxx PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -nostdinc++>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AllowUnsafeAttribute>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BuiltinModule>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Lifetimes>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Lifetimes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowingSequence>")
 target_link_libraries(swiftCxx PUBLIC
   $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>
   swiftCore)

@@ -517,10 +517,11 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
       // In Swift 6.2 and below we incorrectly missed checking this rule for
       // methods, downgrade to a warning until the next language mode.
-      if (!anchor->hasCurriedSelf() || ctx.isAtLeastFutureMajorLanguageMode())
+      if (!anchor->hasCurriedSelf() ||
+          ctx.isLanguageModeAtLeast(LanguageMode::future))
         return Type();
 
-      diag.warnUntilFutureLanguageMode();
+      diag.warnUntilLanguageMode(LanguageMode::future);
     }
   }
 
@@ -661,6 +662,21 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
           : SyntacticElementTarget::forInitialization(
                 initializer, DC, patternType, pattern,
                 /*bindPatternVarsOneWay=*/false);
+
+  // Bindings cannot be type-checked independently from their context in a
+  // closure. If we want to be able to lazily type-check these we'll need to
+  // type-check the entire surrounding expression.
+  if (auto *CE = dyn_cast<ClosureExpr>(DC)) {
+    if (!pattern->isImplicit()) {
+      // Completion may trigger lazy type-checking, just decline to type-check.
+      auto &ctx = CE->getASTContext();
+      if (ctx.SourceMgr.hasIDEInspectionTargetBuffer()) {
+        target.markInvalid();
+        return true;
+      }
+      ABORT("Cannot type-check PatternBindingDecl without closure context");
+    }
+  }
 
   // Type-check the initializer.
   auto resultTarget = typeCheckExpression(target, options);
@@ -1088,6 +1104,26 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
 //===----------------------------------------------------------------------===//
 #pragma mark Debugging
 
+void PotentialThrowSite::print(SourceManager *sm,
+                               llvm::raw_ostream &out) const {
+  switch (kind) {
+  case PotentialThrowSite::Application:
+    out << "- application @ ";
+    break;
+  case PotentialThrowSite::ExplicitThrow:
+    out << " - explicit throw @ ";
+    break;
+  case PotentialThrowSite::NonExhaustiveDoCatch:
+    out << " - non-exhaustive do..catch @ ";
+    break;
+  case PotentialThrowSite::PropertyAccess:
+    out << " - property access @ ";
+    break;
+  }
+
+  locator->dump(sm, out);
+}
+
 void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
                           raw_ostream &out) const {
   PrintOptions PO = PrintOptions::forDebugging();
@@ -1266,6 +1302,17 @@ void Solution::dump(raw_ostream &out, unsigned indent) const {
       out << ", ";
     });
     out << "\n";
+  }
+
+  if (!potentialThrowSites.empty()) {
+    out.indent(indent) << "Potential throw sites:\n";
+    interleave(
+        potentialThrowSites,
+        [&](const auto &throwSite) {
+          throwSite.second.print(sm, out.indent(indent + 2));
+        },
+        [&] { out << "\n"; });
+    out << '\n';
   }
 
   if (!Fixes.empty()) {
@@ -1525,27 +1572,13 @@ void ConstraintSystem::print(raw_ostream &out) const {
 
   if (!potentialThrowSites.empty()) {
     out.indent(indent) << "Potential throw sites:\n";
-    interleave(potentialThrowSites, [&](const auto &throwSite) {
-      out.indent(indent + 2);
-      switch (throwSite.second.kind) {
-      case PotentialThrowSite::Application:
-        out << "- application @ ";
-        break;
-      case PotentialThrowSite::ExplicitThrow:
-        out << " - explicit throw @ ";
-        break;
-      case PotentialThrowSite::NonExhaustiveDoCatch:
-        out << " - non-exhaustive do..catch @ ";
-        break;
-      case PotentialThrowSite::PropertyAccess:
-        out << " - property access @ ";
-        break;
-      }
-
-      throwSite.second.locator->dump(&getASTContext().SourceMgr, out);
-    }, [&] {
-      out << "\n";
-    });
+    interleave(
+        potentialThrowSites,
+        [&](const auto &throwSite) {
+          throwSite.second.print(&getASTContext().SourceMgr,
+                                 out.indent(indent + 2));
+        },
+        [&] { out << "\n"; });
     out << "\n";
 
   }

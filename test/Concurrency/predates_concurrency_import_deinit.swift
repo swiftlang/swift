@@ -15,7 +15,7 @@ actor ActorWithDeinit {
   var ns: NonStrictClass = NonStrictClass()
   var ss: StrictStruct = StrictStruct()
 
-  deinit {
+  deinit { // expected-note{{add 'isolated' to run isolated to 'ActorWithDeinit', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
     print(ns)
     print(ss) // expected-warning{{cannot access property 'ss' with a non-Sendable type 'StrictStruct' from nonisolated deinit}}
   }

@@ -141,6 +141,7 @@ struct BacktraceSettings {
   Symbolication    symbolicate;
   bool             suppressWarnings;
   OutputFormat     format;
+  bool             inBacktracer;
   const char      *swiftBacktracePath;
   const char      *outputPath;
 };

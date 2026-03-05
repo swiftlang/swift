@@ -9,7 +9,7 @@
 public protocol BorrowingSeq<BSElement> {
   associatedtype BSElement // expected-note {{protocol requires nested type 'BSElement'}}
 }
-public protocol Seq {
+public protocol Seq: BorrowingSeq {
   associatedtype Element
 }
 extension Seq: @reparented BorrowingSeq // expected-error {{type 'Self' does not conform to protocol 'BorrowingSeq'}} // expected-note {{add stubs for conformance}}
@@ -20,7 +20,7 @@ extension Seq: @reparented BorrowingSeq // expected-error {{type 'Self' does not
 public protocol Door {
   associatedtype Key  // expected-note 2{{protocol requires nested type 'Key'}}
 }
-public protocol WitnessUsingSelf {}
+public protocol WitnessUsingSelf: Door {}
 struct Wrapper<T> {}
 extension WitnessUsingSelf: @reparented Door where Key == Wrapper<Key> {}
 // expected-error@-1 {{cannot build rewrite system for generic signature; concrete type nesting limit exceeded}}
@@ -31,7 +31,7 @@ extension WitnessUsingSelf: @reparented Door where Key == Wrapper<Key> {}
 
 
 // Both A and Z are candidates to witness Key, so we pick neither!
-public protocol AmbiguousWitness {
+public protocol AmbiguousWitness: Door {
   associatedtype A
   associatedtype Z
 }

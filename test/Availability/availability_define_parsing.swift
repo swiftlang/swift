@@ -8,6 +8,7 @@
 // RUN:   -define-availability "_noVersion: macOS" \
 // RUN:   -define-availability "_duplicateVersion 1.0:iOS 13.0" \
 // RUN:   -define-availability "_duplicateVersion 1.0:iOS 13.0" \
+// RUN:   -define-availability "_allowJustWildcard:*" \
 // RUN:   2>&1 | %FileCheck %s
 
 // Force reading the argument macros.

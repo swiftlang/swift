@@ -81,8 +81,8 @@ import InconsistentPublic
 extension IOIPublicStruct {
   public func foo() {}
 }
-// CHECK-PUBLIC-NOT: A_SPIOnlyImported.IOIPublicStruct
-// CHECK-PRIVATE: @_spi{{.*}} extension A_SPIOnlyImported.IOIPublicStruct
+// CHECK-PUBLIC-NOT: A_SPIOnlyImported::IOIPublicStruct
+// CHECK-PRIVATE: @_spi{{.*}} extension A_SPIOnlyImported::IOIPublicStruct
 
 //--- FileB.swift
 @_spiOnly import ConstantSPIOnly

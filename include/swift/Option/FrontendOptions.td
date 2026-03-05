@@ -438,8 +438,23 @@ def solver_shuffle_disjunctions_EQ : Joined<["-"], "solver-shuffle-disjunctions=
 def solver_shuffle_choices_EQ : Joined<["-"], "solver-shuffle-choices=">,
   HelpText<"Random seed for shuffling disjunction choices. For debugging solver performance">;
 
-def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
-  HelpText<"Disable per-name lazy member loading (obsolete)">;
+def solver_enable_crash_on_valid_salvage : Flag<["-"], "solver-enable-crash-on-valid-salvage">,
+  HelpText<"Reject valid solutions in diagnostic mode">;
+
+def solver_disable_crash_on_valid_salvage : Flag<["-"], "solver-disable-crash-on-valid-salvage">,
+  HelpText<"Accept valid solutions in diagnostic mode">;
+
+def solver_enable_transitive_conformance : Flag<["-"], "solver-enable-transitive-conformance">,
+  HelpText<"Enable transitive conformance constraint optimization">;
+
+def solver_disable_transitive_conformance : Flag<["-"], "solver-disable-transitive-conformance">,
+  HelpText<"Disable transitive conformance constraint optimization">;
+
+def solver_enable_binding_optimizations : Flag<["-"], "solver-enable-binding-optimizations">,
+  HelpText<"Enable experimental optimizations to speed up type variable binding">;
+
+def solver_disable_binding_optimizations : Flag<["-"], "solver-disable-binding-optimizations">,
+  HelpText<"Disable experimental optimizations to speed up type variable binding">;
 
 def disable_named_lazy_import_as_member_loading :
   Flag<["-"], "disable-named-lazy-import-as-member-loading">,
@@ -985,6 +1000,9 @@ def import_module : Separate<["-"], "import-module">,
 
 def testable_import_module : Separate<["-"], "testable-import-module">,
   HelpText<"Implicitly import the specified module with @testable">;
+
+def dependency_only_import : Separate<["-"], "dependency-only-import">,
+                             HelpText<"Import the module as a dependency only">;
 
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;

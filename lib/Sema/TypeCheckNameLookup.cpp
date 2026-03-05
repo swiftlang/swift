@@ -1174,7 +1174,7 @@ ModuleSelectorCorrection(const LookupResult &candidates) {
         kind = CandidateKind::MemberViaSelf;
     }
 
-    auto owningModule = decl->getModuleContext();
+    auto owningModule = decl->getModuleContextForNameLookup();
     candidateModules.insert(
       { owningModule->getNameForModuleSelector(), kind });
   }
@@ -1185,7 +1185,7 @@ ModuleSelectorCorrection(const LookupTypeResult &candidates) {
   // Produce a list of *unique* module selector diagnostics so we don't
   // emit a bunch of duplicates.
   for (auto result : candidates) {
-    auto owningModule = result.Member->getModuleContext();
+    auto owningModule = result.Member->getModuleContextForNameLookup();
     candidateModules.insert(
       { owningModule->getNameForModuleSelector(), CandidateKind::ContextFree });
   }
@@ -1194,7 +1194,7 @@ ModuleSelectorCorrection(const LookupTypeResult &candidates) {
 ModuleSelectorCorrection::
 ModuleSelectorCorrection(const SmallVectorImpl<ValueDecl *> &candidates) {
   for (auto result : candidates) {
-    auto owningModule = result->getModuleContext();
+    auto owningModule = result->getModuleContextForNameLookup();
     candidateModules.insert(
       { owningModule->getName(), CandidateKind::ContextFree });
   }
@@ -1203,7 +1203,7 @@ ModuleSelectorCorrection(const SmallVectorImpl<ValueDecl *> &candidates) {
 ModuleSelectorCorrection::
 ModuleSelectorCorrection(const SmallVectorImpl<constraints::OverloadChoice> &candidates) {
   for (auto result : candidates) {
-    auto owningModule = result.getDecl()->getModuleContext();
+    auto owningModule = result.getDecl()->getModuleContextForNameLookup();
     candidateModules.insert(
       { owningModule->getNameForModuleSelector(), CandidateKind::ContextFree });
   }

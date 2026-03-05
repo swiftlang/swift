@@ -21,7 +21,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/FrontendTool/FrontendTool.h"
-#include "Dependencies.h"
 #include "TBD.h"
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTDumper.h"
@@ -63,6 +62,7 @@
 #include "swift/Frontend/MakeStyleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/FrontendTool/Dependencies.h"
 #include "swift/IRGen/TBDGen.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"
@@ -204,11 +204,11 @@ printModuleInterfaceIfNeeded(llvm::vfs::OutputBackend &outputBackend,
     return false;
 
   DiagnosticEngine &diags = M->getDiags();
-  if (!LangOpts.isLanguageModeAtLeast(5)) {
-    assert(LangOpts.isLanguageModeAtLeast(4));
-    diags.diagnose(SourceLoc(),
-                   diag::warn_unsupported_module_interface_swift_version,
-                   LangOpts.isLanguageModeAtLeast(4, 2) ? "4.2" : "4");
+  if (!LangOpts.isLanguageModeAtLeast(LanguageMode::v5)) {
+    assert(LangOpts.isLanguageModeAtLeast(LanguageMode::v4));
+    diags.diagnose(
+        SourceLoc(), diag::warn_unsupported_module_interface_swift_version,
+        LangOpts.isLanguageModeAtLeast(LanguageMode::v4_2) ? "4.2" : "4");
   }
   if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
     diags.diagnose(SourceLoc(),
@@ -1987,6 +1987,13 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
   // unlikely to reduce the peak heap size. So, only optimize the
   // single-primary-case (or WMO).
   if (opts.InputsAndOutputs.hasMultiplePrimaryInputs()) {
+    return;
+  }
+
+  // DiagnosticVerifier hasn't run yet. Freeing the AST context will free the
+  // source buffers.
+  if (Instance.getInvocation().getDiagnosticOptions().VerifyMode !=
+      DiagnosticOptions::NoVerify) {
     return;
   }
 

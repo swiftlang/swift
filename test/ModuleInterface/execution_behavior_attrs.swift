@@ -7,12 +7,12 @@
 
 public struct TestWithAttrs {
   // CHECK: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK-NEXT: public func test(_: nonisolated(nonsending) @escaping () async -> Swift.Void)
+  // CHECK-NEXT: public func test(_: nonisolated(nonsending) @escaping () async -> Swift::Void)
   // CHECK-NEXT: #endif
   public func test(_: nonisolated(nonsending) @escaping () async -> Void) {}
 
   // CHECK: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK-NEXT: public func withInOut(fn: nonisolated(nonsending) inout () async -> Swift.Void)
+  // CHECK-NEXT: public func withInOut(fn: nonisolated(nonsending) inout () async -> Swift::Void)
   // CHECK-NEXT: #endif
   public func withInOut(fn: nonisolated(nonsending) inout () async -> Void) {}
 }
@@ -26,14 +26,14 @@ public struct Test {
   }
 
   // CHECK: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK-NEXT: @concurrent public init(something: Swift.Int) async
+  // CHECK-NEXT: @concurrent public init(something: Swift::Int) async
   // CHECK-NEXT: #endif
   @concurrent
   public init(something: Int) async {
   }
 
   // CHECK-NOT: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK: public init(noExplicit: Swift.String) async
+  // CHECK: public init(noExplicit: Swift::String) async
   // CHECK-NOT: #endif
   public init(noExplicit: String) async {
   }
@@ -46,27 +46,27 @@ public struct Test {
   }
 
   // CHECK: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK-NEXT: public func other(_: nonisolated(nonsending) () async -> Swift.Void)
+  // CHECK-NEXT: public func other(_: nonisolated(nonsending) () async -> Swift::Void)
   // CHECK-NEXT: #endif
   public func other(_: nonisolated(nonsending) () async -> Void) {}
 
   // CHECK-NOT: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK: public func concurrentResult(_: () async -> Swift.Void) -> (Swift.Int) async -> Swift.Void
+  // CHECK: public func concurrentResult(_: () async -> Swift::Void) -> (Swift::Int) async -> Swift::Void
   // CHECK-NOT: #endif
   public func concurrentResult(_: () async -> Void) -> @concurrent (Int) async -> Void {}
 
   // CHECK: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK-NEXT: public func nestedPositions1(_: Swift.Array<[Swift.String : nonisolated(nonsending) (Swift.Int) async -> Swift.Void]>)
+  // CHECK-NEXT: public func nestedPositions1(_: Swift::Array<[Swift::String : nonisolated(nonsending) (Swift::Int) async -> Swift::Void]>)
   // CHECK-NEXT: #endif
   public func nestedPositions1(_: Array<[String: nonisolated(nonsending) (Int) async -> Void]>) {}
 
   // CHECK-NOT: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK: public func nestedPositions2(_: Swift.Array<[Swift.String : (Swift.Int) async -> Swift.Void]>)
+  // CHECK: public func nestedPositions2(_: Swift::Array<[Swift::String : (Swift::Int) async -> Swift::Void]>)
   // CHECK-NOT: #endif
   public func nestedPositions2(_: Array<[String: @concurrent (Int) async -> Void]>) {}
 
   // CHECK: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK-NEXT: nonisolated(nonsending) public var testOnVar: Swift.Int {
+  // CHECK-NEXT: nonisolated(nonsending) public var testOnVar: Swift::Int {
   // CHECK-NEXT:   get async
   // CHECK-NEXT: }
   // CHECK-NEXT: #endif
@@ -78,7 +78,7 @@ public struct Test {
   }
 
   // CHECK: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK-NEXT: @concurrent public var testOnVarConcurrent: Swift.Int {
+  // CHECK-NEXT: @concurrent public var testOnVarConcurrent: Swift::Int {
   // CHECK-NEXT:   get async
   // CHECK-NEXT: }
   // CHECK-NEXT: #endif
@@ -90,7 +90,7 @@ public struct Test {
   }
 
   // CHECK: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK-NEXT: nonisolated(nonsending) public subscript(onSubscript _: Swift.Int) -> Swift.Bool {
+  // CHECK-NEXT: nonisolated(nonsending) public subscript(onSubscript _: Swift::Int) -> Swift::Bool {
   // CHECK-NEXT:   get async
   // CHECK-NEXT: }
   // CHECK-NEXT: #endif
@@ -102,7 +102,7 @@ public struct Test {
   }
 
   // CHECK: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK-NEXT: @concurrent public subscript(concurrentOnSubscript _: Swift.Int) -> Swift.Bool {
+  // CHECK-NEXT: @concurrent public subscript(concurrentOnSubscript _: Swift::Int) -> Swift::Bool {
   // CHECK-NEXT:   get async
   // CHECK-NEXT: }
   // CHECK-NEXT: #endif

@@ -1240,14 +1240,28 @@ namespace {
 
     void emitReparentedAssociatedConformanceAccessBody(
         IRGenFunction &IGF, ProtocolConformance *conf,
-        llvm::Value *associatedTypeMetadata, llvm::Value *wtable) {
+        llvm::Value *selfMetadata, llvm::Value *wtable) {
       assert(conf->isReparented());
       assert(conf->getDeclContext()->getSelfProtocolDecl() == Proto);
       assert(conf->getProtocol() != Proto);
 
+      // This is similar to emitWitnessTableAccessorCall, but with one fixed
+      // instantiation argument: the witness table passed to the accessor.
+
       // Get the protocol conformance descriptor.
-      auto *descriptor = IGM.getAddrOfProtocolConformanceDescriptor(
+      llvm::Value *descriptor = IGM.getAddrOfProtocolConformanceDescriptor(
           conf->getRootConformance());
+
+      // Sign the descriptor.
+      auto schema = IGF.IGM.getOptions()
+                        .PointerAuth.ProtocolConformanceDescriptorsAsArguments;
+      if (schema) {
+        auto authInfo =
+            PointerAuthInfo::emit(IGF, schema, nullptr,
+                                  PointerAuthEntity::Special::
+                                      ProtocolConformanceDescriptorAsArgument);
+        descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
+      }
 
       unsigned argumentCount = 0;
       SILWitnessTable::enumerateWitnessTableConditionalConformances(
@@ -1272,12 +1286,17 @@ namespace {
       // swift_getWitnessTable(descriptor,
       //                       associatedTypeMetadata,
       //                       &instantiationArgs)
-      auto *func = IGM.getGetWitnessTableFn();
-      auto *funcTy = IGM.getGetWitnessTableFnType();
-      auto thisTable = IGF.Builder.CreateCall(
-          funcTy, func,
-          {descriptor, associatedTypeMetadata, alloca.getAddress()});
-      IGF.Builder.CreateRet(thisTable);
+      auto call = IGF.IGM.IRGen.Opts.UseRelativeProtocolWitnessTables ?
+      IGF.Builder.CreateCall(
+        IGF.IGM.getGetWitnessTableRelativeFunctionPointer(),
+        {descriptor, selfMetadata, alloca.getAddress()}) :
+      IGF.Builder.CreateCall(
+        IGF.IGM.getGetWitnessTableFunctionPointer(),
+        {descriptor, selfMetadata, alloca.getAddress()});
+
+      call->setCallingConv(IGF.IGM.DefaultCC);
+      call->setDoesNotThrow();
+      IGF.Builder.CreateRet(call);
     }
 
     void defineDefaultAssociatedConformanceAccessFunction(
@@ -5647,7 +5666,7 @@ static void emitEmbeddedVTable(IRGenModule &IGM, CanType classTy,
   FixedClassMetadataBuilder builder(IGM, classDecl, init, fragileLayout,
                                     vtable);
   builder.layoutEmbedded(classTy);
-  bool canBeConstant = builder.canBeConstant();
+  bool canBeConstant = true;
 
   StringRef section{};
   auto var = IGM.defineTypeMetadata(classTy, /*isPattern*/ false, canBeConstant,
@@ -7362,8 +7381,10 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
     
   // The other known protocols aren't special at runtime.
   case KnownProtocolKind::Sequence:
+  case KnownProtocolKind::BorrowingSequence:
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::IteratorProtocol:
+  case KnownProtocolKind::BorrowingIteratorProtocol:
   case KnownProtocolKind::AsyncIteratorProtocol:
   case KnownProtocolKind::RawRepresentable:
   case KnownProtocolKind::Equatable:
@@ -7425,6 +7446,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::CxxMutableRandomAccessCollection:
   case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
+  case KnownProtocolKind::CxxBorrowingSequence:
   case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::CxxVector:
   case KnownProtocolKind::CxxSpan:

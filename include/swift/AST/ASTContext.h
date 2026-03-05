@@ -88,6 +88,8 @@ namespace swift {
   class DerivativeAttr;
   class DifferentiableAttr;
   class ExtensionDecl;
+  struct ExplicitSwiftModuleMap;
+  struct ExplicitClangModuleMap;
   struct ExternalSourceLocs;
   class ForeignRepresentationInfo;
   class FuncDecl;
@@ -272,7 +274,6 @@ class ASTContext final {
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SerializationOptions &serializationOpts, SourceManager &SourceMgr,
       DiagnosticEngine &Diags,
-      std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
 
 public:
@@ -299,7 +300,6 @@ public:
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SerializationOptions &serializationOpts, SourceManager &SourceMgr,
       DiagnosticEngine &Diags,
-      std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
   ~ASTContext();
 
@@ -722,11 +722,17 @@ public:
   /// Get Sequence.makeIterator().
   FuncDecl *getSequenceMakeIterator() const;
 
+  /// Get BorrowingSequence.makeBorrowingIterator().
+  FuncDecl *getBorrowingSequenceMakeBorrowingIterator() const;
+
   /// Get AsyncSequence.makeAsyncIterator().
   FuncDecl *getAsyncSequenceMakeAsyncIterator() const;
 
   /// Get IteratorProtocol.next().
   FuncDecl *getIteratorNext() const;
+
+  /// Get BorrowingIteratorProtocol.nextSpan(maximumCount:).
+  FuncDecl *getBorrowingIteratorNextSpan() const;
 
   /// Get AsyncIteratorProtocol.next().
   FuncDecl *getAsyncIteratorNext() const;
@@ -919,6 +925,8 @@ public:
   // runtime version.
 #define FEATURE(N, V)                                                          \
   inline AvailabilityRange get##N##Availability() const {                      \
+    if (LangOpts.hasFeature(Feature::Embedded))                                \
+      return AvailabilityRange::alwaysAvailable();                             \
     return getSwiftAvailability V;                                             \
   }                                                                            \
   inline AvailabilityRange get##N##RuntimeAvailability() const {               \
@@ -1070,8 +1078,8 @@ public:
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
   void addSearchPath(StringRef searchPath, bool isFramework, bool isSystem);
 
-  /// Adds the path to the explicitly built module \c name.
-  void addExplicitModulePath(StringRef name, std::string path);
+  ExplicitSwiftModuleMap *getExplicitSwiftModuleMap();
+  ExplicitClangModuleMap *getExplicitClangModuleMap();
 
   /// Adds a module loader to this AST context.
   ///
@@ -1546,20 +1554,14 @@ public:
       const ValueDecl *base, const ValueDecl *derived,
       const OverrideGenericSignatureReqCheck direction);
 
-  /// Whether our effective Swift version is at least 'major'.
+  /// Returns a boolean value indicating whether the language mode is at least
+  /// `mode`.
   ///
-  /// This is usually the check you want; for example, when introducing
+  /// This is very likely the check you want; for example, when introducing
   /// a new language feature which is only visible in Swift 5, you would
-  /// check for isLanguageModeAtLeast(5).
-  bool isLanguageModeAtLeast(unsigned major, unsigned minor = 0) const {
-    return LangOpts.isLanguageModeAtLeast(major, minor);
-  }
-
-  /// Whether the "next major" language mode is being used. This isn't a real
-  /// language mode, it only exists to signal clients that expect to be
-  /// included in the next language mode when it becomes available.
-  bool isAtLeastFutureMajorLanguageMode() const {
-    return LangOpts.isAtLeastFutureMajorLanguageMode();
+  /// check for `isLanguageModeAtLeast(LanguageMode::v5)`.
+  bool isLanguageModeAtLeast(LanguageMode mode) const {
+    return LangOpts.isLanguageModeAtLeast(mode);
   }
 
   /// Check whether it's important to respect access control restrictions

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -559,10 +559,10 @@ extension __CocoaDictionary: _DictionaryBuffer {
 }
 
 extension __CocoaDictionary {
-  @inlinable
-  internal func mapValues<Key: Hashable, Value, T>(
-    _ transform: (Value) throws -> T
-  ) rethrows -> _NativeDictionary<Key, T> {
+  @_alwaysEmitIntoClient
+  internal func mapValues<Key: Hashable, Value, T, E: Error>(
+    _ transform: (Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
     var result = _NativeDictionary<Key, T>(capacity: self.count)
     for (cocoaKey, cocoaValue) in self {
       let key = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
@@ -571,6 +571,24 @@ extension __CocoaDictionary {
     }
     return result
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of mapValues, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func mapValues<Key: Hashable, Value, T>(
+      _ transform: (Value) throws -> T
+    ) throws -> _NativeDictionary<Key, T>
+  )
+  @usableFromInline
+  internal func __rethrows_mapValues<Key: Hashable, Value, T>(
+    _ transform: (Value) throws -> T
+  ) throws -> _NativeDictionary<Key, T> {
+    try mapValues(transform)
+  }
+#endif
 }
 
 extension __CocoaDictionary {

@@ -48,7 +48,7 @@ Type ide::eraseArchetypes(Type type, GenericSignature genericSig) {
       // Don't erase opaque archetype.
       if (isa<OpaqueTypeArchetypeType>(archetypeType) &&
           archetypeType->isRoot())
-        return std::nullopt;
+        return archetypeType;
 
       auto genericSig =
           archetypeType->getGenericEnvironment()->getGenericSignature();

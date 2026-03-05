@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: ( %target-build-swift %s -o %t/NotImportedByDefault || true ) 2>&1 | %FileCheck %s
+// RUN: not %target-build-swift %s -o %t/NotImportedByDefault 2>&1 | %FileCheck %s
 
 // Windows chokes on the parens in the above expression
 // UNSUPPORTED: OS=windows-msvc

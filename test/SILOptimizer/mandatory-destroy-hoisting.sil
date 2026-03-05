@@ -527,3 +527,32 @@ bb0(%0 : @owned $C):
   %10 = tuple ()
   return %10
 }
+
+protocol P: AnyObject {}
+
+// CHECK-LABEL: sil [ossa] @type_dependent_operand_outside_liverange :
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %2
+// CHECK:       } // end sil function 'type_dependent_operand_outside_liverange'
+sil [ossa] @type_dependent_operand_outside_liverange : $@convention(thin) (@in_guaranteed any P) -> () {
+
+bb0(%0 : $*any P):
+  %1 = load [copy] %0
+  %2 = open_existential_ref %1 to $@opened("093C97B4-11DD-11F1-AC30-1A9AD1B1CD90", any P) Self
+  cond_br undef, bb1, bb2
+
+bb1:
+  %4 = alloc_stack $@opened("093C97B4-11DD-11F1-AC30-1A9AD1B1CD90", any P) Self
+  store %2 to [init] %4
+  %6 = apply undef<@opened("093C97B4-11DD-11F1-AC30-1A9AD1B1CD90", any P) Self>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> ()
+  dealloc_stack %4
+  br bb3
+
+bb2:
+  destroy_value %2
+  br bb3
+
+bb3:
+  %11 = tuple ()
+  return %11
+}

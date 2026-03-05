@@ -77,6 +77,7 @@ using CheckDeclAccessCallback = void(AccessScope, SourceLoc, ImportAccessLevel);
 class AccessControlCheckerBase {
 protected:
   bool checkUsableFromInline;
+  bool ignoreImportAccessLevel;
 
   bool shouldSkipChecking(const ValueDecl *decl);
 
@@ -122,8 +123,10 @@ protected:
                        AccessScope contextAccessScope, const DeclContext *useDC,
                        llvm::function_ref<CheckDeclAccessCallback> diagnose);
 
-  AccessControlCheckerBase(bool checkUsableFromInline)
-      : checkUsableFromInline(checkUsableFromInline) {}
+  AccessControlCheckerBase(bool checkUsableFromInline,
+                           bool ignoreImportAccessLevel)
+      : checkUsableFromInline(checkUsableFromInline),
+        ignoreImportAccessLevel(ignoreImportAccessLevel) {}
 
 public:
   void checkGenericParamAccess(
@@ -291,7 +294,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   if (type) {
     std::optional<AccessScope> typeAccessScope =
         TypeAccessScopeChecker::getAccessScope(type, useDC,
-                                               checkUsableFromInline);
+                                               checkUsableFromInline,
+                                               ignoreImportAccessLevel);
 
     // Note: This means that the type itself is invalid for this particular
     // context, because it references declarations from two incompatible scopes.
@@ -318,7 +322,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
 
     auto typeReprAccessScope =
         TypeAccessScopeChecker::getAccessScope(typeRepr, useDC,
-                                               checkUsableFromInline);
+                                               checkUsableFromInline,
+                                               ignoreImportAccessLevel);
     if (!typeReprAccessScope.has_value())
       return;
 
@@ -334,7 +339,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     // TypeRepr into account).
 
     if (typeRepr && mayBeInferred &&
-        !Context.isLanguageModeAtLeast(5) &&
+        !Context.isLanguageModeAtLeast(LanguageMode::v5) &&
         !useDC->getParentModule()->isResilient()) {
       // Swift 4.2 and earlier didn't check the Type when a TypeRepr was
       // present. However, this is a major hole when generic parameters are
@@ -358,7 +363,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       typeRepr, problematicAccessScope, useDC, checkUsableFromInline);
 
   ImportAccessLevel complainImport = std::nullopt;
-  if (complainRepr) {
+  if (complainRepr && !ignoreImportAccessLevel) {
     const ValueDecl *VD = complainRepr->getBoundDecl();
     assert(VD &&
            "findTypeDeclWithAccessScope should return bound TypeReprs only");
@@ -557,7 +562,7 @@ void AccessControlCheckerBase::checkGenericParamAccess(
     downgradeToWarning = DowngradeToWarning::Yes;
 
   if (checkUsableFromInline) {
-    if (!Context.isLanguageModeAtLeast(5))
+    if (!Context.isLanguageModeAtLeast(LanguageMode::v5))
       downgradeToWarning = DowngradeToWarning::Yes;
 
     auto diagID = diag::generic_param_usable_from_inline;
@@ -680,11 +685,14 @@ class AccessControlChecker : public AccessControlCheckerBase,
                              public DeclVisitor<AccessControlChecker> {
 public:
 
-  AccessControlChecker(bool allowUsableFromInline)
-    : AccessControlCheckerBase(allowUsableFromInline) {}
+  AccessControlChecker(bool allowUsableFromInline,
+                       bool ignoreImportAccessLevel)
+    : AccessControlCheckerBase(allowUsableFromInline,
+                               ignoreImportAccessLevel) {}
 
   AccessControlChecker()
-      : AccessControlCheckerBase(/*checkUsableFromInline=*/false) {}
+      : AccessControlCheckerBase(/*checkUsableFromInline=*/false,
+                                 /*ignoreImportAccessLevel=*/false) {}
 
   void visit(Decl *D) {
     if (D->isInvalid() || D->isImplicit())
@@ -956,7 +964,7 @@ public:
 
         // Swift versions before 5.0 did not check requirements on the
         // protocol's where clause, so emit a warning.
-        if (!assocType->getASTContext().isLanguageModeAtLeast(5))
+        if (!assocType->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
           downgradeToWarning = DowngradeToWarning::Yes;
       }
     });
@@ -1040,7 +1048,7 @@ public:
 
       auto outerDowngradeToWarning = DowngradeToWarning::No;
       if (superclassDecl->isGenericContext() &&
-          !CD->getASTContext().isLanguageModeAtLeast(5)) {
+          !CD->getASTContext().isLanguageModeAtLeast(LanguageMode::v5)) {
         // Swift 4 failed to properly check this if the superclass was generic,
         // because the above loop was too strict.
         outerDowngradeToWarning = DowngradeToWarning::Yes;
@@ -1141,7 +1149,8 @@ public:
               declKind = declKindForType(type);
               // Swift versions before 5.0 did not check requirements on the
               // protocol's where clause, so emit a warning.
-              if (!proto->getASTContext().isLanguageModeAtLeast(5))
+              if (!proto->getASTContext().isLanguageModeAtLeast(
+                      LanguageMode::v5))
                 downgradeToWarning = DowngradeToWarning::Yes;
             }
           });
@@ -1439,10 +1448,11 @@ class UsableFromInlineChecker : public AccessControlCheckerBase,
                                 public DeclVisitor<UsableFromInlineChecker> {
 public:
   UsableFromInlineChecker()
-      : AccessControlCheckerBase(/*checkUsableFromInline=*/true) {}
+      : AccessControlCheckerBase(/*checkUsableFromInline=*/true,
+                                 /*ignoreImportAccessLevel=*/false) {}
 
   void visit(Decl *D) {
-    if (!D->getASTContext().isLanguageModeAtLeast(4, 2))
+    if (!D->getASTContext().isLanguageModeAtLeast(LanguageMode::v4_2))
       return;
 
     if (D->isInvalid() || D->isImplicit())
@@ -1529,7 +1539,7 @@ public:
           auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
           if (fixedLayoutStructContext) {
             diagID = diag::pattern_type_not_usable_from_inline_inferred_frozen;
-          } else if (!Ctx.isLanguageModeAtLeast(5)) {
+          } else if (!Ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
             diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
           }
           Ctx.Diags.diagnose(NP->getLoc(), diagID, theVar->isLet(),
@@ -1568,7 +1578,7 @@ public:
           auto diagID = diag::pattern_type_not_usable_from_inline;
           if (fixedLayoutStructContext)
             diagID = diag::pattern_type_not_usable_from_inline_frozen;
-          else if (!Ctx.isLanguageModeAtLeast(5))
+          else if (!Ctx.isLanguageModeAtLeast(LanguageMode::v5))
             diagID = diag::pattern_type_not_usable_from_inline_warn;
           auto diag = Ctx.Diags.diagnose(TP->getLoc(), diagID, anyVar->isLet(),
                                          isTypeContext);
@@ -1624,7 +1634,7 @@ public:
                         DowngradeToWarning downgradeToWarning,
                         ImportAccessLevel importLimit) {
       auto diagID = diag::type_alias_underlying_type_not_usable_from_inline;
-      if (!TAD->getASTContext().isLanguageModeAtLeast(5))
+      if (!TAD->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
         diagID = diag::type_alias_underlying_type_not_usable_from_inline_warn;
       auto diag = TAD->diagnose(diagID);
       highlightOffendingType(diag, complainRepr);
@@ -1646,7 +1656,7 @@ public:
             DowngradeToWarning downgradeDiag,
                           ImportAccessLevel importLimit) {
         auto diagID = diag::associated_type_not_usable_from_inline;
-        if (!assocType->getASTContext().isLanguageModeAtLeast(5))
+        if (!assocType->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
           diagID = diag::associated_type_not_usable_from_inline_warn;
         auto diag = assocType->diagnose(diagID, ACEK_Requirement);
         highlightOffendingType(diag, complainRepr);
@@ -1661,7 +1671,7 @@ public:
                         DowngradeToWarning downgradeDiag,
                         ImportAccessLevel importLimit) {
       auto diagID = diag::associated_type_not_usable_from_inline;
-      if (!assocType->getASTContext().isLanguageModeAtLeast(5))
+      if (!assocType->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
         diagID = diag::associated_type_not_usable_from_inline_warn;
       auto diag = assocType->diagnose(diagID, ACEK_DefaultDefinition);
       highlightOffendingType(diag, complainRepr);
@@ -1679,7 +1689,7 @@ public:
                                  DowngradeToWarning downgradeDiag,
                                  ImportAccessLevel importLimit) {
         auto diagID = diag::associated_type_not_usable_from_inline;
-        if (!assocType->getASTContext().isLanguageModeAtLeast(5))
+        if (!assocType->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
           diagID = diag::associated_type_not_usable_from_inline_warn;
         auto diag = assocType->diagnose(diagID, ACEK_Requirement);
         highlightOffendingType(diag, complainRepr);
@@ -1710,7 +1720,7 @@ public:
                           DowngradeToWarning downgradeToWarning,
                           ImportAccessLevel importLimit) {
         auto diagID = diag::enum_raw_type_not_usable_from_inline;
-        if (!ED->getASTContext().isLanguageModeAtLeast(5))
+        if (!ED->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
           diagID = diag::enum_raw_type_not_usable_from_inline_warn;
         auto diag = ED->diagnose(diagID);
         highlightOffendingType(diag, complainRepr);
@@ -1755,7 +1765,7 @@ public:
                           DowngradeToWarning downgradeToWarning,
                           ImportAccessLevel importLimit) {
         auto diagID = diag::class_super_not_usable_from_inline;
-        if (!CD->getASTContext().isLanguageModeAtLeast(5))
+        if (!CD->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
           diagID = diag::class_super_not_usable_from_inline_warn;
         auto diag = CD->diagnose(diagID, superclassLocIter->getTypeRepr() !=
                                              complainRepr);
@@ -1779,7 +1789,7 @@ public:
                           DowngradeToWarning downgradeDiag,
                           ImportAccessLevel importLimit) {
         auto diagID = diag::protocol_usable_from_inline;
-        if (!proto->getASTContext().isLanguageModeAtLeast(5))
+        if (!proto->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
           diagID = diag::protocol_usable_from_inline_warn;
         auto diag = proto->diagnose(diagID, PCEK_Refine);
         highlightOffendingType(diag, complainRepr);
@@ -1798,7 +1808,7 @@ public:
                                  DowngradeToWarning downgradeDiag,
                                  ImportAccessLevel importLimit) {
         auto diagID = diag::protocol_usable_from_inline;
-        if (!proto->getASTContext().isLanguageModeAtLeast(5))
+        if (!proto->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
           diagID = diag::protocol_usable_from_inline_warn;
         auto diag = proto->diagnose(diagID, PCEK_Requirement);
         highlightOffendingType(diag, complainRepr);
@@ -1817,7 +1827,7 @@ public:
               DowngradeToWarning downgradeDiag,
               ImportAccessLevel importLimit) {
             auto diagID = diag::subscript_type_usable_from_inline;
-            if (!SD->getASTContext().isLanguageModeAtLeast(5))
+            if (!SD->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
               diagID = diag::subscript_type_usable_from_inline_warn;
             auto diag = SD->diagnose(diagID, /*problemIsElement=*/false);
             highlightOffendingType(diag, complainRepr);
@@ -1832,7 +1842,7 @@ public:
                         DowngradeToWarning downgradeDiag,
                         ImportAccessLevel importLimit) {
       auto diagID = diag::subscript_type_usable_from_inline;
-      if (!SD->getASTContext().isLanguageModeAtLeast(5))
+      if (!SD->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
         diagID = diag::subscript_type_usable_from_inline_warn;
       auto diag = SD->diagnose(diagID, /*problemIsElement=*/true);
       highlightOffendingType(diag, complainRepr);
@@ -1868,7 +1878,8 @@ public:
                   DowngradeToWarning downgradeDiag,
                   ImportAccessLevel importLimit) {
                 auto diagID = diag::function_type_usable_from_inline;
-                if (!fn->getASTContext().isLanguageModeAtLeast(5))
+                if (!fn->getASTContext().isLanguageModeAtLeast(
+                        LanguageMode::v5))
                   diagID = diag::function_type_usable_from_inline_warn;
                 auto diag = fn->diagnose(diagID, functionKind,
                                          /*problemIsResult=*/false,
@@ -1885,7 +1896,7 @@ public:
               DowngradeToWarning downgradeDiag,
               ImportAccessLevel importLimit) {
             auto diagID = diag::function_type_usable_from_inline;
-            if (!fn->getASTContext().isLanguageModeAtLeast(5))
+            if (!fn->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
               diagID = diag::function_type_usable_from_inline_warn;
             auto diag = fn->diagnose(diagID, functionKind,
                                      /*problemIsResult=*/false,
@@ -1903,7 +1914,7 @@ public:
                           DowngradeToWarning downgradeDiag,
                           ImportAccessLevel importLimit) {
         auto diagID = diag::function_type_usable_from_inline;
-        if (!fn->getASTContext().isLanguageModeAtLeast(5))
+        if (!fn->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
           diagID = diag::function_type_usable_from_inline_warn;
         auto diag = fn->diagnose(diagID, functionKind,
                                  /*problemIsResult=*/true,
@@ -1928,7 +1939,7 @@ public:
               DowngradeToWarning downgradeToWarning,
               ImportAccessLevel importLimit) {
             auto diagID = diag::enum_case_usable_from_inline;
-            if (!EED->getASTContext().isLanguageModeAtLeast(5))
+            if (!EED->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
               diagID = diag::enum_case_usable_from_inline_warn;
             auto diag = EED->diagnose(diagID);
             highlightOffendingType(diag, complainRepr);
@@ -2063,7 +2074,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
     // just in this case.
     if (!Context.LangOpts.hasFeature(Feature::StrictAccessControl) &&
         howImported == RestrictedImportKind::MissingImport &&
-        !Context.isLanguageModeAtLeast(6) &&
+        !Context.isLanguageModeAtLeast(LanguageMode::v6) &&
         !SF->hasImportsWithFlag(ImportFlags::ImplementationOnly)) {
       downgradeToWarning = DowngradeToWarning::Yes;
     }
@@ -2508,6 +2519,23 @@ public:
 
   void visitProtocolDecl(ProtocolDecl *proto) {
     for (TypeLoc requirement : proto->getInherited().getEntries()) {
+
+      // Inherited protocols can be less available than this protocol, only if
+      // this protocol has defined a @reparented extension and thus default
+      // conformance. Otherwise, clients compiled for an older version of the
+      // library could send types into a newer library that fails to provide
+      // the default witness table for the inherited protocol's requirements.
+      if (auto inheritedTy = requirement.getType()->getAs<ProtocolType>()) {
+        ProtocolDecl const *inherited = inheritedTy->getDecl();
+        bool isForReparenting = llvm::any_of(
+            proto->getReparentingProtocols(), [=](auto const &tup) {
+              return std::get<ProtocolDecl *>(tup) == inherited;
+            });
+        if (isForReparenting) {
+          continue;
+        }
+      }
+
       checkType(requirement.getType(), requirement.getTypeRepr(), proto,
                 ExportabilityReason::General,
                 DeclAvailabilityFlag::DisableUnsafeChecking);
@@ -2605,7 +2633,14 @@ public:
     //
     // 1) If the extension defines conformances, the conformed-to protocols
     // must be exported.
-    DeclAvailabilityFlags flags = DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+    DeclAvailabilityFlags flags;
+
+    // Extensions of protocols can only have inherited entries for reparenting.
+    // For understandability, the `extension P: @reparented Q` defines a
+    // relationship that should have availability compatible with protocol Q.
+    if (!isa<ProtocolDecl>(extendedType))
+      flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+
     flags |= DeclAvailabilityFlag::DisableUnsafeChecking;
     ExportabilityReason inheritanceReason =
       Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
@@ -2881,7 +2916,10 @@ void swift::checkAccessControl(Decl *D) {
   if (isa<ValueDecl>(D) || isa<PatternBindingDecl>(D)) {
     bool allowInlineable =
         D->getDeclContext()->isInSpecializeExtensionContext();
-    AccessControlChecker(allowInlineable).visit(D);
+    bool ignoreImportAccessLevel =
+        D->getInnermostDeclContext()->isInObjCImplementationContext();
+
+    AccessControlChecker(allowInlineable, ignoreImportAccessLevel).visit(D);
     UsableFromInlineChecker().visit(D);
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     checkExtensionAccess(ED);

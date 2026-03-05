@@ -2216,7 +2216,7 @@ llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
 SwiftEditorDocument::getFileSystem() const {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
   return Impl.SemanticInfo ? Impl.SemanticInfo->getFileSystem()
-                           : llvm::vfs::getRealFileSystem();
+                           : llvm::vfs::createPhysicalFileSystem();
 }
 
 void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,

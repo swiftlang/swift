@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/result_builder.swift -emit-module -emit-module-path %t/result_builder.swiftmodule
-// RUN: %target-swift-frontend -emit-ir %s -I %t -g -O
+// RUN: %target-swift-frontend -emit-ir %s -I %t -g -O -solver-disable-crash-on-valid-salvage
+// RUN: not --crash %target-swift-frontend -emit-ir %s -I %t -g -O -solver-enable-crash-on-valid-salvage
 
 // FIXME: Devise a test case that does not involve -O.
 

@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ThenStatements -enable-experimental-feature ParserASTGen \
+// RUN: %target-swift-frontend-dump-parse -enable-experimental-move-only -enable-experimental-feature ThenStatements -enable-experimental-feature ParserASTGen \
 // RUN:    | %sanitize-address > %t/astgen.ast
-// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ThenStatements \
+// RUN: %target-swift-frontend-dump-parse -enable-experimental-move-only -enable-experimental-feature ThenStatements \
 // RUN:    | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature ThenStatements -enable-experimental-feature ParserASTGen)
+// RUN: %target-run-simple-swift( -enable-experimental-feature ThenStatements -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser

@@ -1482,9 +1482,8 @@ public:
       removeUnreachableBlocks(*getFunction());
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
 
-      // We know that this pass does not create infinite loops even if it
-      // deletes basic blocks.
-      getFunction()->setNeedBreakInfiniteLoops(false);
+      if (getFunction()->needBreakInfiniteLoops())
+        breakInfiniteLoops(getPassManager(), getFunction());
       if (getFunction()->needCompleteLifetimes())
         completeAllLifetimes(getPassManager(), getFunction());
 

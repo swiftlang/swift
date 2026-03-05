@@ -385,7 +385,7 @@ struct ImageSource: CustomStringConvertible {
               isMappedImage: isMappedImage, path: path)
   }
 
-  /// Initialise with a mapped file
+  /// Initialise with a mapped file (this is currently used by Linux)
   init(path: String) throws {
     self.init(storage: try Storage(path: path),
               isMappedImage: false, path: path)

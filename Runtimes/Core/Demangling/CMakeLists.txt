@@ -8,7 +8,7 @@ add_library(swiftDemangling OBJECT
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp"
-  "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/Errors.cpp")
+  "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/DemanglingErrorHandling.cpp")
 target_compile_definitions(swiftDemangling PRIVATE
   $<$<BOOL:${BUILD_SHARED_LIBS}>:-DswiftCore_EXPORTS>
   $<$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>:-DSWIFT_SUPPORT_OLD_MANGLING>

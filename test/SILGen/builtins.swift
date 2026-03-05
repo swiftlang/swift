@@ -979,3 +979,35 @@ func testTaskLocalValuePush<Value>(_ key: Builtin.RawPointer, _ value: consuming
 func testTaskLocalValuePop() async {
   Builtin.taskLocalValuePop()
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins26taskCancellationShieldPushyyYaF : $@convention(thin) @async () -> () {
+// CHECK:   builtin "taskCancellationShieldPush"() : $Builtin.Int1
+// CHECK: } // end sil function '$s8builtins26taskCancellationShieldPushyyYaF'
+func taskCancellationShieldPush() async {
+  Builtin.taskCancellationShieldPush()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins25taskCancellationShieldPopyyYaF : $@convention(thin) @async () -> () {
+// CHECK:   builtin "taskCancellationShieldPop"() : $()
+// CHECK: } // end sil function '$s8builtins25taskCancellationShieldPopyyYaF'
+func taskCancellationShieldPop() async {
+  Builtin.taskCancellationShieldPop()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins20markDependencTrivialySpyxGAC_yXltlF :
+// CHECK:   [[M:%.*]] = mark_dependence %0 : $UnsafeMutablePointer<T> on %1
+// CHECK:   return [[M]]
+// CHECK: } // end sil function '$s8builtins20markDependencTrivialySpyxGAC_yXltlF'
+func markDependencTrivial<T>(_ p: UnsafeMutablePointer<T>, _ o: AnyObject) -> UnsafeMutablePointer<T> {
+  return Builtin.markDependence(p, o)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins24markDependenceGuaranteedyyXlyXl_yXltF :
+// CHECK:   [[M:%.*]] = mark_dependence %0 : $AnyObject on %1
+// CHECK:   [[C:%.*]] = copy_value [[M]]
+// CHECK:   return [[C]]
+// CHECK: } // end sil function '$s8builtins24markDependenceGuaranteedyyXlyXl_yXltF'
+func markDependenceGuaranteed(_ p: AnyObject, _ o: AnyObject) -> AnyObject {
+  return Builtin.markDependence(p, o)
+}
+

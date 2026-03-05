@@ -57,7 +57,10 @@ enum class AllowedBindingKind : uint8_t {
   /// Supertypes of the specified type.
   Supertypes,
   /// Subtypes of the specified type.
-  Subtypes
+  Subtypes,
+  /// Special hack for `extension P where Self == S { ... }` members
+  /// and keypaths.
+  Fallback,
 };
 
 /// The kind of literal binding found.
@@ -93,7 +96,8 @@ struct PotentialBinding {
                    PointerUnion<Constraint *, ConstraintLocator *> source,
                    TypeVariableType *originator)
       : BindingType(type), Kind(kind), BindingSource(source),
-        Originator(originator) {}
+        Originator(originator) {
+  }
 
   PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
       : PotentialBinding(
@@ -131,14 +135,17 @@ struct PotentialBinding {
   Constraint *getSource() const { return cast<Constraint *>(BindingSource); }
 
   PotentialBinding withType(Type type) const {
+    ASSERT(Kind != AllowedBindingKind::Fallback);
     return {type, Kind, BindingSource, Originator};
   }
 
   PotentialBinding withSameSource(Type type, AllowedBindingKind kind) const {
+    ASSERT(kind != AllowedBindingKind::Fallback);
     return {type, kind, BindingSource, Originator};
   }
 
   PotentialBinding asTransitiveFrom(TypeVariableType *originator) const {
+    ASSERT(Kind != AllowedBindingKind::Fallback);
     ASSERT(originator);
     return {BindingType, Kind, BindingSource, originator};
   }
@@ -242,6 +249,9 @@ struct PotentialBindings {
   /// The constraint system this type variable and its bindings belong to.
   ConstraintSystem &CS;
 
+  /// This must be incremented whenever any of the below state changes.
+  unsigned GenerationNumber = 0;
+
   /// The type variable this bindings are associated with. Note that his
   /// property could change when associated with a constraint graph node
   /// that is being re-used. Calling \c reset sets it to `nullptr`.
@@ -255,6 +265,11 @@ struct PotentialBindings {
 
   /// The set of constraints which delay attempting this type variable.
   llvm::TinyPtrVector<Constraint *> DelayedBy;
+
+  /// The set of LValueObject constraints having this type variable on the
+  /// left-hand side. If this is non-empty, we know that the type variable
+  /// must be bound to an lvalue.
+  llvm::TinyPtrVector<Constraint *> LValueOf;
 
   /// The set of type variables adjacent to the current one.
   ///
@@ -359,6 +374,9 @@ struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
   }
 
   static bool isEqual(const Binding &LHS, const Binding &RHS) {
+    if (LHS.Kind != RHS.Kind)
+      return false;
+
     auto lhsTy = LHS.BindingType.getPointer();
     auto rhsTy = RHS.BindingType.getPointer();
 
@@ -394,6 +412,16 @@ private:
 namespace swift {
 namespace constraints {
 namespace inference {
+
+enum class KnownLValueKind: uint8_t {
+  /// Insufficient information to determine yet.
+  Unknown,
+  /// Definitely not an lvalue.
+  RValue,
+  /// Definitely an lvalue.
+  LValue
+};
+
 class BindingSet {
   using BindingScore =
       std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
@@ -405,6 +433,14 @@ class BindingSet {
   const PotentialBindings &Info;
 
   llvm::SmallPtrSet<TypeVariableType *, 4> AdjacentVars;
+
+  /// Set whenever transitive inference changes the binding set
+  /// after the constructor.
+  bool IsDirty = false;
+  /// Generation number of PotentialBindings.
+  unsigned GenerationNumber = 0;
+  /// Computed early by computeLValueState().
+  KnownLValueKind LValueState = KnownLValueKind::Unknown;
 
 public:
   swift::SmallSetVector<PotentialBinding, 4> Bindings;
@@ -440,6 +476,29 @@ public:
   /// that represents a generic parameter.
   bool forGenericParameter() const;
 
+  /// Whether the binding set has changed after construction, in which
+  /// case we must recompute it on the next call to determineBestBindings().
+  bool isDirty() const {
+    return IsDirty;
+  }
+
+  /// Return the generation number of the corresponding potential bindings
+  /// at the time this binding set was constructed.
+  unsigned getGenerationNumber() const {
+    return GenerationNumber;
+  }
+
+  /// Check if this binding set is known to be up to date.
+  bool isUpToDate() const {
+    return (GenerationNumber == Info.GenerationNumber && !IsDirty);
+  }
+
+  KnownLValueKind getLValueState() const {
+    return LValueState;
+  }
+
+  /// Whether this type variable is subject to a ExpressibleByNilLiteral
+  /// requirement. These require special handling.
   bool canBeNil() const;
 
   /// If this type variable doesn't have any viable bindings, or
@@ -506,14 +565,6 @@ public:
     });
   }
 
-  /// Check if this binding is viable for inclusion in the set.
-  ///
-  /// \param binding The binding to validate.
-  /// \param isTransitive Indicates whether this binding has been
-  /// acquired through transitive inference and requires extra
-  /// checking.
-  bool isViable(PotentialBinding &binding);
-
   /// Determine whether this set has any "viable" (or non-hole) bindings.
   ///
   /// A viable binding could be - a direct or transitive binding
@@ -563,6 +614,12 @@ public:
 
     assert(numDefaultable >= unviable);
     return numDefaultable - unviable;
+  }
+
+  unsigned getNumExactBindings() const {
+    return llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
+      return binding.Kind == AllowedBindingKind::Exact;
+    });
   }
 
   ASTNode getAssociatedCodeCompletionToken() const {
@@ -632,7 +689,11 @@ public:
 
   static BindingScore formBindingScore(const BindingSet &b);
 
-  bool operator==(const BindingSet &other);
+  bool operator==(const BindingSet &other) const;
+
+  bool operator!=(const BindingSet &other) const {
+    return !(*this == other);
+  }
 
   /// Compare two sets of bindings, where \c this < other indicates that
   /// \c this is a better set of bindings that \c other.
@@ -640,7 +701,17 @@ public:
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
 
+  void resetTransitiveProtocols() {
+    TransitiveProtocols.reset();
+  }
+
 private:
+  void computeLValueState();
+
+  void markDirty() {
+    IsDirty = true;
+  }
+
   /// Add a new binding to the set.
   ///
   /// \param binding The binding to add.
@@ -661,29 +732,6 @@ private:
 #undef ENTRY
   }
 };
-
-enum class ConversionBehavior : unsigned {
-  None,
-  Class,
-  AnyHashable,
-  Double,
-  Pointer,
-  Array,
-  Dictionary,
-  Set,
-  Optional,
-  Structural,
-  Unknown
-};
-
-/// Classify the possible conversions having this type as result type.
-ConversionBehavior getConversionBehavior(Type type);
-
-/// Check whether there exists a type that could be implicitly converted
-/// to a given type i.e. is the given type is Double or Optional<..> this
-/// function is going to return true because CGFloat could be converted
-/// to a Double and non-optional value could be injected into an optional.
-bool hasConversions(Type type);
 
 /// Check whether the given type can be used as a binding for the given
 /// type variable.

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024-2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,7 +19,9 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeRepr.h"
@@ -27,6 +29,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 
 #define DEBUG_TYPE "LifetimeDependence"
@@ -168,12 +171,12 @@ std::string LifetimeDependenceInfo::getString() const {
   auto addressable = getAddressableIndices();
   auto condAddressable = getConditionallyAddressableIndices();
   
+  bool isFirstSpecifier = true;
   auto getSourceString = [&](IndexSubset *bitvector, StringRef kind) {
     std::string result;
-    bool isFirstSetBit = true;
     for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
       if (bitvector->contains(i)) {
-        if (!isFirstSetBit) {
+        if (!isFirstSpecifier) {
           result += ", ";
         }
         result += kind;
@@ -183,11 +186,20 @@ std::string LifetimeDependenceInfo::getString() const {
           result += "address_for_deps ";
         }
         result += std::to_string(i);
-        isFirstSetBit = false;
+        isFirstSpecifier = false;
       }
     }
     return result;
   };
+  // Unlike the AST printer, there is no need check isDefaultSuppressed() for
+  // SIL printing because SIL does not assume any defaults.
+  if (hasImmortalSpecifier()) {
+    if (!isFirstSpecifier) {
+      lifetimeDependenceString += ", ";
+    }
+    lifetimeDependenceString += "immortal";
+    isFirstSpecifier = false;
+  }
   if (inheritLifetimeParamIndices) {
     assert(!inheritLifetimeParamIndices->isEmpty());
     lifetimeDependenceString +=
@@ -195,21 +207,15 @@ std::string LifetimeDependenceInfo::getString() const {
   }
   if (scopeLifetimeParamIndices) {
     assert(!scopeLifetimeParamIndices->isEmpty());
-    if (inheritLifetimeParamIndices) {
-      lifetimeDependenceString += ", ";
-    }
     lifetimeDependenceString +=
         getSourceString(scopeLifetimeParamIndices, "borrow ");
-  }
-  if (isImmortal()) {
-    lifetimeDependenceString += "immortal";
   }
   lifetimeDependenceString += ") ";
   return lifetimeDependenceString;
 }
 
 void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
-  ID.AddBoolean(isImmortal());
+  ID.AddBoolean(hasImmortalSpecifier());
   ID.AddBoolean(isFromAnnotation());
   ID.AddInteger(targetIndex);
   if (inheritLifetimeParamIndices) {
@@ -291,27 +297,41 @@ static bool isDiagnosedEscapable(Type type) {
 } // anonymous namespace
 
 namespace {
+enum class HasAnnotation { Annotated, Inferred };
+enum class TargetKind { Inout, Result };
+
 // Temporary data structure for building target dependencies. Used by the
 // LifetimeDependenceChecker.
 struct LifetimeDependenceBuilder {
   struct TargetDeps {
     SmallBitVector inheritIndices;
     SmallBitVector scopeIndices;
-    bool hasAnnotation;
-    bool isImmortal = false;
+    HasAnnotation hasAnnotationStatus;
+    TargetKind targetKind;
+    bool hasImmortalSpecifier = false;
 
-    TargetDeps(bool hasAnnotation, unsigned capacity)
+    TargetDeps(HasAnnotation hasAnnotation, TargetKind targetKind,
+               unsigned capacity)
         : inheritIndices(capacity), scopeIndices(capacity),
-          hasAnnotation(hasAnnotation) {}
+          hasAnnotationStatus(hasAnnotation), targetKind(targetKind) {}
 
     bool empty() const {
-      return !(isImmortal || inheritIndices.any() || scopeIndices.any());
+      return !(hasImmortalSpecifier || inheritIndices.any()
+               || scopeIndices.any());
+    }
+
+    bool hasAnnotation() const {
+      return hasAnnotationStatus == HasAnnotation::Annotated;
+    }
+
+    bool isInout() const {
+      return targetKind == TargetKind::Inout;
     }
 
     void addIfNew(unsigned sourceIndex, LifetimeDependenceKind kind) {
       // Some inferrence rules may attempt to add an inherit dependency after a
       // scope dependency (accessor wrapper + getter method).
-      if (isImmortal || inheritIndices[sourceIndex]
+      if (hasImmortalSpecifier || inheritIndices[sourceIndex]
           || scopeIndices[sourceIndex]) {
         return;
       }
@@ -326,17 +346,22 @@ struct LifetimeDependenceBuilder {
     }
   };
 
-  const unsigned sourceIndexCap;
-
-  LifetimeDependenceBuilder(int sourceIndexCap)
-      : sourceIndexCap(sourceIndexCap) {}
-
+  const unsigned resultIndex;
   llvm::SmallMapVector<unsigned, TargetDeps, 4> depsArray;
+
+  LifetimeDependenceBuilder(unsigned resultIndex): resultIndex(resultIndex) {}
 
 public:
   // True if the builder is uninitialized. This may, however, be false even if
   // all TargetDeps are themselves empty.
   bool empty() const { return depsArray.empty(); }
+
+  unsigned sourceIndexCap() const { return resultIndex; }
+
+  TargetKind targetKindForIndex(unsigned targetIndex) const {
+    return
+      (targetIndex == resultIndex) ? TargetKind::Result : TargetKind::Inout;
+  }
 
   // Return TargetDeps for 'targetIndex' if it has at least one source
   // dependency.
@@ -354,7 +379,8 @@ public:
 
   TargetDeps *createAnnotatedTargetDeps(unsigned targetIndex) {
     auto iterAndInserted =
-        depsArray.try_emplace(targetIndex, true, sourceIndexCap);
+      depsArray.try_emplace(targetIndex, HasAnnotation::Annotated,
+                            targetKindForIndex(targetIndex), sourceIndexCap());
     if (!iterAndInserted.second)
       return nullptr;
 
@@ -364,9 +390,11 @@ public:
   // Check this before diagnosing any broken inference to avoid diagnosing a
   // target that has an explicit annotation.
   TargetDeps *getInferredTargetDeps(unsigned targetIndex) {
-    auto iter = depsArray.try_emplace(targetIndex, false, sourceIndexCap).first;
+    auto iter = depsArray.try_emplace(targetIndex, HasAnnotation::Inferred,
+                                      targetKindForIndex(targetIndex),
+                                      sourceIndexCap()).first;
     auto &deps = iter->second;
-    return deps.hasAnnotation ? nullptr : &deps;
+    return deps.hasAnnotation() ? nullptr : &deps;
   }
 
   void inferDependency(unsigned targetIndex, unsigned sourceIndex,
@@ -378,7 +406,21 @@ public:
   }
 
   void inferInoutDependency(unsigned paramIndex) {
-    inferDependency(paramIndex, paramIndex, LifetimeDependenceKind::Inherit);
+    auto iter =
+      depsArray.try_emplace(paramIndex, HasAnnotation::Inferred,
+                            TargetKind::Inout, sourceIndexCap()).first;
+    // An immortal specifier erases any inferred inout dependency;
+    // other annotations do not.
+    if (!iter->second.hasImmortalSpecifier) {
+      iter->second.addIfNew(paramIndex, LifetimeDependenceKind::Inherit);
+    }
+  }
+
+  void inferImmortalResult() {
+    auto targetDeps = getInferredTargetDeps(resultIndex);
+    if (!targetDeps)
+      return;
+    targetDeps->hasImmortalSpecifier = true;
   }
 
   // Allocate LifetimeDependenceInfo in the ASTContext. Initialize it by
@@ -401,20 +443,20 @@ public:
       IndexSubset *inheritIndices = nullptr;
       if (deps.inheritIndices.any()) {
         inheritIndices = IndexSubset::get(ctx, deps.inheritIndices);
-        ASSERT(!deps.isImmortal
-               && "cannot combine immortal lifetime with parameter dependency");
+        ASSERT(!deps.hasImmortalSpecifier || deps.isInout() &&
+               "cannot combine immortal lifetime with parameter dependency");
       }
       IndexSubset *scopeIndices = nullptr;
       if (deps.scopeIndices.any()) {
         scopeIndices = IndexSubset::get(ctx, deps.scopeIndices);
-        ASSERT(!deps.isImmortal
-               && "cannot combine immortal lifetime with parameter dependency");
+        ASSERT(!deps.hasImmortalSpecifier || deps.isInout() &&
+               "cannot combine immortal lifetime with parameter dependency");
       }
       lifetimeDependencies.push_back(LifetimeDependenceInfo(
           /*inheritLifetimeParamIndices*/ inheritIndices,
           /*scopeLifetimeParamIndices*/ scopeIndices, targetIndex,
-          /*isImmortal*/ deps.isImmortal,
-          /*isFromAnnotation*/ deps.hasAnnotation));
+          /*hasImmortalSpecifier*/ deps.hasImmortalSpecifier,
+          /*isFromAnnotation*/ deps.hasAnnotation()));
     }
     if (lifetimeDependencies.empty()) {
       return std::nullopt;
@@ -458,9 +500,6 @@ class LifetimeDependenceChecker {
   // represent the function result.
   const unsigned resultIndex;
 
-  // The result or yield type of the function.
-  Type resultInterfaceType;
-
   // The result or yield type of the function being checked in its generic
   // environment.
   Type resultTy;
@@ -483,9 +522,9 @@ class LifetimeDependenceChecker {
 
 public:
   static unsigned getResultIndex(AbstractFunctionDecl *afd) {
-    return afd->hasImplicitSelfDecl()
-      ? (unsigned)(afd->getParameters()->size() + 1)
-      : (unsigned)afd->getParameters()->size();
+    return afd->isInstanceMethod()
+               ? (unsigned)(afd->getParameters()->size() + 1)
+               : (unsigned)afd->getParameters()->size();
   }
 
   static unsigned getResultIndex(EnumElementDecl *eed) {
@@ -511,6 +550,8 @@ public:
   }
 
   static std::optional<ParamInfo> getSelfParamInfo(AbstractFunctionDecl *afd) {
+    if (!afd->isInstanceMethod())
+      return std::nullopt;
     auto *selfDecl = afd->getImplicitSelfDecl();
     if (!selfDecl)
       return std::nullopt;
@@ -530,17 +571,6 @@ public:
     return parameterInfos[paramIndex];
   }
 
-  Type getInterfaceTypeForIndex(unsigned paramOrResultIndex) {
-    if (paramOrResultIndex == resultIndex)
-      return resultInterfaceType;
-
-    if (implicitSelfParamInfo &&
-        paramOrResultIndex == implicitSelfParamInfo->index)
-      return implicitSelfParamInfo->getInterfaceType();
-
-    return parameterInfos[paramOrResultIndex].getInterfaceType();
-  }
-
   Type getEnvTypeForIndex(unsigned paramOrResultIndex) {
     if (paramOrResultIndex == resultIndex)
       return resultTy;
@@ -553,7 +583,7 @@ public:
   }
 
 private:
-  static auto collectLifetimeEntries(DeclAttributes const &attrs) {
+  static auto collectDeclLifetimeEntries(DeclAttributes const &attrs) {
     decltype(lifetimeEntries) lifetimeEntries;
     for (auto attr : attrs.getAttributes<LifetimeAttr>()) {
       lifetimeEntries.push_back(attr->getLifetimeEntry());
@@ -561,8 +591,17 @@ private:
     return lifetimeEntries;
   }
 
-  static auto collectParameterInfo(ParameterList const *params,
-                                   DeclContext *DC) {
+  static auto collectFunctionTypeLifetimeEntries(
+    ArrayRef<LifetimeTypeAttr *> lifetimeAttrs) {
+    decltype(lifetimeEntries) lifetimeEntries;
+    for (auto *attr : lifetimeAttrs) {
+      lifetimeEntries.push_back(attr->getLifetimeEntry());
+    }
+    return lifetimeEntries;
+  }
+
+  static auto collectDeclParameterInfo(ParameterList const *params,
+                                       DeclContext *DC) {
     decltype(parameterInfos) parameterInfos;
     for (auto [index, param] : enumerate(*params)) {
       parameterInfos.push_back(
@@ -572,22 +611,46 @@ private:
     return parameterInfos;
   }
 
+  static auto collectFunctionTypeParameterInfo(FunctionTypeRepr *funcRepr,
+                                               AnyFunctionType *funcType,
+                                               GenericEnvironment *env) {
+    decltype(parameterInfos) parameterInfos;
+
+    // We only ever use the second names of function type parameters for
+    // lifetimes.
+    ArrayRef<Param> params = funcType->getParams();
+    ArrayRef<TupleTypeReprElement> argReprs =
+      funcRepr->getArgsTypeRepr()->getElements();
+
+    assert(params.size() == argReprs.size());
+    for (auto [index, param] : enumerate(params)) {
+      auto const &arg = argReprs[index];
+      parameterInfos.push_back(
+        {param, (unsigned)index,
+           // If an argument has no second name, use the location of its type.
+           arg.SecondNameLoc.isValid() ? arg.SecondNameLoc : arg.Type->getLoc(),
+           GenericEnvironment::mapTypeIntoEnvironment(
+               env, param.getPlainType())});
+    }
+    return parameterInfos;
+  }
+
 public:
   LifetimeDependenceChecker(AbstractFunctionDecl *afd)
-      : lifetimeEntries(collectLifetimeEntries(afd->getAttrs())),
-        parameterInfos(collectParameterInfo(afd->getParameters(), afd)),
+      : lifetimeEntries(collectDeclLifetimeEntries(afd->getAttrs())),
+        parameterInfos(collectDeclParameterInfo(afd->getParameters(), afd)),
         afd(afd), ctx(afd->getDeclContext()->getASTContext()),
         sourceFile(afd->getParentSourceFile()),
         escapableDecl(ctx.getProtocol(
             swift::getKnownProtocolKind(InvertibleProtocolKind::Escapable))),
         genericEnv(afd->getGenericEnvironment()),
         resultIndex(getResultIndex(afd)),
-        resultInterfaceType(getResultOrYieldInterface(afd)),
-        resultTy(afd->mapTypeIntoEnvironment(resultInterfaceType)),
+        resultTy(afd->mapTypeIntoEnvironment(getResultOrYieldInterface(afd))),
         returnLoc(getReturnLoc(afd)),
         implicitSelfParamInfo(getSelfParamInfo(afd)),
-        depBuilder(/*sourceIndexCap*/ resultIndex),
-        isImplicit(afd->isImplicit()), isInit(isa<ConstructorDecl>(afd)),
+        depBuilder(resultIndex),
+        isImplicit(afd->isImplicit()),
+        isInit(isa<ConstructorDecl>(afd)),
         hasUnsafeNonEscapableResult(
             afd->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {}
 
@@ -595,35 +658,24 @@ public:
                             AnyFunctionType *funcType,
                             ArrayRef<LifetimeTypeAttr *> lifetimeAttrs,
                             DeclContext *dc, GenericEnvironment *env)
-      : afd(nullptr), ctx(funcType->getASTContext()),
+      : lifetimeEntries(collectFunctionTypeLifetimeEntries(lifetimeAttrs)),
+        parameterInfos(
+          collectFunctionTypeParameterInfo(funcRepr, funcType, env)),
+        afd(nullptr), ctx(funcType->getASTContext()),
         sourceFile(dc->getParentSourceFile()),
+        escapableDecl(ctx.getProtocol(
+            swift::getKnownProtocolKind(InvertibleProtocolKind::Escapable))),
+        genericEnv(env),
         resultIndex(funcType->getParams().size()),
+        resultTy(
+          GenericEnvironment::mapTypeIntoEnvironment(env,
+                                                     funcType->getResult())),
         returnLoc(funcRepr->getResultTypeRepr()->getLoc()),
-        implicitSelfParamInfo(std::nullopt), depBuilder(resultIndex),
-        isImplicit(false), isInit(false), hasUnsafeNonEscapableResult(false) {
-    for (auto functionLifetimeEntry : lifetimeAttrs)
-      lifetimeEntries.push_back(functionLifetimeEntry->getLifetimeEntry());
-
-    // We only ever use the second names of function type parameters for
-    // lifetimes.
-    auto const params = funcType->getParams();
-    auto const argReprs = funcRepr->getArgsTypeRepr()->getElements();
-
-    resultTy =
-        GenericEnvironment::mapTypeIntoEnvironment(env, funcType->getResult());
-
-    assert(params.size() == argReprs.size());
-    for (unsigned paramIndex = 0; paramIndex < params.size(); ++paramIndex) {
-      auto const &parameter = params[paramIndex];
-      auto const &arg = argReprs[paramIndex];
-      parameterInfos.push_back(
-          {parameter, paramIndex,
-           // If an argument has no second name, use the location of its type.
-           arg.SecondNameLoc.isValid() ? arg.SecondNameLoc : arg.Type->getLoc(),
-           GenericEnvironment::mapTypeIntoEnvironment(
-               env, parameter.getPlainType())});
-    }
-  }
+        implicitSelfParamInfo(std::nullopt),
+        depBuilder(resultIndex),
+        isImplicit(false),
+        isInit(false),
+        hasUnsafeNonEscapableResult(false) {}
 
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   currentDependencies() const {
@@ -676,7 +728,8 @@ public:
 
   /// Perform lifetime dependence checks for a function declaration.
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkFuncDecl() {
-    assert(nullptr != afd && (isa<FuncDecl>(afd) || isa<ConstructorDecl>(afd)));
+    assert(isLifetimeForDecl()
+           && (isa<FuncDecl>(afd) || isa<ConstructorDecl>(afd)));
     assert(depBuilder.empty());
 
     // Handle Builtins first because, even though Builtins require
@@ -702,8 +755,12 @@ public:
       inferMutatingSelf();
       inferInoutParams();
 
-      diagnoseMissingResultDependencies(
-        diag::lifetime_dependence_feature_required_return.ID);
+      // TODO: Once we infer dependence on the closure context, enable
+      // diagnostics for missing functino type result dependencies.
+      if (isLifetimeForDecl()) {
+        diagnoseMissingResultDependencies(
+          diag::lifetime_dependence_feature_required_return.ID);
+      }
       diagnoseMissingSelfDependencies(
         diag::lifetime_dependence_feature_required_mutating.ID);
       diagnoseMissingInoutDependencies(
@@ -728,8 +785,10 @@ public:
     // If precise diagnostics were already issued, bypass
     // diagnoseMissingDependencies to avoid redundant diagnostics.
     if (!performedDiagnostics) {
-      diagnoseMissingResultDependencies(
-        diag::lifetime_dependence_cannot_infer_return.ID);
+      if (isLifetimeForDecl()) {
+        diagnoseMissingResultDependencies(
+          diag::lifetime_dependence_cannot_infer_return.ID);
+      }
       diagnoseMissingSelfDependencies(
         diag::lifetime_dependence_cannot_infer_mutating.ID);
       diagnoseMissingInoutDependencies(
@@ -743,8 +802,8 @@ public:
     auto const resultIndex = getResultIndex(eed);
     LifetimeDependenceBuilder depBuilder(resultIndex);
     auto *parentEnum = eed->getParentEnum();
-    auto enumType =
-        parentEnum->mapTypeIntoEnvironment(parentEnum->getDeclaredInterfaceType());
+    auto enumType = parentEnum->mapTypeIntoEnvironment(
+      parentEnum->getDeclaredInterfaceType());
 
     // Add early bailout for imported enums.
     if (parentEnum->hasClangNode()) {
@@ -782,6 +841,12 @@ protected:
     typename detail::PassArgument<ArgTypes>::type... Args) {
     performedDiagnostics = true;
     return ctx.Diags.diagnose(Loc, ID, std::move(Args)...);
+  }
+
+  // Is this lifetime information for an abstact function declaration (function,
+  // constructor, or destructor) as opposed to a function type?
+  bool isLifetimeForDecl() const {
+    return afd != nullptr;
   }
 
   // For initializers, the implicit self parameter is ignored and instead shows
@@ -960,6 +1025,138 @@ protected:
     assert(kind == LifetimeDependenceKind::Scope);
     return loweredOwnership == ValueOwnership::Shared ||
            loweredOwnership == ValueOwnership::InOut;
+  }
+
+
+  // ==========================================================================
+  // MARK: Same-type inference
+  // ==========================================================================
+
+  /// Is 'sourceEnvType' Escapable under any of the conformance requirements in
+  /// 'targetReqs'?
+  ///
+  /// If true, we will infer a default dependency because a lifetime requirement
+  /// in the source is always present in the target. The source may have
+  /// additional lifetime requirements which are not copied to the
+  /// target. Conversely, the target may depend on multiple sources.
+  ///
+  /// Example:
+  ///
+  ///    struct NE1: ~Escapable {}
+  ///    struct NE2: ~Escapable {}
+  ///    func foo(arg: NE1?) -> NE1 // DEFAULT: @_lifetime(copy arg)
+  ///    func foo(arg: NE1?) -> NE2 // ERROR: missing annotation
+  ///
+  /// Invariant: hasSameTypeRequirement can only return true when
+  /// hasGuaranteedLifetime is also true.
+  ///
+  bool hasSameTypeRequirement(Type sourceEnvType,
+                              const llvm::SmallDenseSet<Type> &targetReqs) {
+
+    LLVM_DEBUG(llvm::dbgs() << "\nSource Type: " << sourceEnvType << "\n");
+    SmallVector<Type, 4> sourceReqs;
+    if (!collectRequiredTypesForNonEscapable(sourceEnvType, sourceReqs)) {
+      return false;
+    }
+    if (sourceReqs.empty()) {
+      // The source is unconditionally Escapable.
+      return false;
+    }
+    LLVM_DEBUG(llvm::dbgs() << "\nSource reqs:\n";
+               for (auto sourceReq : sourceReqs) {
+                 sourceReq.dump(llvm::dbgs());
+               });
+    return llvm::any_of(sourceReqs, [&](Type sourceReq) {
+      return targetReqs.contains(sourceReq);
+    });
+  }
+
+  bool collectRequiredTypesForNonEscapable(Type envType,
+                                           SmallVectorImpl<Type> &inverseReqs) {
+    if (envType->hasError()) {
+      LLVM_DEBUG(
+        llvm::dbgs() << "Error Type: " << envType << "\n");
+      return false;
+    }
+    auto confRef = lookupConformance(envType, escapableDecl);
+    if (confRef.isInvalid()) {
+      LLVM_DEBUG(
+        llvm::dbgs() << "Outer non-Escapable Type: " << envType << "\n");
+      inverseReqs.push_back(envType);
+      return true;
+    }
+    return collectRequiredTypesRecursively(confRef, inverseReqs);
+  }
+
+  bool collectRequiredTypesRecursively(ProtocolConformanceRef confRef,
+                                       SmallVectorImpl<Type> &inverseReqs) {
+
+    LLVM_DEBUG(llvm::dbgs() << "Collect for conformance:\n";
+               confRef.print(llvm::dbgs());
+               llvm::dbgs() << "\n");
+
+    if (confRef.isAbstract()) {
+      // Abstract conformances unconditionally conform.
+      return true;
+    }
+    if (confRef.isPack()) {
+      // Parameters packs cannot yet suppress Escapable, so bailout.
+      return false;
+      /* TODO:
+      PackType *packType = confRef.getPack()->getType();
+      for (auto subConfRef : confRef.getPack()->getPatternConformances()) {
+        if (!collectRequiredTypesRecursively(subConfRef, inverseReqs)) {
+          return false;
+        }
+      }
+      return true;
+      */
+    }
+    if (confRef.isConcrete()) {
+      ProtocolConformance *conformance = confRef.getConcrete();
+      switch (conformance->getKind()) {
+      case ProtocolConformanceKind::Self:
+      case ProtocolConformanceKind::Builtin:
+      case ProtocolConformanceKind::Normal:
+        // These types conform without requiring another type.
+        return true;
+      case ProtocolConformanceKind::Inherited:
+        // InheritedConformance is not allowed for suppressible protocols.
+        return true;
+      case ProtocolConformanceKind::Specialized:
+        // fall through to the recursive implementation.
+        break;
+      }
+      SubstitutionMap subMap = conformance->getSubstitutionMap();
+      // Use the 'subMap' signature, not the conformance signature.
+      GenericSignature subSig = subMap.getGenericSignature();
+      auto subConformances = subMap.getConformances();
+      for (auto &req : subSig.getRequirements()) {
+        if (req.getKind() != RequirementKind::Conformance)
+          continue;
+
+        // GenericSignature's conformance Requirements line up with
+        // subMap.getConformances().
+        ProtocolConformanceRef subConfRef = subConformances.front();
+        subConformances = subConformances.slice(1);
+        if (subConfRef.isInvalid()) {
+          Type envType = req.getFirstType().subst(subMap);
+          LLVM_DEBUG(llvm::dbgs() << "Nested non-Escapable Type: "
+                     << envType << "\n");
+          inverseReqs.push_back(envType);
+          continue;
+        }
+        if (subConfRef.getProtocol()
+            ->isSpecificProtocol(KnownProtocolKind::Escapable)) {
+          if (!collectRequiredTypesRecursively(subConfRef, inverseReqs)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+    // unknown conformance kind
+    return false;
   }
 
   // ==========================================================================
@@ -1158,7 +1355,7 @@ protected:
     auto const ownership = param.getValueOwnership();
     if (ownership != ValueOwnership::Default)
       return ownership;
-    if (nullptr != afd && isa<ConstructorDecl>(afd)) {
+    if (isLifetimeForDecl() && isa<ConstructorDecl>(afd)) {
       return ValueOwnership::Owned;
     }
     if (auto *ad = dyn_cast_or_null<AccessorDecl>(afd)) {
@@ -1179,9 +1376,9 @@ protected:
   void initializeDescriptorDeps(unsigned targetIndex,
                                 TargetDeps &deps,
                                 LifetimeDescriptor source) {
-    if (source.isImmortal()) {
+    if (source.isImmortalSpecifier()) {
       // Record the immortal dependency even if it is invalid to suppress other diagnostics.
-      deps.isImmortal = true;
+      deps.hasImmortalSpecifier = true;
       auto immortalParam =
           llvm::find_if(parameterInfos, [](auto const &paramInfo) {
             return paramInfo.param.getInternalLabel().is("immortal");
@@ -1192,9 +1389,12 @@ protected:
                            diag::lifetime_dependence_immortal_conflict_name);
         return;
       }
-      if (deps.inheritIndices.any() || deps.scopeIndices.any()) {
-        ctx.Diags.diagnose(immortalParam->loc,
-                           diag::lifetime_dependence_immortal_alone);
+      // @_lifetime(target: immortal, copy source) is allowed for inout targets.
+      if (!deps.isInout()) {
+        if (deps.inheritIndices.any() || deps.scopeIndices.any()) {
+          ctx.Diags.diagnose(immortalParam->loc,
+                             diag::lifetime_dependence_immortal_alone);
+        }
       }
       return;
     }
@@ -1228,7 +1428,8 @@ protected:
                             LifetimeDescriptor descriptor,
                             unsigned paramIndexToSet,
                             LifetimeDependenceKind lifetimeKind) {
-    if (deps.isImmortal) {
+    // @_lifetime(target: immortal, copy source) is allowed for inout targets.
+    if (deps.hasImmortalSpecifier && !deps.isInout()) {
       diagnose(descriptor.getLoc(), diag::lifetime_dependence_immortal_alone);
       return;
     }
@@ -1295,7 +1496,7 @@ protected:
           // Methods that return a non-Escapable value - single parameter
           // default rule.
           inferNonEscapableResultOnSelf();
-        } else {
+        } else if (isLifetimeForDecl()) {
           // Regular functions and initializers that return a non-Escapable
           // value - single parameter default rule.
           inferNonEscapableResultOnParam();
@@ -1312,20 +1513,42 @@ protected:
   }
 
   // Infer a dependency to the ~Escapable result from all parameters of the same
-  // type.
+  // type. More generally, infer a dependency on any parameter type for which
+  // Escapable conformance requires the result type to be Escapable.
+  //
+  //     @_lifetime(copy a) // OK: Optional<T>: Escapable requires T: Escapable
+  //     func foo<T: ~Escapable>(a: T?) -> T {
+  //
   void inferNonEscapableResultOnSameTypeParam() {
-    // The function declaration's substituted result type.
-    CanType canResultTy = resultTy->getCanonicalType();
-
+    // Check that no @_lifetime annotation is present for the function result.
     TargetDeps *targetDeps = depBuilder.getInferredTargetDeps(resultIndex);
     if (!targetDeps)
       return;
 
+    LLVM_DEBUG(llvm::dbgs() << "\nTarget Type: " << resultTy << "\n");
+    SmallVector<Type, 4> targetReqList;
+    if (!collectRequiredTypesForNonEscapable(resultTy, targetReqList)) {
+      // Unable to evaluate conformance requirements.
+      return;
+    }
+    if (targetReqList.empty()) {
+      // The target is unconditionally Escapable.
+      return;
+    }
+    LLVM_DEBUG(llvm::dbgs() << "\nTarget reqs:\n";
+               for (auto targetReq : targetReqList) {
+                 targetReq.dump(llvm::dbgs());
+               });
+    llvm::SmallDenseSet<Type> targetReqs;
+    for (Type targetReq : targetReqList) {
+      targetReqs.insert(targetReq);
+    }
+
     // Ignore mutating self. An 'inout' modifier effectively makes the parameter
     // a different type for lifetime inference.
     if (hasImplicitSelfParam() && !implicitSelfParamInfo->param.isInOut()) {
-      if (implicitSelfParamInfo->typeInContext->getCanonicalType() ==
-          canResultTy) {
+      if (hasSameTypeRequirement(implicitSelfParamInfo->typeInContext,
+                                 targetReqs)) {
         targetDeps->inheritIndices.set(implicitSelfParamInfo->index);
       }
     }
@@ -1341,11 +1564,9 @@ protected:
       if (paramInfo.param.isInOut())
         continue;
 
-      CanType paramTy = paramInfo.typeInContext->getCanonicalType();
-      if (paramTy != canResultTy)
-        continue;
-
-      targetDeps->inheritIndices.set(paramIndex);
+      if (hasSameTypeRequirement(paramInfo.typeInContext, targetReqs)) {
+        targetDeps->inheritIndices.set(paramIndex);
+      }
     }
   }
 
@@ -1355,7 +1576,8 @@ protected:
   // Any accessors not handled here will be handled like a normal method.
   void inferAccessor(AccessorDecl *accessor) {
     if (!hasImplicitSelfParam()) {
-      // global accessors have no 'self'.
+      // Global accessors have no 'self'. Their result must be immortal.
+      depBuilder.inferImmortalResult();
       return;
     }
     bool nonEscapableSelf =
@@ -1557,8 +1779,8 @@ protected:
     // Methods with parameters only apply to lazy inference. This does not
     // include accessors because a subscript's index is assumed not to be the
     // source of the result's dependency.
-    if (!(nullptr != afd && isa<AccessorDecl>(afd)) && !useLazyInference() &&
-        parameterInfos.size() > 0) {
+    if (!(isLifetimeForDecl() && isa<AccessorDecl>(afd))
+        && !useLazyInference() && parameterInfos.size() > 0) {
       return;
     }
     if (!useLazyInference() && !isImplicitOrSIL()) {
@@ -1824,9 +2046,43 @@ LifetimeDependenceInfo::getFromAST(
       .checkFuncType();
 }
 
+ArrayRef<LifetimeDependenceInfo> LifetimeDependenceInfo::uncurry(
+    ASTContext &ctx, ArrayRef<LifetimeDependenceInfo> inner,
+    unsigned numInnerParams, unsigned numOuterParams) {
+
+  const unsigned numUncurriedParams = numInnerParams + numOuterParams;
+
+  const auto uncurryIndices = [&](IndexSubset *indices) -> IndexSubset * {
+    if (!indices)
+      return nullptr;
+    return indices->extendingCapacity(ctx, numUncurriedParams);
+  };
+
+  SmallVector<LifetimeDependenceInfo, 2> uncurried;
+  // Process the inner dependencies
+  for (auto innerDep : inner) {
+    auto inherit = uncurryIndices(innerDep.getInheritIndices());
+    auto scope = uncurryIndices(innerDep.getScopeIndices());
+    auto addressable = uncurryIndices(innerDep.getAddressableIndices());
+    auto conditionallyAddressable =
+        uncurryIndices(innerDep.getConditionallyAddressableIndices());
+
+    // The inner result's dependencies become the uncurried result's
+    // dependencies.
+    const auto targetIndex = (innerDep.getTargetIndex() == numInnerParams)
+                                 ? numUncurriedParams
+                                 : innerDep.getTargetIndex();
+    uncurried.push_back(LifetimeDependenceInfo(
+        inherit, scope, targetIndex, innerDep.hasImmortalSpecifier(),
+        innerDep.isFromAnnotation(), addressable, conditionallyAddressable));
+  }
+
+  return ctx.AllocateCopy(uncurried);
+}
+
 void LifetimeDependenceInfo::dump() const {
   llvm::errs() << "target: " << getTargetIndex() << '\n';
-  if (isImmortal()) {
+  if (hasImmortalSpecifier()) {
     llvm::errs() << "  immortal\n";
   }
   if (auto scoped = getScopeIndices()) {
@@ -1890,6 +2146,7 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
       return false;
     };
 
+  bool hasImmortalSpecifier= false;
   for (auto source : lifetimeDependentRepr->getLifetimeEntry()->getSources())
   {
     switch (source.getDescriptorKind()) {
@@ -1918,11 +2175,9 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
       break;
     }
     case LifetimeDescriptor::DescriptorKind::Named: {
-      assert(source.isImmortal());
-      return LifetimeDependenceInfo(
-          /*inheritLifetimeParamIndices*/ nullptr,
-          /*scopeLifetimeParamIndices*/ nullptr, targetIndex,
-          /*isImmortal*/ true, /*isFromAnnotation*/ true);
+      assert(source.isImmortalSpecifier());
+      hasImmortalSpecifier = true;
+      break;
     }
     default:
       llvm_unreachable("SIL can only have ordered or immortal lifetime "
@@ -1938,7 +2193,7 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
     ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
     : nullptr,
     targetIndex,
-    /*isImmortal*/ false,
+    /*hasImmortalSpecifier*/ hasImmortalSpecifier,
     /*isFromAnnotation*/ true,
     addressableLifetimeParamIndices.any()
     ? IndexSubset::get(ctx, addressableLifetimeParamIndices)

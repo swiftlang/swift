@@ -15,7 +15,7 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "FeatureSet.h"
-#include "InlinableText.h"
+#include "swift/AST/InlinableText.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
@@ -27,11 +27,13 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -511,13 +513,30 @@ bool TypeTransformContext::isPrintingSynthesizedExtension() const {
 static std::string
 getLifetimeDependenceIdentifier(unsigned index,
                                 ArrayRef<AnyFunctionType::Param> params) {
-  // TODO: Print "self" for the self parameter. Requires a way to determine if a
-  // type is the interface type of an instance method.
+  // NOTE: Does not handle the implicit self parameter, since this is only used
+  // for function types.
   if (index < params.size() && params[index].hasInternalLabel()) {
     return params[index].getInternalLabel().get();
   }
 
   return std::to_string(index);
+}
+
+static std::string_view
+getLifetimeDependenceSpecifier(unsigned index,
+                               ArrayRef<AnyFunctionType::Param> params,
+                               LifetimeDependenceKind kind) {
+  // NOTE: Does not handle the implicit self parameter, since this is only used
+  // for function types.
+  switch (kind) {
+  case LifetimeDependenceKind::Inherit:
+    return "copy ";
+  case LifetimeDependenceKind::Scope:
+    if (params[index].isInOut()) {
+      return "&";
+    }
+    return "borrow ";
+  }
 }
 
 /// Get a string representation for the list of sources of the given
@@ -532,16 +551,16 @@ static std::string getLifetimeDependenceInfoSourceListString(
   auto addressable = info.getAddressableIndices();
   auto condAddressable = info.getConditionallyAddressableIndices();
 
+  bool isFirstSpecifier = true;
   auto getSourceString = [&](IndexSubset *bitvector,
-                             StringRef kind) -> std::string {
+                             LifetimeDependenceKind kind) -> std::string {
     std::string result;
-    bool isFirstSetBit = true;
     for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
       if (bitvector->contains(i)) {
-        if (!isFirstSetBit) {
+        if (!isFirstSpecifier) {
           result += ", ";
         }
-        result += kind;
+        result += getLifetimeDependenceSpecifier(i, params, kind);
         if (addressable && addressable->contains(i)) {
           result += "address ";
         } else if (condAddressable && condAddressable->contains(i)) {
@@ -551,27 +570,28 @@ static std::string getLifetimeDependenceInfoSourceListString(
         // print the index. Indices should ideally never be used in Swift
         // lifetime annotations, especially in module interfaces.
         result += getLifetimeDependenceIdentifier(i, params);
-        isFirstSetBit = false;
+        isFirstSpecifier = false;
       }
     }
     return result;
   };
+  if (info.hasImmortalSpecifier()) {
+    if (!isFirstSpecifier) {
+      lifetimeDependenceString += ", ";
+    }
+    lifetimeDependenceString += "immortal";
+    isFirstSpecifier = false;
+  }
   auto inheritLifetimeParamIndices = info.getInheritIndices();
   if (inheritLifetimeParamIndices) {
     assert(!inheritLifetimeParamIndices->isEmpty());
-    lifetimeDependenceString +=
-        getSourceString(inheritLifetimeParamIndices, "copy ");
+    lifetimeDependenceString += getSourceString(
+        inheritLifetimeParamIndices, LifetimeDependenceKind::Inherit);
   }
   if (auto scopeLifetimeParamIndices = info.getScopeIndices()) {
     assert(!scopeLifetimeParamIndices->isEmpty());
-    if (inheritLifetimeParamIndices) {
-      lifetimeDependenceString += ", ";
-    }
-    lifetimeDependenceString +=
-        getSourceString(scopeLifetimeParamIndices, "borrow ");
-  }
-  if (info.isImmortal()) {
-    lifetimeDependenceString += "immortal";
+    lifetimeDependenceString += getSourceString(scopeLifetimeParamIndices,
+                                                LifetimeDependenceKind::Scope);
   }
   return lifetimeDependenceString;
 }
@@ -579,6 +599,8 @@ static std::string getLifetimeDependenceInfoSourceListString(
 /// Get a string representation for this dependence info as a Swift lifetime
 /// attribute (for a type or decl). The target and sources are referred to by
 /// their labels if possible (see getLifetimeDependenceIdentifier).
+///
+/// TODO: Factor this with LifetimeDependenceInfo::getString.
 static std::string
 getLifetimeDependenceInfoSwiftString(LifetimeDependenceInfo const &info,
                                      ArrayRef<AnyFunctionType::Param> params) {
@@ -1965,7 +1987,7 @@ InversesAtDepth::InversesAtDepth(GenericContext *level) {
 }
 bool InversesAtDepth::operator()(const InverseRequirement &inverse) const {
   if (includedDepth) {
-    auto d = inverse.subject->castTo<GenericTypeParamType>()->getDepth();
+    auto d = inverse.subject->getRootGenericParam()->getDepth();
     return d == includedDepth.value();
   }
   return false;
@@ -2036,7 +2058,7 @@ void PrintAST::printGenericSignature(
 
     SmallVector<InverseRequirement, 2> inversesAtDepth;
     for (auto inverseReq : inverses) {
-      if (inverseReq.subject->castTo<GenericTypeParamType>()->getDepth() == depth)
+      if (inverseReq.subject->getRootGenericParam()->getDepth() == depth)
         inversesAtDepth.push_back(inverseReq);
     }
 
@@ -2425,6 +2447,58 @@ bool isNonSendableExtension(const Decl *D) {
 
 bool ShouldPrintChecker::shouldPrint(const Decl *D,
                                      const PrintOptions &Options) {
+  // Skip constructors defined in Objective-C categories that are not
+  // publicly imported according to the interface type being generated
+  if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
+    if (CD->isImplicit() && Options.IsForSwiftInterface &&
+        Options.CurrentModule) {
+      // For inherited constructors, check the original declaration
+      auto *checkDecl = CD;
+      if (auto *overridden = CD->getOverriddenDecl()) {
+        checkDecl = overridden;
+      }
+      auto definingModule = checkDecl->getModuleContext();
+      // Check how the defining module is imported
+      if (auto *SF = CD->getDeclContext()->getParentSourceFile()) {
+        // Don't check import status for self-imports
+        if (definingModule != SF->getParentModule()) {
+          auto restrictedKind = SF->getRestrictedImportKind(definingModule);
+          switch (restrictedKind) {
+          // MissingImport and ImplementationOnly: skip in all interfaces
+          case RestrictedImportKind::MissingImport:
+          case RestrictedImportKind::ImplementationOnly:
+            return false;
+          // SPIOnly: skip in public interfaces
+          case RestrictedImportKind::SPIOnly:
+            if (Options.printPublicInterface())
+              return false;
+            break;
+          case RestrictedImportKind::None:
+            break;
+          }
+          // Check access level
+          if (auto importAccess = SF->getImportAccessLevel(definingModule)) {
+            auto accessLevel = importAccess->accessLevel;
+            switch (accessLevel) {
+            // Internal and below: skip in all interfaces
+            case AccessLevel::Private:
+            case AccessLevel::FilePrivate:
+            case AccessLevel::Internal:
+              return false;
+            // Package: skip in non-package interfaces only
+            case AccessLevel::Package:
+              if (!Options.printPackageInterface())
+                return false;
+              break;
+            default:
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
@@ -3024,6 +3098,112 @@ static void addNamespaceMembers(Decl *decl,
   }
 }
 
+/// Sort and print Clang record members in the following order:
+///
+///   struct PrintMe {
+///     // non-Clang init()
+///     // non-Clang init(...)
+///     // Clang decls (in source order)
+///     // non-Clang decls
+///   }
+///
+///  Doing so keeps the commonly-synthesized constructors near the top,
+///  and the rarely synthesized other decls near the bottom.
+///
+///  Within each section, members are sorted according to source order.
+static bool sortClangDecls(Decl *lhs, Decl *rhs) {
+  auto &SM = lhs->getASTContext().SourceMgr;
+  auto *CML = lhs->getASTContext().getClangModuleLoader();
+
+  auto getClangDecl = [&CML](Decl *d) -> const clang::Decl * {
+    // Has an attached clang::Decl
+    if (auto *D = d->getClangDecl())
+      return D;
+
+    // Cloned from some base member associated with some clang::Decl
+    if (auto *vd = dyn_cast<ValueDecl>(d); vd && CML)
+      if (auto *ovd = CML->getOriginalForClonedMember(vd))
+        return ovd->getClangDecl();
+
+    return nullptr;
+  };
+
+  auto *LHS = getClangDecl(lhs), *RHS = getClangDecl(rhs);
+  if (LHS && RHS) {
+    // Both lhs and rhs are directly imported from Clang
+    // First, sort based on module name, if any
+    auto *LMod = LHS->getOwningModule(), *RMod = RHS->getOwningModule();
+    if (!LMod || !RMod)
+      return (bool)LMod < (bool)RMod;
+    if (LMod != RMod)
+      return LMod->Name < RMod->Name;
+
+    // Both come from the same module; sort based on location, if any
+    auto LLoc = LHS->getLocation(), RLoc = RHS->getLocation();
+    if (!LLoc.isValid() || !RLoc.isValid())
+      return LLoc.isValid() < RLoc.isValid();
+    auto &ClangSM = LHS->getASTContext().getSourceManager();
+    return ClangSM.isBeforeInTranslationUnit(LLoc, RLoc);
+  }
+
+  // At least one of lhs or rhs does not have an associated Clang decl,
+  // i.e., synthesized in some way.
+
+  auto *lctor = LHS ? nullptr : dyn_cast<ConstructorDecl>(lhs),
+       *rctor = RHS ? nullptr : dyn_cast<ConstructorDecl>(rhs);
+  if (!lctor ^ !rctor)
+    // One of these is a non-Clang constructor, and the other is not.
+    return !lctor < !rctor;
+
+  if (lctor && rctor) {
+    // Both of these are non-Clang constructors.
+
+    // If only one of these has zero arguments, prioritize that
+    auto l0 = !lctor->getParameters() || lctor->getParameters()->size() == 0,
+         r0 = !rctor->getParameters() || rctor->getParameters()->size() == 0;
+    if (!l0 ^ !r0)
+      return !l0 < !r0;
+
+    auto *lmod = lhs->getDeclContext()->getModuleScopeContext(),
+         *rmod = rhs->getDeclContext()->getModuleScopeContext();
+    if (lmod != rmod) {
+      // They are somehow from different modules; sort by file name
+      auto *lfile = dyn_cast<SourceFile>(lmod),
+           *rfile = dyn_cast<SourceFile>(rmod);
+      if (!lfile || !rfile)
+        return (bool)lfile < (bool)rfile;
+
+      return lfile->getFilename() < rfile->getFilename();
+    }
+
+    // Same module; use SourceManager to break all other ties
+    return SM.isBeforeInBuffer(lhs->getLoc(), rhs->getLoc());
+  }
+
+  // Neither are non-Clang constructors
+
+  if (!LHS ^ !RHS)
+    // One of these is from Clang; that goes before the other
+    return !LHS < !RHS;
+
+  // Neither are from Clang
+
+  auto *lmod = lhs->getDeclContext()->getModuleScopeContext(),
+       *rmod = rhs->getDeclContext()->getModuleScopeContext();
+  if (lmod != rmod) {
+    // They are somehow from different modules; sort by file name
+    auto *lfile = dyn_cast<SourceFile>(lmod),
+         *rfile = dyn_cast<SourceFile>(rmod);
+    if (!lfile || !rfile)
+      return (bool)lfile < (bool)rfile;
+
+    return lfile->getFilename() < rfile->getFilename();
+  }
+
+  // Same module; use SourceManager to break all other ties
+  return SM.isBeforeInBuffer(lhs->getLoc(), rhs->getLoc());
+}
+
 void PrintAST::printMembersOfDecl(Decl *D, bool needComma, bool openBracket,
                                   bool closeBracket, bool doIndent) {
   llvm::SmallVector<Decl *, 16> Members;
@@ -3055,8 +3235,13 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma, bool openBracket,
         }
       }
     }
-    if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl()))
+    if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl())) {
       addNamespaceMembers(D, Members);
+    } else if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
+      // For Clang records, sort their members, because we may import them
+      // in an unstable order.
+      std::stable_sort(Members.begin(), Members.end(), sortClangDecls);
+    }
   }
   printMembers(Members, needComma, openBracket, closeBracket, doIndent);
 }
@@ -3158,6 +3343,8 @@ void PrintAST::printInherited(const Decl *decl) {
         Printer << "@retroactive ";
       if (inherited.isPreconcurrency())
         Printer << "@preconcurrency ";
+      if (inherited.isReparented())
+        Printer << "@reparented ";
       switch (inherited.getExplicitSafety()) {
       case ExplicitSafety::Unspecified:
       case ExplicitSafety::Safe:
@@ -4626,7 +4813,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
     break;
   }
 
-  auto *raw = elt->getStructuralRawValueExpr();
+  auto *raw = elt->getRawValueExpr();
   if (!raw || raw->isImplicit())
     return;
 
@@ -6194,8 +6381,23 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
-  bool shouldUseExportedModuleName(ASTContext &ctx,
+  /// If \p TyDecl belongs to a submodule, return the \c ModuleDecl for that
+  /// submodule; otherwise just return the parent module.
+  ModuleDecl *getParentSubModuleOrModule(GenericTypeDecl *TyDecl) {
+    // Only clang declarations can belong to a submodule
+    if (auto clangNode = TyDecl->getClangNode()) {
+      auto importer = TyDecl->getASTContext().getClangModuleLoader();
+      if (auto clangMod = importer->getClangOwningModule(clangNode)) {
+        return importer->getWrapperForModule(clangMod);
+      }
+    }
+
+    return TyDecl->getParentModule();
+  }
+
+  bool shouldUseExportedModuleName(GenericTypeDecl *TyDecl,
                                    StringRef exportedModuleName) {
+    auto &ctx = TyDecl->getASTContext();
     if (exportedModuleName.empty())
       return false;
 
@@ -6205,7 +6407,18 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     case PrintOptions::ExportedModuleNameUsage::Never:
       return false;
     case PrintOptions::ExportedModuleNameUsage::IfLoaded:
-      return ctx.getLoadedModule(ctx.getIdentifier(exportedModuleName));
+      // Has the module we're exporting as been loaded? If not, we might be
+      // in a dependency of the exported-as module, so we can't use its name.
+      auto exportAsModule = ctx.getLoadedModule(
+                                ctx.getIdentifier(exportedModuleName));
+      if (!exportAsModule)
+        return false;
+
+      // Is the specific submodule TyDecl belongs to actually visible through
+      // exportAsModule? There are some subtleties about re-exports from
+      // submodules that are captured by querying the ImportCache.
+      auto tyDeclParent = getParentSubModuleOrModule(TyDecl);
+      return ctx.getImportCache().isImportedBy(tyDeclParent, exportAsModule);
     }
 
     llvm_unreachable("Unrecognized ExportedModuleNameUsage");
@@ -6248,7 +6461,7 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     // Should use the module real (binary) name here and everywhere else the
     // module is printed in case module aliasing is used (see -module-alias)
     Identifier Name = Mod->getRealName();
-    if (shouldUseExportedModuleName(Mod->getASTContext(), ExportedModuleName)) {
+    if (shouldUseExportedModuleName(TyDecl, ExportedModuleName)) {
       Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
     }
 
@@ -6290,14 +6503,15 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
   }
 
   bool isMemberOfGenericParameter(TypeBase *T) {
+    if (T->is<DependentMemberType>())    // desugars typealiases
+      // Parent is always a generic parameter.
+      return true;
+
     Type parent = nullptr;
     if (auto alias = dyn_cast<TypeAliasType>(T))    // don't desugar
       parent = alias->getParent();
     else if (auto generic = T->getAs<AnyGenericType>())
       parent = generic->getParent();
-    else if (T->is<DependentMemberType>())
-      // Parent is always a generic parameter.
-      return true;
     return parent && (parent->is<SubstitutableType>() ||
                         isMemberOfGenericParameter(parent.getPointer()));
   }
@@ -8505,6 +8719,7 @@ swift::getInheritedForPrinting(
 
   InheritedTypes inherited = InheritedTypes(decl);
 
+  bool explicitSendable = false;
   // Collect explicit inherited types.
   for (auto i : inherited.getIndices()) {
     if (auto ty = inherited.getResolvedType(i)) {
@@ -8570,6 +8785,10 @@ swift::getInheritedForPrinting(
         entry = InheritedEntry(TypeLoc::withoutLoc(strippedType),
                                entry.getOptions());
       }
+
+      if (auto P = type->getKnownProtocol()) {
+        explicitSendable |= *P == KnownProtocolKind::Sendable;
+      }
     }
 
     Results.push_back(entry);
@@ -8600,6 +8819,38 @@ swift::getInheritedForPrinting(
         uncheckedProtocols.push_back(proto);
       if (attr->isSuppressed())
         suppressedProtocols.push_back(proto);
+    }
+  }
+
+  if (auto *T = dyn_cast<NominalTypeDecl>(decl)) {
+    auto *sendable =
+        T->getASTContext().getProtocol(KnownProtocolKind::Sendable);
+
+    // If printing is for a package interface, let's add derived/implied `Sendable`
+    // conformance to avoid having to infer it while type-checking the interface
+    // file later. Such inference is not always possible, because i.e. a package
+    // declaration can have private storage that won't be printed in a package
+    // interface file and attempting inference would produce an invalid result.
+    bool shouldPrintSynthesizedSendable = [&] {
+      // If `Sendable` is stated explicit or imported from ObjC, were are done.
+      if (explicitSendable || protocols.contains(sendable))
+        return false;
+
+      // Otherwise only do this for package declarations.
+      return options.printPackageInterface() && isPackage(T);
+    }();
+
+    if (shouldPrintSynthesizedSendable) {
+      auto conformance =
+          lookupConformance(T->getDeclaredInterfaceType(), sendable,
+                            /*allowMissing=*/false);
+      if (conformance.isConcrete() &&
+          !conformance.hasUnavailableConformance()) {
+        auto *concrete = conformance.getConcrete();
+        if (concrete->getSourceKind() == ConformanceEntryKind::Synthesized ||
+            concrete->getSourceKind() == ConformanceEntryKind::Implied)
+          protocols.insert(sendable);
+      }
     }
   }
 

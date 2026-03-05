@@ -256,7 +256,7 @@ static std::optional<PGOOptions> buildIRUseOptions(const IRGenOptions &Opts,
   if (Opts.UseIRProfile.empty())
     return std::nullopt;
 
-  auto FS = llvm::vfs::getRealFileSystem();
+  auto FS = llvm::vfs::createPhysicalFileSystem();
   std::unique_ptr<llvm::IndexedInstrProfReader> Reader =
       getProfileReader(Opts.UseIRProfile.c_str(), *FS, Diags);
   if (!Reader)

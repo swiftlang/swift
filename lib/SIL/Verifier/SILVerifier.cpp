@@ -5613,12 +5613,12 @@ public:
     if (F.getModule().getStage() >= SILStage::Canonical &&
         functionResultType.isAddress()) {
       auto base = getAccessBase(RI->getOperand());
-      require(!base->getType().isAddress()
-               || isa<SILFunctionArgument>(base)
-               || isa<DereferenceAddrBorrowInst>(base)
-               || isa<DereferenceBorrowAddrInst>(base)
-               || (isa<ApplyInst>(base)
-                   && cast<ApplyInst>(base)->hasAddressResult()),
+      require(!base->getType().isAddress() || isa<SILFunctionArgument>(base) ||
+                  isa<DereferenceAddrBorrowInst>(base) ||
+                  isa<DereferenceBorrowAddrInst>(base) ||
+                  (isa<ApplyInst>(base) &&
+                       cast<ApplyInst>(base)->hasAddressResult() ||
+                   isa<GlobalAddrInst>(base)),
               "unidentified address return");
     }
   }
@@ -7378,10 +7378,12 @@ public:
         auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
         auto *distributedProtocol =
             ctx.getProtocol(KnownProtocolKind::DistributedActor);
-        require(argType->canBeIsolatedTo() ||
-                    genericSig->requiresProtocol(argType, actorProtocol) ||
-                    genericSig->requiresProtocol(argType, distributedProtocol),
-                "Only any actor types can be isolated");
+        require(
+            argType->canBeIsolatedTo() ||
+                (genericSig &&
+                 (genericSig->requiresProtocol(argType, actorProtocol) ||
+                  genericSig->requiresProtocol(argType, distributedProtocol))),
+            "Only any actor types can be isolated");
         require(!foundIsolatedParameter, "Two isolated parameters");
         foundIsolatedParameter = true;
       }

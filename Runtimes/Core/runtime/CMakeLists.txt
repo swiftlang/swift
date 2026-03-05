@@ -22,7 +22,6 @@ add_library(swiftRuntimeCore OBJECT
     EnvironmentVariables.cpp
     ErrorObjectCommon.cpp
     ErrorObjectNative.cpp
-    Errors.cpp
     ErrorDefaultImpls.cpp
     Exception.cpp
     Exclusivity.cpp
@@ -52,12 +51,13 @@ add_library(swiftRuntimeCore OBJECT
     ProtocolConformance.cpp
     RefCount.cpp
     ReflectionMirror.cpp
+    RuntimeErrorReporting.cpp
     RuntimeInvocationsTracking.cpp
     SwiftTLSContext.cpp
     ThreadingError.cpp
     Tracing.cpp
     AccessibleFunction.cpp
-    Win32.cpp)
+    WindowsUnicode.cpp)
 
 if(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER)
   target_sources(swiftRuntimeCore PRIVATE
@@ -130,7 +130,8 @@ if(SwiftCore_ENABLE_BACKTRACING)
     Backtrace.cpp
     BacktraceUtils.cpp
     CrashHandlerMacOS.cpp
-    CrashHandlerLinux.cpp)
+    CrashHandlerLinux.cpp
+    CrashHandlerWindows.cpp)
 endif()
 
 target_sources(swiftRuntimeCore PRIVATE

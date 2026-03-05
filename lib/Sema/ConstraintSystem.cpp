@@ -33,9 +33,11 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeTransform.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -505,7 +507,8 @@ Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
   // FIXME: This will need to change when we do inference of thrown error
   // types in closures.
   if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
-    return getClosureType(closure)->getEffectiveThrownErrorTypeOrNever();
+    auto closureTy = simplifyType(getType(closure))->castTo<FunctionType>();
+    return closureTy->getEffectiveThrownErrorTypeOrNever();
   }
 
   if (!ctx.LangOpts.hasFeature(Feature::FullTypedThrows))
@@ -949,9 +952,9 @@ void ConstraintSystem::recordPackElementExpansion(
 
 /// Extend the given depth map by adding depths for all of the subexpressions
 /// of the given expression.
-static void
-extendDepthMap(Expr *expr, unsigned initialDepth,
-               llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
+static void extendDepthMap(
+   Expr *expr,
+   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
   // If we already have an entry in the map, we don't need to update it. This
   // avoids invalidating previous entries when solving a smaller component of a
   // larger AST node, e.g during conjunction solving.
@@ -966,9 +969,8 @@ extendDepthMap(Expr *expr, unsigned initialDepth,
     unsigned Depth = 0;
 
     explicit RecordingTraversal(
-        unsigned initialDepth,
         llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap)
-        : DepthMap(depthMap), Depth(initialDepth) {}
+        : DepthMap(depthMap) {}
 
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::ArgumentsAndExpansion;
@@ -1026,7 +1028,7 @@ extendDepthMap(Expr *expr, unsigned initialDepth,
     }
   };
 
-  RecordingTraversal traversal(initialDepth, depthMap);
+  RecordingTraversal traversal(depthMap);
   expr->walk(traversal);
 }
 
@@ -1034,12 +1036,7 @@ std::optional<std::pair<unsigned, Expr *>>
 ConstraintSystem::getExprDepthAndParent(Expr *expr) {
   // Bring the set of expression weights up to date.
   while (NumInputExprsInWeights < InputExprs.size()) {
-    auto *E = InputExprs[NumInputExprsInWeights];
-    unsigned initialDepth = 0;
-    auto depthIter = InputExprSimulatedDepths.find(E);
-    if (depthIter != InputExprSimulatedDepths.end())
-      initialDepth = depthIter->second;
-    extendDepthMap(E, initialDepth, ExprWeights);
+    extendDepthMap(InputExprs[NumInputExprsInWeights], ExprWeights);
     ++NumInputExprsInWeights;
   }
 
@@ -1729,7 +1726,7 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
       return std::pair(ty, false);
 
     // Otherwise we've flattened the dependence, evaluate Sendable.
-    return std::make_pair(Type(), ty->isSendableType());
+    return std::make_pair(Type(), isSendableCapture(ty));
   }
 };
 
@@ -2034,6 +2031,22 @@ SolutionResult ConstraintSystem::salvage() {
       if (*best != 0)
         viable[0] = std::move(viable[*best]);
       viable.erase(viable.begin() + 1, viable.end());
+
+      if (getASTContext().TypeCheckerOpts.CrashOnValidSalvage) {
+        auto &solution = viable[0];
+        if (solution.Fixes.empty() &&
+            diagnosticTransaction == nullptr &&
+            !getASTContext().LangOpts.DisableAvailabilityChecking &&
+            solution.getFixedScore().Data[SK_Unavailable] == 0 &&
+            solution.getFixedScore().Data[SK_Hole] == 0 &&
+            solution.getFixedScore().Data[SK_Fix] == 0) {
+          ABORT([&](auto &out) {
+            out << "Found valid solution in salvage()\n\n";
+            solution.dump(out, 0);
+          });
+        }
+      }
+
       return SolutionResult::forSolved(std::move(viable[0]));
     }
 
@@ -3835,7 +3848,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
     case ConstraintLocator::FallbackType:
     case ConstraintLocator::KeyPathSubscriptIndex:
-    case ConstraintLocator::ImplicitForEachCompatMember:
     case ConstraintLocator::ExistentialMemberAccessConversion:
       break;
     }
@@ -4983,7 +4995,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // get any special power from being formed in certain contexts, such
   // as the ability to assign to `let`s in initialization contexts, so
   // we pass null for the DC to `isSettable` here.)
-  if (!getASTContext().isLanguageModeAtLeast(5)) {
+  if (!getASTContext().isLanguageModeAtLeast(LanguageMode::v5)) {
     // As a source-compatibility measure, continue to allow
     // WritableKeyPaths to be formed in the same conditions we did
     // in previous releases even if we should not be able to set
@@ -5276,6 +5288,23 @@ bool constraints::isOperatorDisjunction(Constraint *disjunction) {
 
   auto *decl = getOverloadChoiceDecl(choices.front());
   return decl ? decl->isOperator() : false;
+}
+
+bool constraints::isSendableCapture(Type type) {
+  ASSERT(!type->hasTypeVariable());
+
+  if (!type->isSendableType())
+    return false;
+
+  // All of the type parameters involved in the type that may have isolated
+  // conformances have to conform to `SendableMetatype`.
+  return !type.findIf([&](Type innerTy) {
+    if (auto *archetypeTy = innerTy->getAs<ArchetypeType>()) {
+      if (archetypeTy->mayHaveIsolatedConformance())
+        return !MetatypeType::get(archetypeTy)->isSendableType();
+    }
+    return false;
+  });
 }
 
 ASTNode constraints::findAsyncNode(ClosureExpr *closure) {

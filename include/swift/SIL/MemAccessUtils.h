@@ -1958,7 +1958,8 @@ public:
   }
 
   SILValue visitPhi(SILPhiArgument *phi) {
-    assert(false && "unexpected phi on access path");
+    // "Address" phis can happen because we look through `pointer_to_address`
+    // instructions and a phi can be a `Builtin.RawPointer`.
     return SILValue();
   }
 

@@ -1114,6 +1114,12 @@ public:
   /// on macOS or Foundation on Linux.
   bool isCGFloat();
 
+  /// Check if this is an integer type coming from the Swift module
+  bool isStdlibInteger();
+
+  /// Check if this is a floating-point type coming from the Swift module
+  bool isStdlibFloat();
+
   /// Check if this is a ObjCBool type from the Objective-C module.
   bool isObjCBool();
 
@@ -7217,6 +7223,10 @@ public:
   /// any of its associated types, since those are the only kind of existential
   /// type we can represent.
   Type getExistentialType() const;
+
+  /// Determine whether it's possible for this type to have an isolated
+  /// conformance. This could be prohibited in the generic signature.
+  bool mayHaveIsolatedConformance() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

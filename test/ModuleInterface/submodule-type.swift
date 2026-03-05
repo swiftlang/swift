@@ -4,8 +4,8 @@
 
 import HasSubmodule.Submodule
 
-// CHECK: public func takesHasSubmoduleType(_ x: HasSubmodule.HasSubmoduleType)
+// CHECK: public func takesHasSubmoduleType(_ x: HasSubmodule::HasSubmoduleType)
 public func takesHasSubmoduleType(_ x: HasSubmoduleType) {}
 
-// CHECK: public func takesSubmoduleType(_ x: HasSubmodule.SubmoduleType)
+// CHECK: public func takesSubmoduleType(_ x: HasSubmodule::SubmoduleType)
 public func takesSubmoduleType(_ x: SubmoduleType) {}

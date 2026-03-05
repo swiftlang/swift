@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-builtin-module -module-name builtins -Xllvm -sil-disable-pass=target-constant-folding -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -enable-builtin-module -module-name builtins -Xllvm -sil-disable-pass=target-constant-folding -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime --dump-input=always
 
 // REQUIRES: CPU=x86_64 || CPU=arm64 || CPU=arm64e
 
@@ -985,6 +985,18 @@ nonisolated(nonsending) func testTaskLocalValuePush<Value>(_ key: Builtin.RawPoi
 // CHECK: call swiftcc {} @swift_task_localValuePop()
 nonisolated(nonsending) func testTaskLocalValuePop() async {
   Builtin.taskLocalValuePop()
+} 
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins30testTaskCancellationShieldPushyyYaF"(ptr swiftasync %0, i64 %1, i64 %2)
+// CHECK: call swiftcc i1 @swift_task_cancellationShieldPush()
+nonisolated(nonsending) func testTaskCancellationShieldPush() async {
+  Builtin.taskCancellationShieldPush()
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins29testTaskCancellationShieldPopyyYaF"(ptr swiftasync %0, i64 %1, i64 %2)
+// CHECK: call swiftcc {} @swift_task_cancellationShieldPop()
+nonisolated(nonsending) func testTaskCancellationShieldPop() async {
+  Builtin.taskCancellationShieldPop()
 }  
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}

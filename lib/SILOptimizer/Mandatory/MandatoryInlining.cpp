@@ -108,7 +108,6 @@ static  bool fixupReferenceCounts(
   bool isLexical = isLexicalPartialApply(pai);
 
   // FIXME: Can we cache this in between inlining invocations?
-  DeadEndBlocks deadEndBlocks(pai->getFunction());
   SmallVector<SILBasicBlock *, 4> leakingBlocks;
   bool invalidatedStackNesting = false;
 
@@ -153,7 +152,7 @@ static  bool fixupReferenceCounts(
       auto *stackLoc = builder.createAllocStack(loc, v->getType().getObjectType());
       builder.createCopyAddr(loc, v, stackLoc, IsNotTake, IsInitialization);
 
-      LinearLifetimeChecker checker(&deadEndBlocks, /*instIndices=*/ nullptr);
+      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr, /*instIndices=*/ nullptr);
       bool consumedInLoop = checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -214,7 +213,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(&deadEndBlocks, /*instIndices=*/ nullptr);
+      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr, /*instIndices=*/ nullptr);
       bool consumedInLoop = checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -261,7 +260,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(&deadEndBlocks, /*instIndices=*/ nullptr);
+      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr, /*instIndices=*/ nullptr);
       checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -298,7 +297,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(&deadEndBlocks, /*instIndices=*/ nullptr);
+      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr, /*instIndices=*/ nullptr);
       checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {

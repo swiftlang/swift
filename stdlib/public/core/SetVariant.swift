@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -381,9 +381,9 @@ extension Set._Variant {
 
 extension Set._Variant {
   @_alwaysEmitIntoClient
-  internal __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> _NativeSet<Element> {
+  internal consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> _NativeSet<Element> {
 #if _runtime(_ObjC)
     guard isNative else {
       var result = _NativeSet<Element>()

@@ -291,6 +291,18 @@ static ManagedValue emitBuiltinFixLifetime(SILGenFunction &SGF,
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
 }
 
+static ManagedValue emitBuiltinMarkDependence(SILGenFunction &SGF,
+                                              SILLocation loc,
+                                              SubstitutionMap substitutions,
+                                              ArrayRef<ManagedValue> args,
+                                              SGFContext C) {
+  auto *md = SGF.B.createMarkDependence(loc, args[0].getValue(), args[1].getValue(),
+                                        MarkDependenceKind::Escaping);
+  ASSERT(md->getOwnershipKind() != OwnershipKind::Owned &&
+         "Builtin.markDependence only works for none and guaranteed ownership");
+  return ManagedValue::forBorrowedObjectRValue(md);
+}
+
 static ManagedValue emitCastToReferenceType(SILGenFunction &SGF,
                                             SILLocation loc,
                                             SubstitutionMap substitutions,

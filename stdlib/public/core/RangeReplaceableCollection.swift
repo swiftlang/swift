@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1111,17 +1111,35 @@ extension RangeReplaceableCollection {
   /// - Returns: A collection of the elements that `isIncluded` allowed.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @inlinable
+  @_alwaysEmitIntoClient
   @available(swift, introduced: 4.0)
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> Self {
+  public consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> Self {
     var result = Self()
     for element in self where try isIncluded(element) {
       result.append(element)
     }
     return result
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> Self
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> Self {
+    try filter(isIncluded)
+  }
+#endif // !$Embedded
 }
 
 extension RangeReplaceableCollection where Self: MutableCollection {

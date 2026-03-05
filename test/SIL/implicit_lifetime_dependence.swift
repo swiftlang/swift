@@ -220,19 +220,10 @@ public struct OuterNE: ~Escapable {
     set { inner1 = newValue }
   }
 
-  public struct InnerNE: ~Escapable {
-    @_lifetime(copy owner)
-    init<Owner: ~Escapable & ~Copyable>(
-      owner: borrowing Owner
-    ) {}
-  }
+  public struct InnerNE: ~Escapable {}
 
-  @_lifetime(copy owner)
-  init<Owner: ~Copyable & ~Escapable>(owner: borrowing Owner) {
-    self.inner1 = InnerNE(owner: owner)
-  }
-
-  // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7OuterNEV8setInner5valueyAC0gE0V_tF : $@convention(method) (@guaranteed OuterNE.InnerNE, @lifetime(copy 0) @inout OuterNE) -> () {
+  // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7OuterNEV8setInner5valueyAC0gE0V_tF : $@convention(method)
+  // (@guaranteed OuterNE.InnerNE, @lifetime(copy 0, copy 1) @inout OuterNE) -> () {
   @_lifetime(self: copy value)
   mutating func setInner(value: InnerNE) {
     self.inner1 = value

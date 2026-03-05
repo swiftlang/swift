@@ -4,13 +4,6 @@
 // We only check the module interface of Shadow to keep this test concise
 
 // CHECK:      public struct Shadow {
-// CHECK-NEXT:   public init()
-// CHECK-NEXT:   public func publPublShadowed() -> Return
-// CHECK-NEXT:   public func protPublShadowed() -> Return
-// CHECK-NEXT:   public func privPublShadowed() -> Return
-// CHECK-NEXT:   private func publPrivShadowed() -> Return
-// CHECK-NEXT:   private func protPrivShadowed() -> Return
-// CHECK-NEXT:   private func privPrivShadowed() -> Return
 
 // Currently, ImportDecl.cpp::loadAllMembersOfRecordDecl() does not correctly
 // handle multiple inheritance, so it only loads one of each ambiguous member.
@@ -25,4 +18,17 @@
 
 // TODO:         public func publOrProt() -> Return
 // TODO:         private func publOrProt() -> Return
+
+// CHECK-NEXT:   public init()
+// CHECK-NEXT:   private func publOrProt() -> Return
+// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
+// CHECK-NEXT:   private func publOrPriv() -> Return
+// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
+// CHECK-NEXT:   private func protOrPriv() -> Return
+// CHECK-NEXT:   public func publPublShadowed() -> Return
+// CHECK-NEXT:   public func protPublShadowed() -> Return
+// CHECK-NEXT:   public func privPublShadowed() -> Return
+// CHECK-NEXT:   private func publPrivShadowed() -> Return
+// CHECK-NEXT:   private func protPrivShadowed() -> Return
+// CHECK-NEXT:   private func privPrivShadowed() -> Return
 // CHECK:      }

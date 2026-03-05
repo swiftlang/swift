@@ -1048,13 +1048,13 @@ InferredGenericSignatureRequest::evaluate(
           ctx.Diags
               .diagnose(loc, diag::requires_generic_params_made_equal,
                         genericParam, result->getSugaredType(reduced))
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
         } else {
           ctx.Diags
               .diagnose(loc,
                         diag::requires_generic_param_made_equal_to_concrete,
                         genericParam)
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
         }
       }
     }

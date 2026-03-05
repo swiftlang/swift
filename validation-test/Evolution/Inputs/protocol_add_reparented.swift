@@ -23,7 +23,7 @@ public protocol SeedEater {
   var seedKinds: Kind { get }
 }
 
-public protocol Bird {
+public protocol Bird: SeedEater {
   func eat(_ food: Int) -> Int
 }
 

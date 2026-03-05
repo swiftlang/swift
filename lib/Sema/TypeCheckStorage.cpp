@@ -130,7 +130,8 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
 
   // Just walk over the members of the type, forcing backing storage
   // for lazy properties and property wrappers to be synthesized.
-  for (auto *member : implDecl->getMembers()) {
+  implDecl->loadStorageMembers();
+  for (auto *member : implDecl->getCurrentMembersWithoutLoading()) {
     // Expand peer macros.
     (void)evaluateOrDefault(
         ctx.evaluator,
@@ -229,7 +230,8 @@ static void enumerateStoredPropertiesAndMissing(
     visitMember(idVar);
   if (auto actorSystemVar = decl->getDistributedActorSystemProperty())
     visitMember(actorSystemVar);
-  for (auto *member : implDecl->getMembers())
+  implDecl->loadStorageMembers();
+  for (auto *member : implDecl->getCurrentMembersWithoutLoading())
     visitMember(member);
 }
 
@@ -351,7 +353,8 @@ InitializablePropertiesRequest::evaluate(Evaluator &evaluator,
     member->visitAuxiliaryDecls(visitMember);
   };
 
-  for (auto *member : decl->getMembers())
+  decl->loadStorageMembers();
+  for (auto *member : decl->getCurrentMembersWithoutLoading())
     visitMember(member);
 
   return decl->getASTContext().AllocateCopy(results);
@@ -2818,8 +2821,6 @@ createBorrowMutateAccessorPrototype(AbstractStorageDecl *storage,
       params, Type(), dc);
   accessor->setSynthesized();
 
-  // TODO: Update self access kind when ownership variations are introduced for
-  // borrow and mutate accessors.
   if (kind == AccessorKind::Mutate) {
     accessor->setSelfAccessKind(SelfAccessKind::Mutating);
   } else {
@@ -2829,22 +2830,20 @@ createBorrowMutateAccessorPrototype(AbstractStorageDecl *storage,
   if (!storage->requiresOpaqueAccessor(kind))
     accessor->setForcedStaticDispatch(true);
 
-  // Make sure the coroutine is available enough to access
+  // Make sure the borrow/mutate accessor is available enough to access
   // the storage.
   SmallVector<const Decl *, 2> asAvailableAs;
   asAvailableAs.push_back(storage);
 
-  if (auto var = dyn_cast<VarDecl>(storage)) {
-    addPropertyWrapperAccessorAvailability(var, kind, asAvailableAs);
-  }
+  // Property wrappers should never appear during borrow/mutate synthesis.
+  // We only synthesize borrow/mutate accessors for stored properties when
+  // a protocol has borrow/mutate requirement. Since property wrappers are
+  // transformed into computed properties with get/set accessors, they cannot
+  // satisfy the protocol requirement.
+  ASSERT(!isa<VarDecl>(storage) ||
+         !cast<VarDecl>(storage)->hasAttachedPropertyWrapper());
 
   AvailabilityInference::applyInferredAvailableAttrs(accessor, asAvailableAs);
-
-  // A mutate accessor should have the same SPI visibility as the setter.
-  if (kind == AccessorKind::Mutate) {
-    if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set))
-      applyInferredSPIAccessControlAttr(accessor, setter, ctx);
-  }
 
   finishImplicitAccessor(accessor, ctx);
 
@@ -3013,11 +3012,6 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
       }
     }
   }
-
-  // Non-stable modules have no ABI to keep stable.
-  if (storage->getModuleContext()->getResilienceStrategy() !=
-      ResilienceStrategy::Resilient)
-    return false;
 
   // Non-exported storage has no ABI to keep stable.
   if (isExported(storage) == ExportedLevel::None)

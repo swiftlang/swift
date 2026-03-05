@@ -608,6 +608,47 @@ do {
   }
 }
 
+// https://github.com/swiftlang/swift/issues/69245
+do {
+  func want_tuple<each T>(_ arg: (repeat each T)) {}
+  func give_arg<each T>(_ arg: repeat each T) {
+  	want_tuple(repeat each arg)
+    // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type '(repeat each T)'}}
+    // expected-note@-2 {{did you mean to expand the pack into a tuple?}} {{15-15=(}}{{30-30=)}}
+  }
+
+  func want_tuples<each T>(a: (repeat each T), b: (repeat each T)) {}
+  func give_args<each T>(_ arg: repeat each T) {
+    want_tuples(a: repeat each arg, b: repeat each arg)
+    // expected-error@-1 2 {{cannot pass value pack expansion to non-pack parameter of type '(repeat each T)'}}
+    // expected-note@-2:20 {{did you mean to expand the pack into a tuple?}} {{20-20=(}}{{35-35=)}}
+    // expected-note@-3:40 {{did you mean to expand the pack into a tuple?}} {{40-40=(}}{{55-55=)}}
+  }
+
+  struct S<each T> {
+    let tuple: (repeat each T)
+  }
+
+  func initWithPack<each T>(xs: repeat each T) -> S<repeat each T> {
+    return S(tuple: repeat each xs)
+    // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type '(repeat each T)'}}
+    // expected-note@-2 {{did you mean to expand the pack into a tuple?}} {{21-21=(}}{{35-35=)}}
+  }
+
+  struct Box<T> {
+    let v: T
+    init(_ v: T) {
+      self.v = v
+    }
+  }
+  
+  func wants_nested_tuple<each T>(_ arg: Box<(repeat each T)>) {}
+  func gives_nested<each T>(_ arg: repeat each T) {
+    wants_nested_tuple(Box(repeat each arg))
+    // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type 'T'}}
+  }
+}
+
 // rdar://110401127 - name lookup bug when abstract tuple stored property shadows a global
 do {
   let c = [false, true]

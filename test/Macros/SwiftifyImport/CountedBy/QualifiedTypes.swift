@@ -1,23 +1,37 @@
 // REQUIRES: swift_swift_parser
 
-// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -strict-memory-safety -warnings-as-errors -dump-macro-expansions 2>&1 | %FileCheck --match-full-lines %s
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
 
+// RUN: %target-swift-frontend %t/test.swift -emit-module -plugin-path %swift-plugin-dir -strict-memory-safety -verify
+// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend %t/test.swift -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions 2> %t/expansions.out
+// RUN: %diff %t/expansions.out %t/expansions.expected
+
+//--- test.swift
 @_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"))
-func foo(_ ptr: Swift.UnsafePointer<Swift.Int>, _ len: Swift.Int) -> Swift.Void {
+public func foo(_ ptr: Swift.UnsafePointer<Swift.Int>, _ len: Swift.Int) -> Swift.Void {
 }
 
 @_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"))
-func bar(_ ptr: Swift.UnsafePointer<Swift.CInt>, _ len: Swift.Int) -> () {
+public func bar(_ ptr: Swift.UnsafePointer<Swift.CInt>, _ len: Swift.Int) -> () {
 }
 
-// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
-// CHECK-NEXT: func foo(_ ptr: Swift.UnsafeBufferPointer<Swift.Int>) -> Swift.Void {
-// CHECK-NEXT:     let len = ptr.count
-// CHECK-NEXT:     return unsafe foo(ptr.baseAddress!, len)
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
-// CHECK-NEXT: func bar(_ ptr: Swift.UnsafeBufferPointer<Swift.CInt>) -> () {
-// CHECK-NEXT:     let len = ptr.count
-// CHECK-NEXT:     return unsafe bar(ptr.baseAddress!, len)
-// CHECK-NEXT: }
+//--- expansions.expected
+@__swiftmacro_4test3foo15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func foo(_ ptr: Swift.UnsafeBufferPointer<Swift.Int>) -> Swift.Void {
+    let len = ptr.count
+    return unsafe foo(ptr.baseAddress!, len)
+}
+------------------------------
+@__swiftmacro_4test3bar15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func bar(_ ptr: Swift.UnsafeBufferPointer<Swift.CInt>) -> () {
+    let len = ptr.count
+    return unsafe bar(ptr.baseAddress!, len)
+}
+------------------------------

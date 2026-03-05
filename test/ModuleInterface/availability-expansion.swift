@@ -6,7 +6,9 @@
 // RUN:   -define-availability "_iOS9:iOS 9.0" \
 // RUN:   -define-availability "_macOS10_11:macOS 10.11" \
 // RUN:   -define-availability "_myProject 1.0:macOS 10.11" \
-// RUN:   -define-availability "_myProject 2.5:macOS 10.12"
+// RUN:   -define-availability "_myProject 2.5:macOS 10.12" \
+// RUN:   -define-availability "_emptyMacro:*"
+
 // RUN: %target-swift-typecheck-module-from-interface(%t/Test.swiftinterface)
 // RUN: %FileCheck %s < %t/Test.swiftinterface
 
@@ -35,7 +37,12 @@ public func onMyProjectV2_5() {}
 // CHECK: @available(macOS 10.12, *)
 // CHECK-NEXT: public func onMyProjectV2_5
 
+@available(_emptyMacro, *)
+public func emptyMacro() {}
+// CHECK-NOT: @available
+// CHECK-NEXT: public func emptyMacro()
+
 @_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
 public func testSemanticsAvailability<T>(_ t: T) {}
-// CHECK: @_specialize(exported: true, kind: full, availability: macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *; where T == Swift.Int)
+// CHECK: @_specialize(exported: true, kind: full, availability: macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *; where T == Swift::Int)
 // CHECK-NEXT: public func testSemanticsAvailability

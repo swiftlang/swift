@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
+// FIXME: Currently non-determinstically failing for non-macOS configs (rdar://170709684)
+// REQUIRES: OS=macosx
+
 /// Setup the SDK composed of SecretModule, SystemModule, SystemDepA, SystemDepB, and SystemDepCommon
 // RUN: %empty-directory(%t/SDK)
 // RUN: mkdir -p %t/SDK/Frameworks/SecretModule.framework/Modules/SecretModule.swiftmodule

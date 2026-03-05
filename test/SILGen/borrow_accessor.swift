@@ -3,7 +3,9 @@
 
 // REQUIRES: swift_feature_BorrowAndMutateAccessors
 
-public final class Klass {}
+public final class Klass {
+  let id: Int = 0
+}
 
 public struct NC : ~Copyable {}
 
@@ -12,7 +14,7 @@ func use(_ t: Klass) {}
 func use(_ t: borrowing NC) {}
 
 public struct S {
-  var _k: Klass
+  var _k = Klass()
 
   var k: Klass {
     borrow {
@@ -24,10 +26,17 @@ public struct S {
   }
 }
 
+let global_int = 0
+let global_klass = Klass()
+let global_wrapper = Wrapper()
+let global_nc = NC()
+let global_ncwrapper = NCWrapper()
+let global_generic: AnyObject = Klass()
+
 public struct Wrapper {
-  var _k: Klass
-  var _s: S
-  var _id: Int
+  var _k = Klass()
+  var _s = S()
+  var _id = 0
 
   var id: Int {
     borrow {
@@ -98,6 +107,51 @@ public struct Wrapper {
     }
     mutating mutate {
       return &_k
+    }
+  }
+
+  var id_ownership_modifier: Int {
+    borrowing borrow {
+      return _id
+    }
+    mutating mutate {
+      return &_id
+    }
+  }
+
+  var global_int_prop: Int {
+    borrow {
+      return global_int
+    }
+  }
+
+  var global_k1: Klass {
+    borrow {
+      return global_klass
+    }
+  }
+
+  var global_k2: Klass {
+    borrow {
+      return global_wrapper._k
+    }
+  }
+
+  var global_k3: Klass {
+    borrow {
+      return global_wrapper.k
+    }
+  }
+
+  var global_k4: AnyObject {
+    borrow {
+      return global_generic
+    }
+  }
+
+  var class_let: Int {
+    borrow {
+      return _k.id
     }
   }
 }
@@ -220,10 +274,28 @@ public struct GenWrapper<T> {
       return &_prop
     }
   }
+
+  var global_k1: Klass {
+    borrow {
+      return global_klass
+    }
+  }
+
+  var global_k2: Klass {
+    borrow {
+      return global_wrapper._k
+    }
+  }
+
+  var global_k3: Klass {
+    borrow {
+      return global_wrapper.k
+    }
+  }
 }
 
 public struct NCS: ~Copyable {
-  var _nc: NC
+  var _nc = NC()
 
   var nc: NC {
     borrow {
@@ -236,8 +308,8 @@ public struct NCS: ~Copyable {
 }
 
 public struct NCWrapper: ~Copyable {
-  var _nc: NC
-  var _s: NCS
+  var _nc = NC()
+  var _s = NCS()
 
   var nc: NC {
     borrow {
@@ -290,6 +362,24 @@ public struct NCWrapper: ~Copyable {
     }
     mutating mutate {
       return &_nc
+    }
+  }
+
+  var global_nc1: NC {
+    borrow {
+      return global_nc
+    }
+  }
+
+  var global_nc2: NC {
+    borrow {
+      return global_ncwrapper._nc
+    }
+  }
+
+  var global_nc3: NC {
+    borrow {
+      return global_ncwrapper.nc
     }
   }
 }

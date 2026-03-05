@@ -23,6 +23,20 @@
 // CHECK-SAME:    i32 0
 // CHECK-SAME:  }>
 
+// CHECK-arm64e-LABEL: _swift_coro_free.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @_swift_coro_free,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 ptrtoint (
+// CHECK-arm64e-SAME:      ptr getelementptr inbounds (
+// CHECK-arm64e-SAME:        ptr @_swift_coro_typed_malloc_allocator,
+// CHECK-arm64e-SAME:        i32 0,
+// CHECK-arm64e-SAME:        i32 2
+// CHECK-arm64e-SAME:      )
+// CHECK-arm64e-SAME:    )
+// CHECK-arm64e-SAME:    i64 40879 },
+// CHECK-arm64e-SAME:  section "llvm.ptrauth",
+// CHECK-arm64e-SAME:  align 8
+
 // CHECK-arm64e-LABEL: _swift_coro_malloc.ptrauth = private constant {
 // CHECK-arm64e-SAME:    ptr @_swift_coro_malloc,
 // CHECK-arm64e-SAME:    i32 0,
@@ -36,19 +50,7 @@
 // CHECK-arm64e-SAME:    i64 24469 }
 // CHECK-arm64e-SAME:  section "llvm.ptrauth"
 // CHECK-arm64e-SAME:  align 8
-// CHECK-arm64e-LABEL: _swift_coro_free.ptrauth = private constant {
-// CHECK-arm64e-SAME:    ptr @_swift_coro_free,
-// CHECK-arm64e-SAME:    i32 0,
-// CHECK-arm64e-SAME:    i64 ptrtoint (
-// CHECK-arm64e-SAME:      ptr getelementptr inbounds (
-// CHECK-arm64e-SAME:        ptr @_swift_coro_malloc_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 2
-// CHECK-arm64e-SAME:      )
-// CHECK-arm64e-SAME:    )
-// CHECK-arm64e-SAME:    i64 40879 },
-// CHECK-arm64e-SAME:  section "llvm.ptrauth",
-// CHECK-arm64e-SAME:  align 8
+
 // CHECK-arm64e-LABEL: _swift_coro_malloc.ptrauth.{{.*}} = private constant {
 // CHECK-arm64e-SAME:    ptr @_swift_coro_malloc,
 // CHECK-arm64e-SAME:    i32 0,

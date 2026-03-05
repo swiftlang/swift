@@ -2325,13 +2325,17 @@ namespace {
       }
       condReqs.clear();
 
+      // Enumerate the conditional requirements from the conformance.
       for (auto condReq : normal->getConditionalRequirements()) {
-        // We don't need to collect conditional requirements for invertible
-        // protocol requirements here, since they are encoded in the inverse
-        // list above.
-        if (!condReq.isInvertibleProtocolRequirement()) {
-          condReqs.push_back(condReq);
+        // We don't need to collect conditional requirements for
+        // GenericTypeParamType here, since they are encoded in the inverse
+        // list above. But we do need to include those for DependentMemberType.
+        if (condReq.getKind() == RequirementKind::Conformance &&
+            condReq.getFirstType()->getAs<GenericTypeParamType>() &&
+            condReq.getProtocolDecl()->getInvertibleProtocolKind()) {
+          continue;
         }
+        condReqs.push_back(condReq);
       }
       if (condReqs.empty() || Conformance->isReparented()) {
         // For a protocol P that conforms to another protocol, introduce a

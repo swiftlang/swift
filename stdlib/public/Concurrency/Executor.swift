@@ -38,6 +38,9 @@ public protocol Executor: AnyObject, Sendable {
 
   #if os(WASI) || !$Embedded
   /// `true` if this is the main executor.
+  #if !os(Windows)
+  @_weakLinked
+  #endif
   @available(StdlibDeploymentTarget 6.3, *)
   var isMainExecutor: Bool { get }
   #endif // os(WASI) || !$Embedded
@@ -49,6 +52,9 @@ public protocol Executor: AnyObject, Sendable {
   /// Executors that implement SchedulingExecutor should provide their
   /// own copy of this method, which will allow the compiler to avoid a
   /// potentially expensive runtime cast.
+  #if !os(Windows)
+  @_weakLinked
+  #endif
   @available(StdlibDeploymentTarget 6.3, *)
   var asSchedulingExecutor: (any SchedulingExecutor)? { get }
   #endif
@@ -138,6 +144,9 @@ extension Executor {
   /// Executors that implement SchedulingExecutor should provide their
   /// own copy of this method, which will allow the compiler to avoid a
   /// potentially expensive runtime cast.
+  #if !os(Windows)
+  @_weakLinked
+  #endif
   @available(StdlibDeploymentTarget 6.3, *)
   public var asSchedulingExecutor: (any SchedulingExecutor)? {
     return self as? SchedulingExecutor
@@ -162,6 +171,9 @@ extension Executor {
   #if os(WASI) || !$Embedded
   // This defaults to `false` so that existing third-party Executor
   // implementations will work as expected.
+  #if !os(Windows)
+  @_weakLinked
+  #endif
   @available(StdlibDeploymentTarget 6.3, *)
   public var isMainExecutor: Bool { false }
   #endif // os(WASI) || !$Embedded
@@ -494,14 +506,17 @@ extension Executor {
   // Delegation goes like this:
   // Unowned Job -> Executor Job -> Job -> ---||---
 
+  @inlinable
   public func enqueue(_ job: UnownedJob) {
     self.enqueue(ExecutorJob(job))
   }
 
+  @inlinable
   public func enqueue(_ job: consuming ExecutorJob) {
     self.enqueue(Job(job))
   }
 
+  @inlinable
   public func enqueue(_ job: consuming Job) {
     self.enqueue(UnownedJob(job))
   }

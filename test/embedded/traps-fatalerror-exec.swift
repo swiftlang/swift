@@ -1,19 +1,19 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -x c -c %S/Inputs/unbuffered-putchar.c -o %t/unbuffered-putchar.o
 
-// RUN: %target-build-swift -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %s -Xlinker %t/unbuffered-putchar.o -o %t/a.out
+// RUN: %target-build-swift -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %s -Xlinker %t/unbuffered-putchar.o -o %t/a.out %target-embedded-posix-shim
 // RUN: %target-not-crash %target-run %t/a.out 2>&1 | %FileCheck %s --check-prefix=CHECK-MESSAGE
 
-// RUN: %target-build-swift -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %s -Xlinker %t/unbuffered-putchar.o -o %t/a.out -O
+// RUN: %target-build-swift -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %s -Xlinker %t/unbuffered-putchar.o -o %t/a.out -O %target-embedded-posix-shim
 // RUN: %target-not-crash %target-run %t/a.out 2>&1 | %FileCheck %s --check-prefix=CHECK-NOMESSAGE
 
-// RUN: %target-build-swift -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %s -Xlinker %t/unbuffered-putchar.o -o %t/a.out -Osize
+// RUN: %target-build-swift -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %s -Xlinker %t/unbuffered-putchar.o -o %t/a.out -Osize %target-embedded-posix-shim
 // RUN: %target-not-crash %target-run %t/a.out 2>&1 | %FileCheck %s --check-prefix=CHECK-NOMESSAGE
 
-// RUN: %target-build-swift -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %s -Xlinker %t/unbuffered-putchar.o -o %t/a.out -O     -assert-config Debug
+// RUN: %target-build-swift -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %s -Xlinker %t/unbuffered-putchar.o -o %t/a.out -O     -assert-config Debug %target-embedded-posix-shim
 // RUN: %target-not-crash %target-run %t/a.out 2>&1 | %FileCheck %s --check-prefix=CHECK-MESSAGE
 
-// RUN: %target-build-swift -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %s -Xlinker %t/unbuffered-putchar.o -o %t/a.out -Osize -assert-config Debug
+// RUN: %target-build-swift -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %s -Xlinker %t/unbuffered-putchar.o -o %t/a.out -Osize -assert-config Debug %target-embedded-posix-shim
 // RUN: %target-not-crash %target-run %t/a.out 2>&1 | %FileCheck %s --check-prefix=CHECK-MESSAGE
 
 // REQUIRES: swift_in_compiler

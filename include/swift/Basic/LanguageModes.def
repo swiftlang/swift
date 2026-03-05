@@ -1,0 +1,45 @@
+//===--- Basic/LanguageModes.def --------------------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This definition file describes all language modes for meta-programming
+/// purposes.
+///
+/// `LANGUAGE_MODE(NAME, MAJOR_VERSION, MINOR_VERSION)`
+///
+/// To define a major language mode, use `MAJOR_LANGUAGE_MODE`.
+///
+//===----------------------------------------------------------------------===//
+
+#ifndef LANGUAGE_MODE
+#error "define LANGUAGE_MODE before including this file"
+#endif
+
+#ifndef MAJOR_LANGUAGE_MODE
+  #define MAJOR_LANGUAGE_MODE(NAME, MAJOR_VERSION)                             \
+    LANGUAGE_MODE(NAME, MAJOR_VERSION, 0)
+#endif
+
+#ifndef LAST_REAL_LANGUAGE_MODE
+  #define LAST_REAL_LANGUAGE_MODE(ID)
+#endif
+
+MAJOR_LANGUAGE_MODE(v4, 4)
+LANGUAGE_MODE(v4_2, 4, 2)
+MAJOR_LANGUAGE_MODE(v5, 5)
+MAJOR_LANGUAGE_MODE(v6, 6)
+
+LAST_REAL_LANGUAGE_MODE(v6)
+
+#undef LANGUAGE_MODE
+#undef MAJOR_LANGUAGE_MODE
+#undef LAST_REAL_LANGUAGE_MODE

@@ -439,6 +439,12 @@ public:
 class AnyPattern : public Pattern {
   SourceLoc Loc;
 
+  /// This is currently here to facilitate support for `for _ in seq`
+  /// where seq is a collection of non-copyable elements.
+  /// This was added as part of the support for Borrowing for-in loops.
+  /// It should be deprecated once `_` is always borrowing.
+  bool borrowing = false;
+
 public:
   explicit AnyPattern(SourceLoc Loc, bool IsAsyncLet = false)
       : Pattern(PatternKind::Any), Loc(Loc) {
@@ -463,6 +469,10 @@ public:
   void setIsAsyncLet() {
     Bits.AnyPattern.IsAsyncLet = static_cast<uint64_t>(true);
   }
+
+  bool isBorrowing() { return borrowing; }
+
+  void setIsBorrowing() { borrowing = true; }
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Any;

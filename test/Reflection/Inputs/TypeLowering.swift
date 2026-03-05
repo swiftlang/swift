@@ -272,3 +272,51 @@ public struct RefersToOtherAssocType {
   var x: OpaqueWitness.A
   var y: OpaqueWitness.A
 }
+
+public enum SimpleEnum {
+  case a, b, c
+}
+
+public enum NormalSinglePayloadEnum {
+  case a(Int)
+  case b
+}
+
+public struct AFD { var x: [1 of Int] }
+
+public enum AFDSinglePayloadEnum {
+  case a(AFD)
+  case b
+}
+
+public enum NormalMultiPayloadEnum {
+  case a(Int)
+  case b(Int)
+}
+
+public enum AFDMultiPayloadEnum {
+  case a(AFD)
+  case b(Int)
+}
+
+public struct NormalStruct {
+  var a: Int
+  var b: Int
+}
+
+public struct AFDStruct {
+  var a: AFD
+  var b: Int
+}
+
+public struct NotQuiteBig {
+  var a, b, c: Int
+}
+
+public struct AlmostBig {
+  var a, b, c, d: Int
+}
+
+public struct Big {
+  var a, b, c, d, e: Int
+}

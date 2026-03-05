@@ -9,6 +9,6 @@
 // CHECK-NEXT: }
 
 // CHECK:      public struct HasSmartPIMPL {
-// CHECK-NEXT:   public init()
 // CHECK-NEXT:   private var smart_ptr: std.
+// CHECK-NEXT:   public init()
 // CHECK-NEXT: }

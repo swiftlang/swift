@@ -38,9 +38,19 @@ func useA(_:A){}
 
 public struct NE : ~Escapable {}
 
+public struct NCE : ~Copyable & ~Escapable {}
+
 public struct NEImmortal: ~Escapable {
   @_lifetime(immortal)
   public init() {}
+}
+
+struct CNE<T: ~Escapable>: ~Escapable {
+    let ne: T
+    @_lifetime(copy ne)
+    init(ne: T) {
+        self.ne = ne
+    }
 }
 
 class C {}
@@ -405,7 +415,13 @@ func test(inline: InlineInt) {
 
 // =============================================================================
 // Closures
+//
+// TODO: Add more diagnostic tests when implementing closure context
+// dependencies, including SILOptimizer diagnostic tests such as the one this
+// originated as.
 // =============================================================================
+
+func takesEscapingClosure(_: @escaping ()->()) {}
 
 /// Test an autoclosure that invokes a mutable method where `Self: ~Escapable`.
 /// The @inout_aliasable argument has an implicit @_lifetime(capture: copy capture),
@@ -421,6 +437,33 @@ extension MutableSpan {
     }
     return false
   }
+}
+
+/// '_overrideLifetime(arg, copying: ())' quiets the diagnostics on the caller side. But, when diagnosing the closure
+/// body itself, lifetime analysis must handle the boxed value.
+///
+/// rdar://170592353 (lifetime-dependent variable 'overriddenLifetime' escapes its scope)
+func testMutableCapture(arg: consuming NCE, action: @escaping (inout NCE) -> ()) {
+  var item = _overrideLifetime(arg, copying: ())
+  takesEscapingClosure {
+    action(&item)
+  }
+}
+
+// Implicit dependence on a nonescaping closure context.
+//
+// TODO: remove the _overrideLifetime when context dependencies are tracked.
+@_lifetime(borrow value)
+func testBasicClosureDependency(value: AnyObject, body: () -> NE) -> NE {
+  return _overrideLifetime(body(), borrowing: value)
+}
+
+// Implicit dependence on a nonescaping closure context. The result is escaping in the current generic context, so
+// should not be diagnosed as an escape.
+//
+// TODO: remove the _overrideLifetime when context dependencies are tracked.
+func testIndirectClosureResult<T>(f: () -> CNE<T>) -> CNE<T> {
+  return _overrideLifetime(f(), copying: ())
 }
 
 // =============================================================================
@@ -440,4 +483,46 @@ func dynamicCastBad<T>(_ span: Span<T>) -> Span<Int> {
     return intSpan // expected-note{{this use causes the lifetime-dependent value to escape}}
   }
   return Span<Int>()
+}
+
+
+struct Wrapper<T: BitwiseCopyable>: ~Escapable {
+  private let span: Span<T>
+
+  @_lifetime(copy span)
+  init(span: borrowing Span<T>) {
+    self.span = copy span
+  }
+}
+
+struct SuperWrapper<T: BitwiseCopyable>: ~Escapable {
+  private let wrapper: Wrapper<T>
+
+  // An extra field forces a projection on 'self' within the initializer without any access scope.
+  var depth: Int = 0
+
+  // Make sure that LocalVariableUtils can successfully analyze 'self'. That's required to determine that the assignment
+  // of `wrapper` is returned without escaping
+  @_lifetime(copy span)
+  init(span: borrowing Span<T>) {
+    self.wrapper = Wrapper(span: span)
+  }
+}
+
+// =============================================================================
+// Static accessors
+// =============================================================================
+
+@available(Span 0.1, *)
+struct TestStaticProperty {
+  static let staticArray = [0, 1]
+
+  static let staticSpan = staticArray.span
+}
+
+@available(Span 0.1, *)
+class TestStaticClassProperty {
+  static let staticArray = [0, 1]
+
+  static let staticSpan = staticArray.span
 }

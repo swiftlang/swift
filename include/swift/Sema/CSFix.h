@@ -1011,11 +1011,7 @@ public:
 class AddSendableAttribute final : public ContextualMismatch {
   AddSendableAttribute(ConstraintSystem &cs, FunctionType *fromType,
                        FunctionType *toType, ConstraintLocator *locator,
-                       FixBehavior fixBehavior)
-      : ContextualMismatch(cs, FixKind::AddSendableAttribute, fromType, toType,
-                           locator, fixBehavior) {
-    assert(fromType->isSendable() != toType->isSendable());
-  }
+                       FixBehavior fixBehavior);
 
 public:
   std::string getName() const override { return "add '@Sendable' attribute"; }

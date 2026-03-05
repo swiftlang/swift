@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir -O | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -O -solver-disable-crash-on-valid-salvage | %FileCheck %s
+// RUN: not --crash %target-swift-frontend %s -emit-ir -O -solver-enable-crash-on-valid-salvage
 
 // REQUIRES: swift_in_compiler
 

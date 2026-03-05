@@ -39,7 +39,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Parse/Token.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
@@ -474,7 +473,7 @@ namespace {
       // Special case for NSZone*, which has its own Swift wrapper.
       if (const clang::RecordType *pointee =
             pointeeQualType->getAsStructureType()) {
-        if (pointee && !pointee->getDecl()->isCompleteDefinition() &&
+        if (!pointee->getDecl()->isCompleteDefinition() &&
             pointee->getDecl()->getName() == "_NSZone") {
           Identifier Id_ObjectiveC = Impl.SwiftContext.Id_ObjectiveC;
           ModuleDecl *objCModule = Impl.SwiftContext.getLoadedModule(Id_ObjectiveC);
@@ -543,7 +542,7 @@ namespace {
       }
 
       // FIXME: this is a workaround for rdar://128013193
-      if (pointeeType && pointeeType->getAnyNominal() &&
+      if (pointeeType->getAnyNominal() &&
           pointeeType->getAnyNominal()
               ->getAttrs()
               .hasAttribute<MoveOnlyAttr>() &&
@@ -584,11 +583,10 @@ namespace {
       }
       if (auto wrapped = pointeeType->wrapInPointer(pointerKind)) {
         return {wrapped, ImportHint::OtherPointer};
-      } else {
-        addImportDiagnostic(Diagnostic(diag::bridged_pointer_type_not_found,
-                                       pointerKind));
-        return Type();
       }
+      addImportDiagnostic(
+          Diagnostic(diag::bridged_pointer_type_not_found, pointerKind));
+      return Type();
     }
 
     ImportResult VisitBlockPointerType(const clang::BlockPointerType *type) {
@@ -1044,13 +1042,14 @@ namespace {
       if (!decl)
         return nullptr;
 
-      for (const auto *attr : decl->getAttrs())
-        if (const auto *customAttr = dyn_cast<CustomAttr>(attr))
-          if (customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
-                  "_refCountedPtr")) {
-            return ImportResult(decl->getDeclaredInterfaceType(),
-                                ImportHint::IntrusivelyRefCountedSmartPtr);
-          }
+      if (Bridging == Bridgeability::Full)
+        for (const auto *attr : decl->getAttrs())
+          if (const auto *customAttr = dyn_cast<CustomAttr>(attr))
+            if (customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
+                    "_refCountedPtr")) {
+              return ImportResult(decl->getDeclaredInterfaceType(),
+                                  ImportHint::IntrusivelyRefCountedSmartPtr);
+            }
 
       return decl->getDeclaredInterfaceType();
     }
@@ -1128,12 +1127,11 @@ namespace {
       Type importedType = Impl.SwiftContext.getAnyObjectType();
 
       if (!type->qual_empty()) {
-        for (auto cp = type->qual_begin(), end = type->qual_end(); cp != end;
-             ++cp) {
-          if (!(*cp)->hasDefinition())
-            Impl.addImportDiagnostic(
-                type, Diagnostic(diag::incomplete_protocol, *cp),
-                clang::SourceLocation());
+        for (auto *cp : type->quals()) {
+          if (!cp->hasDefinition())
+            Impl.addImportDiagnostic(type,
+                                     Diagnostic(diag::incomplete_protocol, cp),
+                                     clang::SourceLocation());
         }
       }
 
@@ -1201,7 +1199,7 @@ namespace {
             // Input is malformed
             return {};
           }
-          if (nsObjectTy && importedType->isEqual(nsObjectTy)) {
+          if (importedType->isEqual(nsObjectTy)) {
             // Skip if there is no NSObject protocol.
             auto nsObjectProtoType =
                 Impl.getNSObjectProtocolType();
@@ -1325,10 +1323,9 @@ namespace {
         if (!importedType->isAnyObject())
           members.push_back(importedType);
 
-        for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
-             cp != cpEnd; ++cp) {
+        for (auto *cp : type->quals()) {
           auto proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
-            Impl.importDecl(*cp, Impl.CurrentVersion));
+              Impl.importDecl(cp, Impl.CurrentVersion));
           if (!proto)
             return Type();
 
@@ -1913,10 +1910,7 @@ bool ClangImporter::Implementation::shouldImportGlobalAsLet(
     return true;
   }
   // Globals of type NSString * should be imported as 'let'.
-  if (isNSString(type))
-    return true;
-
-  return false;
+  return isNSString(type);
 }
 
 /// Returns true if \p name contains the substring "Unsigned" or "unsigned".
@@ -1983,7 +1977,7 @@ class GetSendableType :
   ASTContext &ctx;
 
 public:
-  GetSendableType(ASTContext &ctx) : ctx(ctx) {}
+  explicit GetSendableType(ASTContext &ctx) : ctx(ctx) {}
 
   /// The result of a conversion. Contains the converted type and a \c bool that
   /// is \c true if the operation found something to change, or \c false
@@ -2043,7 +2037,7 @@ private:
     // If we started from a protocol or a composition we should already
     // be in an existential context. Otherwise we'd have to wrap a new
     // composition into an existential.
-    if (isa<ProtocolType>(ty) || isa<ProtocolCompositionType>(ty))
+    if (isa<ProtocolType, ProtocolCompositionType>(ty))
       return {composition, true};
 
     return {ExistentialType::get(composition), true};
@@ -2344,8 +2338,13 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   // context that uses C++ interop. In order to avoid the x-ref resolution
   // failure, normalize the return type's nullability for builtin functions in
   // C++ interop mode, to match the imported type in C interop mode.
+  //
+  // In C interop mode some of these builtins now have bounds annotations on
+  // Apple platforms, which breaks the clang bug that drops the nullability
+  // annotations. To avoid regressing, and make sure the platforms align, strip
+  // this info in C interop mode as well.
   auto builtinContext = clang::Builtin::Context();
-  if (SwiftContext.LangOpts.EnableCXXInterop && clangDecl->getBuiltinID() &&
+  if (clangDecl->getBuiltinID() &&
       !builtinContext.isTSBuiltin(clangDecl->getBuiltinID()) &&
       builtinContext.isPredefinedLibFunction(
           clangDecl->getBuiltinID()) &&
@@ -2604,6 +2603,7 @@ ClangImporter::Implementation::importParameterType(
         *this, templateParamType, genericParams, attrs, addImportDiagnosticFn);
   }
 
+  Bridgeability bridging = Bridgeability::Full;
   if (!swiftParamTy) {
     // C++ reference types are brought in as direct
     // types most commonly.
@@ -2626,6 +2626,7 @@ ClangImporter::Implementation::importParameterType(
         else
           isInOut = true;
       }
+      bridging = Bridgeability::None;
     }
   }
 
@@ -2671,11 +2672,11 @@ ClangImporter::Implementation::importParameterType(
     // for the specific case when the throws conversion works, but is not
     // sufficient if it fails. (The correct, overarching fix is ClangImporter
     // being lazier.)
-    auto importedType = importType(paramTy, importKind, addImportDiagnosticFn,
-                                   allowNSUIntegerAsInt, Bridgeability::Full,
-                                   attrs, optionalityOfParam,
-                                   /*resugarNSErrorPointer=*/!paramIsError,
-                                   completionHandlerErrorParamIndex);
+    auto importedType =
+        importType(paramTy, importKind, addImportDiagnosticFn,
+                   allowNSUIntegerAsInt, bridging, attrs, optionalityOfParam,
+                   /*resugarNSErrorPointer=*/!paramIsError,
+                   completionHandlerErrorParamIndex);
     if (!importedType)
       return std::nullopt;
 
@@ -2719,8 +2720,8 @@ bool ClangImporter::Implementation::isDefaultArgSafeToImport(
   // If the default expression can't be instantiated, bail.
   if (!defaultArgExprResult.isUsable())
     return false;
-  else
-    defaultArgExpr = cast<clang::CXXDefaultArgExpr>(defaultArgExprResult.get());
+
+  defaultArgExpr = cast<clang::CXXDefaultArgExpr>(defaultArgExprResult.get());
 
   // If the type of this parameter is a view type, do not import the
   // default expression, since we cannot guarantee the lifetime of the

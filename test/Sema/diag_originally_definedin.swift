@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:   -define-availability "_myProject 1.0:macOS 10.10"
+// RUN:   -define-availability "_myProject 1.0:macOS 10.10" \
+// RUN:   -define-availability "_emptyMacro:*"
+
 // REQUIRES: OS=macosx
 
 @_originallyDefinedIn(module: "original", OSX 10.13) // expected-error {{'@_originallyDefinedIn' requires that 'foo()' have explicit availability for macOS}}
@@ -31,6 +33,9 @@ public func macroVersioned() {}
 @_originallyDefinedIn(module: "original", _unknownMacro) // expected-warning {{unknown platform '_unknownMacro' for attribute '@_originallyDefinedIn'}}
 // expected-error@-1 {{expected version number in '@_originallyDefinedIn' attribute}}
 public func macroUnknown() {}
+
+@_originallyDefinedIn(module: "original", _emptyMacro)
+public func macroEmpty() {}
 
 @available(macOS 10.9, *)
 @_originallyDefinedIn(module: "original", macos 10.13) // expected-warning {{unknown platform 'macos' for attribute '@_originallyDefinedIn'; did you mean 'macOS'?}} {{43-48=macOS}}

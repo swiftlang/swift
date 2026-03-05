@@ -2982,7 +2982,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       NodePointer implType = popNode(Node::Kind::Type);
       auto node = createWithChildren(c == 'z'
                                   ? Node::Kind::ObjCAsyncCompletionHandlerImpl
-                                  : Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl,
+                                  : Node::Kind::CheckedObjCAsyncCompletionHandlerImpl,
                                 implType, resultType, flagMode);
       if (sig)
         addChild(node, sig);
@@ -4424,6 +4424,20 @@ NodePointer Demangler::demangleGenericRequirement() {
     case 'I': 
       ConstraintKind = Inverse;
       TypeKind = Substitution;
+      inverseKind = demangleIndexAsNode();
+      if (!inverseKind)
+        return nullptr;
+      break;
+    case 'j':
+      ConstraintKind = Inverse;
+      TypeKind = Assoc;
+      inverseKind = demangleIndexAsNode();
+      if (!inverseKind)
+        return nullptr;
+      break;
+    case 'J':
+      ConstraintKind = Inverse;
+      TypeKind = CompoundAssoc;
       inverseKind = demangleIndexAsNode();
       if (!inverseKind)
         return nullptr;

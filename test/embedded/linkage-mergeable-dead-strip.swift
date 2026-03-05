@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -module-name main -O %s -emit-ir | %FileCheck %s --check-prefix=CHECK-IR
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -module-name main -O %s -c -o %t/a.o
-// RUN: %target-clang %target-clang-resource-dir-opt %t/a.o -o %t/a.out -dead_strip
+// RUN: %target-clang %target-clang-resource-dir-opt %t/a.o %target-embedded-posix-shim -o %t/a.out -dead_strip
 // RUN: %llvm-nm --defined-only --format=just-symbols --demangle %t/a.out | sort | %FileCheck %s --check-prefix=CHECK-NM
 // RUN: %target-run %t/a.out | %FileCheck %s
 

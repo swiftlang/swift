@@ -1,39 +1,31 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.5-abi-triple
 
 // REQUIRES: concurrency
 
-@available(SwiftStdlib 5.5, *)
 func doAsynchronously() async { }
-@available(SwiftStdlib 5.5, *)
 func doSynchronously() { }
 
-@available(SwiftStdlib 5.5, *)
 func testConversions() async {
   let _: () -> Void = doAsynchronously // expected-error{{invalid conversion from 'async' function of type '() async -> ()' to synchronous function type '() -> Void'}}
   let _: () async -> Void = doSynchronously // okay
 }
 
 // Overloading
-@available(SwiftStdlib 5.5, *)
 @available(swift, deprecated: 4.0, message: "synchronous is no fun")
 func overloadedSame(_: Int = 0) -> String { "synchronous" }
 
-@available(SwiftStdlib 5.5, *)
+
 func overloadedSame() async -> String { "asynchronous" }
 
-@available(SwiftStdlib 5.5, *)
+
 func overloaded() -> String { "synchronous" }
-@available(SwiftStdlib 5.5, *)
 func overloaded() async -> Double { 3.14159 }
 
-@available(SwiftStdlib 5.5, *)
 @available(swift, deprecated: 4.0, message: "synchronous is no fun")
 func overloadedOptDifference() -> String { "synchronous" }
 
-@available(SwiftStdlib 5.5, *)
 func overloadedOptDifference() async -> String? { nil }
 
-@available(SwiftStdlib 5.5, *)
 func testOverloadedSync() {
   _ = overloadedSame() // expected-warning{{synchronous is no fun}}
 
@@ -63,7 +55,6 @@ func testOverloadedSync() {
   let _: Int = fn4 // expected-error{{value of type '() async -> ()'}}
 }
 
-@available(SwiftStdlib 5.5, *)
 func testOverloadedAsync() async {
   _ = await overloadedSame() // no warning
 
@@ -98,12 +89,9 @@ func testOverloadedAsync() async {
   let _: Int = fn4 // expected-error{{value of type '() async -> ()'}}
 }
 
-@available(SwiftStdlib 5.5, *)
 func takesAsyncClosure(_ closure: () async -> String) -> Int { 0 }
-@available(SwiftStdlib 5.5, *)
 func takesAsyncClosure(_ closure: () -> String) -> String { "" }
 
-@available(SwiftStdlib 5.5, *)
 func testPassAsyncClosure() {
   let a = takesAsyncClosure { await overloadedSame() }
   let _: Double = a // expected-error{{convert value of type 'Int'}}
@@ -112,7 +100,6 @@ func testPassAsyncClosure() {
   let _: Double = b // expected-error{{convert value of type 'String'}}
 }
 
-@available(SwiftStdlib 5.5, *)
 struct FunctionTypes {
   var syncNonThrowing: () -> Void
   var syncThrowing: () throws -> Void
@@ -135,27 +122,22 @@ struct FunctionTypes {
 }
 
 // Overloading when there is conversion from sync to async.
-@available(SwiftStdlib 5.5, *)
 func bar(_ f: (Int) -> Int) -> Int {
   return f(2)
 }
 
-@available(SwiftStdlib 5.5, *)
 func bar(_ f: (Int) async -> Int) async -> Int {
   return await f(2)
 }
 
-@available(SwiftStdlib 5.5, *)
 func incrementSync(_ x: Int) -> Int {
   return x + 1
 }
 
-@available(SwiftStdlib 5.5, *)
 func incrementAsync(_ x: Int) async -> Int {
   return x + 1
 }
 
-@available(SwiftStdlib 5.5, *)
 func testAsyncWithConversions() async {
   _ = bar(incrementSync)
   _ = bar { -$0 }
@@ -181,24 +163,19 @@ struct OverloadInImplicitAsyncClosure {
   init(int: Int) throws { }
 }
 
-@available(SwiftStdlib 5.5, *)
 func test(_: Int) async throws {}
 
 @discardableResult
-@available(SwiftStdlib 5.5, *)
 func test(_: Int) -> String { "" }
 
-@available(SwiftStdlib 5.5, *)
 func compute(_: @escaping () -> Void) {}
 
-@available(SwiftStdlib 5.5, *)
 func test_sync_in_closure_context() {
   compute {
     test(42) // Ok (select sync overloads and discards the result)
   }
 }
 
-@available(SwiftStdlib 5.5, *)
 func test_async_calls_in_async_context(v: Int) async {
   final class Test : Sendable {
     init(_: Int) {}

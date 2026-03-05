@@ -50,7 +50,7 @@ func applyBorrow(nc: borrowing NC, borrow: (borrowing NC) -> NE) -> NE {
 }
 
 func testBorrow(nc: consuming NC) {
-  let borrowed = applyBorrow(nc: nc, borrow: borrow) // OK
+  let borrowed = applyBorrow(nc: nc, borrow: borrow) // expected-error{{argument type 'NE' does not conform to expected type 'Escapable'}}
   _ = consume nc
   _ = transfer(borrowed)
 }
@@ -149,7 +149,7 @@ do {
   let x = NE()
   var y = NE()
   takeGetGenericAndArgs(f: getGeneric, o: &y, i: x)
-  // expected-error@-1{{cannot convert value of type '(inout T, borrowing T) -> ()' to expected argument type '@_lifetime(outValue: borrow inValue) (_ outValue: inout NE, _ inValue: borrowing NE) -> ()'}}
+  // expected-error@-1{{cannot convert value of type '(inout T, borrowing T) -> ()' to expected argument type '@_lifetime(outValue: copy outValue, borrow inValue) (_ outValue: inout NE, _ inValue: borrowing NE) -> ()'}}
   // expected-error@-2{{generic parameter 'T' could not be inferred}}
 }
 do {
@@ -161,12 +161,17 @@ do {
   let x = NE()
   var y = NE()
   takeGetGenericAndArgs(f: getImmortalNE, o: &y, i: x)
-  //  expected-error@-1{{cannot convert value of type '@_lifetime(0: immortal) (inout NE, borrowing NE) -> ()' to expected argument type '@_lifetime(outValue: borrow inValue) (_ outValue: inout NE, _ inValue: borrowing NE) -> ()'}}
+  //  expected-error@-1{{cannot convert value of type '@_lifetime(0: immortal) (inout NE, borrowing NE) -> ()' to expected argument type '@_lifetime(outValue: copy outValue, borrow inValue) (_ outValue: inout NE, _ inValue: borrowing NE) -> ()'}}
 }
 do {
-  let _ = transfer // OK
-  let _: (NE) -> NE = transfer // OK
-  let _: @_lifetime(copy ne) (_ ne: NE) -> NE = transfer // OK
+  let x = NE()
+  var y = NE()
+  takeGetGenericAndArgs(f: { $1 = $0 }, o: &y, i: x) // expected-error{{cannot assign to value: '$1' is immutable}}
+}
+do {
+  let x = NE()
+  var y = NE()
+  takeGetGenericAndArgs(f: { $0 = $1 }, o: &y, i: x) // OK
 }
 
 // rdar://166912068 (Incorrect error when passing a local function with a non-escapable parameter)
@@ -215,22 +220,3 @@ public let TypeParameterResultFunctionType = copyCNE as (CNE<NE>) -> _          
                                                                                                               // expected-error@-1{{failed to produce diagnostic for expression}}
 public let TypeParameterResultFunctionTypeAnnotated = copyCNE as @_lifetime(borrow cne) (_ cne: CNE<NE>) -> _ // expected-error{{lifetime dependence checking failed due to unknown result type}}
                                                                                                               // expected-error@-1{{failed to produce diagnostic for expression}}
-
-// Closure Context Dependence Tests
-
-// This case should pass after we add support for dependencies on the closure context.
-// 
-// We had to move it out of
-// SILOptimizer/lifetime_dependence/verify_diagnostics.swift because it causes
-// an error during type checking with the current version of function type
-// lifetime checking, preventing the SIL diagnostic checks that file tests from
-// running.
-//
-// TODO: Add more diagnostic tests when implementing closure context
-// dependencies, including SILOptimizer diagnostic tests such as the one this
-// originated as.
-func testIndirectClosureResult<T>(f: () -> CNE<T>) -> CNE<T> {
-  // expected-error @-1{{a function with a ~Escapable result needs a parameter to depend on}}
-  // expected-note  @-2{{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
-  f()
-}

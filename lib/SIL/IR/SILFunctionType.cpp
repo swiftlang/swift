@@ -2956,13 +2956,13 @@ static CanSILFunctionType getSILFunctionType(
   auto lowerLifetimeDependence
     = [&](const LifetimeDependenceInfo &formalDeps,
           unsigned target) -> LifetimeDependenceInfo {
-      if (formalDeps.isImmortal()) {
-        return LifetimeDependenceInfo(
-            nullptr, nullptr, target,
-            /*immortal*/ true,
-            /*fromAnnotation*/ formalDeps.isFromAnnotation());
+      if (target == parameterMap.size()) {
+        // The target is the result, represented by the number of parameters.
+        // Parameters may have been added if there were closure captures, so
+        // update the result index accordingly.
+        target = inputs.size();
       }
-      
+
       auto lowerIndexSet = [&](IndexSubset *formal) -> IndexSubset * {
         if (!formal) {
           return nullptr;
@@ -2996,7 +2996,7 @@ static CanSILFunctionType getSILFunctionType(
       if (!inheritIndicesSet && !scopeIndicesSet) {
         return LifetimeDependenceInfo(
             nullptr, nullptr, target,
-            /*immortal*/ true,
+            /*hasImmortalSpecifier*/ true,
             /*fromAnnotation*/ formalDeps.isFromAnnotation());
       }
       
@@ -3015,9 +3015,10 @@ static CanSILFunctionType getSILFunctionType(
         : nullptr;
 
       return LifetimeDependenceInfo(
-          inheritIndicesSet, scopeIndicesSet, target, /*immortal*/ false,
-          /*fromAnnotation*/ formalDeps.isFromAnnotation(), addressableSet,
-          condAddressableSet);
+        inheritIndicesSet, scopeIndicesSet, target,
+        formalDeps.hasImmortalSpecifier(),
+        /*fromAnnotation*/ formalDeps.isFromAnnotation(), addressableSet,
+        condAddressableSet);
     };
   // Lower parameter dependencies.
   for (unsigned i = 0; i < parameterMap.size(); ++i) {
@@ -5295,6 +5296,19 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     extInfo = extInfo.withThrows(true, innerExtInfo.getThrownError());
   if (innerExtInfo.isAsync())
     extInfo = extInfo.withAsync(true);
+  // TODO: Merge outer and inner lifetime dependencies
+  if (innerExtInfo.getLifetimeDependencies().size() > 0) {
+    ASSERT(extInfo.getLifetimeDependencies().size() == 0 &&
+           "We only support uncurrying function types where at most one of the "
+           "inner and outer type has lifetime dependencies, because we do not "
+           "yet support closure context lifetime dependencies.");
+
+    auto uncurriedLifetimes = LifetimeDependenceInfo::uncurry(
+        Context, innerExtInfo.getLifetimeDependencies(),
+        /* numInnerParams */ inner.getParams().size(),
+        /* numOuterParams */ curried.getParams().size());
+    extInfo = extInfo.withLifetimeDependencies(uncurriedLifetimes);
+  }
 
   // Distributed thunks are always `async throws`
   if (constant.isDistributedThunk()) {

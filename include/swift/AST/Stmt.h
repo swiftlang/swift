@@ -208,6 +208,12 @@ public:
                   /*implicit=*/true);
   }
 
+  static BraceStmt *createImplicit(ASTContext &ctx, SourceLoc lbloc,
+                                   ArrayRef<ASTNode> elements,
+                                   SourceLoc rbloc) {
+    return create(ctx, lbloc, elements, rbloc, /*implicit=*/true);
+  }
+
   SourceLoc getLBraceLoc() const { return LBLoc; }
   SourceLoc getRBraceLoc() const { return RBLoc; }
 

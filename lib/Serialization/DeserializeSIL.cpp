@@ -1036,6 +1036,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // Read and instantiate the specialize attributes.
   bool shouldAddSpecAttrs = fn->getSpecializeAttrs().empty();
   bool shouldAddEffectAttrs = !fn->hasArgumentEffects();
+  StringRef WasmImportModule;
+  StringRef WasmImportField;
   for (unsigned attrIdx = 0; attrIdx < numAttrs; ++attrIdx) {
     llvm::Expected<llvm::BitstreamEntry> maybeNext =
         SILCursor.advance(AF_DontPopBlockAtEnd);
@@ -1083,6 +1085,12 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
         break;
       case ExtraStringFlavor::Section:
         fn->setSection(blobData);
+        break;
+      case ExtraStringFlavor::WasmImportModule:
+        WasmImportModule = blobData;
+        break;
+      case ExtraStringFlavor::WasmImportName:
+        WasmImportField = blobData;
         break;
       }
       continue;
@@ -1139,6 +1147,11 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
           spiGroup, spiModule, availability));
     }
   }
+
+  // If either wasm import attribute was present, record both even if one is
+  // empty.
+  if (!WasmImportModule.empty() || !WasmImportField.empty())
+    fn->setWasmImportModuleAndField(WasmImportModule, WasmImportField);
 
   GenericEnvironment *genericEnv = nullptr;
   // Generic signatures are stored for declarations as well in a debug context.
@@ -4310,6 +4323,10 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
       case ExtraStringFlavor::Section:
         v->setSection(blobData);
         break;
+      case ExtraStringFlavor::WasmImportModule:
+      case ExtraStringFlavor::WasmImportName:
+        // TODO: we still don't support wasm import on global variables
+        break;
       }
       continue;
     }
@@ -4468,12 +4485,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
 
   std::vector<SILVTable::Entry> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
-  while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
-         kind != SIL_DEFAULT_WITNESS_TABLE &&
-         kind != SIL_DEFAULT_OVERRIDE_TABLE && kind != SIL_FUNCTION &&
-         kind != SIL_PROPERTY && kind != SIL_MOVEONLY_DEINIT) {
-    assert(kind == SIL_VTABLE_ENTRY &&
-           "Content of Vtable should be in SIL_VTABLE_ENTRY.");
+  while (kind == SIL_VTABLE_ENTRY) {
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
     unsigned RawEntryKind, IsNonOverridden;

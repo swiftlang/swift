@@ -32,10 +32,12 @@ endif()
 
 set(backtracing_sources
   Address.swift
+  AggregatingSymbolSource.swift
   Backtrace.swift
   Backtrace+Codable.swift
   BacktraceFormatter.swift
   BacktraceJSONFormatter.swift
+  BacktracerThreadLocals.swift
   Base64.swift
   ByteSwapping.swift
   CachingMemoryReader.swift
@@ -46,6 +48,7 @@ set(backtracing_sources
   CoreSymbolication.swift
   CrashLog.swift
   CrashLogCapture.swift
+  DefaultSymbolLocator.swift
   Dwarf.swift
   EightByteBuffer.swift
   Elf.swift
@@ -59,6 +62,19 @@ set(backtracing_sources
   ImageSource.swift
   Libc.swift
   LimitSequence.swift
+  PDBCache.swift
+  PDB/Bitset.swift
+  PDB/FunctionInfo.swift
+  PDB/Hashes.swift
+  PDB/ISO8859-1.swift
+  PDB/Module.swift
+  PDB/MultiStreamFile.swift
+  PDB/NameTableNI.swift
+  PDB/PDBFile.swift
+  PDB/PDBFile+SymbolSource.swift
+  PDB/SectionInfo.swift
+  PDB/String+EncodeAs.swift
+  PDB/Windows1252.swift
   MemoryReader.swift
   OSReleaseScanner.swift
   PeCoff.swift
@@ -68,6 +84,7 @@ set(backtracing_sources
   Runtime.swift
   RichFrame.swift
   SymbolicatedBacktrace.swift
+  SymbolLocator.swift
   Utils.swift
   Win32Unwinder.swift
 )
@@ -86,7 +103,8 @@ set(runtime_compile_flags
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
   "-Xcc;-I${CMAKE_BINARY_DIR}/include"
   "-Xcc;-I${SWIFT_STDLIB_SOURCE_DIR}/public/RuntimeModule/modules"
-  "-disable-upcoming-feature;MemberImportVisibility")
+  "-disable-upcoming-feature;MemberImportVisibility"
+  "-enable-experimental-feature;Reparenting")
 
 ###TODO: Add these when we add static linking support
 #

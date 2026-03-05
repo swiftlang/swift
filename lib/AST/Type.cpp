@@ -1006,8 +1006,16 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
     if (dropGlobalActor && extInfo.getGlobalActor())
       extInfo = extInfo.withoutIsolation();
 
-    if (dropIsolation)
-      extInfo = extInfo.withoutIsolation();
+    if (dropIsolation) {
+      // Special case for `isolated` parameters, because even though
+      // the isolation was dropped, the parameter itself was left with
+      // `isolated` bit set. `dropIsolation` is intended only for
+      // mangling of `@preconcurrency` declarations and isolated parameters
+      // don't contribute to the type so it's save to keep the original
+      // isolation here.
+      if (!extInfo.getIsolation().isParameter())
+        extInfo = extInfo.withoutIsolation();
+    }
 
     ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
     Type resultType = fnType->getResult();
@@ -1298,6 +1306,15 @@ bool TypeBase::isCGFloat() {
           module->getName().is("Foundation")   ||
           module->getName().is("CoreFoundation")) &&
          NTD->getName().is("CGFloat");
+}
+
+bool TypeBase::isStdlibInteger() {
+  return isInt() || isInt8() || isInt16() || isInt32() || isInt64() ||
+         isUInt() || isUInt8() || isUInt16() || isUInt32() || isUInt64();
+}
+
+bool TypeBase::isStdlibFloat() {
+  return isFloat() || isDouble() || isFloat80();
 }
 
 bool TypeBase::isObjCBool() {
@@ -3770,6 +3787,12 @@ Type ArchetypeType::getExistentialType() const {
   return genericEnv->maybeApplyOuterContextSubstitutions(existentialType);
 }
 
+bool ArchetypeType::mayHaveIsolatedConformance() const {
+  auto genericEnv = getGenericEnvironment();
+  auto genericSig = genericEnv->getGenericSignature();
+  return !genericSig->prohibitsIsolatedConformance(getInterfaceType());
+}
+
 bool ArchetypeType::requiresClass() const {
   if (auto layout = getLayoutConstraint())
     return layout->isClass();
@@ -4430,6 +4453,9 @@ bool TypeBase::isNoEscape() const {
 
   if (auto funcTy = dyn_cast<FunctionType>(type))
     return funcTy->isNoEscape();
+
+  if (auto packExpansionTy = dyn_cast<PackExpansionType>(type))
+    return packExpansionTy.getPatternType()->isNoEscape();
 
   if (auto tupleTy = dyn_cast<TupleType>(type)) {
     for (auto eltTy : tupleTy.getElementTypes())
@@ -5329,7 +5355,7 @@ getConcurrencyDiagnosticBehaviorLimitRec(
   // Metatypes that aren't Sendable were introduced in Swift 6.2, so downgrade
   // them to warnings prior to Swift 7.
   if (type->is<AnyMetatypeType>()) {
-    if (!declCtx->getASTContext().isAtLeastFutureMajorLanguageMode())
+    if (!declCtx->getASTContext().isLanguageModeAtLeast(LanguageMode::future))
       return DiagnosticBehavior::Warning;
   }
 

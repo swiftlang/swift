@@ -1,10 +1,9 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=ClangIncludesModule -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=ClangIncludesModule -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x | %FileCheck %s
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludes.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludes.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s -cxx-interoperability-mode=default
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludes.swiftmodule -I %S/Inputs %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludes.swiftmodule -I %S/Inputs %s -cxx-interoperability-mode=default
 
 import ClangIncludesModule
 

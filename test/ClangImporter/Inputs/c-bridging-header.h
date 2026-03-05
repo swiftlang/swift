@@ -9,4 +9,7 @@ typedef struct {
 } MyPoint;
 
 typedef double MyDouble;
+
+void cImpl(MyPoint);
+
 #endif

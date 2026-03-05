@@ -1,8 +1,7 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -emit-module -import-bridging-header %t%{fs-sep}bridging_header.h -I %t -plugin-path %swift-plugin-dir -enable-experimental-feature SafeInteropWrappers %t/test.swift -Rmacro-expansions -verify -verify-additional-file %t%{fs-sep}header.h -disable-objc-interop
+// RUN: %target-swift-frontend -emit-module -import-bridging-header %t%{fs-sep}bridging_header.h -I %t -plugin-path %swift-plugin-dir %t/test.swift -Rmacro-expansions -verify -verify-additional-file %t%{fs-sep}header.h -disable-objc-interop
 
 //--- module.modulemap
 module Module {

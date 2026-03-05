@@ -1342,7 +1342,7 @@ namespace {
         // rdar://85263844, as it can affect the prioritization of bindings,
         // which can affect behavior for tuple matching as tuple subtyping is
         // currently a *weaker* constraint than tuple conversion.
-        if (!CS.getASTContext().isLanguageModeAtLeast(6)) {
+        if (!CS.getASTContext().isLanguageModeAtLeast(LanguageMode::v6)) {
           auto paramTypeVar = CS.createTypeVariable(
               CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument),
               TVO_CanBindToLValue | TVO_CanBindToInOut | TVO_CanBindToNoEscape |
@@ -1527,7 +1527,7 @@ namespace {
       // NB Keep adding the additional layer in Swift 5 and on if this 'try?'
       // applies to a delegation to an 'Optional' initializer, or else we won't
       // discern the difference between a failure and a constructed value.
-      if (CS.getASTContext().isLanguageModeAtLeast(5) &&
+      if (CS.getASTContext().isLanguageModeAtLeast(LanguageMode::v5) &&
           !isDelegationToOptionalInit) {
         CS.addConstraint(ConstraintKind::Conversion,
                          CS.getType(expr->getSubExpr()), optTy,
@@ -1978,15 +1978,6 @@ namespace {
         // semantically equivalent.
         if (closure->getThrowsLoc().isValid())
           return Type();
-
-        // Thrown type inferred from context.
-        if (auto contextualType = CS.getContextualType(
-                closure, /*forConstraint=*/false)) {
-          if (auto fnType = contextualType->getAs<AnyFunctionType>()) {
-            if (Type thrownErrorTy = fnType->getThrownError())
-              return thrownErrorTy;
-          }
-        }
 
         // We do not try to infer a thrown error type if one isn't immediately
         // available.
@@ -2451,7 +2442,8 @@ namespace {
         // so we need to set a non-compound reference to make sure that e.g.
         // `case test(x: Int, y: Int)` gets the labels preserved when matched
         // with `case let .test(tuple)`.
-        auto functionRefInfo = FunctionRefInfo::unappliedBaseName();
+        auto functionRefInfo = FunctionRefInfo::unappliedBaseName(
+                                    enumPattern->getName().hasModuleSelector());
         if (enumPattern->hasSubPattern())
           functionRefInfo = functionRefInfo.addingApplicationLevel();
 
@@ -2461,7 +2453,8 @@ namespace {
         // arguments (tuple-to-tuple conversion).
         // FIXME: We ought to be preserving labels and matching in the solver.
         if (dyn_cast_or_null<TuplePattern>(enumPattern->getSubPattern()))
-          functionRefInfo = FunctionRefInfo::singleCompoundNameApply();
+          functionRefInfo = FunctionRefInfo::singleCompoundNameApply(
+                                    enumPattern->getName().hasModuleSelector());
 
         auto patternLocator =
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern));
@@ -3571,7 +3564,8 @@ namespace {
       // Look up the macros with this name.
       auto moduleIdent = expr->getModuleName().getBaseName();
       auto macroIdent = expr->getMacroName().withoutArgumentLabels(ctx);
-      FunctionRefInfo functionRefInfo = FunctionRefInfo::singleBaseNameApply();
+      FunctionRefInfo functionRefInfo =
+          FunctionRefInfo::singleBaseNameApply(macroIdent.hasModuleSelector());
       auto macros = lookupMacros(moduleIdent, macroIdent, functionRefInfo,
                                  expr->getMacroRoles());
       if (macros.empty()) {
@@ -3579,7 +3573,8 @@ namespace {
         if (macroIdent.hasModuleSelector()) {
           auto anyMacroIdent = DeclNameRef(macroIdent.getFullName());
           ModuleSelectorCorrection correction(
-            lookupMacros(moduleIdent, anyMacroIdent, functionRefInfo,
+            lookupMacros(moduleIdent, anyMacroIdent,
+                         FunctionRefInfo::singleBaseNameApply(),
                          expr->getMacroRoles()));
           if (correction.diagnose(ctx, expr->getMacroNameLoc(), macroIdent))
             return Type();
@@ -3803,7 +3798,8 @@ namespace {
       if (auto keyPath = dyn_cast<KeyPathExpr>(expr)) {
         if (keyPath->isObjC()) {
           auto &cs = CG.getConstraintSystem();
-          (void)TypeChecker::checkObjCKeyPathExpr(cs.DC, keyPath);
+          ObjCKeyPathStringRequest req{keyPath, cs.DC};
+          (void)evaluateOrDefault(cs.getASTContext().evaluator, req, nullptr);
         }
       }
 
@@ -4028,6 +4024,8 @@ static bool generateForEachStmtConstraints(ConstraintSystem &cs,
                                            DeclContext *dc, ForEachStmt *stmt,
                                            Pattern *typeCheckedPattern,
                                            bool shouldBindPatternVarsOneWay) {
+  auto &ctx = cs.getASTContext();
+  bool isBorrowing = ctx.LangOpts.hasFeature(Feature::BorrowingForLoop);
   bool isAsync = stmt->getAwaitLoc().isValid();
   auto *sequenceExpr = stmt->getSequence();
 
@@ -4035,8 +4033,10 @@ static bool generateForEachStmtConstraints(ConstraintSystem &cs,
   // constraint for this as part of ForEachElement, and we rely on querying the
   // contextual type for diagnostics.
   auto *sequenceProto = TypeChecker::getProtocol(
-      cs.getASTContext(), stmt->getForLoc(),
-      isAsync ? KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
+      ctx, stmt->getForLoc(),
+      isAsync ? KnownProtocolKind::AsyncSequence
+              : (isBorrowing ? KnownProtocolKind::BorrowingSequence
+                             : KnownProtocolKind::Sequence));
   if (!sequenceProto)
     return true;
 
@@ -4046,12 +4046,6 @@ static bool generateForEachStmtConstraints(ConstraintSystem &cs,
 
   auto seqExprTarget =
       SyntacticElementTarget(sequenceExpr, dc, contextInfo, false);
-
-  // Pretend the sequence expression still has a depth that matches when it
-  // was previously within a 'makeIterator()' call.
-  // FIXME: Remove this
-  if (!cs.getASTContext().isAtLeastFutureMajorLanguageMode())
-    cs.InputExprSimulatedDepths[sequenceExpr] = 2;
 
   if (cs.generateConstraints(seqExprTarget))
     return true;

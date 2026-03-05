@@ -207,22 +207,6 @@ ERROR(value_type_comparison_with_nil_illegal,none,
       "type %0 is not optional, value can never be nil",
       (Type))
 
-ERROR(cannot_match_expr_pattern_with_value,none,
-      "expression pattern of type %0 cannot match values of type %1",
-      (Type, Type))
-ERROR(cannot_match_expr_tuple_pattern_with_nontuple_value,none,
-      "tuple pattern cannot match values of non-tuple type %0",
-      (Type))
-ERROR(cannot_match_unresolved_expr_pattern_with_value,none,
-      "pattern cannot match values of type %0",
-      (Type))
-ERROR(cannot_match_value_with_pattern,none,
-      "pattern of type %1 cannot match %0",
-      (Type, Type))
-ERROR(pattern_does_not_conform_to_match,none,
-      "pattern of type %0 does not conform to expected match type %1",
-      (Type, Type))
-
 ERROR(cannot_reference_compare_types,none,
       "cannot check reference equality of functions; operands here have types "
       "%1 and %2",
@@ -823,31 +807,37 @@ ERROR(expect_compile_time_literal,none,
       "expect a compile-time constant literal", ())
 
 ERROR(const_unsupported_enum_associated_value,none,
-      "enums with associated values not supported in a constant expression", ())
+      "enums with associated values not supported in a literal expression", ())
 ERROR(const_unsupported_operator,none,
-      "unsupported operator in a constant expression", ())
+      "unsupported operator in a literal expression", ())
 ERROR(const_unsupported_type,none,
-      "unsupported type in a constant expression", ())
+      "unsupported type in a literal expression", ())
 ERROR(const_unsupported_type_expr,none,
-      "type expressions not supported in a constant expression", ())
+      "type expressions not supported in a literal expression", ())
 ERROR(const_unsupported_closure,none,
-      "closures not supported in a constant expression", ())
+      "closures not supported in a literal expression", ())
 ERROR(const_unsupported_closure_with_captures,none,
-      "closures with captures not supported in a constant expression", ())
+      "closures with captures not supported in a literal expression", ())
 ERROR(const_unsupported_keypath,none,
-      "keypaths not supported in a constant expression", ())
+      "keypaths not supported in a literal expression", ())
 ERROR(const_opaque_decl_ref,none,
-      "unable to resolve variable reference in a constant expression", ())
+      "unable to resolve variable reference in a literal expression", ())
 ERROR(const_opaque_func_decl_ref,none,
-      "unable to resolve function reference in a constant expression", ())
+      "unable to resolve function reference in a literal expression", ())
 ERROR(const_non_convention_c_conversion,none,
-      "only 'convention(c)' function values are supported in a constant expression", ())
+      "only 'convention(c)' function values are supported in a literal expression", ())
 ERROR(const_opaque_callee,none,
-      "unable to resolve callee in a constant expression", ())
+      "unable to resolve callee in a literal expression", ())
 ERROR(const_non_const_param,none,
-      "reference to a non-'@const' parameter in a constant expression", ())
+      "reference to a non-'@const' parameter in a literal expression", ())
+ERROR(const_integer_overflow,none,
+      "operation results in integer overflow", ())
+ERROR(const_divide_by_zero,none,
+      "division by zero", ())
 ERROR(const_unknown_default,none,
-      "not supported in a constant expression", ())
+      "not supported in a literal expression", ())
+NOTE(const_failed_fold_declref_init,none,
+     "requested from reference in a literal expression", ())
 
 //------------------------------------------------------------------------------
 // MARK: Import Resolution
@@ -2811,6 +2801,14 @@ ERROR(extension_nongeneric_trailing_where,none,
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot declare inheritance relationship",
       (Identifier))
+ERROR(extension_protocol_reparented_not_inheriting,none,
+      "%0 must directly inherit from %1 in order to be reparented",
+      (const NominalTypeDecl *, const NominalTypeDecl *))
+ERROR(extension_protocol_reparented_duplicate,none,
+      "cannot have multiple declarations of %0 being '@reparented' by %1",
+      (const NominalTypeDecl *, const NominalTypeDecl *))
+NOTE(invalid_reparented_prev,none,
+     "%0 previously '@reparented' by %1 here", (const ValueDecl *, const ValueDecl *))
 ERROR(objc_generic_extension_using_type_parameter,none,
       "extension of a generic Objective-C class cannot access the class's "
       "generic parameters at runtime", ())
@@ -3318,6 +3316,8 @@ NOTE(protocol_witness_settable_conflict,none,
 ERROR(protocol_witness_borrow_mutate_conflict, none,
       "candidate is not a stored property or a computed property with %0 accessor, but protocol requires it",
       (StringRef))
+ERROR(protocol_witness_borrow_mutate_unsupported, none,
+      "borrow/mutate protocol requirements can only be witnessed in a struct", ())
 
 NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
@@ -5504,6 +5504,21 @@ ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,
       "%select{|; remove extra parentheses to change tuple into separate arguments}3",
       (const ValueDecl *, bool, unsigned, bool))
 
+ERROR(cannot_match_expr_pattern_with_value,none,
+      "expression pattern of type %0 cannot match values of type %1",
+      (Type, Type))
+ERROR(cannot_match_expr_tuple_pattern_with_nontuple_value,none,
+      "tuple pattern cannot match values of non-tuple type %0",
+      (Type))
+ERROR(cannot_match_unresolved_expr_pattern_with_value,none,
+      "pattern cannot match values of type %0",
+      (Type))
+ERROR(cannot_match_value_with_pattern,none,
+      "pattern of type %1 cannot match %0",
+      (Type, Type))
+ERROR(pattern_does_not_conform_to_match,none,
+      "pattern of type %0 does not conform to expected match type %1",
+      (Type, Type))
 ERROR(enum_element_pattern_assoc_values_mismatch,none,
       "pattern with associated values does not match enum case %0",
       (DeclNameRef))
@@ -5516,7 +5531,8 @@ ERROR(tuple_pattern_label_mismatch,none,
 ERROR(enum_element_pattern_member_not_found,none,
       "enum case %0 not found in type %1", (DeclNameRef, Type))
 ERROR(optional_element_pattern_not_valid_type,none,
-      "'?' pattern cannot match values of type %0", (Type))
+      "optional pattern '?' cannot match value of non-optional type %0",
+      (Type))
 ERROR(condition_optional_element_pattern_not_valid_type,none,
       "initializer for conditional binding must have Optional type, not %0",
       (Type))
@@ -5819,6 +5835,12 @@ GROUPED_ERROR(actor_isolated_call,ActorIsolatedCall,none,
 GROUPED_ERROR(actor_isolated_call_decl,ActorIsolatedCall,none,
       "call to %0 %kind1 in a synchronous %2 context",
       (ActorIsolation, const ValueDecl *, ActorIsolation))
+NOTE(mark_deinit_isolated_to_access,none,
+      "add 'isolated' to run isolated to %0, which may be later than 'nonisolated deinit'",
+      (Identifier))
+NOTE(marked_nonisolated_here,none,
+      "marked as 'nonisolated' here",
+      ())
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %kind0 can not be partially applied",
         (const ValueDecl *))
@@ -6064,7 +6086,7 @@ ERROR(non_concurrent_type_member,none,
       (Type, bool, DeclName, const ValueDecl *, bool))
 ERROR(concurrent_value_class_mutable_property,none,
       "stored property %0 of 'Sendable'-conforming %kind1 is mutable",
-      (DeclName, const ValueDecl *))
+      (const ValueDecl *, const ValueDecl *))
 ERROR(concurrent_value_outside_source_file,none,
       "conformance to 'Sendable' must occur in the same source file as "
       "%kind0; use '@unchecked Sendable' for retroactive conformance",
@@ -6214,6 +6236,8 @@ ERROR(no_concurrency_module,none,
 ERROR(multiple_global_actors,none,
       "declaration can not have multiple global actor attributes (%0 and %1)",
       (Identifier, Identifier))
+NOTE(multiple_global_actors_note,none,
+      "%0 attribute previously declared here", (const Decl *))
 ERROR(global_actor_disallowed,none,
       "%kindonly0 cannot have a global actor", (const Decl *))
 ERROR(global_actor_on_actor_class,none,
@@ -6389,6 +6413,9 @@ ERROR(expansion_expr_not_allowed,none,
 ERROR(invalid_expansion_argument,none,
       "cannot pass value pack expansion to non-pack parameter of type %0",
       (Type))
+NOTE(did_you_mean_tuple_pack_expansion,none,
+      "did you mean to expand the pack into a tuple?",
+      ())
 ERROR(expansion_not_variadic,none,
       "pack expansion %0 must contain at least one pack reference", (Type))
 ERROR(pack_reference_outside_expansion,none,
@@ -6531,6 +6558,9 @@ ERROR(opaque_type_in_parameter,none,
       "'some' cannot appear in parameter position in %select{result|parameter}0"
       " type %1",
       (bool, Type))
+ERROR(opaque_type_member_type,none,
+      "cannot access member type %0 on opaque type %1",
+      (DeclNameRef, Type))
 
 // Function differentiability
 ERROR(attr_only_on_parameters_of_differentiable,none,
@@ -7672,6 +7702,11 @@ GROUPED_ERROR(property_wrapper_type_requirement_not_accessible,PropertyWrappers,
 GROUPED_ERROR(property_wrapper_ambiguous_enclosing_self_subscript,PropertyWrappers,none,
       "property wrapper type %0 has multiple enclosing-self subscripts %1",
       (Type, DeclName))
+GROUPED_ERROR(property_wrapper_enclosing_self_subscript_keypath_type,PropertyWrappers,none,
+      "parameter %0 of enclosing-self subscript should have either "
+      "'WritableKeyPath<...>' or 'ReferenceWritableKeyPath<...>' type "
+      "(got %1)",
+      (Identifier, Type))
 GROUPED_ERROR(property_wrapper_dynamic_self_type,PropertyWrappers,none,
       "property wrapper %select{wrapped value|projected value}0 cannot have "
       "dynamic Self type", (bool))
@@ -8401,6 +8436,10 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
 
+ERROR(borrowingsequence_experimental,none,
+      "'%0' requires -enable-experimental-feature BorrowingSequence",
+      (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Init accessors
 //------------------------------------------------------------------------------
@@ -8513,6 +8552,10 @@ NOTE(lifetime_escapable_source_requires_escapable_note, none,
      "use '@_lifetime(%0%1)' instead", (StringRef, StringRef))
 ERROR(lifetime_dependence_unknown_type, none,
       "lifetime dependence checking failed due to unknown %0 type", (StringRef))
+
+ERROR(borrow_inout_experimental,none,
+      "'%0' is an experimental feature",
+      (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements
@@ -8709,6 +8752,13 @@ ERROR(availability_value_generic_type_only_version_newer, none,
       (AvailabilityDomain, AvailabilityRange))
 ERROR(invalid_value_for_type_same_type,none,
       "cannot constrain type parameter %0 to be integer %1", (Type, Type))
+
+ERROR(nonliteral_integer_generic_value,none,
+      "generic value must be an integer literal", ())
+ERROR(nonliteral_integer_expr_generic_value,none,
+      "generic value must be an integer literal expression", ())
+ERROR(integer_generic_expr_closure_not_supported,none,
+      "closures are not supported in generic value literal expressions", ())
 
 //===----------------------------------------------------------------------===//
 // MARK: InlineArray

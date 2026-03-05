@@ -150,8 +150,8 @@ public:
                         ctx.getProtocol(*kp))
             // Downgrade to a warning for `~BitwiseCopyable` because it was
             // accepted in some incorrect positions before.
-            .warnUntilFutureLanguageModeIf(kp ==
-                                           KnownProtocolKind::BitwiseCopyable);
+            .warnUntilLanguageModeIf(kp == KnownProtocolKind::BitwiseCopyable,
+                                     LanguageMode::future);
         return Type();
       }
     }
@@ -190,6 +190,34 @@ static void checkExtensionAddsSoloInvertibleProtocol(const ExtensionDecl *ext) {
       ext->diagnose(diag::extension_conforms_to_invertible_and_others,
                     getInvertibleProtocolKindName(*ip));
     }
+  }
+}
+
+/// FIXME: it'd be better if this was done elsewhere, as we're going to see
+/// quadratic behavior as the number of @reparented entries in a program grows,
+/// as we scan the getInheritedProtocols list for each entry.
+/// Ideally we'd also roll this into a check that ensures there is only one
+/// extension declaring a reparenting per protocol. Probably should happen
+/// at top-level when checking extensions generally.
+static void checkReparentedExtensionEntry(const ExtensionDecl *ext,
+                                          InheritedEntry const &entry,
+                                          Type resolvedTy) {
+  assert(entry.isReparented());
+  auto *childProto = ext->getExtendedProtocolDecl();
+  ASSERT(childProto && "expected TypeCheckType to exclude this case");
+
+  auto rpProto = resolvedTy->getAs<ProtocolType>();
+  ASSERT(rpProto && "expected TypeCheckType to exclude non-protocols");
+
+  auto reparentedProto = rpProto->getDecl();
+  bool found = llvm::any_of(
+      childProto->getInheritedProtocols(),
+      [&](ProtocolDecl *inherited) { return inherited == reparentedProto; });
+
+  if (!found) {
+    ext->getASTContext().Diags.diagnose(
+        entry.getLoc(), diag::extension_protocol_reparented_not_inheriting,
+        childProto, reparentedProto);
   }
 }
 
@@ -278,6 +306,9 @@ static void checkInheritanceClause(
         isa<AssociatedTypeDecl>(decl))
       continue;
 
+    if (inherited.isReparented())
+      checkReparentedExtensionEntry(ext, inherited, inheritedTy);
+
     // Check whether we inherited from 'AnyObject' twice.
     // Other redundant-inheritance scenarios are checked below, the
     // GenericSignatureBuilder (for protocol inheritance) or the
@@ -290,7 +321,7 @@ static void checkInheritanceClause(
           isa<ProtocolDecl>(decl) &&
           Lexer::getTokenAtLocation(ctx.SourceMgr, sourceRange.Start)
               .is(tok::kw_class);
-      if (ctx.isLanguageModeAtLeast(5) && isWrittenAsClass) {
+      if (ctx.isLanguageModeAtLeast(LanguageMode::v5) && isWrittenAsClass) {
         diags
             .diagnose(sourceRange.Start,
                       diag::anyobject_class_inheritance_deprecated)
@@ -304,7 +335,7 @@ static void checkInheritanceClause(
         auto knownIndex = inheritedAnyObject->first;
         auto knownRange = inheritedAnyObject->second;
         SourceRange removeRange = inheritedTypes.getRemovalRange(knownIndex);
-        if (!ctx.isLanguageModeAtLeast(5) &&
+        if (!ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
             isa<ProtocolDecl>(decl) &&
             Lexer::getTokenAtLocation(ctx.SourceMgr, knownRange.Start)
               .is(tok::kw_class)) {
@@ -574,10 +605,7 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     // is not enabled.
     if (gp->isParameterPack()) {
       // Variadic nominal types require runtime support.
-      //
-      // Embedded doesn't require runtime support for this feature.
-      if (isa<NominalTypeDecl>(decl) &&
-          !ctx.LangOpts.hasFeature(Feature::Embedded)) {
+      if (isa<NominalTypeDecl>(decl)) {
         TypeChecker::checkAvailability(
             gp->getSourceRange(),
             ctx.getVariadicGenericTypeAvailability(),
@@ -597,11 +625,9 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     // Value generic nominal types require runtime support.
     if (gp->isValue() && isa<NominalTypeDecl>(decl)) {
       auto nomTypeDecl = cast<NominalTypeDecl>(decl);
-      // But: Embedded doesn't require runtime support for this feature.
       // But: Stdlib/libswiftCore carries its own support,
       //      so non-public stdlib declarations are safe
-      if (!ctx.LangOpts.hasFeature(Feature::Embedded) &&
-          !(decl->getModuleContext()->isStdlibModule() &&
+      if (!(decl->getModuleContext()->isStdlibModule() &&
             !nomTypeDecl->isAccessibleFrom(nullptr))) {
         // Everything else gets diagnosed for availability
         TypeChecker::checkAvailability(
@@ -1865,7 +1891,7 @@ static void diagnoseRetroactiveConformances(
             diags
                 .diagnose(loc, diag::retroactive_attr_does_not_apply, declForDiag,
                           isSameModule)
-                .warnUntilLanguageMode(6)
+                .warnUntilLanguageMode(LanguageMode::v6)
                 .fixItRemove(SourceRange(loc, loc.getAdvancedLoc(1)));
             return TypeWalker::Action::Stop;
           }
@@ -3652,7 +3678,7 @@ public:
     }
 
     // Force the raw value expr then yell if our parent doesn't have a raw type.
-    Expr *RVE = EED->getRawValueExpr();
+    Expr *RVE = EED->getOriginalRawValueExpr();
     if (RVE && !ED->hasRawType()) {
       DE.diagnose(RVE->getLoc(), diag::enum_raw_value_without_raw_type);
       EED->setInvalid();
@@ -4106,7 +4132,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
           // cannot have more than one isolated parameter (SE-0313)
           param->diagnose(diag::isolated_parameter_duplicate)
               .highlight(param->getSourceRange())
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
           // I'd love to describe the context in which there is an isolated parameter,
           // we had a DescriptiveDeclContextKind, but that only
           // exists for Decls.

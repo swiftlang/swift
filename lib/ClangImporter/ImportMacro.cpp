@@ -50,11 +50,6 @@ parseNumericLiteral(ClangImporter::Implementation &impl,
   return nullptr;
 }
 
-// FIXME: Duplicated from ImportDecl.cpp.
-static bool isInSystemModule(DeclContext *D) {
-  return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
-}
-
 static std::optional<StringRef>
 getTokenSpelling(ClangImporter::Implementation &impl, const clang::Token &tok) {
   bool tokenInvalid = false;
@@ -443,13 +438,16 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                         Ctx.TheEmptyTupleType, ASTExtInfo{});
 
   /* Storage */
-  swift::VarDecl *V =
-      new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
-                        SourceLoc(), alias, DC);
+  auto *V = new (Ctx) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
+                              /*nameLoc=*/SourceLoc(), alias, DC);
+
   V->setAccess(swift::AccessLevel::Public);
   V->setInterfaceType(Ty.getType());
+
   V->addAttribute(new (Ctx) TransparentAttr(/*Implicit*/ true));
   V->addAttribute(new (Ctx) InlineAttr(InlineKind::AlwaysUnderscored));
+  V->addAttribute(new (Ctx) PreconcurrencyAttr(/*IsImplicit=*/true));
+  V->setSynthesized();
 
   /* Accessor */
   swift::AccessorDecl *G = nullptr;
@@ -471,8 +469,8 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
   }
 
   swift::AccessorDecl *S = nullptr;
-  if (isa<clang::VarDecl>(D) &&
-      !cast<clang::VarDecl>(D)->getType().isConstQualified()) {
+  if (const auto *Var = dyn_cast<clang::VarDecl>(D);
+      Var && !Var->getType().isConstQualified()) {
     S = AccessorDecl::createImplicit(Ctx, AccessorKind::Set, V, false, false,
                                      TypeLoc(), Ctx.TheEmptyTupleType, DC);
     S->setAccess(swift::AccessLevel::Public);
@@ -495,10 +493,7 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                AbstractFunctionDecl::BodyKind::TypeChecked);
   }
 
-  /* Bind */
-  V->setImplInfo(S ? StorageImplInfo::getMutableComputed()
-                   : StorageImplInfo::getImmutableComputed());
-  V->setAccessors(SourceLoc(), S ? ArrayRef{G,S} : ArrayRef{G}, SourceLoc());
+  clang.makeComputed(V, G, S);
 
   return V;
 }

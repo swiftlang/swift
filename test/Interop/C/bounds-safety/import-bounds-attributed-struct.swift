@@ -6,60 +6,60 @@
 // rather than being marked unavailable because of an unknown type.
 
 // CHECK:      struct a {
-// CHECK-NEXT:   init()
-// CHECK-NEXT:   init(a: UnsafeMutablePointer<Int{{[0-9]+}}>!, len: Int{{[0-9]+}})
-// CHECK-NEXT:   var a: UnsafeMutablePointer<Int{{[0-9]+}}>!
-// CHECK-NEXT:   var len: Int{{[0-9]+}}
+// CHECK-DAG:   init()
+// CHECK-DAG:   init(a: UnsafeMutablePointer<Int{{[0-9]+}}>!, len: Int{{[0-9]+}})
+// CHECK-NEXT:  var a: UnsafeMutablePointer<Int{{[0-9]+}}>!
+// CHECK-NEXT:  var len: Int{{[0-9]+}}
 // CHECK-NEXT: }
 // CHECK-NEXT: func a(_: a) -> UnsafeMutablePointer<a>!
-// CHECK-NEXT: struct b {
-// CHECK-NEXT:   init()
-// CHECK-NEXT:   init(a: UnsafeMutablePointer<Int{{[0-9]+}}>!, len: Int{{[0-9]+}})
-// CHECK-NEXT:   var a: UnsafeMutablePointer<Int{{[0-9]+}}>!
-// CHECK-NEXT:   var len: Int{{[0-9]+}}
+// CHECK:      struct b {
+// CHECK-DAG:   init()
+// CHECK-DAG:   init(a: UnsafeMutablePointer<Int{{[0-9]+}}>!, len: Int{{[0-9]+}})
+// CHECK-NEXT:  var a: UnsafeMutablePointer<Int{{[0-9]+}}>!
+// CHECK-NEXT:  var len: Int{{[0-9]+}}
 // CHECK-NEXT: }
 // CHECK-NEXT: func b(_: b) -> UnsafeMutablePointer<b>!
-// CHECK-NEXT: struct c {
-// CHECK-NEXT:   init()
-// CHECK-NEXT:   init(a: UnsafeMutablePointer<CChar>!, len: Int{{[0-9]+}})
-// CHECK-NEXT:   var a: UnsafeMutablePointer<CChar>!
-// CHECK-NEXT:   var len: Int{{[0-9]+}}
+// CHECK:      struct c {
+// CHECK-DAG:   init()
+// CHECK-DAG:   init(a: UnsafeMutablePointer<CChar>!, len: Int{{[0-9]+}})
+// CHECK-NEXT:  var a: UnsafeMutablePointer<CChar>!
+// CHECK-NEXT:  var len: Int{{[0-9]+}}
 // CHECK-NEXT: }
 // CHECK-NEXT: func c(_: c) -> UnsafeMutablePointer<c>!
-// CHECK-NEXT: struct d {
-// CHECK-NEXT:   init()
-// CHECK-NEXT:   init(a: UnsafeMutableRawPointer!, len: Int{{[0-9]+}})
-// CHECK-NEXT:   var a: UnsafeMutableRawPointer!
-// CHECK-NEXT:   var len: Int{{[0-9]+}}
+// CHECK:      struct d {
+// CHECK-DAG:   init()
+// CHECK-DAG:   init(a: UnsafeMutableRawPointer!, len: Int{{[0-9]+}})
+// CHECK-NEXT:  var a: UnsafeMutableRawPointer!
+// CHECK-NEXT:  var len: Int{{[0-9]+}}
 // CHECK-NEXT: }
 // CHECK-NEXT: func d(_: d) -> UnsafeMutablePointer<d>!
-// CHECK-NEXT: struct e {
-// CHECK-NEXT:   init()
-// CHECK-NEXT:   init(a: UnsafeMutableRawPointer!, b: UnsafeMutablePointer<Int{{[0-9]+}}>!)
-// CHECK-NEXT:   var a: UnsafeMutableRawPointer!
-// CHECK-NEXT:   var b: UnsafeMutablePointer<Int{{[0-9]+}}>!
+// CHECK:      struct e {
+// CHECK-DAG:   init()
+// CHECK-DAG:   init(a: UnsafeMutableRawPointer!, b: UnsafeMutablePointer<Int{{[0-9]+}}>!)
+// CHECK-NEXT:  var a: UnsafeMutableRawPointer!
+// CHECK-NEXT:  var b: UnsafeMutablePointer<Int{{[0-9]+}}>!
 // CHECK-NEXT: }
 // CHECK-NEXT: func e(_: e) -> UnsafeMutablePointer<e>!
-// CHECK-NEXT: struct f {
-// CHECK-NEXT:   init()
-// CHECK-NEXT:   init(a: UnsafePointer<CChar>!, b: UnsafeMutablePointer<CChar>!)
-// CHECK-NEXT:   var a: UnsafePointer<CChar>!
-// CHECK-NEXT:   var b: UnsafeMutablePointer<CChar>!
+// CHECK:      struct f {
+// CHECK-DAG:   init()
+// CHECK-DAG:   init(a: UnsafePointer<CChar>!, b: UnsafeMutablePointer<CChar>!)
+// CHECK-NEXT:  var a: UnsafePointer<CChar>!
+// CHECK-NEXT:  var b: UnsafeMutablePointer<CChar>!
 // CHECK-NEXT: }
 // CHECK-NEXT: func f(_: f) -> UnsafeMutablePointer<f>!
 
 // BOUNDS-SAFETY-NEXT: struct g {
-// BOUNDS-SAFETY-NEXT:  init()
-// BOUNDS-SAFETY-NEXT:  init(a: UnsafeMutableRawPointer!, b: UnsafeMutablePointer<Int32>!)
-// BOUNDS-SAFETY-NEXT:  var a: UnsafeMutableRawPointer!
-// BOUNDS-SAFETY-NEXT:  var b: UnsafeMutablePointer<Int32>!
+// BOUNDS-SAFETY-DAG:  init()
+// BOUNDS-SAFETY-DAG:  init(a: UnsafeMutableRawPointer!, b: UnsafeMutablePointer<Int32>!)
+// BOUNDS-SAFETY-NEXT: var a: UnsafeMutableRawPointer!
+// BOUNDS-SAFETY-NEXT: var b: UnsafeMutablePointer<Int32>!
 // BOUNDS-SAFETY-NEXT: }
 // BOUNDS-SAFETY-NEXT: func g(_: g) -> UnsafeMutablePointer<g>!
 // BOUNDS-SAFETY-NEXT: struct h {
-// BOUNDS-SAFETY-NEXT:  init()
-// BOUNDS-SAFETY-NEXT:  init(a: UnsafeMutableRawPointer!, b: UnsafeMutablePointer<Int32>!)
-// BOUNDS-SAFETY-NEXT:  var a: UnsafeMutableRawPointer!
-// BOUNDS-SAFETY-NEXT:  var b: UnsafeMutablePointer<Int32>!
+// BOUNDS-SAFETY-DAG:  init()
+// BOUNDS-SAFETY-DAG:  init(a: UnsafeMutableRawPointer!, b: UnsafeMutablePointer<Int32>!)
+// BOUNDS-SAFETY-NEXT: var a: UnsafeMutableRawPointer!
+// BOUNDS-SAFETY-NEXT: var b: UnsafeMutablePointer<Int32>!
 // BOUNDS-SAFETY-NEXT: }
 // BOUNDS-SAFETY-NEXT: func h(_: h) -> UnsafeMutablePointer<h>!
 
@@ -69,19 +69,19 @@
 // CHECK-NEXT: }
 // CHECK-NEXT: func i(_: UnsafeMutablePointer<i>!) -> UnsafeMutablePointer<i>!
 // CHECK-NEXT: var len1: Int{{[0-9]+}} { get }
-// CHECK-NEXT: struct j {
-// CHECK-NEXT:   init()
-// CHECK-NEXT:   init(a: UnsafeMutablePointer<Int{{[0-9]+}}>!, b: UnsafeMutableRawPointer!)
-// CHECK-NEXT:   var a: UnsafeMutablePointer<Int{{[0-9]+}}>!
-// CHECK-NEXT:   var b: UnsafeMutableRawPointer!
+// CHECK:      struct j {
+// CHECK-DAG:   init()
+// CHECK-DAG:   init(a: UnsafeMutablePointer<Int{{[0-9]+}}>!, b: UnsafeMutableRawPointer!)
+// CHECK-NEXT:  var a: UnsafeMutablePointer<Int{{[0-9]+}}>!
+// CHECK-NEXT:  var b: UnsafeMutableRawPointer!
 // CHECK-NEXT: }
 // CHECK-NEXT: func j(_: j) -> UnsafeMutablePointer<j>!
 // CHECK-NEXT: var len2: Int{{[0-9]+}}
-// CHECK-NEXT: struct k {
-// CHECK-NEXT:   init()
-// CHECK-NEXT:   init(a: UnsafeMutablePointer<Int{{[0-9]+}}>!, b: UnsafeMutableRawPointer!)
-// CHECK-NEXT:   var a: UnsafeMutablePointer<Int{{[0-9]+}}>!
-// CHECK-NEXT:   var b: UnsafeMutableRawPointer!
+// CHECK:      struct k {
+// CHECK-DAG:   init()
+// CHECK-DAG:   init(a: UnsafeMutablePointer<Int{{[0-9]+}}>!, b: UnsafeMutableRawPointer!)
+// CHECK-NEXT:  var a: UnsafeMutablePointer<Int{{[0-9]+}}>!
+// CHECK-NEXT:  var b: UnsafeMutableRawPointer!
 // CHECK-NEXT: }
 // CHECK-NEXT: func k(_: k) -> UnsafeMutablePointer<k>!
 

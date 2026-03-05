@@ -4,3 +4,6 @@
 // CHECK: func bridgedFunction2(_ ptr: RefCountedBase?)
 // CHECK: func bridgedFunction3() -> RefCountedBase
 // CHECK: func bridgedFunction4() -> RefCountedBase?
+// CHECK: func notBridgedFunction(_ ptr: inout RefOfBase)
+// CHECK: func notBridgedFunction2(_ ptr: RefOfBase)
+// CHECK: func notBridgedFunction3(consuming ptr: consuming RefOfBase)

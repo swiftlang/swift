@@ -7,9 +7,9 @@ add_swift_host_library(swiftSema STATIC
   Comment.cpp
   CSApply.cpp
   CSBindings.cpp
+  CSDisjunction.cpp
   CSSyntacticElement.cpp
   CSGen.cpp
-  CSLookahead.cpp
   CSRanking.cpp
   CSSimplify.cpp
   CSSolver.cpp
@@ -41,7 +41,8 @@ add_swift_host_library(swiftSema STATIC
   DerivedConformance/DerivedConformanceRawRepresentable.cpp
   ImportResolution.cpp
   InstrumenterSupport.cpp
-  LegalConstExprVerifier.cpp
+  LegalLiteralExprVerifier.cpp
+  LiteralExpressionFolding.cpp
   LookupVisibleDecls.cpp
   MiscDiagnostics.cpp
   OpenedExistentials.cpp
@@ -52,6 +53,7 @@ add_swift_host_library(swiftSema STATIC
   ResilienceDiagnostics.cpp
   SourceLoader.cpp
   SyntacticElementTarget.cpp
+  Subtyping.cpp
   TypeOfReference.cpp
   TypeCheckAccess.cpp
   TypeCheckAccessNotes.cpp

@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
-
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift -target %target-swift-6.0-abi-triple
 
 typealias FnType = @isolated(any) () -> ()
 

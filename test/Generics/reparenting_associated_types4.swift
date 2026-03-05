@@ -9,7 +9,7 @@
 public protocol BorrowingSeq<Zelement> {
   associatedtype Zelement
 }
-public protocol Seq {
+public protocol Seq: BorrowingSeq {
   associatedtype Element
 }
 extension Seq: @reparented BorrowingSeq
@@ -23,11 +23,11 @@ public protocol Door {
 }
 
 
-public protocol FixedKey {}
+public protocol FixedKey: Door {}
 extension FixedKey: @reparented Door where Key == String {}
 
 
-public protocol BoundGenericKey {
+public protocol BoundGenericKey: Door {
   associatedtype MyKey
 }
 struct Wrapper<T> {}

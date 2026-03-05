@@ -4,14 +4,14 @@
 // CHECK: }
 
 // CHECK: struct MagicArray<CInt, _C{{.*}}_2> {
-// CHECK:   init()
 // CHECK:   init(t: (Int32, Int32))
+// CHECK:   init()
 // CHECK:   var t: (Int32, Int32)
 // CHECK: }
 
 // CHECK: struct MagicArray<CInt, _C{{.*}}_3> {
-// CHECK:   init()
 // CHECK:   init(t: (Int32, Int32, Int32))
+// CHECK:   init()
 // CHECK:   var t: (Int32, Int32, Int32)
 // CHECK: }
 

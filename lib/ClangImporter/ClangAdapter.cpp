@@ -16,13 +16,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CFTypeInfo.h"
 #include "ClangAdapter.h"
+#include "CFTypeInfo.h"
 #include "ImportName.h"
 #include "ImporterImpl.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/Lex/Lexer.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 
@@ -632,10 +631,9 @@ static bool isAccessibilityConformingContext(const clang::DeclContext *ctx) {
   const clang::ObjCProtocolList *protocols = nullptr;
 
   if (auto protocol = dyn_cast<clang::ObjCProtocolDecl>(ctx)) {
-    if (protocol->getName() == "NSAccessibility")
-      return true;
-    return false;
-  } else if (auto interface = dyn_cast<clang::ObjCInterfaceDecl>(ctx))
+    return protocol->getName() == "NSAccessibility";
+  }
+  if (auto interface = dyn_cast<clang::ObjCInterfaceDecl>(ctx))
     protocols = &interface->getReferencedProtocols();
   else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(ctx))
     protocols = &category->getReferencedProtocols();
@@ -661,10 +659,8 @@ importer::shouldImportPropertyAsAccessors(const clang::ObjCPropertyDecl *prop) {
   // compromise.
   if (!prop->getName().starts_with("accessibility"))
     return false;
-  if (isAccessibilityConformingContext(prop->getDeclContext()))
-    return true;
 
-  return false;
+  return isAccessibilityConformingContext(prop->getDeclContext());
 }
 
 bool importer::isInitMethod(const clang::ObjCMethodDecl *method) {

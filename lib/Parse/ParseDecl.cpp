@@ -1927,13 +1927,18 @@ static PlatformKind getPlatformFromDomainOrIdentifier(
 
 ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
     llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions,
-    bool &ParsedUnrecognizedPlatformName) {
+    bool &WasEmpty) {
   // Check for availability macros first.
   if (peekAvailabilityMacroName()) {
     SmallVector<AvailabilitySpec *, 4> Specs;
     ParserStatus MacroStatus = parseAvailabilityMacro(Specs);
     if (MacroStatus.isError())
       return MacroStatus;
+
+    if (Specs.size() == 1 && Specs.front()->isWildcard()) {
+      WasEmpty = true;
+      return makeParserSuccess();
+    }
 
     for (auto *Spec : Specs) {
       auto Platform =
@@ -1962,7 +1967,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
   // Parse the platform name.
   StringRef platformText = Tok.getText();
   auto MaybePlatform = platformFromString(platformText);
-  ParsedUnrecognizedPlatformName = ParsedUnrecognizedPlatformName || !MaybePlatform.has_value();
+  WasEmpty = WasEmpty || !MaybePlatform.has_value();
   SourceLoc PlatformLoc = Tok.getLoc();
   consumeToken();
 
@@ -2025,7 +2030,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
   SourceLoc RightLoc;
   ParserStatus Status;
   bool SuppressLaterDiags = false;
-  bool ParsedUnrecognizedPlatformName = false;
+  bool EmptyPlatformAndVersions = false;
   llvm::SmallVector<PlatformAndVersion, 4> PlatformAndVersions;
 
   {
@@ -2048,7 +2053,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
             Status, tok::r_paren, LeftLoc, RightLoc,
             /*AllowSepAfterLast=*/false, [&]() -> ParserStatus {
               return parsePlatformVersionInList(AtAttrName, PlatformAndVersions,
-                                                ParsedUnrecognizedPlatformName);
+                                                EmptyPlatformAndVersions);
             });
       } while (Result == ParseListItemResult::Continue);
     }
@@ -2062,7 +2067,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
     return false;
   }
 
-  if (PlatformAndVersions.empty() && !ParsedUnrecognizedPlatformName) {
+  if (PlatformAndVersions.empty() && !EmptyPlatformAndVersions) {
     diagnose(Loc, diag::attr_availability_need_platform_version, AtAttrName);
     return false;
   }
@@ -3442,7 +3447,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     StringRef AttrName = "@_originallyDefinedIn";
     bool SuppressLaterDiags = false;
-    bool ParsedUnrecognizedPlatformName = false;
+    bool EmptyPlatformAndVersions = false;
     if (parseList(tok::r_paren, LeftLoc, RightLoc,
                   /*AllowSepAfterLast=*/false,
                   diag::originally_defined_in_missing_rparen,
@@ -3484,7 +3489,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       // Parse 'OSX 13.13'.
       case NextSegmentKind::PlatformVersion: {
         ParserStatus ListItemStatus = parsePlatformVersionInList(
-            AttrName, PlatformAndVersions, ParsedUnrecognizedPlatformName);
+            AttrName, PlatformAndVersions, EmptyPlatformAndVersions);
         if (ListItemStatus.isErrorOrHasCompletion())
           SuppressLaterDiags = true;
         return ListItemStatus;
@@ -3499,7 +3504,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    if (PlatformAndVersions.empty() && !ParsedUnrecognizedPlatformName) {
+    if (PlatformAndVersions.empty() && !EmptyPlatformAndVersions) {
       diagnose(AtLoc, diag::attr_availability_need_platform_version, AttrName);
       return makeParserSuccess();
     }
@@ -4237,7 +4242,7 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
     consumeToken();
     if (Version.empty()) {
       // Versions cannot be empty (e.g. "0").
-      diagnose(Range.Start, D).warnUntilLanguageMode(6);
+      diagnose(Range.Start, D).warnUntilLanguageMode(LanguageMode::v6);
       return true;
     }
     return false;
@@ -4278,7 +4283,7 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
 
   if (Version.empty()) {
     // Versions cannot be empty (e.g. "0.0").
-    diagnose(Range.Start, D).warnUntilLanguageMode(6);
+    diagnose(Range.Start, D).warnUntilLanguageMode(LanguageMode::v6);
     return true;
   }
 
@@ -4316,7 +4321,7 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(SourceLoc atLoc) {
   if (isAtAttributeLParen(/*isCustomAttribute=*/true)) {
     if (getEndOfPreviousLoc() != Tok.getLoc()) {
       diagnose(getEndOfPreviousLoc(), diag::attr_extra_whitespace_before_lparen)
-          .warnUntilLanguageMode(6);
+          .warnUntilLanguageMode(LanguageMode::v6);
     }
     // If we have no local context to parse the initial value into, create
     // one for the attribute.
@@ -4375,7 +4380,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
                                         bool isFromClangAttribute) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
   }
 
   bool hasModuleSelector = peekToken().is(tok::colon_colon);
@@ -4438,12 +4443,12 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
   // In Swift 5 and above, these become hard errors. In Swift 4.2, emit a
   // warning for compatibility. Otherwise, don't diagnose at all.
-  if (Context.isLanguageModeAtLeast(5)) {
+  if (Context.isLanguageModeAtLeast(LanguageMode::v5)) {
     checkInvalidAttrName("_versioned", "usableFromInline",
                          DeclAttrKind::UsableFromInline, diag::attr_renamed);
     checkInvalidAttrName("_inlineable", "inlinable", DeclAttrKind::Inlinable,
                          diag::attr_renamed);
-  } else if (Context.isLanguageModeAtLeast(4, 2)) {
+  } else if (Context.isLanguageModeAtLeast(LanguageMode::v4_2)) {
     checkInvalidAttrName("_versioned", "usableFromInline",
                          DeclAttrKind::UsableFromInline,
                          diag::attr_renamed_warning);
@@ -4794,7 +4799,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                         bool justChecking) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
   }
 
   // If this not an identifier, the attribute is malformed.
@@ -9560,7 +9565,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   return DCC.fixupParserResult(Status, ED);
 }
 
-static bool isValidEnumRawValueLiteral(LiteralExpr *expr) {
+static bool isValidEnumRawValueLiteral(Expr *expr) {
   if (expr == nullptr)
     return false;
 
@@ -9673,7 +9678,6 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     // See if there's a raw value expression.
     SourceLoc EqualsLoc;
     ParserResult<Expr> RawValueExpr;
-    LiteralExpr *LiteralRawValueExpr = nullptr;
     if (Tok.is(tok::equal)) {
       EqualsLoc = consumeToken();
       {
@@ -9689,12 +9693,13 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         Status.setIsParseError();
         return Status;
       }
-      // The raw value must be syntactically a simple literal.
-      LiteralRawValueExpr = dyn_cast<LiteralExpr>(RawValueExpr.getPtrOrNull());
-      if (!isValidEnumRawValueLiteral(LiteralRawValueExpr)) {
-        diagnose(RawValueExpr.getPtrOrNull()->getLoc(),
-                 diag::nonliteral_enum_case_raw_value);
-        LiteralRawValueExpr = nullptr;
+
+      if (!Context.LangOpts.hasFeature(Feature::LiteralExpressions)) {
+        if (!isValidEnumRawValueLiteral(RawValueExpr.getPtrOrNull())) {
+          diagnose(RawValueExpr.getPtrOrNull()->getLoc(),
+                   diag::nonliteral_enum_case_raw_value);
+          RawValueExpr = nullptr;
+        }
       }
     }
     
@@ -9720,7 +9725,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     auto *result = new (Context) EnumElementDecl(NameLoc, FullName,
                                                  ArgParams.getPtrOrNull(),
                                                  EqualsLoc,
-                                                 LiteralRawValueExpr,
+                                                 RawValueExpr.getPtrOrNull(),
                                                  CurDeclContext);
 
     if (NameLoc == CaseLoc) {

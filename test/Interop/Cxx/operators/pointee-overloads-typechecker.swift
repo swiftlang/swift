@@ -112,3 +112,19 @@ let _ = lPointee_LNonConst_RNonConst.pointee // expected-error {{cannot use muta
 var vPointee_LNonConst_RNonConst = Pointee_LNonConst_RNonConst()
 let _ = vPointee_LNonConst_RNonConst.pointee
 vPointee_LNonConst_RNonConst.pointee = 42
+
+let vFRT_Const_NonConst = new_FRT_Const_NonConst(42)
+let _ = vFRT_Const_NonConst.pointee
+vFRT_Const_NonConst.pointee = 67
+
+let vInt_FRT_Const_NonConst = Int_Template_FRT_Const_NonConst(42)
+let _: Int32 = vInt_FRT_Const_NonConst.pointee
+vInt_FRT_Const_NonConst.pointee = 4
+vInt_FRT_Const_NonConst.pointee = false // expected-error {{cannot assign value of type 'Bool' to type 'Int32'}}
+vInt_FRT_Const_NonConst.pointee = 4.2 // expected-error {{cannot assign value of type 'Double' to type 'Int32'}}
+
+let vFloat_FRT_Const_NonConst = Double_Template_FRT_Const_NonConst(6.7)
+let _: Double = vFloat_FRT_Const_NonConst.pointee
+vFloat_FRT_Const_NonConst.pointee = 4
+vFloat_FRT_Const_NonConst.pointee = false // expected-error {{cannot assign value of type 'Bool' to type 'Double'}}
+vFloat_FRT_Const_NonConst.pointee = 4.2

@@ -18,7 +18,7 @@
         EXPORT _swift_get_cpu_context
 
 ;; On entry, x8 contains the pointer to the arm64_gprs
-_swift_get_cpu_context PROC PUBLIC
+_swift_get_cpu_context PROC
         stp  x0,  x1, [x8, #0x00]
         stp  x2,  x3, [x8, #0x10]
         stp  x4,  x5, [x8, #0x20]

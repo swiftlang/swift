@@ -747,6 +747,7 @@ Reflection.test("Name of metatype of artificial subclass") {
   expectEqual("\(type(of: obj))", "TestArtificialSubclass")
   expectEqual(String(describing: type(of: obj)), "TestArtificialSubclass")
   expectEqual(String(reflecting: type(of: obj)), "a.TestArtificialSubclass")
+  expectTrue(String(reflecting: obj).starts(with: "<a.TestArtificialSubclass: "))
 
   // Trigger the creation of a KVO subclass for TestArtificialSubclass.
   obj.addObserver(obj, forKeyPath: "foo", options: [.new], context: &KVOHandle)
@@ -758,6 +759,37 @@ Reflection.test("Name of metatype of artificial subclass") {
   expectEqual("\(type(of: obj))", "TestArtificialSubclass")
   expectEqual(String(describing: type(of: obj)), "TestArtificialSubclass")
   expectEqual(String(reflecting: type(of: obj)), "a.TestArtificialSubclass")
+  expectTrue(String(reflecting: obj).starts(with: "<a.TestArtificialSubclass: "))
+}
+
+Reflection.test("Name of ObjC class") {
+  let obj = NSObject()
+  let klass: AnyClass = object_getClass(obj)!
+  expectEqual("NSObject", String(describing: klass))
+  expectEqual("NSObject", String(reflecting: klass))
+  expectEqual("NSObject", _typeName(klass))
+  expectTrue(String(describing: obj).starts(with: "<NSObject: "))
+  expectTrue(String(reflecting: obj).starts(with: "<NSObject: "))
+}
+
+Reflection.test("Name of runtime subclass")
+.require(.stdlib_6_4).code {
+  let klass: AnyClass = objc_allocateClassPair(TestArtificialSubclass.self, "RuntimeSubclass", 0)!
+  objc_registerClassPair(klass)
+  let obj = class_createInstance(klass, 0) as! NSObject
+
+  expectEqual("RuntimeSubclass", String(describing: klass))
+  expectEqual("RuntimeSubclass", String(reflecting: klass))
+  expectTrue(String(describing: obj).starts(with: "<RuntimeSubclass: "))
+  expectTrue(String(reflecting: obj).starts(with: "<RuntimeSubclass: "))
+
+  obj.addObserver(obj, forKeyPath: "foo", options: [.new], context: &KVOHandle)
+  expectTrue(String(describing: obj).starts(with: "<RuntimeSubclass: "))
+  expectTrue(String(reflecting: obj).starts(with: "<RuntimeSubclass: "))
+  obj.removeObserver(obj, forKeyPath: "foo")
+
+  expectTrue(String(describing: obj).starts(with: "<RuntimeSubclass: "))
+  expectTrue(String(reflecting: obj).starts(with: "<RuntimeSubclass: "))
 }
 
 @objc class StringConvertibleInDebugAndOtherwise_Native : NSObject {

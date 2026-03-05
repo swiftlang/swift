@@ -38,7 +38,6 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
-#include "clang/AST/DeclVisitor.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Specifiers.h"
@@ -47,28 +46,18 @@
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ModuleFileExtension.h"
-#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Path.h"
 #include <functional>
-#include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-namespace llvm {
-
-class SmallBitVector;
-
-}
 
 namespace clang {
 class APValue;
@@ -97,6 +86,11 @@ class Identifier;
 class Pattern;
 class SubscriptDecl;
 class ValueDecl;
+
+/// Check whether the given declaration context is from a system module.
+inline bool isInSystemModule(const DeclContext *D) {
+  return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
+}
 
 /// Describes the kind of conversion to apply to a constant value.
 enum class ConstantConvertKind {
@@ -362,7 +356,7 @@ private:
   PlatformAvailability(const PlatformAvailability&) = delete;
   PlatformAvailability &operator=(const PlatformAvailability &) = delete;
 };
-}
+} // namespace importer
 
 using LookupTableMap =
     llvm::DenseMap<StringRef, std::unique_ptr<SwiftLookupTable>>;
@@ -440,9 +434,12 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   using Version = importer::ImportNameVersion;
 
 public:
-  Implementation(ASTContext &ctx, DependencyTracker *dependencyTracker,
-                 DWARFImporterDelegate *dwarfImporterDelegate);
+  Implementation(ASTContext &ctx, DependencyTracker *dependencyTracker);
   ~Implementation();
+
+  void setDWARFImporterDelegate(DWARFImporterDelegate *dwarfImporterDelegate) {
+    DWARFImporter = dwarfImporterDelegate;
+  }
 
   class DiagnosticWalker : public clang::RecursiveASTVisitor<DiagnosticWalker> {
   public:
@@ -749,8 +746,6 @@ public:
   bool isMemberSynthesizedPerType(const ValueDecl *decl);
   void markMemberSynthesizedPerType(const ValueDecl *decl);
 
-  static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
-
   // Cache for already-specialized function templates and any thunks they may
   // have.
   llvm::DenseMap<clang::FunctionDecl *, ValueDecl *>
@@ -926,11 +921,6 @@ private:
   /// The DWARF importer delegate, if installed.
   DWARFImporterDelegate *DWARFImporter = nullptr;
 
-public:
-  /// Only used for testing.
-  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
-
-private:
   /// The list of Clang modules found in the debug info.
   llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
 
@@ -1700,28 +1690,25 @@ public:
     return found->second;
   }
 
-  virtual void
-  loadAllMembers(Decl *D, uint64_t unused) override;
+  virtual void loadStorageMembers(Decl *D, uint64_t unused) override;
+  virtual void loadNonStorageMembers(Decl *D, uint64_t unused) override;
 
   virtual TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;
 
+  void insertMembersAndAlternates(const clang::NamedDecl *nd,
+                                  SmallVectorImpl<Decl *> &members,
+                                  DeclContext *expectedDC = nullptr);
+
 private:
   void
   loadAllMembersOfObjcContainer(Decl *D,
                                 const clang::ObjCContainerDecl *objcContainer);
-  void loadAllMembersOfRecordDecl(NominalTypeDecl *swiftDecl,
-                                  const clang::RecordDecl *clangRecord,
-                                  ClangInheritanceInfo inheritance);
-
   void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
                            Decl *D, DeclContext *DC,
                            SmallVectorImpl<Decl *> &members);
-  void insertMembersAndAlternates(const clang::NamedDecl *nd,
-                                  SmallVectorImpl<Decl *> &members,
-                                  DeclContext *expectedDC = nullptr);
-  void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
+  void loadAllMembersIntoExtension(ExtensionDecl *ext, uint64_t extra);
 
   /// Imports \p decl under \p nameVersion with the name \p newName, and adds
   /// it and its alternates to \p ext.
@@ -2187,6 +2174,7 @@ Identifier getOperatorName(ASTContext &ctx, clang::OverloadedOperatorKind op);
 /// correspond to an overloaded C++ operator.
 Identifier getOperatorName(ASTContext &ctx, Identifier op);
 
+bool hasSwiftAttribute(const clang::Decl *decl, StringRef attr);
 bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
 bool hasIteratorAPIAttr(const clang::Decl *decl);

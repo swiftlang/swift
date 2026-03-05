@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
-// RUN: %target-run-simple-swift(-Osize -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop %target-embedded-posix-shim) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Osize -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop %target-embedded-posix-shim) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
@@ -91,6 +91,12 @@ class Derived3<T, U>: Base3<(T, U)> {}
 func testBaseDerived3() -> Derived3<Int, Bool> {
   return Derived3()
 }
+
+// Check that IRGen doesn't crash
+public func castToClassWhichIsNeverCreated(_ o: AnyObject) -> Outer<Bool> {
+  return o as! Outer<Bool>
+}
+
 
 @main
 struct Main {
