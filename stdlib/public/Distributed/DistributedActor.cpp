@@ -20,6 +20,7 @@
 #include "swift/Basic/Casting.h"
 #include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/Distributed.h"
 
 using namespace swift;
 
@@ -39,7 +40,10 @@ SWIFT_EXPORT_FROM(swiftDistributed)
 void *swift_distributed_getGenericEnvironment(const char *targetNameStart,
                                               size_t targetNameLength) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
-  return accessor ? accessor->GenericEnvironment.get() : nullptr;
+  SWIFT_DISTRIBUTED_DEBUG_LOG("accessor for target: %s ->%p", targetNameStart, accessor);
+  auto genericEnv = accessor ? accessor->GenericEnvironment.get() : nullptr;
+  SWIFT_DISTRIBUTED_DEBUG_LOG("found accessor->GenericEnvironment: %p", genericEnv);
+  return genericEnv;
 }
 
 /// func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
