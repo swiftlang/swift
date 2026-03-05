@@ -679,6 +679,19 @@ diag_not_parsed_note_re = re.compile(
     r"(\S+):(\d+):(\d+): note: file '(\S+)' is not parsed for 'expected' statements"
 )
 
+"""
+ex:
+/path/to/sdk/file.h:19:29: remark: diagnostic produced elsewhere: did not add safe interop wrapper
+struct _LIBCPP_TEMPLATE_VIS input_iterator_tag {};
+                            ^
+/path/to/sdk/file.h:19:29: note: diagnostic produced elsewhere: implicit functions are ignored
+struct _LIBCPP_TEMPLATE_VIS input_iterator_tag {};
+                            ^
+"""
+diag_produced_elsewhere_re = re.compile(
+    r"(\S+):(\d+):(\d+): (?:note|remark|warning): diagnostic produced elsewhere: (.*)"
+)
+
 
 class NotFoundDiag:
     def __init__(self, file, line, col, category, content, prefix):
@@ -739,7 +752,12 @@ def check_expectations(tool_output, prefix):
 
             curr = []
             dprint(f"line: {line.strip()}")
-            if not "error:" in line:
+            if diag_produced_elsewhere_re.match(line.strip()):
+                dprint(
+                    f"diagnostic produced elsewhere (ignored): {line.strip()}"
+                )
+                extra_lines = tool_output[i + 1 : i + 3]
+            elif not "error:" in line:
                 if "note:" in line:
                     if m := diag_not_parsed_note_re.match(line.strip()):
                         dprint(f"unparsed file: {m.group(4)}")
