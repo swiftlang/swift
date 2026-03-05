@@ -25,6 +25,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class LangOptions;
 
   enum class DarwinPlatformKind : unsigned {
     MacOS,
@@ -75,6 +76,12 @@ namespace swift {
   /// Returns true if the given triple represents a version of OpenBSD
   /// that enforces BTCFI by default.
   bool tripleBTCFIByDefaultInOpenBSD(const llvm::Triple &triple);
+
+  /// Returns the least valid pointer value for the given target triple.
+  uint64_t
+  getLeastValidPointerValueForTriple(const llvm::Triple &triple,
+                                     const LangOptions &LangOpts,
+                                     uint64_t customLeastValidPointerValue);
 
   /// Returns the platform name for a given target triple.
   ///
