@@ -14,6 +14,7 @@ Default option value definitions.
 import os
 import platform
 import re
+from typing import Optional
 
 from . import shell
 from .versions import Version
@@ -68,7 +69,7 @@ DARWIN_INSTALL_PREFIX = ('/Applications/Xcode.app/Contents/Developer/'
 DSYMUTIL_JOBS = 1
 
 
-def _system_memory() -> int | None:
+def _system_memory() -> Optional[int]:
     """Returns the system memory as an int in bytes. None if the system memory cannot
     be determined.
 
