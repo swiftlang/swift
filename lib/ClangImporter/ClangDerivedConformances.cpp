@@ -255,23 +255,6 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
   return dyn_cast_or_null<FuncDecl>(result);
 }
 
-static FuncDecl *getNonMutatingDereferenceOperator(NominalTypeDecl *decl) {
-  auto isValid = [](ValueDecl *starOperator) -> bool {
-    auto starOp = dyn_cast<FuncDecl>(starOperator);
-    if (!starOp || starOp->isMutating())
-      return false;
-    auto params = starOp->getParameters();
-    if (params->size() != 0)
-      return false;
-    auto returnTy = starOp->getResultInterfaceType();
-    return static_cast<bool>(returnTy->getAnyPointerElementType());
-  };
-
-  ValueDecl *result = lookupOperator(
-      decl, decl->getASTContext().getIdentifier("__operatorStar"), isValid);
-  return dyn_cast_or_null<FuncDecl>(result);
-}
-
 static clang::FunctionDecl *
 instantiateTemplatedOperator(ClangImporter::Implementation &impl,
                              const clang::CXXRecordDecl *classDecl,
@@ -684,11 +667,9 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
 
   // Look for __operatorStar(), which must be non-mutating and return a
   // reference. This makes sure we use the const operator* overload.
-  auto operatorStar = getNonMutatingDereferenceOperator(decl);
+  auto *operatorStar = impl.lookupAndImportOperatorStar(decl);
   Type dereferenceResultTy = pointeeTy;
-  if (operatorStar) {
-    assert(!operatorStar->isMutating() &&
-           "this __operatorStar can't be mutating");
+  if (operatorStar && !operatorStar->isMutating()) {
     auto operatorStarReturnTy = operatorStar->getResultInterfaceType();
     assert(operatorStarReturnTy &&
            "__operatorStar doesn't have a return type?");
@@ -898,7 +879,7 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   decl->addMember(importedConstructor);
 }
 
-static void conformToCxxBorrowingSequenceIfNedded(
+static void conformToCxxBorrowingSequenceIfNeeded(
     ClangImporter::Implementation &impl, NominalTypeDecl *decl,
     const clang::CXXRecordDecl *clangDecl,
     const ProtocolConformance *rawIteratorConformance) {
@@ -1001,7 +982,7 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
 
-  conformToCxxBorrowingSequenceIfNedded(impl, decl, clangDecl,
+  conformToCxxBorrowingSequenceIfNeeded(impl, decl, clangDecl,
                                         rawIteratorConformance);
 
   // `CxxSequence` and `CxxRandomAccessCollection` protocols require `Element`
