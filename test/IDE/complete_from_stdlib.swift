@@ -71,10 +71,10 @@ func testArchetypeReplacement2<BAR : Equatable>(_ a: [BAR]) {
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         dropFirst()[#ArraySlice<Equatable>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         dropLast()[#[Equatable]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         enumerated()[#EnumeratedSequence<[Equatable]>#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         min({#by: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         max({#by: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         min({#by: (Equatable, Equatable) throws(Error) -> Bool##(Equatable, Equatable) throws(Error) -> Bool#})[' throws'][#Equatable?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         max({#by: (Equatable, Equatable) throws(Error) -> Bool##(Equatable, Equatable) throws(Error) -> Bool#})[' throws'][#Equatable?#]{{; name=.+}}
 // FIXME: The following should include 'partialResult' as local parameter name: "(nextPartialResult): (_ partialResult: Result, Equatable)"
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         reduce({#(initialResult): Result#}, {#(nextPartialResult): (Result, Equatable) throws -> Result##(_ partialResult: Result, Equatable) throws -> Result#})[' rethrows'][#Result#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         reduce({#(initialResult): Result#}, {#(nextPartialResult): (Result, Equatable) throws(Error) -> Result##(_ partialResult: Result, Equatable) throws(Error) -> Result#})[' throws'][#Result#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         dropFirst({#(k): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
 // FIXME: restore Decl[InstanceMethod]/Super:         flatMap({#(transform): (Equatable) throws -> Sequence##(Equatable) throws -> Sequence#})[' rethrows'][#[IteratorProtocol.Element]#]{{; name=.+}}
 
@@ -87,7 +87,7 @@ func testArchetypeReplacement3 (_ a : [Int]) {
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceVar]/Super/IsSystem:            first[#Int?#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super/IsSystem:         map({#(transform): (Int) throws(Error) -> T##(Int) throws(Error) -> T#})[' throws'][#[T]#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super/IsSystem:         dropLast({#(k): Int#})[#ArraySlice<Int>#]
-// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super/IsSystem:         elementsEqual({#(other): Sequence#}, {#by: (Int, Sequence.Element) throws -> Bool##(Int, Sequence.Element) throws -> Bool#})[' rethrows'][#Bool#]; name=elementsEqual(:by:)
+// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super/IsSystem:         elementsEqual({#(other): Sequence#}, {#by: (Int, Sequence.Element) throws(Error) -> Bool##(Int, Sequence.Element) throws(Error) -> Bool#})[' throws'][#Bool#]; name=elementsEqual(:by:)
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super/IsSystem:         elementsEqual({#(other): Sequence#})[#Bool#]; name=elementsEqual(:)
 
 

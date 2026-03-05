@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -536,11 +536,27 @@ extension UnsafeMutableRawBufferPointer {
 extension Sequence {
   @available(swift, deprecated: 4.1/*, obsoleted: 5.1 */, renamed: "compactMap(_:)",
     message: "Please use compactMap(_:) for the case where closure returns an optional value")
-  public func flatMap<ElementOfResult>(
-    _ transform: (Element) throws -> ElementOfResult?
-  ) rethrows -> [ElementOfResult] {
+  @_alwaysEmitIntoClient
+  public func flatMap<ElementOfResult, E: Error>(
+    _ transform: (Element) throws(E) -> ElementOfResult?
+  ) throws(E) -> [ElementOfResult] {
     return try _compactMap(transform)
   }
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func flatMap<ElementOfResult>(
+      _ transform: (Element) throws -> ElementOfResult?
+    ) throws -> [ElementOfResult]
+  )
+  @usableFromInline
+  internal func __rethrows_flatMap_deprecated<ElementOfResult>(
+    _ transform: (Element) throws -> ElementOfResult?
+  ) throws -> [ElementOfResult] {
+    try flatMap(transform)
+  }
+#endif // !hasFeature(Embedded)
 }
 
 extension Collection {

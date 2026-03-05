@@ -1299,7 +1299,7 @@
     "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
-    "LeftUsr": "s:STsE7flatMapySayqd__Gqd__Sg7ElementQzKXEKlF",
+    "LeftUsr": "s:STsE7flatMapySayqd__Gqd__Sg7ElementQzqd_0_YKXEqd_0_YKs5ErrorRd_0_r0_lF",
     "LeftComment": "flatMap",
     "RightUsr": "",
     "RightComment": "compactMap",
