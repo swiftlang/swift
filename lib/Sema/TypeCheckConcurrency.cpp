@@ -7163,10 +7163,13 @@ static bool checkSendableInstanceStorage(
           invalid = invalid || (behavior == DiagnosticBehavior::Unspecified);
           return true;
         }
+      }
 
-        if (!(isolation.isNonisolated() || isolation.isUnspecified())) {
-          return false; // skip sendable check on actor-isolated properties
-        }
+      // Actor-isolated properties don't need Sendable checking because
+      // they can only be accessed from within the actor's isolation domain.
+      // This applies to all nominal types (classes, structs, enums).
+      if (!(isolation.isNonisolated() || isolation.isUnspecified())) {
+        return false; // skip sendable check on actor-isolated properties
       }
 
       return checkSendabilityOfMemberType(property, propertyType);

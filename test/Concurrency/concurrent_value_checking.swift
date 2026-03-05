@@ -393,6 +393,18 @@ final class C14: Sendable { // expected-warning{{default initializer for 'C14' c
   @SomeActor let nc1 = NotConcurrent()
 }
 
+// Structs with actor-isolated properties should also be accepted as Sendable,
+// just like classes (https://github.com/swiftlang/swift/issues/87543)
+struct S13: Sendable {
+  @MainActor let ns: NotSendable? = nil
+  nonisolated init() {}
+}
+
+struct S14: Sendable {
+  @SomeActor let nc1 = NotConcurrent()
+  nonisolated init() {}
+}
+
 extension NotConcurrent {
   func f() { }
 
