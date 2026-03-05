@@ -42,7 +42,7 @@ func missingAsyncInBlock<T : AsyncSequence>(_ seq: T) {
   execute { // expected-error{{cannot pass function of type '() async -> Void' to parameter expecting synchronous function type}}
     do { 
       for try await _ in seq { } // expected-note {{'async' inferred from asynchronous operation used here}}
-    } catch { }
+    } catch _ { }
   }
 }
 
@@ -78,7 +78,7 @@ func forAwaitInsideDoCatch<Source: AsyncSequence>(_ source: Source) async {
     for try await item in source {
       print(item)
     }
-  } catch {} // no-warning
+  } catch _ {} // no-warning
 }
 
 @available(SwiftStdlib 5.1, *)
