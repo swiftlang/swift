@@ -113,13 +113,9 @@ extension ContinuousClock: Clock {
   public func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
-    if #available(StdlibDeploymentTarget 6.3, *) {
-      try await Task._sleep(until: deadline,
-                            tolerance: tolerance,
-                            clock: self)
-    } else {
-      fatalError("we should never get here; if we have, availability is broken")
-    }
+    try await Task._sleep(until: deadline,
+                          tolerance: tolerance,
+                          clock: self)
   }
 #else
   @available(StdlibDeploymentTarget 5.7, *)
