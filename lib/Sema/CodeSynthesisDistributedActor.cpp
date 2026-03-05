@@ -16,6 +16,10 @@
 #include "DerivedConformance/DerivedConformance.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityQuery.h"
+#include "swift/AST/AvailabilityRange.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
@@ -149,7 +153,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   // --- self.actorSystem
   auto systemRefExpr =
       UnresolvedDotExpr::createImplicit(
-          C, new (C) DeclRefExpr(selfDecl, dloc, implicit), //  TODO: make createImplicit
+          C, new (C) DeclRefExpr(selfDecl, dloc, implicit),
           C.Id_actorSystem);
 
   auto *systemVar = new (C) VarDecl(
@@ -193,6 +197,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   // --- Recording invocation details
   // -- recordGenericSubstitution(s)
+  // TODO: trace all these encoding calls as well so we can record timing for them?
   if (auto genEnv = thunk->getGenericEnvironment()) {
     auto recordGenericSubstitutionName =
         DeclName(C, C.Id_recordGenericSubstitution,
@@ -387,15 +392,14 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   auto *targetVar = new (C) VarDecl(
       /*isStatic=*/false, VarDecl::Introducer::Let, sloc, C.Id_target, thunk);
 
-  {
-    // --- Mangle the thunk name
-    auto mangledAccessorRecordName =
-        mangleDistributedThunkForAccessorRecordName(C, thunk);
+  // --- Mangle the thunk name
+  auto mangledAccessorRecordName =
+      mangleDistributedThunkForAccessorRecordName(C, thunk);
 
+  {
     StringLiteralExpr *mangledTargetStringLiteral =
         new (C) StringLiteralExpr(mangledAccessorRecordName,
                                   SourceRange(), implicit);
-
     // --- let target = RemoteCallTarget(<mangled name>)
     targetVar->setInterfaceType(remoteCallTargetTy);
     targetVar->setImplicit();
@@ -422,6 +426,62 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
     remoteBranchStmts.push_back(targetPB);
     remoteBranchStmts.push_back(targetVar);
+  }
+
+  // === Trace the remoteCall
+  {
+    auto traceRemoteCallRef = UnresolvedDeclRefExpr::createImplicit(
+        C, DeclName(C,
+          C.getIdentifier("_traceDistributedRemoteCall"),
+          {C.getIdentifier("targetActor"), C.getIdentifier("targetIdentifier")}));
+
+    SmallVector<Expr *, 2> traceArgs;
+    // targetActor: some DistributedActor
+    traceArgs.push_back(new (C) DeclRefExpr(selfDecl, dloc, implicit,
+                                            swift::AccessSemantics::Ordinary,
+                                            selfDecl->getInterfaceType()));
+    // targetIdentifier: String
+    StringLiteralExpr *mangledTargetStringLiteral =
+          new (C) StringLiteralExpr(mangledAccessorRecordName,
+                                    SourceRange(), implicit);
+    traceArgs.push_back(mangledTargetStringLiteral);
+
+    auto nameRef = DeclNameRef(traceRemoteCallRef->getName());
+    auto traceArgsList = ArgumentList::forImplicitCallTo(
+        nameRef,
+        traceArgs,
+        C);
+
+    // The trace call:
+    auto traceCallExpr = CallExpr::createImplicit(C, traceRemoteCallRef, traceArgsList);
+
+    // Wrap the trace call in an availability check:
+    // if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *) { ... }
+    // We use the target platform's domain and set the query manually since
+    // TypeCheckAvailability won't fill it in for synthesized code with
+    // invalid source locations.
+    auto targetDomain = C.getTargetAvailabilityDomain();
+    auto platformSpec = AvailabilitySpec::createForDomain(
+        C, targetDomain, sloc, llvm::VersionTuple(9999), sloc);
+    auto wildcardSpec = AvailabilitySpec::createWildcard(C, sloc);
+
+    auto availableInfo = PoundAvailableInfo::create(
+        C, sloc, sloc, {platformSpec, wildcardSpec}, sloc,
+        /*isUnavailability=*/false);
+
+    // Set the availability query manually since we have invalid SourceLocs.
+    auto versionRange = VersionRange::allGTE(llvm::VersionTuple(9999));
+    availableInfo->setAvailabilityQuery(AvailabilityQuery::dynamic(
+        targetDomain, AvailabilityRange(versionRange), std::nullopt));
+
+    auto traceBraceStmt = BraceStmt::create(C, sloc, {traceCallExpr}, sloc, implicit);
+
+    StmtConditionElement conds[1] = { availableInfo };
+    auto availabilityIfStmt = new (C) IfStmt(
+        LabeledStmtInfo(), sloc, C.AllocateCopy(conds), traceBraceStmt,
+        /*elseloc=*/sloc, /*else=*/nullptr, /*implicit=*/true);
+
+    remoteBranchStmts.push_back(availabilityIfStmt);
   }
 
   // === Make the 'remoteCall(Void)(...)'
