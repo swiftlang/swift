@@ -114,19 +114,16 @@ class SwiftLookupTableReader : public clang::ModuleFileExtensionReader {
   std::unique_ptr<SerializedGlobalsAsMembersTable> GlobalsAsMembersTable;
   std::unique_ptr<SerializedGlobalsAsMembersIndex> GlobalsAsMembersIndex;
 
-  SwiftLookupTableReader(clang::ModuleFileExtension *extension,
-                         clang::ASTReader &reader,
-                         clang::serialization::ModuleFile &moduleFile,
-                         std::function<void()> onRemove,
-                         std::unique_ptr<SerializedBaseNameToEntitiesTable>
-                             serializedTable,
-                         ArrayRef<clang::serialization::DeclID> categories,
-                         std::unique_ptr<SerializedGlobalsAsMembersTable>
-                             globalsAsMembersTable,
-                         std::unique_ptr<SerializedGlobalsAsMembersIndex>
-                            globalsAsMembersIndex)
+  SwiftLookupTableReader(
+      clang::ModuleFileExtension *extension, clang::ASTReader &reader,
+      clang::serialization::ModuleFile &moduleFile,
+      std::function<void()> onRemove,
+      std::unique_ptr<SerializedBaseNameToEntitiesTable> serializedTable,
+      ArrayRef<clang::serialization::DeclID> categories,
+      std::unique_ptr<SerializedGlobalsAsMembersTable> globalsAsMembersTable,
+      std::unique_ptr<SerializedGlobalsAsMembersIndex> globalsAsMembersIndex)
       : ModuleFileExtensionReader(extension), Reader(reader),
-        ModuleFile(moduleFile), OnRemove(onRemove),
+        ModuleFile(moduleFile), OnRemove(std::move(onRemove)),
         SerializedTable(std::move(serializedTable)), Categories(categories),
         GlobalsAsMembersTable(std::move(globalsAsMembersTable)),
         GlobalsAsMembersIndex(std::move(globalsAsMembersIndex)) {}
@@ -1169,9 +1166,8 @@ namespace {
       return static_cast<hash_value_type>(key.Kind) + llvm::djbHash(key.Name);
     }
 
-    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
-                                                    key_type_ref key,
-                                                    data_type_ref data) {
+    static std::pair<unsigned, unsigned>
+    EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
       uint32_t keyLength = sizeof(uint8_t); // For the flag of the name's kind
       if (key.Kind == DeclBaseName::Kind::Normal) {
         keyLength += key.Name.size(); // The name's length
@@ -1203,7 +1199,7 @@ namespace {
       return { keyLength, dataLength };
     }
 
-    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+    static void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
       endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint8_t>((uint8_t)key.Kind);
       if (key.Kind == swift::DeclBaseName::Kind::Normal)
@@ -1264,9 +1260,8 @@ namespace {
              llvm::djbHash(key.second);
     }
 
-    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
-                                                    key_type_ref key,
-                                                    data_type_ref data) {
+    static std::pair<unsigned, unsigned>
+    EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
       // The length of the key.
       uint32_t keyLength = 1;
       if (SwiftLookupTable::contextRequiresName(key.first))
@@ -1284,7 +1279,7 @@ namespace {
       return { keyLength, dataLength };
     }
 
-    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+    static void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
       endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint8_t>(static_cast<unsigned>(key.first) - 2);
       if (SwiftLookupTable::contextRequiresName(key.first))
@@ -1789,12 +1784,10 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
   // Create the reader.
   // Note: This doesn't use std::make_unique because the constructor is
   // private.
-  return std::unique_ptr<SwiftLookupTableReader>(
-           new SwiftLookupTableReader(extension, reader, moduleFile, onRemove,
-                                      std::move(serializedTable), categories,
-                                      std::move(globalsAsMembersTable),
-                                      std::move(globalsAsMembersIndex)));
-
+  return std::unique_ptr<SwiftLookupTableReader>(new SwiftLookupTableReader(
+      extension, reader, moduleFile, std::move(onRemove),
+      std::move(serializedTable), categories, std::move(globalsAsMembersTable),
+      std::move(globalsAsMembersIndex)));
 }
 
 SmallVector<SerializedSwiftName, 4> SwiftLookupTableReader::getBaseNames() {

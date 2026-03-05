@@ -122,10 +122,10 @@ public:
   }
 private:
   bool hasMacroParameter(StringRef ParamName) const {
-    for (auto *Param : *SwiftifyImportDecl.parameterList)
-      if (Param->getArgumentName().str() == ParamName)
-        return true;
-    return false;
+    return llvm::any_of(*SwiftifyImportDecl.parameterList,
+                        [ParamName](auto *Param) {
+                          return Param->getArgumentName().str() == ParamName;
+                        });
   }
 
   void printAvailabilityOfType(StringRef Name) {

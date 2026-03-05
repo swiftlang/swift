@@ -186,6 +186,7 @@ ClangImporter::createClangArgs(const ClangImporterOptions &ClangImporterOpts,
                                clang::driver::Driver &clangDriver) {
   // Flags passed to Swift with `-Xcc` might affect include paths.
   std::vector<const char *> clangArgs;
+  clangArgs.reserve(ClangImporterOpts.ExtraArgs.size());
   for (const auto &each : ClangImporterOpts.ExtraArgs) {
     clangArgs.push_back(each.c_str());
   }
