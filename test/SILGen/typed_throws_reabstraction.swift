@@ -15,7 +15,7 @@ func test2() throws { // Not OK
     // CHECK: bb{{[0-9]+}}:
     // CHECK: bb{{[0-9]+}}:
     // CHECK:      end_borrow [[ERROR_BORROW]]
-    // CHECK-NEXT: store [[ERROR]] to [init]
+    // CHECK:      store [[ERROR]] to [init]
     // CHECK-NEXT: throw_addr
 
     catch is E1 { /* ignore */ }
@@ -61,3 +61,33 @@ func test3<E: Error>(e: E) {
     throw e
   }
 }
+
+// rdar://170997361
+// Need to stop borrowing the error value earlier, if the error value is not matched by the catch's pattern.
+// In the analogy of a 'switch', it's like a 'default' case where we are throwing the original error.
+// Previously we were emitting the end_borrow after doing the consuming store into an existential box.
+enum DonutError: Error {
+    case invalidItemType
+    case validError(any Error)
+    case unknown((any Error)?)
+}
+
+func testDonutError() throws {
+    let handler: () throws(DonutError) -> String = { () throws(DonutError) in
+        throw DonutError.invalidItemType
+    }
+
+    do {
+        _ = try handler()
+    } catch DonutError.invalidItemType {
+    } catch DonutError.validError {
+      try testDonutError()
+    }
+}
+// CHECK-LABEL: sil{{.*}} @{{.*}}testDonutErroryyKF :
+// CHECK: bb{{.*}}([[ERROR:%.*]] : @owned $DonutError):
+// CHECK:   [[ERROR_BORROW:%.*]] = begin_borrow [[ERROR]]
+// CHECK:   switch_enum [[ERROR_BORROW]]
+// CHECK: bb{{.*}}({{%.*}} : @guaranteed $Optional<any Error>):
+// CHECK:   end_borrow [[ERROR_BORROW]]
+// CHECK:   store [[ERROR]]
