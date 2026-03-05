@@ -193,7 +193,7 @@ public struct AsyncStream<Element> {
     /// without blocking for any awaiting consumption from the iteration.
     @discardableResult
     public func yield(_ value: sending Element) -> YieldResult {
-      storage.yield(value)
+      storage.yield(value).nonThrowingRepresentation
     }
 
     /// Resume the task awaiting the next iteration point by having it return
@@ -225,27 +225,23 @@ public struct AsyncStream<Element> {
     /// ``withTaskCancellationHandler(operation:onCancel:)``.
     public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
-        return storage.getOnTermination()
+        storage.getOnTermination().map { handler in
+          return { @Sendable termination in
+            handler(termination.throwingRepresentation)
+          }
+        }
       }
       nonmutating set {
-        storage.setOnTermination(newValue)
+        storage.setOnTermination(newValue.map { handler in
+          return { @Sendable termination in
+            handler(termination.nonThrowingRepresentation)
+          }
+        })
       }
     }
   }
 
-  final class _Context {
-    let storage: _Storage?
-    let produce: () async -> Element?
-
-    init(storage: _Storage? = nil, produce: @escaping () async -> Element?) {
-      self.storage = storage
-      self.produce = produce
-    }
-
-    deinit {
-      storage?.cancel()
-    }
-  }
+  typealias _Context = AsyncThrowingStream<Element, Never>._Context
 
   let context: _Context
   
@@ -297,7 +293,7 @@ public struct AsyncStream<Element> {
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
     _ build: (Continuation) -> Void
   ) {
-    let storage: _Storage = .create(limit: limit)
+    let storage: _Storage = .create(limit: limit.throwingRepresentation)
     context = _Context(storage: storage, produce: storage.next)
     build(Continuation(storage: storage))
   }
@@ -366,9 +362,7 @@ extension AsyncStream: AsyncSequence {
   /// The asynchronous iterator for iterating an asynchronous stream.
   ///
   /// This type doesn't conform to `Sendable`. Don't use it from multiple
-  /// concurrent contexts. It is a programmer error to invoke `next()` from a
-  /// concurrent context that contends with another such call, which
-  /// results in a call to `fatalError()`.
+  /// concurrent contexts.
   public struct Iterator: AsyncIteratorProtocol {
     let context: _Context
 
@@ -376,10 +370,6 @@ extension AsyncStream: AsyncSequence {
     ///
     /// When `next()` returns `nil`, this signifies the end of the
     /// `AsyncStream`.
-    ///
-    /// It is a programmer error to invoke `next()` from a
-    /// concurrent context that contends with another such call, which
-    /// results in a call to `fatalError()`.
     ///
     /// If you cancel the task this iterator is running in while `next()` is
     /// awaiting a value, the `AsyncStream` terminates. In this case, `next()`
@@ -392,10 +382,6 @@ extension AsyncStream: AsyncSequence {
     ///
     /// When `next()` returns `nil`, this signifies the end of the
     /// `AsyncStream`.
-    ///
-    /// It is a programmer error to invoke `next()` from a concurrent
-    /// context that contends with another such call, which results in a call to
-    /// `fatalError()`.
     ///
     /// If you cancel the task this iterator is running in while `next()`
     /// is awaiting a value, the `AsyncStream` terminates. In this case,
@@ -434,7 +420,7 @@ extension AsyncStream.Continuation {
   ) -> YieldResult {
     switch result {
     case .success(let val):
-      return storage.yield(val)
+      return storage.yield(val).nonThrowingRepresentation
     }
   }
 
@@ -452,7 +438,7 @@ extension AsyncStream.Continuation {
   /// blocking for any awaiting consumption from the iteration.
   @discardableResult
   public func yield() -> YieldResult where Element == Void {
-    return storage.yield(())
+    return storage.yield(()).nonThrowingRepresentation
   }
 }
 
