@@ -871,12 +871,16 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     if (options & TypeResolutionFlags::AllowUnspecifiedTypes)
       return PlaceholderType::get(Context, P);
 
-    Context.Diags.diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
     if (auto named = dyn_cast<NamedPattern>(P)) {
       if (auto var = named->getDecl()) {
         var->setInvalid();
+        if (!var->getTypeReprOrParentPatternTypeRepr() &&
+            !var->getAllAccessors().empty()) {
+          return ErrorType::get(Context);
+        }
       }
     }
+    Context.Diags.diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
     return ErrorType::get(Context);
 
   // A tuple pattern propagates its tuple-ness out.
