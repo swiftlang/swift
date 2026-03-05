@@ -96,6 +96,14 @@ FUNCTION(AllocObject, Swift, swift_allocObject, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::Allocating),
          UNKNOWN_MEMEFFECTS)
 
+// RefCounted *swift_allocObjectTyped(Metadata *type, size_t size, size_t alignMask, uint64_t typeId);
+FUNCTION(AllocObjectTyped, Swift, swift_allocObjectTyped, C_CC, AlwaysAvailable,
+         RETURNS(RefCountedPtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, Int64Ty),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Allocating),
+         UNKNOWN_MEMEFFECTS)
+
 // HeapObject *swift_initStackObject(HeapMetadata const *metadata,
 //                                   HeapObject *object);
 FUNCTION(InitStackObject, Swift, swift_initStackObject, C_CC, AlwaysAvailable,
