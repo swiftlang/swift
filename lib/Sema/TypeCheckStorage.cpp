@@ -128,12 +128,9 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
                           ExpandSynthesizedMemberMacroRequest{decl},
                           false);
 
-  // Walk over members and their auxiliary decls, forcing backing storage
-  // for lazy properties and property wrappers to be synthesized.
-  //
-  // This is necessary for peer macro expansions that introduce wrapped
-  // properties: if we only lower direct members here, stored property
-  // enumeration can run before wrapper backing vars are synthesized.
+  // Walk over members and their auxiliary decls. For stored-property queries,
+  // also force backing storage for lazy properties and property wrappers to be
+  // synthesized.
   std::function<void(Decl *)> visitMember;
   visitMember = [&](Decl *member) {
     auto *var = dyn_cast<VarDecl>(member);
@@ -334,13 +331,29 @@ InitializablePropertiesRequest::evaluate(Evaluator &evaluator,
 
   SmallVector<VarDecl *, 4> results;
   computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Memberwise);
+  bool inSourceFile = isInSourceFile(implDecl);
 
   auto maybeAddProperty = [&](VarDecl *var) {
     if (!var->getDeclContext()->isTypeContext() || var->isStatic())
       return;
 
-    if (var->getAttrs().hasAttribute<LazyAttr>() ||
-        var->hasAttachedPropertyWrapper() || var->hasStorage() ||
+    bool hasLazy = var->getAttrs().hasAttribute<LazyAttr>();
+    bool hasWrapper = var->hasAttachedPropertyWrapper();
+
+    // A peer macro can introduce wrapped/lazy properties that are discovered
+    // via auxiliary decl traversal. Ensure any required auxiliary storage is
+    // synthesized before returning them as initializable properties.
+    if (inSourceFile) {
+      if (hasLazy)
+        (void)var->getLazyStorageProperty();
+
+      if (hasWrapper) {
+        (void)var->getPropertyWrapperAuxiliaryVariables();
+        (void)var->getPropertyWrapperInitializerInfo();
+      }
+    }
+
+    if (hasLazy || hasWrapper || var->hasStorage() ||
         var->hasInitAccessor()) {
       results.push_back(var);
     }
