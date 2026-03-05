@@ -305,14 +305,15 @@ namespace swift {
 
   /// A diagnostic that has no input arguments, so it is trivially-destructable.
   using ZeroArgDiagnostic = Diag<>;
-  
+
   /// Describes an in-flight diagnostic, which is currently active
   /// within the diagnostic engine and can be augmented within additional
   /// information (source ranges, Fix-Its, etc.).
   ///
-  /// Only a single in-flight diagnostic can be active at one time, and all
-  /// additional information must be emitted through the active in-flight
-  /// diagnostic.
+  /// Multiple in-flight diagnostics can be active at the same time. They are
+  /// emitted in FIFO order (based on time of creation) once the number of
+  /// active diagnostics drops to 0. All additional information must be emitted
+  /// through the active in-flight diagnostic.
   class InFlightDiagnostic {
     friend class DiagnosticEngine;
     
@@ -607,7 +608,6 @@ namespace swift {
     InFlightDiagnostic &fixItInsertAfter(SourceLoc L, StringRef FormatString,
                                          ArrayRef<DiagnosticArgument> Args);
   };
-
 
   using WarningGroupBehaviorMap =
       llvm::MapVector<swift::DiagGroupID, WarningGroupBehaviorRule>;
