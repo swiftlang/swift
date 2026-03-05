@@ -83,6 +83,11 @@ FileSpecificDiagnosticConsumer::FileSpecificDiagnosticConsumer(
          "don't waste time handling diagnostics that will never get emitted");
   assert(!hasDuplicateFileNames(Subconsumers) &&
          "having multiple subconsumers for the same file is not implemented");
+  size_t realConsumerCount =
+      llvm::count_if(Subconsumers, [](const Subconsumer &s) {
+        return s.getConsumer() != nullptr;
+      });
+  HasMultiplePrimaryConsumers = realConsumerCount > 1;
 }
 
 void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
@@ -218,7 +223,14 @@ FileSpecificDiagnosticConsumer::findSubconsumerForNonNote(
     return std::nullopt; // No place to put it; might be in an imported module
   if ((*subconsumer)->getConsumer())
     return subconsumer; // A primary file with a .dia file
-  // Try to put it in the responsible primary input
+  // Found a null/eater subconsumer for a non-primary file.
+  // In single-primary-per-job mode (only one real consumer exists), return the
+  // eater so the diagnostic is silently discarded: it will be reported by the
+  // separate job that compiles that file as its primary.
+  // In batch mode (multiple real consumers), route to the responsible primary.
+  if (!HasMultiplePrimaryConsumers)
+    return subconsumer; // eat
+  // Batch mode: route to the responsible primary input.
   if (Info.BufferIndirectlyCausingDiagnostic.isInvalid())
     return std::nullopt;
   const auto currentPrimarySubconsumer =

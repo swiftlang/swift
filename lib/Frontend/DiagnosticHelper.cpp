@@ -70,10 +70,29 @@ private:
   llvm::StringMap<std::vector<std::string>> FileSpecificDiagnostics;
   std::unique_ptr<DiagnosticConsumer> FileSpecificAccumulatingConsumer;
   std::unique_ptr<DiagnosticConsumer> SerializedConsumerDispatcher;
+  std::unique_ptr<DiagnosticConsumer> PrintingConsumerDispatcher;
   std::unique_ptr<DiagnosticConsumer> FixItsConsumer;
 };
 
 namespace {
+
+/// Forwards handleDiagnostic to a PrintingDiagnosticConsumer, temporarily
+/// unsuppressing it so that primary-file diagnostics are printed even though
+/// the PDC is otherwise suppressed to prevent non-primary-file diagnostics
+/// from reaching stderr.
+class UnsuppressedPDCForwarder : public DiagnosticConsumer {
+  PrintingDiagnosticConsumer &PDC;
+public:
+  explicit UnsuppressedPDCForwarder(PrintingDiagnosticConsumer &pdc)
+      : PDC(pdc) {}
+  void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override {
+    PDC.setSuppressOutput(false);
+    PDC.handleDiagnostic(SM, Info);
+    PDC.setSuppressOutput(true);
+  }
+  // Don't forward finishProcessing: PDC is also directly registered with
+  // DiagnosticEngine and will have finishProcessing() called on it separately.
+};
 
 /// If there is an error with fixits it writes the fixits as edits in json
 /// format.
@@ -149,18 +168,21 @@ createDispatchingDiagnosticConsumerIfNeeded(
           subconsumers.emplace_back(input.getFileName(), std::move(consumer));
         return false;
       });
-  // For batch mode, the compiler must sometimes swallow diagnostics pertaining
-  // to non-primary files in order to avoid Xcode showing the same diagnostic
-  // multiple times. So, create a diagnostic "eater" for those non-primary
-  // files.
+  // The compiler must sometimes swallow diagnostics pertaining to non-primary
+  // files in order to avoid Xcode/SwiftPM showing the same diagnostic multiple
+  // times. So, create a diagnostic "eater" for those non-primary files.
   //
   // This routine gets called in cases where no primary subconsumers are
   // created. Don't bother to create non-primary subconsumers if there aren't
   // any primary ones.
   //
-  // To avoid introducing bugs into WMO or single-file modes, test for multiple
-  // primaries.
-  if (!subconsumers.empty() && inputsAndOutputs.hasMultiplePrimaryInputs()) {
+  // Guard on hasPrimaryInputs() (any primary exists) rather than
+  // hasMultiplePrimaryInputs() so that single-primary-per-job mode also gets
+  // eaters for its non-primary inputs. WMO (no primaries) is unaffected
+  // because hasPrimaryInputs() returns false there. Single-file mode
+  // (one file that is also the primary) is unaffected because
+  // forEachNonPrimaryInput produces zero iterations.
+  if (!subconsumers.empty() && inputsAndOutputs.hasPrimaryInputs()) {
     inputsAndOutputs.forEachNonPrimaryInput(
         [&](const InputFile &input) -> bool {
           subconsumers.emplace_back(input.getFileName(), nullptr);
@@ -209,6 +231,21 @@ static std::unique_ptr<DiagnosticConsumer> createAccumulatingDiagnosticConsumer(
         auto &DiagBufferRef = FileSpecificDiagnostics[Input.getFileName()];
         return std::make_unique<AccumulatingFileDiagnosticConsumer>(
             DiagBufferRef);
+      });
+}
+
+/// Creates a dispatching consumer that forwards primary-file diagnostics to
+/// \p printingConsumer (temporarily unsuppressing it) and silently eats
+/// non-primary-file diagnostics.
+/// Returns null if no dispatching is needed (WMO, single-file, etc.).
+static std::unique_ptr<DiagnosticConsumer>
+createDispatchingPrintingConsumerIfNeeded(
+    const FrontendInputsAndOutputs &inputsAndOutputs,
+    PrintingDiagnosticConsumer &printingConsumer) {
+  return createDispatchingDiagnosticConsumerIfNeeded(
+      inputsAndOutputs,
+      [&](const InputFile &) -> std::unique_ptr<DiagnosticConsumer> {
+        return std::make_unique<UnsuppressedPDCForwarder>(printingConsumer);
       });
 }
 
@@ -374,6 +411,19 @@ void DiagnosticHelper::Implementation::beginMessage() {
   if (FixItsConsumer)
     instance.addDiagnosticConsumer(FixItsConsumer.get());
 
+  // In non-parseable-output mode, PDC writes directly to stderr and is not
+  // filtered by any file-specific consumer. Wrap it in a dispatcher so that
+  // non-primary-file diagnostics are eaten rather than printed to stderr
+  // (where the driver would capture them and SwiftPM would display them).
+  if (!invocation.getFrontendOptions().FrontendParseableOutput) {
+    PrintingConsumerDispatcher = createDispatchingPrintingConsumerIfNeeded(
+        invocation.getFrontendOptions().InputsAndOutputs, PDC);
+    if (PrintingConsumerDispatcher) {
+      PDC.setSuppressOutput(true);
+      instance.addDiagnosticConsumer(PrintingConsumerDispatcher.get());
+    }
+  }
+
   if (invocation.getDiagnosticOptions().UseColor)
     PDC.forceColors();
 
@@ -489,6 +539,9 @@ void DiagnosticHelper::Implementation::diagnoseFatalError(const char *reason,
       {}, StringRef(), SourceLoc(), {}, {}, {}, false);
   DiagnosticInfo noteInfo(DiagID(0), SourceLoc(), DiagnosticKind::Note, reason,
                           {}, StringRef(), SourceLoc(), {}, {}, {}, false);
+  // Ensure PDC is not suppressed: fatal errors must always be visible,
+  // even when PDC is otherwise suppressed in single-primary-per-job mode.
+  PDC.setSuppressOutput(false);
   PDC.handleDiagnostic(dummyMgr, errorInfo);
   PDC.handleDiagnostic(dummyMgr, noteInfo);
   if (shouldCrash)

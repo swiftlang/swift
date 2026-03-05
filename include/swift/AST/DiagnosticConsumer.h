@@ -294,6 +294,11 @@ private:
 
   bool HasAnErrorBeenConsumed = false;
 
+  /// True when more than one subconsumer has a real (non-null) consumer,
+  /// i.e. we are in batch-mode where multiple primaries share one invocation.
+  /// False in single-primary-per-job mode where there is exactly one primary.
+  bool HasMultiplePrimaryConsumers = false;
+
   /// Takes ownership of the DiagnosticConsumers specified in \p consumers.
   ///
   /// There must not be two consumers for the same file (i.e., having the same
