@@ -2008,6 +2008,13 @@ namespace {
             return declaredTy;
           }
 
+          // Open a bare placeholder return type into a type variable.
+          if (auto *placeholder = dyn_cast<PlaceholderTypeRepr>(
+                  closure->getExplicitResultTypeRepr()->getWithoutParens())) {
+            return HandlePlaceholderType(CS, resultLocator)(CS.getASTContext(),
+                                                            placeholder);
+          }
+
           auto options =
               TypeResolutionOptions(TypeResolverContext::InExpression);
           options.setContext(TypeResolverContext::ClosureExpr);
