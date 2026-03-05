@@ -3284,6 +3284,8 @@ public:
   
   /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
   bool visitOnStackLifetimeEnds(llvm::function_ref<bool (Operand*)> func) const;
+
+  bool isSupportedAsDifferentiableClosure() const;
 };
 
 class EndApplyInst;

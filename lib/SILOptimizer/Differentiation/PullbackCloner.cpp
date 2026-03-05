@@ -983,6 +983,24 @@ public:
     errorOccurred = true;
   }
 
+  void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *cetnei) {
+    visitValueOwnershipInst(cetnei);
+  }
+
+  void visitPartialApplyInst(PartialApplyInst *pai) {
+    if (!pai->isSupportedAsDifferentiableClosure()) {
+      SILInstructionVisitor::visitPartialApplyInst(pai);
+      return;
+    }
+
+    auto *bb = pai->getParent();
+    const Operand &op = pai->getArgumentOperands().front();
+    SILValue val = op.get();
+    assert(getTangentValueCategory(pai) == SILValueCategory::Object);
+    auto adj = getAdjointValue(bb, pai);
+    addAdjointValue(bb, val, adj, pai->getLoc());
+  }
+
   /// Handle `apply` instruction.
   ///   Original: (y0, y1, ...) = apply @fn (x0, x1, ...)
   ///    Adjoint: (adj[x0], adj[x1], ...) += apply @fn_pullback (adj[y0], ...)
@@ -1155,15 +1173,18 @@ public:
     });
     SmallVector<SILValue, 8> origAllResults;
     collectAllActualResultsInTypeOrder(fai, origDirectResults, origAllResults);
-    // Append semantic result arguments after original results.
-    for (auto paramIdx : applyInfo.config.parameterIndices->getIndices()) {
-      unsigned argIdx = fai.getNumIndirectSILResults() +
-                        fai.getNumIndirectSILErrorResults() + paramIdx;
-      auto paramInfo = conv.getParamInfoForSILArg(argIdx);
-      if (!paramInfo.isAutoDiffSemanticResult())
-        continue;
-      origAllResults.push_back(
-          fai.getArgumentsWithoutIndirectResults()[paramIdx]);
+
+    if (!isApplySiteOfDifferentiableClosure(fai)) {
+      // Append semantic result arguments after original results.
+      for (auto paramIdx : applyInfo.config.parameterIndices->getIndices()) {
+        unsigned argIdx = fai.getNumIndirectSILResults() +
+                          fai.getNumIndirectSILErrorResults() + paramIdx;
+        auto paramInfo = conv.getParamInfoForSILArg(argIdx);
+        if (!paramInfo.isAutoDiffSemanticResult())
+          continue;
+        origAllResults.push_back(
+            fai.getArgumentsWithoutIndirectResults()[paramIdx]);
+      }
     }
 
     // Get callee pullback arguments.
@@ -1267,6 +1288,16 @@ public:
     for (unsigned i : applyInfo.config.parameterIndices->getIndices()) {
       unsigned argIdx = fai.getNumIndirectSILResults() +
                         fai.getNumIndirectSILErrorResults() + i;
+
+      if (isApplySiteOfDifferentiableClosure(fai)) {
+        auto origArg = fai.getCallee();
+        auto tan = *allResultsIt++;
+        assert(!tan->getType().isAddress());
+        recordTemporary(tan);
+        addAdjointValue(bb, origArg, makeConcreteAdjointValue(tan), loc);
+        continue;
+      }
+
       auto origArg = fai.getArgument(argIdx);
       // Skip adjoint accumulation for semantic results arguments.
       auto paramInfo = fai.getSubstCalleeConv().getParamInfoForSILArg(argIdx);

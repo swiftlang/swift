@@ -1008,3 +1008,19 @@ bool TypeBase::isBitwiseCopyable(GenericSignature sig) {
   }
   return contextTy->isBitwiseCopyable();
 }
+
+bool TypeBase::isDifferentiable(bool tangentVectorEqualsSelf) {
+  auto &ctx = getASTContext();
+  auto *differentiableProtocol =
+      ctx.getProtocol(KnownProtocolKind::Differentiable);
+  if (!differentiableProtocol) {
+    return false;
+  }
+  auto conf = checkConformance(this, differentiableProtocol);
+  if (conf.isInvalid())
+    return false;
+  if (!tangentVectorEqualsSelf)
+    return true;
+  auto tanType = conf.getTypeWitnessByName(ctx.Id_TangentVector);
+  return this->isEqual(tanType);
+}

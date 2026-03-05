@@ -5954,23 +5954,6 @@ SpecializeAttrTargetDeclRequest::evaluate(Evaluator &evaluator,
   }
 
   return nullptr;
-
-}
-/// Returns true if the given type conforms to `Differentiable` in the given
-/// context. If `tangentVectorEqualsSelf` is true, also check whether the given
-/// type satisfies `TangentVector == Self`.
-static bool conformsToDifferentiable(Type type,
-                                     bool tangentVectorEqualsSelf = false) {
-  auto &ctx = type->getASTContext();
-  auto *differentiableProto =
-      ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto conf = checkConformance(type, differentiableProto);
-  if (conf.isInvalid())
-    return false;
-  if (!tangentVectorEqualsSelf)
-    return true;
-  auto tanType = conf.getTypeWitnessByName(ctx.Id_TangentVector);
-  return type->isEqual(tanType);
 }
 
 IndexSubset *TypeChecker::inferDifferentiabilityParameters(
@@ -5991,6 +5974,14 @@ IndexSubset *TypeChecker::inferDifferentiabilityParameters(
     if (i >= allParamTypes.size())
       return false;
     auto paramType = allParamTypes[i];
+    if (const auto *anyFunctionType = paramType->getAs<AnyFunctionType>()) {
+      if (!anyFunctionType->isSupportedAsDifferentiableClosure())
+        return false;
+      // Right now we assume that for differentiable closures we capture exactly
+      // one argument and its type is equal to the result type.
+      // TODO: handle arbitrary captured arg types and result types.
+      paramType = anyFunctionType->getResult();
+    }
     if (derivativeGenEnv)
       paramType = derivativeGenEnv->mapTypeIntoEnvironment(paramType);
     else
@@ -5999,7 +5990,7 @@ IndexSubset *TypeChecker::inferDifferentiabilityParameters(
     if (paramType->isExistentialType())
       return false;
     // Return true if the type conforms to `Differentiable`.
-    return conformsToDifferentiable(paramType);
+    return paramType->isDifferentiable();
   };
 
   // Get all parameter types.
@@ -6059,7 +6050,7 @@ static IndexSubset *computeDifferentiabilityParameters(
         selfType = derivativeGenEnv->mapTypeIntoEnvironment(selfType);
       else
         selfType = function->mapTypeIntoEnvironment(selfType);
-      if (!conformsToDifferentiable(selfType)) {
+      if (!selfType->isDifferentiable()) {
         diags
             .diagnose(attrLoc, diag::diff_function_no_parameters, function)
             .highlight(function->getSignatureSourceRange());
@@ -7647,8 +7638,8 @@ static bool checkLinearityParameters(
         parsedLinearParams.empty() ? attrLoc : parsedLinearParams[i].getLoc();
     // Parameter must conform to `Differentiable` and satisfy
     // `Self == Self.TangentVector`.
-    if (!conformsToDifferentiable(linearParamType,
-                                  /*tangentVectorEqualsSelf*/ true)) {
+    if (!linearParamType->isDifferentiable(
+            /*tangentVectorEqualsSelf*/ true)) {
       diags.diagnose(loc,
                      diag::transpose_attr_invalid_linearity_parameter_or_result,
                      linearParamType.getString(), /*isParameter*/ true);
@@ -7759,8 +7750,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   if (expectedOriginalResultType->hasTypeParameter())
     expectedOriginalResultType = transpose->mapTypeIntoEnvironment(
         expectedOriginalResultType);
-  if (!conformsToDifferentiable(expectedOriginalResultType,
-                                /*tangentVectorEqualsSelf*/ true)) {
+  if (!expectedOriginalResultType->isDifferentiable(
+          /*tangentVectorEqualsSelf*/ true)) {
     diagnoseAndRemoveAttr(
         attr, diag::transpose_attr_invalid_linearity_parameter_or_result,
         expectedOriginalResultType.getString(), /*isParameter*/ false);
