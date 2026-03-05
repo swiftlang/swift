@@ -119,3 +119,17 @@ do {
       f4(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
   }
 }
+
+// Generic argument matches involving 'any Sendable' are special-cased to
+// allow matching against 'Any' for backward compatibility with preconcurrency
+// code. Make sure this generates an exact binding and not subtype, otherwise
+// we bind the generic parameter type to S below and fail.
+do {
+  class G<T> {
+    init(_ t: T) {}
+  }
+
+  struct S {}
+
+  let _: G<any Sendable> = G(S())
+}

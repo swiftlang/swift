@@ -2617,7 +2617,10 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     }
   }
 
-  if (constraint->getKind() == ConstraintKind::LValueObject) {
+  if (constraint->getKind() == ConstraintKind::Bind) {
+    // Special case from matchSendableExistentialToAnyInGenericArgumentPosition().
+    kind = AllowedBindingKind::Exact;
+  } else if (constraint->getKind() == ConstraintKind::LValueObject) {
     // Allow l-value type inference from its object type, but
     // not the other way around, that would be handled by constraint
     // simplification.
@@ -2728,7 +2731,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       if (kind == AllowedBindingKind::Subtypes) {
         recordSubtypeOf(bindingTypeVar, constraint);
       } else {
-        assert(kind == AllowedBindingKind::Supertypes);
+        ASSERT(kind == AllowedBindingKind::Supertypes);
         recordSupertypeOf(bindingTypeVar, constraint);
       }
 
