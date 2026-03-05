@@ -2103,10 +2103,6 @@ public:
         });
   }
 
-  /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
-  /// constraint system, return the decl that it references.
-  ValueDecl *findResolvedMemberRef(ConstraintLocator *locator);
-
   /// Try to salvage the constraint system by applying (speculative)
   /// fixes.
   SolutionResult salvage();
