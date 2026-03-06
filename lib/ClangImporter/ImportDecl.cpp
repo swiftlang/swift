@@ -982,12 +982,6 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl) {
         if (md->isVirtual())
           return true;
 
-        // Always import begin() and end() eagerly, those are needed for
-        // iterator conformances
-        if (md->getMinRequiredArguments() == 0 &&
-            (md->getName() == "begin" || md->getName() == "end"))
-          return true;
-
         // Name lookup doesn't know about these renamed methods, import eagerly
         if (CXXMethodBridging(md).classify() !=
             CXXMethodBridging::Kind::unknown)
