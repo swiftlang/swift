@@ -421,6 +421,13 @@ public:
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Borrow;
   }
+
+  // True if values of this borrow type contain a bitwise copy of their target
+  // values.
+  // False if values of this borrow type are pointers to their target values.
+  bool usesValueRepresentation() const {
+    return ReferentTI == RepresentationTI;
+  }
 };
 
 /// This class owns the memory for all TypeInfo instances that it vends.
