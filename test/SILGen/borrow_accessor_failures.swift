@@ -315,3 +315,38 @@ public struct Container<Element: ~Copyable >: ~Copyable {
   }
 }
 
+enum OrderStatus: ~Copyable {
+  case processing(trackingNumber: String)
+  case cancelled(reason: String)
+
+  var description: String {
+    borrow {
+      switch self {
+        case .processing(let trackingNumber):
+          return trackingNumber // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
+
+        case .cancelled(let reason):
+          return reason // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
+
+      }
+    }
+  }
+}
+
+class KlassWrapper {
+  var _k: Klass
+
+  init(_ k: Klass) {
+    self._k = k
+  }
+
+  var k: Klass {
+    borrow {
+      return _k // expected-error{{invalid return value from a borrow accessor}} // expected-note{{borrow accessors can return stored properties, computed properties with borrow accessors or global 'let' declarations}}
+    }
+    mutate {
+      return &_k // expected-error{{invalid return value from a mutate accessor}} // expected-note{{mutate accessors can return stored properties, computed properties with mutate accessors or global 'let' declarations}}
+    }
+  }
+}
+
