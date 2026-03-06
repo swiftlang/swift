@@ -161,3 +161,24 @@ func testNonSendableDiagnostics(
   let _: @MyActor () async -> NonSendable = globalActor2
   // expected-error@-1 {{cannot convert value actor-isolated to 'MainActor' to specified type actor-isolated to 'MyActor'}}
 }
+
+// Non-@Sendable @concurrent variable type conversion (https://github.com/swiftlang/swift/issues/87234)
+func testNonSendableConcurrentVarConversion() {
+  // @concurrent variable type (non-@Sendable) -> nonisolated(nonsending)
+  // crosses an isolation boundary and must check for Sendable.
+  let fn1: @concurrent (NonSendable) async -> Void = { _ in }
+  let _: nonisolated(nonsending) (NonSendable) async -> Void = fn1 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
+  // expected-error@-1 {{cannot convert '(NonSendable) async -> Void' to 'nonisolated(nonsending) (NonSendable) async -> Void' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
+
+  let fn2: @concurrent () async -> NonSendable = { NonSendable() }
+  let _: nonisolated(nonsending) () async -> NonSendable = fn2 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
+  // expected-error@-1 {{cannot convert '() async -> NonSendable' to 'nonisolated(nonsending) () async -> NonSendable' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
+
+  // @concurrent variable type with Sendable types should be fine.
+  let fn3: @concurrent (Int) async -> Void = { _ in }
+  let _: nonisolated(nonsending) (Int) async -> Void = fn3 // Ok
+
+  // Non-async @concurrent -> nonisolated(nonsending) doesn't cross boundary.
+  let fn4: (NonSendable) -> Void = { _ in }
+  let _: nonisolated(nonsending) (NonSendable) async -> Void = fn4 // Ok
+}
