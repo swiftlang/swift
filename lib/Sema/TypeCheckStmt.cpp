@@ -3439,13 +3439,54 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
   return ctx.getAsyncIteratorNext();
 }
 
+bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
+                                       bool isAsync, SourceLoc loc) {
+  if (!ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {
+    return false;
+  }
+
+  if (isAsync || seqTy->isExistentialType()) {
+    return false;
+  }
+
+  auto *borrowingSeqProto =
+      ctx.getProtocol(KnownProtocolKind::BorrowingSequence);
+  if (!borrowingSeqProto) {
+    return false;
+  }
+
+  // Always prefer conformance to Sequence over BorrowingSequence when
+  // both are available.
+  if (lookupConformance(seqTy, ctx.getProtocol(KnownProtocolKind::Sequence))) {
+    return false;
+  }
+
+  // Fall back to Sequence if no conformance to BorrowingSequence is found.
+  // This ensures that we maintain Sequence as the minimal required
+  // conformance.
+  auto seqConformanceRef = lookupConformance(seqTy, borrowingSeqProto);
+  if (seqConformanceRef.isInvalid()) {
+    return false;
+  }
+
+  if (auto *conformance = seqConformanceRef.getConcrete()) {
+    auto protoAvail = AvailabilityContext::forDeclSignature(borrowingSeqProto);
+    auto *dc = conformance->getDeclContext();
+    auto availability = AvailabilityContext::forLocation(loc, dc);
+    if (!availability.isContainedIn(protoAvail))
+      return false;
+  }
+
+  return true;
+}
+
 namespace {
 class DesugarForEachStmt {
   ForEachStmt *stmt;
   DeclContext *dc;
   ASTContext &ctx;
   bool isAsync;
-  bool isBorrowing;
+  bool isBorrowing = false;
   VarDecl *makeIteratorVar = nullptr;
   ProtocolDecl *sequenceProto = nullptr;
   ProtocolConformanceRef seqConformanceRef;
@@ -3455,8 +3496,7 @@ public:
   DesugarForEachStmt(ForEachStmt *stmt)
       : stmt(stmt), dc(stmt->getDeclContext()),
         ctx(stmt->getDeclContext()->getASTContext()),
-        isAsync(stmt->getAwaitLoc().isValid()),
-        isBorrowing(ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {}
+        isAsync(stmt->getAwaitLoc().isValid()) {}
 
   BraceStmt *operator()() {
     auto *sequence = stmt->getSequence();
@@ -3472,7 +3512,8 @@ public:
         (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
       return nullptr;
 
-    isBorrowing = isBorrowing && !seqType->isExistentialType();
+    isBorrowing = shouldUseBorrowingSequence(ctx, seqType, isAsync,
+                                             sequence->getStartLoc());
 
     sequenceProto =
         isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
