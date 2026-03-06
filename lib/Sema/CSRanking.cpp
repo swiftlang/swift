@@ -18,7 +18,6 @@
 #include "Relation.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
@@ -735,6 +734,21 @@ bool CompareDeclSpecializationRequest::evaluate(
                      cast<ProtocolDecl>(outerDC1)->getDeclaredInterfaceType(),
                      locator);
     break;
+  }
+
+  // throws vs. typed throws. We are calling decl2 by passing parameters from
+  // decl1 as arguments, decl1 is affectively a context for decl2 call, let's
+  // see if that's well-formed in presence of typed throws.
+  if (isa<AbstractFunctionDecl>(decl1) && isa<AbstractFunctionDecl>(decl2)) {
+    auto thrownError1 =
+        openedType1->castTo<FunctionType>()->getEffectiveThrownErrorType();
+    auto thrownError2 =
+        openedType2->castTo<FunctionType>()->getEffectiveThrownErrorType();
+
+    if (thrownError1 && thrownError2) {
+      cs.addConstraint(ConstraintKind::Subtype, *thrownError2, *thrownError1,
+                       locator);
+    }
   }
 
   bool fewerEffectiveParameters = false;
