@@ -3247,6 +3247,8 @@ class PartialApplyInst final
                              ApplyInstBase<PartialApplyInst,
                                            SingleValueInstruction>>,
       public llvm::TrailingObjects<PartialApplyInst, Operand> {
+  USE_SHARED_UINT8;
+
   friend SILBuilder;
 
 public:
@@ -3287,6 +3289,13 @@ public:
 
   OnStackKind isOnStack() const {
     return getFunctionType()->isNoEscape() ? OnStack : NotOnStack;
+  }
+
+  StackAllocationIsNested_t isStackAllocationNested() const {
+    return StackAllocationIsNested_t(sharedUInt8().PartialApplyInst.isNested);
+  }
+  void setStackAllocationIsNested(StackAllocationIsNested_t isNested) {
+    sharedUInt8().PartialApplyInst.isNested = bool(isNested);
   }
   
   /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
