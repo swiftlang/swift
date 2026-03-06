@@ -123,11 +123,29 @@ private func isEmptyCOWSingleton(_ value: Value) -> Bool {
         v = (v as! UnaryInstruction).operand.value
       case let globalAddr as GlobalAddrInst:
         let name = globalAddr.global.name
-        return name == "_swiftEmptyArrayStorage" ||
-               name == "_swiftEmptyDictionarySingleton" ||
-               name == "_swiftEmptySetSingleton"
+        return name.isEmptyCollectionSingleton
       default:
         return false
+    }
+  }
+}
+
+extension StringRef {
+  /// Whether this is the name of one of the empty collection singletons.
+  ///
+  /// For historic reasons, we check both the C name and the mangled Swift
+  /// name (for an @extern(c) declaration).
+  var isEmptyCollectionSingleton: Bool {
+    switch self {
+    case "_swiftEmptyArrayStorage",
+         "_swiftEmptyDictionarySingleton",
+         "_swiftEmptySetSingleton",
+         "$ss23_swiftEmptyArrayStorageSo06_SwiftbcD0Vvp",
+         "$ss30_swiftEmptyDictionarySingletonSo06_SwiftbcD0Vvp",
+         "$ss23_swiftEmptySetSingletonSo06_SwiftbcD0Vvp":
+      return true
+    default:
+      return false
     }
   }
 }
