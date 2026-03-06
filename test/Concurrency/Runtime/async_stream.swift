@@ -455,6 +455,113 @@ class NotSendable {}
         expectTrue(continuation1.hashValue != continuation2.hashValue)
       }
 
+      tests.test("onTermination behavior when canceled") {
+        nonisolated(unsafe) var onTerminationCallCount = 0
+
+        let (stream, continuation) = AsyncStream<String>.makeStream()
+        continuation.onTermination = { reason in
+          onTerminationCallCount += 1
+
+          switch reason {
+          case .cancelled:
+            break
+          default:
+            expectUnreachable("unexpected termination reason")
+          }
+
+          // Yielding or re-entrantly terminating the stream should be ignored
+          switch continuation.yield(with: .success("terminated")) {
+          case .terminated:
+            break;
+          default:
+            expectUnreachable("unexpected yield result")
+          }
+
+          // Should not re-trigger the callback
+          continuation.finish()
+        }
+
+        continuation.yield("cancel")
+
+        let results = await Task<[String], Never> {
+          var results = [String]()
+          for await element in stream {
+            results.append(element)
+            switch element {
+            case "cancel":
+              withUnsafeCurrentTask { $0?.cancel() }
+            case "terminated":
+              expectUnreachable("should not have yielded '\(element)'")
+            default:
+              expectUnreachable("unexpected element")
+            }
+          }
+          return results
+        }.value
+
+        expectEqual(results, ["cancel"])
+        expectEqual(onTerminationCallCount, 1)
+      }
+
+      tests.test("onTermination behavior when canceled throwing") {
+        nonisolated(unsafe) var onTerminationCallCount = 0
+
+        let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
+        continuation.onTermination = { reason in
+          onTerminationCallCount += 1
+
+          switch reason {
+          case .cancelled:
+            break
+          default:
+            expectUnreachable("unexpected termination reason")
+          }
+
+          // Yielding or re-entrantly terminating the stream should be ignored
+          switch continuation.yield(with: .success("terminated")) {
+          case .terminated:
+            break;
+          default:
+            expectUnreachable("unexpected yield result")
+          }
+
+          switch continuation.yield(with: .failure(SomeError())) {
+          case .terminated:
+            break;
+          default:
+            expectUnreachable("unexpected yield result")
+          }
+
+          // Should not re-trigger the callback
+          continuation.finish()
+        }
+
+        continuation.yield("cancel")
+
+        do {
+          let results = try await Task<[String], Error> {
+            var results = [String]()
+            for try await element in stream {
+              results.append(element)
+              switch element {
+              case "cancel":
+                withUnsafeCurrentTask { $0?.cancel() }
+              case "terminated":
+                expectUnreachable("should not have yielded '\(element)'")
+              default:
+                expectUnreachable("unexpected element")
+              }
+            }
+            return results
+          }.value
+
+          expectEqual(results, ["cancel"])
+          expectEqual(onTerminationCallCount, 1)
+        } catch {
+          expectUnreachable("unexpected error")
+        }
+      }
+
       // MARK: - Multiple consumers
 
       tests.test("finish behavior with multiple consumers") {

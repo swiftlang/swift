@@ -203,7 +203,7 @@ public struct AsyncStream<Element> {
     /// finish, the stream enters a terminal state and doesn't produce any
     /// additional elements.
     public func finish() {
-      storage.finish()
+      storage.terminate(reason: .finished)
     }
 
     /// A callback to invoke when canceling iteration of an asynchronous
