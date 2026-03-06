@@ -78,7 +78,50 @@ struct LogIndentTracker {
   }
 };
 thread_local uint8_t LogIndentTracker::LogIndent = 0;
+
+static bool loggingEnabled() {
+  bool debug = false;
+  LLVM_DEBUG(debug = true);
+  return debug;
+}
+
+/// Emit diag as logging when -Xllvm -debug-only=safe-interop-wrappers is
+/// enabled. This is useful because it provides a chronological order of
+/// diagnostics interspersed with any other logs, and unlike diagnostics the
+/// logging is emitted eagerly, so they're not swallowed when a crash occurs.
+static void log(ClangImporter::Implementation &Impl, Diagnostic &diag) {
+  ASSERT(loggingEnabled() && "logging not wrapped in LLVM_DEBUG");
+
+  auto formatString =
+      Impl.SwiftContext.Diags.getFormatStringForDiagnostic(diag, false);
+  DiagnosticEngine::formatDiagnosticText(llvm::dbgs(), formatString,
+                                         diag.getArgs());
+  llvm::dbgs() << "\n";
+}
 #endif
+
+// Macros wrapping function calls to properly log __LINE__ info.
+#define DEFERRED_NOTE(emitter, ...)                                            \
+  do {                                                                         \
+    DLOG("");                                                                  \
+    emitter.addNote(__VA_ARGS__);                                              \
+  } while (0)
+#define DIAGNOSE(impl, logOnly, loc, ...)                                      \
+  do {                                                                         \
+    DLOG("");                                                                  \
+    emitDiag(impl, logOnly, loc, Diagnostic(__VA_ARGS__));                     \
+  } while (0)
+
+/// This is the canonical function for emitting diagnostics in SwiftifyDecl.cpp
+/// (with the exception of TentativeFailureRemark::addNote). Should be called via
+/// the DIAGNOSE macro.
+template <typename Loc>
+static void emitDiag(ClangImporter::Implementation &Impl, bool logOnly, Loc loc,
+                     Diagnostic &&diag) {
+  LLVM_DEBUG(log(Impl, diag));
+  if (!logOnly)
+    Impl.diagnose(loc, diag);
+}
 
 ValueDecl *getKnownSingleDecl(ASTContext &SwiftContext, StringRef DeclName) {
   SmallVector<ValueDecl *, 1> decls;
@@ -100,6 +143,7 @@ public:
   }
 
   void addNote(SourceLoc loc, Diagnostic &&note) {
+    LLVM_DEBUG(log(Impl, note));
     if (!aborted) {
       if (loc.isValid())
         note.setLoc(loc);
@@ -107,19 +151,26 @@ public:
         // All notes have the right to a SourceLoc. If you do not have a
         // SourceLoc of your own, one will be appointed for you.
         note.setLoc(failureRemark.getLoc());
+      note.setIsChildNote(true);
       failureRemark.addChildNote(std::move(note));
     }
   }
   void addNote(clang::SourceLocation loc, Diagnostic &&note) {
+    LLVM_DEBUG(log(Impl, note));
     if (!aborted) {
       note.setLoc(Impl.importSourceLoc(loc));
+      note.setIsChildNote(true);
       failureRemark.addChildNote(std::move(note));
     }
   }
-  template<typename L, typename ...ArgTypes>
-  void 
-  addNote(L Loc, Diag<ArgTypes...> ID,
-           typename detail::PassArgument<ArgTypes>::type... Args) {
+  /// addNote provides additional context for why a safe wrapper was not added.
+  /// Multiple notes can be added, with and without arguments.
+  /// This function (and its overloads) should not be called directly.
+  /// Instead it should be called using the DEFERRED_NOTE() macro, to enable
+  /// debug logging with correct __LINE__ information.
+  template <typename L, typename... ArgTypes>
+  void addNote(L Loc, Diag<ArgTypes...> ID,
+               typename detail::PassArgument<ArgTypes>::type... Args) {
     return addNote(Loc, Diagnostic(ID, std::move(Args)...));
   }
 
@@ -128,7 +179,7 @@ public:
 
   ~TentativeFailureRemark() {
     if (!aborted) {
-      Impl.diagnose(failureRemark.getLoc(), failureRemark);
+      DIAGNOSE(Impl, false, failureRemark.getLoc(), std::move(failureRemark));
     }
   }
 };
@@ -293,9 +344,8 @@ struct CountedByExpressionValidator
     case clang::BuiltinType::ULong:
     case clang::BuiltinType::LongLong:
     case clang::BuiltinType::ULongLong:
-      DLOG("Ignoring count parameter with non-portable integer literal\n");
-      if (diagnose)
-        Impl.diagnose(HeaderLoc{IL->getBeginLoc()}, diag::non_portable_int_literal);
+      DIAGNOSE(Impl, !diagnose, HeaderLoc{IL->getBeginLoc()},
+               diag::non_portable_int_literal);
       return false;
     default:
       return true;
@@ -335,8 +385,8 @@ struct CountedByExpressionValidator
 #undef SUPPORTED_BINOP
 
   bool VisitStmt(const clang::Stmt *S) {
-    if (diagnose)
-      Impl.diagnose(HeaderLoc{S->getBeginLoc()}, diag::unknown_count_expr, S->getStmtClassName());
+    DIAGNOSE(Impl, !diagnose, HeaderLoc{S->getBeginLoc()},
+             diag::unknown_count_expr, S->getStmtClassName());
     return false;
   }
 };
@@ -365,18 +415,14 @@ SwiftifiableSizedByPointerType(ClangImporter::Implementation &Impl,
     return true;
   PointerTypeKind PTK;
   if (!nonnullType->getAnyPointerElementType(PTK)) {
-    DLOG("Ignoring sized_by on non-pointer type\n");
-    if (diagnose)
-      Impl.diagnose(loc, diag::sized_by_on_non_pointer);
+    DIAGNOSE(Impl, !diagnose, loc, diag::sized_by_on_non_pointer);
     return false;
   }
   if (PTK == PTK_UnsafeRawPointer || PTK == PTK_UnsafeMutableRawPointer)
     return true;
   if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeMutablePointer) {
-    DLOG("Ignoring sized_by on Autoreleasing pointer\n");
     CONDITIONAL_ASSERT(PTK == PTK_AutoreleasingUnsafeMutablePointer);
-    if (diagnose)
-      Impl.diagnose(loc, diag::sized_by_on_autorelease);
+    DIAGNOSE(Impl, !diagnose, loc, diag::sized_by_on_autorelease);
     return false;
   }
   // We have a pointer to a type with a size. Verify that it is char-sized.
@@ -384,10 +430,9 @@ SwiftifiableSizedByPointerType(ClangImporter::Implementation &Impl,
   auto PointeeT = PtrT->getPointeeType();
   clang::CharUnits PointeeSize = ctx.getTypeSizeInChars(PointeeT);
   if (!PointeeSize.isOne()) {
-    if (diagnose) {
-      Impl.diagnose(loc, diag::sized_by_on_non_bytesized);
-      Impl.diagnose(loc, diag::type_has_size, PointeeT.getTypePtr(), (unsigned)PointeeSize.getQuantity());
-    }
+    DIAGNOSE(Impl, !diagnose, loc, diag::sized_by_on_non_bytesized);
+    DIAGNOSE(Impl, !diagnose, loc, diag::type_has_size, PointeeT.getTypePtr(),
+             (unsigned)PointeeSize.getQuantity());
     return false;
   }
   return true;
@@ -401,10 +446,10 @@ static bool SwiftifiableCAT(ClangImporter::Implementation &Impl,
   std::optional<CompoundDiagnosticTransaction> transaction;
   // FIXME: fetch loc from TypeLoc once CountAttributedType supports it
   HeaderLoc loc(CAT->getCountExpr()->getExprLoc());
-  if (diagnose) {
+  if (diagnose)
     transaction.emplace(Impl.SwiftContext.Diags);
-    Impl.diagnose(loc, diag::ignoring_counted_by, CAT->getAttributeName(true));
-  }
+  DIAGNOSE(Impl, !diagnose, loc, diag::ignoring_counted_by,
+           CAT->getAttributeName(true));
 
   if (!CountedByExpressionValidator(Impl, diagnose).Visit(CAT->getCountExpr()))
     return false;
@@ -413,8 +458,7 @@ static bool SwiftifiableCAT(ClangImporter::Implementation &Impl,
     if (!SwiftifiableSizedByPointerType(Impl, diagnose, ctx, swiftType, CAT))
       return false;
   } else if (ConcretePointeeType(swiftType).isNull()) {
-    if (diagnose)
-      Impl.diagnose(loc, diag::counted_by_incompatible_type);
+    DIAGNOSE(Impl, !diagnose, loc, diag::counted_by_incompatible_type);
     return false;
   }
 
@@ -438,8 +482,7 @@ struct UnaliasedInstantiationVisitor
   bool
   VisitTemplateSpecializationTypeLoc(clang::TemplateSpecializationTypeLoc TSTL) {
     hasUnaliasedInstantiationFailure = true;
-    emitter.addNote(TSTL.getBeginLoc(), diag::ignoring_template_in_signature);
-    DLOG("Signature contains raw template, skipping\n");
+    DEFERRED_NOTE(emitter, TSTL.getBeginLoc(), diag::ignoring_template_in_signature);
     return false;
   }
 };
@@ -517,17 +560,16 @@ struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
 
     if (!Owner || !Owner->isModuleVisible(M)) {
       hasForwardDeclaredConcreteType = true;
-      if (emitter.enabled()) {
+      if (emitter.enabled() || loggingEnabled()) {
         auto &SwiftContext = Nom->getASTContext();
-        emitter.addNote(F->getLocation(), diag::forward_declared_concrete_type);
+        DEFERRED_NOTE(emitter, F->getLocation(), diag::forward_declared_concrete_type);
         StringRef OwnerName =
             Owner ? SwiftContext.AllocateCopy(Owner->getFullModuleName())
                   : StringRef(CLANG_HEADER_MODULE_NAME);
-        emitter.addNote(F->getLocation(), diag::clang_module_owner, F, OwnerName);
+        DEFERRED_NOTE(emitter, F->getLocation(), diag::clang_module_owner, F, OwnerName);
         StringRef MName = SwiftContext.AllocateCopy(M->getFullModuleName());
-        emitter.addNote(TD->getLocation(), diag::clang_module_owner, TD, MName);
+        DEFERRED_NOTE(emitter, TD->getLocation(), diag::clang_module_owner, TD, MName);
       }
-      DLOG("Imported signature contains concrete type not available in bridging header, skipping\n");
       if (const clang::TagDecl *Def = TD->getDefinition())
         LLVM_DEBUG(DUMP(Def));
       return Action::Stop;
@@ -574,7 +616,8 @@ wouldBeIllegalInitializer(TentativeFailureRemark &emitter,
 
   if (ParentClass->getForeignClassKind() == ClassDecl::ForeignKind::Normal)
     return false;
-  emitter.addNote(ParentClass->getLoc(), diag::cf_ref_initializer, ParentClass->getDeclaredType());
+  DEFERRED_NOTE(emitter, ParentClass->getLoc(), diag::cf_ref_initializer,
+                ParentClass->getDeclaredType());
   return true;
 }
 
@@ -594,8 +637,8 @@ static bool shouldSkipModule(TentativeFailureRemark &emitter, ModuleDecl *M) {
   }
 
   if (M->getImplicitImportInfo().StdlibKind != ImplicitStdlibKind::Stdlib) {
-    DLOG("module " << M->getNameStr() << " does not import stdlib\n");
-    emitter.addNote(SourceLoc{}, diag::module_without_stdlib, M->getNameStr());
+    DEFERRED_NOTE(emitter, SourceLoc{}, diag::module_without_stdlib,
+                  M->getNameStr());
     return true;
   }
 
@@ -603,20 +646,19 @@ static bool shouldSkipModule(TentativeFailureRemark &emitter, ModuleDecl *M) {
 }
 } // namespace
 
+// Any path where this function returns 'false' should contain at least one call
+// to `DEFERRED_NOTE(emitter, ...)``, either directly in this function or in a callee.
 template <typename T>
 static bool swiftifyImpl(ClangImporter::Implementation &Self,
-                           SwiftifyInfoFunctionPrinter &printer,
-                           const AbstractFunctionDecl *MappedDecl,
-                           const T *ClangDecl,
-                           TentativeFailureRemark &emitter) {
-  DLOG_SCOPE("Checking '" << *ClangDecl << "' for bounds and lifetime info\n");
-
+                         SwiftifyInfoFunctionPrinter &printer,
+                         const AbstractFunctionDecl *MappedDecl,
+                         const T *ClangDecl, TentativeFailureRemark &emitter) {
+  LLVM_DEBUG(DUMP(ClangDecl));
   if (ClangDecl->hasAttrs()) {
     for (auto *attr : ClangDecl->getAttrs()) {
       if (auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
           swiftAttr && swiftAttr->getAttribute() == "no_safe_wrapper") {
-        DLOG("skipping function with no_safe_wrapper\n");
-        emitter.addNote(swiftAttr->getLoc(), diag::no_safe_wrapper_attr);
+        DEFERRED_NOTE(emitter, swiftAttr->getLoc(), diag::no_safe_wrapper_attr);
         return false;
       }
     }
@@ -636,13 +678,13 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
   // SILFunction's body anywhere triggering assertions.
   if (ClangDecl->getAccess() == clang::AS_protected ||
       ClangDecl->getAccess() == clang::AS_private) {
-    emitter.addNote(MappedDecl->getLoc(), diag::ignoring_non_public_func, MappedDecl);
+    DEFERRED_NOTE(emitter, MappedDecl->getLoc(), diag::ignoring_non_public_func,
+                  MappedDecl);
     return false;
   }
 
   if (ClangDecl->isImplicit()) {
-    DLOG("implicit functions lack lifetime and bounds info\n");
-    emitter.addNote(MappedDecl->getLoc(), diag::ignoring_implicit_func);
+    DEFERRED_NOTE(emitter, MappedDecl->getLoc(), diag::ignoring_implicit_func);
     return false;
   }
 
@@ -651,7 +693,6 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
   ForwardDeclaredConcreteTypeVisitor CheckForwardDecls(MappedDecl, ClangDecl, emitter);
 
   if (wouldBeIllegalInitializer(emitter, MappedDecl)) {
-    DLOG("illegal initializer\n");
     return false;
   }
 
@@ -708,14 +749,14 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                                            true);
           returnHasLifetimeInfo = true;
         } else {
-          if (emitter.enabled())
-            Self.diagnose(HeaderLoc{lifetimeboundAttr->getLoc()}, diag::ignoring_lifetimebound_escapable_return);
-          DLOG("lifetimebound ignored because return value is escapable");
+          DIAGNOSE(Self, !emitter.enabled(),
+                   HeaderLoc{lifetimeboundAttr->getLoc()},
+                   diag::ignoring_lifetimebound_escapable_return);
         }
       } else {
-        if (emitter.enabled())
-          Self.diagnose(HeaderLoc{lifetimeboundAttr->getLoc()}, diag::ignoring_lifetimebound_on_frt);
-        DLOG("lifetimebound ignored because it depends on class with refcount\n");
+        DIAGNOSE(Self, !emitter.enabled(),
+                 HeaderLoc{lifetimeboundAttr->getLoc()},
+                 diag::ignoring_lifetimebound_on_frt);
       }
     }
 
@@ -733,16 +774,15 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     }
     size_t clangNumParams = getNumParams(ClangDecl);
     if (clangNumParams != swiftNumParams) {
-      DLOG("mismatching parameter lists");
       assert(
           ClangDecl->isVariadic() ||
           MappedDecl->getForeignErrorConvention().has_value() ||
           MappedDecl->getForeignAsyncConvention().has_value() ||
           (swiftNumParams == 1 &&
            MappedDecl->getParameters()->get(0)->getInterfaceType()->isVoid()));
-      emitter.addNote(MappedDecl->getNameLoc(),
-                      diag::mismatching_parameter_count,
-                      (unsigned)swiftNumParams, (unsigned)clangNumParams);
+      DEFERRED_NOTE(emitter, MappedDecl->getNameLoc(),
+                    diag::mismatching_parameter_count, (unsigned)swiftNumParams,
+                    (unsigned)clangNumParams);
       return false;
     }
 
@@ -771,14 +811,15 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       bool paramHasBoundsInfo = false;
       auto *CAT = clangParamTy->getAs<clang::CountAttributedType>();
       if (CAT && mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX) {
-        Self.diagnose(HeaderLoc(clangParam->getLocation()),
+        DIAGNOSE(Self, !emitter.enabled(), HeaderLoc(clangParam->getLocation()),
                  diag::warn_clang_ignored_bounds_on_self, getAttributeName(CAT));
         auto swiftName = ClangDecl->template getAttr<clang::SwiftNameAttr>();
         ASSERT(swiftName &&
                "free function mapped to instance method without swift_name??");
-        Self.diagnose(HeaderLoc(swiftName->getLocation()),
+        DIAGNOSE(Self, !emitter.enabled(), HeaderLoc(swiftName->getLocation()),
                  diag::note_swift_name_instance_method);
-      } else if (SwiftifiableCAT(Self, emitter.enabled(), clangASTContext, CAT, swiftParamTy)) {
+      } else if (SwiftifiableCAT(Self, emitter.enabled(), clangASTContext, CAT,
+                                 swiftParamTy)) {
         printer.printCountedBy(CAT, mappedIndex);
         DLOG("Found bounds info '" << clangParamTy << "'\n");
         attachMacro = paramHasBoundsInfo = true;
@@ -809,20 +850,18 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
               paramHasLifetimeInfo = true;
               returnHasLifetimeInfo = true;
             } else {
-              if (emitter.enabled())
-                Self.diagnose(HeaderLoc{lifetimeboundAttr->getLoc()}, diag::ignoring_lifetimebound_escapable_return);
-              DLOG("lifetimebound ignored because return value is escapable\n");
+              DIAGNOSE(Self, !emitter.enabled(),
+                       HeaderLoc{lifetimeboundAttr->getLoc()},
+                       diag::ignoring_lifetimebound_escapable_return);
               clangParam->dump();
             }
           } else {
-            if (emitter.enabled())
-              Self.diagnose(HeaderLoc{lifetimeboundAttr->getLoc()}, diag::ignoring_lifetimebound_on_frt);
-            DLOG("lifetimebound ignored because it depends on class with "
-                 "refcount\n");
+            DIAGNOSE(Self, !emitter.enabled(),
+                     HeaderLoc{lifetimeboundAttr->getLoc()},
+                     diag::ignoring_lifetimebound_on_frt);
           }
         } else {
-          DLOG("lifetimebound not yet supported by stable feature-set - skipping\n");
-          emitter.addNote(lifetimeboundAttr->getLoc(), diag::ignoring_lifetimebound);
+          DEFERRED_NOTE(emitter, lifetimeboundAttr->getLoc(), diag::ignoring_lifetimebound);
           return false;
         }
       }
@@ -832,9 +871,8 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       }
     }
     if (!returnHasLifetimeInfo && returnValueIsNonEscapable) {
-      DLOG("~Escapable return value without lifetime info\n");
-      emitter.addNote(
-          ClangDecl->getFunctionTypeLoc().getReturnLoc().getBeginLoc(),
+      DEFERRED_NOTE(
+          emitter, ClangDecl->getFunctionTypeLoc().getReturnLoc().getBeginLoc(),
           diag::ignoring_nonescapable_return_without_lifetime, swiftReturnTy);
       return false;
     }
@@ -847,7 +885,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
   if (attachMacro)
     return true;
 
-  emitter.addNote(MappedDecl->getNameLoc(), diag::no_bounds_or_lifetime);
+  DEFERRED_NOTE(emitter, MappedDecl->getNameLoc(), diag::no_bounds_or_lifetime);
   return false;
 }
 
@@ -875,6 +913,7 @@ static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
 }
 
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
+  DLOG_SCOPE("Checking '" << MappedDecl->getName() << "' for bounds and lifetime info\n");
   // Load up a failure remark to be emitted unless aborted. This is passed
   // around to collect notes to ensure they get aborted along with the remark.
   // Note that this cannot be replaced by `CompoundDiagnosticTransaction`,
@@ -884,16 +923,24 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       *this, MappedDecl->getNameLoc(),
       SwiftContext.LangOpts.RemarkClangImporter);
 
-  if (SwiftContext.LangOpts.DisableSafeInteropWrappers)
-    return failureRemarkEmitter.addNote(MappedDecl->getNameLoc(), diag::safe_interop_disabled);
+  if (SwiftContext.LangOpts.DisableSafeInteropWrappers) {
+    DEFERRED_NOTE(failureRemarkEmitter, MappedDecl->getNameLoc(),
+                  diag::safe_interop_disabled);
+    return;
+  }
   auto ClangDecl = dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
-  if (!ClangDecl)
-    return failureRemarkEmitter.addNote(MappedDecl->getNameLoc(), diag::unsupported_function_kind, MappedDecl->getClangDecl()->getDeclKindName());
+  if (!ClangDecl) {
+    DEFERRED_NOTE(failureRemarkEmitter, MappedDecl->getNameLoc(),
+                  diag::unsupported_function_kind,
+                  MappedDecl->getClangDecl()->getDeclKindName());
+    return;
+  }
 
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
   if (!SwiftifyImportDecl) {
-    DLOG("_SwiftifyImport macro not found\n");
-    return failureRemarkEmitter.addNote(MappedDecl->getNameLoc(), diag::swiftify_macro_not_found);
+    DEFERRED_NOTE(failureRemarkEmitter, MappedDecl->getNameLoc(),
+                  diag::swiftify_macro_not_found);
+    return;
   }
 
   llvm::SmallString<128> MacroString;
@@ -905,7 +952,6 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     SwiftifyInfoFunctionPrinter printer(getClangASTContext(), SwiftContext, out,
                                         *SwiftifyImportDecl, typeMapping);
     if (!swiftifyImpl(*this, printer, MappedDecl, ClangDecl, failureRemarkEmitter)) {
-      DLOG("No relevant bounds or lifetime info found\n");
       return;
     }
     printer.printAvailability();
@@ -913,14 +959,17 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     out << ")";
   }
 
-  if (diagnoseMissingMacroPlugin(SwiftContext, "_SwiftifyImport", MappedDecl))
-    return failureRemarkEmitter.addNote(MappedDecl->getNameLoc(), diag::swiftify_macro_not_found);
+  if (diagnoseMissingMacroPlugin(SwiftContext, "_SwiftifyImport", MappedDecl)) {
+    DEFERRED_NOTE(failureRemarkEmitter, MappedDecl->getNameLoc(),
+                  diag::swiftify_macro_not_found);
+    return;
+  }
 
   DLOG("Attaching safe interop macro: " << MacroString << "\n");
-  if (SwiftContext.LangOpts.RemarkClangImporter) {
+  if (SwiftContext.LangOpts.RemarkClangImporter)
     failureRemarkEmitter.abort();
-    diagnose(MappedDecl->getNameLoc(), diag::yes_safe_wrapper);
-  }
+  DIAGNOSE(*this, !SwiftContext.LangOpts.RemarkClangImporter,
+           MappedDecl->getNameLoc(), diag::yes_safe_wrapper);
   if (clang::RawComment *raw =
           getClangASTContext().getRawCommentForDeclNoCache(ClangDecl)) {
     // swift::RawDocCommentAttr doesn't contain its text directly, but instead
