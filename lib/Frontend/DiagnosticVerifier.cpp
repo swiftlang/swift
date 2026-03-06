@@ -1572,7 +1572,7 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
   CapturedDiagnostics.emplace_back(message, loc.bufferID, Info.Kind,
                                    loc.sourceLoc, loc.line, loc.column, fixIts,
                                    llvm::sys::path::stem(
-                                      Info.CategoryDocumentationURL).str());
+                                      Info.getCategoryDocumentationURL()).str());
 }
 
 /// Once all diagnostics have been captured, perform verification.

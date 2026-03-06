@@ -376,10 +376,10 @@ unsigned SerializedDiagnosticConsumer::getEmitCategory(
 
 unsigned
 SerializedDiagnosticConsumer::emitDocumentationURL(const DiagnosticInfo &Info) {
-  if (Info.CategoryDocumentationURL.empty())
+  if (Info.getCategoryDocumentationURL().empty())
     return 0;
 
-  unsigned &recordID = State->Flags[Info.CategoryDocumentationURL];
+  unsigned &recordID = State->Flags[Info.getCategoryDocumentationURL()];
   if (recordID)
     return recordID;
 
@@ -388,9 +388,9 @@ SerializedDiagnosticConsumer::emitDocumentationURL(const DiagnosticInfo &Info) {
   RecordData Record;
   Record.push_back(RECORD_DIAG_FLAG);
   Record.push_back(recordID);
-  Record.push_back(Info.CategoryDocumentationURL.size());
+  Record.push_back(Info.getCategoryDocumentationURL().size());
   State->Stream.EmitRecordWithBlob(State->Abbrevs.get(RECORD_DIAG_FLAG), Record,
-                                   Info.CategoryDocumentationURL);
+                                   Info.getCategoryDocumentationURL());
   return recordID;
 }
 
@@ -641,9 +641,10 @@ emitDiagnosticMessage(SourceManager &SM,
   addLocToRecord(Loc, SM, filename, Record);
 
   // Emit the category.
-  if (!Info.Category.empty()) {
+  if (!Info.getCategoryName().empty()) {
     Record.push_back(
-        getEmitCategory(Info.Category, Info.CategoryDocumentationURL));
+        getEmitCategory(Info.getCategoryName(),
+                        Info.getCategoryDocumentationURL()));
   } else {
     Record.push_back(0);
   }
