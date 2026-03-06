@@ -997,7 +997,7 @@ protected:
 
   // Create a new explosion for potentially reabstracted parameters.
   Explosion args;
-  Address resultValueAddr;
+  StackAddress resultValueAddr;
 
   PartialApplicationForwarderEmission(
       IRGenModule &IGM, IRGenFunction &subIGF, llvm::Function *fwd,
@@ -1044,13 +1044,13 @@ public:
       useSRet = false;
     } else if (origNativeSchema.requiresIndirect()) {
       assert(!nativeResultSchema.requiresIndirect());
-      auto stackAddr = outResultTI.allocateStack(
+      resultValueAddr = outResultTI.allocateStack(
           subIGF,
           outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()),
           "return.temp");
-      resultValueAddr = stackAddr.getAddress();
       auto resultAddr = subIGF.Builder.CreateElementBitCast(
-          resultValueAddr, IGM.getStorageType(origConv.getSILResultType(
+          resultValueAddr.getAddress(),
+          IGM.getStorageType(origConv.getSILResultType(
                                IGM.getMaximalTypeExpansionContext())));
       args.add(resultAddr.getAddress());
       useSRet = false;
@@ -1258,7 +1258,7 @@ public:
         assert(!nativeResultSchema.requiresIndirect());
         Explosion loadedResult;
         cast<LoadableTypeInfo>(outResultTI)
-            .loadAsTake(subIGF, resultValueAddr, loadedResult);
+            .loadAsTake(subIGF, resultValueAddr.getAddress(), loadedResult);
         Explosion nativeResult = nativeResultSchema.mapIntoNative(
             IGM, subIGF, loadedResult,
             outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()),
@@ -2573,10 +2573,9 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     // Allocate a new object on the heap or stack.
     HeapNonFixedOffsets offsets(IGF, layout);
     if (outType->isNoEscape()) {
-      stackAddr = IGF.emitDynamicAlloca(
-          IGF.IGM.Int8Ty,
-          layout.isFixedLayout() ? layout.emitSize(IGF.IGM) : offsets.getSize(),
-          Alignment(16));
+      stackAddr = IGF.emitStackAllocation(
+        layout.isFixedLayout() ? layout.emitSize(IGF.IGM) : offsets.getSize(),
+        Alignment(MaximumAlignment));
       stackAddr = stackAddr->withAddress(IGF.Builder.CreateElementBitCast(
           stackAddr->getAddress(), IGF.IGM.OpaqueTy));
       data = stackAddr->getAddress().getAddress();

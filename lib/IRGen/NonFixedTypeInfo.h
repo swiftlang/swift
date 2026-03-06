@@ -73,11 +73,10 @@ public:
              getAsBitCastAddress(IGF, alloca.getAddressPointer()));
   }
 
-  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
-                       StackAllocationIsNested_t isNested =
-                           StackAllocationIsNested) const override {
+  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
+                       SILType T) const override {
     IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
-    IGF.emitDynamicStackDeallocation(stackAddress, isNested);
+    IGF.emitDynamicStackDeallocation(stackAddress);
   }
 
   void destroyStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,

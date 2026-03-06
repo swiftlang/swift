@@ -361,8 +361,7 @@ public:
 
   /// Deallocate a variable of this type.
   virtual void deallocateStack(
-      IRGenFunction &IGF, StackAddress addr, SILType T,
-      StackAllocationIsNested_t isNested = StackAllocationIsNested) const = 0;
+      IRGenFunction &IGF, StackAddress addr, SILType T) const = 0;
 
   /// Destroy the value of a variable of this type, then deallocate its
   /// memory.

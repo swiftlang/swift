@@ -85,9 +85,8 @@ public:
                              const llvm::Twine &name,
                              StackAllocationIsNested_t isNested =
                                  StackAllocationIsNested) const override;
-  void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T,
-                       StackAllocationIsNested_t isNested =
-                           StackAllocationIsNested) const override;
+  void deallocateStack(IRGenFunction &IGF, StackAddress addr,
+                       SILType T) const override;
   void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
                     bool isOutlined) const override;
 

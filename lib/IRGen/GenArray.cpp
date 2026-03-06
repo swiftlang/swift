@@ -647,17 +647,16 @@ public:
     return alloca.withAddress(getAddressForPointer(alloca.getAddressPointer()));
   }
 
-  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
-                       StackAllocationIsNested_t isNested) const override {
+  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
+                       SILType T) const override {
     IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
-    IGF.emitDynamicStackDeallocation(stackAddress, isNested);
+    IGF.emitDynamicStackDeallocation(stackAddress);
   }
 
   void destroyStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
                     bool isOutlined) const override {
     emitDestroyCall(IGF, T, stackAddress.getAddress());
-    // For now, just always do nested.
-    deallocateStack(IGF, stackAddress, T, StackAllocationIsNested);
+    deallocateStack(IGF, stackAddress, T);
   }
 
   TypeLayoutEntry *
