@@ -2299,7 +2299,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     llvm::Value *fnContext, Explosion &args, ArrayRef<SILParameterInfo> params,
     SubstitutionMap subs, CanSILFunctionType origType,
     CanSILFunctionType substType, CanSILFunctionType outType, Explosion &out,
-    bool isOutlined) {
+    bool isOutlined, StackAllocationIsNested_t isNested) {
   // If we have a single Swift-refcounted context value, we can adopt it
   // directly as our closure context without creating a box and thunk.
   enum HasSingleSwiftRefcountedContext { Maybe, Yes, No, Thunkable }
@@ -2575,7 +2575,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     if (outType->isNoEscape()) {
       stackAddr = IGF.emitStackAllocation(
         layout.isFixedLayout() ? layout.emitSize(IGF.IGM) : offsets.getSize(),
-        Alignment(MaximumAlignment));
+        Alignment(MaximumAlignment), isNested);
       stackAddr = stackAddr->withAddress(IGF.Builder.CreateElementBitCast(
           stackAddr->getAddress(), IGF.IGM.OpaqueTy));
       data = stackAddr->getAddress().getAddress();

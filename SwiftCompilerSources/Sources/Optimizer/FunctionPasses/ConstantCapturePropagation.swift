@@ -218,11 +218,13 @@ private func rewritePartialApply(_ partialApply: PartialApplyInst, withSpecializ
     newClosure = builder.createThinToThickFunction(thinFunction: fri, resultType: partialApply.type)
     context.erase(instructions: partialApply.uses.users(ofType: DeallocStackInst.self))
   } else {
-    newClosure = builder.createPartialApply(
+    let newPartialApply = builder.createPartialApply(
       function: fri,
       substitutionMap: specialized.genericSignature.isEmpty ? SubstitutionMap() : partialApply.substitutionMap,
       capturedArguments: arguments, calleeConvention: partialApply.calleeConvention,
       hasUnknownResultIsolation: partialApply.hasUnknownResultIsolation, isOnStack: partialApply.isOnStack)
+    newPartialApply.isNested = partialApply.isNested
+    newClosure = newPartialApply
   }
   partialApply.uses.replaceAll(with: newClosure, context)
 

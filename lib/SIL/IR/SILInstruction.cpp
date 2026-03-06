@@ -1359,9 +1359,10 @@ SILInstruction::getStackAllocation() const {
 }
 
 StackAllocationIsNested_t SILInstruction::isStackAllocationNested() const {
-  assert(isAllocatingStack());
   if (auto ASI = dyn_cast<AllocStackInst>(this)) {
     return ASI->isStackAllocationNested();
+  } else if (auto PAI = dyn_cast<PartialApplyInst>(this)) {
+    return PAI->isStackAllocationNested();
   } else {
     // TODO: implement for all remaining allocations
     return StackAllocationIsNested;
@@ -1370,9 +1371,10 @@ StackAllocationIsNested_t SILInstruction::isStackAllocationNested() const {
 
 void SILInstruction::setStackAllocationIsNested(
     StackAllocationIsNested_t nested) {
-  assert(isAllocatingStack());
   if (auto ASI = dyn_cast<AllocStackInst>(this)) {
     ASI->setStackAllocationIsNested(nested);
+  } else if (auto PAI = dyn_cast<PartialApplyInst>(this)) {
+    PAI->setStackAllocationIsNested(nested);
   } else if (!nested) {
     llvm_unreachable("unimplemented");
   }

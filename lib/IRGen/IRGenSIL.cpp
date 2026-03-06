@@ -4381,7 +4381,8 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   auto closureStackAddr = emitFunctionPartialApplication(
       *this, *CurSILFn, calleeFn, innerContext, llArgs, params,
       i->getSubstitutionMap(), origCalleeTy, i->getSubstCalleeType(),
-      i->getType().castTo<SILFunctionType>(), function, false);
+      i->getType().castTo<SILFunctionType>(), function, false,
+      i->isStackAllocationNested());
   setLoweredExplosion(v, function);
 
   if (closureStackAddr) {

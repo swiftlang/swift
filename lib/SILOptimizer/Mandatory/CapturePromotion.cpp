@@ -1560,6 +1560,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
       pai->getLoc(), fnVal, pai->getSubstitutionMap(), args,
       pai->getCalleeConvention(), pai->getResultIsolation(),
       pai->isOnStack());
+  newPAI->setStackAllocationIsNested(pai->isStackAllocationNested());
   pai->replaceAllUsesWith(newPAI);
   pai->eraseFromParent();
   if (fri->use_empty()) {

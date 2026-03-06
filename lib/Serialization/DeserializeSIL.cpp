@@ -2353,10 +2353,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                        ? PartialApplyInst::OnStackKind::OnStack
                        : PartialApplyInst::OnStackKind::NotOnStack;
 
+    unsigned flags = ApplyCallerIsolation;
+    auto isNested = StackAllocationIsNested_t(
+      IsNestedEncoding((flags >> 0) & 1) == IsNestedEncoding::IsNested);
+
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    ResultInst = Builder.createPartialApply(
+    auto PAI = Builder.createPartialApply(
         Loc, FnVal, Substitutions, Args,
         closureTy->getCalleeConvention(), closureTy->getIsolation(), onStack);
+    PAI->setStackAllocationIsNested(isNested);
+
+    ResultInst = PAI;
     break;
   }
   case SILInstructionKind::BuiltinInst: {

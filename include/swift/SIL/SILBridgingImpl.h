@@ -1454,6 +1454,16 @@ bool BridgedInstruction::PartialApplyInst_hasUnknownResultIsolation() const {
          swift::SILFunctionTypeIsolation::forUnknown();
 }
 
+bool BridgedInstruction::PartialApplyInst_isStackAllocationNested() const {
+  return getAs<swift::PartialApplyInst>()->isStackAllocationNested();
+}
+
+void BridgedInstruction::PartialApplyInst_setStackAllocationIsNested(bool isNested) const {
+  return getAs<swift::PartialApplyInst>()->setStackAllocationIsNested(
+           swift::StackAllocationIsNested_t(isNested));
+}
+
+
 bool BridgedInstruction::AllocStackInst_hasDynamicLifetime() const {
   return getAs<swift::AllocStackInst>()->hasDynamicLifetime();
 }

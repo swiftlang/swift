@@ -6892,6 +6892,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   SILOptionalAttrValue AttrValue;
   SourceLoc AttrValueLoc;
   std::optional<ApplyIsolationCrossing> isolationCrossing;
+  std::optional<StackAllocationIsNested_t> isNested;
 
   while (parseSILOptional(AttrName, AttrLoc, AttrValue, AttrValueLoc, *this)) {
     if (AttrName == "nothrow") {
@@ -6921,6 +6922,12 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     if (AttrName == "on_stack") {
       assert(!bool(AttrValue));
       IsNoEscape = true;
+      continue;
+    }
+
+    if (AttrName == "non_nested") {
+      assert(!bool(AttrValue));
+      isNested = StackAllocationIsNotNested;
       continue;
     }
 
@@ -7103,11 +7110,17 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    ResultVal = B.createPartialApply(
+    auto PA = B.createPartialApply(
         InstLoc, FnVal, subs, Args, PartialApplyConvention,
         PartialApplyIsolation,
         IsNoEscape ? PartialApplyInst::OnStackKind::OnStack
                    : PartialApplyInst::OnStackKind::NotOnStack);
+
+    if (isNested) {
+      PA->setStackAllocationIsNested(*isNested);
+    }
+
+    ResultVal = PA;
     break;
   }
   case SILInstructionKind::TryApplyInst: {

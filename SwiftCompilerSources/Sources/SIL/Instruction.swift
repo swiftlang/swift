@@ -1353,6 +1353,10 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var hasUnknownResultIsolation: Bool { bridged.PartialApplyInst_hasUnknownResultIsolation() }
   public var unappliedArgumentCount: Int { bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() }
   public var calleeConvention: ArgumentConvention { type.bridged.getCalleeConvention().convention }
+  public var isNested: Bool {
+    get { bridged.PartialApplyInst_isStackAllocationNested() }
+    set { bridged.PartialApplyInst_setStackAllocationIsNested(newValue) }
+  }
 }
 
 final public class ApplyInst : SingleValueInstruction, FullApplySite {

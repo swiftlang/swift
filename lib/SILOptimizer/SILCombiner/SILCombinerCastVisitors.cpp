@@ -930,6 +930,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
             pa->getLoc(), cfi->getOperand(), pa->getSubstitutionMap(), args,
             pa->getFunctionType()->getCalleeConvention(),
             pa->getResultIsolation());
+        newPA->setStackAllocationIsNested(pa->isStackAllocationNested());
         auto newConvert = Builder.createConvertFunction(pa->getLoc(), newPA,
                                                         partialApplyTy, false);
         replaceInstUsesWith(*pa, newConvert);
@@ -952,6 +953,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
           pa->getLoc(), newValue, pa->getSubstitutionMap(), args,
           pa->getFunctionType()->getCalleeConvention(),
           pa->getResultIsolation());
+      newPA->setStackAllocationIsNested(pa->isStackAllocationNested());
       if (!use->isLifetimeEnding()) {
         localBuilder.emitDestroyValueOperation(pa->getLoc(), newValue);
       }

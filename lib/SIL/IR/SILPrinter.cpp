@@ -1766,8 +1766,11 @@ public:
       *this << "[isolated_any] ";
       break;
     }
-    if (CI->isOnStack())
+    if (CI->isOnStack()) {
       *this << "[on_stack] ";
+      if (!CI->isStackAllocationNested())
+        *this << "[non_nested] ";
+    }
     visitApplyInstBase(CI);
   }
 

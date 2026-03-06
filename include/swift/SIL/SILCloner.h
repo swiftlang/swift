@@ -1213,14 +1213,16 @@ void
 SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
   auto Args = getOpValueArray<8>(Inst->getArguments());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createPartialApply(
+  auto NewInst = getBuilder().createPartialApply(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getCallee()),
                 getOpSubstitutionMap(Inst->getSubstitutionMap()), Args,
                 Inst->getCalleeConvention(),
                 Inst->getResultIsolation(),
                 Inst->isOnStack(),
-                GenericSpecializationInformation::create(Inst, getBuilder())));
+                GenericSpecializationInformation::create(Inst, getBuilder()));
+  NewInst->setStackAllocationIsNested(Inst->isStackAllocationNested());
+
+  recordClonedInstruction(Inst, NewInst);
 }
 
 template<typename ImplClass>
