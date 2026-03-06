@@ -51,6 +51,15 @@ struct Plus100Eagle: Bird {
   }
 }
 
+// A non-bird seed eater. Relies on the default implementation for containsChirps.
+struct Human: SeedEater {
+  public func eatSeed(_ food: Int) -> Int { 0 }
+  public typealias Kind = UInt
+  public var seedKinds: UInt {
+    get { 0 }
+  }
+}
+
 extension UInt: @retroactive AsInt {
   public func asInt() -> Int { return Int(self) }
 }
@@ -76,6 +85,11 @@ ProtocolAddReparentedTest.test("Some Types") {
     let 💯 = Plus100Eagle()
     expectEqual(SomeType.feed(💯, clientVersion), base + 100)
     expectEqual(SomeType.count(💯, clientVersion), base + 100)
+  }
+
+  do {
+    expectEqual(willChirp(Human()), false)
+    expectEqual(willChirp(Plus100Eagle()), true)
   }
   #endif
 }
