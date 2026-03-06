@@ -198,7 +198,7 @@ expected_expansion_diag_re = re.compile(
 expected_expansion_close_re = re.compile(r"//(\s*)\}\}")
 
 
-def parse_diag(line, filename, prefix):
+def parse_diag(line, filename, prefix, all_prefixes=False):
     s = line.content
     ms = expected_diag_re.findall(s)
     matched_re = expected_diag_re
@@ -230,7 +230,7 @@ def parse_diag(line, filename, prefix):
         count_s,
         diag_s,
     ] = ms[0]
-    if check_prefix != prefix and check_prefix != "":
+    if check_prefix != prefix and check_prefix != "" and not all_prefixes:
         return None
     if not target_line_s:
         target_line_n = 0
@@ -395,16 +395,17 @@ def add_diag(
     return new_diag
 
 
-def remove_dead_diags(lines):
+def remove_dead_diags(lines, prefix):
     for line in lines.copy():
         if not line.diag:
             continue
         if line.diag.category == "expansion":
-            remove_dead_diags(line.diag.nested_lines)
-            if line.diag.nested_lines:
-                line.diag.count = 1
-            else:
-                line.diag.count = 0
+            if not line.diag.prefix or line.diag.prefix == prefix:
+                remove_dead_diags(line.diag.nested_lines, prefix)
+                if line.diag.nested_lines:
+                    line.diag.count = 1
+                else:
+                    line.diag.count = 0
         if line.diag.count != 0:
             continue
         if line.render() == "":
@@ -466,12 +467,13 @@ def error_refers_to_diag(diag_error, diag, target_line_n):
     )
 
 
-def find_other_targeting(lines, orig_lines, is_nested, diag_error):
+def find_other_targeting(lines, orig_lines, is_nested, diag_error, prefix):
     if is_nested:
         other_diags = [
             line.diag
             for line in lines
             if line.diag
+            and (not line.diag.prefix or line.diag.prefix == prefix)
             and error_refers_to_diag(diag_error, line.diag, diag_error.line)
         ]
     else:
@@ -479,7 +481,8 @@ def find_other_targeting(lines, orig_lines, is_nested, diag_error):
         other_diags = [
             d
             for d in target.targeting_diags
-            if error_refers_to_diag(diag_error, d, target.line_n)
+            if (not d.prefix or d.prefix == prefix)
+            and error_refers_to_diag(diag_error, d, target.line_n)
         ]
     return other_diags
 
@@ -510,7 +513,7 @@ def update_lines(
         ):
             continue
         other_diags = find_other_targeting(
-            lines, orig_lines, bool(nested_context), diag_error
+            lines, orig_lines, bool(nested_context), diag_error, prefix
         )
         diag = other_diags[0] if other_diags else None
         if diag:
@@ -562,7 +565,7 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
     expansion_context = []
     for line in lines:
         dprint(f"parsing line {line.render()}")
-        diag = parse_diag(line, filename, prefix)
+        diag = parse_diag(line, filename, prefix, all_prefixes=True)
         if diag:
             dprint(f"  parsed diag {diag.render()}")
             line.diag = diag
@@ -579,7 +582,7 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
 
     fold_expansions(lines)
     update_lines(diag_errors, lines, orig_lines, prefix, filename, None)
-    remove_dead_diags(lines)
+    remove_dead_diags(lines, prefix)
     expand_expansions(lines)
     with open(filename, "w") as f:
         for line in lines:
