@@ -99,6 +99,47 @@ lookupCxxTypeMember(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
   return td;
 }
 
+static std::pair<clang::CXXMethodDecl *, clang::CXXMethodDecl *>
+lookupCxxZeroArityMethod(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
+                         StringRef name) {
+  auto R = clang::LookupResult(Sema, &Sema.PP.getIdentifierTable().get(name),
+                               clang::SourceLocation(),
+                               clang::Sema::LookupMemberName);
+  R.suppressDiagnostics();
+  Sema.LookupQualifiedName(R, const_cast<clang::CXXRecordDecl *>(Rec));
+
+  if (!R.isSingleResult() && !R.isOverloadedResult())
+    return {nullptr, nullptr};
+
+  clang::CXXMethodDecl *constMethod = nullptr, *mutMethod = nullptr;
+  for (auto it = R.begin(); it != R.end(); ++it) {
+    if (it.getAccess() != clang::AS_public)
+      continue; // not public
+
+    auto *cmd = dyn_cast<clang::CXXMethodDecl>(it.getDecl());
+    if (!cmd)
+      continue; // not a method
+
+    if (cmd->getMinRequiredArguments() != 0)
+      continue; // not 0-arity
+
+    if (cmd->isVolatile() ||
+        cmd->getRefQualifier() == clang::RefQualifierKind::RQ_RValue)
+      continue; // volatile and r-value ref overload (not supported)
+
+    if (cmd->isConst()) {
+      if (constMethod)
+        return {nullptr, nullptr};
+      constMethod = cmd;
+    } else {
+      if (mutMethod)
+        return {nullptr, nullptr};
+      mutMethod = cmd;
+    }
+  }
+  return {constMethod, mutMethod};
+}
+
 /// Alternative to `NominalTypeDecl::lookupDirect`.
 /// This function does not attempt to load extensions of the nominal decl.
 static TinyPtrVector<ValueDecl *>
@@ -950,6 +991,7 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
                              NominalTypeDecl *decl,
                              const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("trying to conform to CxxSequence", decl);
+  clang::Sema &clangSema = impl.getClangSema();
   ASTContext &ctx = decl->getASTContext();
 
   ProtocolDecl *cxxIteratorProto =
@@ -961,27 +1003,51 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   if (!cxxIteratorProto || !cxxSequenceProto)
     return;
 
-  // Check if present: `func __beginUnsafe() -> RawIterator`
-  auto beginId = ctx.getIdentifier("__beginUnsafe");
-  auto begin = lookupDirectSingleWithoutExtensions<FuncDecl>(decl, beginId);
-  if (!begin)
+  // Look up begin() and end() methods. We only require the const overloads,
+  // but will make use of the non-const overloads later, if available, for
+  // a possible mutable collection conformance.
+  auto [beginConst, beginMut] =
+      lookupCxxZeroArityMethod(clangSema, clangDecl, "begin");
+  auto [endConst, endMut] =
+      lookupCxxZeroArityMethod(clangSema, clangDecl, "end");
+  if (!beginConst || !endConst)
     return;
+
+  auto iterTy = beginConst->getReturnType().getCanonicalType();
+  if (iterTy != endConst->getReturnType().getCanonicalType())
+    // begin() and end() need to have the same return type
+    return;
+
+  if (!iterTy->isPointerOrReferenceType()) {
+    // Check if begin() returns an iterator.
+    auto *iterDecl = iterTy->getAsCXXRecordDecl();
+    if (!iterDecl || !iterDecl->hasDefinition())
+      return;
+    auto iterInfo = evaluateOrDefault(
+        ctx.evaluator, CxxIteratorInfoRequest({iterDecl, clangSema}), {});
+    if (!iterInfo.has_value())
+      return;
+  }
+
+  // import begin() and end()
+  auto *begin = dyn_cast_or_null<FuncDecl>(
+      impl.importDecl(beginConst, impl.CurrentVersion));
+  auto *end = dyn_cast_or_null<FuncDecl>(
+      impl.importDecl(endConst, impl.CurrentVersion));
+  if (!begin || !end)
+    return;
+
+  ASSERT(begin->getBaseName() == "__beginUnsafe" &&
+         "begin() should always be __Unsafe");
+  ASSERT(end->getBaseName() == "__endUnsafe" &&
+         "end() should always be __Unsafe");
+  ASSERT(!begin->isMutating() && !end->isMutating() &&
+         "begin() and end() should not be mutating");
+
   auto rawIteratorTy = begin->getResultInterfaceType();
-
-  // Check if present: `func __endUnsafe() -> RawIterator`
-  auto endId = ctx.getIdentifier("__endUnsafe");
-  auto end = lookupDirectSingleWithoutExtensions<FuncDecl>(decl, endId);
-  if (!end)
-    return;
-
-  // Check if `begin()` and `end()` are non-mutating.
-  if (begin->isMutating() || end->isMutating())
-    return;
-
-  // Check if `__beginUnsafe` and `__endUnsafe` have the same return type.
-  auto endTy = end->getResultInterfaceType();
-  if (!endTy || endTy->getCanonicalType() != rawIteratorTy->getCanonicalType())
-    return;
+  ASSERT(rawIteratorTy->getCanonicalType() ==
+             end->getResultInterfaceType()->getCanonicalType() &&
+         "begin() and end() should have the same return type");
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
   auto rawIteratorConformanceRef =
