@@ -72,8 +72,6 @@ const int signalsToHandle[] = {
   SIGTRAP
 };
 
-static struct rlimit rlp = {0};
-
 } // namespace
 
 namespace swift {
@@ -83,8 +81,6 @@ namespace backtrace {
 SWIFT_RUNTIME_STDLIB_INTERNAL int
 _swift_installCrashHandler()
 {
-  getrlimit(RLIMIT_NOFILE, &rlp);
-
   stack_t ss;
 
   // See if an alternate signal stack already exists
@@ -205,7 +201,7 @@ resume_other_threads()
 void
 closeFds() {
   for (int i = MIN_FD_TO_CLOSE; i < MAX_FD_TO_CLOSE; i++) {
-    close(i)
+    close(i);
   }
 }
 
