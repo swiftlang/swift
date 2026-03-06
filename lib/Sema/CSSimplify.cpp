@@ -12280,28 +12280,32 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       }
 
       auto *backingVar = paramDecl->getPropertyWrapperBackingProperty();
-      setType(backingVar, backingType);
-
       auto *localWrappedVar = paramDecl->getPropertyWrapperWrappedValueVar();
-      setType(localWrappedVar, wrappedValueType);
 
-      if (auto *projection = paramDecl->getPropertyWrapperProjectionVar()) {
-        setType(projection, computeProjectedValueType(paramDecl, backingType));
-      }
+      // Invalid wrapper declarations can skip synthesizing local wrapper vars.
+      // Wrapper diagnostics are emitted by declaration checking; avoid
+      // crashing during closure constraint generation.
+      if (backingVar && localWrappedVar) {
+        setType(backingVar, backingType);
+        setType(localWrappedVar, wrappedValueType);
 
-      if (!paramDecl->getName().hasDollarPrefix()) {
-        if (generateWrappedPropertyTypeConstraints(paramDecl, backingType,
-                                                   param.getParameterType()))
+        if (auto *projection = paramDecl->getPropertyWrapperProjectionVar()) {
+          setType(projection, computeProjectedValueType(paramDecl, backingType));
+        }
+
+        if (!paramDecl->getName().hasDollarPrefix()) {
+          if (generateWrappedPropertyTypeConstraints(paramDecl, backingType,
+                                                     param.getParameterType()))
+            return false;
+        }
+
+        auto result = applyPropertyWrapperToParameter(
+            backingType, param.getParameterType(), paramDecl,
+            paramDecl->getName(), ConstraintKind::Equal,
+            getConstraintLocator(closure), getConstraintLocator(closure));
+        if (result.isFailure())
           return false;
       }
-
-      auto result = applyPropertyWrapperToParameter(backingType, param.getParameterType(),
-                                                    paramDecl, paramDecl->getName(),
-                                                    ConstraintKind::Equal,
-                                                    getConstraintLocator(closure),
-                                                    getConstraintLocator(closure));
-      if (result.isFailure())
-        return false;
     }
 
     Type internalType;
