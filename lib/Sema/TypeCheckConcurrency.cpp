@@ -6831,9 +6831,61 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
     if (enclosingIsolation != requiredIsolation) {
       bool preconcurrency =
           !isa<ParamDecl>(var) || requiredIsolation.preconcurrency();
-      var->diagnose(diag::isolated_default_argument_context, requiredIsolation,
-                    enclosingIsolation)
+      // If both are actor isolation, it's unhelpful to print 'actor-isolated'
+      // twice. Check if that's the case and we have the actor instances needed
+      // to say something more specific.
+      if (!(requiredIsolation.getKind() == ActorIsolation::ActorInstance &&
+            enclosingIsolation.getKind() == ActorIsolation::ActorInstance &&
+            requiredIsolation.getActor() && enclosingIsolation.getActor())) {
+        var->diagnose(diag::isolated_default_argument_context,
+                      requiredIsolation, enclosingIsolation)
+            .warnUntilLanguageModeIf(preconcurrency, LanguageMode::v6);
+        return ActorIsolation::forUnspecified();
+      }
+
+      // Tailor a precise diagnostic to surface the mismatch in the actors, or
+      // that each instance of an actor type is isolated, and that these are
+      // potentially different instances. This won't occur for global actors,
+      // since they share an isolation domain.
+
+      auto requiredActor = requiredIsolation.getActor();
+      auto enclosingActor = enclosingIsolation.getActor();
+
+      if (requiredActor != enclosingActor) {
+        var->diagnose(diag::different_actor_isolated_default_argument_context,
+                      var, enclosingActor->getName())
+            .warnUntilLanguageModeIf(preconcurrency, LanguageMode::v6);
+        var->diagnose(diag::note_expected_same_actor_default_argument, var,
+                      requiredActor->getName(), enclosingActor->getName());
+        return ActorIsolation::forUnspecified();
+      }
+
+      var->diagnose(diag::same_actor_isolated_default_argument_context,
+                    requiredActor->getName())
           .warnUntilLanguageModeIf(preconcurrency, LanguageMode::v6);
+
+      auto enclosingActorInstance = enclosingIsolation.getActorInstance();
+      if (!enclosingActorInstance)
+        return ActorIsolation::forUnspecified();
+
+      // Note the name of the actor instance the default should be isolated
+      // to. Usually this is 'self'.
+      ASTContext &ctx = var->getASTContext();
+      ctx.Diags
+          .diagnose(initExpr->getLoc(),
+                    diag::same_actor_isolated_default_argument_context_note,
+                    enclosingActorInstance->getName())
+          .highlight(initExpr->getSourceRange());
+
+      if (enclosingActorInstance->isActorSelf())
+        return ActorIsolation::forUnspecified();
+
+      // If it's not actor self, like an isolated param, note where it is
+      // specified.
+      ctx.Diags.diagnose(
+          enclosingActorInstance->getLoc(),
+          diag::same_actor_isolated_default_argument_context_specified_here,
+          enclosingActorInstance->getName());
       return ActorIsolation::forUnspecified();
     }
   }
