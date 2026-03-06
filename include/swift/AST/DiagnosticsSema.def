@@ -6099,9 +6099,12 @@ ERROR(concurrent_value_outside_source_file,none,
 ERROR(concurrent_value_nonfinal_class,none,
       "non-final class %0 cannot conform to the 'Sendable' protocol", (DeclName))
 ERROR(concurrent_value_inherit,none,
-      "'Sendable' class %1 cannot inherit from another class"
+      "'Sendable' class %1 cannot inherit from a non-Sendable class"
       "%select{| other than 'NSObject'}0",
       (bool, DeclName))
+NOTE(does_not_conform_sendable,none,
+      "%kind0 does not conform to the 'Sendable' protocol",
+      (const ValueDecl *))
 ERROR(non_sendable_type,none,
       "type %0 does not conform to the 'Sendable' protocol", (Type))
 GROUPED_ERROR(non_sendable_metatype_type,SendableMetatypes,none,
