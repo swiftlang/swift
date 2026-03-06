@@ -341,9 +341,11 @@ static bool validateEnclosingSelfSubscript(SubscriptDecl *subscript) {
     if (paramTy->hasError())
       return true;
 
-    if (!paramTy->isWritableKeyPath() && !paramTy->isReferenceWritableKeyPath()) {
-      param->diagnose(diag::property_wrapper_enclosing_self_subscript_keypath_type,
-                      param->getArgumentName(), paramTy);
+    if (!(paramTy->isKeyPath() || paramTy->isWritableKeyPath() ||
+          paramTy->isReferenceWritableKeyPath())) {
+      param->diagnose(
+          diag::property_wrapper_enclosing_self_subscript_keypath_type,
+          param->getArgumentName(), paramTy);
       return false;
     }
     return true;

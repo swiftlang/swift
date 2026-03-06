@@ -14,12 +14,13 @@ public class Store {
     set {}
   }
   public static subscript(_enclosingInstance object: Any,
-                          wrapped wrappedKeyPath: Any, // expected-error {{parameter 'wrapped' of enclosing-self subscript should have either 'WritableKeyPath<...>' or 'ReferenceWritableKeyPath<...>' type (got 'Any')}}
-                          storage storageKeyPath: Any) // expected-error {{parameter 'storage' of enclosing-self subscript should have either 'WritableKeyPath<...>' or 'ReferenceWritableKeyPath<...>' type (got 'Any')}}
+                          wrapped wrappedKeyPath: Any, // expected-error {{parameter 'wrapped' of enclosing-self subscript should have read-only or writable key path type (got 'Any')}}
+                          storage storageKeyPath: Any) // expected-error {{parameter 'storage' of enclosing-self subscript should have read-only or writable key path type (got 'Any')}}
       -> Value {
     get { fatalError() }
     set {}
   }
+
   public struct Publisher {}
   public var projectedValue: Publisher {
     mutating get { fatalError() }
