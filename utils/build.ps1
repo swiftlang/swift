@@ -4232,6 +4232,11 @@ function Check-DockerRequirements() {
 }
 
 function Run-SmokeTests([Hashtable] $Platform) {
+  # XXX: temp for testing! PR runs don't seem to pull down swift-docker
+  if (-not (Test-Path "$SourceCache\swift-docker")) {
+    git clone https://github.com/apple/swift-docker "$SourceCache\swift-docker"
+  }
+
   Check-DockerRequirements
 
   $InstallerPath = "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe"
