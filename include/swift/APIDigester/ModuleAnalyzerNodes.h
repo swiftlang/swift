@@ -358,7 +358,6 @@ class SDKNodeDecl: public SDKNode {
   bool IsOverriding;
   bool IsOpen;
   bool IsInternal;
-  bool IsABIPlaceholder;
   bool IsFromExtension;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
@@ -398,7 +397,6 @@ public:
   bool isOptional() const { return hasDeclAttribute(DeclAttrKind::Optional); }
   bool isOpen() const { return IsOpen; }
   bool isInternal() const { return IsInternal; }
-  bool isABIPlaceholder() const { return IsABIPlaceholder; }
   bool isFromExtension() const { return IsFromExtension; }
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getSugaredGenericSignature() const { return SugaredGenericSig; }
@@ -610,13 +608,12 @@ class SDKNodeConformance: public SDKNode {
   StringRef MangledName;
   SDKNodeDeclType *TypeDecl;
   friend class SDKNodeDeclType;
-  bool IsABIPlaceholder;
+
 public:
   SDKNodeConformance(SDKNodeInitInfo Info);
   StringRef getUsr() const { return Usr; }
   ArrayRef<SDKNode*> getTypeWitnesses() const { return Children; }
   SDKNodeDeclType *getNominalTypeDecl() const { return TypeDecl; }
-  bool isABIPlaceholder() const { return IsABIPlaceholder; }
   void jsonize(json::Output &out) override;
   static bool classof(const SDKNode *N);
 };

@@ -122,7 +122,6 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
       IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
       IsProtocolReq(Info.IsProtocolReq), IsOverriding(Info.IsOverriding),
       IsOpen(Info.IsOpen), IsInternal(Info.IsInternal),
-      IsABIPlaceholder(Info.IsABIPlaceholder),
       IsFromExtension(Info.IsFromExtension),
       ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
       GenericSig(Info.GenericSig), SugaredGenericSig(Info.SugaredGenericSig),
@@ -156,10 +155,9 @@ SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
   HasMissingDesignatedInitializers(Info.HasMissingDesignatedInitializers),
   InheritsConvenienceInitializers(Info.InheritsConvenienceInitializers) {}
 
-SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
-  SDKNode(Info, SDKNodeKind::Conformance),
-  Usr(Info.Usr), MangledName(Info.MangledName),
-  IsABIPlaceholder(Info.IsABIPlaceholder) {}
+SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info)
+    : SDKNode(Info, SDKNodeKind::Conformance), Usr(Info.Usr),
+      MangledName(Info.MangledName) {}
 
 SDKNodeTypeWitness::SDKNodeTypeWitness(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::TypeWitness) {}
@@ -1336,28 +1334,6 @@ std::optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
   }
 }
 
-// check for if it has @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
-static bool isABIPlaceHolder(Decl *D) {
-  llvm::SmallSet<PlatformKind, 4> Platforms;
-  for (auto attr : D->getSemanticAvailableAttrs()) {
-    if (attr.isPlatformSpecific() && attr.getIntroduced().has_value() &&
-        attr.getIntroduced()->getMajor() == 9999) {
-      Platforms.insert(attr.getPlatform());
-    }
-  }
-
-  // FIXME: [availability] This probably isn't correct now that visionOS exists
-  return Platforms.size() == 4;
-}
-
-static bool isABIPlaceholderRecursive(Decl *D) {
-  for (auto *CD = D; CD; CD = CD->getDeclContext()->getAsDecl()) {
-    if (isABIPlaceHolder(CD))
-      return true;
-  }
-  return false;
-}
-
 StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
   if (!D)
     return StringRef();
@@ -1474,7 +1450,6 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D)
       IntroAnyAppleOS(Ctx.getPlatformIntroVersion(D, PlatformKind::anyAppleOS)),
       ObjCName(Ctx.getObjcName(D)), InitKind(Ctx.getInitKind(D)),
       IsImplicit(D->isImplicit()), IsDeprecated(D->isDeprecated()),
-      IsABIPlaceholder(isABIPlaceholderRecursive(D)),
       IsFromExtension(isDeclaredInExtension(D)),
       DeclAttrs(collectDeclAttributes(D)) {
   // Keep track of SPI group names
@@ -1505,12 +1480,9 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformanceRef Conform
     auto *Concrete = Conform.getConcrete();
 
     GenericSig = printGenericSignature(Ctx, Concrete, Ctx.checkingABI());
-    SugaredGenericSig = Ctx.checkingABI() ?
-      printGenericSignature(Ctx, Concrete, false): StringRef();
-    // Whether this conformance is ABI placeholder depends on the decl context
-    // of this conformance.
-    IsABIPlaceholder = isABIPlaceholderRecursive(Concrete->getDeclContext()->
-                                                 getAsDecl());
+    SugaredGenericSig = Ctx.checkingABI()
+                            ? printGenericSignature(Ctx, Concrete, false)
+                            : StringRef();
   }
 }
 
@@ -2132,7 +2104,6 @@ void SDKNodeConformance::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
   output(out, KeyKind::KK_usr, Usr);
   output(out, KeyKind::KK_mangledName, MangledName);
-  output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
 }
 
 void SDKNodeDecl::jsonize(json::Output &out) {
@@ -2151,7 +2122,6 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_implicit, IsImplicit);
   output(out, KeyKind::KK_isOpen, IsOpen);
   output(out, KeyKind::KK_isInternal, IsInternal);
-  output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
   output(out, KeyKind::KK_intro_Macosx, introVersions.macos);
   output(out, KeyKind::KK_intro_iOS, introVersions.ios);
   output(out, KeyKind::KK_intro_tvOS, introVersions.tvos);
