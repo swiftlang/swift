@@ -9911,7 +9911,7 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto *seqProto = contextualTy->castTo<ProtocolType>()->getDecl();
   auto isAsync = seqProto->isSpecificProtocol(KnownProtocolKind::AsyncSequence);
   auto isBorrowing =
-      shouldUseBorrowingSequence(ctx, seqTy, isAsync, anchor.getStartLoc());
+      shouldUseBorrowingSequence(ctx, seqTy, isAsync, anchor.getStartLoc(), DC);
 
   if (isBorrowing) {
     seqProto = ctx.getProtocol(KnownProtocolKind::BorrowingSequence);
