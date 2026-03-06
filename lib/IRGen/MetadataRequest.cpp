@@ -1491,11 +1491,9 @@ emitFunctionTypeMetadataParams(IRGenFunction &IGF,
   if (!params.empty()) {
     auto arrayTy =
         llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy, info.numParams);
-    info.parameters = StackAddress(IGF.createAlloca(
-        arrayTy, IGF.IGM.getTypeMetadataAlignment(), "function-parameters"));
-
-    IGF.Builder.CreateLifetimeStart(info.parameters.getAddress(),
-                                    IGF.IGM.getPointerSize() * info.numParams);
+    info.parameters = IGF.emitStaticAlloca(
+        arrayTy, IGF.IGM.getPointerSize() * info.numParams,
+        IGF.IGM.getTypeMetadataAlignment(), "function-parameters");
 
     for (unsigned i : indices(params)) {
       auto param = params[i];
@@ -1561,12 +1559,7 @@ emitDynamicFunctionTypeMetadataParams(IRGenFunction &IGF,
 static void cleanupFunctionTypeMetadataParams(IRGenFunction &IGF,
                                               FunctionTypeMetadataParamInfo info) {
   if (info.parameters.isValid()) {
-    if (info.parameters.getExtraInfo()) {
-      IGF.emitDeallocateDynamicAlloca(info.parameters);
-    } else {
-      IGF.Builder.CreateLifetimeEnd(info.parameters.getAddress(),
-                                    IGF.IGM.getPointerSize() * info.numParams);
-    }
+    IGF.emitStackDeallocation(info.parameters);
   }
 }
 

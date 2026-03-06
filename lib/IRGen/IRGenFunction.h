@@ -214,7 +214,7 @@ public:
                                         ArrayRef<llvm::Type *> argTypes);
 
   void emitGetAsyncContinuation(SILType resumeTy,
-                                StackAddress optionalResultAddr,
+                                Address optionalResultAddr,
                                 Explosion &out,
                                 bool canThrow);
 
@@ -304,27 +304,107 @@ public:
   void setupAsync(unsigned asyncContextIndex);
   bool isAsync() const { return asyncContextLocation.isValid(); }
 
+  /// Allocate memory using whatever the current function's notion of
+  /// the stack is. This may perform either static or dynamic allocation
+  /// depending on the size. If `isNested` is true, this allocation must
+  /// use stack discipline w.r.t all other dynamic allocations.
+  ///
+  /// Always returns an address with i8 element type.
+  ///
+  /// The memory should be deallocated with emitStackDeallocation.
+  StackAddress emitStackAllocation(llvm::Value *size, Alignment align,
+                                   StackAllocationIsNested_t isNested =
+                                     StackAllocationIsNested,
+                                   const llvm::Twine &name = "");
+
+  /// Deallocate memory that was allocated with emitStackAllocation.
+  ///
+  /// Calling this is equivalent to calling whichever the appropriate
+  /// deallocation routine was for the kind of allocation that was
+  /// performed, so it should be safe to call it for any allocation.
+  void emitStackDeallocation(StackAddress address);
+
+  /// Create an alloca instruction at the static alloca insertion point
+  /// in the entry block of the function.
+  ///
+  /// You should generally prefer emitStaticAlloca and
+  /// emitDeallocateStaticAlloca instead, which also insert the
+  /// lifetime start and end intrinsics.
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name = "");
   Address createAlloca(llvm::Type *ty, llvm::Value *arraySize, Alignment align,
                        const llvm::Twine &name = "");
 
+  /// Allocate memory statically in the stack frame by creating an alloca
+  /// instruction in the entry block and calling the llvm.lifetime.start
+  /// intrinsic for it at the current IP.
+  ///
+  /// Static memory allocations in the stack frame do not need to use
+  /// stack discipline; LLVM will perform a reaching analysis for the
+  /// start/finish intrinsics when deciding whether to reuse the memory.
+  ///
+  /// Always returns an address with the given element type.
+  ///
+  /// The memory should be deallocated with emitDeallocateStaticAlloca.
+  StackAddress emitStaticAlloca(llvm::Type *ty, Size size, Alignment align,
+                                const llvm::Twine &name = "");
+  StackAddress emitStaticByteArrayAlloca(llvm::ConstantInt *size,
+                                         Alignment align,
+                                         const llvm::Twine &name = "");
+
+  /// Deallocate memory that was allocated statically in the stack frame by
+  /// calling the llvm.lifetime.end intrinsic for it at the current IP.
+  void emitDeallocateStaticAlloca(StackAddress address);
+
+  /// Like emitStackAllocation, but do not try to allocate statically.
+  ///
+  /// Always returns an address with i8 element type.
+  ///
+  /// The memory should be deallocated with emitDynamicStackDeallocation.
+  StackAddress emitDynamicStackAllocation(SILType type,
+                                          StackAllocationIsNested_t isNested,
+                                          const llvm::Twine &name = "");
+  void emitDynamicStackDeallocation(StackAddress address);
+
+  /// Allocate memory dynamically in whatever the current function's notion
+  /// of the stack is. In a synchronous, non-coroutine function, this will
+  /// use LLVM's alloca instruction together with a stacksave; other
+  /// approaches are used in other contexts.
+  ///
+  /// Always returns an address with i8 element type.
+  ///
+  /// All such allocations must use proper stack discipline, i.e. FIFO
+  /// ordering on alloc + dealloc operations.
   StackAddress emitDynamicAlloca(SILType type, const llvm::Twine &name = "");
+
+  /// Allocate memory dynamically in whatever the current function's notion
+  /// of the stack is. In a synchronous, non-coroutine function, this will
+  /// use LLVM's alloca instruction together with a stacksave; other
+  /// approaches are used in other contexts.
+  ///
+  /// Always returns an address with the given element type.
+  ///
+  /// All such allocations must use proper stack discipline, i.e. FIFO
+  /// ordering on alloc + dealloc operations.
   StackAddress
   emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize, Alignment align,
                     AllowsTaskAlloc_t allowTaskAlloc = AllowsTaskAlloc,
                     llvm::Value *mallocTypeId = nullptr,
                     const llvm::Twine &name = "");
   void emitDeallocateDynamicAlloca(StackAddress address,
-                                   bool allowTaskDealloc = true,
                                    bool useTaskDeallocThrough = false,
                                    bool forCalleeCoroutineFrame = false);
 
-  StackAddress emitDynamicStackAllocation(SILType type,
-                                          StackAllocationIsNested_t isNested,
-                                          const llvm::Twine &name = "");
-  void emitDynamicStackDeallocation(StackAddress address,
-                                    StackAllocationIsNested_t isNested);
+  /// Perform a dynamic "stack" allocation that may not be properly nested.
+  /// Currently, this just calls malloc/free.
+  ///
+  /// Always returns an address with i8 element type.
+  ///
+  /// The memory should be deallocated with emitNonNestedStackDeallocation.
+  StackAddress emitNonNestedStackAllocation(llvm::Value *size,
+                                            Alignment align,
+                                            const llvm::Twine &name = "");
+  void emitNonNestedStackDeallocation(StackAddress address);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);

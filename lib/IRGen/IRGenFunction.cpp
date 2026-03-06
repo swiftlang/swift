@@ -662,7 +662,7 @@ static Address emitAddrOfContinuationErrorResultPointer(IRGenFunction &IGF,
 }
 
 void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
-                                             StackAddress resultAddr,
+                                             Address resultAddr,
                                              Explosion &out,
                                              bool canThrow) {
   // A continuation is just a reference to the current async task,
@@ -708,13 +708,14 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
   //   lifetime.end within the await after we take from the slot.
   auto normalResultAddr =
     emitAddrOfContinuationNormalResultPointer(*this, continuationContext);
-  if (!resultAddr.getAddress().isValid()) {
+  if (!resultAddr.isValid()) {
     auto &resumeTI = getTypeInfo(resumeTy);
     resultAddr =
-      resumeTI.allocateStack(*this, resumeTy, "async.continuation.result");
+      resumeTI.allocateStack(*this, resumeTy, "async.continuation.result")
+        .getAddress();
   }
   Builder.CreateStore(Builder.CreateBitOrPointerCast(
-                            resultAddr.getAddress().getAddress(),
+                            resultAddr.getAddress(),
                             IGM.OpaquePtrTy),
                       normalResultAddr);
 

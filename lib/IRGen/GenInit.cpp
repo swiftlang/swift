@@ -65,14 +65,11 @@ FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T, const Twine &name,
   // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty(ResilienceExpansion::Maximal)) {
     auto addr = getUndefAddress();
-    return { addr };
+    return StackAddress(addr, StackAddress::StaticAlloca, nullptr);
   }
 
-  Address alloca =
-    IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
-  IGF.Builder.CreateLifetimeStart(alloca, getFixedSize());
-  
-  return { alloca };
+  return IGF.emitStaticAlloca(getStorageType(), getFixedSize(),
+                              getFixedAlignment(), name);
 }
 
 void FixedTypeInfo::destroyStack(IRGenFunction &IGF, StackAddress addr,
@@ -82,8 +79,7 @@ void FixedTypeInfo::destroyStack(IRGenFunction &IGF, StackAddress addr,
 }
 
 void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, StackAddress addr,
-                                    SILType T,
-                                    StackAllocationIsNested_t isNested) const {
+                                    SILType T) const {
   if (isKnownEmpty(ResilienceExpansion::Maximal))
     return;
   IGF.Builder.CreateLifetimeEnd(addr.getAddress(), getFixedSize());
