@@ -5612,13 +5612,15 @@ public:
     // function argument or Builtin.Borrow.
     if (F.getModule().getStage() >= SILStage::Canonical &&
         functionResultType.isAddress()) {
-      auto base = getAccessBase(RI->getOperand());
-      require(!base->getType().isAddress() || isa<SILFunctionArgument>(base) ||
-                  isa<DereferenceAddrBorrowInst>(base) ||
-                  isa<DereferenceBorrowAddrInst>(base) ||
-                  (isa<ApplyInst>(base) &&
-                       cast<ApplyInst>(base)->hasAddressResult() ||
-                   isa<GlobalAddrInst>(base)),
+      auto base = AccessBase::compute(RI->getOperand());
+      auto root = base ? base.isReference() ? base.getOwnershipReferenceRoot()
+                                            : base.getBaseAddress()
+                       : SILValue();
+      require(!root || !root->getType().isAddress() ||
+                  isa<SILFunctionArgument>(root) ||
+                  (isa<ApplyInst>(root) &&
+                       cast<ApplyInst>(root)->hasAddressResult() ||
+                   isa<GlobalAddrInst>(root)),
               "unidentified address return");
     }
   }
