@@ -109,6 +109,7 @@ enum class ActionType {
   PrintUSRs,
   PrintLocalTypes,
   PrintTypeInterface,
+  PrintPolyglotAST,
   PrintIndexedSymbols,
   PrintExpressionTypes,
   TestCreateCompilerInvocation,
@@ -200,6 +201,8 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "print-module-metadata", "Print meta-data in a module"),
            clEnumValN(ActionType::PrintHeader,
                       "print-header", "Print visible declarations in a header file"),
+           clEnumValN(ActionType::PrintPolyglotAST,
+                      "print-polyglot-ast", ""),
            clEnumValN(ActionType::PrintSwiftFileInterface,
                       "print-swift-file-interface", "Print interface of a swift file"),
            clEnumValN(ActionType::PrintDecl,
@@ -3320,6 +3323,52 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   return ExitCode;
 }
 
+static int
+doPrintPolyglotAST(const CompilerInvocation &InitInvok,
+                   const std::vector<std::string> HeadersToPrint) {
+  CompilerInvocation Invocation(InitInvok);
+
+  CompilerInstance CI;
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
+    return 1;
+  }
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
+  auto &Context = CI.getASTContext();
+
+  // Load implicit imports so that Clang importer can use it.
+  for (auto unloadedImport :
+       CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
+    (void)Context.getModule(unloadedImport.module.getModulePath());
+  }
+
+  auto &Importer =
+    static_cast<ClangImporter &>(*Context.getClangModuleLoader());
+  auto &FEOpts = Invocation.getFrontendOptions();
+  if (!FEOpts.ImplicitObjCHeaderPath.empty()) {
+    Importer.importBridgingHeader(FEOpts.ImplicitObjCHeaderPath,
+                                  CI.getMainModule(),
+                                  /*diagLoc=*/{},
+                                  /*trackParsedSymbols=*/true);
+  }
+
+  int ExitCode = 0;
+  for (StringRef HeaderToPrint : HeadersToPrint) {
+    if (HeaderToPrint.empty()) {
+      ExitCode = 1;
+      continue;
+    }
+
+    Importer.printPolyglotAST(HeaderToPrint, llvm::outs());
+  }
+
+  return ExitCode;
+}
+
 static int doPrintHeaders(const CompilerInvocation &InitInvok,
                           StringRef SourceFilename,
                           const std::vector<std::string> HeadersToPrint,
@@ -5038,6 +5087,11 @@ int main(int argc, char *argv[]) {
     ExitCode = doPrintHeaders(InitInvok, options::SourceFilename,
                               options::HeaderToPrint, PrintOpts,
                               options::AnnotatePrint);
+    break;
+  }
+
+  case ActionType::PrintPolyglotAST: {
+    ExitCode = doPrintPolyglotAST(InitInvok, options::HeaderToPrint);
     break;
   }
 
