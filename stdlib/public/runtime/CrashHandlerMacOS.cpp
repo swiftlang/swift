@@ -200,11 +200,12 @@ resume_other_threads()
 }
 
 #define MIN_FD_TO_CLOSE 3
+#define MAX_FD_TO_CLOSE 100
 
 void
 closeFds() {
-  for (int i = MIN_FD_TO_CLOSE; i < rlp.rlim_max; i++) {
-    close(i);
+  for (int i = MIN_FD_TO_CLOSE; i < MAX_FD_TO_CLOSE; i++) {
+    close(i)
   }
 }
 

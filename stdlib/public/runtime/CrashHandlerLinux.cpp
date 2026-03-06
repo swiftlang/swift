@@ -65,9 +65,6 @@
 
 #include "BacktracePrivate.h"
 
-// Run the memserver in a thread (0) or separate process (1)
-#define MEMSERVER_USE_PROCESS 0
-
 #ifndef lengthof
 #define lengthof(x)     (sizeof(x) / sizeof(x[0]))
 #endif
@@ -86,7 +83,7 @@ uint32_t currently_paused();
 void wait_paused(uint32_t expected, const struct timespec *timeout);
 int  memserver_start();
 int  memserver_entry(void *);
-void closeFds(int keepOpen);
+void closeFds(int memserver_master_fd);
 
 ssize_t safe_read(int fd, void *buf, size_t len) {
   uint8_t *ptr = (uint8_t *)buf;
@@ -291,12 +288,10 @@ handle_fatal_signal(int signum,
       write(STDERR_FILENO, message, strlen(message));
   }
 
-#if !MEMSERVER_USE_PROCESS
-  /* If the memserver is in-process, it may have set signal handlers,
+  /* The memserver may have set signal handlers,
      so reset SIGSEGV and SIGBUS again */
   reset_signal(SIGSEGV);
   reset_signal(SIGBUS);
-#endif
 
   // Restart the other threads
   resume_other_threads();
@@ -679,23 +674,6 @@ wait_paused(uint32_t expected, const struct timespec *timeout)
            || errno == EAGAIN);
 }
 
-#define MIN_FD_TO_CLOSE 3
-#define MAX_FD_TO_CLOSE ~0
-
-void
-closeFds(int keepOpen) {
-  // We don't attempt to close memserver_fd, if the mem server is in process
-  // we need to leave it open, if it's in a sub process then this function
-  // should be running on the parent (crashing) process and should already
-  // have closed it.
-
-  // Otherwise we close all file descriptors after stderr except the end of
-  // the pipe used by swift-backtrace.
-
-  _close_range(MIN_FD_TO_CLOSE, keepOpen-1, 0);
-  _close_range(keepOpen+1, MAX_FD_TO_CLOSE, 0);
-}
-
 // .. Memory server ............................................................
 
 /* The memory server exists so that we can gain access to the crashing
@@ -711,6 +689,37 @@ int memserver_fd;
 sigjmp_buf memserver_fault_buf;
 pid_t memserver_pid;
 
+#define MIN_FD_TO_CLOSE 3
+#define MAX_FD_TO_CLOSE ~0
+
+void
+closeFds(int memserver_master_fd) {
+  // We don't attempt to close either of the file descriptors for the
+  // pipe used to communicate with the memserver thread.
+
+  // Otherwise we close all file descriptors after stderr except the end of
+  // the pipe used by swift-backtrace.
+
+  int keepOpen1 = memserver_master_fd;
+  int keepOpen2 = memserver_fd;
+
+  if (keepOpen2 > keepOpen1+1) {
+    _close_range(MIN_FD_TO_CLOSE, keepOpen1-1, 0);
+    _close_range(keepOpen1+1, keepOpen2-1, 0);
+    _close_range(keepOpen2+1, MAX_FD_TO_CLOSE, 0);
+  } else if (keepOpen2+1 < keepOpen1) {
+    _close_range(MIN_FD_TO_CLOSE, keepOpen2-1, 0);
+    _close_range(keepOpen2+1, keepOpen1-1, 0);
+    _close_range(keepOpen1+1, MAX_FD_TO_CLOSE, 0);
+  } else {
+    // the file descriptors are adjacent
+    int fd1 = keepOpen2 > keepOpen1 ? keepOpen1 : keepOpen2;
+    int fd2 = keepOpen2 > keepOpen1 ? keepOpen2 : keepOpen1;
+    _close_range(MIN_FD_TO_CLOSE, fd1-1, 0);
+    _close_range(fd2+1, MAX_FD_TO_CLOSE, 0);    
+  }
+}
+
 int
 memserver_start()
 {
@@ -725,34 +734,19 @@ memserver_start()
 
   memserver_fd = fds[0];
   ret = clone(memserver_entry, memserver_stack + sizeof(memserver_stack),
-#if MEMSERVER_USE_PROCESS
-              0,
-#else
               #ifndef __musl__
               // Can't use CLONE_THREAD on musl because the clone() function
               // there returns EINVAL if we do.
               CLONE_THREAD | CLONE_SIGHAND |
               #endif
               CLONE_VM | CLONE_FILES | CLONE_FS | CLONE_IO,
-#endif
               NULL);
   if (ret < 0) {
     memserver_error("memserver_start: clone failed");
     return ret;
   }
 
-#if MEMSERVER_USE_PROCESS
-  memserver_pid = ret;
-
-  /* Tell the Yama LSM module, if it's running, that it's OK for
-     the memserver to read process memory */
-  prctl(PR_SET_PTRACER, ret);
-
-  close(fds[0]);
-  memserver_fd = 0;
-#else
   memserver_pid = getpid();
-#endif
 
   return fds[1];
 }
@@ -784,10 +778,6 @@ int
 memserver_entry(void *dummy __attribute__((unused))) {
   int fd = memserver_fd;
   int result = 1;
-
-#if MEMSERVER_USE_PROCESS || defined(__musl__)
-  prctl(PR_SET_NAME, "[backtrace]");
-#endif
 
   struct sigaction sa;
   sigfillset(&sa.sa_mask);
