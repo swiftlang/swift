@@ -115,25 +115,22 @@ SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root)
   JsonFormatVer(Info.JsonFormatVer.has_value() ? *Info.JsonFormatVer : DIGESTER_JSON_DEFAULT_VERSION) {}
 
 SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
-      : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
-        MangledName(Info.MangledName), Loc(Info.Loc),
-        Location(Info.Location), ModuleName(Info.ModuleName),
-        DeclAttributes(Info.DeclAttrs),
-        SPIGroups(Info.SPIGroups),
-        IsImplicit(Info.IsImplicit),
-        IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
-        IsProtocolReq(Info.IsProtocolReq),
-        IsOverriding(Info.IsOverriding),
-        IsOpen(Info.IsOpen),
-        IsInternal(Info.IsInternal), IsABIPlaceholder(Info.IsABIPlaceholder),
-        IsFromExtension(Info.IsFromExtension),
-        ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
-        GenericSig(Info.GenericSig),
-        SugaredGenericSig(Info.SugaredGenericSig),
-        FixedBinaryOrder(Info.FixedBinaryOrder),
-        introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
-                       Info.IntrowatchOS, Info.IntrovisionOS, Info.Introswift}),
-        ObjCName(Info.ObjCName) {}
+    : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
+      MangledName(Info.MangledName), Loc(Info.Loc), Location(Info.Location),
+      ModuleName(Info.ModuleName), DeclAttributes(Info.DeclAttrs),
+      SPIGroups(Info.SPIGroups), IsImplicit(Info.IsImplicit),
+      IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
+      IsProtocolReq(Info.IsProtocolReq), IsOverriding(Info.IsOverriding),
+      IsOpen(Info.IsOpen), IsInternal(Info.IsInternal),
+      IsABIPlaceholder(Info.IsABIPlaceholder),
+      IsFromExtension(Info.IsFromExtension),
+      ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
+      GenericSig(Info.GenericSig), SugaredGenericSig(Info.SugaredGenericSig),
+      FixedBinaryOrder(Info.FixedBinaryOrder),
+      introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
+                     Info.IntrowatchOS, Info.IntrovisionOS, Info.Introswift,
+                     Info.IntroAnyAppleOS}),
+      ObjCName(Info.ObjCName) {}
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
   SDKNode(Info, Kind), TypeAttributes(Info.TypeAttrs),
@@ -1459,24 +1456,24 @@ static bool isDeclaredInExtension(Decl *D) {
   return false;
 }
 
-SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
-      Ctx(Ctx), DKind(D->getKind()), Loc(D->getLoc()),
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D)
+    : Ctx(Ctx), DKind(D->getKind()), Loc(D->getLoc()),
       Location(calculateLocation(Ctx, D)),
       ModuleName(D->getModuleContext()->getName().str()),
-      GenericSig(printGenericSignature(Ctx, D, /*Canonical*/Ctx.checkingABI())),
-      SugaredGenericSig(Ctx.checkingABI()?
-                        printGenericSignature(Ctx, D, /*Canonical*/false):
-                        StringRef()),
+      GenericSig(
+          printGenericSignature(Ctx, D, /*Canonical*/ Ctx.checkingABI())),
+      SugaredGenericSig(Ctx.checkingABI()
+                            ? printGenericSignature(Ctx, D, /*Canonical*/ false)
+                            : StringRef()),
       IntromacOS(Ctx.getPlatformIntroVersion(D, PlatformKind::macOS)),
       IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
       IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
       IntrovisionOS(Ctx.getPlatformIntroVersion(D, PlatformKind::visionOS)),
       Introswift(Ctx.getLanguageIntroVersion(D)),
-      ObjCName(Ctx.getObjcName(D)),
-      InitKind(Ctx.getInitKind(D)),
-      IsImplicit(D->isImplicit()),
-      IsDeprecated(D->isDeprecated()),
+      IntroAnyAppleOS(Ctx.getPlatformIntroVersion(D, PlatformKind::anyAppleOS)),
+      ObjCName(Ctx.getObjcName(D)), InitKind(Ctx.getInitKind(D)),
+      IsImplicit(D->isImplicit()), IsDeprecated(D->isDeprecated()),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)),
       IsFromExtension(isDeclaredInExtension(D)),
       DeclAttrs(collectDeclAttributes(D)) {
@@ -2160,6 +2157,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_intro_tvOS, introVersions.tvos);
   output(out, KeyKind::KK_intro_watchOS, introVersions.watchos);
   output(out, KeyKind::KK_intro_swift, introVersions.swift);
+  output(out, KeyKind::KK_intro_anyAppleOS, introVersions.anyappleos);
   output(out, KeyKind::KK_objc_name, ObjCName);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(), DeclAttributes);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
