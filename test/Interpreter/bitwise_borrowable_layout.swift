@@ -16,6 +16,7 @@
 // REQUIRES: swift_feature_RawLayout
 // REQUIRES: swift_feature_AddressableTypes
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import BitwiseBorrowableLayoutResilientTypes
 
