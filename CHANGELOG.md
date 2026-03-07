@@ -216,7 +216,7 @@
   }
   ```
 
-* [SE-0471][]:
+* [SE-0371][]:
   Actor and global actor annotated types may now declare a synchronous `isolated deinit`, which allows such deinitializer
   to access actor isolated state while deinitializing the actor. This enables actor deinitializers to safely access
   and shut down or close resources during an actors deinitialization, without explicitly resorting to unstructured 
