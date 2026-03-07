@@ -360,5 +360,9 @@ func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
 
 // https://github.com/apple/swift/issues/54865
 func f_54865(a: Any, _ str: String?) {
-  a == str // expected-error {{cannot convert value of type 'Any' to expected argument type 'String'}}
+  a == str
+  // expected-error@-1 {{cannot convert value of type 'Any' to expected argument type 'String'}}
+  // expected-error@-2 {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
+  // expected-note@-3 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-4 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 }

@@ -2166,7 +2166,6 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
                                                 const OverloadChoice &overload,
-                                                bool allowMembers,
                                                 DeclContext *useDC) {
   switch (overload.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -2223,9 +2222,6 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   // If this declaration is within a type context, we might not be able
   // to handle it.
   if (decl->getDeclContext()->isTypeContext()) {
-    if (!allowMembers)
-      return Type();
-
     auto getBaseObjectType = [&] () -> Type {
       return overload.getBaseType()
           ->getRValueType()
@@ -2239,7 +2235,6 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           getBaseObjectType(), decl, locator));
     };
 
-    SmallVector<OpenedType, 4> emptyReplacements;
     if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
       auto elementTy = subscript->getElementInterfaceType();
 
@@ -2317,6 +2312,16 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   if (decl->getAttrs().hasAttribute<OptionalAttr>() &&
       !isa<SubscriptDecl>(decl))
     type = OptionalType::get(type->getRValueType());
+
+  GenericSignature genericSig;
+  if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
+    genericSig = GF->getGenericSignature();
+  } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+    genericSig = SD->getGenericSignature();
+  }
+
+  if (genericSig)
+    type = type->getReducedType(genericSig);
 
   return type;
 }

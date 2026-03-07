@@ -41,4 +41,6 @@ struct DefaultsAdapter<KeyStore: DefaultsKeyStore> {
 
 
 var Defaults = DefaultsAdapter<DefaultsKeys>()
-Defaults[\.missingKey] = "" // expected-error {{}}
+Defaults[\.missingKey] = ""
+// expected-error@-1 {{missing argument label 'keyPath:' in subscript}}
+// expected-error@-2 {{cannot assign value of type 'String' to subscript of type 'Never'}}

@@ -516,9 +516,7 @@ retry_after_fail:
         }
 
         // Determine the type that this choice will have.
-        Type choiceType = getEffectiveOverloadType(
-            constraint->getLocator(), choice, /*allowMembers=*/true,
-            constraint->getDeclContext());
+        Type choiceType = constraint->getEffectiveOverloadType();
         if (!choiceType) {
           hasUnhandledConstraints = true;
           return true;
@@ -717,10 +715,7 @@ static void forEachDisjunctionChoice(
     if (!decl)
       continue;
 
-    Type overloadType = cs.getEffectiveOverloadType(
-        disjunction->getLocator(), choice,
-        /*allowMembers=*/true, constraint->getDeclContext());
-
+    Type overloadType = constraint->getEffectiveOverloadType();
     if (!overloadType || !overloadType->is<FunctionType>())
       continue;
 
@@ -843,14 +838,6 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
           llvm::errs() << "\n";
         }
         return;
-      }
-
-      // This is important for SIMD operators in particular because
-      // a lot of their overloads have same-type requires to a concrete
-      // type:  `<Scalar == (U)Int*>(_: SIMD*<Scalar>, ...) -> ...`.
-      if (genericSig) {
-        overloadType = overloadType->getReducedType(genericSig)
-                           ->castTo<FunctionType>();
       }
 
       ConflictReason reason;

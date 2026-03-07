@@ -477,3 +477,19 @@ do {
 func tooAggressiveShrink() {
   let _ = [1 / 1].map { $0 / 1.0 }
 }
+
+// Another example rejected by 6.2 which we now accept as we should
+// https://forums.swift.org/t/strange-issue-with-custom-operator/85073
+struct X {}
+struct Y {}
+let x = X()
+
+func + (a: X, b: X) -> Y { Y() }
+func + (a: Y, b: Y) -> Y { Y() }
+
+func testCustomOperators() {
+  let y: Y = x + x
+  _ = x + x
+  _ = y + y
+  _ = (x + x) + (x + x)
+}

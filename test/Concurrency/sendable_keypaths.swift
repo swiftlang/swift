@@ -222,14 +222,14 @@ do {
     fatalError()
   }
 
-  // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
+  // This shouldn't be ambiguous (@Sendable version should be preferred)
   func test() -> KeyPath<String, Int> {
-    true ? kp() : kp() // expected-error {{failed to produce diagnostic for expression}}
+    true ? kp() : kp()
   }
 
   func forward<T>(_ v: T) -> T { v }
-  // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
-  let _: KeyPath<String, Int> = forward(kp()) // expected-error {{conflicting arguments to generic parameter 'T' ('any KeyPath<String, Int> & Sendable' vs. 'KeyPath<String, Int>')}}
+  // This shouldn't be ambiguous (@Sendable version should be preferred)
+  let _: KeyPath<String, Int> = forward(kp())
 }
 
 do {
@@ -238,25 +238,6 @@ do {
   }
 
   _ = \C<Int>.immutable as? ReferenceWritableKeyPath // Ok
-}
-
-// Should be moved back to sendable_methods.swift once ambiguities are fixed
-do {
-  struct Test {
-    static func fn() {}
-    static func otherFn() {}
-  }
-
-  // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
-  func fnRet(cond: Bool) -> () -> Void {
-    cond ? Test.fn : Test.otherFn // expected-error {{failed to produce diagnostic for expression}}
-  }
-
-  func forward<T>(_: T) -> T {
-  }
-
-  // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
-  let _: () -> Void = forward(Test.fn) // expected-error {{conflicting arguments to generic parameter 'T' ('@Sendable () -> ()' vs. '() -> Void')}}
 }
 
 // https://github.com/swiftlang/swift/issues/77105

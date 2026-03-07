@@ -436,6 +436,9 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       /// The first type.
       Type First;
 
+      /// The effective overload type, without any type variables.
+      Type EffectiveOverloadType;
+
       /// The prepared overload, if any.
       PreparedOverload *Prepared;
     } Overload;
@@ -485,9 +488,8 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new overload-binding constraint, which might have a fix.
-  Constraint(Type type, OverloadChoice choice,
-             DeclContext *useDC,
-             ConstraintFix *fix, ConstraintLocator *locator,
+  Constraint(Type type, OverloadChoice choice, Type effectiveOverloadType,
+             DeclContext *useDC, ConstraintFix *fix, ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a restricted constraint.
@@ -841,19 +843,26 @@ public:
   /// from the rest of the constraint system.
   bool isIsolated() const { return IsIsolated; }
 
-  /// Retrieve the overload choice for an overload-binding constraint.
+  /// Retrieve the overload choice for a bind overload constraint.
   OverloadChoice getOverloadChoice() const {
     ASSERT(Kind == ConstraintKind::BindOverload);
     return *getTrailingObjects<OverloadChoice>();
   }
 
-  /// Retrieve the prepared overload choice for an overload-binding
-  /// constraint.
+  /// Retrieve the effective overload type for a bind overload constraint.
+  Type getEffectiveOverloadType() const {
+    ASSERT(Kind == ConstraintKind::BindOverload);
+    return Overload.EffectiveOverloadType;
+  }
+
+  /// Retrieve the prepared overload choice for a bind overload
+  /// constraint, if any.
   PreparedOverload *getPreparedOverload() const {
     ASSERT(Kind == ConstraintKind::BindOverload);
     return Overload.Prepared;
   }
 
+  /// Save the precomputed prepared overload.
   void setPreparedOverload(PreparedOverload *preparedOverload);
 
   FunctionType *getAppliedFunctionType() const {

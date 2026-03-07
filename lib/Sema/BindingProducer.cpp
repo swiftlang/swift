@@ -394,15 +394,17 @@ bool TypeVarBindingProducer::computeNext() {
         addNewBinding(binding.withSameSource(voidType, BindingKind::Exact));
       }
 
-      for (auto supertype : enumerateDirectSupertypes(type)) {
-        // If we're not allowed to try this binding, skip it.
-        if (checkTypeOfBinding(TypeVar, supertype)) {
-          // A key path type cannot be bound to type-erased key path variants.
-          if (TypeVar->getImpl().isKeyPathType() &&
-              isTypeErasedKeyPathType(supertype))
-            continue;
+      if (!CS.getASTContext().TypeCheckerOpts.SolverEnableBindingOptimizations) {
+        for (auto supertype : enumerateDirectSupertypes(type)) {
+          // If we're not allowed to try this binding, skip it.
+          if (checkTypeOfBinding(TypeVar, supertype)) {
+            // A key path type cannot be bound to type-erased key path variants.
+            if (TypeVar->getImpl().isKeyPathType() &&
+                isTypeErasedKeyPathType(supertype))
+              continue;
 
-          addNewBinding(binding.withType(supertype));
+            addNewBinding(binding.withType(supertype));
+          }
         }
       }
     }

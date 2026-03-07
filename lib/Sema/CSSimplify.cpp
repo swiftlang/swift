@@ -42,6 +42,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SetVector.h"
@@ -12932,16 +12933,25 @@ ConstraintSystem::simplifyKeyPathConstraint(
     if (contextualTy->isPlaceholder())
       return true;
 
+    if (contextualTy->is<ArchetypeType>()) {
+      contextualTy = contextualTy->getSuperclass();
+      if (!contextualTy)
+        return true;
+    }
+
     // Situations like `any KeyPath<...> & Sendable`.
     if (contextualTy->isExistentialType()) {
-      contextualTy = contextualTy->getExistentialLayout().explicitSuperclass;
-      assert(contextualTy);
+      contextualTy = contextualTy->getSuperclass();
+      if (!contextualTy)
+        return true;
     }
 
     if (auto bgt = contextualTy->getAs<BoundGenericType>()) {
       // We can get root and value from a concrete key path type.
-      assert(bgt->isKeyPath() || bgt->isWritableKeyPath() ||
-             bgt->isReferenceWritableKeyPath());
+      if (!(bgt->isKeyPath() || bgt->isWritableKeyPath() ||
+            bgt->isReferenceWritableKeyPath())) {
+        return true;
+      }
 
       contextualRootTy = bgt->getGenericArgs()[0];
       contextualValueTy = bgt->getGenericArgs()[1];
@@ -13080,6 +13090,17 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   if (locator.endsWith<LocatorPathElt::KeyPathDynamicMember>())
     return SolutionKind::Error;
 
+  if (keyPathTy->is<ArchetypeType>()) {
+    if (auto superclassTy = keyPathTy->getSuperclass())
+      keyPathTy = superclassTy;
+  }
+
+  // Situations like `any KeyPath<...> & Sendable`.
+  if (keyPathTy->isExistentialType()) {
+    if (auto superclassTy = keyPathTy->getSuperclass())
+      keyPathTy = superclassTy;
+  }
+
   if (keyPathTy->isAnyKeyPath()) {
     // Read-only keypath, whose projected value is upcast to `Any?`.
     // The root type can be anything.
@@ -13152,9 +13173,9 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     /// Solve for an lvalue base.
     auto solveLValue = [&]() -> ConstraintSystem::SolutionKind {
       return matchTypes(LValueType::get(kpValueTy), valueTy,
-                        ConstraintKind::Bind, subflags, locator);
+                        ConstraintKind::Conversion, subflags, locator);
     };
-  
+
     if (bgt->isKeyPath()) {
       // Read-only keypath.
       if (!matchRoot(ConstraintKind::Conversion))
@@ -13163,6 +13184,24 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       return solveRValue();
     }
     if (bgt->isWritableKeyPath()) {
+      kpRootTy = getFixedTypeRecursive(kpRootTy, flags, /*wantRValueType=*/true);
+
+      // We might not know if the value is ultimately going to be used as an
+      // lvalue or rvalue yet, but this determines whether we can convert the
+      // base. To avoid introducing a disjunction, just guess if the keypath
+      // root type is already bound, and conservatively assume we will not
+      // convert the base if the keypath root type is not bound.
+      if (!kpRootTy->isTypeVariableOrMember()) {
+        auto result = isLikelyExactMatch(rootTy->getRValueType(), kpRootTy);
+        if (result && !*result) {
+          // Proceed as in the read-only case.
+          if (!matchRoot(ConstraintKind::Conversion))
+            return SolutionKind::Error;
+
+          return solveRValue();
+        }
+      }
+
       // Writable keypath. The result can be an lvalue if the root was.
       // We can't convert the base without giving up lvalue-ness, though.
       if (!matchRoot(ConstraintKind::Equal))

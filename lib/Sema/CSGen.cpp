@@ -33,6 +33,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
@@ -3627,12 +3628,7 @@ namespace {
       return member == "trigger_fallback_diagnostic";
     }
 
-    enum class TypeOperation { None,
-                               Join,
-                               JoinInout,
-                               JoinMeta,
-                               JoinNonexistent,
-    };
+    enum class TypeOperation { None, Join };
 
     static TypeOperation getTypeOperation(UnresolvedDotExpr *UDE,
                                           ASTContext &Context) {
@@ -3646,9 +3642,6 @@ namespace {
       return llvm::StringSwitch<TypeOperation>(
                  UDE->getName().getBaseIdentifier().str())
           .Case("type_join", TypeOperation::Join)
-          .Case("type_join_inout", TypeOperation::JoinInout)
-          .Case("type_join_meta", TypeOperation::JoinMeta)
-          .Case("type_join_nonexistent", TypeOperation::JoinNonexistent)
           .Default(TypeOperation::None);
     }
 
@@ -3656,81 +3649,21 @@ namespace {
       auto *lhs = Args->getExpr(0);
       auto *rhs = Args->getExpr(1);
 
-      switch (op) {
-      case TypeOperation::None:
-        llvm_unreachable(
-            "We should have a valid type operation at this point!");
+      ASSERT(op == TypeOperation::Join &&
+             "We should have a valid type operation at this point!");
 
-      case TypeOperation::Join: {
-        auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
-        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
-        if (!lhsMeta || !rhsMeta)
-          llvm_unreachable("Unexpected argument types for Builtin.type_join!");
+      auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
+      auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
+      if (!lhsMeta || !rhsMeta)
+        ABORT("Unexpected argument types for Builtin.type_join!");
 
-        auto &ctx = lhsMeta->getASTContext();
+      auto &ctx = CS.getASTContext();
 
-        auto join =
-            Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
-
-        if (!join)
-          return ErrorType::get(ctx);
-
-        return MetatypeType::get(*join, ctx)->getCanonicalType();
-      }
-
-      case TypeOperation::JoinInout: {
-        auto lhsInOut = CS.getType(lhs)->getAs<InOutType>();
-        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
-        if (!lhsInOut || !rhsMeta)
-          llvm_unreachable("Unexpected argument types for Builtin.type_join!");
-
-        auto &ctx = lhsInOut->getASTContext();
-
-        auto join =
-            Type::join(lhsInOut, rhsMeta->getInstanceType());
-
-        if (!join)
-          return ErrorType::get(ctx);
-
-        return MetatypeType::get(*join, ctx)->getCanonicalType();
-      }
-
-      case TypeOperation::JoinMeta: {
-        auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
-        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
-        if (!lhsMeta || !rhsMeta)
-          llvm_unreachable("Unexpected argument types for Builtin.type_join!");
-
-        auto &ctx = lhsMeta->getASTContext();
-
-        auto join = Type::join(lhsMeta, rhsMeta);
-
-        if (!join)
-          return ErrorType::get(ctx);
-
-        return *join;
-      }
-
-      case TypeOperation::JoinNonexistent: {
-        auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
-        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
-        if (!lhsMeta || !rhsMeta)
-          llvm_unreachable("Unexpected argument types for Builtin.type_join_nonexistent!");
-
-        auto &ctx = lhsMeta->getASTContext();
-
-        auto join =
-            Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
-
-        // Verify that we could not compute a join.
-        if (join)
-          llvm_unreachable("Unexpected result from join - it should not have been computable!");
-
-        // The return value is unimportant.
-        return MetatypeType::get(ctx.getAnyExistentialType())->getCanonicalType();
-      }
-      }
-      llvm_unreachable("unhandled operation");
+      bool existentialUpperBound = false;
+      auto join =
+          subtypeJoin(lhsMeta->getInstanceType(), rhsMeta->getInstanceType(),
+                      &existentialUpperBound);
+      return MetatypeType::get(join, ctx);
     }
 
     /// Assuming that we are solving for code completion, assign \p expr a fresh

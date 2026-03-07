@@ -19,7 +19,6 @@
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/Basic/Defer.h"
@@ -27,6 +26,7 @@
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSDisjunction.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
@@ -582,10 +582,7 @@ void forEachDisjunctionChoice(
     if (!decl)
       continue;
 
-    Type overloadType = cs.getEffectiveOverloadType(
-        disjunction->getLocator(), constraint->getOverloadChoice(),
-        /*allowMembers=*/true, constraint->getDeclContext());
-
+    Type overloadType = constraint->getEffectiveOverloadType();
     if (!overloadType || !overloadType->is<FunctionType>())
       continue;
 
@@ -804,57 +801,6 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 }
 
 } // end anonymous namespace
-
-/// Determine whether the candidate type is a subclass of the superclass
-/// type. This check is approximate, because it disregards generic
-/// arguments.
-///
-/// FIXME: This should be a common utility somewhere instead of being
-/// re-implemented in several places in the compiler.
-static bool isSubclassOf(Type candidateType, Type superclassType) {
-  auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
-  if (!superclassDecl)
-    return false;
-
-  auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
-  if (!subclassDecl) {
-    candidateType = candidateType->getSuperclass();
-    if (!candidateType)
-      return false;
-    subclassDecl = candidateType->getClassOrBoundGenericClass();
-    if (!subclassDecl)
-      return false;
-  }
-
-  return superclassDecl->isSuperclassOf(subclassDecl);
-}
-
-/// Determine whether the candidate type can be erased to the given
-/// existential type. This check is approximate, because it disregards
-/// conditional conformance and parameterized protocol types.
-///
-/// FIXME: This should be a common utility somewhere instead of being
-/// re-implemented in several places in the compiler.
-static bool isSubtypeOfExistentialType(Type candidateType, Type existentialType) {
-  auto layout = existentialType->getExistentialLayout();
-
-  if (auto layoutConstraint = layout.getLayoutConstraint()) {
-    if (layoutConstraint->isClass() &&
-        !(candidateType->isClassExistentialType() ||
-          candidateType->mayHaveSuperclass()))
-      return false;
-  }
-
-  if (layout.explicitSuperclass &&
-      !isSubclassOf(candidateType, layout.explicitSuperclass))
-    return false;
-
-  return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
-    auto result = TypeChecker::containsProtocol(candidateType, P,
-                                                /*allowMissing=*/false);
-    return result.first || result.second;
-  });
-}
 
 enum class MatchFlag {
   OnParam = 0x01,
@@ -1452,18 +1398,21 @@ static DisjunctionInfo computeDisjunctionInfo(
           types.push_back({type, /*fromLiteral=*/true});
         }
 
-        auto binding =
-            inferTypeFromInitializerResultType(cs, typeVar, disjunctions);
 
-        if (auto instanceTy = binding.getPointer()) {
-          types.push_back({instanceTy,
-                           /*fromLiteral=*/false,
-                           /*fromInitializerCall=*/true});
+        if (cs.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
+          auto binding =
+              inferTypeFromInitializerResultType(cs, typeVar, disjunctions);
 
-          if (binding.getInt())
-            types.push_back({instanceTy->wrapInOptionalType(),
+          if (auto instanceTy = binding.getPointer()) {
+            types.push_back({instanceTy,
                              /*fromLiteral=*/false,
                              /*fromInitializerCall=*/true});
+
+            if (binding.getInt())
+              types.push_back({instanceTy->wrapInOptionalType(),
+                               /*fromLiteral=*/false,
+                               /*fromInitializerCall=*/true});
+          }
         }
       }
     } else {
@@ -1508,18 +1457,21 @@ static DisjunctionInfo computeDisjunctionInfo(
       resultTypes.push_back(binding.BindingType);
     }
 
-    // Infer bindings for each side of a ternary condition.
-    bindingSet.forEachAdjacentVariable(
-        [&cs, &resultTypes](TypeVariableType *adjacentVar) {
-          auto *adjacentLoc = adjacentVar->getImpl().getLocator();
-          // This is one of the sides of a ternary operator.
-          if (adjacentLoc->directlyAt<TernaryExpr>()) {
-            auto adjacentBindings = cs.getBindingsFor(adjacentVar);
+    const auto &potentialBindings = cs.getConstraintGraph()[typeVar]
+        .getPotentialBindings();
 
-            for (const auto &binding : adjacentBindings.Bindings)
-              resultTypes.push_back(binding.BindingType);
-          }
-        });
+    // Infer bindings for each side of a ternary condition.
+    for (auto pair : potentialBindings.SubtypeOf) {
+      auto *adjacentVar = pair.first;
+      auto *adjacentLoc = adjacentVar->getImpl().getLocator();
+      // This is one of the sides of a ternary operator.
+      if (adjacentLoc->directlyAt<TernaryExpr>()) {
+        auto adjacentBindings = cs.getBindingsFor(adjacentVar);
+
+        for (const auto &binding : adjacentBindings.Bindings)
+          resultTypes.push_back(binding.BindingType);
+      }
+    }
   } else {
     resultTypes.push_back(resultType);
   }
@@ -1565,12 +1517,10 @@ static DisjunctionInfo computeDisjunctionInfo(
       cs, disjunction,
       [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
         GenericSignature genericSig;
-        {
-          if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
-            genericSig = GF->getGenericSignature();
-          } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
-            genericSig = SD->getGenericSignature();
-          }
+        if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
+          genericSig = GF->getGenericSignature();
+        } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+          genericSig = SD->getGenericSignature();
         }
 
         auto matchings =
@@ -1585,13 +1535,6 @@ static DisjunctionInfo computeDisjunctionInfo(
             onlySpeculativeArgumentCandidates &&
             (!canUseContextualResultTypes || resultTypes.empty());
 
-        // This is important for SIMD operators in particular because
-        // a lot of their overloads have same-type requires to a concrete
-        // type:  `<Scalar == (U)Int*>(_: SIMD*<Scalar>, ...) -> ...`.
-        if (genericSig) {
-          overloadType = overloadType->getReducedType(genericSig)
-                             ->castTo<FunctionType>();
-        }
 
         unsigned score = 0;
         unsigned numDefaulted = 0;
