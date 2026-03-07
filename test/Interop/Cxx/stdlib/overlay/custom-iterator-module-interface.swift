@@ -125,7 +125,7 @@
 // CHECK: struct TemplatedRACIteratorOutOfLineEq<CInt> : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
 // CHECK:   func successor() -> TemplatedRACIteratorOutOfLineEq<CInt>
 // CHECK:   typealias Pointee = Int32
-// CHECK:   typealias Distance = TemplatedRACIteratorOutOfLineEq<CInt>.difference_type
+// CHECK:   typealias Distance = Int32
 // CHECK:   var pointee: Int32 { get }
 // CHECK: }
 

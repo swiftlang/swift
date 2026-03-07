@@ -704,26 +704,42 @@ private:
       unavailableMethods;
 
 public:
-  // Attempt to lookup and import the synthesized .pointee computed property.
-  //
-  // Requires that \a Record is a (Swift) StructDecl and is import from
-  // a CXXRecordDecl.
-  //
-  // This function is idempotent, and if successful, ensures the synthesized
-  // .pointee that it returns is a mamber of \a Record.
+  /// Attempt to lookup and import the synthesized, non-mutating,
+  /// .__operatorStar() method.
+  ///
+  /// Requires that \a Record is a (Swift) StructDecl and is imported from
+  /// a CXXRecordDecl.
+  ///
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// .__operatorStar() that it returns is a member of \a Record.
+  FuncDecl *lookupAndImportOperatorStar(NominalTypeDecl *Record);
+
+  /// Attempt to lookup and import the synthesized .pointee computed property.
+  /// It also synthesizes __operatorStar(), which is used as the getter and
+  /// setter for .pointee.
+  ///
+  /// Requires that \a Record is a (Swift) StructDecl and is imported from
+  /// a CXXRecordDecl.
+  ///
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// .pointee and __operatorStar() methods that it returns are members of \a
+  /// Record.
   VarDecl *lookupAndImportPointee(NominalTypeDecl *Record);
 
-  // Attempt to lookup and import the synthesized .successor() method.
-  //
-  // Requires that \a Record is a (Swift) StructDecl and is import from
-  // a CXXRecordDecl.
-  //
-  // This function is idempotent, and if successful, ensures the synthesized
-  // .successor() that it returns is a mamber of \a Record.
+  /// Attempt to lookup and import the synthesized .successor() method.
+  ///
+  /// Requires that \a Record is a (Swift) StructDecl and is imported from
+  /// a CXXRecordDecl.
+  ///
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// .successor() that it returns is a member of \a Record.
   FuncDecl *lookupAndImportSuccessor(NominalTypeDecl *Record);
 
 private:
-  llvm::DenseMap<NominalTypeDecl *, VarDecl *> importedPointeeCache;
+  /// Stores <.pointee, func __operatorStar(), mutating func __operatorStar()>
+  llvm::DenseMap<NominalTypeDecl *,
+                 std::tuple<VarDecl *, FuncDecl *, FuncDecl *>>
+      importedPointeeCache;
   llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedSuccessorCache;
 
 public:
