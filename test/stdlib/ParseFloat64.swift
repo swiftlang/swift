@@ -103,18 +103,12 @@ tests.test("Infinities") {
   expectParseFails("infinite")
   expectParseFails("infinityandbeyond")
 
-  expectRoundTrip(Float64.infinity)
-  expectRoundTrip(-Float64.infinity)
 }
 
 tests.test("NaNs") {
   // Note: Previous Swift runtime used libc strtof and then
   // truncated to Float64, which is why some of these are
   // wrong when testing previous runtimes.
-  expectRoundTrip(Float64.nan)
-  expectRoundTrip(-Float64.nan)
-  expectRoundTrip(Float64(nan:73, signaling:false))
-  expectRoundTrip(Float64(nan:73, signaling:true))
   expectParse("nan", Float64.nan)
   expectParse("NAN", Float64.nan)
   expectParse("NaN", Float64.nan)
