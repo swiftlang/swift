@@ -2375,6 +2375,9 @@ BridgedBraceStmt BridgedBraceStmt_createImplicit(BridgedASTContext cContext,
                                                  BridgedASTNode element,
                                                  swift::SourceLoc rBLoc);
 
+SWIFT_NAME("BridgedBraceStmt.hasAsyncNode(self:)")
+bool BridgedBraceStmt_hasAsyncNode(BridgedBraceStmt braceStmt);
+
 SWIFT_NAME("BridgedBreakStmt.createParsed(_:loc:targetName:targetLoc:)")
 BridgedBreakStmt BridgedBreakStmt_createParsed(BridgedDeclContext cDeclContext,
                                                swift::SourceLoc loc,
@@ -2405,6 +2408,10 @@ BridgedDeferStmt BridgedDeferStmt_createParsed(BridgedDeclContext cDeclContext,
 
 SWIFT_NAME("getter:BridgedDeferStmt.tempDecl(self:)")
 BridgedFuncDecl BridgedDeferStmt_getTempDecl(BridgedDeferStmt bridged);
+
+SWIFT_NAME("BridgedDeferStmt.makeAsync(self:_:)")
+void BridgedDeferStmt_makeAsync(BridgedDeferStmt bridged,
+                                BridgedASTContext ctx);
 
 SWIFT_NAME("BridgedDiscardStmt.createParsed(_:discardLoc:subExpr:)")
 BridgedDiscardStmt BridgedDiscardStmt_createParsed(BridgedASTContext cContext,
