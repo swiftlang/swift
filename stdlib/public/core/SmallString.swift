@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -229,15 +229,15 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
 }
 
 extension _SmallString {
-  @inlinable @inline(__always)
+  @_alwaysEmitIntoClient @inline(__always)
   @safe
-  internal func withUTF8<Result>(
-    _ f: (UnsafeBufferPointer<UInt8>) throws -> Result
-  ) rethrows -> Result {
+  internal func withUTF8<Result, E: Error>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws(E) -> Result
+  ) throws(E) -> Result {
     let count = self.count
     var raw = self.zeroTerminatedRawCodeUnits
-    return try unsafe Swift._withUnprotectedUnsafeBytes(of: &raw) {
-      let rawPtr = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
+    return try unsafe Swift._withUnprotectedUnsafeBytes(of: &raw) { buffer throws(E) in
+      let rawPtr = unsafe buffer.baseAddress._unsafelyUnwrappedUnchecked
       // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the
       // duration of the closure. Accessing self after this rebind is undefined.
       let ptr = unsafe rawPtr.bindMemory(to: UInt8.self, capacity: count)
@@ -249,15 +249,30 @@ extension _SmallString {
     }
   }
 
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withUTF8<Result>(
+      _ f: (UnsafeBufferPointer<UInt8>) throws -> Result
+    ) throws -> Result
+  )
+  @usableFromInline
+  internal func __rethrows_withUTF8<Result>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws -> Result
+  ) throws -> Result {
+    return try self.withUTF8(f)
+  }
+#endif // !hasFeature(Embedded)
+
   // Overwrite stored code units, including uninitialized. `f` should return the
   // new count. This will re-establish the invariant after `f` that all bits
   // between the last code unit and the discriminator are unset.
-  @inline(__always)
-  fileprivate mutating func withMutableCapacity(
-    _ f: (UnsafeMutableRawBufferPointer) throws -> Int
-  ) rethrows {
-    let len = try unsafe withUnsafeMutableBytes(of: &_storage) {
-      try unsafe f(.init(start: $0.baseAddress, count: _SmallString.capacity))
+  @_alwaysEmitIntoClient @inline(__always)
+  fileprivate mutating func withMutableCapacity<E: Error>(
+    _ f: (UnsafeMutableRawBufferPointer) throws(E) -> Int
+  ) throws(E) {
+    let len = try unsafe withUnsafeMutableBytes(of: &_storage) { buffer throws(E) in
+      try unsafe f(.init(start: buffer.baseAddress, count: _SmallString.capacity))
     }
 
     if len <= 0 {
@@ -321,14 +336,14 @@ extension _SmallString {
   }
 
   @inline(__always)
-  internal init(
+  internal init<E: Error>(
     initializingUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
-    ) throws -> Int
-  ) rethrows {
+    ) throws(E) -> Int
+  ) throws(E) {
     self.init()
-    try unsafe self.withMutableCapacity {
-      try unsafe $0.withMemoryRebound(to: UInt8.self, initializer)
+    try unsafe self.withMutableCapacity { buffer throws(E) in
+      try unsafe buffer.withMemoryRebound(to: UInt8.self, initializer)
     }
     self._invariantCheck()
   }

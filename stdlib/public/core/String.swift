@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -641,30 +641,94 @@ extension String {
   ///   - initializer: A closure that accepts a buffer covering uninitialized
   ///     memory with room for `capacity` UTF-8 code units, initializes
   ///     that memory, and returns the number of initialized elements.
-  @inline(__always)
+#if hasFeature(Embedded)
+  @_alwaysEmitIntoClient @inline(__always)
   @available(SwiftStdlib 5.3, *)
-  public init(
+  public init<E: Error>(
     unsafeUninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
-    ) throws -> Int
-  ) rethrows {
+    ) throws(E) -> Int
+  ) throws(E) {
+    // Unable to call init(__rethrows_unsafeUninitializedCapacity:initializingUTF8With:)
+    // in Embedded Swift due to thrown `any Error`.
+
+    try unsafe self.init(
+      __impl_unsafeUninitializedCapacity: capacity,
+      initializingUTF8With: initializer
+    )
+  }
+
+  @available(SwiftStdlib 5.3, *)
+  @usableFromInline
+  internal init<E: Error>(
+    __impl_unsafeUninitializedCapacity capacity: Int,
+    initializingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>
+    ) throws(E) -> Int
+  ) throws(E) {
     self = try unsafe String(
       _uninitializedCapacity: capacity,
       initializingUTF8With: initializer
     )
   }
+#else
+  @_alwaysEmitIntoClient @inline(__always)
+  @available(SwiftStdlib 5.3, *)
+  public init<E: Error>(
+    unsafeUninitializedCapacity capacity: Int,
+    initializingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>
+    ) throws(E) -> Int
+  ) throws(E) {
+    do {
+      try unsafe self.init(
+        __rethrows_unsafeUninitializedCapacity: capacity,
+        initializingUTF8With: initializer
+      )
+    } catch {
+      throw error as! E
+    }
+  }
 
-  @inline(__always)
+  // ABI-preserved entrypoint for the rethrows version of init(unsafeUninitializedCapacity:initializingUTF8With:),
+  // which has been superseded by the typed-throws version. Expressed as "throws",
+  // which is ABI-compatible with "rethrows".
+  // Called from the typed throws version to avoid exposing the non-usableFromInline
+  // String(_uninitializedCapacity:initializingUTF8With:) as ABI.
+  @abi(
+    init(
+      unsafeUninitializedCapacity capacity: Int,
+      initializingUTF8With initializer: (
+        _ buffer: UnsafeMutableBufferPointer<UInt8>
+      ) throws -> Int
+    ) throws
+  )
+  @available(SwiftStdlib 5.3, *)
+  @usableFromInline
   internal init(
-    _uninitializedCapacity capacity: Int,
+    __rethrows_unsafeUninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
     ) throws -> Int
-  ) rethrows {
+  ) throws {
+    self = try unsafe String(
+      _uninitializedCapacity: capacity,
+      initializingUTF8With: initializer
+    )
+  }
+#endif // hasFeature(Embedded)
+
+  @inline(__always)
+  internal init<E: Error>(
+    _uninitializedCapacity capacity: Int,
+    initializingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>
+    ) throws(E) -> Int
+  ) throws(E) {
     if _fastPath(capacity <= _SmallString.capacity) {
-      let smol = try unsafe _SmallString(initializingUTF8With: {
-        try unsafe initializer(.init(start: $0.baseAddress, count: capacity))
+      let smol = try unsafe _SmallString(initializingUTF8With: { buffer throws(E) in
+        try unsafe initializer(.init(start: buffer.baseAddress, count: capacity))
       })
       // Fast case where we fit in a _SmallString and don't need UTF8 validation
       if _fastPath(smol.isASCII) {
@@ -694,12 +758,27 @@ extension String {
   ///   `withCString(_:)` method. The pointer argument is valid only for the
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable // fast-path: already C-string compatible
-  public func withCString<Result>(
-    _ body: (UnsafePointer<Int8>) throws -> Result
-  ) rethrows -> Result {
+  @_alwaysEmitIntoClient // (Primarily @inlinable) fast-path: already C-string compatible
+  public func withCString<Result, E: Error>(
+    _ body: (UnsafePointer<Int8>) throws(E) -> Result
+  ) throws(E) -> Result {
     return try unsafe _guts.withCString(body)
   }
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withCString<Result>(
+      _ body: (UnsafePointer<Int8>) throws -> Result
+    ) throws -> Result
+  )
+  @usableFromInline
+  internal func __rethrows_withCString<Result>(
+    _ body: (UnsafePointer<Int8>) throws -> Result
+  ) throws -> Result {
+    return try unsafe withCString(body)
+  }
+#endif // !hasFeature(Embedded)
 
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of code units.
@@ -717,15 +796,15 @@ extension String {
   ///   - targetEncoding: The encoding in which the code units should be
   ///     interpreted.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
+  @_alwaysEmitIntoClient
   @inline(__always) // Eliminate dynamic type check when possible
-  public func withCString<Result, TargetEncoding: Unicode.Encoding>(
+  public func withCString<Result, TargetEncoding: Unicode.Encoding, E: Error>(
     encodedAs targetEncoding: TargetEncoding.Type,
-    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
+  ) throws(E) -> Result {
     if targetEncoding == UTF8.self {
       return try unsafe self.withCString {
-        (cPtr: UnsafePointer<CChar>) -> Result  in
+        (cPtr: UnsafePointer<CChar>) throws(E) -> Result  in
         _internalInvariant(UInt8.self == TargetEncoding.CodeUnit.self)
         let ptr = unsafe UnsafeRawPointer(cPtr).assumingMemoryBound(
           to: TargetEncoding.CodeUnit.self)
@@ -735,14 +814,31 @@ extension String {
     return try unsafe _slowWithCString(encodedAs: targetEncoding, body)
   }
 
-  @usableFromInline @inline(never) // slow-path
-  @_effects(releasenone)
-  internal func _slowWithCString<Result, TargetEncoding: Unicode.Encoding>(
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withCString<Result, TargetEncoding: Unicode.Encoding>(
+      encodedAs targetEncoding: TargetEncoding.Type,
+      _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+    ) throws -> Result
+  )
+  @usableFromInline
+  internal func __rethrows_withCString<Result, TargetEncoding: Unicode.Encoding>(
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
-  ) rethrows -> Result {
+  ) throws -> Result {
+    return try unsafe withCString(encodedAs: targetEncoding, body)
+  }
+#endif // !hasFeature(Embedded)
+
+  @_alwaysEmitIntoClient @inline(never) // slow-path
+  @_effects(releasenone)
+  internal func _slowWithCString<Result, TargetEncoding: Unicode.Encoding, E: Error>(
+    encodedAs targetEncoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
+  ) throws(E) -> Result {
     var copy = self
-    return try copy.withUTF8 { utf8 in
+    return try copy.withUTF8 { utf8 throws(E) in
       var arg = Array<TargetEncoding.CodeUnit>()
       arg.reserveCapacity(1 &+ self._guts.count / 4)
       let repaired = unsafe transcode(
@@ -756,6 +852,25 @@ extension String {
       return try unsafe body(arg)
     }
   }
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func _slowWithCString<Result, TargetEncoding: Unicode.Encoding>(
+      encodedAs targetEncoding: TargetEncoding.Type,
+      _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+    ) throws -> Result
+  )
+  @usableFromInline
+  internal func __rethrows_underscore_slowWithCString<
+    Result, TargetEncoding: Unicode.Encoding
+  >(
+    encodedAs targetEncoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+  ) throws -> Result {
+    return try unsafe _slowWithCString(encodedAs: targetEncoding, body)
+  }
+#endif // !hasFeature(Embedded)
 }
 
 extension String: _ExpressibleByBuiltinUnicodeScalarLiteral {
@@ -1106,10 +1221,56 @@ extension String {
     return codeUnits
   }
 
+#if hasFeature(Embedded)
+  @_alwaysEmitIntoClient
   public // @testable
-  func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
+  func _withNFCCodeUnits<E: Error>(
+    _ f: (UInt8) throws(E) -> Void
+  ) throws(E) {
+    // Unable to call __rethrows_underscore_withNFCCodeUnits(_:)
+    // in Embedded Swift due to thrown `any Error`.
+
+    try _withNFCCodeUnitsImpl(f)
+  }
+
+  @usableFromInline
+  internal
+  func _withNFCCodeUnitsImpl<E: Error>(
+    _ f: (UInt8) throws(E) -> Void
+  ) throws(E) {
     try _gutsSlice._withNFCCodeUnits(f)
   }
+#else
+  @_alwaysEmitIntoClient
+  public // @testable
+  func _withNFCCodeUnits<E: Error>(
+    _ f: (UInt8) throws(E) -> Void
+  ) throws(E) {
+    do {
+      try __rethrows_underscore_withNFCCodeUnits(f)
+    } catch {
+      throw error as! E
+    }
+  }
+
+  // ABI-preserved entrypoint for the rethrows version of _withNFCCodeUnits,
+  // which has been superseded by the typed-throws version. Expressed as "throws",
+  // which is ABI-compatible with "rethrows".
+  // Called from the typed throws version to avoid exposing the non-usableFromInline
+  // _gutsSlice._withNFCCodeUnits as ABI.
+  @abi(
+    func _withNFCCodeUnits(
+      _ f: (UInt8) throws -> Void
+    ) throws
+  )
+  @usableFromInline
+  internal
+  func __rethrows_underscore_withNFCCodeUnits(
+    _ f: (UInt8) throws -> Void
+  ) throws {
+    try _gutsSlice._withNFCCodeUnits(f)
+  }
+#endif
 }
 
 extension String {

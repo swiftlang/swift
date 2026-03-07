@@ -96,7 +96,16 @@ Func Sequence.filter(_:) has been removed
 Func Sequence.map(_:) has been removed
 Func Dictionary.filter(_:) has been removed
 Func Set.filter(_:) has been removed
+Func String._slowWithCString(encodedAs:_:) has been removed
+Func String._withNFCCodeUnits(_:) has been renamed to Func __rethrows_underscore_withNFCCodeUnits(_:)
+Func String._withNFCCodeUnits(_:) has mangled name changing from 'Swift.String._withNFCCodeUnits((Swift.UInt8) throws -> ()) throws -> ()' to 'Swift.String.__rethrows_underscore_withNFCCodeUnits((Swift.UInt8) throws -> ()) throws -> ()'
+Func String._withNFCCodeUnits(_:) is now without rethrows
+Func String.withCString(_:) has been removed
+Func String.withCString(encodedAs:_:) has been removed
 Func Substring.filter(_:) has been removed
+Func Substring.withCString(_:) has been removed
+Func Substring.withCString(encodedAs:_:) has been removed
+Func Unicode.Scalar.withUTF8CodeUnits(_:) has been removed
 Func _ArrayProtocol.filter(_:) has been removed
 Constructor Result.init(catching:) has been removed
 Func withoutActuallyEscaping(_:do:) has been renamed to Func __abi_withoutActuallyEscaping(_:do:)
@@ -839,6 +848,12 @@ Func Dictionary.merge(_:uniquingKeysWith:) has been removed
 Func Dictionary.merging(_:uniquingKeysWith:) has been removed
 Func _NativeDictionary.mapValues(_:) has been removed
 Func _NativeDictionary.merge(_:isUnique:uniquingKeysWith:) has been removed
+Func _SmallString.withUTF8(_:) has been removed
+Func _StringGuts._slowWithCString(_:) has been removed
+Func _StringGuts.withCString(_:) has been removed
+Func _StringGuts.withFastCChar(_:) has been removed
+Func _StringGuts.withFastUTF8(_:) has been removed
+Func _StringGuts.withFastUTF8(range:_:) has been removed
 Func __CocoaDictionary.mapValues(_:) has been removed
 
 

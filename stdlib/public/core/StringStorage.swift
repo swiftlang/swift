@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -361,12 +361,12 @@ extension __StringStorage {
 
   // The caller is expected to check UTF8 validity and ASCII-ness and update
   // the resulting StringStorage accordingly
-  internal static func create(
+  internal static func create<E: Error>(
     uninitializedCodeUnitCapacity capacity: Int,
     initializingUncheckedUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
-    ) throws -> Int
-  ) rethrows -> __StringStorage {
+    ) throws(E) -> Int
+  ) throws(E) -> __StringStorage {
     let storage = __StringStorage.create(
       codeUnitCapacity: capacity,
       countAndFlags: _CountAndFlags(mortalCount: 0, isASCII: false)
