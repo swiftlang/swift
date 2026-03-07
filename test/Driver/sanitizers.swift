@@ -2,7 +2,6 @@
  * Address Sanitizer Tests  (asan)
  */
 // RUN: %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target x86_64-apple-macosx10.9 %s | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_OSX %s
-// RUN: not %swiftc_driver -sdk '""' -driver-print-jobs -sanitize=fuzzer -target x86_64-apple-macosx10.9 -resource-dir %S/Inputs/nonexistent-resource-dir %s 2>&1 | %FileCheck -check-prefix=FUZZER_NONEXISTENT %s
 // RUN: %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target x86_64-apple-ios7.1-simulator %s | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_IOSSIM %s
 // RUN: %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target arm64-apple-ios7.1 %s  | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_IOS %s
 // RUN: %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target x86_64-apple-tvos9.0-simulator %s | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_tvOS_SIM %s
@@ -55,6 +54,12 @@
 // RUN: not %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=memtag-stack -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=MEMTAGSAN_LINUX %s
 
 /*
+ * Fuzzer Sanitizer Tests
+ */
+// RUN: not %swiftc_driver -sdk '""' -driver-print-jobs -sanitize=fuzzer -target x86_64-apple-macosx10.9 -resource-dir %S/Inputs/nonexistent-resource-dir %s 2>&1 | %FileCheck -check-prefix=FUZZER_NONEXISTENT %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -sanitize=fuzzer-no-link -target x86_64-apple-macosx10.9 -resource-dir %S/Inputs/nonexistent-resource-dir %s 2>&1 | %FileCheck -check-prefix=FUZZER_NO_LINK %s
+
+/*
  * Multiple Sanitizers At Once
  */
 // RUN: %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address,undefined,fuzzer -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=MULTIPLE_SAN_LINUX %s
@@ -101,7 +106,6 @@
 // TSAN_tvOS: unsupported option '-sanitize=thread' for target 'arm64-apple-tvos9.0'
 // TSAN_watchOS_SIM: unsupported option '-sanitize=thread' for target 'i386-apple-watchos2.0-simulator'
 // TSAN_watchOS: unsupported option '-sanitize=thread' for target 'armv7k-apple-watchos2.0'
-// FUZZER_NONEXISTENT: unsupported option '-sanitize=fuzzer' for target 'x86_64-apple-macosx10.9'
 // TSAN_LINUX: -fsanitize=thread -lBlocksRuntime -ldispatch
 // TSAN_WINDOWS: unsupported option '-sanitize=thread' for target 'x86_64-unknown-windows-msvc'
 
@@ -136,6 +140,10 @@
 // MEMTAGSAN_watchOS: unsupported option '-sanitize=memtag-stack' for target 'armv7k-apple-watchos2.0'
 // MEMTAGSAN_LINUX: unsupported option '-sanitize=memtag-stack' for target 'x86_64-unknown-linux-gnu'
 // MEMTAGSAN_WINDOWS: unsupported option '-sanitize=memtag-stack' for target 'x86_64-unknown-windows-msvc'
+
+// FUZZER_NONEXISTENT: unsupported option '-sanitize=fuzzer' for target 'x86_64-apple-macosx10.9'
+// FUZZER_NO_LINK: swift
+// FUZZER_NO_LINK-NOT: unsupported option '-sanitize=fuzzer-no-link' for target 'x86_64-apple-macosx10.9'
 
 // MULTIPLE_SAN_LINUX: -fsanitize=address,undefined,fuzzer
 

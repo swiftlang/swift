@@ -149,13 +149,18 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
 
     // Support is determined by existence of the sanitizer library.
     auto fileName = toFileName(kind);
-    bool isShared = (kind != SanitizerKind::Fuzzer);
+    bool isShared =
+        (kind != SanitizerKind::Fuzzer && kind != SanitizerKind::FuzzerNoLink);
     bool sanitizerSupported = sanitizerRuntimeLibExists(fileName, isShared);
 
     if (kind == SanitizerKind::MemTagStack)
       // MemTagStack requires no runtime, so ignore library check above
       sanitizerSupported =
           Triple.isOSDarwin() && Triple.getArch() == llvm::Triple::aarch64;
+    else if (kind == SanitizerKind::FuzzerNoLink)
+      // Assume fuzzing is supported if using fuzzer-no-link; the user is
+      // expected to provide the library.
+      sanitizerSupported = true;
 
     // TSan is explicitly not supported for 32 bits.
     if (kind == SanitizerKind::Thread && !Triple.isArch64Bit())
