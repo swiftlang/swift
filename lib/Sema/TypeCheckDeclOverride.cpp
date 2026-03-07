@@ -915,9 +915,15 @@ OverrideMatcher::OverrideMatcher(ValueDecl *decl, bool ignoreMissingImports)
     if (auto superclassDecl = classDecl->getSuperclassDecl())
       superContexts.push_back(superclassDecl);
   } else if (auto protocol = dyn_cast<ProtocolDecl>(dc)) {
-    auto inheritedProtocols = protocol->getInheritedProtocols();
-    superContexts.insert(superContexts.end(), inheritedProtocols.begin(),
-                         inheritedProtocols.end());
+    for (auto inherited : protocol->getInheritedProtocols()) {
+      // Reparentable protocol members are never overridden by any members of
+      // protocols inheriting from it. This preserves the witness tables of
+      // those inheriting protocols.
+      if (inherited->getAttrs().hasAttribute<ReparentableAttr>())
+        continue;
+
+      superContexts.push_back(inherited);
+    }
   }
 }
 

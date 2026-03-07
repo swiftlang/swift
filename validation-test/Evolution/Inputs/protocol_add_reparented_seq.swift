@@ -29,6 +29,9 @@ public protocol Seq<Element> {
   associatedtype Element
   associatedtype Iterator: Iterable
   func makeIterator() -> Iterator
+
+  var underestimatedCount: Int { get }
+  func _customContainsEquality(_ e: Element) -> Bool?
 }
 #else
 public protocol Seq<Element>: BorrowingSeq {
@@ -37,6 +40,9 @@ public protocol Seq<Element>: BorrowingSeq {
   func makeIterator() -> Iterator
 
   associatedtype BorrowingSeqIter: BorrowingIter<Element>, ~Copyable, ~Escapable = Adapter<Iterator>
+
+  var underestimatedCount: Int { get }
+  func _customContainsEquality(_ e: Element) -> Bool?
 }
 
 @reparentable
@@ -46,6 +52,14 @@ public protocol BorrowingSeq<Element>: ~Copyable, ~Escapable {
 
   @_lifetime(borrow self)
   func makeBorrowingSeqIter() -> BorrowingSeqIter
+
+  var underestimatedCount: Int { get }
+  func _customContainsEquality(_ e: borrowing Element) -> Bool?
+}
+
+extension BorrowingSeq {
+  public var underestimatedCount: Int { 1 }
+  public func _customContainsEquality(_ e: borrowing Element) -> Bool? { nil }
 }
 
 extension Seq : @reparented BorrowingSeq
@@ -81,9 +95,15 @@ extension LibraryConformer {
 }
 #endif
 
+extension Seq {
+  public var underestimatedCount: Int { 0 }
+  public func _customContainsEquality(_ e: Element) -> Bool? { nil }
+}
+
 public func libraryTest(_ x: some Seq) {
   var iter = x.makeIterator()
   print(iter.next()!)
+  print("underestimatedCount = \(x.underestimatedCount)")
 #if !BEFORE
   libraryTestNew(x)
 #endif
@@ -94,5 +114,6 @@ public func libraryTestNew(_ x: some BorrowingSeq) {
   var borrowingIter = x.makeBorrowingSeqIter()
   let answer = borrowingIter.nextThing()!
   print(answer)
+  print("underestimatedCount = \(x.underestimatedCount)")
 }
 #endif
