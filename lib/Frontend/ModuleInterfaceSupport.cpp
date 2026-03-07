@@ -330,7 +330,8 @@ static void printImports(raw_ostream &out,
 
   for (auto import : allImports) {
     auto importedModule = import.importedModule;
-    if (importedModule->isOnoneSupportModule()) {
+    if (importedModule->isOnoneSupportModule() ||
+        importedModule->isClangHeaderImportModule()) {
       continue;
     }
 
