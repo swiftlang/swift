@@ -758,9 +758,9 @@ getCxxReferencePointeeTypeOrNone(const clang::Type *type);
 /// Returns true if the given type is a C++ `const` reference type.
 bool isCxxConstReferenceType(const clang::Type *type);
 
-/// Determine whether the given Clang record declaration has one of the
-/// attributes that makes it import as a reference types.
-bool hasImportAsRefAttr(const clang::RecordDecl *decl);
+/// Determine whether the given Clang record declaration has an attribute that
+/// makes it import as a reference types. Does not check its bases, if any.
+bool hasImportReferenceAttr(const clang::RecordDecl *decl);
 
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);

@@ -8025,69 +8025,6 @@ ClangImporter::createEmbeddedBridgingHeaderCacheKey(
                    "ChainedHeaderIncludeTree -> EmbeddedHeaderIncludeTree");
 }
 
-bool importer::hasImportAsRefAttr(const clang::RecordDecl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "import_reference" ||
-                    // TODO: Remove this once libSwift hosttools no longer
-                    // requires it.
-                    swiftAttr->getAttribute() == "import_as_ref";
-           return false;
-         });
-}
-
-static bool hasDiamondInheritanceRefType(const clang::CXXRecordDecl *decl) {
-  if (!decl->hasDefinition() || decl->isDependentType())
-    return false;
-
-  llvm::DenseSet<const clang::CXXRecordDecl *> seenBases;
-  bool hasRefDiamond = false;
-
-  decl->forallBases([&](const clang::CXXRecordDecl *Base) {
-    if (hasImportAsRefAttr(Base) && !seenBases.insert(Base).second &&
-        !decl->isVirtuallyDerivedFrom(Base))
-      hasRefDiamond = true;
-    return true;
-  });
-
-  return hasRefDiamond;
-}
-
-// Returns the given declaration along with all its parent declarations that are
-// reference types.
-static llvm::SmallVector<const clang::RecordDecl *, 4>
-getRefParentDecls(const clang::RecordDecl *decl, ASTContext &ctx,
-                  ClangImporter::Implementation *importerImpl) {
-  assert(decl && "decl is null inside getRefParentDecls");
-
-  llvm::SmallVector<const clang::RecordDecl *, 4> matchingDecls;
-
-  if (hasImportAsRefAttr(decl))
-    matchingDecls.push_back(decl);
-
-  if (const auto *cxxRecordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
-    if (!cxxRecordDecl->hasDefinition())
-      return matchingDecls;
-    if (hasDiamondInheritanceRefType(cxxRecordDecl)) {
-      if (importerImpl) {
-        if (importerImpl->DiagnosedCxxRefDecls.insert(decl).second) {
-          HeaderLoc loc(decl->getLocation());
-          importerImpl->diagnose(loc, diag::cant_infer_frt_in_cxx_inheritance,
-                                 decl);
-        }
-      }
-      return matchingDecls;
-    }
-    cxxRecordDecl->forallBases([&](const clang::CXXRecordDecl *baseDecl) {
-      if (hasImportAsRefAttr(baseDecl))
-        matchingDecls.push_back(baseDecl);
-      return true;
-    });
-  }
-
-  return matchingDecls;
-}
-
 llvm::SmallVector<ValueDecl *, 1>
 importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
   // If the name is empty, don't try to find any decls.
@@ -8137,62 +8074,17 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
   return results;
 }
 
-const clang::RecordDecl *
-importer::getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
-                             ClangImporter::Implementation *importerImpl) {
-  auto refParentDecls = getRefParentDecls(decl, ctx, importerImpl);
-  if (refParentDecls.empty())
-    return nullptr;
-
-  std::set<StringRef> uniqueRetainDecls{}, uniqueReleaseDecls{};
-  constexpr StringRef retainPrefix = "retain:";
-  constexpr StringRef releasePrefix = "release:";
-
-  for (const auto *refParentDecl : refParentDecls) {
-    assert(refParentDecl && "refParentDecl is null inside getRefParentOrDiag");
-    for (const auto *attr : refParentDecl->getAttrs()) {
-      if (const auto swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
-        auto attribute = swiftAttr->getAttribute();
-        if (attribute.consume_front(retainPrefix))
-          uniqueRetainDecls.insert(attribute);
-        else if (attribute.consume_front(releasePrefix))
-          uniqueReleaseDecls.insert(attribute);
-      }
-    }
-  }
-
-  // Ensure that exactly one unique retain function and one unique release
-  // function are found.
-  if (uniqueRetainDecls.size() != 1 || uniqueReleaseDecls.size() != 1) {
-    if (importerImpl) {
-      if (importerImpl->DiagnosedCxxRefDecls.insert(decl).second) {
-        HeaderLoc loc(decl->getLocation());
-        importerImpl->diagnose(loc, diag::cant_infer_frt_in_cxx_inheritance,
-                               decl);
-      }
-    }
-    return nullptr;
-  }
-
-  return refParentDecls.front();
-}
-
 /// Is this a pointer or a reference to a foreign reference type.
-static bool isForeignReferenceType(const clang::QualType type,
-                                   ASTContext &ctx) {
+static bool clangTypeIsForeignReference(const clang::QualType type,
+                                        ASTContext &ctx) {
   if (!type->isPointerOrReferenceType())
     return false;
-
-  auto pointeeType =
-      dyn_cast<clang::RecordType>(type->getPointeeType().getCanonicalType());
-  if (pointeeType == nullptr)
+  auto *pointee = type->getPointeeType().getCanonicalType()->getAsRecordDecl();
+  if (!pointee)
     return false;
-  auto pointeeDecl = pointeeType->getAsRecordDecl();
-
-  auto semanticsKind = evaluateOrDefault(
-      ctx.evaluator,
-      CxxRecordSemantics({pointeeDecl, ctx, /*importerImpl=*/nullptr}), {});
-  return semanticsKind == CxxRecordSemanticsKind::Reference;
+  auto info = evaluateOrDefault(ctx.evaluator,
+                                ForeignReferenceTypeInfoRequest({pointee}), {});
+  return info.isReference();
 }
 
 bool importer::hasSwiftAttribute(const clang::Decl *decl, StringRef attr) {
@@ -8257,7 +8149,7 @@ static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
     if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
       if (auto cxxRecord =
               dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
-        if (hasImportAsRefAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
+        if (hasImportReferenceAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
             hasUnsafeAPIAttr(cxxRecord))
           return false;
 
@@ -8383,9 +8275,8 @@ CxxRecordSemanticsKind
 CxxRecordSemantics::evaluate(Evaluator &evaluator,
                              CxxRecordSemanticsDescriptor desc) const {
   const auto *decl = desc.decl;
-  ClangImporter::Implementation *importerImpl = desc.importerImpl;
-  if (hasImportAsRefAttr(decl) ||
-      getRefParentOrDiag(decl, desc.ctx, importerImpl))
+  if (evaluateOrDefault(evaluator, ForeignReferenceTypeInfoRequest({decl}), {})
+          .isReference())
     return CxxRecordSemanticsKind::Reference;
 
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl);
@@ -8464,7 +8355,9 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
       // When a reference type is copied, the pointer’s value is copied rather
       // than the object’s storage. This means reference types can be imported
       // as copyable to Swift, even when they are non-copyable in C++.
-      if (recordHasReferenceSemantics(recordDecl, importerImpl))
+      if (evaluateOrDefault(evaluator,
+                            ForeignReferenceTypeInfoRequest({recordDecl}), {})
+              .isReference())
         return;
 
       if (recordDecl->isInStdNamespace()) {
@@ -8639,7 +8532,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
         isa<clang::CXXConstructorDecl>(decl))
       return true;
 
-    if (isForeignReferenceType(method->getReturnType(), desc.ctx))
+    if (clangTypeIsForeignReference(method->getReturnType(), desc.ctx))
       return true;
 
     // begin and end methods likely return an interator, so they're unsafe. This
@@ -8652,7 +8545,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
       ->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
 
     bool parentIsSelfContained =
-        !isForeignReferenceType(parentQualType, desc.ctx) &&
+        !clangTypeIsForeignReference(parentQualType, desc.ctx) &&
         anySubobjectsSelfContained(method->getParent());
 
     // If it returns a pointer or reference from an owned parent, that's a
@@ -8810,7 +8703,7 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
       if (pointeeType->isFunctionType())
         return false; // Function pointers are not unsafe
       auto *recordDecl = pointeeType->getAsRecordDecl();
-      if (recordDecl && hasImportAsRefAttr(recordDecl))
+      if (recordDecl && hasImportReferenceAttr(recordDecl))
         return false; // Pointers are ok if imported as foreign reference types
       return true; // All other pointers are considered unsafe.
     }
