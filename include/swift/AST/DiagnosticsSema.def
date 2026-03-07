@@ -3893,6 +3893,8 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
       "in an '@available' attribute here|" \
       "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context|" \
       "in a property declaration member of a type not marked '@_implementationOnly'|" \
+      "in a property declaration member of an open class|" \
+      "in a property declaration member of a class without the required '@export(interface)' deinit in Embedded|" \
       "in an associated value of a public or '@usableFromInline' enum|" \
       "in an associated value of an enum not marked '@_implementationOnly'}"
 
@@ -3938,6 +3940,12 @@ ERROR(unexportable_clang_function_type,none,
       "cannot export the underlying C type of the function type %0; "
       "it may use anonymous types or types defined outside of a module",
       (Type))
+
+NOTE(embedded_classes_require_export_interface_deinit,none,
+     "add a '@export(interface)' deinit to the class "
+     "for properties to reference a hidden dependency. "
+     "This is a restriction in Embedded mode.",
+     ())
 
 ERROR(cxx_class_instantiation_failed,none,
       "couldn't instantiate a C++ class template",
