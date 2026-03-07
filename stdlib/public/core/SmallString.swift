@@ -235,30 +235,48 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
       if start < 8 {
         if end <= 8 {
           // Substring entirely in leading word
-          let shiftAmount = UInt64(start) * 8
-          let mask = (UInt64(1) << (UInt64(subCount) * 8)) - 1
-          leading = (self.leadingRawBits >> shiftAmount) & mask
+          let shiftAmount = UInt64(start) &* 8
+          let mask = UInt64.max &>> (64 &- UInt64(subCount) &* 8)
+          leading = (self.leadingRawBits &>> shiftAmount) & mask
           trailing = 0
         } else {
-          // Substring spans both words
-          let leadingBits = 8 - start
-          let trailingBits = subCount - leadingBits
+          // Substring spans both words.
+          // Pack bytes into the correct _SmallString layout:
+          //   new leading  = bytes 0 ..< min(subCount, 8)
+          //   new trailing = bytes 8 ..< subCount  (empty when subCount ≤ 8)
+          let leadingBits = 8 - start   // bytes from first word
+          let complementBits = start    // bytes from second word that complete new leading
 
-          // Extract from leading word
-          let leadingShift = UInt64(start) * 8
-          let leadingMask = (UInt64(1) << (UInt64(leadingBits) * 8)) - 1
-          leading = (self.leadingRawBits >> leadingShift) & leadingMask
+          // Extract leadingBits bytes from first word
+          let leadingShift = UInt64(start) &* 8
+          let leadingFromOrig = (self.leadingRawBits &>> leadingShift)
+                              & (UInt64.max &>> (64 &- UInt64(leadingBits) &* 8))
 
-          // Extract from trailing word
-          let trailingMask = (UInt64(1) << (UInt64(trailingBits) * 8)) - 1
-          trailing = self.trailingRawBits & trailingMask
+          // Extract up to complementBits bytes from second word, shift up to fill new leading.
+          // complementBits ∈ [0..7], so (1 &<< (n*8)) &- 1 is safe (n ≤ 7 < 8).
+          let complementMask = (UInt64(1) &<< (UInt64(complementBits) &* 8)) &- 1
+          let leadingFromTrailing = (self.trailingRawBits & complementMask)
+                                  &<< (UInt64(leadingBits) &* 8)
+
+          // Mask to min(subCount, 8) bytes.
+          let leadingBytes = Swift.min(subCount, 8)
+          leading = (leadingFromOrig | leadingFromTrailing)
+                  & (UInt64.max &>> (64 &- UInt64(leadingBytes) &* 8))
+
+          if subCount > 8 {
+            let tailBits = subCount - 8
+            trailing = (self.trailingRawBits &>> (UInt64(complementBits) &* 8))
+                     & (UInt64.max &>> (64 &- UInt64(tailBits) &* 8))
+          } else {
+            trailing = 0
+          }
         }
       } else {
         // Substring entirely in trailing word
         let trailingStart = start - 8
-        let shiftAmount = UInt64(trailingStart) * 8
-        let mask = (UInt64(1) << (UInt64(subCount) * 8)) - 1
-        leading = (self.trailingRawBits >> shiftAmount) & mask
+        let shiftAmount = UInt64(trailingStart) &* 8
+        let mask = UInt64.max &>> (64 &- UInt64(subCount) &* 8)
+        leading = (self.trailingRawBits &>> shiftAmount) & mask
         trailing = 0
       }
 
