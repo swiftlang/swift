@@ -15,15 +15,15 @@
 
 // Build the client using module
 // RUN: %target-swift-frontend -typecheck -verify -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name Client -I %t %t/src/Client.swift
-// RUN: %target-swift-frontend -typecheck -verify -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name ClientWithMacro -I %t %t/src/ClientWithMacro.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name ClientWithMacro -I %t %t/src/ClientWithMacro.swift
 
 // RUN: rm %t/Lib.swiftmodule
 
 // Re-build the client using interface
 // RUN: %target-swift-frontend -typecheck -verify -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name Client -I %t %t/src/Client.swift
-// RUN: %target-swift-frontend -typecheck -verify -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name ClientWithMacro -I %t %t/src/ClientWithMacro.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name ClientWithMacro -I %t %t/src/ClientWithMacro.swift
 
-// REQUIRES: swift_swift_parser, executable_test
+// REQUIRES: swift_swift_parser, executable_test, concurrency
 
 //--- macro_definitions.swift
 import SwiftOperators
@@ -39,16 +39,16 @@ public struct AddConformanceMacro: ExtensionMacro {
     conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
-    let conformance: DeclSyntax =
+    protocols.compactMap {
+      let conformance: DeclSyntax =
       """
-      extension \(type.trimmed): Q {}
+      extension \(type.trimmed): nonisolated \($0.trimmed) {
+        func test() {}
+      }
       """
 
-    guard let extensionDecl = conformance.as(ExtensionDeclSyntax.self) else {
-      return []
+      return conformance.as(ExtensionDeclSyntax.self)
     }
-
-    return [extensionDecl]
   }
 }
 
@@ -65,8 +65,11 @@ public protocol Q: P, Other {
 public protocol W: Q {
 }
 
-@attached(extension, conformances: Q)
+@attached(extension, names: named(test), conformances: Q)
 public macro AddQ() = #externalMacro(module: "MacroDefinition", type: "AddConformanceMacro")
+
+@attached(extension, names: named(test), conformances: Hashable)
+public macro AddHashable() = #externalMacro(module: "MacroDefinition", type: "AddConformanceMacro")
 
 //--- ClientWithMacro.swift
 import Lib
@@ -74,6 +77,22 @@ import Lib
 @AddQ
 struct S: W {
   var x: Int // Ok (no errors about conformance isolation)
+}
+
+@AddHashable
+nonisolated struct TestNonisolated {
+  var x: Int
+}
+
+@AddHashable
+struct TestIsolated {
+  var x: Int
+}
+
+nonisolated func test(v1: S, v2: TestNonisolated, v3: TestIsolated) async {
+  v1.test() // Ok (because S is Sendable)
+  v2.test() // Ok
+  await v3.test() // Ok (no warnings because main-actor method is implicitly async when called from a different context)
 }
 
 //--- Client.swift
