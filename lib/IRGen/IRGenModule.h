@@ -2093,6 +2093,7 @@ private:
   void emitSwiftAsyncExtendedFrameInfoWeakRef();
 public:
   bool isConcurrencyAvailable();
+  bool isTypedAllocationAvailable();
   void noteSwiftAsyncFunctionDef() {
     hasSwiftAsyncFunctionDef = true;
   }

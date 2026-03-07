@@ -2394,6 +2394,12 @@ bool IRGenModule::isConcurrencyAvailable() {
   return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
 }
 
+bool IRGenModule::isTypedAllocationAvailable() {
+  auto &langOpts = Context.LangOpts;
+  return langOpts.hasFeature(Feature::Embedded) &&
+         langOpts.hasFeature(Feature::TypedAllocation);
+}
+
 /// Pretend the other files that drivers/build systems expect exist by
 /// creating empty files. Used by UseSingleModuleLLVMEmission when
 /// num-threads > 0.

@@ -367,7 +367,13 @@ public:
 
   llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,
                                    llvm::Value *alignMask,
+                                   std::optional<uint64_t> mallocTypeId,
                                    const llvm::Twine &name = "");
+  llvm::Value *emitAllocObjectTypedCall(llvm::Value *metadata,
+                                        llvm::Value *size,
+                                        llvm::Value *alignMask,
+                                        llvm::Value *typeDescriptor,
+                                        const llvm::Twine &name);
   llvm::Value *emitInitStackObjectCall(llvm::Value *metadata,
                                        llvm::Value *object,
                                        const llvm::Twine &name = "");

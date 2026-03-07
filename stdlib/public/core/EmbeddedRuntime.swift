@@ -149,6 +149,9 @@ public func _swift_generateRandomHashSeed(_ buf: UnsafeMutableRawPointer, _ nbyt
 @_extern(c, "_swift_writeCharToStandardOutput")
 public func _swift_writeCharToStandardOutput(_: CInt) -> CInt
 
+@_extern(c, "_swift_typedAllocate")
+public func _swift_typedAllocate(_ buf: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ size: Int, _ alignMask: Int, _ typeId: UInt64)
+
 #else
 // Interface that predates the introduction of swift/EmbeddedPlatform.h
 
@@ -214,6 +217,21 @@ func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, requiredSi
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
   unsafe object.pointee.refcount = 1
   return unsafe object
+}
+
+@c
+public func swift_allocObjectTyped(metadata: Builtin.RawPointer, requiredSize: Int, requiredAlignmentMask: Int, typeId: UInt64) -> Builtin.RawPointer {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  var _p: UnsafeMutableRawPointer? = nil
+  unsafe _swift_typedAllocate(&p, requiredSize, requiredAlignmentMask, typeId)
+  let p = p!
+  let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
+  unsafe _swift_embedded_set_heap_object_metadata_pointer(object, UnsafeMutablePointer<ClassMetadata>(metadata))
+  unsafe object.pointee.refcount = 1
+  return unsafe p._rawValue
+#else
+  swift_allocObject(metadata: metadata, requiredSize: requiredSize, requiredAlignmentMask: requiredAlignmentMask)
+#endif
 }
 
 @c

@@ -600,6 +600,9 @@ EXPERIMENTAL_FEATURE(EmbeddedExistentials, true)
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
 
+/// Emit typed allocation calls in Embedded Swift.
+EXPERIMENTAL_FEATURE(TypedAllocation, true)
+
 /// Check @_implementationOnly imports in non-library-evolution mode.
 EXPERIMENTAL_FEATURE(CheckImplementationOnly, true)
 

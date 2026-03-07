@@ -162,13 +162,26 @@ llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
 }
 
 /// Emit a heap allocation.
-llvm::Value *IRGenFunction::emitAllocObjectCall(llvm::Value *metadata,
-                                                llvm::Value *size,
-                                                llvm::Value *alignMask,
-                                                const llvm::Twine &name) {
+llvm::Value *IRGenFunction::emitAllocObjectCall(
+    llvm::Value *metadata, llvm::Value *size, llvm::Value *alignMask,
+    std::optional<uint64_t> mallocTypeId, const llvm::Twine &name) {
+  if (mallocTypeId) {
+    auto descriptorConst = llvm::ConstantInt::get(IGM.Int64Ty, *mallocTypeId);
+    return emitAllocObjectTypedCall(metadata, size, alignMask, descriptorConst,
+                                    name);
+  }
   // For now, all we have is swift_allocObject.
   return emitAllocatingCall(*this, IGM.getAllocObjectFunctionPointer(),
                             {metadata, size, alignMask}, name);
+}
+
+/// Emit a typed heap allocation.
+llvm::Value *IRGenFunction::emitAllocObjectTypedCall(
+    llvm::Value *metadata, llvm::Value *size, llvm::Value *alignMask,
+    llvm::Value *typeDescriptor, const llvm::Twine &name) {
+  // For now, all we have is swift_allocObjectTyped.
+  return emitAllocatingCall(*this, IGM.getAllocObjectTypedFunctionPointer(),
+                            {metadata, size, alignMask, typeDescriptor}, name);
 }
 
 llvm::Value *IRGenFunction::emitInitStackObjectCall(llvm::Value *metadata,

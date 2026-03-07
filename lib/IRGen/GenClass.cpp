@@ -895,7 +895,12 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     // Allocate the object on the heap.
     std::tie(size, alignMask)
       = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
-    val = IGF.emitAllocObjectCall(metadata, size, alignMask, "reference.new");
+
+    auto maybeDescriptor =
+        classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, selfType);
+
+    val = IGF.emitAllocObjectCall(metadata, size, alignMask, maybeDescriptor,
+                                  "reference.new");
     StackAllocSize = -1;
   }
   return IGF.Builder.CreateBitCast(val, IGF.IGM.PtrTy);
@@ -941,7 +946,7 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
     = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
 
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
-                                             "reference.new");
+                                             std::nullopt, "reference.new");
   StackAllocSize = -1;
   return IGF.Builder.CreateBitCast(val, destType);
 }
