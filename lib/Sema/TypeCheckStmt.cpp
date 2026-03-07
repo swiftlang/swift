@@ -3440,7 +3440,8 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
 }
 
 bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
-                                       bool isAsync, SourceLoc loc) {
+                                       bool isAsync, SourceLoc loc,
+                                       const DeclContext *dc) {
   if (!ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {
     return false;
   }
@@ -3469,9 +3470,8 @@ bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
     return false;
   }
 
-  if (auto *conformance = seqConformanceRef.getConcrete()) {
+  if (seqConformanceRef.getConcrete()) {
     auto protoAvail = AvailabilityContext::forDeclSignature(borrowingSeqProto);
-    auto *dc = conformance->getDeclContext();
     auto availability = AvailabilityContext::forLocation(loc, dc);
     if (!availability.isContainedIn(protoAvail))
       return false;
@@ -3513,7 +3513,7 @@ public:
       return nullptr;
 
     isBorrowing = shouldUseBorrowingSequence(ctx, seqType, isAsync,
-                                             sequence->getStartLoc());
+                                             sequence->getStartLoc(), dc);
 
     sequenceProto =
         isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
