@@ -7447,8 +7447,9 @@ bool swift::checkSendableConformance(
     }
 
     if (!isInherited) {
-      // A 'Sendable' class cannot inherit from another class, although
-      // we allow `NSObject` for Objective-C interoperability.
+      // A 'Sendable' class cannot inherit from another class unless it is
+      // sendable, although we allow `NSObject` for Objective-C
+      // interoperability.
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
         if (!superclassDecl->isNSObject()) {
           classDecl
@@ -7456,7 +7457,8 @@ bool swift::checkSendableConformance(
                          nominal->getASTContext().LangOpts.EnableObjCInterop,
                          classDecl->getName())
               .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
-
+          superclassDecl->diagnose(diag::does_not_conform_sendable,
+                                   superclassDecl);
           if (behavior == DiagnosticBehavior::Unspecified)
             return true;
         }
