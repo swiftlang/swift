@@ -135,7 +135,6 @@ struct PotentialBinding {
   Constraint *getSource() const { return cast<Constraint *>(BindingSource); }
 
   PotentialBinding withType(Type type) const {
-    ASSERT(Kind != AllowedBindingKind::Fallback);
     return {type, Kind, BindingSource, Originator};
   }
 
