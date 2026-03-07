@@ -25,8 +25,6 @@ namespace trace {
 
 inline void actor_create(HeapObject *actor) {}
 
-inline void actor_destroy(HeapObject *actor) {}
-
 inline void actor_deallocate(HeapObject *actor) {}
 
 inline void actor_enqueue(HeapObject *actor, Job *job) {}
@@ -77,7 +75,12 @@ inline void job_enqueue_global_with_delay(unsigned long long delay, Job *job) {}
 
 inline void job_enqueue_main_executor(Job *job) {}
 
-inline job_run_info job_run_begin(Job *job) { return {}; }
+inline void job_enqueue_executor(Job *job, HeapObject *executor) {}
+
+inline job_run_info job_run_begin(Job *job, HeapObject *actor,
+                                  HeapObject *executorIdentity) {
+  return {};
+}
 
 inline void job_run_end(job_run_info info) {}
 

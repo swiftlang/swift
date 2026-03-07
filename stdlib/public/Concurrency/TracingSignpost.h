@@ -66,6 +66,7 @@
 #define SWIFT_LOG_JOB_ENQUEUE_GLOBAL_WITH_DELAY_NAME                           \
   "job_enqueue_global_with_delay"
 #define SWIFT_LOG_JOB_ENQUEUE_MAIN_EXECUTOR_NAME "job_enqueue_main_executor"
+#define SWIFT_LOG_JOB_ENQUEUE_EXECUTOR_NAME "job_enqueue_executor"
 #define SWIFT_LOG_JOB_RUN_NAME "job_run"
 
 namespace swift {
@@ -111,20 +112,15 @@ inline void actor_create(HeapObject *actor) {
 
   auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
   os_signpost_interval_begin(ActorLog, id, SWIFT_LOG_ACTOR_LIFETIME_NAME,
-                             "actor=%p typeName:%.*s", actor,
+                             "actor=%p typeName=%.*s", actor,
                              (int)typeName.length, typeName.data);
-}
-
-inline void actor_destroy(HeapObject *actor) {
-  ENSURE_LOGS();
-  auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
-  os_signpost_interval_end(ActorLog, id, SWIFT_LOG_ACTOR_LIFETIME_NAME,
-                           "actor=%p", actor);
 }
 
 inline void actor_deallocate(HeapObject *actor) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
+  os_signpost_interval_end(ActorLog, id, SWIFT_LOG_ACTOR_LIFETIME_NAME,
+                           "actor=%p", actor);
   os_signpost_event_emit(ActorLog, id, SWIFT_LOG_ACTOR_DEALLOCATE_NAME,
                          "actor=%p", actor);
 }
@@ -132,18 +128,24 @@ inline void actor_deallocate(HeapObject *actor) {
 inline void actor_enqueue(HeapObject *actor, Job *job) {
   if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
     ENSURE_LOGS();
+    auto metadata = swift_getObjectType(actor);
     auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
-    os_signpost_event_emit(ActorLog, id, SWIFT_LOG_ACTOR_ENQUEUE_NAME,
-                           "actor=%p task=%" PRId64, actor, task->getTaskId());
+    os_signpost_event_emit(
+        ActorLog, id, SWIFT_LOG_ACTOR_ENQUEUE_NAME,
+        "actor=%p task=%" PRId64 " metadata=%p descriptor=%p", actor,
+        task->getTaskId(), metadata, metadata->getTypeContextDescriptor());
   }
 }
 
 inline void actor_dequeue(HeapObject *actor, Job *job) {
   if (AsyncTask *task = dyn_cast_or_null<AsyncTask>(job)) {
     ENSURE_LOGS();
+    auto metadata = swift_getObjectType(actor);
     auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
-    os_signpost_event_emit(ActorLog, id, SWIFT_LOG_ACTOR_DEQUEUE_NAME,
-                           "actor=%p task=%" PRId64, actor, task->getTaskId());
+    os_signpost_event_emit(
+        ActorLog, id, SWIFT_LOG_ACTOR_DEQUEUE_NAME,
+        "actor=%p task=%" PRId64 " metadata=%p descriptor=%p", actor,
+        task->getTaskId(), metadata, metadata->getTypeContextDescriptor());
   }
 }
 
@@ -234,13 +236,15 @@ inline void task_status_changed(AsyncTask *task, uint8_t maxPriority,
 #endif // !TARGET_OS_SIMULATOR
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
+  const char *taskName = task->getTaskName();
   os_signpost_event_emit(
       TaskLog, id, SWIFT_LOG_TASK_STATUS_CHANGED_NAME,
       "task=%" PRId64 " resumefn=%p "
       "maxPriority=%u, isCancelled=%{bool}d "
-      "isEscalated=%{bool}d, isRunning=%{bool}d, isEnqueued=%{bool}d",
-      task->getTaskId(), task->getResumeFunctionForLogging(isStarting), maxPriority,
-      isCancelled, isEscalated, isRunning, isEnqueued);
+      "isEscalated=%{bool}d, isRunning=%{bool}d, isEnqueued=%{bool}d "
+      "taskName=%{public}s",
+      task->getTaskId(), task->getResumeFunctionForLogging(isStarting),
+      maxPriority, isCancelled, isEscalated, isRunning, isEnqueued, taskName);
 }
 
 inline void task_flags_changed(AsyncTask *task, uint8_t jobPriority,
@@ -325,7 +329,21 @@ inline void job_enqueue_main_executor(Job *job) {
   }
 }
 
-inline job_run_info job_run_begin(Job *job) {
+inline void job_enqueue_executor(Job *job, HeapObject *executor) {
+  if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
+    ENSURE_LOGS();
+    auto metadata = swift_getObjectType(executor);
+    auto id = os_signpost_id_make_with_pointer(TaskLog, job);
+    os_signpost_event_emit(TaskLog, id, SWIFT_LOG_JOB_ENQUEUE_EXECUTOR_NAME,
+                           "task=%" PRId64
+                           " executor=%p metadata=%p descriptor=%p",
+                           task->getTaskId(), executor, metadata,
+                           metadata->getTypeContextDescriptor());
+  }
+}
+
+inline job_run_info job_run_begin(Job *job, HeapObject *actor,
+                                  HeapObject *executorIdentity) {
   auto invalidInfo = []{
     return job_run_info{ 0, OS_SIGNPOST_ID_INVALID };
   };
@@ -334,8 +352,16 @@ inline job_run_info job_run_begin(Job *job) {
     ENSURE_LOGS(invalidInfo());
     auto handle = os_signpost_id_generate(TaskLog);
     auto taskId = task->getTaskId();
-    os_signpost_interval_begin(TaskLog, handle, SWIFT_LOG_JOB_RUN_NAME,
-                               "task=%" PRId64, taskId);
+    const char *taskName = task->getTaskName();
+    auto metadata =
+        executorIdentity ? swift_getObjectType(executorIdentity) : nullptr;
+    auto descriptor = metadata ? metadata->getTypeContextDescriptor() : nullptr;
+
+    os_signpost_interval_begin(
+        TaskLog, handle, SWIFT_LOG_JOB_RUN_NAME,
+        "task=%" PRId64 " actor=%p executor=%p metadata=%p descriptor=%p "
+        "taskName=%{public}s",
+        taskId, actor, executorIdentity, metadata, descriptor, taskName);
     return { taskId, handle };
   }
   return invalidInfo();
