@@ -13,6 +13,8 @@ Default option value definitions.
 
 import os
 import platform
+import re
+from typing import Optional
 
 from . import shell
 from .versions import Version
@@ -67,19 +69,42 @@ DARWIN_INSTALL_PREFIX = ('/Applications/Xcode.app/Contents/Developer/'
 DSYMUTIL_JOBS = 1
 
 
-def _system_memory():
-    """Returns the system memory as an int. None if the system memory cannot
+def _system_memory() -> Optional[int]:
+    """Returns the system memory as an int in bytes. None if the system memory cannot
     be determined.
 
-    TODO: Support Linux and Windows platforms.
+    TODO: Support Windows platforms.
     """
 
-    if platform.platform() == 'Darwin':
-        try:
-            output = shell.check_output(['sysctl', 'hw.memsize']).strip()
-            return int(output.split(' ')[1])
-        except shell.CalledProcessError:
-            return None
+    try:
+        platform_system = platform.system()
+
+        if platform_system == "Darwin":
+            output = shell.check_output(["sysctl", "-n", "hw.memsize"]).strip()
+            return int(output)
+        elif platform_system == "FreeBSD":
+            output = shell.check_output(["sysctl", "-n", "hw.physmem"]).strip()
+            return int(output)
+        elif platform_system == "Linux":
+            with open("/proc/meminfo", "r") as file:
+                meminfo_data = file.read()
+                # Line to match "MemTotal: 239402943 kB"
+                matched = re.search(r"^MemTotal:\s+(\d+)\s*(\w*)?", meminfo_data)
+                if not matched:
+                    return None
+                total_memory, meminfo_unit = matched.groups()
+                total_memory = int(total_memory)
+                unit_multiplier = {
+                    "b": 1,
+                    "kb": 1024,
+                    "mb": 1024 * 1024,
+                    "gb": 1024 * 1024 * 1024,
+                }
+                memory_unit = unit_multiplier.get(meminfo_unit.lower(), 1024)
+                return total_memory * memory_unit
+
+    except (shell.CalledProcessError, FileNotFoundError, ValueError):
+        return None
 
     return None
 
