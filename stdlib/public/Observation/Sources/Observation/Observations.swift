@@ -51,7 +51,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
     }
     
     // the cancellation of awaiting on willSet only ferries in resuming early
-    // it is the responsability of the caller to check if the task is actually
+    // it is the responsibility of the caller to check if the task is actually
     // cancelled after awaiting the willSet to act accordingly.
     static func cancel(_ state: _ManagedCriticalState<State>, id: Int) {
       state.withCriticalRegion { state in
