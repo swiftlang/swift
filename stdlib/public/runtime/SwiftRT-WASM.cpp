@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,48 +11,40 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImageInspectionCommon.h"
-#include "swift/shims/MetadataSections.h"
 #include "swift/Runtime/Backtrace.h"
 #include "swift/Runtime/Config.h"
+#include "swift/shims/MetadataSections.h"
 
 #include <cstddef>
 #include <new>
 
-#if defined(__ELF__)
-extern "C" const char __ehdr_start[] __attribute__((__weak__));
-#endif
-
 #if SWIFT_ENABLE_BACKTRACING
 // Drag in a symbol from the backtracer, to force the static linker to include
 // the code.
-static const void *__backtraceRef __attribute__((used, retain))
-  = (const void *)swift::runtime::backtrace::_swift_backtrace_isThunkFunction;
+static const void *__backtraceRef __attribute__((used, retain)) =
+    (const void *)swift::runtime::backtrace::_swift_backtrace_isThunkFunction;
 #endif
 
 // Create empty sections to ensure that the start/stop symbols are synthesized
 // by the linker.  Otherwise, we may end up with undefined symbol references as
 // the linker table section was never constructed.
-#if defined(__ELF__)
-# define DECLARE_EMPTY_METADATA_SECTION(name, attrs) __asm__("\t.section " #name ",\"" attrs "\"\n");
-#elif defined(__wasm__)
-# define DECLARE_EMPTY_METADATA_SECTION(name, attrs) __asm__("\t.section " #name ",\"R\",@\n");
-#endif
+#define DECLARE_EMPTY_METADATA_SECTION(name)                                   \
+  __asm__("\t.section " #name ",\"R\",@\n");
 
-#define BOUNDS_VISIBILITY __attribute__((__visibility__("hidden"), \
-                                         __aligned__(1)))
+#define BOUNDS_VISIBILITY                                                      \
+  __attribute__((__visibility__("hidden"), __aligned__(1)))
 
-#define DECLARE_BOUNDS(name)                            \
-  BOUNDS_VISIBILITY extern const char __start_##name;   \
+#define DECLARE_BOUNDS(name)                                                   \
+  BOUNDS_VISIBILITY extern const char __start_##name;                          \
   BOUNDS_VISIBILITY extern const char __stop_##name;
 
-#define DECLARE_SWIFT_SECTION(name)             \
-  DECLARE_EMPTY_METADATA_SECTION(name, "aR")    \
+#define DECLARE_SWIFT_SECTION(name)                                            \
+  DECLARE_EMPTY_METADATA_SECTION(name)                                         \
   DECLARE_BOUNDS(name)
 
 // These may or may not be present, depending on compiler switches; it's
 // worth calling them out as a result.
-#define DECLARE_SWIFT_REFLECTION_SECTION(name)  \
-  DECLARE_SWIFT_SECTION(name)
+#define DECLARE_SWIFT_REFLECTION_SECTION(name) DECLARE_SWIFT_SECTION(name)
 
 extern "C" {
 DECLARE_SWIFT_SECTION(swift5_protocols)
@@ -82,25 +74,19 @@ static swift::MetadataSections sections{};
 }
 
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
-__attribute__((__constructor__))
-static void swift_image_constructor() {
+__attribute__((__constructor__)) static void swift_image_constructor() {
 #define SWIFT_SECTION_RANGE(name)                                              \
-  { reinterpret_cast<uintptr_t>(&__start_##name),                              \
-    static_cast<uintptr_t>(&__stop_##name - &__start_##name) }
-
-    const void *baseAddress = nullptr;
-#if defined(__ELF__)
-  if (&__ehdr_start != nullptr) {
-    baseAddress = __ehdr_start;
+  {                                                                            \
+    reinterpret_cast<uintptr_t>(&__start_##name),                              \
+        static_cast<uintptr_t>(&__stop_##name - &__start_##name)               \
   }
-#elif defined(__wasm__)
-  // NOTE: Multi images in a single process is not yet stabilized in WebAssembly
-  // toolchain outside of Emscripten.
-#endif
 
-  ::new (&sections) swift::MetadataSections {
+  ::new (&sections) swift::MetadataSections{
       swift::CurrentSectionMetadataVersion,
-      baseAddress,
+
+      // NOTE: Multi images in a single process is not yet stabilized in
+      // WebAssembly toolchain outside of Emscripten.
+      nullptr,
 
       nullptr,
       nullptr,

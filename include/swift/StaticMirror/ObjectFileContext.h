@@ -47,6 +47,8 @@ private:
     uint64_t OffsetOrAddress;
   };
   llvm::DenseMap<uint64_t, DynamicRelocation> DynamicRelocations;
+  // Storage for relocated segment data (ELF only)
+  std::vector<std::string> RelocatedSegmentStorage;
 
   void scanMachO(const llvm::object::MachOObjectFile *O);
 

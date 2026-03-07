@@ -1,0 +1,34 @@
+//===--- MetadataSectionNames.def -----------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef HANDLE_SWIFT_SECTION
+#error "HANDLE_SWIFT_SECTION(elfname, coffname) not defined"
+#endif
+
+// NOTE: This table is ABI. Don't rearrange it!
+// NOTE: If adding fields, remember to add the field to ReflectionContext.h
+
+HANDLE_SWIFT_SECTION(swift5_protocols, sw5prt)
+HANDLE_SWIFT_SECTION(swift5_protocol_conformances, sw5prtc)
+HANDLE_SWIFT_SECTION(swift5_type_metadata, sw5tymd)
+HANDLE_SWIFT_SECTION(swift5_typeref, sw5tyrf)
+HANDLE_SWIFT_SECTION(swift5_reflstr, sw5rfst)
+HANDLE_SWIFT_SECTION(swift5_fieldmd, sw5flmd)
+HANDLE_SWIFT_SECTION(swift5_assocty, sw5asty)
+HANDLE_SWIFT_SECTION(swift5_replace, sw5repl)
+HANDLE_SWIFT_SECTION(swift5_replac2, sw5reps)
+HANDLE_SWIFT_SECTION(swift5_builtin, sw5bltn)
+HANDLE_SWIFT_SECTION(swift5_capture, sw5cptr)
+HANDLE_SWIFT_SECTION(swift5_mpenum, sw5mpen)
+HANDLE_SWIFT_SECTION(swift5_accessible_functions, sw5acfn)
+HANDLE_SWIFT_SECTION(swift5_runtime_attributes, sw5ratt)
+HANDLE_SWIFT_SECTION(swift5_tests, sw5test)
