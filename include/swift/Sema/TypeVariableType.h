@@ -418,7 +418,7 @@ private:
     ENTRY(TVO_CanBindToInOut, "inout");
     ENTRY(TVO_CanBindToNoEscape, "noescape");
     ENTRY(TVO_CanBindToHole, "hole");
-    ENTRY(TVO_PrefersSubtypeBinding, "");
+    ENTRY(TVO_PrefersSubtypeBinding, "subtype");
     ENTRY(TVO_CanBindToPack, "pack");
     ENTRY(TVO_PackExpansion, "pack expansion");
     }

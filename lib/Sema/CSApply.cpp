@@ -253,21 +253,27 @@ bool ConstraintSystem::isTypeReference(Expr *E) {
   return E->isTypeReference(
       [&](Expr *E) -> Type { return simplifyType(getType(E)); },
       [&](Expr *E) -> Decl * {
-        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
-          return findResolvedMemberRef(
-              getConstraintLocator(UDE, ConstraintLocator::Member));
-        }
+        ConstraintLocator *locator = nullptr;
+        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E))
+          locator = getConstraintLocator(UDE, ConstraintLocator::Member);
+        else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(E))
+          locator = getConstraintLocator(UME, ConstraintLocator::UnresolvedMember);
+        else if (isa<OverloadSetRefExpr>(E))
+          locator = getConstraintLocator(const_cast<Expr *>(E));
+        else
+          return nullptr;
 
-        if (auto *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
-          return findResolvedMemberRef(
-              getConstraintLocator(UME, ConstraintLocator::UnresolvedMember));
-        }
+        // See if we have a resolution for this member.
+        auto overload = findSelectedOverloadFor(locator);
+        if (!overload)
+          return nullptr;
 
-        if (isa<OverloadSetRefExpr>(E))
-          return findResolvedMemberRef(
-              getConstraintLocator(const_cast<Expr *>(E)));
+        // We only want to handle the simplest decl binding.
+        auto choice = overload->choice;
+        if (choice.getKind() != OverloadChoiceKind::Decl)
+          return nullptr;
 
-        return nullptr;
+        return choice.getDecl();
       });
 }
 

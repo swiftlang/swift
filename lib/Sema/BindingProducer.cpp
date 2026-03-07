@@ -129,16 +129,24 @@ TypeVarBindingProducer::TypeVarBindingProducer(
   // A binding to `Any` which should always be considered as a last resort.
   std::optional<Binding> Any;
 
-  auto addBinding = [&](const Binding &binding) {
+  // FIXME: Move this into BindingSet.
+  auto adjustBinding = [&](const Binding &binding) -> Binding {
     // Adjust optionality of existing bindings based on presence of
     // `ExpressibleByNilLiteral` requirement.
     if (requiresOptionalAdjustment(binding)) {
-      Bindings.push_back(
-          binding.withType(OptionalType::get(binding.BindingType)));
-    } else if (binding.BindingType->isAny()) {
-      Any.emplace(binding);
+      return binding.withType(OptionalType::get(binding.BindingType));
+    }
+    return binding;
+  };
+
+  auto addBinding = [&](const Binding &binding) {
+    // Adjust optionality of existing bindings based on presence of
+    // `ExpressibleByNilLiteral` requirement.
+    auto adjustedBinding = adjustBinding(binding);
+    if (adjustedBinding.BindingType->isAny()) {
+      Any.emplace(adjustedBinding);
     } else {
-      Bindings.push_back(binding);
+      Bindings.push_back(adjustedBinding);
     }
   };
 
@@ -168,7 +176,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(
       addBinding(viableBindings.front());
     } else {
       for (auto *constraint : bindings.Defaults) {
-        Bindings.push_back(getDefaultBinding(constraint));
+        addBinding(getDefaultBinding(constraint));
       }
     }
 
@@ -176,7 +184,10 @@ TypeVarBindingProducer::TypeVarBindingProducer(
   }
 
   for (const auto &binding : bindings.Bindings) {
-    addBinding(binding);
+    if (binding.Kind == AllowedBindingKind::Fallback)
+      DelayedDefaults.push_back(adjustBinding(binding));
+    else
+      addBinding(binding);
   }
 
   // Infer defaults based on "uncovered" literal protocol requirements.
@@ -200,21 +211,19 @@ TypeVarBindingProducer::TypeVarBindingProducer(
     Bindings.push_back(*Any);
   }
 
-  {
-    bool noBindings = Bindings.empty();
+  for (auto *constraint : bindings.Defaults) {
+    DelayedDefaults.push_back(adjustBinding(getDefaultBinding(constraint)));
+  }
 
-    for (auto *constraint : bindings.Defaults) {
-      if (noBindings) {
-        // If there are no direct or transitive bindings to attempt
-        // let's add defaults to the list right away.
-        Bindings.push_back(getDefaultBinding(constraint));
-      } else {
-        // Otherwise let's delay attempting default bindings
-        // until all of the direct & transitive bindings and
-        // their derivatives have been attempted.
-        DelayedDefaults.push_back(constraint);
-      }
-    }
+  // If there are no bindings to attempt let's add defaults
+  // to the list right away.
+  //
+  // Otherwise let's delay attempting default bindings
+  // until all of the direct & transitive bindings and
+  // their derivatives have been attempted.
+  if (Bindings.empty() && !DelayedDefaults.empty()) {
+    Bindings.append(DelayedDefaults.begin(), DelayedDefaults.end());
+    DelayedDefaults.clear();
   }
 }
 
@@ -248,10 +257,7 @@ TypeVarBindingProducer::getDefaultBinding(Constraint *constraint) const {
          constraint->getKind() == ConstraintKind::FallbackType);
 
   auto type = constraint->getSecondType();
-  Binding binding{type, BindingKind::Exact, constraint};
-  return requiresOptionalAdjustment(binding)
-             ? binding.withType(OptionalType::get(type))
-             : binding;
+  return Binding{type, BindingKind::Fallback, constraint};
 }
 
 bool TypeVarBindingProducer::computeNext() {
@@ -414,16 +420,18 @@ bool TypeVarBindingProducer::computeNext() {
       return false;
 
     // Add defaultable constraints (if any).
-    for (auto *constraint : DelayedDefaults) {
-      if (constraint->getKind() == ConstraintKind::FallbackType) {
-        // If there are no other possible bindings for this variable
-        // let's default it to the fallback type, otherwise we should
-        // only attempt contextual types.
-        if (!ExploredTypes.empty())
-          continue;
+    for (const auto &binding : DelayedDefaults) {
+      if (auto *constraint = binding.getSource()) {
+        if (constraint->getKind() == ConstraintKind::FallbackType) {
+          // If there are no other possible bindings for this variable
+          // let's default it to the fallback type, otherwise we should
+          // only attempt contextual types.
+          if (!ExploredTypes.empty())
+            continue;
+        }
       }
 
-      addNewBinding(getDefaultBinding(constraint));
+      addNewBinding(binding);
     }
 
     // Drop all of the default since we have converted them into bindings.

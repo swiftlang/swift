@@ -43,6 +43,8 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
     bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToPack);
   if (isPackExpansion())
     bindingOptions.push_back(TypeVariableOptions::TVO_PackExpansion);
+  if (prefersSubtypeBinding())
+    bindingOptions.push_back(TypeVariableOptions::TVO_PrefersSubtypeBinding);
   if (!bindingOptions.empty()) {
     OS << " [can bind to: ";
     interleave(bindingOptions, OS,

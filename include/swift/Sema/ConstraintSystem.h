@@ -2103,10 +2103,6 @@ public:
         });
   }
 
-  /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
-  /// constraint system, return the decl that it references.
-  ValueDecl *findResolvedMemberRef(ConstraintLocator *locator);
-
   /// Try to salvage the constraint system by applying (speculative)
   /// fixes.
   SolutionResult salvage();
@@ -2983,7 +2979,6 @@ public:
   /// Retrieve the type that will be used when matching the given overload.
   Type getEffectiveOverloadType(ConstraintLocator *locator,
                                 const OverloadChoice &overload,
-                                bool allowMembers,
                                 DeclContext *useDC);
 
   /// Add a new overload set to the list of unresolved overload

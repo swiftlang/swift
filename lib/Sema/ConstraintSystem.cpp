@@ -4684,22 +4684,6 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
       ctx, TypeExpr::createImplicit(typeEraser, ctx), argList);
 }
 
-/// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
-/// constraint system, return the decl that it references.
-ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
-  // See if we have a resolution for this member.
-  auto overload = findSelectedOverloadFor(locator);
-  if (!overload)
-    return nullptr;
-
-  // We only want to handle the simplest decl binding.
-  auto choice = overload->choice;
-  if (choice.getKind() != OverloadChoiceKind::Decl)
-    return nullptr;
-
-  return choice.getDecl();
-}
-
 void SyntacticElementTargetKey::dump() const { dump(llvm::errs()); }
 
 void SyntacticElementTargetKey::dump(raw_ostream &OS) const {

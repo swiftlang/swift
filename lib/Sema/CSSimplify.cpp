@@ -7084,6 +7084,9 @@ static bool isDependentMemberTypeWithBaseThatContainsUnresolvedPackExpansions(
 
 ConstraintSystem::ImpliedResultConversionKind
 ConstraintSystem::getImpliedResultConversionKind(ConstraintLocator *locator) {
+  if (locator->isLastElement<LocatorPathElt::ClosureResult>())
+    return ImpliedResultConversionKind::ToVoid;
+
   if (locator->isLastElement<LocatorPathElt::ClosureBody>() ||
       locator->isForContextualType(CTP_ReturnStmt) ||
       locator->isForContextualType(CTP_ClosureResult) ||
@@ -12005,13 +12008,10 @@ ConstraintSystem::simplifyUnresolvedMemberChainBaseConstraint(
     if (shouldAttemptFixes() && hasFixFor(memberLoc))
       return SolutionKind::Solved;
 
-    auto *memberRef = findResolvedMemberRef(memberLoc);
-    if (memberRef && (memberRef->isStatic() || isa<TypeAliasDecl>(memberRef))) {
-      return simplifyConformsToConstraint(
-          resultTy, baseTy, ConstraintKind::ConformsTo,
-          getConstraintLocator(memberLoc, ConstraintLocator::MemberRefBase),
-          flags);
-    }
+    return simplifyConformsToConstraint(
+        resultTy, baseTy, ConstraintKind::ConformsTo,
+        getConstraintLocator(memberLoc, ConstraintLocator::MemberRefBase),
+        flags);
   }
 
   return matchTypes(baseTy, resultTy, ConstraintKind::Equal, flags, locator);
