@@ -361,14 +361,14 @@ extension _SmallString {
 
     if count <= 8 {
       // Single unaligned load for small strings
-      leading = UnsafeRawPointer(ptr).loadUnaligned(as: UInt64.self).littleEndian
-      let mask = (UInt64(1) &<< (UInt64(count) &* 8)) &- 1
+      leading = unsafe UnsafeRawPointer(ptr).loadUnaligned(as: UInt64.self).littleEndian
+      let mask = UInt64.max &>> (64 &- UInt64(count) &* 8)
       leading = leading & mask
       trailing = 0
     } else {
       // Two unaligned loads for larger strings
-      leading = UnsafeRawPointer(ptr).loadUnaligned(as: UInt64.self).littleEndian
-      let trailingRaw = UnsafeRawPointer(ptr + 8).loadUnaligned(as: UInt64.self).littleEndian
+      leading = unsafe UnsafeRawPointer(ptr).loadUnaligned(as: UInt64.self).littleEndian
+      let trailingRaw = unsafe UnsafeRawPointer(ptr + 8).loadUnaligned(as: UInt64.self).littleEndian
       let trailingCount = count &- 8
       let mask = (UInt64(1) &<< (UInt64(trailingCount) &* 8)) &- 1
       trailing = trailingRaw & mask
