@@ -118,6 +118,10 @@ steps.
 .PARAMETER SkipPackaging
 Skip building the MSI installers and packaging. Useful for development builds.
 
+.PARAMETER SmokeTest
+Smoke test the installer. Mutually exclusive with `-SkipPackaging`.
+Requires Docker installation with Windows container support.
+
 .PARAMETER Test
 An array of names of projects to run tests for. Use '*' to run all tests.
 Available tests: lld, lldb, lldb-swift, swift, dispatch, foundation, xctest, swift-format, sourcekit-lsp
@@ -217,6 +221,9 @@ param
   [switch] $SkipPackaging = $false,
   [string[]] $Test = @(),
 
+  # XXX: True temporarily for testing. Do not merge.
+  [switch] $SmokeTest = $true,
+
   [switch] $IncludeDS2 = $false,
   [ValidateSet("none", "full", "thin")]
   [string] $LTO = "none",
@@ -252,6 +259,10 @@ $UnixToolsBinDir = "$env:SystemDrive\Program Files\Git\usr\bin"
 # Validate that if one is set all are set.
 if (($PinnedBuild -or $PinnedSHA256 -or $PinnedVersion) -and -not ($PinnedBuild -and $PinnedSHA256 -and $PinnedVersion)) {
   throw "If any of PinnedBuild, PinnedSHA256, or PinnedVersion is set, all three must be set."
+}
+
+if ($SmokeTest -and $SkipPackaging) {
+  throw "Cannot use -SmokeTest with -SkipPackaging."
 }
 
 # Work around limitations of cmd passing in array arguments via powershell.exe -File
@@ -4209,6 +4220,75 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   Invoke-Program "$($WiX.Path)\wix.exe" -- burn detach "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)\"
 }
 
+# Ensure:
+# - Docker is installed
+# - Docker is configured for Windows containers
+# If all conditions are not met, exit with an error.
+function Check-DockerRequirements() {
+  try {
+    $dockerVersion = docker version 2>$null
+    if ($LASTEXITCODE -ne 0) {
+      throw "Docker is not installed or not running"
+    }
+
+    $dockerInfo = docker info 2>$null
+    if (-not ($dockerInfo -match "OSType:\s*windows")) {
+      Write-Host $dockerInfo
+      throw "Docker is not configured for Windows containers."
+    }
+  } catch {
+    Write-Host -ForegroundColor Red "Docker requirements check failed: $_"
+    exit 1
+  }
+}
+
+function Run-SmokeTests([Hashtable] $Platform) {
+  # XXX: temp for testing! PR runs don't seem to pull down swift-docker
+  if (-not (Test-Path "$SourceCache\swift-docker")) {
+    git clone https://github.com/apple/swift-docker "$SourceCache\swift-docker"
+  }
+
+  Check-DockerRequirements
+
+  $InstallerPath = "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe"
+  if (-not (Test-Path $InstallerPath)) {
+    throw "Installer not found at: $InstallerPath"
+  }
+
+  $SmokeTestDir = Join-Path $PSScriptRoot "windows-smoke-tests"
+  $InstallerFileName = Split-Path $InstallerPath -Leaf
+
+  Copy-Item $InstallerPath (Join-Path $SmokeTestDir $InstallerFileName) -Force
+
+  Push-Location $SmokeTestDir
+  try {
+    Record-OperationTime $Platform "SmokeTests-DockerBuild" {
+      Write-Host "Building Docker image with installer"
+      docker build `
+          --file "$SourceCache\swift-docker\swift-ci\main\windows\smoketest\ltsc2022\Dockerfile" `
+          --build-arg SWIFT_INSTALLER_PATH=$InstallerFileName `
+          --build-arg ENTRY_POINT=smoke_test.ps1 `
+          -t swift-smoke-test .
+      if ($LASTEXITCODE -ne 0) {
+        throw "Docker build failed"
+      }
+    }
+
+    Record-OperationTime $Platform "SmokeTest-DockerRun" {
+      Write-Host "Running smoke test container"
+      docker run --rm swift-smoke-test
+      if ($LASTEXITCODE -ne 0) {
+        throw "Smoke test failed"
+      }
+    }
+
+    Write-Host -ForegroundColor Green "Smoke test completed successfully!"
+  } finally {
+    Pop-Location
+    Remove-Item (Join-Path $SmokeTestDir $InstallerFileName) -ErrorAction SilentlyContinue
+  }
+}
+
 function Build-NoAssertsToolchain() {
   Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building NoAsserts Toolchain ..."
 
@@ -4562,6 +4642,12 @@ if (-not $IsCrossCompiling) {
       } catch {
       }
     }
+  }
+}
+
+if ($SmokeTest) {
+  Record-OperationTime $HostPlatform "Run-SmokeTests" {
+    Run-SmokeTests $HostPlatform
   }
 }
 
