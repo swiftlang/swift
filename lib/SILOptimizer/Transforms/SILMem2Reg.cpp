@@ -1982,8 +1982,13 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
                                   /*replacement=*/initialValue),
             /*isStorageValid=*/!doesLoadInvalidateStorage(inst)};
         if (auto varInfo = asi->getVarInfo()) {
-          SILBuilderWithScope(inst, ctx).createDebugValue(
+          auto dbg = SILBuilderWithScope(inst, ctx).createDebugValue(
               inst->getLoc(), initialValue, *varInfo);
+          // Always use the scope of the instruction we are replacing and not
+          // the scope of the AllocStackInst. The instruction could have been
+          // inlined from another function with a different scope.
+          if (dbg)
+            dbg->setDebugVarScope(inst->getDebugScope());
         }
       }
       auto *loadInst = dyn_cast<LoadInst>(inst);
