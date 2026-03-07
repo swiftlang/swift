@@ -3728,7 +3728,7 @@ void SILSerializer::writeSILDifferentiabilityWitness(
   DifferentiabilityWitnessLayout::emitRecord(
       Out, ScratchRecord, SILAbbrCodes[DifferentiabilityWitnessLayout::Code],
       addSILFunctionRef(original), toStableSILLinkage(dw.getLinkage()),
-      dw.isDeclaration(), dw.isSerialized(),
+      dw.isDeclaration(), dw.isSerialized(), dw.isDefault(),
       toStableDifferentiabilityKind(dw.getKind()),
       S.addGenericSignatureRef(dw.getDerivativeGenericSignature()), jvpID,
       vjpID, dw.getParameterIndices()->getNumIndices(),

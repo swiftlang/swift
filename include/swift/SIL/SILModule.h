@@ -956,6 +956,8 @@ public:
   /// Attempt to deserialize the SILDifferentiabilityWitness. Returns true if
   /// deserialization succeeded, false otherwise.
   bool loadDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
+  SILDifferentiabilityWitness *
+  loadDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
 
   // Given a protocol, attempt to create a default witness table declaration
   // for it.

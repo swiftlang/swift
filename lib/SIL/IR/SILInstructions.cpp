@@ -994,12 +994,13 @@ SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
   auto *parameterIndices = witness->getParameterIndices();
   auto *resultIndices = witness->getResultIndices();
   if (auto derivativeKind = witnessKind.getAsDerivativeFunctionKind()) {
-    bool isReabstractionThunk =
-        witness->getOriginalFunction()->isThunk() == IsReabstractionThunk;
+    auto original = witness->getOriginalFunction();
+    bool isDefaultDerivative = witness->isDefault();
+    bool isReabstractionThunk = original->isThunk() == IsReabstractionThunk;
     auto diffFnTy = fnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, resultIndices, *derivativeKind, module.Types,
-        LookUpConformanceInModule(), witnessCanGenSig,
-        isReabstractionThunk);
+        LookUpConformanceInModule(), witnessCanGenSig, isReabstractionThunk,
+        CanType(), isDefaultDerivative);
     return SILType::getPrimitiveObjectType(diffFnTy);
   }
   assert(witnessKind == DifferentiabilityWitnessFunctionKind::Transpose);

@@ -63,6 +63,9 @@ private:
   /// Whether or not this differentiability witness is serialized, which allows
   /// devirtualization from another module.
   bool IsSerialized;
+  /// Wheter or not this is differentiability witness for a defaul derivative
+  /// for non-differentiable protocol requirement
+  bool IsDefault;
   /// The AST `@differentiable` or `@derivative` attribute from which the
   /// differentiability witness is generated. Used for diagnostics.
   /// Null if the differentiability witness is parsed from SIL or if it is
@@ -74,12 +77,12 @@ private:
       DifferentiabilityKind kind, IndexSubset *parameterIndices,
       IndexSubset *resultIndices, GenericSignature derivativeGenSig,
       SILFunction *jvp, SILFunction *vjp, bool isDeclaration, bool isSerialized,
-      const DeclAttribute *attribute)
+      bool isDefault, const DeclAttribute *attribute)
       : Module(module), Linkage(linkage), OriginalFunction(originalFunction),
         Kind(kind),
         Config(parameterIndices, resultIndices, derivativeGenSig.getPointer()),
         JVP(jvp), VJP(vjp), IsDeclaration(isDeclaration),
-        IsSerialized(isSerialized), Attribute(attribute) {
+        IsSerialized(isSerialized), IsDefault(isDefault), Attribute(attribute) {
     assert(kind != DifferentiabilityKind::NonDifferentiable);
   }
 
@@ -88,15 +91,16 @@ public:
   createDeclaration(SILModule &module, SILLinkage linkage,
                     SILFunction *originalFunction, DifferentiabilityKind kind,
                     IndexSubset *parameterIndices, IndexSubset *resultIndices,
-                    GenericSignature derivativeGenSig,
+                    GenericSignature derivativeGenSig, bool isDefault,
                     const DeclAttribute *attribute = nullptr);
 
-  static SILDifferentiabilityWitness *createDefinition(
-      SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
-      DifferentiabilityKind kind, IndexSubset *parameterIndices,
-      IndexSubset *resultIndices, GenericSignature derivativeGenSig,
-      SILFunction *jvp, SILFunction *vjp, bool isSerialized,
-      const DeclAttribute *attribute = nullptr);
+  static SILDifferentiabilityWitness *
+  createDefinition(SILModule &module, SILLinkage linkage,
+                   SILFunction *originalFunction, DifferentiabilityKind kind,
+                   IndexSubset *parameterIndices, IndexSubset *resultIndices,
+                   GenericSignature derivativeGenSig, SILFunction *jvp,
+                   SILFunction *vjp, bool isSerialized, bool isDefault,
+                   const DeclAttribute *attribute = nullptr);
 
   void convertToDefinition(SILFunction *jvp, SILFunction *vjp,
                            bool isSerialized);
@@ -139,6 +143,7 @@ public:
   bool isDeclaration() const { return IsDeclaration; }
   bool isDefinition() const { return !IsDeclaration; }
   bool isSerialized() const { return IsSerialized; }
+  bool isDefault() const { return IsDefault; }
   const DeclAttribute *getAttribute() const { return Attribute; }
 
   /// Verify that the differentiability witness is well-formed.

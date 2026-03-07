@@ -950,9 +950,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     IndexSubset *parameterIndices, IndexSubset *resultIndices,
     AutoDiffDerivativeFunctionKind kind, TypeConverter &TC,
     LookupConformanceFn lookupConformance,
-    CanGenericSignature derivativeFnInvocationGenSig,
-    bool isReabstractionThunk,
-    CanType origTypeOfAbstraction) {
+    CanGenericSignature derivativeFnInvocationGenSig, bool isReabstractionThunk,
+    CanType origTypeOfAbstraction, bool isDefaultDerivative) {
   assert(parameterIndices);
   assert(!parameterIndices->isEmpty() && "Parameter indices must not be empty");
   assert(resultIndices);
@@ -965,7 +964,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
                                        resultIndices,
                                        kind,
                                        derivativeFnInvocationGenSig,
-                                       isReabstractionThunk};
+                                       isReabstractionThunk,
+                                       isDefaultDerivative};
   auto insertion =
       ctx.SILAutoDiffDerivativeFunctions.try_emplace(key, CanSILFunctionType());
   auto &cachedResult = insertion.first->getSecond();
@@ -1025,9 +1025,16 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // If original function is `@convention(c)`, the derivative function should
   // have `@convention(thin)`. IRGen does not support `@convention(c)` functions
   // with multiple results.
+  // Likewise, the default derivatives for non-differentiable protocol
+  // requirements must use `@convention(method)` as there is no witness table
+  // to lookup such a derivative.
   auto extInfo = constrainedOriginalFnTy->getExtInfo();
   if (getRepresentation() == SILFunctionTypeRepresentation::CFunctionPointer)
     extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+  else if (getRepresentation() ==
+               SILFunctionTypeRepresentation::WitnessMethod &&
+           isDefaultDerivative)
+    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Method);
 
   // Put everything together to get the derivative function type. Then, store in
   // cache and return.
@@ -1040,7 +1047,9 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
       constrainedOriginalFnTy->getPatternSubstitutions(),
       /*invocationSubstitutions*/ SubstitutionMap(),
       constrainedOriginalFnTy->getASTContext(),
-      constrainedOriginalFnTy->getWitnessMethodConformanceOrInvalid());
+      isDefaultDerivative
+          ? ProtocolConformanceRef()
+          : constrainedOriginalFnTy->getWitnessMethodConformanceOrInvalid());
   return cachedResult;
 }
 

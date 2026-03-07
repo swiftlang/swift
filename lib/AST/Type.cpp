@@ -4827,6 +4827,7 @@ Type AnyFunctionType::getEffectiveThrownErrorTypeOrNever() const {
 
 std::optional<TangentSpace>
 TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
+  // TODO: looks like `lookupConformance` is not used anymore
   assert(lookupConformance);
   auto &ctx = getASTContext();
 

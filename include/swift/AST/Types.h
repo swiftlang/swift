@@ -6043,13 +6043,16 @@ public:
   ///     function - this is more direct. It may be possible to implement
   ///     reabstraction thunk derivatives using "reabstraction thunks for
   ///     the original function's derivative", avoiding extra code generation.
+  /// - Default derivatives for non-differentiable protocol requirements
+  ///   are using `@convention(method)` representation
   CanSILFunctionType getAutoDiffDerivativeFunctionType(
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
       AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
       LookupConformanceFn lookupConformance,
       CanGenericSignature derivativeFunctionGenericSignature = nullptr,
       bool isReabstractionThunk = false,
-      CanType origTypeOfAbstraction = CanType());
+      CanType origTypeOfAbstraction = CanType(),
+      bool isDefaultDerivative = false);
 
   /// If \p M is nullptr, the type is not substituted.
   uint16_t getPointerAuthDiscriminator(SILModule *M);

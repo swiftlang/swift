@@ -267,6 +267,7 @@ struct SILAutoDiffDerivativeFunctionKey {
   AutoDiffDerivativeFunctionKind kind;
   CanGenericSignature derivativeFnGenSig;
   bool isReabstractionThunk;
+  bool isDefaultDerivative;
 };
 
 class ParsedAutoDiffParameter {
@@ -803,7 +804,8 @@ template <> struct DenseMapInfo<SILAutoDiffDerivativeFunctionKey> {
            lhs.resultIndices == rhs.resultIndices &&
            lhs.kind.rawValue == rhs.kind.rawValue &&
            lhs.derivativeFnGenSig == rhs.derivativeFnGenSig &&
-           lhs.isReabstractionThunk == rhs.isReabstractionThunk;
+           lhs.isReabstractionThunk == rhs.isReabstractionThunk &&
+           lhs.isDefaultDerivative == rhs.isDefaultDerivative;
   }
 
   static inline SILAutoDiffDerivativeFunctionKey getEmptyKey() {
@@ -813,6 +815,7 @@ template <> struct DenseMapInfo<SILAutoDiffDerivativeFunctionKey> {
             AutoDiffDerivativeFunctionKind::innerty(
                 DenseMapInfo<unsigned>::getEmptyKey()),
             CanGenericSignature(DenseMapInfo<GenericSignature>::getEmptyKey()),
+            (bool)DenseMapInfo<unsigned>::getEmptyKey(),
             (bool)DenseMapInfo<unsigned>::getEmptyKey()};
   }
 
@@ -824,6 +827,7 @@ template <> struct DenseMapInfo<SILAutoDiffDerivativeFunctionKey> {
         AutoDiffDerivativeFunctionKind::innerty(
             DenseMapInfo<unsigned>::getTombstoneKey()),
         CanGenericSignature(DenseMapInfo<GenericSignature>::getTombstoneKey()),
+        (bool)DenseMapInfo<unsigned>::getTombstoneKey(),
         (bool)DenseMapInfo<unsigned>::getTombstoneKey()};
   }
 
@@ -835,7 +839,9 @@ template <> struct DenseMapInfo<SILAutoDiffDerivativeFunctionKey> {
         DenseMapInfo<unsigned>::getHashValue((unsigned)Val.kind.rawValue),
         DenseMapInfo<GenericSignature>::getHashValue(Val.derivativeFnGenSig),
         DenseMapInfo<unsigned>::getHashValue(
-            (unsigned)Val.isReabstractionThunk));
+            (unsigned)Val.isReabstractionThunk),
+        DenseMapInfo<unsigned>::getHashValue(
+            (unsigned)Val.isDefaultDerivative));
   }
 };
 

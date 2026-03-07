@@ -6575,11 +6575,16 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
   auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature().getGenericEnvironment();
 
+  bool isDefaultDerivative =
+      isa<ProtocolDecl>(originalAFD->getDeclContext()) &&
+      !originalAFD->getAttrs().hasAttribute<DifferentiableAttr>();
   auto origFnTy = originalFn->getLoweredFunctionType();
   auto derivativeCanGenSig = config.derivativeGenericSignature.getCanonicalSignature();
   auto thunkFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices, kind, Types,
-      LookUpConformanceInModule(), derivativeCanGenSig);
+      LookUpConformanceInModule(), derivativeCanGenSig,
+      /*isReabstractionThunk*/ false, /* origTypeOfAbstraction */ CanType(),
+      isDefaultDerivative);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
   Mangle::ASTMangler mangler(getASTContext());
