@@ -894,6 +894,11 @@ class FlowIsolation : public SILFunctionTransform {
     if (fn->wasDeserializedCanonical())
       return;
 
+    // Do not run on thunks. We trust those and there isn't a benefit to the
+    // user. Any issue there is a compiler bug.
+    if (fn->isThunk())
+      return;
+
     // Look for functions that use flow-isolation.
     if (auto *dc = fn->getDeclContext())
       if (auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(dc->getAsDecl()))

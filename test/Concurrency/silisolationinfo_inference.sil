@@ -125,7 +125,7 @@ sil @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<M
 //
 // CHECK: begin running test 1 of 1 on actor_self_isolation_unknown: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = argument of bb0 : $MyActor
-// CHECK-NEXT: Isolation: unknown
+// CHECK-NEXT: Isolation: invalid
 // CHECK-NEXT: end running test 1 of 1 on actor_self_isolation_unknown: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @actor_self_isolation_unknown : $@convention(thin) (@guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor):
@@ -1915,7 +1915,7 @@ bb0:
 
 // CHECK-LABEL: begin running test 1 of 1 on var_box_with_sendable_type_is_nonsendable_isolationinfo: sil_isolation_info_inference with: @trace[0]
 // CHECK: Input Value:   %0 = alloc_box ${ var MyActor }                 // user: %1
-// CHECK: Isolation: unknown
+// CHECK: Isolation: invalid
 // CHECK: end running test 1 of 1 on var_box_with_sendable_type_is_nonsendable_isolationinfo: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @var_box_with_sendable_type_is_nonsendable_isolationinfo : $@convention(thin) () -> () {
 bb0:
@@ -1943,7 +1943,7 @@ bb0:
 
 // CHECK-LABEL: begin running test 1 of 1 on let_box_with_sendable_type_is_sendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
 // CHECK: Input Value:   %0 = alloc_box ${ let MyActor }                 // user: %1
-// CHECK: Isolation: unknown
+// CHECK: Isolation: invalid
 // CHECK: end running test 1 of 1 on let_box_with_sendable_type_is_sendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @let_box_with_sendable_type_is_sendable_isolationinfo_inference : $@convention(thin) () -> () {
 bb0:
@@ -1971,7 +1971,7 @@ bb0:
 
 // CHECK-LABEL: begin running test 1 of 1 on var_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
 // CHECK: Input Value:   %0 = alloc_box ${ var NonSendableKlass }        // user: %1
-// CHECK: Isolation: unknown
+// CHECK: Isolation: invalid
 // CHECK: end running test 1 of 1 on var_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @var_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference : $@convention(thin) () -> () {
 bb0:
@@ -1999,7 +1999,7 @@ bb0:
 
 // CHECK-LABEL: begin running test 1 of 1 on let_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
 // CHECK: Input Value:   %0 = alloc_box ${ let NonSendableKlass }        // user: %1
-// CHECK: Isolation: unknown
+// CHECK: Isolation: invalid
 // CHECK: end running test 1 of 1 on let_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @let_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference : $@convention(thin) () -> () {
 bb0:

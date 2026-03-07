@@ -149,6 +149,12 @@ PARTITION_OP_VERBATIM_ERROR(InOutSendingReturned)
 /// called from a different actor), returning a non-Sendable type is unsafe.
 PARTITION_OP_VERBATIM_ERROR(NonSendableIsolationCrossingResult)
 
+/// Used to signify that when performing the analysis two regions with
+/// incompatible isolations were attempted to be merged. Contains information
+/// to SendNonSendable knows /why/ the region merge happened so that we can
+/// emit a nice diagnostic.
+PARTITION_OP_VERBATIM_ERROR(IncompatibleRegionMerge)
+
 //===---
 // Verbatim Errors with Special Emission
 //

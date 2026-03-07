@@ -86,7 +86,7 @@ struct NonisolatedStruct {
   // CHECK-NEXT: Isolation: global_actor. type: CustomActor
   // CHECK: NonisolatedStruct.customActorField.setter
   // CHECK-NEXT: Isolation: global_actor. type: CustomActor
-  @CustomActor var customActorField = NonSendableKlass()
+  @CustomActor var customActorField = NonSendableKlass() // expected-error {{pattern that the region-based isolation checker does not understand how to check}}
 
   nonisolated init() {}
 }
@@ -135,7 +135,7 @@ struct NonisolatedKlass {
   // CHECK-NEXT: Isolation: global_actor. type: CustomActor
   // CHECK: NonisolatedKlass.customActorField.setter
   // CHECK-NEXT: Isolation: global_actor. type: CustomActor
-  @CustomActor var customActorField = NonSendableKlass()
+  @CustomActor var customActorField = NonSendableKlass() // expected-error {{pattern that the region-based isolation checker does not understand how to check}}
 
   nonisolated init() {}
 }

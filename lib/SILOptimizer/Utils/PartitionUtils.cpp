@@ -123,6 +123,37 @@ void PartitionOpError::InOutSendingParametersInSameRegionError::print(
   }
 }
 
+void PartitionOpError::IncompatibleRegionMergeError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: IncompatibleRegionMergeError!\n"
+     << "        Src ID:  %%" << srcRegionElt
+     << "        Src Rep: " << valueMap.getRepresentativeValue(srcRegionElt)
+     << "        Dst ID:  %%" << dstRegionElt
+     << "        Dst Rep: " << valueMap.getRepresentativeValue(dstRegionElt)
+     << "        Reason: ";
+  switch (reason) {
+  case Reason::Unknown:
+    os << "unknown\n";
+    return;
+  case Reason::Assign:
+    os << "assign\n";
+    return;
+  case Reason::IsolatedFunction:
+    os << "isolated_function\n";
+    return;
+  case Reason::NonisolatedClosure:
+    os << "nonisolated_closure\n";
+    return;
+  case Reason::Builtin:
+    os << "builtin\n";
+    return;
+  case Reason::NonisolatedFunction:
+    os << "nonisolated_function\n";
+    return;
+  }
+  llvm_unreachable("Unhandled case");
+}
+
 //===----------------------------------------------------------------------===//
 //                             MARK: PartitionOp
 //===----------------------------------------------------------------------===//

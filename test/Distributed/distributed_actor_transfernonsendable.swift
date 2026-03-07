@@ -34,7 +34,7 @@ distributed actor MyDistributedActor {
     _ = { @MainActor in
       // TODO: This should error saying 'y' is actor isolated.
       print(y) // expected-error {{sending 'y' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'y' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{'self'-isolated 'y' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 

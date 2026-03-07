@@ -863,8 +863,7 @@ actor SomeActorWithInits {
   // expected-note@+1 4 {{mutation of this property is only permitted within the actor}}
   var mutableState: Int = 17
   var otherMutableState: Int
-  // expected-note@+1 {{mutation of this property is only permitted within the actor}}
-  let nonSendable: SomeClass
+  let nonSendable: SomeClass // expected-note {{mutation of this property is only permitted within the actor}}
 
   // Sema should not complain about referencing non-Sendable members
   // in an actor init or deinit, as those are diagnosed later by flow-isolation.
@@ -935,7 +934,7 @@ actor SomeActorWithInits {
   @MainActor init(i5 x: SomeClass) {
     self.mutableState = 42
     self.otherMutableState = 17
-    self.nonSendable = x // expected-warning {{actor-isolated property 'nonSendable' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.nonSendable = x // expected-warning {{actor-isolated property 'nonSendable' can not be mutated from the main actor}}
 
     self.isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
     self.nonisolated()
@@ -1665,14 +1664,13 @@ actor ActorWithNonSendableLet: NonisolatedProtocol {
 }
 
 actor ProtectNonSendable {
-  // expected-note@+1 2 {{property declared here}}
-  let ns = NonSendable()
+  // expected-note@+1 {{property declared here}}
+  let ns = NonSendable() // expected-note {{property declared here}}
 
   init() {}
 
   @MainActor init(fromMain: Void) {
-    // expected-warning@+1 {{actor-isolated property 'ns' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
-    _ = self.ns
+    _ = self.ns // expected-warning {{actor-isolated property 'ns' can not be referenced from the main actor}}
   }
 }
 
