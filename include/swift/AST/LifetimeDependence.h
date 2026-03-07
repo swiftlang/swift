@@ -379,6 +379,10 @@ public:
              ArrayRef<LifetimeTypeAttr *> lifetimeAttributes, DeclContext *dc,
              GenericEnvironment *env);
 
+  /// Determine whether Type t is "unknown", meaning we cannot safely determine
+  /// whether it is Escapable by calling TypeBase::isEscapable.
+  static bool isTypeUnknown(Type t);
+
   /// Compute a LifetimeDependenceInfo list for the uncurried form of a curried
   /// function whose inner type has LifetimeDependenceInfo list
   /// 'inner'.
@@ -405,9 +409,49 @@ public:
   bool operator!=(const LifetimeDependenceInfo &other) const {
     return !(*this == other);
   }
-  
+
+  /// Whether the other LifetimeDependenceInfo is at least as restrictive as
+  /// this. If so, a parameter or result with the other LifetimeDependenceInfo
+  /// can be assumed to satisfy this LifetimeDependenceInfo's dependencies.
+  ///
+  /// For inherited/copied dependencies, only the dependence sources that are
+  /// selected in the nonEscapableMask (with the bit at their index set) need to
+  /// be present in 'other' for the dependence to match. This is necessary
+  /// because inherited dependencies on Escapable parameters should be ignored.
+  /// Masking is not performed if nonEscapableMask is NULL.
+  ///
+  /// The method does not consider whether this->getTargetIndex() is in the
+  /// nonEscapableMask.
+  ///
+  /// NOTE: Neither this nor operator== consider conditionally addressable
+  /// dependencies.
+  bool convertibleTo(const LifetimeDependenceInfo &other,
+                     const SmallBitVector *nonEscapableMask) const;
+
   SWIFT_DEBUG_DUMPER(dump());
 };
+
+/// Check whether function type 'from' can safely be converted to 'to' while
+/// maintaining 'from's lifetime dependencies.
+///
+/// The lifetime dependencies are passed separately, and the types are treated
+/// as the interface types of methods if implicitSelfParamType is non-null.
+bool matchFunctionTypeLifetimeDependencies(
+    const AnyFunctionType *from, ArrayRef<LifetimeDependenceInfo> fromLifetimes,
+    const AnyFunctionType *to, ArrayRef<LifetimeDependenceInfo> toLifetimes,
+    std::optional<Type> implicitSelfParamType);
+
+/// Check whether function type 'from' can safely be converted to 'to' while
+/// maintaining 'from's lifetime dependencies.
+///
+/// The 'from' and 'to' types are assumed to be normal function types unless
+/// 'curriedMethodTypes' is true. If it is, they are treated as curried method
+/// types of the form (Self) -> (Params...) -> Result. They are also assumed to
+/// have the same parameter and result types, ignoring lifetimes.
+///
+/// See matchLifetimeDependencies.
+bool matchFunctionTypeLifetimeDependencies(const AnyFunctionType *from,
+                                           const AnyFunctionType *to);
 
 std::optional<LifetimeDependenceInfo>
 getLifetimeDependenceFor(ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
