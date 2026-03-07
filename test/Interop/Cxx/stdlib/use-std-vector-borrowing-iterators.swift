@@ -9,11 +9,16 @@
 // RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=swift-6 -Xcc -std=c++20)
 // RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20)
 
+// Test iterating through a vector using the borrowing iterators (currently behind a feature flag).
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20 -enable-experimental-feature BorrowingForLoop -DBORROWING_ITERATOR_PROTOCOL)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20 -enable-experimental-feature BorrowingForLoop -DBORROWING_ITERATOR_PROTOCOL)
+
 // Ubuntu 20.04 ships with an old version of libstdc++, which does not provide
 // std::contiguous_iterator_tag from C++20.
 // REQUIRES: OS=macosx || OS=windows-msvc
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_BorrowingForLoop
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
@@ -23,12 +28,18 @@ import CxxStdlib
 
 var StdVectorBorrowingIteratorTestSuite = TestSuite("StdVectorBorrowingIterator")
 
+// FIXME https://github.com/swiftlang/swift/issues/87260
+// Currently, `Sequence` doesn't conform to `BorrowingSequence`, which means that types like `Range` don't
+// automatically conform to `BorrowingSequence`. When we enable the experimental feature `BorrowingForLoop`,
+// all for-in loops use the new borrowing iterators, which means that all range iterations will be invalid.
+#if !BORROWING_ITERATOR_PROTOCOL
+
 StdVectorBorrowingIteratorTestSuite.test("VecOfInt has contiguous iterator").require(.stdlib_6_4).code {
     guard #available(SwiftStdlib 6.4, *) else { return }
     let arr : [Int32] = [1, 2, 3, 4, 5]
     let v = Vector(arr)
     expectEqual(v.size(), 5)
-    var iterator = v.makeBorrowingIterator()
+    var iterator = v._makeBorrowingIterator()
     var counter = 0
     while true {
         let span = iterator.nextSpan()
@@ -43,7 +54,7 @@ StdVectorBorrowingIteratorTestSuite.test("VectorOfNonCopyable has contiguous ite
     guard #available(SwiftStdlib 6.4, *) else { return }
     let v = makeVectorOfNonCopyable()
     expectEqual(v.size(), 3)
-    var iterator = v.makeBorrowingIterator()
+    var iterator = v._makeBorrowingIterator()
     var counter = 0
     while true {
         let span = iterator.nextSpan()
@@ -53,5 +64,35 @@ StdVectorBorrowingIteratorTestSuite.test("VectorOfNonCopyable has contiguous ite
     }
     expectEqual(counter, 1)
 }
+
+#else // !BORROWING_ITERATOR_PROTOCOL
+
+StdVectorBorrowingIteratorTestSuite.test("VectorOfInt borrowing for loop").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+    let arr : [Int32] = [1, 2, 3]
+    let v = Vector(arr)
+    expectEqual(v.size(), arr.count)
+    var counter = 0
+    for el in v {
+        expectEqual(el, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+}
+
+StdVectorBorrowingIteratorTestSuite.test("VectorOfNonCopyable borrowing for loop").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+    let v = makeVectorOfNonCopyable()
+    let arr : [Int32] = [1, 2, 3]
+    expectEqual(v.size(), arr.count)
+    var counter = 0
+    for el in v {
+        expectEqual(el.number, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+}
+
+#endif // !BORROWING_ITERATOR_PROTOCOL
 
 runAllTests()

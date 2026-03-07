@@ -1,11 +1,13 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20)
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -enable-experimental-feature BorrowingForLoop -DBORROWING_ITERATOR_PROTOCOL)
 
 // TODO: test failed in macOS PR testing but passes locally: rdar://163049442
 // UNSUPPORTED: OS_FAMILY=darwin && !CPU=arm64
 
 // REQUIRES: executable_test
 // REQUIRES: std_span
+// REQUIRES: swift_feature_BorrowingForLoop
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
@@ -14,6 +16,12 @@ import StdSpan
 import CxxStdlib
 
 var StdSpanTestSuite = TestSuite("StdSpan")
+
+// FIXME https://github.com/swiftlang/swift/issues/87260
+// Currently, `Sequence` doesn't conform to `BorrowingSequence`, which means that types like `Range` don't
+// automatically conform to `BorrowingSequence`. When we enable the experimental feature `BorrowingForLoop`,
+// all for-in loops use the new borrowing iterators, which means that all range iterations will be invalid.
+#if !BORROWING_ITERATOR_PROTOCOL
 
 func checkSpan<T: RandomAccessCollection, E: Equatable>(_ s : T, _ arr: [E]) 
                     where T.Index == Int, T.Element == E {
@@ -710,5 +718,9 @@ StdSpanTestSuite.test("Convert between Swift and C++ span types")
     }
   }
 }
+
+#else // !BORROWING_ITERATOR_PROTOCOL
+
+#endif // !BORROWING_ITERATOR_PROTOCOL
 
 runAllTests()

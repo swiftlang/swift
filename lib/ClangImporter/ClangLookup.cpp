@@ -56,6 +56,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator_range.h"
+#include <tuple>
 #include <utility>
 
 using namespace swift;
@@ -519,9 +520,10 @@ ClangImporter::Implementation::lookupAndImportPointee(NominalTypeDecl *Struct) {
   if (!CXXRecord)
     return nullptr;
 
-  if (auto [it, inserted] = importedPointeeCache.try_emplace(Struct, nullptr);
+  if (auto [it, inserted] = importedPointeeCache.try_emplace(
+          Struct, std::make_tuple(nullptr, nullptr, nullptr));
       !inserted)
-    return it->second;
+    return std::get<0>(it->second);
 
   // From this point onward, if we encounter some error and return, future calls
   // to this function will pick up the nullptr we cached using try_emplace. Note
@@ -604,8 +606,27 @@ ClangImporter::Implementation::lookupAndImportPointee(NominalTypeDecl *Struct) {
   importAttributes(CXXGetter ? CXXGetter : CXXSetter, pointee);
 
   Struct->addMember(pointee);
-  importedPointeeCache[Struct] = pointee;
+  importedPointeeCache[Struct] =
+      std::make_tuple(pointee, getter ? getter : setter, setter);
   return pointee;
+}
+
+FuncDecl *ClangImporter::Implementation::lookupAndImportOperatorStar(
+    NominalTypeDecl *Struct) {
+  auto it = importedPointeeCache.find(Struct);
+  if (it != importedPointeeCache.end())
+    return std::get<1>(it->second);
+
+  // __operatorStar() is synthesized when importing the .pointee computed
+  // property.
+  if (!lookupAndImportPointee(Struct)) {
+    importedPointeeCache.try_emplace(
+        Struct, std::make_tuple(nullptr, nullptr, nullptr));
+    return nullptr;
+  }
+
+  it = importedPointeeCache.find(Struct);
+  return it != importedPointeeCache.end() ? std::get<1>(it->second) : nullptr;
 }
 
 FuncDecl *ClangImporter::Implementation::lookupAndImportSuccessor(
