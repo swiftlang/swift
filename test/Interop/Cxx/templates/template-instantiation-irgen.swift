@@ -66,31 +66,8 @@ func takesCPtr() {
 }
 
 func takesCFnPtr() {
-  takesValue(get42) // function symbol
   // FIXME: optional pointers are not yet supported but they should be; this crashes
   // takesValue(functionPtrGet42)
   takesValue(functionPtrGet42!) // dereferenced nullable function pointer
   takesValue(nonNullFunctionPtrGet42) // non-null function symbol
 }
-
-func takesRecursively() { takesValue(takesRecursively) }
-func takesRecursiveClosure() { takesValue({() in takesRecursiveClosure()}) }
-func takesSwiftClosure() { takesValue({() in ()}) }
-func takesTakesTrue() { takesValue(takesTrue) }
-
-func takesSwiftClosureReturningBool() { takesValue({() -> Bool in true}) }
-func takesSwiftClosureTakingBool() { takesValue({(x: Bool) in ()}) }
-func takesTakesBool() { takesValue(takesBool) }
-
-func takesSwiftClosureReturningPlainStruct() { takesValue({() -> PlainStruct in PlainStruct(x: 42)}) }
-func takesSwiftClosureTakingPlainStruct() { takesValue({(x: PlainStruct) in takesValue(x)}) }
-func takesTakesPlainStruct() { takesValue(takesPlainStruct) }
-
-func takesSwiftClosureReturningCxxClass() { takesValue({() -> CxxClass in CxxClass(x: 42)}) }
-func takesSwiftClosureTakingCxxClass() { takesValue({(x: CxxClass) in takesValue(x)}) }
-func takesTakesCxxClass() { takesValue(takesCxxClass) }
-
-func takesSwiftClosureReturningFRT() { takesValue({() -> FRT in FRT()}) }
-func takesSwiftClosureTakingFRT() { takesValue({(x: FRT) in takesValue(x)}) }
-
-func takesTakesFRT() { takesValue(takesFRT) }

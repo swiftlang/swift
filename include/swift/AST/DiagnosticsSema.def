@@ -2613,6 +2613,11 @@ ERROR(unable_to_convert_generic_swift_types,none,
 ERROR(unable_to_substitute_cxx_function_template,none,
       "could not substitute parameters for C++ function template '%0': %1",
       (StringRef, StringRef))
+ERROR(unable_to_substitute_cxx_template_argument_with_swift_closure,none,
+      "could not substitute parameter(s) for C++ function template '%0' with "
+      "Swift closure of %1 type; consider using 'std::function' as the C++ "
+      "function parameter",
+      (StringRef, Type))
 
 // Type aliases
 ERROR(type_alias_underlying_type_access,none,
