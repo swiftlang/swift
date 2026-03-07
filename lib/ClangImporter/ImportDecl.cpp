@@ -175,22 +175,6 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
   }
 }
 
-bool importer::recordHasReferenceSemantics(
-    const clang::RecordDecl *decl,
-    ClangImporter::Implementation *importerImpl) {
-  // At this point decl might not be fully imported into Swift yet, which
-  // means we might not have asked Clang to generate its implicit members, such
-  // as copy or move constructors. This would cause CxxRecordSemanticsRequest to
-  // return MissingLifetimeOperation if the type is not a foreign reference
-  // type. Note that this doesn't affect the correctness of this function, since
-  // those implicit members aren't required for foreign reference types.
-  auto semanticsKind = evaluateOrDefault(
-      importerImpl->SwiftContext.evaluator,
-      CxxRecordSemantics({decl, importerImpl->SwiftContext, importerImpl}),
-      {});
-  return semanticsKind == CxxRecordSemanticsKind::Reference;
-}
-
 bool importer::hasImmortalAttrs(const clang::RecordDecl *decl) {
   return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
@@ -2192,7 +2176,9 @@ namespace {
     }
 
     bool recordHasReferenceSemantics(const clang::RecordDecl *decl) {
-      return importer::recordHasReferenceSemantics(decl, &Impl);
+      return evaluateOrDefault(Impl.SwiftContext.evaluator,
+                               ForeignReferenceTypeInfoRequest({decl}), {})
+          .isReference();
     }
 
     bool recordIsCopyable(const clang::RecordDecl *decl) {
@@ -2316,8 +2302,11 @@ namespace {
       auto clangDecl = dyn_cast<clang::CXXRecordDecl>(clangType);
       if (!clangDecl)
         return nonInheritedRefCountingOperations();
-      auto baseClangDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
-          getRefParentOrDiag(clangDecl, context, nullptr));
+
+      auto frtInfo = evaluateOrDefault(
+          context.evaluator, ForeignReferenceTypeInfoRequest({clangDecl}), {});
+      auto *baseClangDecl =
+          dyn_cast_or_null<clang::CXXRecordDecl>(frtInfo.getDecl());
       if (!baseClangDecl || baseClangDecl == clangDecl)
         return nonInheritedRefCountingOperations();
 
@@ -3394,9 +3383,11 @@ namespace {
         return nullptr;
       }
 
+      diagnoseForeignReferenceType(decl, Impl);
+
       auto cxxRecordsemanticsKind = evaluateOrDefault(
           Impl.SwiftContext.evaluator,
-          CxxRecordSemantics({decl, Impl.SwiftContext, &Impl}), {});
+          CxxRecordSemantics({decl, Impl.SwiftContext}), {});
 
       if (cxxRecordsemanticsKind == CxxRecordSemanticsKind::SwiftClassType) {
         // FIXME: add a diagnostic here for unsupported imported use of Swift

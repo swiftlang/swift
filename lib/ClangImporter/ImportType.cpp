@@ -2375,10 +2375,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     if (auto recordType = returnType->getAsCXXRecordDecl()) {
       if (auto *vd = evaluateOrDefault(
               SwiftContext.evaluator,
-              // `importerImpl` is set to nullptr here to avoid diagnostics
-              // during this CxxRecordSemantics evaluation.
-              CxxRecordAsSwiftType({recordType, SwiftContext, nullptr}),
-              nullptr)) {
+              CxxRecordAsSwiftType({recordType, SwiftContext}), nullptr)) {
         if (auto *cd = dyn_cast<ClassDecl>(vd)) {
           Type t = ClassType::get(cd, Type(), SwiftContext);
           return ImportedType(t, /*implicitlyUnwraps=*/false);
@@ -2654,10 +2651,7 @@ ClangImporter::Implementation::importParameterType(
 
       if (auto *vd = evaluateOrDefault(
               SwiftContext.evaluator,
-              // `importerImpl` is set to nullptr here to avoid diagnostics
-              // during this CxxRecordSemantics evaluation.
-              CxxRecordAsSwiftType({recordType, SwiftContext, nullptr}),
-              nullptr)) {
+              CxxRecordAsSwiftType({recordType, SwiftContext}), nullptr)) {
 
         if (auto *cd = dyn_cast<ClassDecl>(vd)) {
 

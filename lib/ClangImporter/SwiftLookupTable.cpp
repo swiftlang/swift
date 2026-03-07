@@ -1910,7 +1910,7 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
     if (!isa<clang::ClassTemplateSpecializationDecl>(named) &&
         !tagDecl->getDefinition() &&
         !(isa<clang::RecordDecl>(tagDecl) &&
-          hasImportAsRefAttr(cast<clang::RecordDecl>(tagDecl)))) {
+          hasImportReferenceAttr(cast<clang::RecordDecl>(tagDecl)))) {
       return;
     }
   }

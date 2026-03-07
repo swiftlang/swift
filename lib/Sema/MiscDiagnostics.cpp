@@ -6590,8 +6590,9 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
   const_cast<Expr *>(E)->walk(walker);
 }
 
-static bool isReturningFRT(const clang::NamedDecl *ND,
-                           clang::QualType &outReturnType, ASTContext &Ctx) {
+static bool isReturningSharedFRT(const clang::NamedDecl *ND,
+                                 clang::QualType &outReturnType,
+                                 ASTContext &Ctx) {
   if (auto *CD = dyn_cast<clang::CXXConstructorDecl>(ND))
     outReturnType =
         CD->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
@@ -6610,10 +6611,12 @@ static bool isReturningFRT(const clang::NamedDecl *ND,
   if (!recordDecl)
     return false;
 
-  return !importer::hasImmortalAttrs(recordDecl) &&
-         evaluateOrDefault(Ctx.evaluator,
-                           CxxRecordSemantics({recordDecl, Ctx, nullptr}),
-                           {}) == CxxRecordSemanticsKind::Reference;
+  if (importer::hasImmortalAttrs(recordDecl))
+    return false;
+
+  auto info = evaluateOrDefault(
+      Ctx.evaluator, ForeignReferenceTypeInfoRequest({recordDecl}), {});
+  return info.isReference();
 }
 
 static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
@@ -6690,7 +6693,7 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
         return Action::Continue(E);
 
       clang::QualType retType;
-      if (!isReturningFRT(ND, retType, Ctx))
+      if (!isReturningSharedFRT(ND, retType, Ctx))
         return Action::Continue(E);
 
       if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {

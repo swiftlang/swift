@@ -44,7 +44,7 @@ struct container_t {
 // }}
 void fooWrapped(struct container_t * x, int * __counted_by(len) p, int len);
 
-typedef struct __attribute__((swift_attr("import_as_ref")))
+typedef struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:foobar_retain")))
 __attribute__((swift_attr("release:foobar_release"))) foobar_t *foobar_ref;
 
