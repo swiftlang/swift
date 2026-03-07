@@ -17,11 +17,11 @@ import Swift
 
 // CHECK-LABEL: @"$s15generic_classes11RootGenericCMn" =
 // --       flags: class, generic, unique, has vtable
-// CHECK-SAME:   <i32 0x8000_00D0>
+// CHECK-SAME:   <i32 0x8020_00D0>
 // --       name
 // CHECK-SAME:   ptr [[ROOTGENERIC_NAME]]
 // --       negative size in words
-// CHECK-SAME:   i32 3,
+// CHECK-SAME:   i32 4,
 // --       positive size in words
 // CHECK-objc-SAME:   i32 18,
 // CHECK-native-SAME:   i32 15,
@@ -81,10 +81,10 @@ import Swift
 // -- fixed-layout nongeneric descriptor
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [15 x i8] c"RootNonGeneric\00"
-// CHECK: @"$s15generic_classes14RootNonGenericCMn" = hidden constant <{ {{.*}} %swift.method_descriptor }> <{
+// CHECK: @"$s15generic_classes14RootNonGenericCMn" = hidden constant <{ {{.*}} %swift.method_descriptor, i32 }> <{
 // --       flags: class, unique, has vtable
-// CHECK-DIRECT-SAME:   <i32 0x8000_0050>
-// CHECK-INDIRECT-SAME:   <i32 0x8001_0050>
+// CHECK-DIRECT-SAME:   <i32 0x8020_0050>
+// CHECK-INDIRECT-SAME:   <i32 0x8021_0050>
 // --       name
 // CHECK-SAME:   ptr [[ROOTNONGENERIC_NAME]]
 // --       num fields

@@ -8,7 +8,7 @@
 
 // REQUIRES: executable_test
 
-// METADATA: @"$s1A8SomeEnumOMn" = {{.*}}constant <{ i32, i32, i32, i32, i32, i32, i32 }> <{{{.*}} i32 33554434, i32 0 }>
+// METADATA: @"$s1A8SomeEnumOMn" = {{.*}}constant <{ i32, i32, i32, i32, i32, i32, i32, i32 }> <{{{.*}} i32 33554434, i32 0, i32 1 }>
 
 import A
 

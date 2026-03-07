@@ -1961,7 +1961,8 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Set if the metadata contains a pointer to a layout string
     HasLayoutString = 4,
 
-    /// WARNING: 5 is the last bit!
+    /// Set if the metadata has an extended flags field in the prefix
+    HasExtendedFlags = 5,
 
     // Type-specific flags:
 
@@ -2054,6 +2055,9 @@ public:
                                 hasLayoutString,
                                 setHasLayoutString)
 
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasExtendedFlags, hasExtendedFlags,
+                                setHasExtendedFlags)
+
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,
                                 class_setHasVTable)
@@ -2081,6 +2085,17 @@ public:
                                  TypeReferenceKind,
                                  class_getResilientSuperclassReferenceKind,
                                  class_setResilientSuperclassReferenceKind)
+};
+
+class ExtendedTypeContextDescriptorFlags : public FlagSet<uint32_t> {
+  enum { HasTypedMallocTypeId = 0 };
+
+public:
+  explicit ExtendedTypeContextDescriptorFlags(uint32_t bits) : FlagSet(bits) {}
+  constexpr ExtendedTypeContextDescriptorFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasTypedMallocTypeId, hasTypedMallocTypeId,
+                                setHasTypedMallocTypeId)
 };
 
 /// Extra flags for resilient classes, since we need more than 16 bits of

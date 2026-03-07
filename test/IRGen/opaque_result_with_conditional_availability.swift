@@ -265,7 +265,7 @@ func test_other_platform_available() -> some P {
 // CHECK-NEXT:  br label %universal
 
 // CHECK: universal:
-// CHECK-NEXT:  ret ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s43opaque_result_with_conditional_availability1DVMf", i32 0, i32 2)
+// CHECK-NEXT:  ret ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s43opaque_result_with_conditional_availability1DVMf", i32 0, i32 3)
 // CHECK-NEXT: }
 
 // CHECK: define private ptr @"get_underlying_witness 43opaque_result_with_conditional_availabilityAA29test_other_platform_availableQryFQOxAA1PHC"(ptr %0)
@@ -289,7 +289,7 @@ func test_other_platform_unavailable() -> some P {
 // CHECK-NEXT:   br label %universal
 
 // CHECK: universal:
-// CHECK-NEXT:  ret ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s43opaque_result_with_conditional_availability1DVMf", i32 0, i32 2)
+// CHECK-NEXT:  ret ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s43opaque_result_with_conditional_availability1DVMf", i32 0, i32 3)
 // CHECK-NEXT: }
 
 // CHECK: define private ptr @"get_underlying_witness 43opaque_result_with_conditional_availabilityAA31test_other_platform_unavailableQryFQOxAA1PHC"(ptr %0)

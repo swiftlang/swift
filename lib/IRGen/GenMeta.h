@@ -196,28 +196,29 @@ namespace irgen {
   /// Adjustment indices for the address points of various metadata.
   /// Size is in words.
   namespace MetadataAdjustmentIndex {
-    enum : unsigned {
-      // Class metadata has two words of head-allocated data: the destructor
-      // and the value witness table.
-      Class = 3,
+  enum : unsigned {
+    // Class metadata has four words of head-allocated data:
+    // typed malloc type id, layout string, the destructor
+    // and the value witness table.
+    Class = 4,
 
-      // In Embedded with existentials all metadata is a record with a value
-      // witness prepended.
-      //   -1: vwt
-      //    0: metadata flags (unused)
-      EmbeddedWithExistentials = 1,
-      
-      // Struct and enum metadata have one word of head-allocated data:
-      // the value witness table.
-      ValueType = 2,
+    // In Embedded with existentials all metadata is a record with a value
+    // witness prepended.
+    //   -1: vwt
+    //    0: metadata flags (unused)
+    EmbeddedWithExistentials = 1,
 
-      // Some builtin and well-known types don't have a layout string
-      // for binary compatibility reasons.
-      NoTypeLayoutString = 1,
-      
-      // Other metadata objects have no head allocation.
-      None = 0,
-    };
+    // Struct and enum metadata have three word of head-allocated data:
+    // typed malloc type id, layout string and the value witness table.
+    ValueType = 3,
+
+    // Some builtin and well-known types don't have a layout string
+    // for binary compatibility reasons.
+    NoTypeLayoutString = 1,
+
+    // Other metadata objects have no head allocation.
+    None = 0,
+  };
   }
 
   /// Get the runtime identifier for a special protocol, if any.

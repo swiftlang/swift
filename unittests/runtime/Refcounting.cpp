@@ -34,9 +34,8 @@ static SWIFT_CC(swift) void destroyTestObject(SWIFT_CONTEXT HeapObject *_object)
 }
 
 static const FullMetadata<ClassMetadata> TestClassObjectMetadata = {
-  { { nullptr }, { &destroyTestObject }, { &VALUE_WITNESS_SYM(Bo) } },
-  { { nullptr }, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0 }
-};
+    {{0}, {nullptr}, {&destroyTestObject}, {&VALUE_WITNESS_SYM(Bo)}},
+    {{nullptr}, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0}};
 
 static TestObject ImmortalTestObject{&TestClassObjectMetadata};
 

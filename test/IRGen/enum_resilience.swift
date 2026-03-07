@@ -37,9 +37,9 @@ import resilient_struct
 //              0x0001      - InPlaceMetadataInitialization
 //              0x    0040  - IsUnique
 //              0x    0012  - Enum
-// CHECK-SAME: <i32 0x0001_0052>,
+// CHECK-SAME: <i32 0x0021_0052>,
 // CHECK-SAME: @"$s15enum_resilience24EnumWithResilientPayloadOMl"
-// CHECK-SAME: @"$s15enum_resilience24EnumWithResilientPayloadOMf", i32 0, i32 2)
+// CHECK-SAME: @"$s15enum_resilience24EnumWithResilientPayloadOMf", i32 0, i32 3)
 // CHECK-SAME: @"$s15enum_resilience24EnumWithResilientPayloadOMr"
 
 public class Class {}

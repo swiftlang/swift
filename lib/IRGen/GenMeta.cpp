@@ -57,9 +57,11 @@
 #include "Field.h"
 #include "FixedTypeInfo.h"
 #include "ForeignClassMetadataVisitor.h"
+#include "FunctionMetadataVisitor.h"
 #include "GenArchetype.h"
 #include "GenClass.h"
 #include "GenDecl.h"
+#include "GenHeap.h"
 #include "GenPointerAuth.h"
 #include "GenPoly.h"
 #include "GenStruct.h"
@@ -76,7 +78,6 @@
 #include "StructLayout.h"
 #include "StructMetadataVisitor.h"
 #include "TupleMetadataVisitor.h"
-#include "FunctionMetadataVisitor.h"
 
 #include "GenMeta.h"
 
@@ -1901,6 +1902,11 @@ namespace {
       }
     }
 
+    void addExtendedFlags() {
+      auto flags = asImpl().getExtendedFlags();
+      B.addInt32(flags);
+    }
+
     // Subclasses should provide:
     // ContextDescriptorKind getContextKind();
     // void addLayoutInfo();
@@ -1936,6 +1942,7 @@ namespace {
       maybeAddCanonicalMetadataPrespecializations();
       addInvertedProtocols();
       maybeAddSingletonMetadataPointer();
+      addExtendedFlags();
     }
 
     ContextDescriptorKind getContextKind() {
@@ -1955,8 +1962,17 @@ namespace {
 
       setCommonFlags(flags);
       flags.setHasLayoutString(hasLayoutString);
-      
+      // Only set hasExtendedFlags for non-generic types where we emit them as
+      // fixed fields
+      flags.setHasExtendedFlags(true);
+
       return flags.getOpaqueValue();
+    }
+
+    uint32_t getExtendedFlags() {
+      ExtendedTypeContextDescriptorFlags extendedFlags;
+      extendedFlags.setHasTypedMallocTypeId(true);
+      return extendedFlags.getOpaqueValue();
     }
 
     void maybeAddResilientSuperclass() { }
@@ -2011,6 +2027,7 @@ namespace {
       maybeAddCanonicalMetadataPrespecializations();
       addInvertedProtocols();
       maybeAddSingletonMetadataPointer();
+      addExtendedFlags();
     }
     
     ContextDescriptorKind getContextKind() {
@@ -2040,8 +2057,17 @@ namespace {
 
       setCommonFlags(flags);
       flags.setHasLayoutString(hasLayoutString);
+      // Only set hasExtendedFlags for non-generic types where we emit them as
+      // fixed fields
+      flags.setHasExtendedFlags(true);
 
       return flags.getOpaqueValue();
+    }
+
+    uint32_t getExtendedFlags() {
+      ExtendedTypeContextDescriptorFlags extendedFlags;
+      extendedFlags.setHasTypedMallocTypeId(true);
+      return extendedFlags.getOpaqueValue();
     }
 
     void maybeAddResilientSuperclass() { }
@@ -2146,6 +2172,7 @@ namespace {
       addInvertedProtocols();
       maybeAddSingletonMetadataPointer();
       maybeAddDefaultOverrideTable();
+      addExtendedFlags();
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -2196,8 +2223,18 @@ namespace {
         flags.class_setResilientSuperclassReferenceKind(
                                             ResilientSuperClassRef->getKind());
       }
-      
+
+      // Only set hasExtendedFlags for non-generic types where we emit them as
+      // fixed fields
+      flags.setHasExtendedFlags(true);
+
       return flags.getOpaqueValue();
+    }
+
+    uint32_t getExtendedFlags() {
+      ExtendedTypeContextDescriptorFlags extendedFlags;
+      extendedFlags.setHasTypedMallocTypeId(true);
+      return extendedFlags.getOpaqueValue();
     }
 
     void maybeAddResilientSuperclass() {
@@ -4320,6 +4357,8 @@ namespace {
     // later turned into !type metadata attributes.
     SmallVector<std::pair<Size, SILDeclRef>, 8> VTableEntriesForVFE;
 
+    std::optional<std::optional<uint64_t>> typedMallocTypeId;
+
   public:
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
                              ConstantStructBuilder &builder,
@@ -4496,6 +4535,20 @@ namespace {
       auto metadata = asImpl().getSuperclassMetadata(superclass);
       assert(metadata);
       B.add(metadata);
+    }
+
+    std::optional<uint64_t> getTypedMallocTypeId() {
+      if (!typedMallocTypeId) {
+        typedMallocTypeId =
+            FieldLayout.computeTypedMallocTypeDescriptor(IGM, getLoweredType());
+      }
+
+      return *typedMallocTypeId;
+    }
+
+    void addTypedMallocTypeId() {
+      auto mallocId = getTypedMallocTypeId();
+      B.addInt64(mallocId.value_or(0));
     }
 
     llvm::Constant *emitLayoutString() {
@@ -5893,6 +5946,8 @@ namespace {
 
     using Base::Base;
 
+    std::optional<std::optional<uint64_t>> typedMallocTypeId;
+
   public:
     SILType getLoweredType() {
       return IGM.getLoweredType(Target->getDeclaredTypeInContext());
@@ -5910,6 +5965,14 @@ namespace {
         emitInitializeValueMetadata(IGF, Target, metadata,
                                     /*vwt mutable*/true, collector);
       });
+    }
+
+    std::optional<uint64_t> getTypedMallocTypeId() {
+      if (!typedMallocTypeId) {
+        llvm::SmallVector<SILType, 1> types = {getLoweredType()};
+        typedMallocTypeId = irgen::computeTypedMallocTypeDescriptor(IGM, types);
+      }
+      return *typedMallocTypeId;
     }
   };
 }
@@ -5931,10 +5994,11 @@ namespace {
   protected:
     ConstantStructBuilder &B;
     using NominalDecl = StructDecl;
-    using super::IGM;
-    using super::Target;
     using super::asImpl;
     using super::getLoweredType;
+    using super::getTypedMallocTypeId;
+    using super::IGM;
+    using super::Target;
 
     StructMetadataBuilderBase(IRGenModule &IGM, StructDecl *theStruct,
                               ConstantStructBuilder &B)
@@ -6024,6 +6088,11 @@ namespace {
       } else {
         B.addNullPointer(IGM.Int8PtrTy);
       }
+    }
+
+    void addTypedMallocTypeId() {
+      auto mallocId = getTypedMallocTypeId();
+      B.addInt64(mallocId.value_or(0));
     }
 
     void addFieldOffset(VarDecl *var) {
@@ -6536,9 +6605,10 @@ namespace {
     using NominalDecl = EnumDecl;
     ConstantStructBuilder &B;
     using super::asImpl;
+    using super::getLoweredType;
+    using super::getTypedMallocTypeId;
     using super::IGM;
     using super::Target;
-    using super::getLoweredType;
 
     EnumMetadataBuilderBase(IRGenModule &IGM, EnumDecl *theEnum,
                             ConstantStructBuilder &B)
@@ -6606,6 +6676,11 @@ namespace {
       } else {
         B.addNullPointer(IGM.Int8PtrTy);
       }
+    }
+
+    void addTypedMallocTypeId() {
+      auto mallocId = getTypedMallocTypeId();
+      B.addInt64(mallocId.value_or(0));
     }
 
     void addValueWitnessTable() {
@@ -7083,6 +7158,8 @@ namespace {
       B.addNullPointer(IGM.Int8PtrTy);
     }
 
+    void addTypedMallocTypeId() { B.addInt64(0); }
+
     void addValueWitnessTable() {
       assert(!getTargetType()->isForeignReferenceType());
 
@@ -7176,6 +7253,8 @@ namespace {
     }
 
     // Visitor methods.
+
+    void addTypedMallocTypeId() { B.addInt64(0); }
 
     void addLayoutStringPointer() {
       B.addNullPointer(IGM.Int8PtrTy);

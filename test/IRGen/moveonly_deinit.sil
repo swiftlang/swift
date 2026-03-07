@@ -10,7 +10,7 @@ import Builtin
 import Swift
 
 // Check that box destructor invokes deinit for a captured move-only value.
-// CHECK: @[[BOX_STRUCT_METADATA:[A-Za-z0-9_.]+]] = {{.*}} constant %swift.full_boxmetadata { ptr @[[BOX_STRUCT_DESTRUCTOR:[A-Za-z0-9_.]+]]
+// CHECK: @[[BOX_STRUCT_METADATA:[A-Za-z0-9_.]+]] = {{.*}} constant %swift.full_boxmetadata { i64 {{.*}}, ptr @[[BOX_STRUCT_DESTRUCTOR:[A-Za-z0-9_.]+]]
 
 sil_stage canonical
 

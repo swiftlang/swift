@@ -29,7 +29,7 @@ func consume<T>(_ t: T) {
 // CHECK-SAME:     }>, 
 // CHECK-SAME:     ptr @"$s4main5ValueVMf", 
 // CHECK-SAME:     i32 0, 
-// CHECK-SAME:     i32 2
+// CHECK-SAME:     i32 3
 // CHECK-SAME:   )
 // CHECK-SAME: )
 // CHECK: }

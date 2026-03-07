@@ -10,7 +10,7 @@
 
 // CHECK: @"$sSo24CCMutableRefrigeratorRefaMn" = linkonce_odr hidden constant
 // -- is imported, foreign init, is class, is nonunique
-// CHECK-SAME: <i32 0x0006_0010>
+// CHECK-SAME: <i32 0x0026_0010>
 // CHECK-SAME: [[MUTABLE_REFRIGERATOR_NAME]]
 // CHECK-SAME: @"$sSo24CCMutableRefrigeratorRefaMa"
 // CHECK-SAME: @"$sSo24CCMutableRefrigeratorRefaMr"
