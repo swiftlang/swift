@@ -126,3 +126,56 @@ do {
       f4(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
   }
 }
+
+// Regression tests for closure returns defaulting to Void.
+// Here, we want to make sure that we don't diagnose ambiguity
+// because there are two places where we can convert to Void
+// here; in the outermost closure passed to g(), or the closure
+// passed to f().
+do {
+  @discardableResult
+  func f<T>(_: () -> T) -> T { fatalError() }
+
+  func g<T>(_: T, _: (T) -> ()) {}
+
+  struct R {
+    func m() -> Bool { fatalError() }
+  }
+
+  func h(r: R) {
+    g(r) { r in
+      f {
+        r.m()
+      }
+    }
+  }
+}
+
+// More elaborate variant of the above.
+do {
+  @discardableResult
+  func f<T>(_: () -> T) -> T { fatalError() }
+
+  @discardableResult
+  func f<T>(_: () async -> T) async -> T { fatalError() }
+
+  protocol P {}
+
+  struct R: P {
+    @discardableResult func g() async -> String {
+       fatalError()
+    }
+  }
+
+  class C {
+    func g<T: P>(_: T, _: (T) async -> ()) {}
+
+    func h(r: R) {
+      g(r) { r in
+        await f {
+          await r.g()
+        }
+      }
+    }
+  }
+}

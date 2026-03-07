@@ -184,7 +184,10 @@ TypeVarBindingProducer::TypeVarBindingProducer(
   }
 
   for (const auto &binding : bindings.Bindings) {
-    addBinding(binding);
+    if (binding.Kind == AllowedBindingKind::Fallback)
+      DelayedDefaults.push_back(adjustBinding(binding));
+    else
+      addBinding(binding);
   }
 
   // Infer defaults based on "uncovered" literal protocol requirements.
