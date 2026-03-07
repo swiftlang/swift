@@ -2748,6 +2748,26 @@ private:
       return DITy;
     }
 
+    // Marker protocols have no runtime representation (no witness tables, no
+    // field descriptors). An existential of only marker protocols (e.g., "any
+    // Sendable") has the same layout as "Any", so emit it as "Any" in debug
+    // info to avoid referencing protocols that have no DWARF representation.
+    if (auto *ExTy = dyn_cast<ExistentialType>(DbgTy.getType())) {
+      auto Constraint = ExTy->getConstraintType();
+      if (auto *PT = dyn_cast<ProtocolType>(Constraint.getPointer())) {
+        if (PT->getDecl()->isMarkerProtocol()) {
+          CanType AnyTy =
+              IGM.getSILModule().getASTContext().getAnyExistentialType();
+          auto &TI = IGM.getTypeInfoForUnlowered(AnyTy);
+          auto *DITy = getOrCreateType(
+              DebugTypeInfo::getFromTypeInfo(AnyTy, TI, IGM), Scope);
+          // Cache under the original type so subsequent lookups are fast.
+          DITypeCache.insert({DbgTy.getType(), llvm::TrackingMDNodeRef(DITy)});
+          return DITy;
+        }
+      }
+    }
+
     // Use a separate DIRefMap cache for existential typealiases
     // because they have identical mangled names as their inner
     // protocol types and cause conflicts in the cache. For example,
