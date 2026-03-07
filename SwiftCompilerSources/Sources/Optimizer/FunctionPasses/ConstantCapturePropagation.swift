@@ -58,6 +58,10 @@ import AST
 let constantCapturePropagation = FunctionPass(name: "constant-capture-propagation") {
   (function: Function, context: FunctionPassContext) in
 
+  guard function.hasOwnership else {
+    return
+  }
+
   for inst in function.instructions {
     guard let partialApply = inst as? PartialApplyInst,
           // Only support closures which - after generic specialization - are not generic anymore.
@@ -316,7 +320,7 @@ private extension PartialApplyInst {
     for argOp in argumentOperands {
       // In non-OSSA we don't know where to insert the compensating release for a propagated keypath.
       // Therefore bail if a keypath has multiple uses.
-      switch argOp.value.isConstant(requireSingleUse: !parentFunction.hasOwnership && !isOnStack) {
+      switch argOp.value.isConstant() {
       case .constant:
         constArgs.append(argOp)
       case .constantWithKeypath:
@@ -368,17 +372,18 @@ private enum ConstantKind {
 }
 
 private extension Value {
-  func isConstant(requireSingleUse: Bool) -> ConstantKind {
+  func isConstant() -> ConstantKind {
     // All instructions handled here must also be handled in
     // `FunctionSignatureSpecializationMangler::mangleConstantProp`.
     let result: ConstantKind
     switch self {
     case let si as StructInst:
       result = si.operands.reduce(.constant, {
-        $0.merge(with: $1.value.isConstant(requireSingleUse: requireSingleUse))
+        $0.merge(with: $1.value.isConstant())
       })
-    case is ThinToThickFunctionInst, is ConvertFunctionInst, is UpcastInst, is OpenExistentialRefInst:
-      result = (self as! UnaryInstruction).operand.value.isConstant(requireSingleUse: requireSingleUse)
+    case is ThinToThickFunctionInst, is ConvertFunctionInst, is UpcastInst, is OpenExistentialRefInst,
+         is MoveValueInst:
+      result = (self as! UnaryInstruction).operand.value.isConstant()
     case is StringLiteralInst, is IntegerLiteralInst, is FloatLiteralInst, is FunctionRefInst, is GlobalAddrInst:
       result = .constant
     case let keyPath as KeyPathInst:
@@ -390,9 +395,6 @@ private extension Value {
       }
       result = .constantWithKeypath
     default:
-      return .notConstant
-    }
-    if requireSingleUse, result == .constantWithKeypath, !uses.ignoreDebugUses.isSingleUse {
       return .notConstant
     }
     return result

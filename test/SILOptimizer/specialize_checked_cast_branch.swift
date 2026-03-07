@@ -159,7 +159,7 @@ _ = ArchetypeToConcreteCastC(t: c)
 // CHECK-LABEL: sil shared {{.*}}@$s30specialize_checked_cast_branch24ArchetypeToConcreteCastC1tAA1CCx_tlFAA1DC_Tg5 : $@convention(thin) (@guaranteed D) -> @owned C {
 // CHECK: bb0([[ARG:%.*]] : $D):
 // CHECK:  [[CAST:%.*]] = upcast [[ARG]] : $D to $C
-// CHECK:  strong_retain [[ARG]]
+// CHECK:  strong_retain [[CAST]]
 // CHECK:  return [[CAST]]
 // CHECK: } // end sil function '$s30specialize_checked_cast_branch24ArchetypeToConcreteCastC1tAA1CCx_tlFAA1DC_Tg5'
 _ = ArchetypeToConcreteCastC(t: d)

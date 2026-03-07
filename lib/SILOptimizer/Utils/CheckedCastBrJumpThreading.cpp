@@ -270,7 +270,8 @@ canRAUW(OwnershipFixupContext &rauwContext) {
   // a phi in the successor. It is always valid to replace a phi use, because
   // phi itself already guarantees that lifetime extends over its own uses.
   return OwnershipRAUWHelper::hasValidNonLexicalRAUWOwnership(oldSuccessArg,
-                                                              SuccessArg);
+                                                              SuccessArg,
+                                                              /*respectLexicalFlags=*/ false);
 }
 
 // Erase the checked_cast_br that terminates this block. The caller must replace
@@ -352,7 +353,8 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForSuccessPreds(
 
     // Replace uses with SuccessArg from the dominating BB. Do this while it is
     // still a valid terminator result, before erasing the cast.
-    OwnershipRAUWHelper rauwTransform(rauwContext, oldSuccessArg, SuccessArg);
+    OwnershipRAUWHelper rauwTransform(rauwContext, oldSuccessArg, SuccessArg,
+                                      /*respectLexicalFlags=*/ false);
     assert(rauwTransform.isValid() && "sufficiently checked by canRAUW");
     rauwTransform.perform();
 
@@ -399,7 +401,8 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForSuccessPreds(
   Cloner.updateSSAAfterCloning();
 
   auto *clonedSuccessArg = successBB->getArgument(0);
-  OwnershipRAUWHelper rauwUtil(rauwContext, clonedSuccessArg, SuccessArg);
+  OwnershipRAUWHelper rauwUtil(rauwContext, clonedSuccessArg, SuccessArg,
+                               /*respectLexicalFlags=*/ false);
   assert(rauwUtil.isValid() && "sufficiently checked by canRAUW");
   rauwUtil.perform();
 

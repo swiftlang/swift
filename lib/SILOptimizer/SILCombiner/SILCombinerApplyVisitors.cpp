@@ -611,10 +611,6 @@ bool swift::tryOptimizeKeypath(ApplyInst *AI, SILBuilder Builder) {
 ///   %addr = struct_element_addr/ref_element_addr %root_object
 ///   // use %inout_addr
 bool SILCombiner::tryOptimizeInoutKeypath(BeginApplyInst *AI) {
-  // Disable in OSSA because KeyPathProjector is not fully ported
-  if (AI->getFunction()->hasOwnership())
-    return false;
-
   SILFunction *callee = AI->getReferencedFunctionOrNull();
   if (!callee)
     return false;
@@ -1537,6 +1533,8 @@ SILInstruction *SILCombiner::legacyVisitApplyInst(ApplyInst *AI) {
       callee = cee->getOperand();
     } else if (auto *mdi = dyn_cast<MarkDependenceInst>(callee)) {
       callee = mdi->getValue();
+    } else if (auto *cvi = dyn_cast<CopyValueInst>(callee)) {
+      callee = cvi->getOperand();
     } else {
       break;
     }

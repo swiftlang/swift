@@ -279,8 +279,6 @@ public:
   SILInstruction *visitSwitchValueInst(SwitchValueInst *SVI);
   SILInstruction *
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
-  SILInstruction *
-  visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
   SILInstruction *visitUnreachableInst(UnreachableInst *UI);
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
       

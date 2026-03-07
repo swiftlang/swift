@@ -76,11 +76,14 @@ static SILValue getArrayStructPointer(ArrayCallKind K, SILValue Array) {
   assert(K != ArrayCallKind::kNone);
 
   if (K < ArrayCallKind::kMakeMutable) {
-    auto LI = dyn_cast<LoadInst>(lookThroughCopyValueInsts(Array));
-    if (!LI) {
-      return Array;
+    SILValue a = lookThroughCopyValueInsts(Array);
+    if (auto *li = dyn_cast<LoadInst>(a)) {
+      return li->getOperand();
     }
-    return LI->getOperand();
+    if (auto *lbi = dyn_cast<LoadBorrowInst>(a)) {
+      return lbi->getOperand();
+    }
+    return Array;
   }
   return Array;
 }
