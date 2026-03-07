@@ -174,7 +174,11 @@ public func testStruct(_ s: S) {
 // CHECK:   [[V3:%.*]] = icmp ne ptr @"$s17has_symbol_helper1SV6memberSivs", null
 // CHECK:   [[V4:%.*]] = and i1 [[V2]], [[V3]]
 // CHECK:   [[V5:%.*]] = icmp ne ptr @"$s17has_symbol_helper1SV6memberSivM", null
-// CHECK:   [[RES:%.*]] = and i1 [[V4]], [[V5]]
+// CHECK:   [[V6:%.*]] = and i1 [[V4]], [[V5]]
+// CHECK:   [[V7:%.*]] = icmp ne ptr @"$s17has_symbol_helper1SV6memberSivx", null
+// CHECK:   [[V8:%.*]] = and i1 [[V6]], [[V7]]
+// CHECK:   [[V9:%.*]] = icmp ne ptr @"$s17has_symbol_helper1SV6memberSivxTwc", null
+// CHECK:  [[RES:%.*]] = and i1 [[V8]], [[V9]]
 // CHECK:   ret i1 [[RES]]
 
 // --- S.staticMember ---
@@ -183,7 +187,11 @@ public func testStruct(_ s: S) {
 // CHECK:   [[V1:%.*]] = icmp ne ptr @"$s17has_symbol_helper1SV12staticMemberSivsZ", null
 // CHECK:   [[V2:%.*]] = and i1 [[V0]], [[V1]]
 // CHECK:   [[V3:%.*]] = icmp ne ptr @"$s17has_symbol_helper1SV12staticMemberSivMZ", null
-// CHECK:   [[RES:%.*]] = and i1 [[V2]], [[V3]]
+// CHECK:   [[V4:%.*]] = and i1 [[V2]], [[V3]]
+// CHECK:   [[V5:%.*]] = icmp ne ptr @"$s17has_symbol_helper1SV12staticMemberSivxZ", null
+// CHECK:   [[V6:%.*]] = and i1 [[V4]], [[V5]]
+// CHECK:   [[V7:%.*]] = icmp ne ptr @"$s17has_symbol_helper1SV12staticMemberSivxZTwc", null
+// CHECK:   [[RES:%.*]] = and i1 [[V6]], [[V7]]
 // CHECK:   ret i1 [[RES]]
 
 // --- S.method(with:) ---

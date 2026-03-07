@@ -765,11 +765,12 @@ func testClassModifyAccessor(_ c: inout C) {
 // CHECK: [VARIED]   %7 = load [copy] %6 : $*C
 // CHECK: [VARIED]   %9 = class_method %7 : $C, #C.float!getter : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
 // CHECK: [VARIED]   %10 = apply %9(%7) : $@convention(method) (@guaranteed C) -> Float
-// CHECK: [VARIED]   %12 = class_method %4 : $C, #C.float!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
-// CHECK: [VARIED] (**%13**, %14) = begin_apply %12(%4) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
-// CHECK: [VARIED] (%13, **%14**) = begin_apply %12(%4) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED]   %12 = class_method %4 : $C, #C.float!yielding_mutate : (C) -> () -> (), $@yield_once_2 @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED] (**%13**, %14, %15) = begin_apply %12(%4) : $@yield_once_2 @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED] (%13, **%14**, %15) = begin_apply %12(%4) : $@yield_once_2 @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED] (%13, %14, **%15**) = begin_apply %12(%4) : $@yield_once_2 @convention(method) (@guaranteed C) -> @yields @inout Float
 // CHECK: [NONE]   // function_ref static Float.*= infix(_:_:)
-// CHECK: [NONE]   %16 = apply %15(%13, %10, %2) : $@convention(method) (@inout Float, Float, @thin Float.Type) -> ()
+// CHECK: [NONE]   %17 = apply %16(%13, %10, %2) : $@convention(method) (@inout Float, Float, @thin Float.Type) -> ()
 
 //===----------------------------------------------------------------------===//
 // Enum differentiation

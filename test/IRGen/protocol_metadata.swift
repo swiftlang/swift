@@ -113,10 +113,10 @@ protocol Comprehensive {
 // CHECK-SAME:   %swift.protocol_requirement { i32 1, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 19, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 20, i32 0 },
-// CHECK-SAME:   %swift.protocol_requirement { i32 22, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 54, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 3, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 4, i32 0 },
-// CHECK-SAME:   %swift.protocol_requirement { i32 6, i32 0 }
+// CHECK-SAME:   %swift.protocol_requirement { i32 38, i32 0 }
 
   struct ParentType {
 

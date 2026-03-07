@@ -239,7 +239,7 @@ func update<T : Equatable>(at location: inout T, to newValue: T) throws -> T {
 }
 
 protocol ReadableTitle {
-  var title: String { read }
+  var title: String { yielding borrow }
 }
 class OverridableGetter : ReadableTitle {
   var title: String = ""

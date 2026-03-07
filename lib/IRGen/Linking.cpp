@@ -922,8 +922,14 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::DynamicallyReplaceableFunctionKey:
     return getSILFunction()->getLinkage();
 
-  case Kind::SILFunction:
+  case Kind::SILFunction: {
+    if (getSILFunction()->getModule().getASTContext().
+          LangOpts.hasFeature(Feature::Embedded)) {
+      if (getSILFunction()->getName() == "swift_deletedCalleeAllocatedCoroutineMethodError")
+        return SILLinkage::Shared;
+    }
     return getSILFunction()->getEffectiveSymbolLinkage();
+    }
 
   case Kind::AsyncFunctionPointerAST:
   case Kind::DistributedThunkAsyncFunctionPointer:
@@ -975,8 +981,13 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getUnderlyingEntityForAsyncFunctionPointer()
         .getLinkage(forDefinition);
   case Kind::KnownAsyncFunctionPointer:
-  case Kind::KnownCoroFunctionPointer:
     return SILLinkage::PublicExternal;
+  case Kind::KnownCoroFunctionPointer: {
+    auto &langOpts = reinterpret_cast<IRGenModule*>(this->SecondaryPointer)->Context.LangOpts;
+    if (langOpts.hasFeature(Feature::Embedded))
+      return SILLinkage::Shared;
+    return SILLinkage::PublicExternal;
+  }
   case Kind::PartialApplyForwarder:
     return SILLinkage::Private;
   case Kind::DistributedAccessor:

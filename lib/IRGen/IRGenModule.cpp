@@ -1189,7 +1189,7 @@ llvm::Constant *IRGenModule::
     getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer() {
   return getAddrOfLLVMVariableOrGOTEquivalent(
              LinkEntity::forKnownCoroFunctionPointer(
-                 "swift_deletedCalleeAllocatedCoroutineMethodError"))
+                 "swift_deletedCalleeAllocatedCoroutineMethodError", this))
       .getValue();
 }
 

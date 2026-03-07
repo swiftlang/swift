@@ -21,5 +21,5 @@ class Sub : Base {
 // CHECK: #Base.foo!getter: (Base) -> () -> Int : {{.*}} // Sub.foo.getter
 // CHECK: #Base.bar!getter: (Base) -> () -> Int : {{.*}} // Sub.bar.getter
 // CHECK: #Base.bar!setter: (Base) -> (Int) -> () : {{.*}} // Sub.bar.setter
-// CHECK: #Base.bar!modify: (Base) -> {{.*}} : {{.*}} // Sub.bar.modify
+// CHECK: #Base.bar!yielding_mutate: (Base) -> () -> () : {{.*}} // Sub.bar.yielding_mutate
 // CHECK: }
