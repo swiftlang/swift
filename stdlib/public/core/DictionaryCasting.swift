@@ -57,6 +57,23 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
   }!
 }
 
+@_alwaysEmitIntoClient
+public func _dictionaryWitnessCast<SourceKey, SourceValue, TargetKey, TargetValue>(
+  _ source: Dictionary<SourceKey, SourceValue>,
+  _ keyWitness: (SourceKey) -> TargetKey,
+  _ valueWitness: (SourceValue) -> TargetValue
+) -> Dictionary<TargetKey, TargetValue> {
+  return Dictionary(
+    _mapping: source,
+    // String and NSString have different concepts of equality, so
+    // NSString-keyed Dictionaries may generate key collisions when "upcasted"
+    // to String. See rdar://problem/35995647
+    allowingDuplicates: (TargetKey.self == String.self)
+  ) { k, v in
+    (keyWitness(k), valueWitness(v))
+  }!
+}
+
 /// Called by the casting machinery.
 @_silgen_name("_swift_dictionaryDownCastIndirect")
 @_unavailableInEmbedded

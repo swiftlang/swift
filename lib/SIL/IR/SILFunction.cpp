@@ -534,8 +534,8 @@ Type SILFunction::mapTypeIntoEnvironment(Type type) const {
 SILType SILFunction::mapTypeIntoEnvironment(SILType type) const {
   assert(!type.hasPrimaryArchetype());
 
-  if (GenericEnv) {
-    auto genericSig = GenericEnv->getGenericSignature().getCanonicalSignature();
+  if (GenericEnv || !CapturedEnvs.empty()) {
+    auto genericSig = GenericEnv ? GenericEnv->getGenericSignature().getCanonicalSignature() : CanGenericSignature();
     return type.subst(Module,
                       MapIntoLocalArchetypeContext(GenericEnv, CapturedEnvs),
                       LookUpConformanceInModule(),
