@@ -1384,6 +1384,14 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
                                          bool passParentContext, MacroRole role,
                                          ArrayRef<ProtocolDecl *> conformances = {},
                                          StringRef discriminatorStr = "") {
+  // Decls produced by attached macros are parsed in a top-level macro buffer.
+  // For nested attached macros, recover the original lexical parent so
+  // ASTGen can stitch lexicalContext across expansion boundaries.
+  if (!passParentContext && attachedTo->isInMacroExpansionInContext() &&
+      attachedTo->getDeclContext()->getAsDecl()) {
+    passParentContext = true;
+  }
+
   DeclContext *dc;
   if (role == MacroRole::Peer) {
     dc = attachedTo->getDeclContext();
