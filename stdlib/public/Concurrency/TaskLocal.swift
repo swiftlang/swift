@@ -198,16 +198,52 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// in specific child tasks, the more specific (i.e. "deeper") binding is
   /// returned when the value is read.
   ///
+  /// The operation is guaranteed to execute in the calling context.
+  ///
   /// If the value is a reference type, it will be retained for the duration of
   /// the operation closure.
+  @_alwaysEmitIntoClient
+  @discardableResult
+  @available(SwiftStdlib 5.1, *)
+  // ABI Note: @abi needed because the mangling otherwise conflicts with the
+  // legacy @_unsafeInheritExecutor declaration.
+  @abi(
+    nonisolated(nonsending) func withValueNonisolatedNonsending<R: ~Copyable, E: Error>(
+      _ valueDuringOperation: Value,
+      operation: nonisolated(nonsending) () async throws(E) -> R,
+      file: String, line: UInt
+    ) async throws(E) -> R
+  )
+  public nonisolated(nonsending) func withValue<R: ~Copyable, E: Error>(
+    _ valueDuringOperation: Value,
+    operation: nonisolated(nonsending) () async throws(E) -> R,
+    file: String = #fileID, line: UInt = #line
+  ) async throws(E) -> R {
+    return try await withValueImpl(
+      valueDuringOperation,
+      operation: operation,
+      file: file, line: line)
+  }
+
   @inlinable
   @discardableResult
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 6.0)
-  public func withValue<R>(_ valueDuringOperation: Value,
-                           operation: () async throws -> R,
-                           isolation: isolated (any Actor)? = #isolation,
-                           file: String = #fileID, line: UInt = #line) async rethrows -> R {
+  @available(*, deprecated, message: "Prefer the 'nonisolated(nonsending)' overload with stricter execution on caller context semantics: withValue(_:operation:file:line:)")
+  @abi(
+    func withValue<R>(
+      _ valueDuringOperation: Value,
+      operation: () async throws -> R,
+      isolation: isolated (any Actor)?,
+      file: String, line: UInt
+    ) async rethrows -> R
+  )
+  public func _abi_withValue<R>(
+    _ valueDuringOperation: Value,
+    operation: () async throws -> R,
+    isolation: isolated (any Actor)? = #isolation,
+    file: String = #fileID, line: UInt = #line
+  ) async rethrows -> R {
     return try await withValueImpl(
       valueDuringOperation,
       operation: operation,
@@ -251,14 +287,14 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// to swift_task_de/alloc for the copy as follows:
   /// - withValue contains the compiler-emitted calls swift_task_de/alloc.
   /// - withValueImpl contains the calls to Builtin.taskLocalValuePush/Pop
-  @inlinable
+  @_alwaysEmitIntoClient
   @discardableResult
   @available(SwiftStdlib 5.1, *)
-  @backDeployed(before: SwiftStdlib 6.0)
-  internal func withValueImpl<R>(_ valueDuringOperation: __owned Value,
-                                 operation: () async throws -> R,
-                                 isolation: isolated (any Actor)?,
-                                 file: String = #fileID, line: UInt = #line) async rethrows -> R {
+  internal nonisolated(nonsending) func withValueImpl<R: ~Copyable, E: Error>(
+    _ valueDuringOperation: __owned Value,
+    operation: nonisolated(nonsending) () async throws(E) -> R,
+    file: String = #fileID, line: UInt = #line
+  ) async throws(E) -> R {
 #if $BuiltinConcurrencyStackNesting
     Builtin.taskLocalValuePush(key, consume valueDuringOperation)
     defer { Builtin.taskLocalValuePop() }
@@ -266,7 +302,26 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     _taskLocalValuePush(key: key, value: consume valueDuringOperation)
     defer { _taskLocalValuePop() }
 #endif
+    return try await operation()
+  }
 
+  @inlinable
+  @discardableResult
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 6.0)
+  internal func withValueImpl<R>(
+    _ valueDuringOperation: __owned Value,
+    operation: () async throws -> R,
+    isolation: isolated (any Actor)?,
+    file: String = #fileID, line: UInt = #line
+  ) async rethrows -> R {
+#if $BuiltinConcurrencyStackNesting
+    Builtin.taskLocalValuePush(key, consume valueDuringOperation)
+    defer { Builtin.taskLocalValuePop() }
+#else
+    _taskLocalValuePush(key: key, value: consume valueDuringOperation)
+    defer { _taskLocalValuePop() }
+#endif
     return try await operation()
   }
 
