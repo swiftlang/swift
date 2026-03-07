@@ -59,26 +59,62 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-llvm::cl::opt<bool> EnableOSSACheckedCastBrJumpThreading(
-    "enable-ossa-checked-cast-br-jump-threading",
-    llvm::cl::desc("Enable OSSA checked cast branch jump threading "
-                   "(staging)."),
-    llvm::cl::init(true));
+static llvm::cl::opt<bool> &EnableOSSACheckedCastBrJumpThreading() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-ossa-checked-cast-br-jump-threading");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-ossa-checked-cast-br-jump-threading",
+      llvm::cl::desc("Enable OSSA checked cast branch jump threading "
+                     "(staging)."),
+      llvm::cl::init(true));
+  return *opt;
+}
+static auto &EarlyInitEnableOSSACheckedCastBrJumpThreading = EnableOSSACheckedCastBrJumpThreading();
 
-llvm::cl::opt<bool> EnableOSSASimpleJumpThreading(
-    "enable-ossa-simple-jump-threading",
-    llvm::cl::desc("Enable OSSA simple jump threading (staging)."),
-    llvm::cl::init(true));
+static llvm::cl::opt<bool> &EnableOSSASimpleJumpThreading() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-ossa-simple-jump-threading");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-ossa-simple-jump-threading",
+      llvm::cl::desc("Enable OSSA simple jump threading (staging)."),
+      llvm::cl::init(true));
+  return *opt;
+}
+static auto &EarlyInitEnableOSSASimpleJumpThreading = EnableOSSASimpleJumpThreading();
 
-llvm::cl::opt<bool> EnableOSSADominatorBasedSimplify(
-    "enable-ossa-dominator-based-simplify",
-    llvm::cl::desc("Enable OSSA dominator based simplifications (staging)."),
-    llvm::cl::init(true));
+static llvm::cl::opt<bool> &EnableOSSADominatorBasedSimplify() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-ossa-dominator-based-simplify");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-ossa-dominator-based-simplify",
+      llvm::cl::desc("Enable OSSA dominator based simplifications (staging)."),
+      llvm::cl::init(true));
+  return *opt;
+}
+static auto &EarlyInitEnableOSSADominatorBasedSimplify = EnableOSSADominatorBasedSimplify();
 
-llvm::cl::opt<bool> IsInfiniteJumpThreadingBudget(
-    "sil-infinite-jump-threading-budget",
-    llvm::cl::desc(
-        "Use infinite budget for jump threading. Useful for testing purposes"));
+static llvm::cl::opt<bool> &IsInfiniteJumpThreadingBudget() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-infinite-jump-threading-budget");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-infinite-jump-threading-budget",
+      llvm::cl::desc(
+          "Use infinite budget for jump threading. Useful for testing purposes"));
+  return *opt;
+}
+static auto &EarlyInitIsInfiniteJumpThreadingBudget = IsInfiniteJumpThreadingBudget();
 
 STATISTIC(NumBlocksDeleted, "Number of unreachable blocks removed");
 STATISTIC(NumBlocksMerged, "Number of blocks merged together");
@@ -551,7 +587,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
   // Get the dominator tree.
   DT = DA->get(&Fn);
 
-  if (!EnableOSSADominatorBasedSimplify && Fn.hasOwnership())
+  if (!EnableOSSADominatorBasedSimplify() && Fn.hasOwnership())
     return false;
 
   // Split all critical edges such that we can move code onto edges. This is
@@ -575,7 +611,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
     // and MUST NOT change the CFG without updating the dominator tree to
     // reflect such change.
     if (tryCheckedCastBrJumpThreading(&Fn, PM, DT, deBlocks, BlocksForWorklist,
-                                      EnableOSSACheckedCastBrJumpThreading)) {
+                                      EnableOSSACheckedCastBrJumpThreading())) {
       for (auto BB: BlocksForWorklist)
         addToWorklist(BB);
 
@@ -922,7 +958,7 @@ static bool hasInjectedEnumAtEndOfBlock(SILBasicBlock *block, SILValue enumAddr)
 /// tryJumpThreading - Check to see if it looks profitable to duplicate the
 /// destination of an unconditional jump into the bottom of this block.
 bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
-  if (!EnableOSSASimpleJumpThreading && Fn.hasOwnership())
+  if (!EnableOSSASimpleJumpThreading() && Fn.hasOwnership())
     return false;
 
   auto *DestBB = BI->getDestBB();
@@ -952,7 +988,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // major second order simplifications.  Here we only do it if there are
   // "constant" arguments to the branch or if we know how to fold something
   // given the duplication.
-  int ThreadingBudget = IsInfiniteJumpThreadingBudget ? INT_MAX : 0;
+  int ThreadingBudget = IsInfiniteJumpThreadingBudget() ? INT_MAX : 0;
 
   for (unsigned i : indices(BI->getArgs())) {
     SILValue Arg = BI->getArg(i);
@@ -1226,8 +1262,17 @@ static bool isReachable(SILBasicBlock *Block) {
 }
 #endif
 
-static llvm::cl::opt<bool> SimplifyUnconditionalBranches(
-    "simplify-cfg-simplify-unconditional-branches", llvm::cl::init(true));
+static llvm::cl::opt<bool> &SimplifyUnconditionalBranches() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("simplify-cfg-simplify-unconditional-branches");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "simplify-cfg-simplify-unconditional-branches", llvm::cl::init(true));
+  return *opt;
+}
+static auto &EarlyInitSimplifyUnconditionalBranches = SimplifyUnconditionalBranches();
 
 /// Returns true if \p block has less instructions than \p other.
 static bool hasLessInstructions(SILBasicBlock *block, SILBasicBlock *other) {
@@ -1254,7 +1299,7 @@ static bool hasLessInstructions(SILBasicBlock *block, SILBasicBlock *other) {
 bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   // If we are asked to not simplify unconditional branches (for testing
   // purposes), exit early.
-  if (!SimplifyUnconditionalBranches)
+  if (!SimplifyUnconditionalBranches())
     return false;
 
   // First simplify instructions generating branch operands since that
@@ -3219,9 +3264,18 @@ bool ArgumentSplitter::createNewArguments() {
   return true;
 }
 
-static llvm::cl::opt<bool>
-RemoveDeadArgsWhenSplitting("sroa-args-remove-dead-args-after",
-                            llvm::cl::init(true));
+static llvm::cl::opt<bool> &RemoveDeadArgsWhenSplitting() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sroa-args-remove-dead-args-after");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sroa-args-remove-dead-args-after",
+      llvm::cl::init(true));
+  return *opt;
+}
+static auto &EarlyInitRemoveDeadArgsWhenSplitting = RemoveDeadArgsWhenSplitting();
 
 bool ArgumentSplitter::split() {
   if (Arg->getFunction()->hasOwnership()) {
@@ -3270,7 +3324,7 @@ bool ArgumentSplitter::split() {
   ++NumSROAArguments;
 
   // This is here for testing purposes via sil-opt
-  if (!RemoveDeadArgsWhenSplitting)
+  if (!RemoveDeadArgsWhenSplitting())
     return true;
 
   // Perform some cleanups such as:

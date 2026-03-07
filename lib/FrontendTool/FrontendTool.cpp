@@ -112,9 +112,18 @@
 
 using namespace swift;
 
-static llvm::cl::opt<std::string> SaveSIL(
-    "save-sil", llvm::cl::Hidden,
-    llvm::cl::desc("Save SIL to a file after SIL optimizations"));
+static llvm::cl::opt<std::string> &SaveSIL() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("save-sil");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "save-sil", llvm::cl::Hidden,
+      llvm::cl::desc("Save SIL to a file after SIL optimizations"));
+  return *opt;
+}
+static auto &EarlyInitSaveSIL = SaveSIL();
 
 static std::vector<std::string>
 collectSupplementaryOutputPaths(ArrayRef<const char *> Args,
@@ -2174,9 +2183,9 @@ static bool performCompileStepsPostSILGen(
       return true;
   }
 
-  if (!SaveSIL.empty()) {
+  if (!SaveSIL().empty()) {
     if (writeSIL(*SM, Instance.getMainModule(), Invocation.getSILOptions(),
-                 SaveSIL, Instance.getOutputBackend()))
+                 SaveSIL(), Instance.getOutputBackend()))
       return true;
   }
 

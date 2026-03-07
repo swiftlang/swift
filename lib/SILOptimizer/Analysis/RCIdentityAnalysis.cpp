@@ -418,9 +418,18 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
   return FirstIV;
 }
 
-llvm::cl::opt<bool> StripOffArgs(
-    "enable-rc-identity-arg-strip", llvm::cl::init(true),
-    llvm::cl::desc("Should RC identity try to strip off arguments"));
+llvm::cl::opt<bool> &StripOffArgs() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-rc-identity-arg-strip");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-rc-identity-arg-strip", llvm::cl::init(true),
+      llvm::cl::desc("Should RC identity try to strip off arguments"));
+  return *opt;
+}
+static auto &EarlyInitStripOffArgs = StripOffArgs();
 
 //===----------------------------------------------------------------------===//
 //                   Top Level RC Identity Root Entrypoints
@@ -435,7 +444,7 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingOps(SILValue V,
       continue;
     }
 
-    if (!StripOffArgs)
+    if (!StripOffArgs())
       break;
 
     // Once we have done all of the easy work, try to see if we can strip off

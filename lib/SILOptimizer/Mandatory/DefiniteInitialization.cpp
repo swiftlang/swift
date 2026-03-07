@@ -44,18 +44,27 @@
 using namespace swift;
 using namespace ownership;
 
-llvm::cl::opt<bool> TriggerUnreachableOnFailure(
-    "sil-di-assert-on-failure", llvm::cl::init(false),
-    llvm::cl::desc("After emitting a DI error, assert instead of continuing. "
-                   "Meant for debugging ONLY!"),
-    llvm::cl::Hidden);
+static llvm::cl::opt<bool> &TriggerUnreachableOnFailure() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-di-assert-on-failure");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-di-assert-on-failure", llvm::cl::init(false),
+      llvm::cl::desc("After emitting a DI error, assert instead of continuing. "
+                     "Meant for debugging ONLY!"),
+      llvm::cl::Hidden);
+  return *opt;
+}
+static auto &EarlyInitTriggerUnreachableOnFailure = TriggerUnreachableOnFailure();
 
 template<typename ...ArgTypes>
 static InFlightDiagnostic diagnose(SILModule &M, SILLocation loc,
                                    ArgTypes... args) {
   auto diag = M.getASTContext().Diags.diagnose(loc.getSourceLoc(),
                                                Diagnostic(args...));
-  if (TriggerUnreachableOnFailure)
+  if (TriggerUnreachableOnFailure())
     llvm_unreachable("Triggering standard assertion failure routine");
   return diag;
 }

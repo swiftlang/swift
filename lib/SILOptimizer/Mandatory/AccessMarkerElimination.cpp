@@ -32,9 +32,18 @@ using namespace swift;
 // This temporary option allows markers during optimization passes. Enabling
 // this flag causes this pass to preserve all access markers. Otherwise, it only
 // preserved "dynamic" markers.
-llvm::cl::opt<bool> EnableOptimizedAccessMarkers(
-    "sil-optimized-access-markers", llvm::cl::init(false),
-    llvm::cl::desc("Enable memory access markers during optimization passes."));
+static llvm::cl::opt<bool> &EnableOptimizedAccessMarkers() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-optimized-access-markers");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-optimized-access-markers", llvm::cl::init(false),
+      llvm::cl::desc("Enable memory access markers during optimization passes."));
+  return *opt;
+}
+static auto &EarlyInitEnableOptimizedAccessMarkers = EnableOptimizedAccessMarkers();
 
 namespace {
 
@@ -71,7 +80,7 @@ struct AccessMarkerElimination {
 
 bool AccessMarkerElimination::shouldPreserveAccess(
     SILAccessEnforcement enforcement) {
-  if (EnableOptimizedAccessMarkers || Mod->getOptions().VerifyExclusivity)
+  if (EnableOptimizedAccessMarkers() || Mod->getOptions().VerifyExclusivity)
     return true;
 
   switch (enforcement) {
@@ -186,7 +195,7 @@ struct AccessMarkerEliminationPass : SILModuleTransform {
     }
     // Markers from all current SIL functions are stripped. Register a
     // callback to strip an subsequently loaded functions on-the-fly.
-    if (!EnableOptimizedAccessMarkers && !M.checkHasAccessMarkerHandler()) {
+    if (!EnableOptimizedAccessMarkers() && !M.checkHasAccessMarkerHandler()) {
       using NotificationHandlerTy =
         FunctionBodyDeserializationNotificationHandler;
       auto *n = new NotificationHandlerTy(prepareSILFunctionForOptimization);

@@ -1314,12 +1314,33 @@ DiagnosticBehavior toDiagnosticBehavior(DiagnosticKind kind, bool isFatal) {
 
 // A special option only for compiler writers that causes Diagnostics to assert
 // when a failure diagnostic is emitted. Intended for use in the debugger.
-llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
-                                  llvm::cl::init(false));
+static llvm::cl::opt<bool> &AssertOnError() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("swift-diagnostics-assert-on-error");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "swift-diagnostics-assert-on-error",
+      llvm::cl::init(false));
+  return *opt;
+}
+static auto &EarlyInitAssertOnError = AssertOnError();
+
 // A special option only for compiler writers that causes Diagnostics to assert
 // when a warning diagnostic is emitted. Intended for use in the debugger.
-llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
-                                    llvm::cl::init(false));
+static llvm::cl::opt<bool> &AssertOnWarning() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("swift-diagnostics-assert-on-warning");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "swift-diagnostics-assert-on-warning",
+      llvm::cl::init(false));
+  return *opt;
+}
+static auto &EarlyInitAssertOnWarning = AssertOnWarning();
 
 std::optional<DiagnosticBehavior>
 DiagnosticState::determineUserControlledWarningBehavior(
@@ -1455,8 +1476,8 @@ void DiagnosticState::updateFor(DiagnosticBehavior behavior) {
     anyErrorOccurred = true;
   }
 
-  ASSERT((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
-  ASSERT((!AssertOnWarning || (behavior != DiagnosticBehavior::Warning)) &&
+  ASSERT((!AssertOnError() || !anyErrorOccurred) && "We emitted an error?!");
+  ASSERT((!AssertOnWarning() || (behavior != DiagnosticBehavior::Warning)) &&
          "We emitted a warning?!");
 
   previousBehavior = behavior;

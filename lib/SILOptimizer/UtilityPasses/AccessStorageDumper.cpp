@@ -24,9 +24,18 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> EnableDumpUses(
-    "enable-access-storage-dump-uses", llvm::cl::init(false),
-    llvm::cl::desc("With --sil-access-storage-dumper, dump all uses"));
+static llvm::cl::opt<bool> &EnableDumpUses() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-access-storage-dump-uses");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-access-storage-dump-uses", llvm::cl::init(false),
+      llvm::cl::desc("With --sil-access-storage-dumper, dump all uses"));
+  return *opt;
+}
+static auto &EarlyInitEnableDumpUses = EnableDumpUses();
 
 namespace {
 
@@ -44,7 +53,7 @@ class AccessStorageDumper : public SILModuleTransform {
     pathAndBase.print(llvm::outs());
     // If enable-accessed-storage-dump-uses is set, dump all types of uses.
     auto accessPath = pathAndBase.accessPath;
-    if (!accessPath.isValid() || !EnableDumpUses)
+    if (!accessPath.isValid() || !EnableDumpUses())
       return;
 
     uses.clear();

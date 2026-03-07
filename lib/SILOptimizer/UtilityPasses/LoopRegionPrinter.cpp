@@ -24,18 +24,36 @@
 
 using namespace swift;
 
-static llvm::cl::opt<std::string>
-    SILViewCFGOnlyFun("sil-loop-region-view-cfg-only-function",
-                      llvm::cl::init(""),
-                      llvm::cl::desc("Only produce a graphviz file for the "
-                                     "loop region info of this function"));
+static llvm::cl::opt<std::string> &SILViewCFGOnlyFun() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-loop-region-view-cfg-only-function");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-loop-region-view-cfg-only-function",
+      llvm::cl::init(""),
+      llvm::cl::desc("Only produce a graphviz file for the "
+                     "loop region info of this function"));
+  return *opt;
+}
+static auto &EarlyInitSILViewCFGOnlyFun = SILViewCFGOnlyFun();
 
-static llvm::cl::opt<std::string>
-    SILViewCFGOnlyFuns("sil-loop-region-view-cfg-only-functions",
-                       llvm::cl::init(""),
-                       llvm::cl::desc("Only produce a graphviz file for the "
-                                      "loop region info for the functions "
-                                      "whose name contains this substring"));
+static llvm::cl::opt<std::string> &SILViewCFGOnlyFuns() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-loop-region-view-cfg-only-functions");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-loop-region-view-cfg-only-functions",
+      llvm::cl::init(""),
+      llvm::cl::desc("Only produce a graphviz file for the "
+                     "loop region info for the functions "
+                     "whose name contains this substring"));
+  return *opt;
+}
+static auto &EarlyInitSILViewCFGOnlyFuns = SILViewCFGOnlyFuns();
 
 namespace {
 
@@ -47,10 +65,10 @@ class LoopRegionViewText : public SILModuleTransform {
     for (auto &fn : *getModule()) {
       if (fn.isExternalDeclaration())
         continue;
-      if (!SILViewCFGOnlyFun.empty() && fn.getName() != SILViewCFGOnlyFun)
+      if (!SILViewCFGOnlyFun().empty() && fn.getName() != SILViewCFGOnlyFun())
         continue;
-      if (!SILViewCFGOnlyFuns.empty() &&
-          !fn.getName().contains(SILViewCFGOnlyFuns))
+      if (!SILViewCFGOnlyFuns().empty() &&
+          !fn.getName().contains(SILViewCFGOnlyFuns()))
         continue;
 
       // Ok, we are going to analyze this function. Invalidate all state
@@ -71,10 +89,10 @@ class LoopRegionViewCFG : public SILModuleTransform {
     for (auto &fn : *getModule()) {
       if (fn.isExternalDeclaration())
         continue;
-      if (!SILViewCFGOnlyFun.empty() && fn.getName() != SILViewCFGOnlyFun)
+      if (!SILViewCFGOnlyFun().empty() && fn.getName() != SILViewCFGOnlyFun())
         continue;
-      if (!SILViewCFGOnlyFuns.empty() &&
-          !fn.getName().contains(SILViewCFGOnlyFuns))
+      if (!SILViewCFGOnlyFuns().empty() &&
+          !fn.getName().contains(SILViewCFGOnlyFuns()))
         continue;
 
       // Ok, we are going to analyze this function. Invalidate all state

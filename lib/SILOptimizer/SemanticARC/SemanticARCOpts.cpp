@@ -28,36 +28,45 @@
 using namespace swift;
 using namespace swift::semanticarc;
 
-static llvm::cl::list<ARCTransformKind> TransformsToPerform(
-    llvm::cl::values(
-        clEnumValN(ARCTransformKind::AllPeepholes,
-                   "sil-semantic-arc-peepholes-all",
-                   "Perform All ARC canonicalizations and peepholes"),
-        clEnumValN(ARCTransformKind::LoadCopyToLoadBorrowPeephole,
-                   "sil-semantic-arc-peepholes-loadcopy-to-loadborrow",
-                   "Perform the load [copy] to load_borrow peephole"),
-        clEnumValN(ARCTransformKind::RedundantCopyValueElimPeephole,
-                   "sil-semantic-arc-peepholes-redundant-copyvalue-elim",
-                   "Perform the redundant copy_value peephole"),
-        clEnumValN(ARCTransformKind::LifetimeJoiningPeephole,
-                   "sil-semantic-arc-peepholes-lifetime-joining",
-                   "Perform the join lifetimes peephole"),
-        clEnumValN(ARCTransformKind::OwnershipConversionElimPeephole,
-                   "sil-semantic-arc-peepholes-ownership-conversion-elim",
-                   "Eliminate unchecked_ownership_conversion insts that are "
-                   "not needed"),
-        clEnumValN(ARCTransformKind::OwnedToGuaranteedPhi,
-                   "sil-semantic-arc-owned-to-guaranteed-phi",
-                   "Perform Owned To Guaranteed Phi. NOTE: Seeded by peephole "
-                   "optimizer for compile time saving purposes, so run this "
-                   "after running peepholes)"),
-        clEnumValN(ARCTransformKind::RedundantMoveValueElim,
-                   "sil-semantic-arc-redundant-move-value-elim",
-                   "Eliminate move_value which don't change owned lifetime "
-                   "characteristics.  (Escaping, Lexical).")),
-    llvm::cl::desc(
-        "For testing purposes only run the specified list of semantic arc "
-        "optimization. If the list is empty, we run all transforms"));
+static llvm::cl::list<ARCTransformKind> &TransformsToPerform() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-semantic-arc-peepholes-all");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<ARCTransformKind>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<ARCTransformKind>(
+      llvm::cl::values(
+          clEnumValN(ARCTransformKind::AllPeepholes,
+                     "sil-semantic-arc-peepholes-all",
+                     "Perform All ARC canonicalizations and peepholes"),
+          clEnumValN(ARCTransformKind::LoadCopyToLoadBorrowPeephole,
+                     "sil-semantic-arc-peepholes-loadcopy-to-loadborrow",
+                     "Perform the load [copy] to load_borrow peephole"),
+          clEnumValN(ARCTransformKind::RedundantCopyValueElimPeephole,
+                     "sil-semantic-arc-peepholes-redundant-copyvalue-elim",
+                     "Perform the redundant copy_value peephole"),
+          clEnumValN(ARCTransformKind::LifetimeJoiningPeephole,
+                     "sil-semantic-arc-peepholes-lifetime-joining",
+                     "Perform the join lifetimes peephole"),
+          clEnumValN(ARCTransformKind::OwnershipConversionElimPeephole,
+                     "sil-semantic-arc-peepholes-ownership-conversion-elim",
+                     "Eliminate unchecked_ownership_conversion insts that are "
+                     "not needed"),
+          clEnumValN(ARCTransformKind::OwnedToGuaranteedPhi,
+                     "sil-semantic-arc-owned-to-guaranteed-phi",
+                     "Perform Owned To Guaranteed Phi. NOTE: Seeded by peephole "
+                     "optimizer for compile time saving purposes, so run this "
+                     "after running peepholes)"),
+          clEnumValN(ARCTransformKind::RedundantMoveValueElim,
+                     "sil-semantic-arc-redundant-move-value-elim",
+                     "Eliminate move_value which don't change owned lifetime "
+                     "characteristics.  (Escaping, Lexical).")),
+      llvm::cl::desc(
+          "For testing purposes only run the specified list of semantic arc "
+          "optimization. If the list is empty, we run all transforms"));
+  return *opt;
+}
+static auto &EarlyInitTransformsToPerform = TransformsToPerform();
 
 //===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
@@ -75,7 +84,7 @@ struct SemanticARCOpts : SILFunctionTransform {
       : mandatoryOptsOnly(mandatoryOptsOnly) {}
 
   void performCommandlineSpecifiedTransforms(SemanticARCOptVisitor &visitor) {
-    for (auto transform : TransformsToPerform) {
+    for (auto transform : TransformsToPerform()) {
       visitor.ctx.transformKind = transform;
       SWIFT_DEFER {
         visitor.ctx.transformKind = ARCTransformKind::Invalid;
@@ -158,7 +167,7 @@ struct SemanticARCOpts : SILFunctionTransform {
 
     // If we are being asked for testing purposes to run a series of transforms
     // expressed on the command line, run that and return.
-    if (!TransformsToPerform.empty()) {
+    if (!TransformsToPerform().empty()) {
       return performCommandlineSpecifiedTransforms(visitor);
     }
 

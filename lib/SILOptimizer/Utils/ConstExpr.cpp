@@ -1977,7 +1977,7 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
     LLVM_DEBUG(llvm::dbgs() << "ConstExpr interpret: "; inst->dump());
 
     // Make sure we haven't exceeded our interpreter iteration cap.
-    if (++numInstEvaluated > ConstExprLimit) {
+    if (++numInstEvaluated > ConstExprLimit()) {
       return getUnknown(evaluator, inst->asSILNode(),
                         UnknownReason::TooManyInstructions);
     }

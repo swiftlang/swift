@@ -63,8 +63,17 @@ using llvm::SmallSet;
 
 /// This flag enables experimental `@differentiable(_linear)` function
 /// transposition.
-static llvm::cl::opt<bool> EnableExperimentalLinearMapTransposition(
-    "enable-experimental-linear-map-transposition", llvm::cl::init(false));
+static llvm::cl::opt<bool> &EnableExperimentalLinearMapTransposition() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-experimental-linear-map-transposition");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-experimental-linear-map-transposition", llvm::cl::init(false));
+  return *opt;
+}
+static auto &EarlyInitEnableExperimentalLinearMapTransposition = EnableExperimentalLinearMapTransposition();
 
 //===----------------------------------------------------------------------===//
 // Helpers
@@ -1582,7 +1591,7 @@ void Differentiation::run() {
           // If linear map transposition is not enabled and an uncanonical
           // `linear_function` instruction is encountered, emit a diagnostic.
           // FIXME(https://github.com/apple/swift/issues/54256): Finish support for linear map transposition.
-          if (!EnableExperimentalLinearMapTransposition) {
+          if (!EnableExperimentalLinearMapTransposition()) {
             if (!lfi->hasTransposeFunction()) {
               astCtx.Diags.diagnose(
                 lfi->getLoc().getSourceLoc(),

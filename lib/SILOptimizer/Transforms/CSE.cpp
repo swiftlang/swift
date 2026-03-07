@@ -53,9 +53,18 @@ STATISTIC(NumOpenExtRemoved,
 STATISTIC(NumSimplify, "Number of instructions simplified or DCE'd");
 STATISTIC(NumCSE,      "Number of instructions CSE'd");
 
-llvm::cl::opt<bool>
-PrintCSEInternals("print-cse-internals", llvm::cl::init(false),
-                  llvm::cl::desc("Print internal CSE log messages"));
+static llvm::cl::opt<bool> &PrintCSEInternals() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("print-cse-internals");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "print-cse-internals", llvm::cl::init(false),
+      llvm::cl::desc("Print internal CSE log messages"));
+  return *opt;
+}
+static auto &EarlyInitPrintCSEInternals = PrintCSEInternals();
 
 
 using namespace swift;
@@ -1069,7 +1078,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
       LLVM_DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: "
                               << *AvailInst << '\n');
 
-      if (PrintCSEInternals) {
+      if (PrintCSEInternals()) {
         llvm::dbgs() << "CSE " << *Inst << "with " << *AvailInst;
       }
 

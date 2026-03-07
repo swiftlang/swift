@@ -24,10 +24,21 @@
 
 using namespace swift;
 
-llvm::cl::opt<bool> DontAbortOnMemoryLifetimeErrors(
-    "dont-abort-on-memory-lifetime-errors",
-    llvm::cl::desc("Don't abort compilation if the memory lifetime checker "
-                   "detects an error."));
+namespace {
+llvm::cl::opt<bool> &DontAbortOnMemoryLifetimeErrors() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("dont-abort-on-memory-lifetime-errors");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "dont-abort-on-memory-lifetime-errors",
+      llvm::cl::desc("Don't abort compilation if the memory lifetime checker "
+                     "detects an error."));
+  return *opt;
+}
+auto &EarlyInitDontAbortOnMemoryLifetimeErrors = DontAbortOnMemoryLifetimeErrors();
+} // namespace
 
 namespace {
 
@@ -259,7 +270,7 @@ void MemoryLifetimeVerifier::reportError(const Twine &complaint,
   }
   llvm::errs() << "at instruction: " << *where << '\n';
 
-  if (DontAbortOnMemoryLifetimeErrors)
+  if (DontAbortOnMemoryLifetimeErrors())
     return;
 
   ABORT([&](auto &out) {

@@ -48,9 +48,18 @@
 using namespace swift;
 
 // Temporary flag.
-llvm::cl::opt<bool> EagerSpecializeFlag(
-    "enable-eager-specializer", llvm::cl::init(true),
-    llvm::cl::desc("Run the eager-specializer pass."));
+static llvm::cl::opt<bool> &EagerSpecializeFlag() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-eager-specializer");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-eager-specializer", llvm::cl::init(true),
+      llvm::cl::desc("Run the eager-specializer pass."));
+  return *opt;
+}
+static auto &EarlyInitEagerSpecializeFlag = EagerSpecializeFlag();
 
 static void
 cleanupCallArguments(SILBuilder &builder, SILLocation loc,
@@ -805,7 +814,7 @@ static SILFunction *eagerSpecialize(SILOptFunctionBuilder &FuncBuilder,
 
 /// Run the pass.
 void EagerSpecializerTransform::run() {
-  if (!EagerSpecializeFlag)
+  if (!EagerSpecializeFlag())
     return;
 
   SILOptFunctionBuilder FuncBuilder(*this);

@@ -172,8 +172,17 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> DisableUnhandledConsumeOperator(
-    "sil-consume-operator-disable-unknown-moveaddr-diagnostic");
+static llvm::cl::opt<bool> &DisableUnhandledConsumeOperator() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-consume-operator-disable-unknown-moveaddr-diagnostic");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-consume-operator-disable-unknown-moveaddr-diagnostic");
+  return *opt;
+}
+static auto &EarlyInitDisableUnhandledConsumeOperator = DisableUnhandledConsumeOperator();
 
 //===----------------------------------------------------------------------===//
 //                                 Utilities
@@ -2657,7 +2666,7 @@ class ConsumeOperatorCopyableAddressesCheckerPass
     // uses have been resolved appropriately.
     //
     // TODO: Emit specific diagnostics here (e.x.: _move of global).
-    if (DisableUnhandledConsumeOperator)
+    if (DisableUnhandledConsumeOperator())
       return;
 
     bool lateMadeChange = false;

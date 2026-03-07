@@ -26,10 +26,19 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> FSODisableArgExplosion(
-    "sil-fso-disable-arg-explosion",
-    llvm::cl::desc("Do not perform argument explosion during FSO. Intended "
-                   "only for testing purposes"));
+static llvm::cl::opt<bool> &FSODisableArgExplosion() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-fso-disable-arg-explosion");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-fso-disable-arg-explosion",
+      llvm::cl::desc("Do not perform argument explosion during FSO. Intended "
+                     "only for testing purposes"));
+  return *opt;
+}
+static auto &EarlyInitFSODisableArgExplosion = FSODisableArgExplosion();
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -315,7 +324,7 @@ shouldExplode(FunctionSignatureTransformDescriptor &transformDesc,
 
 bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
   // If we are not supposed to perform argument explosion, bail.
-  if (FSODisableArgExplosion)
+  if (FSODisableArgExplosion())
     return false;
 
   SILFunction *F = TransformDescriptor.OriginalFunction;

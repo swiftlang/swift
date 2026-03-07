@@ -47,13 +47,10 @@ STATISTIC(NumMandatoryInlines,
 //                           Printing Helpers
 //===----------------------------------------------------------------------===//
 
-extern llvm::cl::opt<bool> SILPrintInliningCallee;
-
-extern llvm::cl::opt<bool> SILPrintInliningCallerBefore;
-
-extern llvm::cl::opt<bool> SILPrintInliningCallerAfter;
-
-extern llvm::cl::opt<bool> EnableVerifyAfterEachInlining;
+extern llvm::cl::opt<bool> &SILPrintInliningCallee();
+extern llvm::cl::opt<bool> &SILPrintInliningCallerBefore();
+extern llvm::cl::opt<bool> &SILPrintInliningCallerAfter();
+extern llvm::cl::opt<bool> &EnableVerifyAfterEachInlining();
 
 extern void printInliningDetailsCallee(StringRef passName, SILFunction *caller,
                                        SILFunction *callee);
@@ -647,10 +644,13 @@ static bool convertsThinEscapeToNoescape(ConvertFunctionInst *cv) {
 // PartialApply/ThinToThick -> ConvertFunction patterns are generated
 // by @noescape closures.
 //
+// This is a selective version that only strips specific safe conversions
+// for mandatory inlining, unlike the general stripFunctionConversions utility.
+//
 // FIXME: We don't currently handle mismatched return types, however, this
 // would be a good optimization to handle and would be as simple as inserting
 // a cast.
-static SILValue stripFunctionConversions(SILValue CalleeValue) {
+static SILValue stripSelectiveFunctionConversions(SILValue CalleeValue) {
   // Skip any copies that we see.
   CalleeValue = lookThroughOwnershipInsts(CalleeValue);
 
@@ -658,7 +658,7 @@ static SILValue stripFunctionConversions(SILValue CalleeValue) {
     if (ConvertFn->onlyConvertsSubstitutions() ||
         ConvertFn->onlyConvertsSendable() ||
         convertsThinEscapeToNoescape(ConvertFn)) {
-      return stripFunctionConversions(ConvertFn->getOperand());
+      return stripSelectiveFunctionConversions(ConvertFn->getOperand());
     }
     return CalleeValue;
   }
@@ -735,7 +735,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
   }
 
   // Look through a escape to @noescape conversion.
-  CalleeValue = stripFunctionConversions(CalleeValue);
+  CalleeValue = stripSelectiveFunctionConversions(CalleeValue);
 
   // We are allowed to see through exactly one "partial apply" instruction or
   // one "thin to thick function" instructions, since those are the patterns
@@ -752,7 +752,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
     IsThick = true;
   }
 
-  CalleeValue = stripFunctionConversions(CalleeValue);
+  CalleeValue = stripSelectiveFunctionConversions(CalleeValue);
 
   auto *FRI = dyn_cast<FunctionRefInst>(CalleeValue);
   if (!FRI)
@@ -1005,10 +1005,10 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SwiftPassInvocation
 
       invalidatedStackNesting |= Inliner.invalidatesStackNesting(InnerAI);
 
-      if (SILPrintInliningCallee) {
+      if (SILPrintInliningCallee()) {
         printInliningDetailsCallee("MandatoryInlining", F, CalleeFunction);
       }
-      if (SILPrintInliningCallerBefore) {
+      if (SILPrintInliningCallerBefore()) {
         printInliningDetailsCallerBefore("MandatoryInlining", F,
                                          CalleeFunction);
       }
@@ -1025,7 +1025,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SwiftPassInvocation
       invalidatedStackNesting |=
           (CalleeFunction->hasOwnership() && !F->hasOwnership());
 
-      if (SILPrintInliningCallerAfter) {
+      if (SILPrintInliningCallerAfter()) {
         printInliningDetailsCallerAfter("MandatoryInlining", F, CalleeFunction);
       }
       nextBB = lastBB->getReverseIterator();
@@ -1043,7 +1043,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SwiftPassInvocation
       // later.
       changedFunctions.insert(F);
 
-      if (EnableVerifyAfterEachInlining) {
+      if (EnableVerifyAfterEachInlining()) {
         if (invalidatedStackNesting) {
           StackNesting::fixNesting(F);
           changedFunctions.insert(F);

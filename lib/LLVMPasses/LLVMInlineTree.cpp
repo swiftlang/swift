@@ -50,9 +50,23 @@ INITIALIZE_PASS_END(InlineTreePrinter,
                     "inline-tree-printer", "Inline tree printer pass",
                     false, false)
 
-llvm::cl::opt<bool>
-InlineTreeNoDemangle("inline-tree-no-demangle", llvm::cl::init(false),
-              llvm::cl::desc("Don't demangle symbols in inline tree output"));
+namespace {
+// Helper to get or create command line option, checking if already registered.
+llvm::cl::opt<bool> &InlineTreeNoDemangle() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("inline-tree-no-demangle");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "inline-tree-no-demangle", llvm::cl::init(false),
+      llvm::cl::desc("Don't demangle symbols in inline tree output"));
+  return *opt;
+}
+
+// Force early registration before command line parsing
+auto &EarlyInitInlineTreeNoDemangle = InlineTreeNoDemangle();
+} // namespace
 
 
 ModulePass *swift::createInlineTreePrinterPass() {
@@ -188,7 +202,7 @@ public:
 /// Print the function \p Name as simplified demangled name or optionally
 /// as not demangled name.
 static void printSymbol(StringRef Name, raw_ostream &os) {
-  if (InlineTreeNoDemangle) {
+  if (InlineTreeNoDemangle()) {
     os << Name;
   } else {
     os << demangleSymbolAsString(Name,

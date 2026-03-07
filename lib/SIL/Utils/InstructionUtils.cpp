@@ -32,8 +32,20 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> EnableExpandAll("enable-expand-all",
-                                           llvm::cl::init(false));
+namespace {
+llvm::cl::opt<bool> &EnableExpandAll() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-expand-all");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-expand-all",
+      llvm::cl::init(false));
+  return *opt;
+}
+auto &EarlyInitEnableExpandAll = EnableExpandAll();
+} // namespace
 
 
 SILValue swift::lookThroughOwnershipInsts(SILValue v) {
@@ -1496,7 +1508,7 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
   // At this point we know it's valid to expand the type, next decide if we
   // "should" expand it.
 
-  if (EnableExpandAll) {
+  if (EnableExpandAll()) {
     return true;
   }
 

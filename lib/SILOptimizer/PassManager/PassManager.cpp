@@ -46,33 +46,97 @@
 
 using namespace swift;
 
-llvm::cl::opt<bool> SILPrintAll(
-    "sil-print-all", llvm::cl::init(false),
-    llvm::cl::desc("Print SIL after each pass"));
+namespace {
+llvm::cl::opt<bool> &SILPrintAll() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-all");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-all", llvm::cl::init(false),
+      llvm::cl::desc("Print SIL after each pass"));
+  return *opt;
+}
+auto &EarlyInitSILPrintAll = SILPrintAll();
 
-llvm::cl::opt<bool> SILPrintPassName(
-    "sil-print-pass-name", llvm::cl::init(false),
-    llvm::cl::desc("Print the name of each SIL pass before it runs"));
+llvm::cl::opt<bool> &SILPrintPassName() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-pass-name");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-pass-name", llvm::cl::init(false),
+      llvm::cl::desc("Print the name of each SIL pass before it runs"));
+  return *opt;
+}
+auto &EarlyInitSILPrintPassName = SILPrintPassName();
 
-llvm::cl::opt<bool> SILPrintPassTime(
-    "sil-print-pass-time", llvm::cl::init(false),
-    llvm::cl::desc("Print the execution time of each SIL pass"));
+llvm::cl::opt<bool> &SILPrintPassTime() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-pass-time");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-pass-time", llvm::cl::init(false),
+      llvm::cl::desc("Print the execution time of each SIL pass"));
+  return *opt;
+}
+auto &EarlyInitSILPrintPassTime = SILPrintPassTime();
 
-llvm::cl::opt<bool> SILPrintPassMD5(
-    "sil-print-pass-md5", llvm::cl::init(false),
-    llvm::cl::desc("Print the MD5 of the SIL after each pass"));
+llvm::cl::opt<bool> &SILPrintPassMD5() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-pass-md5");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-pass-md5", llvm::cl::init(false),
+      llvm::cl::desc("Print the MD5 of the SIL after each pass"));
+  return *opt;
+}
+auto &EarlyInitSILPrintPassMD5 = SILPrintPassMD5();
 
-llvm::cl::opt<unsigned> SILMinPassTime(
-    "sil-min-pass-time", llvm::cl::init(0),
-    llvm::cl::desc("The minimum number of milliseconds for which a pass is printed with -sil-print-pass-time"));
+llvm::cl::opt<unsigned> &SILMinPassTime() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-min-pass-time");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<unsigned>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<unsigned>(
+      "sil-min-pass-time", llvm::cl::init(0),
+      llvm::cl::desc("The minimum number of milliseconds for which a pass is printed with -sil-print-pass-time"));
+  return *opt;
+}
+auto &EarlyInitSILMinPassTime = SILMinPassTime();
 
-llvm::cl::opt<bool> SILPrintLast(
-    "sil-print-last", llvm::cl::init(false),
-    llvm::cl::desc("Print the last optimized function before and after the last pass"));
+llvm::cl::opt<bool> &SILPrintLast() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-last");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-last", llvm::cl::init(false),
+      llvm::cl::desc("Print the last optimized function before and after the last pass"));
+  return *opt;
+}
+auto &EarlyInitSILPrintLast = SILPrintLast();
 
-llvm::cl::opt<std::string> SILNumOptPassesToRun(
-    "sil-opt-pass-count", llvm::cl::init(""),
-    llvm::cl::desc("Stop optimizing after <N> passes or <N>.<M> passes/sub-passes"));
+llvm::cl::opt<std::string> &SILNumOptPassesToRun() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-opt-pass-count");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-opt-pass-count", llvm::cl::init(""),
+      llvm::cl::desc("Stop optimizing after <N> passes or <N>.<M> passes/sub-passes"));
+  return *opt;
+}
+auto &EarlyInitSILNumOptPassesToRun = SILNumOptPassesToRun();
 
 // Read pass counts for each module from a config file.
 // Config file format:
@@ -84,91 +148,264 @@ llvm::cl::opt<std::string> SILNumOptPassesToRun(
 //   2. add the `-Xllvm -sil-pass-count-config-file config.txt` option to the project settings
 //   3. bisect by modifying the counts in the config file
 //   4. clean-rebuild after each bisecting step
-llvm::cl::opt<std::string> SILPassCountConfigFile(
-    "sil-pass-count-config-file", llvm::cl::init(""),
-    llvm::cl::desc("Read optimization counts from file"));
+llvm::cl::opt<std::string> &SILPassCountConfigFile() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-pass-count-config-file");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-pass-count-config-file", llvm::cl::init(""),
+      llvm::cl::desc("Read optimization counts from file"));
+  return *opt;
+}
+auto &EarlyInitSILPassCountConfigFile = SILPassCountConfigFile();
 
-llvm::cl::opt<unsigned> SILOptProfileRepeat(
-    "sil-opt-profile-repeat", llvm::cl::init(1),
-    llvm::cl::desc("repeat passes N times and report the run time"));
+llvm::cl::opt<unsigned> &SILOptProfileRepeat() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-opt-profile-repeat");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<unsigned>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<unsigned>(
+      "sil-opt-profile-repeat", llvm::cl::init(1),
+      llvm::cl::desc("repeat passes N times and report the run time"));
+  return *opt;
+}
+auto &EarlyInitSILOptProfileRepeat = SILOptProfileRepeat();
 
-llvm::cl::opt<std::string> SILBreakOnFun(
-    "sil-break-on-function", llvm::cl::init(""),
-    llvm::cl::desc(
-        "Break before running each function pass on a particular function"));
+llvm::cl::opt<std::string> &SILBreakOnFun() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-break-on-function");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-break-on-function", llvm::cl::init(""),
+      llvm::cl::desc(
+          "Break before running each function pass on a particular function"));
+  return *opt;
+}
+auto &EarlyInitSILBreakOnFun = SILBreakOnFun();
 
-llvm::cl::opt<std::string> SILBreakOnPass(
-    "sil-break-on-pass", llvm::cl::init(""),
-    llvm::cl::desc("Break before running a particular function pass"));
+llvm::cl::opt<std::string> &SILBreakOnPass() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-break-on-pass");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-break-on-pass", llvm::cl::init(""),
+      llvm::cl::desc("Break before running a particular function pass"));
+  return *opt;
+}
+auto &EarlyInitSILBreakOnPass = SILBreakOnPass();
 
-llvm::cl::opt<std::string>
-    SILBreakBeforePassCount("sil-break-before-pass-count", llvm::cl::init(""),
-                            llvm::cl::desc("Break before running pass number"));
+llvm::cl::opt<std::string> &SILBreakBeforePassCount() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-break-before-pass-count");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-break-before-pass-count", llvm::cl::init(""),
+      llvm::cl::desc("Break before running pass number"));
+  return *opt;
+}
+auto &EarlyInitSILBreakBeforePassCount = SILBreakBeforePassCount();
 
-llvm::cl::list<std::string>
-    SILPrintFunction("sil-print-function", llvm::cl::CommaSeparated,
-                    llvm::cl::desc("Only print out the sil for this function"));
+llvm::cl::list<std::string> &SILPrintFunction() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-function");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<std::string>(
+      "sil-print-function", llvm::cl::CommaSeparated,
+      llvm::cl::desc("Only print out the sil for this function"));
+  return *opt;
+}
+auto &EarlyInitSILPrintFunction = SILPrintFunction();
 
-llvm::cl::opt<std::string>
-    SILPrintFunctions("sil-print-functions", llvm::cl::init(""),
-                     llvm::cl::desc("Only print out the sil for the functions "
-                                    "whose name contains this substring"));
+llvm::cl::opt<std::string> &SILPrintFunctions() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-functions");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-print-functions", llvm::cl::init(""),
+      llvm::cl::desc("Only print out the sil for the functions "
+                     "whose name contains this substring"));
+  return *opt;
+}
+auto &EarlyInitSILPrintFunctions = SILPrintFunctions();
 
-llvm::cl::list<std::string>
-    SILPrintBefore("sil-print-before", llvm::cl::CommaSeparated,
-                   llvm::cl::desc("Print out the sil before passes which "
-                                  "contain a string from this list."));
+llvm::cl::list<std::string> &SILPrintBefore() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-before");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<std::string>(
+      "sil-print-before", llvm::cl::CommaSeparated,
+      llvm::cl::desc("Print out the sil before passes which "
+                     "contain a string from this list."));
+  return *opt;
+}
+auto &EarlyInitSILPrintBefore = SILPrintBefore();
 
-llvm::cl::list<std::string>
-    SILPrintAfter("sil-print-after", llvm::cl::CommaSeparated,
-                  llvm::cl::desc("Print out the sil after passes which contain "
-                                 "a string from this list."));
+llvm::cl::list<std::string> &SILPrintAfter() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-after");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<std::string>(
+      "sil-print-after", llvm::cl::CommaSeparated,
+      llvm::cl::desc("Print out the sil after passes which contain "
+                     "a string from this list."));
+  return *opt;
+}
+auto &EarlyInitSILPrintAfter = SILPrintAfter();
 
-llvm::cl::list<std::string>
-    SILPrintAround("sil-print-around", llvm::cl::CommaSeparated,
-                   llvm::cl::desc("Print out the sil before and after passes "
-                                  "which contain a string from this list"));
+llvm::cl::list<std::string> &SILPrintAround() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-around");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<std::string>(
+      "sil-print-around", llvm::cl::CommaSeparated,
+      llvm::cl::desc("Print out the sil before and after passes "
+                     "which contain a string from this list"));
+  return *opt;
+}
+auto &EarlyInitSILPrintAround = SILPrintAround();
 
-llvm::cl::list<std::string>
-    SILDisablePass("sil-disable-pass", llvm::cl::CommaSeparated,
-                     llvm::cl::desc("Disable passes "
-                                    "which contain a string from this list"));
-llvm::cl::list<std::string> SILDisablePassOnlyFun(
-    "sil-disable-pass-only-function", llvm::cl::CommaSeparated,
-    llvm::cl::desc("Apply -sil-disable-pass only on this function"));
+llvm::cl::list<std::string> &SILDisablePass() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-disable-pass");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<std::string>(
+      "sil-disable-pass", llvm::cl::CommaSeparated,
+      llvm::cl::desc("Disable passes "
+                     "which contain a string from this list"));
+  return *opt;
+}
+auto &EarlyInitSILDisablePass = SILDisablePass();
 
-llvm::cl::list<std::string> SILVerifyBeforePass(
-    "sil-verify-before-pass", llvm::cl::CommaSeparated,
-    llvm::cl::desc("Verify the module/analyses before we run "
-                   "a pass from this list"));
+llvm::cl::list<std::string> &SILDisablePassOnlyFun() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-disable-pass-only-function");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<std::string>(
+      "sil-disable-pass-only-function", llvm::cl::CommaSeparated,
+      llvm::cl::desc("Apply -sil-disable-pass only on this function"));
+  return *opt;
+}
+auto &EarlyInitSILDisablePassOnlyFun = SILDisablePassOnlyFun();
 
-llvm::cl::list<std::string> SILVerifyAroundPass(
-    "sil-verify-around-pass", llvm::cl::CommaSeparated,
-    llvm::cl::desc("Verify the module/analyses before/after we run "
-                   "a pass from this list"));
+llvm::cl::list<std::string> &SILVerifyBeforePass() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-verify-before-pass");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<std::string>(
+      "sil-verify-before-pass", llvm::cl::CommaSeparated,
+      llvm::cl::desc("Verify the module/analyses before we run "
+                     "a pass from this list"));
+  return *opt;
+}
+auto &EarlyInitSILVerifyBeforePass = SILVerifyBeforePass();
 
-llvm::cl::list<std::string>
-    SILVerifyAfterPass("sil-verify-after-pass", llvm::cl::CommaSeparated,
-                       llvm::cl::desc("Verify the module/analyses after we run "
-                                      "a pass from this list"));
+llvm::cl::list<std::string> &SILVerifyAroundPass() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-verify-around-pass");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<std::string>(
+      "sil-verify-around-pass", llvm::cl::CommaSeparated,
+      llvm::cl::desc("Verify the module/analyses before/after we run "
+                     "a pass from this list"));
+  return *opt;
+}
+auto &EarlyInitSILVerifyAroundPass = SILVerifyAroundPass();
 
-llvm::cl::list<std::string> SILForceVerifyAroundPass(
-    "sil-verify-force-analysis-around-pass", llvm::cl::CommaSeparated,
-    llvm::cl::desc("For the given passes, precompute analyses before the pass "
-                   "and verify analyses after the pass"));
+llvm::cl::list<std::string> &SILVerifyAfterPass() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-verify-after-pass");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<std::string>(
+      "sil-verify-after-pass", llvm::cl::CommaSeparated,
+      llvm::cl::desc("Verify the module/analyses after we run "
+                     "a pass from this list"));
+  return *opt;
+}
+auto &EarlyInitSILVerifyAfterPass = SILVerifyAfterPass();
 
-llvm::cl::opt<bool> SILVerifyWithoutInvalidation(
-    "sil-verify-without-invalidation", llvm::cl::init(false),
-    llvm::cl::desc("Verify after passes even if the pass has not invalidated"));
+llvm::cl::list<std::string> &SILForceVerifyAroundPass() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-verify-force-analysis-around-pass");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<std::string>(
+      "sil-verify-force-analysis-around-pass", llvm::cl::CommaSeparated,
+      llvm::cl::desc("For the given passes, precompute analyses before the pass "
+                     "and verify analyses after the pass"));
+  return *opt;
+}
+auto &EarlyInitSILForceVerifyAroundPass = SILForceVerifyAroundPass();
 
-llvm::cl::opt<bool> SILDisableSkippingPasses(
-    "sil-disable-skipping-passes", llvm::cl::init(false),
-    llvm::cl::desc("Do not skip passes even if nothing was changed"));
+llvm::cl::opt<bool> &SILVerifyWithoutInvalidation() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-verify-without-invalidation");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-verify-without-invalidation", llvm::cl::init(false),
+      llvm::cl::desc("Verify after passes even if the pass has not invalidated"));
+  return *opt;
+}
+auto &EarlyInitSILVerifyWithoutInvalidation = SILVerifyWithoutInvalidation();
 
-llvm::cl::opt<bool> SILForceVerifyAll(
-    "sil-verify-force-analysis", llvm::cl::init(false),
-    llvm::cl::desc("For all passes, precompute analyses before the pass and "
-                   "verify analyses after the pass"));
+llvm::cl::opt<bool> &SILDisableSkippingPasses() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-disable-skipping-passes");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-disable-skipping-passes", llvm::cl::init(false),
+      llvm::cl::desc("Do not skip passes even if nothing was changed"));
+  return *opt;
+}
+auto &EarlyInitSILDisableSkippingPasses = SILDisableSkippingPasses();
+
+llvm::cl::opt<bool> &SILForceVerifyAll() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-verify-force-analysis");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-verify-force-analysis", llvm::cl::init(false),
+      llvm::cl::desc("For all passes, precompute analyses before the pass and "
+                     "verify analyses after the pass"));
+  return *opt;
+}
+auto &EarlyInitSILForceVerifyAll = SILForceVerifyAll();
+} // namespace
 
 
 static llvm::ManagedStatic<std::vector<unsigned>> DebugPassNumbers;
@@ -190,27 +427,45 @@ struct DebugOnlyPassNumberOpt {
   }
 };
 
+llvm::cl::opt<DebugOnlyPassNumberOpt, true, llvm::cl::parser<std::string>> &DebugOnly() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("debug-only-pass-number");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<DebugOnlyPassNumberOpt, true, llvm::cl::parser<std::string>>*>(it->second);
+  }
+  static DebugOnlyPassNumberOpt DebugOnlyPassNumberOptLoc;
+  static auto *opt = new llvm::cl::opt<DebugOnlyPassNumberOpt, true, llvm::cl::parser<std::string>>(
+      "debug-only-pass-number",
+      llvm::cl::desc("Enable a specific type of debug output (comma "
+                     "separated list pass numbers)"),
+      llvm::cl::Hidden, llvm::cl::ZeroOrMore,
+      llvm::cl::value_desc("pass number"),
+      llvm::cl::location(DebugOnlyPassNumberOptLoc),
+      llvm::cl::ValueRequired);
+  return *opt;
+}
+auto &EarlyInitDebugOnly = DebugOnly();
+
 } // end anonymous namespace
 
-static DebugOnlyPassNumberOpt DebugOnlyPassNumberOptLoc;
-
-static llvm::cl::opt<DebugOnlyPassNumberOpt, true,
-                     llvm::cl::parser<std::string>>
-    DebugOnly("debug-only-pass-number",
-              llvm::cl::desc("Enable a specific type of debug output (comma "
-                             "separated list pass numbers)"),
-              llvm::cl::Hidden, llvm::cl::ZeroOrMore,
-              llvm::cl::value_desc("pass number"),
-              llvm::cl::location(DebugOnlyPassNumberOptLoc),
-              llvm::cl::ValueRequired);
-
-static llvm::cl::opt<bool> SILPrintEverySubpass(
-    "sil-print-every-subpass", llvm::cl::init(false),
-    llvm::cl::desc("Print the function before every subpass run of passes that "
-                   "have multiple subpasses"));
+namespace {
+llvm::cl::opt<bool> &SILPrintEverySubpass() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-every-subpass");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-every-subpass", llvm::cl::init(false),
+      llvm::cl::desc("Print the function before every subpass run of passes that "
+                     "have multiple subpasses"));
+  return *opt;
+}
+auto &EarlyInitSILPrintEverySubpass = SILPrintEverySubpass();
+} // namespace
 
 static bool isInPrintFunctionList(SILFunction *F) {
-  for (const std::string &printFnName : SILPrintFunction) {
+  for (const std::string &printFnName : SILPrintFunction()) {
     if (printFnName == F->getName())
       return true;
     if (!printFnName.empty() && printFnName[0] != '$' &&
@@ -223,10 +478,10 @@ static bool isInPrintFunctionList(SILFunction *F) {
 }
 
 bool isFunctionSelectedForPrinting(SILFunction *F) {
-  if (!SILPrintFunction.empty() && !isInPrintFunctionList(F))
+  if (!SILPrintFunction().empty() && !isInPrintFunctionList(F))
     return false;
 
-  if (!F->getName().contains(SILPrintFunctions))
+  if (!F->getName().contains(SILPrintFunctions()))
     return false;
 
   return true;
@@ -264,11 +519,11 @@ void printInliningDetailsCallerAfter(StringRef passName, SILFunction *caller,
 }
 
 static bool functionSelectionEmpty() {
-  return SILPrintFunction.empty() && SILPrintFunctions.empty();
+  return SILPrintFunction().empty() && SILPrintFunctions().empty();
 }
 
 bool SILPassManager::doPrintBefore(SILTransform *T, SILFunction *F) {
-  if (NumPassesRun == maxNumPassesToRun - 1 && SILPrintLast &&
+  if (NumPassesRun == maxNumPassesToRun - 1 && SILPrintLast() &&
       maxNumSubpassesToRun == UINT_MAX && !isMandatory)
     return true;
 
@@ -279,23 +534,23 @@ bool SILPassManager::doPrintBefore(SILTransform *T, SILFunction *F) {
     return T->getTag().contains(Str) || T->getID().contains(Str);
   };
 
-  if (SILPrintBefore.end() !=
-      std::find_if(SILPrintBefore.begin(), SILPrintBefore.end(), MatchFun))
+  if (SILPrintBefore().end() !=
+      std::find_if(SILPrintBefore().begin(), SILPrintBefore().end(), MatchFun))
     return true;
-  if (!SILPrintBefore.empty())
+  if (!SILPrintBefore().empty())
     return false;
 
-  if (SILPrintAround.end() !=
-      std::find_if(SILPrintAround.begin(), SILPrintAround.end(), MatchFun))
+  if (SILPrintAround().end() !=
+      std::find_if(SILPrintAround().begin(), SILPrintAround().end(), MatchFun))
     return true;
-  if (!SILPrintAround.empty())
+  if (!SILPrintAround().empty())
     return false;
 
   return false;
 }
 
 bool SILPassManager::doPrintAfter(SILTransform *T, SILFunction *F, bool PassChangedSIL) {
-  if (NumPassesRun == maxNumPassesToRun - 1 && SILPrintLast && !isMandatory)
+  if (NumPassesRun == maxNumPassesToRun - 1 && SILPrintLast() && !isMandatory)
     return true;
 
   if (F && !isFunctionSelectedForPrinting(F))
@@ -305,19 +560,19 @@ bool SILPassManager::doPrintAfter(SILTransform *T, SILFunction *F, bool PassChan
     return T->getTag().contains(Str) || T->getID().contains(Str);
   };
 
-  if (SILPrintAfter.end() !=
-      std::find_if(SILPrintAfter.begin(), SILPrintAfter.end(), MatchFun))
+  if (SILPrintAfter().end() !=
+      std::find_if(SILPrintAfter().begin(), SILPrintAfter().end(), MatchFun))
     return true;
-  if (!SILPrintAfter.empty())
+  if (!SILPrintAfter().empty())
     return false;
 
-  if (SILPrintAround.end() !=
-      std::find_if(SILPrintAround.begin(), SILPrintAround.end(), MatchFun))
+  if (SILPrintAround().end() !=
+      std::find_if(SILPrintAround().begin(), SILPrintAround().end(), MatchFun))
     return true;
-  if (!SILPrintAround.empty())
+  if (!SILPrintAround().empty())
     return false;
 
-  return PassChangedSIL && (SILPrintAll || !functionSelectionEmpty());
+  return PassChangedSIL && (SILPrintAll() || !functionSelectionEmpty());
 }
 
 static void printModule(SILModule *Mod, bool EmitVerboseSIL) {
@@ -412,11 +667,11 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
   Analyses.push_back(create##NAME##Analysis(Mod));
 #include "swift/SILOptimizer/Analysis/Analysis.def"
 
-  if (!SILNumOptPassesToRun.empty()) {
-    parsePassesToRunCount(SILNumOptPassesToRun);
-  } else if (!SILPassCountConfigFile.empty()) {
+  if (!SILNumOptPassesToRun().empty()) {
+    parsePassesToRunCount(SILNumOptPassesToRun());
+  } else if (!SILPassCountConfigFile().empty()) {
     StringRef moduleName = M->getSwiftModule()->getName().str();
-    std::fstream fs(SILPassCountConfigFile);
+    std::fstream fs(SILPassCountConfigFile());
     if (!fs) {
       llvm::errs() << "cannot open pass count config file\n";
       exit(1);
@@ -434,8 +689,8 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
     fs.close();
   }
 
-  if (!SILBreakBeforePassCount.empty()) {
-    parseBreakBeforePassCount(SILBreakBeforePassCount);
+  if (!SILBreakBeforePassCount().empty()) {
+    parseBreakBeforePassCount(SILBreakBeforePassCount());
   }
 
   for (SILAnalysis *A : Analyses) {
@@ -496,7 +751,7 @@ bool SILPassManager::continueWithNextSubpassRun(
 
   unsigned subPass = numSubpassesRun++;
 
-  if (SILPrintEverySubpass && isFunctionSelectedForPrinting(function) &&
+  if (SILPrintEverySubpass() && isFunctionSelectedForPrinting(function) &&
       doPrintBefore(trans, function)) {
     dumpPassInfo("*** SIL function before ", trans, function);
     llvm::dbgs() << "  *** sub-pass " << subPass << " for ";
@@ -519,7 +774,7 @@ bool SILPassManager::continueWithNextSubpassRun(
   if (NumPassesRun != maxNumPassesToRun - 1)
     return true;
 
-  if (subPass == maxNumSubpassesToRun - 1 && SILPrintLast) {
+  if (subPass == maxNumSubpassesToRun - 1 && SILPrintLast()) {
     dumpPassInfo("*** SIL function before ", trans, function);
     if (forTransformee) {
       auto forValue = dyn_cast<SILValue>(*forTransformee);
@@ -550,18 +805,18 @@ bool SILPassManager::analysesUnlocked() {
 // given function.
 bool SILPassManager::breakBeforeRunning(StringRef fnName,
                                         SILFunctionTransform *SFT) {
-  if (SILBreakOnFun.empty() && SILBreakOnPass.empty() &&
-      SILBreakBeforePassCount.empty())
+  if (SILBreakOnFun().empty() && SILBreakOnPass().empty() &&
+      SILBreakBeforePassCount().empty())
     return false;
 
-  if (!SILBreakOnPass.empty() &&
-      (SFT->getID() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass))
+  if (!SILBreakOnPass().empty() &&
+      (SFT->getID() == SILBreakOnPass() || SFT->getTag() == SILBreakOnPass()))
     return true;
 
-  if (!SILBreakOnFun.empty() && fnName == SILBreakOnFun)
+  if (!SILBreakOnFun().empty() && fnName == SILBreakOnFun())
     return true;
 
-  if (!SILBreakBeforePassCount.empty() &&
+  if (!SILBreakBeforePassCount().empty() &&
       breakBeforePassCount == NumPassesRun) {
     return true;
   }
@@ -592,7 +847,7 @@ bool SILPassManager::isMandatoryFunctionPass(SILFunctionTransform *sft) {
 }
 
 static bool isDisabled(SILTransform *T, SILFunction *F = nullptr) {
-  if (SILDisablePass.empty())
+  if (SILDisablePass().empty())
     return false;
 
   if (SILPassManager::isPassDisabled(T->getTag()) ||
@@ -605,7 +860,7 @@ static bool isDisabled(SILTransform *T, SILFunction *F = nullptr) {
 }
 
 bool SILPassManager::isPassDisabled(StringRef passName) {
-  for (const std::string &namePattern : SILDisablePass) {
+  for (const std::string &namePattern : SILDisablePass()) {
     if (passName.contains(namePattern))
       return true;
   }
@@ -614,7 +869,7 @@ bool SILPassManager::isPassDisabled(StringRef passName) {
 
 bool SILPassManager::isInstructionPassDisabled(StringRef instName) {
   StringRef prefix("simplify-");
-  for (const std::string &namePattern : SILDisablePass) {
+  for (const std::string &namePattern : SILDisablePass()) {
     StringRef pattern(namePattern);
     if (pattern.starts_with(prefix) && pattern.ends_with(instName) &&
         pattern.size() == prefix.size() + instName.size()) {
@@ -625,15 +880,15 @@ bool SILPassManager::isInstructionPassDisabled(StringRef instName) {
 }
 
 bool SILPassManager::isAnyPassDisabled() {
-  return !SILDisablePass.empty();
+  return !SILDisablePass().empty();
 }
 
 bool SILPassManager::disablePassesForFunction(SILFunction *function) {
-  if (SILDisablePassOnlyFun.empty())
+  if (SILDisablePassOnlyFun().empty())
     return true;
 
-  return std::find(SILDisablePassOnlyFun.begin(), SILDisablePassOnlyFun.end(),
-                   function->getName()) != SILDisablePassOnlyFun.end();
+  return std::find(SILDisablePassOnlyFun().begin(), SILDisablePassOnlyFun().end(),
+                   function->getName()) != SILDisablePassOnlyFun().end();
 }
 
 void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
@@ -657,14 +912,14 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   CompletedPasses &completedPasses = CompletedPassesMap[F];
   if (!isMandatoryFunctionPass(SFT) &&
       completedPasses.test((size_t)SFT->getPassKind()) &&
-      !SILDisableSkippingPasses) {
-    if (SILPrintPassName)
+      !SILDisableSkippingPasses()) {
+    if (SILPrintPassName())
       dumpPassInfo("(Skip)", TransIdx, F);
     return;
   }
 
   if (isDisabled(SFT, F)) {
-    if (SILPrintPassName)
+    if (SILPrintPassName())
       dumpPassInfo("(Disabled)", TransIdx, F);
     return;
   }
@@ -678,18 +933,18 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   auto MatchFun = [&](const std::string &Str) -> bool {
     return SFT->getTag().contains(Str) || SFT->getID().contains(Str);
   };
-  if ((SILVerifyBeforePass.end() != std::find_if(SILVerifyBeforePass.begin(),
-                                                 SILVerifyBeforePass.end(),
+  if ((SILVerifyBeforePass().end() != std::find_if(SILVerifyBeforePass().begin(),
+                                                 SILVerifyBeforePass().end(),
                                                  MatchFun)) ||
-      (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
-                                                 SILVerifyAroundPass.end(),
+      (SILVerifyAroundPass().end() != std::find_if(SILVerifyAroundPass().begin(),
+                                                 SILVerifyAroundPass().end(),
                                                  MatchFun))) {
     F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
     runSwiftFunctionVerification(F);
   }
 
-  if (SILPrintPassName)
+  if (SILPrintPassName())
     dumpPassInfo("Run", TransIdx, F);
 
   if (doPrintBefore(SFT, F)) {
@@ -699,10 +954,10 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
 
   if (breakBeforeRunning(F->getName(), SFT))
     LLVM_BUILTIN_DEBUGTRAP;
-  if (SILForceVerifyAll ||
-      SILForceVerifyAroundPass.end() !=
-          std::find_if(SILForceVerifyAroundPass.begin(),
-                       SILForceVerifyAroundPass.end(), MatchFun)) {
+  if (SILForceVerifyAll() ||
+      SILForceVerifyAroundPass().end() !=
+          std::find_if(SILForceVerifyAroundPass().begin(),
+                       SILForceVerifyAroundPass().end(), MatchFun)) {
     forcePrecomputeAnalyses(F);
   }
   
@@ -715,7 +970,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     SnapshotID = -1
   };
 
-  unsigned numRepeats = SILOptProfileRepeat;
+  unsigned numRepeats = SILOptProfileRepeat();
   if (numRepeats > 1) {
     // Need to create a snapshot to restore the original state for consecutive runs.
     F->createSnapshot(SnapshotID);
@@ -750,14 +1005,14 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
 
   duration += (std::chrono::system_clock::now() - startTime);
   totalPassRuntime += duration;
-  if (SILPrintPassTime) {
+  if (SILPrintPassTime()) {
     double milliSecs = (double)duration.count() / 1000000.;
-    if (milliSecs > (double)SILMinPassTime) {
+    if (milliSecs > (double)SILMinPassTime()) {
       llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: " << SFT->getTag()
                    << " #" << NumPassesRun << " @" << F->getName() << "\n";
     }
   }
-  if (SILPrintPassMD5 && CurrentPassHasInvalidated) {
+  if (SILPrintPassMD5() && CurrentPassHasInvalidated) {
     MD5Stream md5Stream;
     F->print(md5Stream);
     llvm::MD5::MD5Result result;
@@ -772,10 +1027,10 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
 
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
 
-  if (SILForceVerifyAll ||
-      SILForceVerifyAroundPass.end() !=
-          std::find_if(SILForceVerifyAroundPass.begin(),
-                       SILForceVerifyAroundPass.end(), MatchFun)) {
+  if (SILForceVerifyAll() ||
+      SILForceVerifyAroundPass().end() !=
+          std::find_if(SILForceVerifyAroundPass().begin(),
+                       SILForceVerifyAroundPass().end(), MatchFun)) {
     verifyAnalyses(F);
   }
 
@@ -793,19 +1048,19 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     completedPasses.set((size_t)SFT->getPassKind());
 
   if (getOptions().VerifyAll &&
-      (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
+      (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation())) {
     F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses(F);
     runSwiftFunctionVerification(F);
   } else if (getOptions().VerifyOwnershipAll &&
-             (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
+             (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation())) {
     F->verifyOwnership();
   } else {
-    if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
-                                                  SILVerifyAfterPass.end(),
+    if ((SILVerifyAfterPass().end() != std::find_if(SILVerifyAfterPass().begin(),
+                                                  SILVerifyAfterPass().end(),
                                                   MatchFun)) ||
-        (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
-                                                   SILVerifyAroundPass.end(),
+        (SILVerifyAroundPass().end() != std::find_if(SILVerifyAroundPass().begin(),
+                                                   SILVerifyAroundPass().end(),
                                                    MatchFun))) {
       F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
       verifyAnalyses();
@@ -846,7 +1101,7 @@ runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx) {
   // happening.
   const unsigned MaxNumRestarts = 20;
 
-  if (SILPrintPassName)
+  if (SILPrintPassName())
     llvm::dbgs() << "Start function passes at stage: " << StageName << "\n";
 
   // Run all transforms for all functions, starting at the tail of the worklist.
@@ -897,7 +1152,7 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   CurrentPassHasInvalidated = false;
   numSubpassesRun = 0;
 
-  if (SILPrintPassName)
+  if (SILPrintPassName())
     dumpPassInfo("Run module pass", TransIdx);
 
   if (doPrintBefore(SMT, nullptr)) {
@@ -908,11 +1163,11 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   auto MatchFun = [&](const std::string &Str) -> bool {
     return SMT->getTag().contains(Str) || SMT->getID().contains(Str);
   };
-  if ((SILVerifyBeforePass.end() != std::find_if(SILVerifyBeforePass.begin(),
-                                                 SILVerifyBeforePass.end(),
+  if ((SILVerifyBeforePass().end() != std::find_if(SILVerifyBeforePass().begin(),
+                                                 SILVerifyBeforePass().end(),
                                                  MatchFun)) ||
-      (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
-                                                 SILVerifyAroundPass.end(),
+      (SILVerifyAroundPass().end() != std::find_if(SILVerifyAroundPass().begin(),
+                                                 SILVerifyAroundPass().end(),
                                                  MatchFun))) {
     Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
@@ -937,14 +1192,14 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   std::chrono::nanoseconds duration = std::chrono::system_clock::now() - StartTime;
   totalPassRuntime += duration;
 
-  if (SILPrintPassTime) {
+  if (SILPrintPassTime()) {
     double milliSecs = (double)duration.count() / 1000000.;
-    if (milliSecs > (double)SILMinPassTime) {
+    if (milliSecs > (double)SILMinPassTime()) {
       llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: " << SMT->getTag()
                    << " #" << NumPassesRun << "\n";
     }
   }
-  if (SILPrintPassMD5 && CurrentPassHasInvalidated) {
+  if (SILPrintPassMD5() && CurrentPassHasInvalidated) {
     MD5Stream md5Stream;
     Mod->print(md5Stream);
     llvm::MD5::MD5Result result;
@@ -963,16 +1218,16 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   updateSILModuleStatsAfterTransform(*Mod, SMT, *this, NumPassesRun, duration.count());
 
   if (Options.VerifyAll &&
-      (CurrentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
+      (CurrentPassHasInvalidated || !SILVerifyWithoutInvalidation())) {
     Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
     runSwiftModuleVerification();
   } else {
-    if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
-                                                  SILVerifyAfterPass.end(),
+    if ((SILVerifyAfterPass().end() != std::find_if(SILVerifyAfterPass().begin(),
+                                                  SILVerifyAfterPass().end(),
                                                   MatchFun)) ||
-        (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
-                                                   SILVerifyAroundPass.end(),
+        (SILVerifyAroundPass().end() != std::find_if(SILVerifyAroundPass().begin(),
+                                                   SILVerifyAroundPass().end(),
                                                    MatchFun))) {
       Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
       verifyAnalyses();
@@ -1017,12 +1272,12 @@ void SILPassManager::execute() {
 
   LLVM_DEBUG(llvm::dbgs() << "*** Optimizing the module (" << StageName
                           << ") *** \n");
-  if (SILPrintAll) {
+  if (SILPrintAll()) {
     llvm::dbgs() << "*** SIL module before "  << StageName << " ***\n";
     printModule(Mod, Options.EmitVerboseSIL);
   }
 
-  if (SILPrintPassMD5) {
+  if (SILPrintPassMD5()) {
     MD5Stream md5Stream;
     Mod->print(md5Stream);
     llvm::MD5::MD5Result result;
@@ -1084,7 +1339,7 @@ irgen::IRGenModule *SILPassManager::getIRGenModule() {
 /// D'tor.
 SILPassManager::~SILPassManager() {
 
-  if (SILOptProfileRepeat > 1) {
+  if (SILOptProfileRepeat() > 1) {
     double milliSecs = (double)totalPassRuntime.count() / 1000000.;
     llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: total runtime of all passes\n";
   }

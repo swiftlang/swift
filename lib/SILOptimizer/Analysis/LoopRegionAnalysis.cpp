@@ -1088,28 +1088,69 @@ struct GraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
 
 } // end namespace llvm
 
-static llvm::cl::opt<unsigned>
-    MaxColumns("view-loop-regions-max-columns", llvm::cl::init(80),
-               llvm::cl::desc("Maximum width of a printed node"));
-
 namespace {
-enum class LongLineBehavior { None, Truncate, Wrap };
-} // end anonymous namespace
-static llvm::cl::opt<LongLineBehavior> LLBehavior(
-    "view-loop-regions-long-line-behavior",
-    llvm::cl::init(LongLineBehavior::Truncate),
-    llvm::cl::desc("Behavior when line width is greater than the "
-                   "value provided my -view-loop-regions-max-columns "
-                   "option"),
-    llvm::cl::values(
-        clEnumValN(LongLineBehavior::None, "none", "Print everything"),
-        clEnumValN(LongLineBehavior::Truncate, "truncate",
-                   "Truncate long lines"),
-        clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines")));
+llvm::cl::opt<unsigned> &MaxColumns() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("view-loop-regions-max-columns");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<unsigned>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<unsigned>(
+      "view-loop-regions-max-columns", llvm::cl::init(80),
+      llvm::cl::desc("Maximum width of a printed node"));
+  return *opt;
+}
+auto &EarlyInitMaxColumns = MaxColumns();
 
-static llvm::cl::opt<bool> RemoveUseListComments(
-    "view-loop-regions-remove-use-list-comments", llvm::cl::init(false),
-    llvm::cl::desc("Should use list comments be removed"));
+enum class LongLineBehavior { None, Truncate, Wrap };
+
+llvm::cl::opt<LongLineBehavior> &LLBehavior() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("view-loop-regions-long-line-behavior");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<LongLineBehavior>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<LongLineBehavior>(
+      "view-loop-regions-long-line-behavior",
+      llvm::cl::init(LongLineBehavior::Truncate),
+      llvm::cl::desc("Behavior when line width is greater than the "
+                     "value provided my -view-loop-regions-max-columns "
+                     "option"),
+      llvm::cl::values(
+          clEnumValN(LongLineBehavior::None, "none", "Print everything"),
+          clEnumValN(LongLineBehavior::Truncate, "truncate",
+                     "Truncate long lines"),
+          clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines")));
+  return *opt;
+}
+auto &EarlyInitLLBehavior = LLBehavior();
+
+llvm::cl::opt<bool> &RemoveUseListComments() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("view-loop-regions-remove-use-list-comments");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "view-loop-regions-remove-use-list-comments", llvm::cl::init(false),
+      llvm::cl::desc("Should use list comments be removed"));
+  return *opt;
+}
+auto &EarlyInitRemoveUseListComments = RemoveUseListComments();
+
+llvm::cl::opt<std::string> &TargetFunction() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("view-loop-regions-only-for-function");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "view-loop-regions-only-for-function", llvm::cl::init(""),
+      llvm::cl::desc("Only print out the loop regions for this function"));
+  return *opt;
+}
+auto &EarlyInitTargetFunction = TargetFunction();
+} // namespace
 
 namespace llvm {
 template <>
@@ -1162,22 +1203,22 @@ struct DOTGraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
         OutStr.insert(OutStr.begin() + i + 1, 'l');
         ColNum = 0;
         LastSpace = 0;
-      } else if (RemoveUseListComments && OutStr[i] == '/' &&
+      } else if (RemoveUseListComments() && OutStr[i] == '/' &&
                  i != (OutStr.size() - 1) && OutStr[i + 1] == '/') {
         unsigned Idx = OutStr.find('\n', i + 1); // Find end of line
         OutStr.erase(OutStr.begin() + i, OutStr.begin() + Idx);
         --i;
 
-      } else if (ColNum == MaxColumns) { // Handle long lines.
+      } else if (ColNum == MaxColumns()) { // Handle long lines.
 
-        if (LLBehavior == LongLineBehavior::Wrap) {
+        if (LLBehavior() == LongLineBehavior::Wrap) {
           if (!LastSpace)
             LastSpace = i;
           OutStr.insert(LastSpace, "\\l...");
           ColNum = i - LastSpace;
           LastSpace = 0;
           i += 3; // The loop will advance 'i' again.
-        } else if (LLBehavior == LongLineBehavior::Truncate) {
+        } else if (LLBehavior() == LongLineBehavior::Truncate) {
           unsigned Idx = OutStr.find('\n', i + 1); // Find end of line
           OutStr.erase(OutStr.begin() + i, OutStr.begin() + Idx);
           --i;
@@ -1261,16 +1302,13 @@ struct DOTGraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
 };
 } // namespace llvm
 
-static llvm::cl::opt<std::string> TargetFunction(
-    "view-loop-regions-only-for-function", llvm::cl::init(""),
-    llvm::cl::desc("Only print out the loop regions for this function"));
 #endif
 
 void LoopRegionFunctionInfo::viewLoopRegions() const {
 // This is a no-op when asserts are disabled.
 #ifndef NDEBUG
   // If we have a target function, only print that function out.
-  if (!TargetFunction.empty() && !(F->getName().str() == TargetFunction))
+  if (!TargetFunction().empty() && !(F->getName().str() == TargetFunction()))
     return;
   LoopRegionFunctionInfoGrapherWrapper Wrapper;
   Wrapper.FuncInfo = const_cast<LoopRegionFunctionInfo *>(this);

@@ -37,8 +37,18 @@ using namespace swift::Lowering;
 
 STATISTIC(NumExpand, "Number of instructions expanded");
 
-static llvm::cl::opt<bool> EnableExpandAll("sil-lower-agg-instrs-expand-all",
-                                           llvm::cl::init(false));
+static llvm::cl::opt<bool> &EnableExpandAll() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-lower-agg-instrs-expand-all");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-lower-agg-instrs-expand-all",
+      llvm::cl::init(false));
+  return *opt;
+}
+static auto &EarlyInitEnableExpandAll = EnableExpandAll();
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -52,7 +62,7 @@ static llvm::cl::opt<bool> EnableExpandAll("sil-lower-agg-instrs-expand-all",
 static bool shouldExpandShim(SILFunction *fn, SILType type) {
   // shouldExpand returns false for struct-with-deinit types, so bypassing it is
   // incorrect for move-only types
-  if (EnableExpandAll) {
+  if (EnableExpandAll()) {
     assert(!type.isMoveOnly(/*orWrapped=*/false)
            && "sil-lower-agg-instrs-expand-all is incompatible with move-only "
               "types");

@@ -21,11 +21,31 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> LinkEmbeddedRuntime("link-embedded-runtime",
-                                               llvm::cl::init(true));
+static llvm::cl::opt<bool> &LinkEmbeddedRuntime() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("link-embedded-runtime");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "link-embedded-runtime",
+      llvm::cl::init(true));
+  return *opt;
+}
+static auto &EarlyInitLinkEmbeddedRuntime = LinkEmbeddedRuntime();
 
-static llvm::cl::opt<bool> LinkUsedFunctions("link-used-functions",
-                                               llvm::cl::init(true));
+static llvm::cl::opt<bool> &LinkUsedFunctions() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("link-used-functions");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "link-used-functions",
+      llvm::cl::init(true));
+  return *opt;
+}
+static auto &EarlyInitLinkUsedFunctions = LinkUsedFunctions();
 
 //===----------------------------------------------------------------------===//
 //                          Top Level Driver
@@ -49,14 +69,14 @@ public:
 
     // In embedded Swift, the stdlib contains all the runtime functions needed
     // (swift_retain, etc.). Link them in so they can be referenced in IRGen.
-    if (M.getOptions().EmbeddedSwift && LinkEmbeddedRuntime) {
+    if (M.getOptions().EmbeddedSwift && LinkEmbeddedRuntime()) {
       linkEmbeddedRuntimeFromStdlib();
       linkEmbeddedConcurrency();
     }
 
     // In embedded Swift, we need to explicitly link any @used globals and
     // functions from imported modules.
-    if (M.getOptions().EmbeddedSwift && LinkUsedFunctions) {
+    if (M.getOptions().EmbeddedSwift && LinkUsedFunctions()) {
       linkUsedGlobalsAndFunctions();
     }
   }

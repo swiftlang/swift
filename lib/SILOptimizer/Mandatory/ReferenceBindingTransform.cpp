@@ -23,12 +23,21 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> SilentlyEmitDiagnostics(
-    "sil-reference-binding-diagnostics-silently-emit-diagnostics",
-    llvm::cl::desc(
-        "For testing purposes, emit the diagnostic silently so we can "
-        "filecheck the result of emitting an error from the move checkers"),
-    llvm::cl::init(false));
+static llvm::cl::opt<bool> &SilentlyEmitDiagnostics() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-reference-binding-diagnostics-silently-emit-diagnostics");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-reference-binding-diagnostics-silently-emit-diagnostics",
+      llvm::cl::desc(
+          "For testing purposes, emit the diagnostic silently so we can "
+          "filecheck the result of emitting an error from the move checkers"),
+      llvm::cl::init(false));
+  return *opt;
+}
+static auto &EarlyInitSilentlyEmitDiagnostics = SilentlyEmitDiagnostics();
 
 //===----------------------------------------------------------------------===//
 //                          MARK: Diagnosis Helpers
@@ -39,7 +48,7 @@ static void diagnose(SILInstruction *inst, Diag<T...> diag, U &&...args) {
   // If we asked to actually emit diagnostics, skip it. This lets us when
   // testing to write FileCheck tests for tests without an error along side
   // other tests where we want to use -verify.
-  if (SilentlyEmitDiagnostics)
+  if (SilentlyEmitDiagnostics())
     return;
 
   // See if the consuming use is an owned moveonly_to_copyable whose only

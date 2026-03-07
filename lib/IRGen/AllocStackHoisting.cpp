@@ -36,9 +36,23 @@
 
 using namespace swift;
 
-llvm::cl::opt<bool> SILUseStackSlotMerging(
-    "sil-merge-stack-slots", llvm::cl::init(true),
-    llvm::cl::desc("Merge generic alloc_stack instructions"));
+namespace {
+// Helper to get or create command line option, checking if already registered.
+llvm::cl::opt<bool> &SILUseStackSlotMerging() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-merge-stack-slots");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-merge-stack-slots", llvm::cl::init(true),
+      llvm::cl::desc("Merge generic alloc_stack instructions"));
+  return *opt;
+}
+
+// Force early registration before command line parsing
+auto &EarlyInitSILUseStackSlotMerging = SILUseStackSlotMerging();
+} // namespace
 
 /// Hoist generic alloc_stack instructions to the entry basic block and merge
 /// alloc_stack instructions if their users span non-overlapping live-ranges.
@@ -498,7 +512,7 @@ void HoistAllocStack::collectHoistableInstructions() {
 /// Hoist the alloc_stack instructions to the entry block and sink the
 /// dealloc_stack instructions to the function exists.
 void HoistAllocStack::hoist() {
-  if (SILUseStackSlotMerging) {
+  if (SILUseStackSlotMerging()) {
     MergeStackSlots Merger(AllocStackToHoist, FunctionExits, stackInstructionIndices);
     InvalidationKind = Merger.mergeSlots(DomInfoToUpdate);
     return;

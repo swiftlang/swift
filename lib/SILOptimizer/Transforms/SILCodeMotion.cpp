@@ -39,7 +39,17 @@ STATISTIC(NumRefCountOpsSimplified, "Number of enum ref count ops simplified");
 STATISTIC(NumHoisted, "Number of instructions hoisted");
 STATISTIC(NumSILArgumentReleaseHoisted, "Number of silargument release instructions hoisted");
 
-llvm::cl::opt<bool> DisableSILRRCodeMotion("disable-sil-cm-rr-cm", llvm::cl::init(true));
+static llvm::cl::opt<bool> &DisableSILRRCodeMotion() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("disable-sil-cm-rr-cm");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "disable-sil-cm-rr-cm", llvm::cl::init(true));
+  return *opt;
+}
+static auto &EarlyInitDisableSILRRCodeMotion = DisableSILRRCodeMotion();
 
 using namespace swift;
 

@@ -24,9 +24,18 @@
 
 using namespace swift;
 
-llvm::cl::opt<bool> verifyARCLoopSummary(
-    "verify-arc-loop-summary", llvm::cl::init(false),
-    llvm::cl::desc("Verify if loop summary is correct in ARCLoopsOpts"));
+static llvm::cl::opt<bool> &verifyARCLoopSummary() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("verify-arc-loop-summary");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "verify-arc-loop-summary", llvm::cl::init(false),
+      llvm::cl::desc("Verify if loop summary is correct in ARCLoopsOpts"));
+  return *opt;
+}
+static auto &EarlyInitVerifyARCLoopSummary = verifyARCLoopSummary();
 
 //===----------------------------------------------------------------------===//
 //                               ARCRegionState
@@ -291,7 +300,7 @@ bool ARCRegionState::processLoopBottomUp(
 #ifndef NDEBUG
     // Verify updateForDifferentLoopInst is conservative enough that the flow
     // sensitive native of the loop summarized instructions does not matter.
-    if (verifyARCLoopSummary) {
+    if (verifyARCLoopSummary()) {
       auto NewRefCountState = OtherState->second;
       for (auto *I : State->getSummarizedInterestingInsts()) {
         NewRefCountState.updateForDifferentLoopInst(I, AA);
@@ -441,7 +450,7 @@ bool ARCRegionState::processLoopTopDown(
 #ifndef NDEBUG
     // Verify updateForDifferentLoopInst is conservative enough that the flow
     // sensitive native of the loop summarized instructions does not matter.
-    if (verifyARCLoopSummary) {
+    if (verifyARCLoopSummary()) {
       auto NewRefCountState = OtherState->second;
       for (auto *I : State->getSummarizedInterestingInsts()) {
         NewRefCountState.updateForDifferentLoopInst(I, AA);

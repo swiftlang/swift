@@ -40,10 +40,19 @@
 
 using namespace swift;
 
-llvm::cl::opt<std::string> DumpFuncsBeforeOutliner(
-    "sil-dump-functions-before-outliner", llvm::cl::init(""),
-    llvm::cl::desc(
-        "Break before running each function pass on a particular function"));
+static llvm::cl::opt<std::string> &DumpFuncsBeforeOutliner() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-dump-functions-before-outliner");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-dump-functions-before-outliner", llvm::cl::init(""),
+      llvm::cl::desc(
+          "Break before running each function pass on a particular function"));
+  return *opt;
+}
+static auto &EarlyInitDumpFuncsBeforeOutliner = DumpFuncsBeforeOutliner();
 
 namespace {
 
@@ -1405,8 +1414,8 @@ public:
       return;
 
     // Dump function if requested.
-    if (DumpFuncsBeforeOutliner.size() &&
-        Fun->getName().contains(DumpFuncsBeforeOutliner)) {
+    if (DumpFuncsBeforeOutliner().size() &&
+        Fun->getName().contains(DumpFuncsBeforeOutliner())) {
       Fun->dump();
     }
 

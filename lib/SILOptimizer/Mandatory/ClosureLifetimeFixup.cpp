@@ -35,18 +35,36 @@
 
 #include "llvm/Support/CommandLine.h"
 
-llvm::cl::opt<bool> DisableConvertEscapeToNoEscapeSwitchEnumPeephole(
-    "sil-disable-convert-escape-to-noescape-switch-peephole",
-    llvm::cl::init(false),
-    llvm::cl::desc(
-        "Disable the convert_escape_to_noescape switch enum peephole. "),
-    llvm::cl::Hidden);
+static llvm::cl::opt<bool> &DisableConvertEscapeToNoEscapeSwitchEnumPeephole() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-disable-convert-escape-to-noescape-switch-peephole");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-disable-convert-escape-to-noescape-switch-peephole",
+      llvm::cl::init(false),
+      llvm::cl::desc(
+          "Disable the convert_escape_to_noescape switch enum peephole. "),
+      llvm::cl::Hidden);
+  return *opt;
+}
+static auto &EarlyInitDisableConvertEscapeToNoEscapeSwitchEnumPeephole = DisableConvertEscapeToNoEscapeSwitchEnumPeephole();
 
-llvm::cl::opt<bool> DisableCopyEliminationOfCopyableCapture(
-    "sil-disable-copy-elimination-of-copyable-closure-capture",
-    llvm::cl::init(false),
-    llvm::cl::desc("Don't eliminate copy_addr of Copyable closure captures "
-                   "inserted by SILGen"));
+static llvm::cl::opt<bool> &DisableCopyEliminationOfCopyableCapture() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-disable-copy-elimination-of-copyable-closure-capture");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-disable-copy-elimination-of-copyable-closure-capture",
+      llvm::cl::init(false),
+      llvm::cl::desc("Don't eliminate copy_addr of Copyable closure captures "
+                     "inserted by SILGen"));
+  return *opt;
+}
+static auto &EarlyInitDisableCopyEliminationOfCopyableCapture = DisableCopyEliminationOfCopyableCapture();
 
 using namespace swift;
 
@@ -133,11 +151,20 @@ static void findReachableExitBlocks(SILInstruction *i,
 /// We use this to ensure that we properly handle recursive cases by revisiting
 /// phi nodes that we are tracking. This just makes it easier to reproduce in a
 /// test case.
-static llvm::cl::opt<bool> ReverseInitialWorklist(
-    "sil-closure-lifetime-fixup-reverse-phi-order", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Reverse the order in which we visit phis for testing purposes"),
-    llvm::cl::Hidden);
+static llvm::cl::opt<bool> &ReverseInitialWorklist() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-closure-lifetime-fixup-reverse-phi-order");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-closure-lifetime-fixup-reverse-phi-order", llvm::cl::init(false),
+      llvm::cl::desc(
+          "Reverse the order in which we visit phis for testing purposes"),
+      llvm::cl::Hidden);
+  return *opt;
+}
+static auto &EarlyInitReverseInitialWorklist = ReverseInitialWorklist();
 
 // Finally, we need to prune phis inserted by the SSA updater that
 // only take the .none from the entry block. This means that they are
@@ -150,7 +177,7 @@ static void
 cleanupDeadTrivialPhiArgs(SILValue initialValue,
                           SmallVectorImpl<SILPhiArgument *> &insertedPhis) {
   // Just for testing purposes.
-  if (ReverseInitialWorklist) {
+  if (ReverseInitialWorklist()) {
     std::reverse(insertedPhis.begin(), insertedPhis.end());
   }
   SmallVector<SILArgument *, 8> worklist(insertedPhis.begin(),
@@ -751,7 +778,7 @@ static SILValue tryRewriteToPartialApplyStack(
       continue;
     }
 
-    if (DisableCopyEliminationOfCopyableCapture) {
+    if (DisableCopyEliminationOfCopyableCapture()) {
       if (!copy->getType().isMoveOnly()) {
         LLVM_DEBUG(llvm::dbgs() << "-- not move-only\n");
         continue;
@@ -1470,7 +1497,7 @@ static bool fixupClosureLifetimes(SILFunction &fn,
         continue;
 
       // First try to peephole a known pattern.
-      if (!DisableConvertEscapeToNoEscapeSwitchEnumPeephole) {
+      if (!DisableConvertEscapeToNoEscapeSwitchEnumPeephole()) {
         if (trySwitchEnumPeephole(cvt)) {
           changed = true;
           continue;

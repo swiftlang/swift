@@ -21,12 +21,21 @@
 using namespace swift;
 using namespace swift::semanticarc;
 
-static llvm::cl::opt<bool>
-    VerifyAfterTransformOption("sil-semantic-arc-opts-verify-after-transform",
-                               llvm::cl::Hidden, llvm::cl::init(false));
+static llvm::cl::opt<bool> &VerifyAfterTransformOption() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-semantic-arc-opts-verify-after-transform");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-semantic-arc-opts-verify-after-transform",
+      llvm::cl::Hidden, llvm::cl::init(false));
+  return *opt;
+}
+static auto &EarlyInitVerifyAfterTransformOption = VerifyAfterTransformOption();
 
 void Context::verify() const {
-  if (VerifyAfterTransformOption)
+  if (VerifyAfterTransformOption())
     fn.verify();
 }
 

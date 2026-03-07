@@ -29,10 +29,19 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool>
-EnableExistentialSpecializer("enable-existential-specializer",
-                             llvm::cl::Hidden,
-                             llvm::cl::init(true));
+static llvm::cl::opt<bool> &EnableExistentialSpecializer() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-existential-specializer");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-existential-specializer",
+      llvm::cl::Hidden,
+      llvm::cl::init(true));
+  return *opt;
+}
+static auto &EarlyInitEnableExistentialSpecializer = EnableExistentialSpecializer();
 
 STATISTIC(NumFunctionsWithExistentialArgsSpecialized,
           "Number of functions with existential args specialized");
@@ -72,7 +81,7 @@ public:
     auto *F = getFunction();
 
     /// Don't optimize functions that should not be optimized.
-    if (!F->shouldOptimize() || !EnableExistentialSpecializer) {
+    if (!F->shouldOptimize() || !EnableExistentialSpecializer()) {
       return;
     }
 

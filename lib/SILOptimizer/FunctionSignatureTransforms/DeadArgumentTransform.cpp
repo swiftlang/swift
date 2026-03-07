@@ -17,13 +17,22 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> FSODisableDeadArgument(
-    "sil-fso-disable-dead-argument",
-    llvm::cl::desc("Do not perform dead argument elimination during FSO. "
-                   "Intended only for testing purposes"));
+static llvm::cl::opt<bool> &FSODisableDeadArgument() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-fso-disable-dead-argument");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-fso-disable-dead-argument",
+      llvm::cl::desc("Do not perform dead argument elimination during FSO. "
+                     "Intended only for testing purposes"));
+  return *opt;
+}
+static auto &EarlyInitFSODisableDeadArgument = FSODisableDeadArgument();
 
 bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
-  if (FSODisableDeadArgument)
+  if (FSODisableDeadArgument())
     return false;
 
   // Did we decide we should optimize any parameter?

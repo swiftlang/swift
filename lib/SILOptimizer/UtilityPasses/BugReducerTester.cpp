@@ -31,11 +31,20 @@
 
 using namespace swift;
 
-static llvm::cl::opt<std::string> FunctionTarget(
-    "bug-reducer-tester-target-func",
-    llvm::cl::desc("Function that when called by an apply should cause "
-                   "BugReducerTester to blow up or miscompile if the pass "
-                   "visits the apply"));
+static llvm::cl::opt<std::string> &FunctionTarget() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("bug-reducer-tester-target-func");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "bug-reducer-tester-target-func",
+      llvm::cl::desc("Function that when called by an apply should cause "
+                     "BugReducerTester to blow up or miscompile if the pass "
+                     "visits the apply"));
+  return *opt;
+}
+static auto &EarlyInitFunctionTarget = FunctionTarget();
 
 namespace {
 enum class FailureKind {
@@ -46,19 +55,28 @@ enum class FailureKind {
 };
 } // end anonymous namespace
 
-static llvm::cl::opt<FailureKind> TargetFailureKind(
-    "bug-reducer-tester-failure-kind",
-    llvm::cl::desc("The type of failure to perform"),
-    llvm::cl::values(
-        clEnumValN(FailureKind::OptimizerCrasher, "opt-crasher",
-                   "Crash the optimizer when we see the specified apply"),
-        clEnumValN(FailureKind::RuntimeMiscompile, "miscompile",
-                   "Delete the target function call to cause a runtime "
-                   "miscompile that is not a crasher"),
-        clEnumValN(FailureKind::RuntimeCrasher, "runtime-crasher",
-                   "Delete the target function call to cause a runtime "
-                   "miscompile that is not a crasher")),
-    llvm::cl::init(FailureKind::None));
+static llvm::cl::opt<FailureKind> &TargetFailureKind() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("bug-reducer-tester-failure-kind");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<FailureKind>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<FailureKind>(
+      "bug-reducer-tester-failure-kind",
+      llvm::cl::desc("The type of failure to perform"),
+      llvm::cl::values(
+          clEnumValN(FailureKind::OptimizerCrasher, "opt-crasher",
+                     "Crash the optimizer when we see the specified apply"),
+          clEnumValN(FailureKind::RuntimeMiscompile, "miscompile",
+                     "Delete the target function call to cause a runtime "
+                     "miscompile that is not a crasher"),
+          clEnumValN(FailureKind::RuntimeCrasher, "runtime-crasher",
+                     "Delete the target function call to cause a runtime "
+                     "miscompile that is not a crasher")),
+      llvm::cl::init(FailureKind::None));
+  return *opt;
+}
+static auto &EarlyInitTargetFailureKind = TargetFailureKind();
 
 
 LLVM_ATTRIBUTE_NOINLINE
@@ -75,7 +93,7 @@ class BugReducerTester : public SILFunctionTransform {
   StringRef RuntimeCrasherFunctionName = "bug_reducer_runtime_crasher_func";
 
   SILFunction *getRuntimeCrasherFunction() {
-    assert(TargetFailureKind == FailureKind::RuntimeCrasher);
+    assert(TargetFailureKind() == FailureKind::RuntimeCrasher);
     llvm::SmallVector<SILResultInfo, 1> ResultInfoArray;
     auto EmptyTupleCanType = getFunction()
                                  ->getModule()
@@ -112,9 +130,9 @@ class BugReducerTester : public SILFunctionTransform {
   void run() override {
     // If we don't have a target function or we already caused a miscompile,
     // just return.
-    if (FunctionTarget.empty() || CausedError)
+    if (FunctionTarget().empty() || CausedError)
       return;
-    assert(TargetFailureKind != FailureKind::None);
+    assert(TargetFailureKind() != FailureKind::None);
     for (auto &BB : *getFunction()) {
       for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
         // Skip try_apply. We do not support them for now.
@@ -130,19 +148,19 @@ class BugReducerTester : public SILFunctionTransform {
         }
 
         auto *FRI = dyn_cast<FunctionRefInst>(FAS.getCallee());
-        if (!FRI || FRI->getReferencedFunction()->getName() != FunctionTarget) {
+        if (!FRI || FRI->getReferencedFunction()->getName() != FunctionTarget()) {
           ++II;
           continue;
         }
 
         // Ok, we found the Apply that we want! If we are asked to crash, crash
         // here.
-        if (TargetFailureKind == FailureKind::OptimizerCrasher)
+        if (TargetFailureKind() == FailureKind::OptimizerCrasher)
           THIS_TEST_IS_EXPECTED_TO_CRASH_HERE();
 
         // Otherwise, if we are asked to perform a runtime time miscompile,
         // delete the apply target.
-        if (TargetFailureKind == FailureKind::RuntimeMiscompile) {
+        if (TargetFailureKind() == FailureKind::RuntimeMiscompile) {
           // Ok, we need to insert a runtime miscompile. Move II to
           // the next instruction and then replace its current value
           // with undef.
@@ -156,7 +174,7 @@ class BugReducerTester : public SILFunctionTransform {
           return;
         }
 
-        assert(TargetFailureKind == FailureKind::RuntimeCrasher);
+        assert(TargetFailureKind() == FailureKind::RuntimeCrasher);
         // Finally, if we reach this point we are being asked to replace the
         // given apply with a new apply that calls the crasher func.
         auto Loc = RegularLocation::getAutoGeneratedLocation();

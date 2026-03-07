@@ -51,19 +51,48 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool>
-ParseSerializedSIL("parse-serialized-sil",
-                   llvm::cl::desc("Parse the output of a serialized module"));
+namespace {
+llvm::cl::opt<bool> &ParseSerializedSIL() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("parse-serialized-sil");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "parse-serialized-sil",
+      llvm::cl::desc("Parse the output of a serialized module"));
+  return *opt;
+}
+auto &EarlyInitParseSerializedSIL = ParseSerializedSIL();
 
-static llvm::cl::opt<bool>
-    DisableInputVerify("sil-disable-input-verify",
-                       llvm::cl::desc("Disable verification of input SIL"),
-                       llvm::cl::init(false));
+llvm::cl::opt<bool> &DisableInputVerify() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-disable-input-verify");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-disable-input-verify",
+      llvm::cl::desc("Disable verification of input SIL"),
+      llvm::cl::init(false));
+  return *opt;
+}
+auto &EarlyInitDisableInputVerify = DisableInputVerify();
 
 // Option for testing -silgen-cleanup -enable-complete-ossa
-static llvm::cl::opt<bool>
-ParseIncompleteOSSA("parse-incomplete-ossa",
-                    llvm::cl::desc("Parse OSSA with incomplete lifetimes"));
+llvm::cl::opt<bool> &ParseIncompleteOSSA() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("parse-incomplete-ossa");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "parse-incomplete-ossa",
+      llvm::cl::desc("Parse OSSA with incomplete lifetimes"));
+  return *opt;
+}
+auto &EarlyInitParseIncompleteOSSA = ParseIncompleteOSSA();
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // SILParserState implementation
@@ -111,7 +140,7 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   Parser parser(bufferID, *SF, &parserState);
   PrettyStackTraceParser StackTrace(parser);
 
-  if (ParseSerializedSIL) {
+  if (ParseSerializedSIL()) {
     silMod.get()->setParsedAsSerializedSIL();
   }
 
@@ -139,8 +168,8 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   parserState.markZombies();
 
   // If SIL parsing succeeded, verify the generated SIL.
-  if (!parser.Diags.hadAnyError() && !DisableInputVerify) {
-    silMod->verify(/*SingleFunction=*/true, !ParseIncompleteOSSA);
+  if (!parser.Diags.hadAnyError() && !DisableInputVerify()) {
+    silMod->verify(/*SingleFunction=*/true, !ParseIncompleteOSSA());
   }
 
   return silMod;

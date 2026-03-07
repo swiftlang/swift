@@ -19,10 +19,19 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> FSODisableOwnedToGuaranteed(
-    "sil-fso-disable-owned-to-guaranteed",
-    llvm::cl::desc("Do not perform owned to guaranteed during FSO. Intended "
-                   "only for testing purposes."));
+static llvm::cl::opt<bool> &FSODisableOwnedToGuaranteed() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-fso-disable-owned-to-guaranteed");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-fso-disable-owned-to-guaranteed",
+      llvm::cl::desc("Do not perform owned to guaranteed during FSO. Intended "
+                     "only for testing purposes."));
+  return *opt;
+}
+static auto &EarlyInitFSODisableOwnedToGuaranteed = FSODisableOwnedToGuaranteed();
 
 //===----------------------------------------------------------------------===//
 //                                 Utilities
@@ -274,7 +283,7 @@ void FunctionSignatureTransform::OwnedToGuaranteedAddResultRelease(
 }
 
 bool FunctionSignatureTransform::OwnedToGuaranteedAnalyze() {
-  if (FSODisableOwnedToGuaranteed)
+  if (FSODisableOwnedToGuaranteed())
     return false;
   SILFunction *F = TransformDescriptor.OriginalFunction;
   if (F->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_OWNED2GUARANTEE_NEVER))

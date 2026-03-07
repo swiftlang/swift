@@ -64,11 +64,20 @@ using Region = PartitionPrimitives::Region;
 // case which are emitted when we are unable to infer the name of a value. We in
 // most cases do succeed inferring, so it makes sense to add an asserts only
 // option that can be used by the compiler to test that we emit these correctly.
-static llvm::cl::opt<bool> ForceTypedErrors(
-    "sil-regionbasedisolation-force-use-of-typed-errors",
-    llvm::cl::desc("Force the usage of typed instead of named errors to make "
-                   "it easier to test typed errors"),
-    llvm::cl::Hidden);
+static llvm::cl::opt<bool> &ForceTypedErrors() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-regionbasedisolation-force-use-of-typed-errors");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-regionbasedisolation-force-use-of-typed-errors",
+      llvm::cl::desc("Force the usage of typed instead of named errors to make "
+                     "it easier to test typed errors"),
+      llvm::cl::Hidden);
+  return *opt;
+}
+static auto &EarlyInitForceTypedErrors = ForceTypedErrors();
 
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
@@ -205,7 +214,7 @@ static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
 /// Attempt to infer a name for \p value. Returns none if we fail or if we are
 /// asked to force typed errors since we are testing.
 static std::optional<Identifier> inferNameHelper(SILValue value) {
-  if (ForceTypedErrors)
+  if (ForceTypedErrors())
     return {};
   return VariableNameInferrer::inferName(value);
 }
@@ -214,7 +223,7 @@ static std::optional<Identifier> inferNameHelper(SILValue value) {
 /// we are asked to force typed errors since we are testing.
 static std::optional<std::pair<Identifier, SILValue>>
 inferNameAndRootHelper(SILValue value) {
-  if (ForceTypedErrors)
+  if (ForceTypedErrors())
     return {};
   return VariableNameInferrer::inferNameAndRoot(value);
 }

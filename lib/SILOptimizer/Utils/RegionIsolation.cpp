@@ -23,14 +23,22 @@ using namespace regionisolation;
 
 LoggingFlag swift::regionisolation::ENABLE_LOGGING;
 
-static llvm::cl::opt<LoggingFlag, true> // The parser
-    RegionBasedIsolationLog(
-        "sil-regionbasedisolation-log",
-        llvm::cl::desc("Enable logging for SIL region-based isolation "
-                       "diagnostics"),
-        llvm::cl::Hidden,
-        llvm::cl::values(
-            clEnumValN(LoggingFlag::Off, "none", "no logging"),
-            clEnumValN(LoggingFlag::Normal, "on", "non verbose logging"),
-            clEnumValN(LoggingFlag::Verbose, "verbose", "verbose logging")),
-        llvm::cl::location(swift::regionisolation::ENABLE_LOGGING));
+static llvm::cl::opt<LoggingFlag, true> &RegionBasedIsolationLog() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-regionbasedisolation-log");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<LoggingFlag, true>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<LoggingFlag, true>(
+      "sil-regionbasedisolation-log",
+      llvm::cl::desc("Enable logging for SIL region-based isolation "
+                     "diagnostics"),
+      llvm::cl::Hidden,
+      llvm::cl::values(
+          clEnumValN(LoggingFlag::Off, "none", "no logging"),
+          clEnumValN(LoggingFlag::Normal, "on", "non verbose logging"),
+          clEnumValN(LoggingFlag::Verbose, "verbose", "verbose logging")),
+      llvm::cl::location(swift::regionisolation::ENABLE_LOGGING));
+  return *opt;
+}
+static auto &EarlyInitRegionBasedIsolationLog = RegionBasedIsolationLog();

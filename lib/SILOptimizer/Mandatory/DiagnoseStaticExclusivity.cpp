@@ -622,11 +622,20 @@ static bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
   return FD == Ctx.getSwap();
 }
 
-static llvm::cl::opt<bool> ShouldAssertOnFailure(
-    "sil-assert-on-exclusivity-failure",
-    llvm::cl::desc("Should the compiler assert when it diagnoses conflicting "
-                   "accesses rather than emitting a diagnostic? Intended for "
-                   "use only with debugging."));
+static llvm::cl::opt<bool> &ShouldAssertOnFailure() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-assert-on-exclusivity-failure");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-assert-on-exclusivity-failure",
+      llvm::cl::desc("Should the compiler assert when it diagnoses conflicting "
+                     "accesses rather than emitting a diagnostic? Intended for "
+                     "use only with debugging."));
+  return *opt;
+}
+static auto &EarlyInitShouldAssertOnFailure = ShouldAssertOnFailure();
 
 /// If making an access of the given kind at the given subpath would
 /// would conflict, returns the first recorded access it would conflict
@@ -638,7 +647,7 @@ shouldReportAccess(const AccessInfo &Info, swift::SILAccessKind Kind,
     return std::nullopt;
 
   auto result = Info.conflictsWithAccess(Kind, SubPath);
-  if (ShouldAssertOnFailure && result.has_value())
+  if (ShouldAssertOnFailure() && result.has_value())
     llvm_unreachable("Standard assertion routine.");
   return result;
 }

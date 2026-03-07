@@ -31,12 +31,21 @@
 using namespace swift;
 using namespace swift::siloptimizer;
 
-static llvm::cl::opt<bool> SilentlyEmitDiagnostics(
-    "move-only-diagnostics-silently-emit-diagnostics",
-    llvm::cl::desc(
-        "For testing purposes, emit the diagnostic silently so we can "
-        "filecheck the result of emitting an error from the move checkers"),
-    llvm::cl::init(false));
+static llvm::cl::opt<bool> &SilentlyEmitDiagnostics() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("move-only-diagnostics-silently-emit-diagnostics");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "move-only-diagnostics-silently-emit-diagnostics",
+      llvm::cl::desc(
+          "For testing purposes, emit the diagnostic silently so we can "
+          "filecheck the result of emitting an error from the move checkers"),
+      llvm::cl::init(false));
+  return *opt;
+}
+static auto &EarlyInitSilentlyEmitDiagnostics = SilentlyEmitDiagnostics();
 
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
@@ -58,7 +67,7 @@ static void diagnose(ASTContext &context, SILInstruction *inst, Diag<T...> diag,
 
   // If for testing reasons we want to return that we emitted an error but not
   // emit the actual error itself, return early.
-  if (SilentlyEmitDiagnostics)
+  if (SilentlyEmitDiagnostics())
     return;
 
   auto sourceLoc = loc.getSourceLoc();
@@ -75,7 +84,7 @@ static void diagnose(ASTContext &context, SourceLoc loc, Diag<T...> diag,
                      U &&...args) {
   // If for testing reasons we want to return that we emitted an error but not
   // emit the actual error itself, return early.
-  if (SilentlyEmitDiagnostics)
+  if (SilentlyEmitDiagnostics())
     return;
 
   context.Diags.diagnose(loc, diag, std::forward<U>(args)...);

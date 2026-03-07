@@ -54,16 +54,34 @@ using namespace swift;
 STATISTIC(NumCombined, "Number of instructions combined");
 STATISTIC(NumDeadInst, "Number of dead insts eliminated");
 
-static llvm::cl::opt<bool> EnableSinkingOwnedForwardingInstToUses(
-    "silcombine-owned-code-sinking",
-    llvm::cl::desc("Enable sinking of owned forwarding insts"),
-    llvm::cl::init(true), llvm::cl::Hidden);
+static llvm::cl::opt<bool> &EnableSinkingOwnedForwardingInstToUses() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("silcombine-owned-code-sinking");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "silcombine-owned-code-sinking",
+      llvm::cl::desc("Enable sinking of owned forwarding insts"),
+      llvm::cl::init(true), llvm::cl::Hidden);
+  return *opt;
+}
+static auto &EarlyInitEnableSinkingOwnedForwardingInstToUses = EnableSinkingOwnedForwardingInstToUses();
 
 // Allow disabling general optimization for targeted unit tests.
-static llvm::cl::opt<bool> EnableSILCombineCanonicalize(
-    "sil-combine-canonicalize",
-    llvm::cl::desc("Canonicalization during sil-combine"), llvm::cl::init(true),
-    llvm::cl::Hidden);
+static llvm::cl::opt<bool> &EnableSILCombineCanonicalize() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-combine-canonicalize");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-combine-canonicalize",
+      llvm::cl::desc("Canonicalization during sil-combine"), llvm::cl::init(true),
+      llvm::cl::Hidden);
+  return *opt;
+}
+static auto &EarlyInitEnableSILCombineCanonicalize = EnableSILCombineCanonicalize();
 
 //===----------------------------------------------------------------------===//
 //                              Utility Methods
@@ -159,7 +177,7 @@ public:
   }
 
   bool tryCanonicalize(SILInstruction *inst) {
-    if (!EnableSILCombineCanonicalize)
+    if (!EnableSILCombineCanonicalize())
       return false;
 
     changed = false;
@@ -465,7 +483,7 @@ void SILCombiner::processInstruction(SILInstruction *I,
   // If we have reached this point, all attempts to do simple simplifications
   // have failed. First if we have an owned forwarding value, we try to
   // sink. Otherwise, we perform the actual SILCombine operation.
-  if (EnableSinkingOwnedForwardingInstToUses) {
+  if (EnableSinkingOwnedForwardingInstToUses()) {
     // If we have an ownership forwarding single value inst that forwards
     // through its first argument and it is trivially duplicatable, see if it
     // only has consuming uses. If so, we can duplicate the instruction into

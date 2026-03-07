@@ -51,10 +51,21 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> KeepWillThrowCall(
-    "keep-will-throw-call", llvm::cl::init(false),
-    llvm::cl::desc(
-      "Keep calls to swift_willThrow, even if the throw is optimized away"));
+namespace {
+llvm::cl::opt<bool> &KeepWillThrowCall() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("keep-will-throw-call");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "keep-will-throw-call", llvm::cl::init(false),
+      llvm::cl::desc(
+        "Keep calls to swift_willThrow, even if the throw is optimized away"));
+  return *opt;
+}
+auto &EarlyInitKeepWillThrowCall = KeepWillThrowCall();
+} // namespace
 
 std::optional<SILBasicBlock::iterator>
 swift::getInsertAfterPoint(SILValue val) {
@@ -376,7 +387,7 @@ getConcreteValueOfExistentialBox(AllocExistentialBoxInst *existentialBox,
     }
     case SILInstructionKind::BuiltinInst: {
       auto *builtin = cast<BuiltinInst>(user);
-      if (KeepWillThrowCall ||
+      if (KeepWillThrowCall() ||
           builtin->getBuiltinInfo().ID != BuiltinValueKind::WillThrow) {
         return SILValue();
       }
@@ -2601,17 +2612,28 @@ bool swift::isDestructorSideEffectFree(SILInstruction *mayRelease,
 // Additionally, also interpret the lines as function names and check whether
 // the current cond_fail is contained in a listed function when considering
 // whether to remove it.
-static llvm::cl::opt<std::string> CondFailConfigFile(
-    "cond-fail-config-file", llvm::cl::init(""),
-    llvm::cl::desc("read the cond_fail message strings to elimimate from file"));
+namespace {
+llvm::cl::opt<std::string> &CondFailConfigFile() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("cond-fail-config-file");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "cond-fail-config-file", llvm::cl::init(""),
+      llvm::cl::desc("read the cond_fail message strings to elimimate from file"));
+  return *opt;
+}
+auto &EarlyInitCondFailConfigFile = CondFailConfigFile();
+} // namespace
 
 static std::set<std::string> CondFailsToRemove;
 
 bool swift::shouldRemoveCondFail(StringRef withMessage, StringRef functionName) {
-  if (CondFailConfigFile.empty())
+  if (CondFailConfigFile().empty())
     return false;
 
-  std::fstream fs(CondFailConfigFile);
+  std::fstream fs(CondFailConfigFile());
   if (!fs) {
     llvm::errs() << "cannot cond_fail disablement config file\n";
     exit(1);

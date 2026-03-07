@@ -46,9 +46,6 @@ llvm::cl::opt<std::string> CASID("id", llvm::cl::desc("<casid>"),
                                  llvm::cl::cat(Category));
 llvm::cl::opt<std::string> Input("input", llvm::cl::desc("<file|index>"),
                                  llvm::cl::cat(Category));
-llvm::cl::opt<unsigned> Threads("threads",
-                                llvm::cl::desc("<number of threads>"),
-                                llvm::cl::cat(Category), cl::init(1));
 llvm::cl::opt<std::string> WorkingDirectory("cwd", llvm::cl::desc("<path>"),
                                             llvm::cl::cat(Category));
 llvm::cl::opt<Actions>
@@ -65,6 +62,21 @@ llvm::cl::opt<Actions>
 llvm::cl::list<std::string>
     SwiftCommands(llvm::cl::Positional, llvm::cl::desc("<swift-frontend args>"),
                   llvm::cl::cat(Category));
+
+unsigned getThreadsFromRegistry() {
+  // Access LLVM's "threads" option value from the registry after parsing.
+  // The option is defined in ThinLTOCodeGenerator.cpp as cl::opt<int>.
+  auto &Opts = cl::getRegisteredOptions();
+  auto It = Opts.find("threads");
+  if (It != Opts.end() && It->second->getNumOccurrences() > 0) {
+    if (auto *Opt = static_cast<llvm::cl::opt<int> *>(It->second)) {
+      int V = Opt->getValue();
+      if (V > 0)
+        return static_cast<unsigned>(V);
+    }
+  }
+  return 1u; // Default
+}
 
 } // namespace
 
@@ -298,6 +310,10 @@ int main(int argc, char *argv[]) {
   llvm::cl::HideUnrelatedOptions(Category);
   llvm::cl::ParseCommandLineOptions(argc, argv,
                                     "Test libSwiftScan interfaces\n");
+
+  // Get threads value from LLVM's option after parsing (avoids duplicate
+  // registration with LLVM's ThinLTOCodeGenerator.cpp option)
+  unsigned Threads = getThreadsFromRegistry();
 
   // Create CAS.
   auto option = swiftscan_cas_options_create();

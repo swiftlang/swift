@@ -55,9 +55,20 @@ target_link_libraries(SwiftBasicTests
   swiftOption
   swiftThreading
   clangBasic
-  LLVMOption
   LLVMTestingSupport
   )
+
+if(LLVM_LINK_LLVM_DYLIB)
+  target_link_libraries(SwiftBasicTests
+    PRIVATE
+    LLVM
+    )
+else()
+  target_link_libraries(SwiftBasicTests
+    PRIVATE
+    LLVMOption
+    )
+endif()
 
 if(SWIFT_HOST_VARIANT STREQUAL "windows")
   target_link_libraries(SwiftBasicTests PRIVATE Synchronization)

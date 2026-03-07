@@ -4742,9 +4742,20 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
 }
 
 // Provide the ability to turn off the type converter cache to ease debugging.
-static llvm::cl::opt<bool>
-    DisableConstantInfoCache("sil-disable-typelowering-constantinfo-cache",
-                             llvm::cl::init(false));
+namespace {
+llvm::cl::opt<bool> &DisableConstantInfoCache() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-disable-typelowering-constantinfo-cache");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-disable-typelowering-constantinfo-cache",
+      llvm::cl::init(false));
+  return *opt;
+}
+auto &EarlyInitDisableConstantInfoCache = DisableConstantInfoCache();
+} // namespace
 
 static IndexSubset *
 getLoweredResultIndices(const SILFunctionType *functionType,
@@ -4781,7 +4792,7 @@ getLoweredResultIndices(const SILFunctionType *functionType,
 const SILConstantInfo &
 TypeConverter::getConstantInfo(TypeExpansionContext expansion,
                                SILDeclRef constant) {
-  if (!DisableConstantInfoCache) {
+  if (!DisableConstantInfoCache()) {
     auto found = ConstantTypes.find(std::make_pair(expansion, constant));
     if (found != ConstantTypes.end())
       return *found->second;
@@ -4863,7 +4874,7 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
                                                   bridgedTypes.Pattern,
                                                   loweredInterfaceType,
                                                   silFnType};
-  if (DisableConstantInfoCache)
+  if (DisableConstantInfoCache())
     return *result;
 
   auto inserted =

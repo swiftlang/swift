@@ -51,9 +51,23 @@
 using namespace swift;
 using namespace Lowering;
 
-llvm::cl::list<std::string> PrintFunctionAST(
-    "print-function-ast", llvm::cl::CommaSeparated,
-    llvm::cl::desc("Only print out the ast for this function"));
+namespace {
+// Helper to get or create command line option, checking if already registered.
+llvm::cl::list<std::string> &PrintFunctionAST() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("print-function-ast");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<std::string>(
+      "print-function-ast", llvm::cl::CommaSeparated,
+      llvm::cl::desc("Only print out the ast for this function"));
+  return *opt;
+}
+
+// Force early registration before command line parsing
+auto &EarlyInitPrintFunctionAST = PrintFunctionAST();
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // SILGenModule Class implementation
@@ -889,11 +903,11 @@ void SILGenModule::visit(Decl *D) {
 }
 
 static bool isInPrintFunctionList(AbstractFunctionDecl *fd) {
-  if (PrintFunctionAST.empty()) {
+  if (PrintFunctionAST().empty()) {
     return false;
   }
   auto fnName = SILDeclRef(fd).mangle();
-  for (const std::string &printFnName : PrintFunctionAST) {
+  for (const std::string &printFnName : PrintFunctionAST()) {
     if (printFnName == fnName)
       return true;
     if (!printFnName.empty() && printFnName[0] != '$' && !fnName.empty() &&
