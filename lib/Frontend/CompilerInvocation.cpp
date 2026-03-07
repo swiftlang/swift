@@ -4206,6 +4206,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
                    "-mergeable-symbols");
 
+  if (Arg *A = Args.getLastArg(OPT_oslog_string_section_name)) {
+    Opts.OSLogStringSectionName = A->getValue();
+  }
+
   return false;
 }
 

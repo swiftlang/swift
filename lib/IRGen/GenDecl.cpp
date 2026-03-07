@@ -6154,7 +6154,7 @@ IRGenModule::getAddrOfGlobalString(StringRef data, CStringSectionType type,
     sectionName = ObjCMethodTypeSectionName;
     break;
   case CStringSectionType::OSLogString:
-    sectionName = OSLogStringSectionName;
+    sectionName = getOptions().OSLogStringSectionName;
     break;
   case CStringSectionType::NumTypes:
     llvm_unreachable("invalid type");
