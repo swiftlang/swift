@@ -20,22 +20,7 @@ import ASTBridging
 public struct Conformance: CustomStringConvertible, Hashable, NoReflectionChildren {
   public let bridged: BridgedConformance
 
-  public init(bridged: BridgedConformance) {
-    self.bridged = bridged
-  }
-
-  public var description: String {
-    return String(taking: bridged.getDebugDescription())
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(bridged.opaqueValue)
-  }
-
-  public static func ==(lhs: Conformance, rhs: Conformance) -> Bool {
-    lhs.bridged.opaqueValue == rhs.bridged.opaqueValue
-  }
-
+ 
   public var isConcrete: Bool { bridged.isConcrete() }
 
   public var isValid: Bool { bridged.isValid() }
