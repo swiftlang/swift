@@ -245,6 +245,9 @@ protected:
       isBare : 1,   // Only used in AllocRefInst
       numTailTypes: NumAllocRefTailTypesBits);
 
+    SHARED_FIELD(PartialApplyInst, uint8_t
+                 isNested : 1);
+
     SHARED_FIELD(BeginBorrowInst, uint8_t
                  lexical : 1,
                  pointerEscape : 1,

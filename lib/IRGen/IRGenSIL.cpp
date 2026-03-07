@@ -154,13 +154,11 @@ public:
   enum class Kind {
     /// The first three LoweredValue kinds correspond to a SIL address value.
 
-    /// The LoweredValue of a resilient, generic, or loadable typed alloc_stack
-    /// keeps an optional stackrestore point in addition to the address of the
-    /// allocated buffer. For all other address values the stackrestore point is
-    /// just null.
-    /// If the stackrestore point is set (currently, this might happen for
-    /// opaque types: generic and resilient) the deallocation of the stack must
-    /// reset the stack pointer to this point.
+    /// An address.
+    Address,
+
+    /// The address of a local state allocation, together with enough
+    /// information to deallocate it.
     StackAddress,
 
     /// A @box together with the address of the box value.
@@ -196,7 +194,8 @@ private:
   using ExplosionVector = SmallVector<llvm::Value *, 4>;
   using SingletonExplosion = llvm::Value*;
 
-  using Members = ExternalUnionMembers<StackAddress,
+  using Members = ExternalUnionMembers<Address,
+                                       StackAddress,
                                        OwnedAddress,
                                        DynamicallyEnforcedAddress,
                                        ExplosionVector,
@@ -208,6 +207,7 @@ private:
   
   static Members::Index getMemberIndexForKind(Kind kind) {
     switch (kind) {
+    case Kind::Address: return Members::indexOf<Address>();
     case Kind::StackAddress: return Members::indexOf<StackAddress>();
     case Kind::OwnedAddress: return Members::indexOf<OwnedAddress>();
     case Kind::DynamicallyEnforcedAddress: return Members::indexOf<DynamicallyEnforcedAddress>();
@@ -231,8 +231,8 @@ public:
 
   /// Create an address value without a stack restore point.
   LoweredValue(const Address &address)
-      : kind(Kind::StackAddress) {
-    Storage.emplace<StackAddress>(kind, address);
+      : kind(Kind::Address) {
+    Storage.emplace<Address>(kind, address);
   }
 
   /// Create an address value with an optional stack restore point.
@@ -301,7 +301,8 @@ public:
   }
   
   bool isAddress() const {
-    return (kind == Kind::StackAddress ||
+    return (kind == Kind::Address ||
+            kind == Kind::StackAddress ||
             kind == Kind::DynamicallyEnforcedAddress);
   }
   bool isBoxWithAddress() const {
@@ -319,7 +320,9 @@ public:
   }
 
   Address getAnyAddress() const {
-    if (kind == LoweredValue::Kind::StackAddress) {
+    if (kind == LoweredValue::Kind::Address) {
+      return Storage.get<Address>(kind);
+    } else if (kind == LoweredValue::Kind::StackAddress) {
       return Storage.get<StackAddress>(kind).getAddress();
     } else {
       return getDynamicallyEnforcedAddress().Addr;
@@ -1848,6 +1851,10 @@ getCOrObjCEntryPointArgumentEmission(IRGenSILFunction &IGF,
 void LoweredValue::getExplosion(IRGenFunction &IGF, SILType type,
                                 Explosion &ex) const {
   switch (kind) {
+  case Kind::Address:
+    ex.add(Storage.get<Address>(kind).getAddress());
+    return;
+
   case Kind::StackAddress:
     ex.add(Storage.get<StackAddress>(kind).getAddressPointer());
     return;
@@ -1886,6 +1893,7 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, SILType type,
 llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF,
                                                  SILType type) const {
   switch (kind) {
+  case Kind::Address:
   case Kind::StackAddress:
   case Kind::DynamicallyEnforcedAddress:
   case Kind::CoroutineState:
@@ -3598,6 +3606,7 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
   }
 
   case LoweredValue::Kind::EmptyExplosion:
+  case LoweredValue::Kind::Address:
   case LoweredValue::Kind::OwnedAddress:
   case LoweredValue::Kind::StackAddress:
   case LoweredValue::Kind::DynamicallyEnforcedAddress:
@@ -3746,9 +3755,9 @@ static void emitBuiltinStackAlloc(IRGenSILFunction &IGF,
 
   // Emit a static alloca if the size is constant.
   if (auto *constSize = dyn_cast<llvm::ConstantInt>(size)) {
-    auto stackAddress = IGF.createAlloca(IGF.IGM.Int8Ty, constSize, align,
-                                         "temp_alloc");
-    IGF.setLoweredStackAddress(i, {stackAddress});
+    auto stackAddress =
+      IGF.emitStaticByteArrayAlloca(constSize, align, "temp_alloc");
+    IGF.setLoweredStackAddress(i, stackAddress);
     return;
   }
 
@@ -3766,7 +3775,7 @@ static void emitBuiltinStackDealloc(IRGenSILFunction &IGF,
   auto stackAddress = IGF.getLoweredStackAddress(address);
 
   if (stackAddress.getAddress().isValid()) {
-    IGF.emitDeallocateDynamicAlloca(stackAddress, false);
+    IGF.emitStackDeallocation(stackAddress);
   }
 }
 
@@ -4150,6 +4159,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
   auto fnType = v->getType().castTo<SILFunctionType>();
 
   switch (lv.kind) {
+  case LoweredValue::Kind::Address:
   case LoweredValue::Kind::StackAddress:
   case LoweredValue::Kind::DynamicallyEnforcedAddress:
   case LoweredValue::Kind::OwnedAddress:
@@ -4386,7 +4396,8 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   auto closureStackAddr = emitFunctionPartialApplication(
       *this, *CurSILFn, calleeFn, innerContext, llArgs, params,
       i->getSubstitutionMap(), origCalleeTy, i->getSubstCalleeType(),
-      i->getType().castTo<SILFunctionType>(), function, false);
+      i->getType().castTo<SILFunctionType>(), function, false,
+      i->isStackAllocationNested());
   setLoweredExplosion(v, function);
 
   if (closureStackAddr) {
@@ -6753,7 +6764,9 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   if (auto *closure = dyn_cast<PartialApplyInst>(i->getOperand())) {
     assert(closure->isOnStack());
     auto stackAddr = LoweredPartialApplyAllocations[i->getOperand()];
-    emitDeallocateDynamicAlloca(stackAddr, closure->isStackAllocationNested());
+    if (stackAddr.isValid()) {
+      emitStackDeallocation(stackAddr);
+    }
     return;
   }
   if (isaResultOf<BeginApplyInst>(i->getOperand())) {
@@ -6771,9 +6784,8 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   auto allocatedType = asi->getType();
   const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
   StackAddress stackAddr = getLoweredStackAddress(asi);
-  auto isNested = asi->isStackAllocationNested();
 
-  allocatedTI.deallocateStack(*this, stackAddr, allocatedType, isNested);
+  allocatedTI.deallocateStack(*this, stackAddr, allocatedType);
 }
 
 void IRGenSILFunction::visitDeallocStackRefInst(DeallocStackRefInst *i) {
@@ -7915,7 +7927,7 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
       argsBufAlign = Builder.CreateOr(argsBufAlign, alignMask);
     }
 
-    dynamicArgsBuf = emitDynamicAlloca(IGM.Int8Ty, argsBufSize, Alignment(16));
+    dynamicArgsBuf = emitStackAllocation(argsBufSize, Alignment(16));
     
     Address argsBuf = dynamicArgsBuf->getAddress();
     
@@ -7953,7 +7965,7 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   call->setDoesNotThrow();
 
   if (dynamicArgsBuf) {
-    emitDeallocateDynamicAlloca(*dynamicArgsBuf);
+    emitStackDeallocation(*dynamicArgsBuf);
   }
 
   auto loweredKeyPathTy = IGM.getLoweredType(I->getKeyPathType());
@@ -8642,14 +8654,14 @@ void IRGenSILFunction::visitObjCMethodInst(swift::ObjCMethodInst *i) {
 void IRGenSILFunction::visitGetAsyncContinuationInst(
     GetAsyncContinuationInst *i) {
   Explosion out;
-  emitGetAsyncContinuation(i->getLoweredResumeType(), StackAddress(), out,
+  emitGetAsyncContinuation(i->getLoweredResumeType(), Address(), out,
                            i->throws());
   setLoweredExplosion(i, out);
 }
 
 void IRGenSILFunction::visitGetAsyncContinuationAddrInst(
     GetAsyncContinuationAddrInst *i) {
-  auto resultAddr = getLoweredStackAddress(i->getOperand());
+  auto resultAddr = getLoweredAddress(i->getOperand());
   Explosion out;
   emitGetAsyncContinuation(i->getLoweredResumeType(), resultAddr, out,
                            i->throws());

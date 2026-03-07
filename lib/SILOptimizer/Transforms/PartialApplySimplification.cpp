@@ -392,10 +392,12 @@ rewriteKnownCalleeConventionOnly(SILFunction *callee,
     switch (site.getKind()) {
     case ApplySiteKind::PartialApplyInst: {
       auto pa = cast<PartialApplyInst>(site.getInstruction());
-      newInst = B.createPartialApply(loc, fr, site.getSubstitutionMap(), args,
-                                     pa->getCalleeConvention(),
-                                     pa->getResultIsolation(),
-                                     pa->isOnStack());
+      auto newPA = B.createPartialApply(loc, fr, site.getSubstitutionMap(), args,
+                                        pa->getCalleeConvention(),
+                                        pa->getResultIsolation(),
+                                        pa->isOnStack());
+      newPA->setStackAllocationIsNested(pa->isStackAllocationNested());
+      newInst = newPA;
       break;
     }
     case ApplySiteKind::ApplyInst:
@@ -840,6 +842,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
                                      paConvention,
                                      paIsolation,
                                      paOnStack);
+      newPA->setStackAllocationIsNested(oldPA->isStackAllocationNested());
       assert(isSimplePartialApply(newPA)
              && "partial apply wasn't simple after transformation?");
       newInst = newPA;

@@ -1030,6 +1030,17 @@ bb0(%0 : $Float):
   return %2 : $@callee_owned (Int) -> ()
 }
 
+// CHECK-LABEL: sil @test_partial_apply_non_nested : $@convention(thin) (Float) -> () {
+sil @test_partial_apply_non_nested : $@convention(thin)  (Float) -> () {
+bb0(%0 : $Float):
+  %1 = function_ref @takes_int64_float32 : $@convention(thin) (Int, Float) -> ()
+  // CHECK: partial_apply [on_stack] [non_nested] %{{.*}}(%{{.*}}) : $@convention(thin) (Int, Float) -> ()
+  %2 = partial_apply [on_stack] [non_nested] %1(%0) : $@convention(thin) (Int, Float) -> ()
+  dealloc_stack %2
+  %3 = tuple ()
+  return %3
+}
+
 class X {
   @objc func f() { }
 }

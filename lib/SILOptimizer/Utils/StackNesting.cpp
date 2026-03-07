@@ -16,6 +16,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/StackAllocation.h"
 #include "swift/SIL/Test.h"
 #include "llvm/Support/Debug.h"
 
@@ -161,16 +162,6 @@ void runInDominanceOrder(SILFunction &F, State &&state, const Fn &fn) {
   }
 }
 
-/// Returns the stack allocation instruction for a stack deallocation
-/// instruction.
-static SILInstruction *getAllocForDealloc(SILInstruction *dealloc) {
-  SILValue op = dealloc->getOperand(0);
-  while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
-    op = mvi->getOperand();
-  }
-  return op->getDefiningInstruction();
-}
-
 /// Create a dealloc for a particular allocation.
 ///
 /// This is expected to work for all allocations that don't have
@@ -182,64 +173,98 @@ static SILInstruction *getAllocForDealloc(SILInstruction *dealloc) {
 /// Only allocations whose deallocations return true from canMoveDealloc
 /// need to support this.
 static void createDealloc(SILBuilder &B, SILLocation loc, SILInstruction *alloc) {
-  switch (alloc->getKind()) {
-  case SILInstructionKind::PartialApplyInst:
-  case SILInstructionKind::AllocStackInst:
-    assert((isa<AllocStackInst>(alloc) ||
-            cast<PartialApplyInst>(alloc)->isOnStack()) &&
-           "wrong instruction");
-    B.createDeallocStack(loc, cast<SingleValueInstruction>(alloc));
+  auto allocation = alloc->getStackAllocation();
+  assert(allocation);
+  switch (allocation->getKind()) {
+  case StackAllocationKind::PartialApply:
+  case StackAllocationKind::AllocStack:
+  case StackAllocationKind::CalleeAllocatedBeginApply:
+    B.createDeallocStack(loc, allocation->getValue());
     return;
-  case SILInstructionKind::BeginApplyInst: {
-    auto *bai = cast<BeginApplyInst>(alloc);
-    assert(bai->isCalleeAllocated());
-    B.createDeallocStack(loc, bai->getCalleeAllocationResult());
+  case StackAllocationKind::AllocRefDynamic:
+  case StackAllocationKind::AllocRef:
+    B.createDeallocStackRef(loc, allocation->getValue());
     return;
-  }
-  case SILInstructionKind::AllocRefDynamicInst:
-  case SILInstructionKind::AllocRefInst:
-    assert(cast<AllocRefInstBase>(alloc)->canAllocOnStack());
-    B.createDeallocStackRef(loc, cast<AllocRefInstBase>(alloc));
+  case StackAllocationKind::AllocPack:
+    B.createDeallocPack(loc, allocation->getValue());
     return;
-  case SILInstructionKind::AllocPackInst:
-    B.createDeallocPack(loc, cast<AllocPackInst>(alloc));
-    return;
-  case SILInstructionKind::BuiltinInst: {
-    auto *bi = cast<BuiltinInst>(alloc);
+  case StackAllocationKind::BuiltinStackAlloc:
+  case StackAllocationKind::BuiltinUnprotectedStackAlloc: {
     auto &ctx = alloc->getFunction()->getModule().getASTContext();
-
-    switch (*bi->getBuiltinKind()) {
-    case BuiltinValueKind::StackAlloc:
-    case BuiltinValueKind::UnprotectedStackAlloc: {
-      auto identifier =
-        ctx.getIdentifier(getBuiltinName(BuiltinValueKind::StackDealloc));
-      B.createBuiltin(loc, identifier,
-                      SILType::getEmptyTupleType(ctx),
-                      SubstitutionMap(), {bi});
-      return;
-    }
-    default:
-      llvm_unreachable("unknown stack allocation builtin");
-    }
-  }
-  case SILInstructionKind::AllocPackMetadataInst:
-    B.createDeallocPackMetadata(loc, cast<AllocPackMetadataInst>(alloc));
+    auto identifier =
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::StackDealloc));
+    B.createBuiltin(loc, identifier,
+                    SILType::getEmptyTupleType(ctx),
+                    SubstitutionMap(), {allocation->getValue()});
     return;
-  default:
-    llvm_unreachable("unknown stack allocation");
   }
+  case StackAllocationKind::BuiltinStartAsyncLet:
+    llvm_unreachable("cannot insert finishAsyncLet builtin; not safely reorderable");
+    return;
+  case StackAllocationKind::AllocPackMetadata:
+    B.createDeallocPackMetadata(loc, allocation->getValue());
+    return;
+  }
+  llvm_unreachable("unknown stack allocation");
+}
+
+static bool isUnreorderableAllocation(StackAllocation allocation) {
+  switch (allocation.getKind()) {
+  // These are all simple allocations for which the deallocation can
+  // always be sunk.
+  case StackAllocationKind::PartialApply:
+  case StackAllocationKind::AllocStack:
+  case StackAllocationKind::AllocRefDynamic:
+  case StackAllocationKind::AllocRef:
+  case StackAllocationKind::AllocPack:
+  case StackAllocationKind::AllocPackMetadata:
+  case StackAllocationKind::BuiltinStackAlloc:
+  case StackAllocationKind::BuiltinUnprotectedStackAlloc:
+    return false;
+
+  // end_apply is side-effectful in general, but the allocation here
+  // is specifically the callee allocation, which *can* be reordered.
+  case StackAllocationKind::CalleeAllocatedBeginApply:
+    return false;
+
+  // The finish of an async let cannot be reordered across.
+  case StackAllocationKind::BuiltinStartAsyncLet:
+    return true;
+  }
+  llvm_unreachable("unknown stack allocation");
 }
 
 namespace {
 enum class AllocationStatus {
-  Allocated, Pending, Undeallocatable
+  /// No deallocation has been processed for this allocation.
+  Allocated,
+  /// A deallocation has been processed for this allocation, but the
+  /// allocation was not at the top of the stack, so the deallocation
+  /// has been deferred.
+  Pending,
+  /// A deallocation has been processed for this allocation, but the
+  /// allocation was not at the top of the stack. The deallocation could
+  /// not be deferred, so it was just deallocated out of order, and all
+  /// the active allocations above it were marked as non-nested.
+  /// (This state is not described in the correctness proof.)
+  DeallocatedOutOfOrder,
+  /// The allocation cannot be deallocated because there was a stack
+  /// mismatch on a branch into the current region (which is dead-end).
+  /// Whether a deallocation has been processed for this allocation is
+  /// no longer known.
+  Undeallocatable,
 };
+
+static bool isAllocatedOrUndeallocatable(AllocationStatus status) {
+  return status == AllocationStatus::Allocated ||
+         status == AllocationStatus::Undeallocatable;
+}
 
 class ActiveAllocation {
   llvm::PointerIntPair<SILInstruction*, 2, AllocationStatus> valueAndStatus;
 
 public:
-  ActiveAllocation(SILInstruction *value)
+  explicit ActiveAllocation(SILInstruction *value)
     : valueAndStatus(value, AllocationStatus::Allocated) {}
 
   SILInstruction *getValue() const {
@@ -253,6 +278,11 @@ public:
   void setPending() {
     assert(getStatus() == AllocationStatus::Allocated);
     valueAndStatus.setInt(AllocationStatus::Pending);
+  }
+
+  void setDeallocatedOutOfOrder() {
+    assert(getStatus() == AllocationStatus::Allocated);
+    valueAndStatus.setInt(AllocationStatus::DeallocatedOutOfOrder);
   }
 
   void setUndeallocatable() {
@@ -276,6 +306,9 @@ struct State {
   ActiveAllocation &getEntryForNonTop(SILInstruction *alloc,
                                       SILInstruction *dealloc,
                                       IndexForAllocationMap &indexForAllocation);
+
+  void collectAllocationsAbove(SILInstruction *alloc,
+                               SmallPtrSetImpl<SILInstruction*> &set) const;
 
   /// Given that these are the end states of two blocks with edges into
   /// a dead-end region R, merge them.
@@ -432,12 +465,37 @@ State::getEntryForNonTop(SILInstruction *alloc,
   return stack[*foundIndexForAlloc];
 }
 
+void State::collectAllocationsAbove(SILInstruction *alloc,
+                         llvm::SmallPtrSetImpl<SILInstruction*> &set) const {
+  auto stack = ArrayRef(allocations);
+  assert(!stack.empty());
+  for (size_t i = stack.size() - 1; true; --i) {
+    // If we reach the target allocation, we've processed all the
+    // allocations above it, so we're done.
+    if (stack[i].getValue() == alloc) break;
+
+    // Add the allocation to the set unless it's flagged as already
+    // deallocated.
+    if (stack[i].getStatus() != AllocationStatus::DeallocatedOutOfOrder) {
+#ifndef NDEBUG
+      auto sa = stack[i].getValue()->getStackAllocation();
+      assert(sa && !isUnreorderableAllocation(*sa));
+#endif
+      set.insert(stack[i].getValue());
+    }
+
+    assert(i != 0 && "didn't find allocation in stack");
+  }
+}
+
 /// Pop and emit deallocations for any allocations on top of the
-/// active allocations stack that are pending deallocation.
+/// active allocations stack that are pending deallocation. Also pop
+/// allocations in the deallocated-out-of-order state, but do not
+/// emit them.
 ///
 /// This operation is called whenever we pop an allocation; it
 /// restores the invariant that the top of the stack is never in a
-/// pending state.
+/// pending or deallocated-out-of-order state.
 static void emitPendingDeallocations(State &state,
                                      SILInstruction *insertAfterDealloc,
                                      bool &madeChanges) {
@@ -447,22 +505,41 @@ static void emitPendingDeallocations(State &state,
   // correctly w.r.t each other.
   std::optional<SILBuilderWithScope> builder;
 
-  while (!state.allocations.empty() &&
-         state.allocations.back().getStatus() == AllocationStatus::Pending) {
-    auto entry = state.allocations.pop_back_val();
-    SILInstruction *alloc = entry.getValue();
+  while (!state.allocations.empty()) {
+    switch (state.allocations.back().getStatus()) {
+    // Pop and emit a deallocation for an allocation with pending status.
+    case AllocationStatus::Pending: {
+      auto entry = state.allocations.pop_back_val();
+      SILInstruction *alloc = entry.getValue();
 
-    // Create a builder if necessary.
-    if (!builder) {
-      // We want to use the location of (and inherit debug scopes from)
-      // the initial dealloc that we're inserting after.
-      builder.emplace(/*insertion point*/
-                        std::next(insertAfterDealloc->getIterator()),
-                      /*inherit scope from*/insertAfterDealloc);
+      // Create a builder if necessary.
+      if (!builder) {
+        // We want to use the location of (and inherit debug scopes from)
+        // the initial dealloc that we're inserting after.
+        builder.emplace(/*insertion point*/
+                          std::next(insertAfterDealloc->getIterator()),
+                        /*inherit scope from*/insertAfterDealloc);
+      }
+
+      createDealloc(*builder, insertAfterDealloc->getLoc(), alloc);
+      madeChanges = true;
+      continue;
     }
 
-    createDealloc(*builder, insertAfterDealloc->getLoc(), alloc);
-    madeChanges = true;
+    // Pop allocations with deallocated-out-of-order status, but don't
+    // emit a deallocation for them because we left the original
+    // deallocation in place.
+    case AllocationStatus::DeallocatedOutOfOrder: {
+      state.allocations.pop_back();
+      continue;
+    }
+
+    // Stop if we see an allocation with a different status.
+    case AllocationStatus::Allocated:
+    case AllocationStatus::Undeallocatable:
+      return;
+    }
+    llvm_unreachable("bad state");
   }
 }
 
@@ -552,6 +629,11 @@ static void emitPendingDeallocations(State &state,
 StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
   bool madeChanges = false;
 
+  // The set of allocations that we need to flag as unnested.
+  // We can't do this live because we might run across more
+  // deallocations of the allocation.
+  SmallPtrSet<SILInstruction*, 8> unnestedAllocations;
+
   // The index in the allocation stack for each allocation.
   // This function never uses this directly; it's just a cache for
   // setAllocationAsPending.
@@ -570,36 +652,40 @@ StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
       SILInstruction *I = &*II;
       ++II;
 
-      // Invariant: the top of the stack is never pending.
+      // Invariant: the top of the stack is either allocated or
+      // undeallocatable.
       assert(state.allocations.empty() ||
-             state.allocations.back().getStatus() != AllocationStatus::Pending);
+             isAllocatedOrUndeallocatable(state.allocations.back().getStatus()));
 
       // Push allocations onto the current stack in the non-pending state.
       //
       // In the formal presentation, the state change is
       //   state = STATE_PUSH(state, alloc)
-      if (I->isAllocatingStack()) {
+      if (auto alloc = I->getStackAllocation()) {
         // Only handle nested stack allocations.
         if (I->isStackAllocationNested() == StackAllocationIsNested)
-          state.allocations.push_back(I);
+          state.allocations.emplace_back(I);
         continue;
       }
 
       // Ignore instructions other than allocations and deallocations.
-      if (!I->isDeallocatingStack()) {
+      auto deallocation = I->getStackDeallocation();
+      if (!deallocation) {
         continue;
       }
 
       // Get the allocation for the deallocation. The allocation should be
       // in the state, and it should not have pending status; see
       // [deallocation-preconditions] in the proof.
-      SILInstruction *dealloc = I;
-      SILInstruction *alloc = getAllocForDealloc(dealloc);
+      auto allocation = deallocation->getAllocation();
 
       // Since we only processed nested allocations above, ignore deallocations
       // from non-nested allocations.
-      if (alloc->isStackAllocationNested() == StackAllocationIsNotNested)
+      if (allocation.isNested() == StackAllocationIsNotNested)
         continue;
+
+      auto dealloc = deallocation->getInstruction();
+      auto alloc = allocation.getInstruction();
 
 #ifndef NDEBUG
       if (state.allocations.empty()) {
@@ -610,8 +696,7 @@ StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
       // If the allocation is the top of the allocations stack:
       if (alloc == state.allocations.back().getValue()) {
         auto status = state.allocations.back().getStatus();
-        assert(status == AllocationStatus::Allocated ||
-               status == AllocationStatus::Undeallocatable);
+        assert(isAllocatedOrUndeallocatable(status));
 
         // If the allocation has allocated status, leave the deallocation
         // alone, pop the record of it off the stack, and pop and emit any
@@ -637,8 +722,24 @@ StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
                                               indexForAllocation);
 
         auto status = entry.getStatus();
-        assert(status == AllocationStatus::Allocated ||
-               status == AllocationStatus::Undeallocatable);
+        assert(isAllocatedOrUndeallocatable(status));
+
+        // If the allocation has allocated status but its deallocation
+        // cannot be reordered, mark the allocation as deallocated out
+        // of order, then add all the allocations above it to the
+        // allocated-out-of-order set. Do not remove the deallocation.
+        //
+        // FIXME: We really need to do this even for allocations with
+        // undeallocatable status. The problem is that we'd need to collect
+        // the *union* of the active allocations on entry to this dead-end
+        // region in order to force the allocation to remain deallocatable
+        // here, and we don't have that information easily at hand.
+        if (status == AllocationStatus::Allocated &&
+            isUnreorderableAllocation(allocation)) {
+          state.collectAllocationsAbove(alloc, unnestedAllocations);
+          entry.setDeallocatedOutOfOrder();
+          continue;
+        }
 
         // If the allocation has allocated status, remove the deallocation
         // and update the allocation status to pending.
@@ -658,6 +759,13 @@ StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
       }
     }
   });
+
+  // Now that we're done traversing the CFG, record all of the allocations
+  // as unnested that we need to.
+  for (auto alloc : unnestedAllocations) {
+    alloc->setStackAllocationIsNested(StackAllocationIsNotNested);
+    madeChanges = true;
+  }
 
   // We never make changes to the CFG.
   return (madeChanges ? Changes::Instructions : Changes::None);

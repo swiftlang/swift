@@ -1198,10 +1198,12 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
   switch (Apply.getKind()) {
   case ApplySiteKind::PartialApplyInst: {
     auto *PAI = cast<PartialApplyInst>(ApplyInst);
-    return Builder.createPartialApply(
+    auto NewPAI = Builder.createPartialApply(
         Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
         PAI->getCalleeConvention(), PAI->getResultIsolation(), PAI->isOnStack(),
         GenericSpecializationInformation::create(ApplyInst, Builder));
+    NewPAI->setStackAllocationIsNested(PAI->isStackAllocationNested());
+    return NewPAI;
   }
   case ApplySiteKind::ApplyInst:
     return Builder.createApply(
