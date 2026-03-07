@@ -170,7 +170,7 @@ _swift_embedded_initialize_box(void *metadata, void *newObjectAddr, void *oldObj
 }
 
 typedef struct {
-  void *inlineBuffer[3];
+  void * _Nullable inlineBuffer[3];
   void *metadata;
 } ExistentialValue;
 
@@ -218,6 +218,75 @@ _swift_embedded_existential_init_with_copy(void *dst, void *srcExist) {
   } else {
     fullmeta->vwt->initializeWithCopyFn(dst, &(existVal->inlineBuffer[0]), metadata);
   }
+}
+
+// Helpers for value-witness copy/take operations used by swift_allocError.
+static inline void
+_swift_embedded_metadata_initialize_with_copy(void *metadata, void *dst, void *src) {
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  fullmeta->vwt->initializeWithCopyFn(dst, src, metadata);
+}
+
+static inline void
+_swift_embedded_metadata_initialize_with_take(void *metadata, void *dst, void *src) {
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  fullmeta->vwt->initializeWithTakeFn(dst, src, metadata);
+}
+
+// Layout of an embedded error box:
+// [metadata ptr] [refcount] [type ptr] [errorConformance ptr] [alignment padding] [value]
+typedef struct {
+  void *metadata;          // points to _swift_embedded_error_metadata_storage
+  __swift_size_t refcount;
+  void *type;              // concrete error type metadata
+  void *errorConformance;  // Error protocol witness table
+  // value is tail-allocated after alignment padding
+} EmbeddedSwiftError;
+
+// Compute the address of the tail-allocated value in an error box.
+static inline void *
+_swift_embedded_error_get_value(EmbeddedSwiftError *error) {
+  void *type = error->type;
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(type);
+  __swift_size_t alignMask = _swift_embedded_metadata_get_align_mask_impl(fullmeta);
+  __swift_size_t headerSize = sizeof(EmbeddedSwiftError);
+  __swift_size_t startOfValue = (headerSize + alignMask) & ~alignMask;
+  return (void *)(((unsigned char *)error) + startOfValue);
+}
+
+// Forward-declare the destroy function (defined below).
+SWIFT_CC_swift static void
+_swift_embedded_error_destroy(SWIFT_CONTEXT void *object);
+
+// ClassMetadata-like metadata for error boxes.
+// Layout: [superclassMetadata=null, destroy=_swift_embedded_error_destroy, ivarDestroyer=null]
+// This is static per-TU; only swift_allocError (in EmbeddedRuntime.swift) ever stores it in
+// error boxes, so metadata-pointer identity is never compared across TUs.
+static void * _Nullable _swift_embedded_error_metadata_storage[3] = {
+  (void *)0,
+  (void *)_swift_embedded_error_destroy,
+  (void *)0,
+};
+
+// Returns a pointer to the error-box metadata (passed to swift_allocError).
+static inline void *
+_swift_embedded_error_metadata_ptr(void) {
+  return (void *)_swift_embedded_error_metadata_storage;
+}
+
+// Destroy callback for error boxes: destroy the contained value, then free the allocation.
+// Invoked via swift_release when the refcount drops to zero.
+SWIFT_CC_swift static void
+_swift_embedded_error_destroy(SWIFT_CONTEXT void *object) {
+  extern void free(void *);
+  EmbeddedSwiftError *error = (EmbeddedSwiftError *)object;
+  void *type = error->type;
+  if (type) {
+    EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(type);
+    void *value = _swift_embedded_error_get_value(error);
+    fullmeta->vwt->destroyFn(value, type);
+  }
+  free(object);
 }
 
 #ifdef __cplusplus
