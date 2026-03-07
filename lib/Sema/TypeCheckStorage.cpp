@@ -3817,7 +3817,9 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
   if (auto *projection = var->getPropertyWrapperProjectionVar()) {
     createPBD(projection);
 
-    if (var->hasExternalPropertyWrapper()) {
+    // Make sure that we actually have init(projectedValue:)
+    // before attempting to type check it.
+    if (var->hasExternalPropertyWrapper() && wrapperInfo.hasProjectedValueInit) {
       // Projected-value initialization is currently only supported for parameters.
       auto *param = dyn_cast<ParamDecl>(var);
       auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(
