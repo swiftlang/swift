@@ -2887,6 +2887,16 @@ static CanSILFunctionType getSILFunctionType(
 
     auto origErrorType = optPair->first;
     auto errorType = optPair->second;
+
+    // If the abstraction pattern asks for an existential error, that becomes
+    // the return type of the abstracted function. Any concrete error type
+    // thrown by the concrete function will be type erased.
+    if (!origErrorType.isTypeParameterOrOpaqueArchetype()
+        && !origErrorType.isTuple()
+        && origErrorType.getType()->isExistentialType()) {
+      errorType = origErrorType.getType();
+    }
+    
     auto &errorTLConv = TC.getTypeLowering(origErrorType, errorType,
                                            TypeExpansionContext::minimal());
 
