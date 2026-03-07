@@ -20,8 +20,8 @@ from .. import shell
 from .. import targets
 
 
-def is_release_variant(build_variant):
-    return build_variant in ['Release', 'RelWithDebInfo']
+def is_release_variant(build_variant: str) -> bool:
+    return build_variant in ['Release', 'RelWithDebInfo', 'MinSizeRel']
 
 
 def is_debug_info_variant(build_variant):
