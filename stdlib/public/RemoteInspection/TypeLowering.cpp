@@ -1228,8 +1228,9 @@ class ExistentialTypeInfoBuilder {
       }
 
       auto FD = TC.getBuilder().getFieldDescriptor(P);
+      // If there is no field descriptor this could be a marker protocol
+      // (Sendable, Copyable, Escapable, etc).
       if (FD == nullptr) {
-        markInvalid("no field descriptor", P);
         continue;
       }
 
