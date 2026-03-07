@@ -20,13 +20,23 @@ inline Map initEmptyMap() { return {}; }
 inline UnorderedMap initEmptyUnorderedMap() { return {}; }
 
 struct NonCopyable {
-  NonCopyable() = default;
+  NonCopyable(int n) : number(n) {}
   NonCopyable(const NonCopyable &other) = delete;
   NonCopyable(NonCopyable &&other) = default;
   ~NonCopyable() {}
+
+  int number;
 };
 
 using MapNonCopyableKey = std::map<NonCopyable, int>;
 using MapNonCopyableValue = std::map<int, NonCopyable>;
+
+inline MapNonCopyableValue initMapNonCopyableValue() {
+  MapNonCopyableValue m;
+  m.emplace(1, 1);
+  m.emplace(3, 3);
+  m.emplace(7, 7);
+  return m;
+}
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_MAP_H

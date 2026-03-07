@@ -3455,7 +3455,16 @@ bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
     return false;
   }
 
-  // Always prefer conformance to Sequence over BorrowingSequence when
+  // Always use BorrowingSequence for Cxx sequences that conform to
+  // CxxBorrowingSequence.
+  if (auto cxxBorrowingSequence =
+          ctx.getProtocol(KnownProtocolKind::CxxBorrowingSequence)) {
+    if (lookupConformance(seqTy, cxxBorrowingSequence)) {
+      return true;
+    }
+  }
+
+  // Else, always prefer conformance to Sequence over BorrowingSequence when
   // both are available.
   if (lookupConformance(seqTy, ctx.getProtocol(KnownProtocolKind::Sequence))) {
     return false;
