@@ -2450,6 +2450,27 @@ public struct InitWithProjectedValueWrapperMacro: PeerMacro {
   }
 }
 
+public struct InitWithDollarProjectedValueWrapperMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      """
+      private var _value: Wrapper
+      var $value: Wrapper {
+        @storageRestrictions(initializes: _value)
+        init {
+          self._value = newValue
+        }
+        get { _value }
+      }
+      """
+    ]
+  }
+}
+
 public struct RequiredDefaultInitMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
