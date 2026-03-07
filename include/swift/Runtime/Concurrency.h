@@ -1056,7 +1056,7 @@ bool swift_task_isCurrentExecutor(SerialExecutorRef executor);
 enum swift_task_is_current_executor_flag : uint64_t {
   /// We aren't passing any flags.
   /// Effectively this is a backwards compatible mode.
-  None = 0x0,
+  IsCurrentTaskExecutorFlag_None = 0x0,
 
   /// This is not used today, but is just future ABI reservation.
   ///
@@ -1065,24 +1065,58 @@ enum swift_task_is_current_executor_flag : uint64_t {
   /// dereference and then have further extended behavior controlled by a
   /// different enum. By placing this here, we ensure that we will have a tagged
   /// pointer compatible flag for this purpose.
-  TaggedPointer = 0x1,
+  IsCurrentTaskExecutorFlag_TaggedPointer = 0x1,
 
   /// This is not used today, but is just future ABI reservation.
   ///
   /// \see swift_task_is_current_executor_flag::TaggedPointer
-  TaggedPointer2 = 0x2,
+  IsCurrentTaskExecutorFlag_TaggedPointer2 = 0x2,
 
   /// This is not used today, but is just future ABI reservation.
   ///
   /// \see swift_task_is_current_executor_flag::TaggedPointer
-  TaggedPointer3 = 0x4,
+  IsCurrentTaskExecutorFlag_TaggedPointer3 = 0x4,
 
   /// The routine should assert on failure.
-  Assert = 0x8,
+  IsCurrentTaskExecutorFlag_Assert = 0x8,
 
   /// The routine MUST NOT assert on failure.
   /// Even at the cost of not calling 'checkIsolated' if it is available.
-  MustNotAssert = 0x10,
+  IsCurrentTaskExecutorFlag_MustNotAssert = 0x10,
+};
+
+/// This is an options enum that configures if a Task.immediate can be used in bridged async methods (from obj-c).
+///
+/// Since this is an options enum, so all values should be powers of 2.
+///
+/// NOTE: We are purposely leaving this as a uint64_t so that on all platforms
+/// this could be a pointer to a different enum instance if we need it to be.
+enum swift_task_run_task_for_bridged_async_method_flag : uint64_t {
+  /// We aren't passing any flags.
+  /// Effectively this is a backwards compatible mode, create a plain `Task {}`
+  BridgedAsyncMethodFlag_None = 0x0,
+
+  /// This is not used today, but is just future ABI reservation.
+  ///
+  /// The intention is that we may want the ability to tell future versions of
+  /// the runtime that this uint64_t is actually a pointer that it should
+  /// dereference and then have further extended behavior controlled by a
+  /// different enum. By placing this here, we ensure that we will have a tagged
+  /// pointer compatible flag for this purpose.
+  BridgedAsyncMethodFlag_TaggedPointer = 0x1,
+
+  /// This is not used today, but is just future ABI reservation.
+  ///
+  /// \see swift_task_run_task_for_bridged_async_method_flag::TaggedPointer
+  BridgedAsyncMethodFlag_TaggedPointer2 = 0x2,
+
+  /// This is not used today, but is just future ABI reservation.
+  ///
+  /// \see swift_task_run_task_for_bridged_async_method_flag::TaggedPointer
+  BridgedAsyncMethodFlag_TaggedPointer3 = 0x4,
+
+  /// Use an `Task.immediate` in the bridging implementation
+  BridgedAsyncMethodFlag_TaskImmediate = 0x8,
 };
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -1106,6 +1140,13 @@ void swift_task_startOnMainActor(AsyncTask* job);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_immediate(AsyncTask* job, SerialExecutorRef targetExecutor);
+
+/// Determine if the deployment target is at least release targeting Fall 2025.
+///
+/// This is used to guard runtime behavior based on when a change was introduced,
+/// so we keep "old" behavior until the deployment target is raised to a recent enough one.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+size_t swift_task_RunTaskForBridgedAsyncMethodMode();
 
 /// Donate this thread to the global executor until either the
 /// given condition returns true or we've run out of cooperative

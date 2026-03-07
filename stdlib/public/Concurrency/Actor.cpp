@@ -388,36 +388,70 @@ enum IsCurrentExecutorCheckMode : unsigned {
 namespace {
 using SwiftTaskIsCurrentExecutorOptions =
     OptionSet<swift_task_is_current_executor_flag>;
+using SwiftBridgedAsyncMethodOptions =
+    OptionSet<swift_task_run_task_for_bridged_async_method_flag>;
 }
 
 static void _swift_task_debug_dumpIsCurrentExecutorFlags(
     const char *hint,
     swift_task_is_current_executor_flag flags) {
-  if (flags == swift_task_is_current_executor_flag::None) {
+  if (flags == IsCurrentTaskExecutorFlag_None) {
     SWIFT_TASK_DEBUG_LOG("%s swift_task_is_current_executor_flag::%s",
                          hint, "None");
     return;
   }
 
   auto options = SwiftTaskIsCurrentExecutorOptions(flags);
-  if (options.contains(swift_task_is_current_executor_flag::Assert))
+  if (options.contains(IsCurrentTaskExecutorFlag_Assert))
     SWIFT_TASK_DEBUG_LOG("%s swift_task_is_current_executor_flag::%s",
                          hint, "Assert");
+}
+
+static void _swift_task_debug_dumpBridgedAsyncMethodModeFlags(
+    const char *hint,
+    swift_task_run_task_for_bridged_async_method_flag flags) {
+  if (flags == BridgedAsyncMethodFlag_None) {
+    SWIFT_TASK_DEBUG_LOG("%s swift_task_run_task_for_bridged_async_method_flag::%s",
+                         hint, "None");
+    return;
+  }
+
+  auto options = SwiftBridgedAsyncMethodOptions(flags);
+  if (options.contains(BridgedAsyncMethodFlag_TaskImmediate))
+    SWIFT_TASK_DEBUG_LOG("%s swift_task_run_task_for_bridged_async_method_flag::%s",
+                         hint, "TaskImmediate");
 }
 
 // Shimming call to Swift runtime because Swift Embedded does not have
 // these symbols defined.
 swift_task_is_current_executor_flag
 __swift_bincompat_useLegacyNonCrashingExecutorChecks() {
-  swift_task_is_current_executor_flag options = swift_task_is_current_executor_flag::None;
+  swift_task_is_current_executor_flag options = IsCurrentTaskExecutorFlag_None;
 #if !SWIFT_CONCURRENCY_EMBEDDED
   if (!swift::runtime::bincompat::
       swift_bincompat_useLegacyNonCrashingExecutorChecks()) {
     options = swift_task_is_current_executor_flag(
-        options | swift_task_is_current_executor_flag::Assert);
+        options | IsCurrentTaskExecutorFlag_Assert);
   }
 #endif
   _swift_task_debug_dumpIsCurrentExecutorFlags("runtime linking determined default mode", options);
+  return options;
+}
+
+// Shimming call to Swift runtime because Swift Embedded does not have
+// these symbols defined.
+swift_task_run_task_for_bridged_async_method_flag
+__swift_bincompat_getRunTaskForBridgedAsyncMethodMode() {
+  swift_task_run_task_for_bridged_async_method_flag options =
+    BridgedAsyncMethodFlag_None;
+#if !SWIFT_CONCURRENCY_EMBEDDED
+  if (!swift::runtime::bincompat::
+      swift_bincompat_useTaskImmediateForInTaskForBridgedAsyncMethodMode()) {
+    options = swift_task_run_task_for_bridged_async_method_flag(
+        options | BridgedAsyncMethodFlag_TaskImmediate);
+  }
+#endif
+  _swift_task_debug_dumpBridgedAsyncMethodModeFlags("runtime linking determined default mode", options);
   return options;
 }
 
@@ -428,6 +462,18 @@ const char *__swift_runtime_env_useLegacyNonCrashingExecutorChecks() {
 #if SWIFT_STDLIB_HAS_ENVIRON && !SWIFT_CONCURRENCY_EMBEDDED
   return swift::runtime::environment::
       concurrencyIsCurrentExecutorLegacyModeOverride();
+#else
+  return nullptr;
+#endif
+}
+
+// Shimming call to Swift runtime because Swift Embedded does not have
+// these symbols defined.
+const char *__swift_runtime_env_getRunTaskForBridgedAsyncMethodMode() {
+  // Potentially, override the platform detected mode, primarily used in tests.
+#if SWIFT_STDLIB_HAS_ENVIRON && !SWIFT_CONCURRENCY_EMBEDDED
+  return swift::runtime::environment::
+      concurrencyBridgedAsyncMethodModeOverride();
 #else
   return nullptr;
 #endif
@@ -459,11 +505,41 @@ swift_task_is_current_executor_flag swift_bincompat_selectDefaultIsCurrentExecut
       // Since we're in nocrash/legacy mode:
       // Remove the assert option which is what would cause the "crash" mode
       options = swift_task_is_current_executor_flag(
-        options & ~swift_task_is_current_executor_flag::Assert);
+        options & ~swift_task_is_current_executor_flag::IsCurrentTaskExecutorFlag_Assert);
     } else if (strcmp(modeStr, "crash") == 0 ||
                strcmp(modeStr, "swift6") == 0) {
       options = swift_task_is_current_executor_flag(
-        options | swift_task_is_current_executor_flag::Assert);
+        options | swift_task_is_current_executor_flag::IsCurrentTaskExecutorFlag_Assert);
+    } // else, just use the platform detected mode
+  } // no override, use the default mode
+
+  return options;
+}
+
+swift_task_run_task_for_bridged_async_method_flag swift_bincompat_runTaskForBridgeAsyncMethodMode() {
+  // Default options as determined by linked runtime,
+  // i.e. very old runtimes were not allowed to crash but then we introduced 'checkIsolated'
+  // which was allowed to crash;
+  swift_task_run_task_for_bridged_async_method_flag options =
+      __swift_bincompat_getRunTaskForBridgedAsyncMethodMode();
+
+  // Potentially, override the platform detected mode, primarily used in tests.
+  if (const char *modeStr =
+          __swift_runtime_env_getRunTaskForBridgedAsyncMethodMode()) {
+
+    if (strlen(modeStr) == 0) {
+      _swift_task_debug_dumpBridgedAsyncMethodModeFlags("mode override is empty", options);
+      return options;
+    }
+
+    if (strcmp(modeStr, "legacy") == 0) {
+      // Since we're in legacy mode:
+      // Remove the "immediate" option, and any other behavioral option we might add in the future
+      options = swift_task_run_task_for_bridged_async_method_flag(
+        options & ~BridgedAsyncMethodFlag_TaskImmediate);
+    } else if (strcmp(modeStr, "immediate") == 0) {
+      options = swift_task_run_task_for_bridged_async_method_flag(
+        options | BridgedAsyncMethodFlag_TaskImmediate);
     } // else, just use the platform detected mode
   } // no override, use the default mode
 
@@ -540,7 +616,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
 
     // Otherwise, as last resort, let the expected executor check using
     // external means, as it may "know" this thread is managed by it etc.
-    if (options.contains(swift_task_is_current_executor_flag::Assert)) {
+    if (options.contains(swift_task_is_current_executor_flag::IsCurrentTaskExecutorFlag_Assert)) {
       SWIFT_TASK_DEBUG_LOG("executor checking mode option: Assert; invoke (%p).expectedExecutor",
                            expectedExecutor.getIdentity());
       swift_task_checkIsolated(expectedExecutor); // will crash if not same context
@@ -549,7 +625,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
       return true;
     }
 
-    assert(!options.contains(swift_task_is_current_executor_flag::Assert));
+    assert(!options.contains(swift_task_is_current_executor_flag::IsCurrentTaskExecutorFlag_Assert));
     return false;
   }
 
@@ -587,7 +663,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
   // the crashing 'dispatch_assert_queue(main queue)' which will either crash
   // or confirm we actually are on the main queue; or the custom expected
   // executor has a chance to implement a similar queue check.
-  if (!options.contains(swift_task_is_current_executor_flag::Assert)) {
+  if (!options.contains(swift_task_is_current_executor_flag::IsCurrentTaskExecutorFlag_Assert)) {
     if ((expectedExecutor.isMainExecutor() && !currentExecutor.isMainExecutor())) {
       SWIFT_TASK_DEBUG_LOG("executor checking: expected executor %p%s is main executor, and current executor %p%s is NOT => fail",
                  expectedExecutor.getIdentity(), expectedExecutor.getIdentityDebugName(),
@@ -681,7 +757,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
   // Note that this only works because the closure in assumeIsolated is
   // synchronous, and will not cause suspensions, as that would require the
   // presence of a Task.
-  if (options.contains(swift_task_is_current_executor_flag::Assert)) {
+  if (options.contains(swift_task_is_current_executor_flag::IsCurrentTaskExecutorFlag_Assert)) {
     SWIFT_TASK_DEBUG_LOG("executor checking: call (%p).checkIsolated",
       expectedExecutor.getIdentity());
     swift_task_checkIsolated(expectedExecutor); // will crash if not same context
@@ -697,7 +773,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
 
   // In the end, since 'checkIsolated' could not be used, so we must assume
   // that the executors are not the same context.
-  assert(!options.contains(swift_task_is_current_executor_flag::Assert));
+  assert(!options.contains(swift_task_is_current_executor_flag::IsCurrentTaskExecutorFlag_Assert));
   return false;
 }
 
@@ -706,12 +782,24 @@ static void swift_task_setDefaultExecutorCheckingFlags(void *context) {
   auto *options = static_cast<swift_task_is_current_executor_flag *>(context);
 
   auto modeOverride = swift_bincompat_selectDefaultIsCurrentExecutorCheckingMode();
-  if (modeOverride != swift_task_is_current_executor_flag::None) {
+  if (modeOverride != IsCurrentTaskExecutorFlag_None) {
     *options = modeOverride;
   }
 
   SWIFT_TASK_DEBUG_LOG("executor checking: resulting options = %d", *options);
   _swift_task_debug_dumpIsCurrentExecutorFlags(__FUNCTION__, *options);
+}
+
+static void swift_task_setRunTaskForBridgedAsyncMethodMode(void *context) {
+  auto *options = static_cast<swift_task_run_task_for_bridged_async_method_flag *>(context);
+
+  auto modeOverride = swift_bincompat_runTaskForBridgeAsyncMethodMode();
+  if (modeOverride != BridgedAsyncMethodFlag_None) {
+    *options = modeOverride;
+  }
+
+  SWIFT_TASK_DEBUG_LOG("async method bridging: resulting options = %d", *options);
+  _swift_task_debug_dumpBridgedAsyncMethodModeFlags(__FUNCTION__, *options);
 }
 
 SWIFT_CC(swift)
@@ -735,6 +823,18 @@ swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor) {
                                                isCurrentExecutorFlag);
 }
 
+SWIFT_CC(swift)
+static size_t
+swift_task_RunTaskForBridgedAsyncMethodMode() {
+  static swift_task_run_task_for_bridged_async_method_flag runBridgedAsyncMethodFlag;
+  static swift::once_t runBridgedAsyncMethodFlagToken;
+  swift::once(runBridgedAsyncMethodFlagToken,
+              swift_task_setRunTaskForBridgedAsyncMethodMode,
+              &runBridgedAsyncMethodFlag);
+
+  return runBridgedAsyncMethodFlag;
+}
+
 /// Logging level for unexpected executors:
 /// 0 - no logging -- will be IGNORED when Swift6 mode of isCurrentExecutor is used
 /// 1 - warn on each instance -- will be IGNORED when Swift6 mode of isCurrentExecutor is used
@@ -744,7 +844,7 @@ swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor) {
 /// an application was linked to. Since Swift 6 the default is to crash,
 /// and the logging behavior is no longer available.
 static unsigned unexpectedExecutorLogLevel =
-    (swift_bincompat_selectDefaultIsCurrentExecutorCheckingMode() == swift_task_is_current_executor_flag::None)
+    (swift_bincompat_selectDefaultIsCurrentExecutorCheckingMode() == swift_task_is_current_executor_flag::IsCurrentTaskExecutorFlag_None)
         ? 1 // legacy apps default to the logging mode, and cannot use `checkIsolated`
         : 2; // new apps will only crash upon concurrency violations, and will call into `checkIsolated`
 
@@ -758,7 +858,7 @@ static void checkUnexpectedExecutorLogLevel(void *context) {
   if (level >= 0 && level < 3) {
     auto options = SwiftTaskIsCurrentExecutorOptions(
         swift_bincompat_selectDefaultIsCurrentExecutorCheckingMode());
-    if (options.contains(swift_task_is_current_executor_flag::Assert)) {
+    if (options.contains(swift_task_is_current_executor_flag::IsCurrentTaskExecutorFlag_Assert)) {
       // We are in swift6/crash mode of isCurrentExecutor which means that
       // rather than returning false, that method will always CRASH when an
       // executor mismatch is discovered.
@@ -2614,7 +2714,7 @@ static void swift_task_deinitOnExecutorImpl(void *object,
   // Note that isCurrentExecutor() returns true for @MainActor
   // when running on the main thread without any executor.
   if (swift_task_isCurrentExecutorWithFlags(
-          newExecutor, swift_task_is_current_executor_flag::None)) {
+          newExecutor, swift_task_is_current_executor_flag::IsCurrentTaskExecutorFlag_None)) {
     TaskLocal::StopLookupScope scope;
     return work(object);
   }
