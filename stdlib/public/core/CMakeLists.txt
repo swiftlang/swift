@@ -349,6 +349,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Reparenti
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Lifetimes")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowAndMutateAccessors")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
+list(APPEND swift_stdlib_compile_flags "-Werror" "StrictMemorySafety")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")
