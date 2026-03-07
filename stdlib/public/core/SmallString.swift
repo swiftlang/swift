@@ -401,96 +401,30 @@ extension _SmallString {
     }
 
     let baseCount = base.count
+
+    if baseCount == 0 {
+      self = other
+      return
+    }
+
     let totalCount = baseCount + otherCount
     guard totalCount <= _SmallString.capacity else { return nil }
 
-    let baseClean = base.zeroTerminatedRawCodeUnits
-    var resultLeading = baseClean.0
-    var resultTrailing = baseClean.1
-    let (otherLeading, otherTrailing) = other.zeroTerminatedRawCodeUnits
-
-    // Use direct bit manipulation instead of byte-by-byte copying.
-    // This is more efficient than SIMD for such small data sizes (max 15 bytes).
-
-    if baseCount < 8 {
-      if baseCount + otherCount <= 8 {
-        // Everything fits in leading word
-        let shiftAmount = UInt64(baseCount) &* 8
-        let otherMask = (UInt64(1) &<< (UInt64(otherCount) &* 8)) &- 1
-        let otherBits = otherLeading & otherMask
-#if _endian(big)
-        let insertShift = UInt64(8 - baseCount - otherCount) &* 8
-        resultLeading |= otherBits &<< insertShift
-#else
-        resultLeading |= otherBits &<< shiftAmount
-#endif
-      } else {
-        // Spans both words
-        let leadingBytes = 8 - baseCount
-        let trailingBytes = otherCount - leadingBytes
-
-        // Copy leading portion
-        let shiftAmount = UInt64(baseCount) &* 8
-        let leadingMask = (UInt64(1) &<< (UInt64(leadingBytes) &* 8)) &- 1
-        let leadingBits = otherLeading & leadingMask
-#if _endian(big)
-        resultLeading |= leadingBits &<< (UInt64(8 - baseCount - leadingBytes) &* 8)
-#else
-        resultLeading |= leadingBits &<< shiftAmount
-#endif
-
-        // Copy trailing portion
-        let trailingMask = (UInt64(1) &<< (UInt64(trailingBytes) &* 8)) &- 1
-#if _endian(big)
-        if leadingBytes < 8 {
-          let otherShift = UInt64(8 - leadingBytes) &* 8
-          let trailingBits = (otherLeading &>> otherShift) | (otherTrailing &<< (UInt64(leadingBytes) &* 8))
-          resultTrailing = trailingBits & trailingMask
-        } else {
-          resultTrailing = otherTrailing & trailingMask
-        }
-#else
-        if leadingBytes < 8 {
-          let otherShift = UInt64(leadingBytes) &* 8
-          let trailingBits = (otherLeading &>> otherShift) | (otherTrailing &<< (UInt64(8 - leadingBytes) &* 8))
-          resultTrailing = trailingBits & trailingMask
-        } else {
-          resultTrailing = otherTrailing & trailingMask
-        }
-#endif
-      }
-    } else {
-      // Base uses trailing word, append to trailing
-      let trailingIndex = baseCount - 8
-      let shiftAmount = UInt64(trailingIndex) &* 8
-      let availableBytes = 8 - trailingIndex
-
-      if otherCount <= availableBytes {
-        // Fits in trailing word
-        let otherMask = (UInt64(1) &<< (UInt64(otherCount) &* 8)) &- 1
-        let otherBits = otherLeading & otherMask
-#if _endian(big)
-        let insertShift = UInt64(availableBytes - otherCount) &* 8
-        resultTrailing |= otherBits &<< insertShift
-#else
-        resultTrailing |= otherBits &<< shiftAmount
-#endif
-      } else {
-        // This case shouldn't happen as totalCount > capacity would be caught above
-        // But for safety, fall back to original implementation
-        var result = base
-        var writeIdx = base.count
-        for readIdx in 0..<other.count {
-          result[writeIdx] = other[readIdx]
-          writeIdx &+= 1
-        }
-        let (leading, trailing) = result.zeroTerminatedRawCodeUnits
-        self.init(leading: leading, trailing: trailing, count: totalCount)
-        return
-      }
+    // Use _UInt128 arithmetic to concatenate the two small strings.
+    // .littleEndian normalizes byte order before arithmetic, making this
+    // endian-safe without any #if _endian guards.
+    func convert(_ s: _SmallString) -> _UInt128 {
+      let bits = s.zeroTerminatedRawCodeUnits
+      return .init(high: bits.1.littleEndian, low: bits.0.littleEndian)
     }
 
-    self.init(leading: resultLeading, trailing: resultTrailing, count: totalCount)
+    let resultInt = (convert(other) &<< _UInt128(8 &* baseCount)) &+ convert(base)
+
+    self.init(
+      leading: resultInt.low.littleEndian,
+      trailing: resultInt.high.littleEndian,
+      count: totalCount
+    )
   }
 }
 
