@@ -766,6 +766,27 @@ bool TypeChecker::diagnoseInvalidFunctionType(
     }
   }
 
+  auto params = fnTy->getParams();
+  bool lastWasPackExpansion = false;
+  
+  for (unsigned i = 0, e = params.size(); i < e; ++i) {
+    auto param = params[i];
+    
+    if (lastWasPackExpansion) {
+      if (!param.hasLabel() && !param.getPlainType()->is<PackExpansionType>()) {
+        auto diagLoc = repr ? (*repr)->getArgsTypeRepr()->getElement(i).Type->getLoc() : loc;
+        ctx.Diags.diagnose(diagLoc, 
+                           diag::function_type_unlabeled_param_after_variadic_pack);
+        hadAnyError = true;
+      }
+      lastWasPackExpansion = false;
+    }
+    
+    if (param.getPlainType()->is<PackExpansionType>()) {
+      lastWasPackExpansion = true;
+    }
+  }
+
   return hadAnyError;
 }
 
