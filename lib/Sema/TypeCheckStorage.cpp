@@ -128,30 +128,28 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
                           ExpandSynthesizedMemberMacroRequest{decl},
                           false);
 
-  // Just walk over the members of the type, forcing backing storage
-  // for lazy properties and property wrappers to be synthesized.
-  implDecl->loadStorageMembers();
-  for (auto *member : implDecl->getCurrentMembersWithoutLoading()) {
-    // Expand peer macros.
-    (void)evaluateOrDefault(
-        ctx.evaluator,
-        ExpandPeerMacroRequest{member},
-        {});
-
+  // Walk over members and their auxiliary decls. For stored-property queries,
+  // also force backing storage for lazy properties and property wrappers to be
+  // synthesized.
+  std::function<void(Decl *)> visitMember;
+  visitMember = [&](Decl *member) {
     auto *var = dyn_cast<VarDecl>(member);
-    if (!var || var->isStatic())
-      continue;
-
-    if (reason == LoweredPropertiesReason::Stored) {
+    if (var && !var->isStatic() && reason == LoweredPropertiesReason::Stored) {
       if (var->getAttrs().hasAttribute<LazyAttr>())
-        (void) var->getLazyStorageProperty();
+        (void)var->getLazyStorageProperty();
 
       if (var->hasAttachedPropertyWrapper()) {
-        (void) var->getPropertyWrapperAuxiliaryVariables();
-        (void) var->getPropertyWrapperInitializerInfo();
+        (void)var->getPropertyWrapperAuxiliaryVariables();
+        (void)var->getPropertyWrapperInitializerInfo();
       }
     }
-  }
+
+    member->visitAuxiliaryDecls(visitMember);
+  };
+
+  implDecl->loadStorageMembers();
+  for (auto *member : implDecl->getCurrentMembersWithoutLoading())
+    visitMember(member);
 
   if (reason != LoweredPropertiesReason::Stored)
     return;
@@ -333,13 +331,29 @@ InitializablePropertiesRequest::evaluate(Evaluator &evaluator,
 
   SmallVector<VarDecl *, 4> results;
   computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Memberwise);
+  bool inSourceFile = isInSourceFile(implDecl);
 
   auto maybeAddProperty = [&](VarDecl *var) {
     if (!var->getDeclContext()->isTypeContext() || var->isStatic())
       return;
 
-    if (var->getAttrs().hasAttribute<LazyAttr>() ||
-        var->hasAttachedPropertyWrapper() || var->hasStorage() ||
+    bool hasLazy = var->getAttrs().hasAttribute<LazyAttr>();
+    bool hasWrapper = var->hasAttachedPropertyWrapper();
+
+    // A peer macro can introduce wrapped/lazy properties that are discovered
+    // via auxiliary decl traversal. Ensure any required auxiliary storage is
+    // synthesized before returning them as initializable properties.
+    if (inSourceFile) {
+      if (hasLazy)
+        (void)var->getLazyStorageProperty();
+
+      if (hasWrapper) {
+        (void)var->getPropertyWrapperAuxiliaryVariables();
+        (void)var->getPropertyWrapperInitializerInfo();
+      }
+    }
+
+    if (hasLazy || hasWrapper || var->hasStorage() ||
         var->hasInitAccessor()) {
       results.push_back(var);
     }
