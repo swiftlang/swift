@@ -1849,6 +1849,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.RemarkMacroExpansions = Args.hasArg(
       OPT_expansion_remarks);
 
+  Opts.RemarkClangImporter = Args.hasArg(
+      OPT_clang_importer_remarks);
+
   Opts.DumpSourceFileImports = Args.hasArg(
       OPT_dump_source_file_imports);
 

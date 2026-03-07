@@ -2,7 +2,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-objc-header %t/bridging.h -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast %t/test.swift -verify
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-objc-header %t/bridging.h -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast %t/test.swift -verify \
+// RUN:   -verify-additional-file %t%{fs-sep}bridging.h -verify-additional-file %t%{fs-sep}b.h -verify-additional-file %t%{fs-sep}c.h -Rclang-importer
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-objc-header %t/bridging.h -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast %t/test.swift -dump-macro-expansions 2>&1 | %FileCheck --dry-run > %t/macro-expansions.out
 // RUN: %diff %t/macro-expansions.out %t/macro-expansions.expected
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-objc-header %t/bridging.h -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast %t/test.swift -dump-source-file-imports 2>&1 | %FileCheck --dry-run > %t/imports.out
@@ -65,11 +66,18 @@ func test3(p: UnsafeMutablePointer<CInt>, len: CInt, z: UnsafeMutablePointer<c_t
 #include "c.h"
 
 struct no_module_record_t;
+// expected-remark@+1{{added safe interop wrapper}}
 void foo(no_module_t len, const a_t * __counted_by(len) p __noescape, struct no_module_record_t *x);
 
 struct b_t;
+// expected-remark@+3{{did not add safe interop wrapper}}
+// expected-note@+2{{clang function signature refers to concrete type without importing owning module}}
+// expected-note@+1{{'bar' is in module __ObjC}}
 void bar(int len, const int * __counted_by(len) p __noescape, struct b_t *y);
 
+// expected-remark@+3{{did not add safe interop wrapper}}
+// expected-note@+2{{clang function signature refers to concrete type without importing owning module}}
+// expected-note@+1{{'baz' is in module __ObjC}}
 void baz(int len, const int * __counted_by(len) p __noescape, struct c_t *z);
 
 //--- no-module.h
@@ -82,11 +90,13 @@ struct no_module_record_t {
 typedef int a_t;
 
 //--- b.h
+// expected-note@+1{{'b_t' is in module B}}
 struct b_t {
   int placeholder;
 };
 
 //--- c.h
+// expected-note@+1{{'c_t' is in module C}}
 struct c_t {
   int placeholder;
 };

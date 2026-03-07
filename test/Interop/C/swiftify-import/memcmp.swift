@@ -7,7 +7,7 @@
 // RUN: %empty-directory(%t/sdk)
 
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -strict-memory-safety -sdk %t/sdk \
-// RUN:   -Xcc -Werror %t%{fs-sep}test.swift -import-objc-header %t%{fs-sep}test.h -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions
+// RUN:   -Xcc -Werror %t%{fs-sep}test.swift -import-objc-header %t%{fs-sep}test.h -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -Rclang-importer
 
 // Check that ClangImporter does not try to apply _SwiftifyImport to functions in SwiftShims,
 // as it does not import the standard library types.
@@ -29,3 +29,5 @@ public func callMemCmp2(_ p1: UnsafeMutableRawPointer, _ p2: UnsafeMutableRawPoi
 
 // expected-note@+1{{'memcmp' declared here}}
 int memcmp(const void * _Nullable __sized_by(n) s1, const void * _Nullable __sized_by(n) s2, size_t n);
+// expected-remark@-1{{did not add safe interop wrapper}}
+// expected-note@-2{{module SwiftShims does not import the Swift module}}

@@ -118,6 +118,7 @@ int * __counted_by(len) _Nonnull nonnull(int len, int len2, int * _Nonnull p __c
 int * __counted_by(len) _Nullable nullable(int len, int len2, int * _Nullable p __counted_by(len2) __lifetimebound);
 
 typedef struct foo opaque_t;
+// expected-experimental-remark@+1{{ignoring lifetimebound attribute because return value is Escapable}}
 opaque_t * __counted_by(len) opaque(int len, int len2, opaque_t * p __counted_by(len2) __lifetimebound);
 
 // expected-experimental-expansion@+6:60{{
@@ -155,6 +156,7 @@ int * __counted_by(13) _Nullable constant(int * _Nullable p __counted_by_or_null
 
 struct EscapableStruct {};
 // make sure __lifetimebound is ignored when return value is escapable
+// expected-experimental-remark@+8{{ignoring lifetimebound attribute because return value is Escapable}}
 // expected-experimental-expansion@+7:87{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func lifetimeboundEscapableReturn(_ p: UnsafeMutableBufferPointer<Int32>) -> EscapableStruct {|}}

@@ -648,6 +648,9 @@ namespace swift {
     /// Emits a remark with the content of each macro expansion line, for matching with -verify
     bool RemarkMacroExpansions = false;
 
+    /// Emits a remark with diagnosis for all imported functions without safe interop wrappers.
+    bool RemarkClangImporter = false;
+
     /// Enables dumping imports for each SourceFile.
     bool DumpSourceFileImports = false;
 

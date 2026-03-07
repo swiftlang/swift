@@ -437,5 +437,41 @@ ERROR(repeating_swift_attrs, none, "multiple %0 annotations found on %1",
 
 NOTE(annotation_here, none, "%0 annotation found here", (StringRef))
 
+//------------------------------------------------------------------------------
+// MARK: ClangImporter remark diagnostics
+//------------------------------------------------------------------------------
+
+REMARK(yes_safe_wrapper, none, "added safe interop wrapper", ())
+
+REMARK(no_safe_wrapper, none, "did not add safe interop wrapper", ())
+
+NOTE(safe_interop_disabled, none, "due to -disable-safe-interop-wrappers", ())
+NOTE(unsupported_function_kind, none, "unsupported function kind %0", (StringRef))
+NOTE(swiftify_macro_not_found, none, "@_SwiftifyImport macro not available", ())
+NOTE(no_safe_wrapper_attr, none, "function is annotated with swift_attr(\"no_safe_wrapper\")", ())
+NOTE(forward_declared_concrete_type, none, "clang function signature refers to concrete type without importing owning module", ())
+NOTE(clang_module_owner, none, "%0 is in module %1", (const clang::NamedDecl*,StringRef))
+NOTE(cf_ref_initializer, none, "Swift cannot define initializer for CoreFoundation style reference type", (Type))
+NOTE(ignoring_implicit_func, none, "implicit functions are ignored", ())
+NOTE(ignoring_non_public_func, none, "member function %0 is not public", (const Decl *))
+NOTE(module_without_stdlib, none, "module %0 does not import the Swift module", (StringRef))
+NOTE(ignoring_template_in_signature, none, "template specialization cannot be represented in Swift syntax; try hiding it behind a typedef", ())
+NOTE(mismatching_parameter_count, none, "the imported Swift signature and the clang function signature have mismatching parameter counts (%0 vs %1)", (unsigned, unsigned))
+NOTE(ignoring_lifetimebound, none, "lifetimebound support is not yet stabilized", ())
+NOTE(ignoring_nonescapable_return_without_lifetime, none, "function without lifetime information returns ~Escapable type %0", (Type))
+NOTE(no_bounds_or_lifetime, none, "no bounds or lifetime information found", ())
+
+REMARK(ignoring_counted_by, none, "ignoring %0 attribute", (StringRef))
+NOTE(non_portable_int_literal, none, "count parameter contains integer literal not supported in Swift syntax", ())
+NOTE(unknown_count_expr, none, "count parameter contains unsupported expression kind %0", (StringRef))
+NOTE(sized_by_on_non_pointer, none, "__sized_by attribute not on pointer type", ())
+NOTE(sized_by_on_autorelease, none, "__sized_by attribute on autoreleasing pointer", ())
+NOTE(sized_by_on_non_bytesized, none, "__sized_by attribute on pointer to type larger than a single byte", ())
+NOTE(type_has_size, none, "type %0 has size %1", (const clang::Type*, unsigned))
+NOTE(counted_by_incompatible_type, none, "__counted_by attribute not on pointer with known pointee size", ())
+
+REMARK(ignoring_lifetimebound_escapable_return, none, "ignoring lifetimebound attribute because return value is Escapable", ())
+REMARK(ignoring_lifetimebound_on_frt, none, "ignoring lifetimebound attribute on reference counted parameter", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
