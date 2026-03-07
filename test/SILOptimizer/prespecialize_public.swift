@@ -18,13 +18,13 @@ extension Sequence where Element: BinaryInteger {
 // CHECK:   cond_br [[T5]], bb3, bb1
 
 // CHECK: bb1:
-// CHECK:   [[T6:%.*]] = function_ref @$sSTsE6reduceyqd__qd___qd__qd___7ElementQztKXEtKlF
-// CHECK:   apply {{.*}} [[T6]]<Self, Double>(
+// CHECK:   [[T6:%.*]] = function_ref @$sSTsE6reduceyqd__qd___qd__qd___7ElementQztqd_0_YKXEtqd_0_YKs5ErrorRd_0_r0_lF
+// CHECK:   apply {{.*}} [[T6]]<Self, Double, Never>(
 // CHECK:   br bb2(
 
 // CHECK: bb2({{.*}} : $Double):
 // CHECK:   return
 
 // CHECK: bb3:
-// CHECK:   %25 = unchecked_addr_cast %0 to $*Array<Int>
+// CHECK:   [[T7:%.*]] = unchecked_addr_cast %0 to $*Array<Int>
 }
