@@ -443,7 +443,7 @@ internal func _bytesToUInt64(
   // Unfortunately that causes regressions in literal concatenation tests. (Some
   // owned to guaranteed specializations don't get inlined.)
   guard _fastPath(c != 8) else {
-    return unsafe input.withMemoryRebound(to: UInt64.self, capacity: 1) { unsafe $0.pointee.littleEndian }
+    return unsafe UnsafeRawPointer(input).loadUnaligned(as: UInt64.self).littleEndian
   }
 
   var r: UInt64 = 0
@@ -452,14 +452,14 @@ internal func _bytesToUInt64(
 
   // Read 32-bit chunk
   if remaining >= 4 {
-    r = unsafe UInt64(ptr.withMemoryRebound(to: UInt32.self, capacity: 1) { unsafe $0.pointee })
+    r = unsafe UInt64(UnsafeRawPointer(ptr).loadUnaligned(as: UInt32.self))
     unsafe ptr = unsafe ptr.advanced(by: 4)
     remaining &-= 4
   }
 
   // Read 16-bit chunk
   if remaining >= 2 {
-    let chunk: UInt16 = unsafe ptr.withMemoryRebound(to: UInt16.self, capacity: 1) { unsafe $0.pointee }
+    let chunk = unsafe UnsafeRawPointer(ptr).loadUnaligned(as: UInt16.self)
     r |= UInt64(chunk) &<< (UInt64(c &- remaining) &* 8)
     unsafe ptr = unsafe ptr.advanced(by: 2)
   }
