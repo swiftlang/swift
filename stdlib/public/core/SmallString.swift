@@ -442,12 +442,32 @@ internal func _bytesToUInt64(
   // FIXME: This should be unified with _loadPartialUnalignedUInt64LE.
   // Unfortunately that causes regressions in literal concatenation tests. (Some
   // owned to guaranteed specializations don't get inlined.)
-  var r: UInt64 = 0
-  var shift: Int = 0
-  for idx in 0..<c {
-    r = unsafe r | (UInt64(input[idx]) &<< shift)
-    shift = shift &+ 8
+  guard _fastPath(c != 8) else {
+    return unsafe UnsafeRawPointer(input).loadUnaligned(as: UInt64.self).littleEndian
   }
-  // Convert from little-endian to host byte order.
+
+  var r: UInt64 = 0
+  var remaining = c
+  var ptr = unsafe input
+
+  // Read 32-bit chunk
+  if remaining >= 4 {
+    r = unsafe UInt64(UnsafeRawPointer(ptr).loadUnaligned(as: UInt32.self))
+    unsafe ptr = unsafe ptr.advanced(by: 4)
+    remaining &-= 4
+  }
+
+  // Read 16-bit chunk
+  if remaining >= 2 {
+    let chunk = unsafe UnsafeRawPointer(ptr).loadUnaligned(as: UInt16.self)
+    r |= UInt64(chunk) &<< (UInt64(c &- remaining) &* 8)
+    unsafe ptr = unsafe ptr.advanced(by: 2)
+  }
+
+  // Read final byte
+  if c & 1 != 0 {
+    r |= unsafe UInt64(ptr.pointee) &<< (UInt64(c &- 1) &* 8)
+  }
+
   return r.littleEndian
 }
