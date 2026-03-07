@@ -259,9 +259,6 @@ bool TypeVarBindingProducer::computeNext() {
     auto type = binding.BindingType;
 
     // If we've already tried this binding, move on.
-    if (!BoundTypes.insert(type.getPointer()).second)
-      return;
-
     if (!ExploredTypes.insert(type->getCanonicalType()).second)
       return;
 
