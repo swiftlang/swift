@@ -1264,3 +1264,6 @@ Added: _$ss6BorrowVsRi_zrlE7builtinxBWvg
 Added: _$ss5InoutVMa
 Added: _$ss5InoutVMn
 Added: _$ss5InoutVsRi_zrlE7pointerSpyxGvg
+
+// SE-0513: CommandLine.executablePath
+Added: _$ss11CommandLineO14executablePathSSSgvpZMV
