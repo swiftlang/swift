@@ -37,6 +37,13 @@ swift_exceptionPersonality(int version,
 
 } // end namespace swift
 
+#define OVERRIDE_PERSONALITY_ASM                                               \
+  asm(".cfi_personality 155, __swift_exceptionPersonality")
+
+#else // defined(__ELF__) || defined(__APPLE__)
+
+#define OVERRIDE_PERSONALITY_ASM
+
 #endif // defined(__ELF__) || defined(__APPLE__)
 
 #endif // SWIFT_RUNTIME_EXCEPTION_H
