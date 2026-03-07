@@ -123,7 +123,9 @@ add_library(swiftSynchronization
   Atomics/WordPair.swift
   Atomics/AtomicStorage.swift
   Atomics/AtomicIntegers.swift
-  Cell.swift)
+  Cell.swift
+  SharedBox.swift
+  WeakBox.swift)
 
 # Determine Mutex definition
 if(${PROJECT_NAME}_SINGLE_THREADED_MODE)

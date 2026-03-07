@@ -26,6 +26,8 @@ set(SWIFT_SYNCHRONIZATION_SOURCES
   ${SWIFT_SYNCHRONIZATION_ATOMIC_SOURCES}
 
   Cell.swift
+  SharedBox.swift
+  WeakBox.swift
 )
 
 set(SWIFT_SYNCHRONIZATION_GYB_SOURCES
@@ -90,10 +92,13 @@ set(SWIFT_SYNCHRONIZATION_OPENBSD_SOURCES
 set(SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS
   ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   "-enable-builtin-module"
+  "-enable-experimental-feature" "BorrowAndMutateAccessors"
+  "-enable-experimental-feature" "Lifetimes"
   "-enable-experimental-feature" "RawLayout"
   "-enable-experimental-feature" "StaticExclusiveOnly"
   "-enable-experimental-feature" "Extern"
   "-strict-memory-safety"
+  "-Werror" "StrictMemorySafety"
 )
 
 add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
@@ -199,7 +204,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_SOURCES})
       list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_WASM_SOURCES})
     else()
-      list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_ATOMIC_SOURCES})
+      list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_SOURCES})
     endif()
       
     add_swift_target_library_single(
