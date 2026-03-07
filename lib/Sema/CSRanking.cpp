@@ -1486,6 +1486,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   }
 
   // Compare the type variable bindings.
+  // TODO: Consider replacing with typesDiffPerSolution, which has
+  // performed many similar operations in setting differing types
   llvm::DenseMap<TypeVariableType *, TypeBindingsToCompare> typeDiff;
 
   const auto &bindings1 = solutions[idx1].typeBindings;
@@ -1686,9 +1688,36 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
     return SolutionCompareResult::Identical;
   } else {
+    // Both solutions selected the same fix, and we're in salvage not
+    // in an IDE mode And in experimental unification mode
+    if (cs.getASTContext().LangOpts.hasFeature(Feature::UnificationDiagnostic)
+        && !cs.isForCodeCompletion() && !cs.getASTContext().SolutionCallback
+        && cs.inSalvageMode()) {
+      if (!solutions[idx1].Fixes.empty() &&
+          !solutions[idx2].Fixes.empty() &&
+          solutions[idx1].Fixes[0] &&
+          solutions[idx2].Fixes[0] &&
+          solutions[idx1].Fixes[0]->getKind() ==
+          solutions[idx2].Fixes[0]->getKind()) {
+
+        auto currentDiff = diff.typesDiffPerSolution(idx1, idx2);
+
+        SolutionUnifier su = SolutionUnifier(&(cs.getASTContext()));
+        bool unifiable = su.canUnifyTypes(&(solutions[idx1]), &(solutions[idx2]),
+                                          currentDiff, true);
+        if (unifiable) {
+          if (cs.isDebugMode()) {
+            llvm::errs().indent(cs.solverState->getCurrentIndent())
+            << "- mergeable\n";
+          }
+          return SolutionCompareResult::Mergeable;
+        }
+      }
+    }
+
     if (cs.isDebugMode()) {
       llvm::errs().indent(cs.solverState->getCurrentIndent())
-          << "- incomparable\n";
+      << "- incomparable\n";
     }
 
     return SolutionCompareResult::Incomparable;
@@ -1776,6 +1805,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
       break;
 
     case SolutionCompareResult::Better:
+    case SolutionCompareResult::Mergeable:
       losers[bestIdx] = true;
       bestIdx = i;
       break;
@@ -1799,8 +1829,10 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
       break;
 
     case SolutionCompareResult::Better:
+    case SolutionCompareResult::Mergeable:
       losers[i] = true;
       break;
+
 
     case SolutionCompareResult::Worse:
       losers[bestIdx] = true;
@@ -1898,6 +1930,336 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
       break;
     }
   }
+
+  for (size_t idx : indices(solutions)) {
+    auto &solution = solutions[idx];
+    if (solution.Fixes.size() > 0) {
+      auto primaryFix = solution.Fixes[0];
+      bool added = false;
+      for (auto fixD : fixes)
+        if (primaryFix && fixD.fix == primaryFix->getKind()) {
+          fixD.solutions.push_back(idx);
+          added = true;
+        }
+      if (primaryFix && !added) {
+        FixDiff fd{primaryFix->getKind(), {idx}};
+        fixes.push_back(fd);
+      }
+    }
+
+    for (const auto &binding : solutions[idx].typeBindings) {
+      if (!binding.second)
+        continue;
+
+      auto *typeVar = binding.first;
+      auto *loc = typeVar->getImpl().getLocator();
+
+      // Check whether this is the overload type for a short-form init call
+      // 'X(...)' or 'self.init(...)' call.
+      auto isShortFormOrSelfDelegatingConstructorBinding = false;
+      if (auto initMemberTypeElt =
+          loc->getLastElementAs<LocatorPathElt::ConstructorMemberType>()) {
+        isShortFormOrSelfDelegatingConstructorBinding =
+        initMemberTypeElt->isShortFormOrSelfDelegatingConstructor();
+      }
+
+      // If the type variable isn't one for which we should be looking at the
+      // bindings, don't.
+      if (!typeVar->getImpl().prefersSubtypeBinding() &&
+          !isShortFormOrSelfDelegatingConstructorBinding) {
+        continue;
+      }
+
+      // See if we already have a record for this type var
+      auto typeDiffs = types.find(typeVar);
+
+      // If not, create one for this solution
+      if (typeDiffs == types.end()) {
+        TypeDiff td{binding.second, {idx}};
+        types[typeVar].push_back(td);
+      } else {
+        // Add this solution to the proper record
+        bool added = false;
+        for (auto& typeD : typeDiffs->second) {
+          if (typeD.resolved->isEqual(binding.second)) {
+            typeD.solutions.push_back(idx);
+            added = true;
+          }
+        }
+        if (!added) {
+          TypeDiff td{binding.second, {idx}};
+          typeDiffs->second.push_back(td);
+        }
+      }
+    }
+  }
+}
+
+llvm::DenseMap<TypeVariableType*, std::pair<Type,Type>>
+    SolutionDiff::typesDiffPerSolution(size_t idx1, size_t idx2) const {
+      auto pairDiff = llvm::DenseMap<TypeVariableType*, std::pair<Type,Type>>();
+      for(auto tdv : types) {
+        if (tdv.second.size() >= 1) {
+          std::optional<Type> ty1 = std::nullopt;
+          std::optional<Type> ty2 = std::nullopt;
+          for(auto td: tdv.second) {
+            for (auto idx : td.solutions) {
+              if (idx == idx1)
+                ty1 = td.resolved;
+              if (idx == idx2)
+                ty2 = td.resolved;
+            }
+          }
+          if (ty1.has_value() && ty2.has_value()) {
+            std::pair tb(ty1.value(), ty2.value());
+            pairDiff[tdv.first] = tb;
+          }
+        }
+      }
+      return pairDiff;
+    }
+
+typedef llvm::DenseMap<TypeVariableType*, Type> Env;
+typedef llvm::DenseMap<TypeVariableType*, std::pair<Type, Type>> ExtendedEnv;
+typedef std::function<Type(std::pair<Type, Type>)> AccessorFun;
+
+std::optional<Type> SolutionUnifier::inTypeMap(Type key) {
+  for (auto eachTypePair : typeMap) {
+   if (key->isEqual(eachTypePair.first))
+     return std::optional<Type>(eachTypePair.second);
+  }
+  return (std::optional<Type>) std::nullopt;
+}
+
+TypeVariableType* SolutionUnifier::nextVar(TypeVariableType* currentTV) {
+ return TypeVariableType::getNew(*context,
+                                 nextFreeType++,
+                                 currentTV->getImpl());
+}
+
+std::optional<Type> SolutionUnifier::TypeUnifier::unifyNominal(Type t) {
+  if (t->is<NominalType>()) {
+    NominalType* nt = t->getAs<NominalType>();
+    if (t->isEqual(idxType)) {
+      std::optional<Type> replacement = inMapTopLevel(currentTV, nt);
+      if (replacement.has_value()) {
+        if (!storeNew)
+          su->mapType(idxType, replacement.value());
+        return replacement;
+      } else {
+        Type nv = su->nextVar(currentTV);
+        if (storeNew)
+          su->mapType(idxType, nv);
+        return nv;
+      }
+    } else
+      return su->inTypeMap(nt);
+  }
+  return std::nullopt;
+}
+
+std::optional<Type> SolutionUnifier::TypeUnifier::unifyAll(Type t) {
+  if (t->is<NominalType>())
+    return unifyNominal(t);
+  if (t->is<BoundGenericType>()) {
+    BoundGenericType* bgt = t->getAs<BoundGenericType>();
+    ArrayRef<Type> genericArgs = bgt->getGenericArgs();
+    SmallVector<Type, 2> replacementArgs;
+    bool anyReplaced = false;
+    for(auto arg : genericArgs) {
+      std::optional<Type> replaceArg =
+      arg.transformRec([&](Type t) { return this->unifyAll(t); });
+      if (replaceArg.has_value()) {
+        replacementArgs.emplace_back(replaceArg.value());
+        anyReplaced = true;
+      } else {
+        // keep the current arg, in case there are any others replaced
+        replacementArgs.emplace_back(arg);
+      }
+    }
+    if (anyReplaced) {
+      auto replacement =
+      BoundGenericType::get(bgt->getDecl(),
+                            bgt->getParent(),
+                            ArrayRef<Type>(replacementArgs.begin(),
+                                           replacementArgs.end()));
+
+      return replacement;
+    }
+  }
+  if (t->is<TupleType>()) {
+    TupleType* tt = t->getAs<TupleType>();
+    TupleEltTypeArrayRef elementTypes = tt->getElementTypes();
+    SmallVector<TupleTypeElt, 2> replacementElementTypes;
+    bool anyReplaced = false;
+    for(auto elt : elementTypes) {
+      std::optional<Type> replaceElt =
+      elt.transformRec([&](Type t) { return this->unifyAll(t); });
+      if (replaceElt.has_value()) {
+        replacementElementTypes.emplace_back(TupleTypeElt(replaceElt.value()));
+        anyReplaced = true;
+      } else {
+        // Keep current in case any others are replaced
+        replacementElementTypes.emplace_back(elt);
+      }
+    }
+    if (anyReplaced) {
+      auto replacement =
+      TupleType::get(ArrayRef<TupleTypeElt>(replacementElementTypes.begin(),
+                                            replacementElementTypes.end()),
+                     *context);
+      return replacement;
+    }
+  }
+  return std::nullopt;
+}
+
+void SolutionUnifier::TypeUnifier::buildUnificationMap(ASTContext *context,
+                                                       SolutionUnifier *su,
+                                                       ExtendedEnv baseMap,
+                                                       Env *storageMap,
+                                                       bool storeNew,
+                                                       LookupFun inMapTop,
+                                                       AccessorFun typeAccess) {
+  auto loop = [&] (bool nominalOrAll) {
+    for (auto tv : baseMap) {
+      Type idxType = typeAccess(tv.second);
+      TypeUnifier transformer =
+        TypeUnifier(idxType, tv.first, context, su, inMapTop, storeNew);
+      std::optional<Type> nextType = nominalOrAll ?
+        transformer.unifyNominal(idxType) :
+        idxType.transformRec([&](Type t){
+          return transformer.unifyAll(t);
+        });
+      if (nextType.has_value()) {
+        (*storageMap)[tv.first] = nextType.value();
+      }
+    }
+  };
+  loop(true /*Nominal*/);
+  loop(false /* All */);
+}
+
+auto SolutionUnifier::TypeUnifier::inReplacementMap(Env& map){
+  return [&] (TypeVariableType* currentTV, Type _) {
+    if (map.contains(currentTV))
+      return std::optional<Type>(map[currentTV]);
+    return (std::optional<Type>) std::nullopt;
+  };
+}
+
+std::pair<bool, bool>
+  SolutionUnifier::TypeUnifier::matchingTypes(ExtendedEnv baseMap,
+                                              Env unified1, Env comparison1,
+                                              Env unified2, Env comparison2) {
+    bool allMatchesU1 = true,allMatchesU2 = true;
+    for(auto tv : baseMap) {
+      TypeVariableType* typeVar = tv.first;
+      Type firstUnification = unified1[typeVar];
+      Type firstComp = comparison1[typeVar];
+      Type secondUnification = unified2[typeVar];
+      Type secondComp = comparison2[typeVar];
+
+      if ((firstUnification && firstComp &&
+           !firstUnification->isEqual(firstComp))
+          || !firstUnification || !firstComp)
+        allMatchesU1 = false;
+      if ((secondUnification && secondComp &&
+           !secondUnification->isEqual(secondComp)) ||
+          !secondUnification || !secondComp)
+        allMatchesU2 = false;
+    }
+    return std::pair(allMatchesU1,allMatchesU2);
+}
+
+bool SolutionUnifier::canUnifyTypes(const Solution* s1, const Solution* s2,
+                                    ExtendedEnv baseMap,
+                                    bool saveUnifiedTypes) {
+  Env proposedS1Replacements;
+  Env proposedS2Replacements;
+  Env s2Unifications;
+  Env s1Unifications;
+  auto baseSize = baseMap.size();
+
+  if (s1->UnionedTypes.size() >= baseSize &&
+      s2->UnionedTypes.size() >= baseSize) {
+    return TypeUnifier::matchingTypes(baseMap, s1->UnionedTypes,
+                                      s2->UnionedTypes,
+                                      Env(), Env()
+                                      ).first;
+  } else if (s1->UnionedTypes.size() >= baseSize) {
+    TypeUnifier::buildUnificationMap(context, this, baseMap, &s2Unifications, false,
+                                     TypeUnifier::inReplacementMap(s1->UnionedTypes),
+                                     first);
+    TypeUnifier::buildUnificationMap(context, this, baseMap, &proposedS2Replacements,
+                                     true, liftedInMap(), second);
+    TypeUnifier::buildUnificationMap(context, this, baseMap, &s1Unifications, false,
+                                     TypeUnifier::inReplacementMap(proposedS2Replacements),
+                                     first);
+    auto matching =
+      TypeUnifier::matchingTypes(baseMap, s1->UnionedTypes, s2Unifications,
+                                proposedS2Replacements, s1Unifications);
+
+    if (matching.first && saveUnifiedTypes) {
+      s2->UnionedTypes.copyFrom(s1->UnionedTypes);
+      return matching.first;
+    } else if (matching.second && saveUnifiedTypes) {
+      s1->UnionedTypes.copyFrom(proposedS2Replacements);
+      s2->UnionedTypes.copyFrom(proposedS2Replacements);
+      return matching.second;
+    } else
+      return matching.first || matching.second;
+  } else if (s2->UnionedTypes.size() >= baseSize) {
+    TypeUnifier::buildUnificationMap(context, this, baseMap, &s1Unifications, false,
+                                     TypeUnifier::inReplacementMap(s2->UnionedTypes),
+                                     second);
+    TypeUnifier::buildUnificationMap(context, this, baseMap, &proposedS1Replacements,
+                                     true, liftedInMap(), first);
+    TypeUnifier::buildUnificationMap(context, this, baseMap, &s2Unifications, false,
+                                     TypeUnifier::inReplacementMap(proposedS1Replacements),
+                                     second);
+    auto matching =
+      TypeUnifier::matchingTypes(baseMap, s2->UnionedTypes, s1Unifications,
+                                 proposedS1Replacements, s2Unifications);
+
+    if (matching.second && saveUnifiedTypes) {
+      s1->UnionedTypes.copyFrom(s2->UnionedTypes);
+      return matching.second;
+    } else if (matching.first && saveUnifiedTypes) {
+      s1->UnionedTypes.copyFrom(proposedS1Replacements);
+      s2->UnionedTypes.copyFrom(proposedS1Replacements);
+      return matching.first;
+    } else
+      return matching.first || matching.second;
+  }
+  TypeUnifier::buildUnificationMap(context, this, baseMap, &proposedS1Replacements,
+                                   true, liftedInMap(), first);
+  typeMap.clear();
+  TypeUnifier::buildUnificationMap(context, this, baseMap, &proposedS2Replacements,
+                                   true, liftedInMap(), second);
+
+  TypeUnifier::buildUnificationMap(context, this, baseMap, &s2Unifications, false,
+                                   TypeUnifier::inReplacementMap(proposedS1Replacements),
+                                   first);
+  TypeUnifier::buildUnificationMap(context, this, baseMap, &s1Unifications, false,
+                                   TypeUnifier::inReplacementMap(proposedS2Replacements),
+                                   second);
+
+  //Now check all of the type variabyles, for both orderings
+  auto matching = TypeUnifier::matchingTypes(baseMap,
+                                             proposedS1Replacements, s2Unifications,
+                                             proposedS2Replacements, s1Unifications);
+  if (matching.first || matching.second) {
+    if (matching.first && saveUnifiedTypes) {
+      s1->UnionedTypes.copyFrom(proposedS1Replacements);
+      s2->UnionedTypes.copyFrom(proposedS1Replacements);
+    }
+    if (matching.second && saveUnifiedTypes) {
+      s1->UnionedTypes.copyFrom(proposedS2Replacements);
+      s2->UnionedTypes.copyFrom(proposedS2Replacements);
+    }
+  }
+  return matching.first || matching.second;
 }
 
 InputMatcher::InputMatcher(const ArrayRef<AnyFunctionType::Param> params,

@@ -383,6 +383,14 @@ ERROR(cannot_convert_argument_value,none,
       "cannot convert value of type %0 to expected argument type %1",
       (Type,Type))
 
+ERROR(cannot_convert_argument_value_general_type,none,
+      "cannot convert value of type %0 for use in overloaded function; changing to %1 reduces ambiguity",
+      (Type,Type))
+
+ERROR(cannot_convert_argument_value_generic_params,none,
+      "cannot convert value of type %0 for use in overloaded function; looking for a type like %1",
+      (Type,Type))
+
 ERROR(cannot_convert_unresolved_key_path_argument_value,none,
       "cannot convert value of key path type to expected argument type %0",
       (Type))

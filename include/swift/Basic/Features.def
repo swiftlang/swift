@@ -402,6 +402,9 @@ EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances, false)
 /// Enables opaque type erasure without also enabling implict dynamic
 EXPERIMENTAL_FEATURE(OpaqueTypeErasure, true)
 
+/// Enables unification of types for ambiguity resolution in diagnostics
+EXPERIMENTAL_FEATURE(UnificationDiagnostic, false)
+
 /// Whether to perform round-trip testing of the Swift Swift parser.
 EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
 

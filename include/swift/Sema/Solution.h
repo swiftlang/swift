@@ -448,6 +448,9 @@ public:
   /// Contextual types introduced by this solution.
   std::vector<std::pair<ASTNode, ContextualTypeInfo>> contextualTypes;
 
+  /// Unioned types found while analyzing this and similar solutions
+  mutable llvm::DenseMap<TypeVariableType *, Type> UnionedTypes;
+
   /// Maps AST nodes to their target.
   llvm::DenseMap<SyntacticElementTargetKey, SyntacticElementTarget> targets;
 

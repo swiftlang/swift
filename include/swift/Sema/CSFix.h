@@ -847,6 +847,7 @@ protected:
                      FixBehavior fixBehavior = FixBehavior::Error)
       : ConstraintFix(cs, kind, locator, fixBehavior), LHS(lhs), RHS(rhs) {}
 
+  std::optional<Type> GenericFixType;
 public:
   std::string getName() const override { return "fix contextual mismatch"; }
 
