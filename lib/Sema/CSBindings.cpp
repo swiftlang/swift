@@ -991,7 +991,7 @@ bool BindingSet::finalizeKeyPathBindings() {
       bool isContextualTypeReadOnly = false;
       // If the key path is sufficiently resolved we can add inferred binding
       // to the set.
-      SmallSetVector<PotentialBinding, 4> updatedBindings;
+      SmallVector<PotentialBinding, 4> updatedBindings;
       for (const auto &binding : Bindings) {
         auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
 
@@ -1008,7 +1008,7 @@ bool BindingSet::finalizeKeyPathBindings() {
                                        extInfo.withSendable(false));
           }
 
-          updatedBindings.insert(binding.withType(fnType));
+          updatedBindings.push_back(binding.withType(fnType));
           isContextualTypeReadOnly = true;
         } else if (!(bindingTy->isWritableKeyPath() ||
                      bindingTy->isReferenceWritableKeyPath())) {
@@ -1042,8 +1042,8 @@ bool BindingSet::finalizeKeyPathBindings() {
           // better diagnostics.
           auto keyPathTy = getKeyPathType(ctx, *capability, rootTy,
                                           CS.getKeyPathValueType(keyPath));
-          updatedBindings.insert({keyPathTy, AllowedBindingKind::Fallback, locator,
-                                  /*originator=*/nullptr});
+          updatedBindings.push_back({keyPathTy, AllowedBindingKind::Fallback, locator,
+                                    /*originator=*/nullptr});
         } else if (CS.shouldAttemptFixes()) {
           auto fixedRootTy = CS.getFixedType(rootTy);
           // If key path is structurally correct and has a resolved root
@@ -1058,12 +1058,12 @@ bool BindingSet::finalizeKeyPathBindings() {
               return entry->getKind() == ConstraintKind::FallbackType;
             });
             assert(fallback != Defaults.end());
-            updatedBindings.insert(
+            updatedBindings.push_back(
                 {(*fallback)->getSecondType(),
                  AllowedBindingKind::Fallback,
                  *fallback});
           } else {
-            updatedBindings.insert(PotentialBinding::forHole(
+            updatedBindings.push_back(PotentialBinding::forHole(
                 TypeVar, CS.getConstraintLocator(
                              keyPath, ConstraintLocator::FallbackType)));
           }
@@ -1071,7 +1071,8 @@ bool BindingSet::finalizeKeyPathBindings() {
       }
 
       Bindings.clear();
-      Bindings.append(updatedBindings.begin(), updatedBindings.end());
+      for (const auto &binding : updatedBindings)
+        addBinding(binding);
       Defaults.clear();
 
       // Note the fact that we modified the binding set.
