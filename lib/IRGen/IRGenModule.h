@@ -716,6 +716,7 @@ public:
   llvm::StringMap<ModuleDecl*> OriginalModules;
   llvm::SmallString<128> OutputFilename;
   llvm::SmallString<128> MainInputFilenameForDebugInfo;
+  llvm::SmallString<128> CacheKeyForJob;
 
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
@@ -1643,13 +1644,14 @@ public:
               SourceFile *SF,
               StringRef ModuleName, StringRef OutputFilename,
               StringRef MainInputFilenameForDebugInfo,
-              StringRef PrivateDiscriminator);
+              StringRef PrivateDiscriminator,
+              StringRef CacheKeyForJob);
 
   /// The constructor used when we just need an IRGenModule for type lowering.
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target)
     : IRGenModule(irgen, std::move(target), /*SF=*/nullptr,
                   "<fake module name>", "<fake output filename>",
-                  "<fake main input filename>", "") {}
+                  "<fake main input filename>", "", "") {}
 
   ~IRGenModule();
 

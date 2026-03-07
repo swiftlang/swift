@@ -205,7 +205,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                          SourceFile *SF, StringRef ModuleName,
                          StringRef OutputFilename,
                          StringRef MainInputFilenameForDebugInfo,
-                         StringRef PrivateDiscriminator)
+                         StringRef PrivateDiscriminator,
+                         StringRef CacheKeyForJob)
     : LLVMContext(new llvm::LLVMContext()), IRGen(irgen),
       Context(irgen.SIL.getASTContext()),
       // The LLVMContext (and the IGM itself) will get deleted by the IGMDeleter
@@ -216,11 +217,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       DataLayout(irgen.getClangDataLayoutString()),
       Triple(irgen.getEffectiveClangTriple()),
       VariantTriple(irgen.getEffectiveClangVariantTriple()),
-      TargetMachine(std::move(target)),
-      silConv(irgen.SIL), OutputFilename(OutputFilename),
+      TargetMachine(std::move(target)), silConv(irgen.SIL),
+      OutputFilename(OutputFilename),
       MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
-      TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
-      ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
+      CacheKeyForJob(CacheKeyForJob), TargetInfo(SwiftTargetInfo::get(*this)),
+      DebugInfo(nullptr), ModuleHash(nullptr),
+      ObjCInterop(Context.LangOpts.EnableObjCInterop),
       UseDarwinPreStableABIBit(Context.LangOpts.UseDarwinPreStableABIBit),
       Types(*new TypeConverter(*this)) {
   irgen.addGenModule(SF, this);
@@ -574,10 +576,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   }
 
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
-    DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
-                                                     Module,
-                                                 MainInputFilenameForDebugInfo,
-                                                     PrivateDiscriminator);
+    DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(
+        IRGen.Opts, *CI, *this, Module, MainInputFilenameForDebugInfo,
+        PrivateDiscriminator, CacheKeyForJob);
 
   if (auto loader = Context.getClangModuleLoader()) {
     ClangASTContext =
