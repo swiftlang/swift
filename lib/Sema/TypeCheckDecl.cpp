@@ -2733,7 +2733,11 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
       // or lazy type-checking, regular type-checking should go through the
       // StmtChecker and assign types before querying this, otherwise we could
       // end up double-type-checking.
+      // FIXME: The check for 'IsForSourceKit' is a hack to workaround cases
+      // where we're doing cursor info in an invalid extension, we ought to
+      // still be type-checking decls in invalid extensions.
       ASSERT(Context.SourceMgr.hasIDEInspectionTargetBuffer() ||
+             Context.LangOpts.IsForSourceKit ||
              Context.TypeCheckerOpts.EnableLazyTypecheck &&
              "Querying VarDecl's type before type-checking parent stmt");
 
