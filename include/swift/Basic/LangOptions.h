@@ -526,6 +526,10 @@ namespace swift {
     /// prevents files from being written.
     bool OpenSourcesAsVolatile = false;
 
+    /// Whether the AST is being built for SourceKit.
+    /// FIXME: Eliminate this, it's a layering violation.
+    bool IsForSourceKit = false;
+
     /// Load swiftmodule files in memory as volatile and avoid mmap.
     bool EnableVolatileModules = false;
 

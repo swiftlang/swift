@@ -1146,6 +1146,7 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
       Invocation, convertFileContentsToInputs(getFileContents()));
 
   Invocation.getLangOptions().CollectParsedToken = true;
+  Invocation.getLangOptions().IsForSourceKit = true;
   CompIns.getSourceMgr().setFileSystem(FileSystem);
 
   if (CompIns.setup(Invocation, Error)) {
