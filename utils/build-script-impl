@@ -2690,7 +2690,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 FILTER_SWIFT_OPTION="--filter=[sS]wift"
-                FILTER_SWIFT_API_OPTION="--filter=lang/swift"
                 LLVM_LIT_FILTER_ARG=""
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLVM_LIT_FILTER_ARG="${FILTER_SWIFT_OPTION}"
@@ -2699,20 +2698,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Running LLDB unit tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
-                echo "--- Running LLDB tests (Swift Config: ClangImporter) ---"
+                echo "--- Running LLDB tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG} \
-                         --param dotest-args="--setting symbols.use-swift-clangimporter=true"
-                echo "--- Rerun LLDB Swift API tests (Swift Config: DWARFImporter) ---"
-                with_pushd ${results_dir} \
-                    call "${llvm_build_dir}/bin/llvm-lit" \
-                         "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_API_OPTION} \
-                         --param dotest-args="--setting symbols.use-swift-clangimporter=false"
+                         ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}
 
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                     echo "Running LLDB swift compatibility tests against" \
