@@ -124,7 +124,7 @@ class SwiftPM(product.Product):
             host_target,
             additional_params=[
                 "--reconfigure",
-                "--verbose",
+                # "--verbose",
             ],
         )
 
@@ -137,7 +137,7 @@ class SwiftPM(product.Product):
             host_target,
             compile_only_for_running_host_architecture=True,
             additional_params=[
-                "--verbose",
+                # "--verbose",
             ]
         )
 
