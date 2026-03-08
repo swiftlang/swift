@@ -1116,9 +1116,6 @@ bool BindingSet::finalizeKeyPathBindings() {
       for (const auto &binding : Bindings) {
         auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
 
-        assert(bindingTy->isKnownKeyPathType() ||
-               bindingTy->is<FunctionType>());
-
         // Functions don't have capability so we can simply add them.
         if (auto *fnType = bindingTy->getAs<FunctionType>()) {
           auto extInfo = fnType->getExtInfo();
@@ -1131,9 +1128,11 @@ bool BindingSet::finalizeKeyPathBindings() {
 
           updatedBindings.push_back(binding.withType(fnType));
           isContextualTypeReadOnly = true;
-        } else if (!(bindingTy->isWritableKeyPath() ||
-                     bindingTy->isReferenceWritableKeyPath())) {
-          isContextualTypeReadOnly = true;
+        } else if (bindingTy->isKnownKeyPathType()) {
+          if (!bindingTy->isWritableKeyPath() &&
+              !bindingTy->isReferenceWritableKeyPath()) {
+            isContextualTypeReadOnly = true;
+          }
         }
       }
 
@@ -2840,8 +2839,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   }
 
   if (TypeVar->getImpl().isKeyPathType()) {
-    auto objectTy = type->lookThroughAllOptionalTypes();
-
     // If contextual type is an existential with a superclass
     // constraint, let's try to infer a key path type from it.
     if (kind == AllowedBindingKind::Subtypes) {
@@ -2850,22 +2847,16 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
         if (auto superclass = layout.explicitSuperclass) {
           if (superclass->isKnownKeyPathType()) {
             type = superclass;
-            objectTy = superclass;
           }
         }
       }
-    }
-
-    if (!(objectTy->isKnownKeyPathType() || objectTy->is<AnyFunctionType>())) {
-      DEBUG_BAILOUT("Bad key path type (1)");
-      return std::nullopt;
     }
   }
 
   if (TypeVar->getImpl().isKeyPathSubscriptIndex()) {
     // Key path subscript index can only be a r-value non-optional
     // type that is a subtype of a known KeyPath type.
-    type = type->getRValueType()->lookThroughAllOptionalTypes();
+    type = type->getRValueType();
 
     // If argument to a key path subscript is an existential,
     // we can erase it to superclass (if any) here and solver
@@ -2876,9 +2867,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
         auto layout = type->getExistentialLayout();
         if (auto superclass = layout.explicitSuperclass) {
           type = superclass;
-        } else if (!CS.shouldAttemptFixes()) {
-          DEBUG_BAILOUT("Bad key path type (2)");
-          return std::nullopt;
         }
       }
     }
