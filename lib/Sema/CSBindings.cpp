@@ -2673,51 +2673,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     return std::nullopt;
   }
 
-  if (TypeVar->getImpl().isKeyPathType()) {
-    auto objectTy = type->lookThroughAllOptionalTypes();
-
-    // If contextual type is an existential with a superclass
-    // constraint, let's try to infer a key path type from it.
-    if (kind == AllowedBindingKind::Subtypes) {
-      if (type->isExistentialType()) {
-        auto layout = type->getExistentialLayout();
-        if (auto superclass = layout.explicitSuperclass) {
-          if (superclass->isKnownKeyPathType()) {
-            type = superclass;
-            objectTy = superclass;
-          }
-        }
-      }
-    }
-
-    if (!(objectTy->isKnownKeyPathType() || objectTy->is<AnyFunctionType>())) {
-      DEBUG_BAILOUT("Bad key path type (1)");
-      return std::nullopt;
-    }
-  }
-
-  if (TypeVar->getImpl().isKeyPathSubscriptIndex()) {
-    // Key path subscript index can only be a r-value non-optional
-    // type that is a subtype of a known KeyPath type.
-    type = type->getRValueType()->lookThroughAllOptionalTypes();
-
-    // If argument to a key path subscript is an existential,
-    // we can erase it to superclass (if any) here and solver
-    // will perform the opening if supertype turns out to be
-    // a valid key path type of its subtype.
-    if (kind == AllowedBindingKind::Supertypes) {
-      if (type->isExistentialType()) {
-        auto layout = type->getExistentialLayout();
-        if (auto superclass = layout.explicitSuperclass) {
-          type = superclass;
-        } else if (!CS.shouldAttemptFixes()) {
-          DEBUG_BAILOUT("Bad key path type (2)");
-          return std::nullopt;
-        }
-      }
-    }
-  }
-
   // Situations like `v.<member> = { ... }` where member is overloaded.
   // We need to wait until member is resolved otherwise there is a risk
   // of losing some of the contextual attributes important for the closure
@@ -2808,23 +2763,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     return std::nullopt;
   }
 
-  // If our binding choice is a function type and we're attempting
-  // to bind to a type variable that is the result of opening a
-  // generic parameter, strip the noescape bit so that we only allow
-  // bindings of escaping functions in this position. We do this
-  // because within the generic function we have no indication of
-  // whether the parameter is a function type and if so whether it
-  // should be allowed to escape. As a result we allow anything
-  // passed in to escape.
-  if (auto *fnTy = type->getAs<AnyFunctionType>()) {
-    // Since inference now happens during constraint generation,
-    // this hack should be allowed in both `Solving`
-    // (during non-diagnostic mode) and `ConstraintGeneration` phases.
-    if (isGenericParameter(TypeVar) && !CS.inSalvageMode()) {
-      type = fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape(false));
-    }
-  }
-
   // Check whether we can perform this binding.
   if (!checkTypeOfBinding(TypeVar, type)) {
     auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
@@ -2899,6 +2837,68 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     }
 
     return std::nullopt;
+  }
+
+  if (TypeVar->getImpl().isKeyPathType()) {
+    auto objectTy = type->lookThroughAllOptionalTypes();
+
+    // If contextual type is an existential with a superclass
+    // constraint, let's try to infer a key path type from it.
+    if (kind == AllowedBindingKind::Subtypes) {
+      if (type->isExistentialType()) {
+        auto layout = type->getExistentialLayout();
+        if (auto superclass = layout.explicitSuperclass) {
+          if (superclass->isKnownKeyPathType()) {
+            type = superclass;
+            objectTy = superclass;
+          }
+        }
+      }
+    }
+
+    if (!(objectTy->isKnownKeyPathType() || objectTy->is<AnyFunctionType>())) {
+      DEBUG_BAILOUT("Bad key path type (1)");
+      return std::nullopt;
+    }
+  }
+
+  if (TypeVar->getImpl().isKeyPathSubscriptIndex()) {
+    // Key path subscript index can only be a r-value non-optional
+    // type that is a subtype of a known KeyPath type.
+    type = type->getRValueType()->lookThroughAllOptionalTypes();
+
+    // If argument to a key path subscript is an existential,
+    // we can erase it to superclass (if any) here and solver
+    // will perform the opening if supertype turns out to be
+    // a valid key path type of its subtype.
+    if (kind == AllowedBindingKind::Supertypes) {
+      if (type->isExistentialType()) {
+        auto layout = type->getExistentialLayout();
+        if (auto superclass = layout.explicitSuperclass) {
+          type = superclass;
+        } else if (!CS.shouldAttemptFixes()) {
+          DEBUG_BAILOUT("Bad key path type (2)");
+          return std::nullopt;
+        }
+      }
+    }
+  }
+
+  // If our binding choice is a function type and we're attempting
+  // to bind to a type variable that is the result of opening a
+  // generic parameter, strip the noescape bit so that we only allow
+  // bindings of escaping functions in this position. We do this
+  // because within the generic function we have no indication of
+  // whether the parameter is a function type and if so whether it
+  // should be allowed to escape. As a result we allow anything
+  // passed in to escape.
+  if (auto *fnTy = type->getAs<AnyFunctionType>()) {
+    // Since inference now happens during constraint generation,
+    // this hack should be allowed in both `Solving`
+    // (during non-diagnostic mode) and `ConstraintGeneration` phases.
+    if (isGenericParameter(TypeVar) && !CS.inSalvageMode()) {
+      type = fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape(false));
+    }
   }
 
   // Make sure we aren't trying to equate type variables with different
