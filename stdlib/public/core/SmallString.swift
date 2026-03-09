@@ -231,13 +231,13 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
 extension _SmallString {
   @inlinable @inline(__always)
   @safe
-  internal func withUTF8<Result>(
-    _ f: (UnsafeBufferPointer<UInt8>) throws -> Result
-  ) rethrows -> Result {
+  internal func withUTF8<Success, Failure: Error>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws(Failure) -> Success
+  ) throws(Failure) -> Success {
     let count = self.count
     var raw = self.zeroTerminatedRawCodeUnits
-    return try unsafe Swift._withUnprotectedUnsafeBytes(of: &raw) {
-      let rawPtr = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
+    return try unsafe Swift._withUnprotectedUnsafeBytes(of: &raw) { (bytes) throws(Failure) in
+      let rawPtr = unsafe bytes.baseAddress._unsafelyUnwrappedUnchecked
       // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the
       // duration of the closure. Accessing self after this rebind is undefined.
       let ptr = unsafe rawPtr.bindMemory(to: UInt8.self, capacity: count)
@@ -379,7 +379,7 @@ extension _SmallString {
     }
     self._invariantCheck()
   }
-  
+
   @_effects(readonly) // @opaque
   internal init?(taggedASCIICocoa cocoa: AnyObject) {
     self.init()
