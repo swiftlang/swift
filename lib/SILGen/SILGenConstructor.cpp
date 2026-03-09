@@ -615,7 +615,11 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
     // pointer field whose return type bridges differently), convert using
     // emitSubstToOrigValue before handling any ReferenceStorageType
     // conversion.
-    if (mv.getType() != fieldTy) {
+    // Skip this when the mismatch is solely due to reference storage type
+    // wrapping (weak/unowned/unmanaged) — emitConversionFromSemanticValue
+    // handles that case.
+    if (mv.getType() != fieldTy &&
+        !fieldTy.getASTType()->is<ReferenceStorageType>()) {
       AbstractionPattern origFieldTy =
           SGF.SGM.Types.getAbstractionPattern(field);
       CanType substFieldTy;
