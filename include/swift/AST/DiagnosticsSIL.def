@@ -1220,6 +1220,40 @@ GROUPED_ERROR(regionbasedisolation_inout_sending_in_same_region, RegionIsolation
 NOTE(regionbasedisolation_inout_sending_in_same_region_note, none,
      "caller function assumes on return that %0 and %1 cannot be used to access each other implying sending them to different isolation domains does not risk a data race", (Identifier, Identifier))
 
+//===
+// Merge Region Failure Error
+//
+
+ERROR(regionbasedisolation_merge_region_failure_error_unknown, none,
+      "allowing references between %select{%0|%1 %0}4 and %3 %2 risks causing data races",
+      (Identifier, StringRef, Identifier, StringRef, bool))
+NOTE(regionbasedisolation_merge_region_failure_error_unknown_note, none,
+     "%0 could become accessible to %3 code despite remaining accessible to %select{code in the current task|%1 code}4",
+     (Identifier, StringRef, Identifier, StringRef, bool))
+ERROR(regionbasedisolation_merge_region_failure_error_assign, none,
+      "assigning %select{%0|%1 %0}4 to %3 %2 risks causing data races",
+      (Identifier, StringRef, Identifier, StringRef, bool))
+NOTE(regionbasedisolation_merge_region_failure_error_assign_note, none,
+      "%0 could become accessible to %2 code despite remaining accessible to %select{code in the current task|%1 code}3",
+      (Identifier, StringRef, StringRef, bool))
+ERROR(regionbasedisolation_merge_region_failure_error_functionisolation, none,
+      "passing %select{%0|%1 %0}4 to %3 %kind2 risks causing data races",
+      (Identifier, StringRef, const ValueDecl *, StringRef, bool))
+ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_type, none,
+      "passing %select{%0|%1 %0}4 to %3 %kind2 risks causing data races",
+      (Type, StringRef, const ValueDecl *, StringRef, bool))
+
+ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_sil, none,
+      "passing %1 %0 to %3 %2 risks causing data races",
+      (Identifier, StringRef, Identifier, StringRef))
+
+// We always put the potential task-isolated value first to simplify the note.
+ERROR(regionbasedisolation_merge_region_failure_error_nonisolatedfunction, none,
+      "passing %select{%0|%1 %0}5 and %3 %2 as arguments to %kind4 risks causing data races",
+      (Identifier, StringRef, Identifier, StringRef, const ValueDecl *, bool))
+NOTE(regionbasedisolation_merge_region_failure_error_nonisolatedfunction_note, none,
+     "%2 could begin referencing %0 allowing concurrent access to %0 by %3 code and %select{code in the current task|%1 code}5", (Identifier, StringRef, Identifier, StringRef, const ValueDecl *, bool))
+
 // Concurrency related diagnostics
 ERROR(cannot_find_executor_factory_type, none,
       "the DefaultExecutorFactory type could not be found", ())
