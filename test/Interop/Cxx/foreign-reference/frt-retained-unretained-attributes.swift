@@ -247,3 +247,32 @@ func testVirtualMethods(base: Base, derived: Derived) {
     var frt4 = mutableDerived.VirtualMethodReturningFRTOwned()
     // CHECK: function_ref @{{.*}}VirtualMethodReturningFRTOwned{{.*}} : $@convention(cxx_method) (@inout Derived) -> @owned FRTStruct
 }
+
+func testDefaultOwnershipAnnotation() {
+  let _ = DefaultOwnershipConventionOnCXXForeignRefType.returnRefTyDefUnretained()
+  // CHECK: function_ref {{.*}}returnRefTyDefUnretained{{.*}} : $@convention(c) () -> DefaultOwnershipConventionOnCXXForeignRefType.RefTyDefUnretained
+
+  let _ = FunctionAnnotationHasPrecedence.returnRefTyDefUnretained()
+  // CHECK: function_ref {{.*}}returnRefTyDefUnretained{{.*}} : $@convention(c) () -> FunctionAnnotationHasPrecedence.RefTyDefUnretained
+
+  let _ = FunctionAnnotationHasPrecedence.returnRefTyDefUnretainedAnnotatedRetained()
+  // CHECK: function_ref {{.*}}returnRefTyDefUnretainedAnnotatedRetained{{.*}} : $@convention(c) () -> @owned FunctionAnnotationHasPrecedence.RefTyDefUnretained
+
+  let _ = DefaultOwnershipInheritance.createBaseType()
+  // CHECK: function_ref {{.*}}createBaseType{{.*}} : $@convention(c) () -> DefaultOwnershipInheritance.BaseType
+
+  let _ = DefaultOwnershipInheritance.createDerivedType()
+  // CHECK: function_ref {{.*}}createDerivedType{{.*}} : $@convention(c) () -> DefaultOwnershipInheritance.DerivedType
+
+  let _ = DefaultOwnershipInheritance.createDerivedType2()
+  // CHECK: function_ref {{.*}}createDerivedType2{{.*}} : $@convention(c) () -> DefaultOwnershipInheritance.DerivedType2
+
+  let _ = DefaultOwnershipInheritance.createBaseTypeNonDefault()
+  // CHECK: function_ref {{.*}}createBaseTypeNonDefault{{.*}} : $@convention(c) () -> @owned DefaultOwnershipInheritance.BaseTypeNonDefault
+
+  let _ = DefaultOwnershipInheritance.createDerivedTypeNonDefault()
+  // CHECK: function_ref {{.*}}createDerivedTypeNonDefault{{.*}} : $@convention(c) () -> @owned DefaultOwnershipInheritance.DerivedTypeNonDefault
+
+  let _ = DefaultOwnershipInheritance.createDerivedTypeNonDefaultUnretained()
+  // CHECK: function_ref {{.*}}createDerivedTypeNonDefaultUnretained{{.*}} : $@convention(c) () -> DefaultOwnershipInheritance.DerivedTypeNonDefault
+}
