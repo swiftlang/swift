@@ -82,6 +82,12 @@ public:
     HeapTypeInfo::emitScalarRelease(IGF, value, atomicity);
   }
 
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override {
+    // Custom refcounting functions might not support null pointers.
+    return index == 0 && getReferenceCounting() != ReferenceCounting::Custom;
+  }
+
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
                         Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
@@ -100,7 +106,7 @@ public:
   }
 
   void strongCustomRetain(IRGenFunction &IGF, Explosion &e,
-                          bool needsNullCheck) const {
+                          bool needsNullCheck) const override {
     assert(getReferenceCounting() == ReferenceCounting::Custom &&
            "only supported for custom ref-counting");
 
@@ -129,7 +135,7 @@ public:
   }
 
   void strongCustomRelease(IRGenFunction &IGF, Explosion &e,
-                           bool needsNullCheck) const {
+                           bool needsNullCheck) const override {
     assert(getReferenceCounting() == ReferenceCounting::Custom &&
            "only supported for custom ref-counting");
 

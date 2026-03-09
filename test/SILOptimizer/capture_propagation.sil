@@ -585,7 +585,6 @@ bb0:
 // CHECK:         [[K:%[0-9]+]] = keypath
 // CHECK:         [[F:%[0-9]+]] = function_ref @swift_getAtKeyPath
 // CHECK:         apply [[F]]<Str, Int>({{%[0-9]+, %[0-9]+}}, [[K]]
-// CHECK:         strong_release [[K]]
 // CHECK:       } // end sil function '$s18closureWithKeypath{{.*}}main3StrVSiTf3npk_n'
 sil @closureWithKeypath : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>) -> Int {
 bb0(%0 : $Str, %1 : $KeyPath<Str, Int>):
@@ -695,8 +694,9 @@ bb0:
 
 // CHECK-LABEL: sil shared [ossa] @$s22closureWithKeypathOSSA{{.*}}main3StrVSiTf3npk_n : $@convention(thin) (Str) -> Int {
 // CHECK:         [[K:%[0-9]+]] = keypath
+// CHECK:         [[BB:%[0-9]+]] = begin_borrow [[K]]
 // CHECK:         [[F:%[0-9]+]] = function_ref @swift_getAtKeyPath
-// CHECK:         apply [[F]]<Str, Int>({{%[0-9]+, %[0-9]+}}, [[K]]
+// CHECK:         apply [[F]]<Str, Int>({{%[0-9]+, %[0-9]+}}, [[BB]]
 // CHECK:         destroy_value [[K]]
 // CHECK:       } // end sil function '$s22closureWithKeypathOSSA{{.*}}main3StrVSiTf3npk_n'
 sil [ossa] @closureWithKeypathOSSA : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>) -> Int {
@@ -736,8 +736,9 @@ bb0(%0 : $Int):
 
 // CHECK-LABEL: sil shared [ossa] @$s24closureWithKeypathAndInt{{.*}}4main3StrVSiTf3npkn_n : $@convention(thin) (Str, Int) -> Int {
 // CHECK:         [[K:%[0-9]+]] = keypath
+// CHECK:         [[BB:%[0-9]+]] = begin_borrow [[K]]
 // CHECK:         [[F:%[0-9]+]] = function_ref @swift_getAtKeyPath
-// CHECK:         apply [[F]]<Str, Int>({{%[0-9]+, %[0-9]+}}, [[K]]
+// CHECK:         apply [[F]]<Str, Int>({{%[0-9]+, %[0-9]+}}, [[BB]]
 // CHECK:         destroy_value [[K]]
 // CHECK:       } // end sil function '$s24closureWithKeypathAndInt{{.*}}4main3StrVSiTf3npkn_n'
 sil [ossa] @closureWithKeypathAndInt : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>, Int) -> Int {
@@ -777,8 +778,9 @@ bb0(%0 : $*Int):
 
 // CHECK-LABEL: sil shared [ossa] @$s22closureWithKeypathAndT{{.*}}4main3StrVSiTf3npkn_n : $@convention(thin) (Str, @in_guaranteed Int) -> Int {
 // CHECK:         [[K:%[0-9]+]] = keypath
+// CHECK:         [[BB:%[0-9]+]] = begin_borrow [[K]]
 // CHECK:         [[F:%[0-9]+]] = function_ref @swift_getAtKeyPath
-// CHECK:         apply [[F]]<Str, Int>({{%[0-9]+, %[0-9]+}}, [[K]]
+// CHECK:         apply [[F]]<Str, Int>({{%[0-9]+, %[0-9]+}}, [[BB]]
 // CHECK:         destroy_value [[K]]
 // CHECK:       } // end sil function '$s22closureWithKeypathAndT{{.*}}4main3StrVSiTf3npkn_n'
 sil [ossa] @closureWithKeypathAndT : $@convention(thin) <T> (Str, @guaranteed KeyPath<Str, Int>, @in_guaranteed T) -> Int {
@@ -793,6 +795,48 @@ bb0(%0 : $Str, %1 : @guaranteed $KeyPath<Str, Int>, %2 : $*T):
   dealloc_stack %4 : $*Str
   return %9 : $Int
 }
+
+sil [ossa] @testUpcastInClosure : $@convention(thin) () -> () {
+bb0:
+  %0 = keypath $WritableKeyPath<Str, Int>, (root $Str; stored_property #Str.a : $Int)
+  %1 = function_ref @closureWithWritableKeypath : $@convention(thin) (Str, @guaranteed WritableKeyPath<Str, Int>) -> Int
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Str, @guaranteed WritableKeyPath<Str, Int>) -> Int
+  %4 = function_ref @callee2WithKeypath : $@convention(thin) (@callee_guaranteed (Str) -> Int) -> ()
+  %5 = apply %4(%2) : $@convention(thin) (@callee_guaranteed (Str) -> Int) -> ()
+  destroy_value %2
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s26closureWithWritableKeypath{{.*}}4main3StrVSiTf3npk_n : $@convention(thin) (Str) -> Int {
+// CHECK:         [[K:%[0-9]+]] = keypath
+// CHECK:         [[BB:%[0-9]+]] = begin_borrow [[K]]
+// CHECK:         [[UC:%[0-9]+]] = upcast [[BB]]
+// CHECK:         [[F:%[0-9]+]] = function_ref @swift_getAtKeyPath
+// CHECK:         apply [[F]]<Str, Int>({{%[0-9]+, %[0-9]+}}, [[UC]]
+// CHECK:         destroy_value [[K]]
+// CHECK:       } // end sil function '$s26closureWithWritableKeypath{{.*}}4main3StrVSiTf3npk_n'
+sil [ossa] @closureWithWritableKeypath : $@convention(thin) (Str, @guaranteed WritableKeyPath<Str, Int>) -> Int {
+bb0(%0 : $Str, %1 : @guaranteed $WritableKeyPath<Str, Int>):
+  %2 = upcast %1 to $KeyPath<Str, Int>
+  %4 = alloc_stack $Str
+  store %0 to [trivial] %4 : $*Str
+  %6 = function_ref @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %7 = alloc_stack $Int
+  %8 = apply %6<Str, Int>(%7, %4, %2) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  %9 = load [trivial] %7 : $*Int
+  dealloc_stack %7 : $*Int
+  dealloc_stack %4 : $*Str
+  return %9 : $Int
+}
+
+sil @callee2WithKeypath : $@convention(thin) (@callee_guaranteed (Str) -> Int) -> ()
 
 sil @useIntClosure : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Builtin.Int32) -> ()
 

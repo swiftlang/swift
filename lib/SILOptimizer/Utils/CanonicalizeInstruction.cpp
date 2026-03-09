@@ -521,8 +521,15 @@ eliminateUnneededForwardingUnarySingleValueInst(SingleValueInstruction *inst,
     }
     return next;
   }
-  deleteAllDebugUses(inst, pass.callbacks);
   SILValue op = inst->getOperand(0);
+
+  // If a forwarding instruction doesn't forward the same ownership we cannot delete it.
+  // This can happen if e.g. a `struct` instruction constructs a non-copyable struct
+  // out of trivial arguments.
+  if (op->getOwnershipKind() != inst->getOwnershipKind())
+    return next;
+
+  deleteAllDebugUses(inst, pass.callbacks);
   inst->replaceAllUsesWith(op);
   pass.notifyHasNewUsers(op);
   return killInstruction(inst, next, pass);

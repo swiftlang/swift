@@ -140,14 +140,17 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
 // actually dereference the instruction, so just use some invalid ptr values so
 // we can compare.
 Operand *operandSingletons[5] = {
-    (Operand *)0xDEAD0000, (Operand *)0xFEAD0000, (Operand *)0xAEDF0000,
-    (Operand *)0xFEDA0000, (Operand *)0xFBDA0000,
+    (Operand *)uintptr_t(0xDEAD0000), (Operand *)uintptr_t(0xFEAD0000),
+    (Operand *)uintptr_t(0xAEDF0000), (Operand *)uintptr_t(0xFEDA0000),
+    (Operand *)uintptr_t(0xFBDA0000),
 };
 
 SILInstruction *instSingletons[5] = {
-    (SILInstruction *)0xBEAD0000, (SILInstruction *)0xBEAD0000,
-    (SILInstruction *)0xBEDF0000, (SILInstruction *)0xBEDA0000,
-    (SILInstruction *)0xBBDA0000,
+    (SILInstruction *)uintptr_t(0xBEAD0000),
+    (SILInstruction *)uintptr_t(0xBEAD0000),
+    (SILInstruction *)uintptr_t(0xBEDF0000),
+    (SILInstruction *)uintptr_t(0xBEDA0000),
+    (SILInstruction *)uintptr_t(0xBBDA0000),
 };
 
 SILLocation fakeLoc = SILLocation::invalid();

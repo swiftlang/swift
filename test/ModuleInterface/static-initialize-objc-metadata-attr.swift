@@ -17,7 +17,7 @@ public class Super<T>: NSObject, NSCoding {
 }
 
 // CHECK-NOT: @_staticInitializeObjCMetadata
-// CHECK: public class Sub : Module.Super<Swift.Int>
+// CHECK: public class Sub : Module::Super<Swift::Int>
 public class Sub: Super<Int> {
   required public init(coder: NSCoder) {}
   override public func encode(with: NSCoder) {}

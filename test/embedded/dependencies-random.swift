@@ -10,6 +10,9 @@
 // RUN: %if OS=wasip1 %{ comm -13 %t/allowed-dependencies_wasi.txt %t/actual-dependencies.txt > %t/extra.txt %}
 // RUN: test ! -s %t/extra.txt
 
+// Expects the POSIX-based dependencies, not the Embedded Swift platform ones.
+// XFAIL: swift_embedded_platform
+
 //--- allowed-dependencies_macos.txt
 ___stack_chk_fail
 ___stack_chk_guard

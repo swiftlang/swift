@@ -1,12 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -module-name ResilientTypes -emit-module-path %t/ResilientTypes.swiftmodule -enable-library-evolution %S/Inputs/builtin_borrow_ResilientTypes.swift
-// RUN: %target-swift-emit-silgen -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes -enable-experimental-feature BorrowAndMutateAccessors -I %t %s | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes -enable-experimental-feature BorrowAndMutateAccessors -I %t %s | %FileCheck --check-prefix=CHECK-POST-CLEANUP %s
+// RUN: %target-swift-emit-silgen -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature RawLayout -I %t %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature RawLayout -I %t %s | %FileCheck --check-prefix=CHECK-POST-CLEANUP %s
 
 // REQUIRES: swift_feature_BuiltinModule
 // REQUIRES: swift_feature_AddressableTypes
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_BorrowAndMutateAccessors
+// REQUIRES: swift_feature_RawLayout
 
 import Builtin
 import ResilientTypes
@@ -29,6 +30,23 @@ struct Dependent<T> {
 
 struct ContainsResilient {
 	var x: Resilient
+}
+
+@_addressableForDependencies
+struct AFD { var x: AnyObject }
+
+@_addressableForDependencies
+struct AFDTrivial { var x: Int }
+
+struct ContainsAFD {
+  let afd: AFD
+}
+
+@_rawLayout(like: Int)
+struct RawInt: ~Copyable {}
+
+struct ContainsRawInt: ~Copyable {
+  let x: RawInt
 }
 
 // Borrow is loadable when its referent has a fixed layout. Otherwise, it's
@@ -78,15 +96,25 @@ func known_dependent(_: Builtin.Borrow<Dependent<NonGeneric>>) {} // loadable
 // CHECK-SAME: $@convention(thin) (@in_guaranteed Builtin.Borrow<Dependent<Resilient>>)
 func resilient_dependent(_: Builtin.Borrow<Dependent<Resilient>>) {} // address
 
+// CHECK-LABEL: sil {{.*}}@$s{{.*}}15known_rawLayout{{.*}} :
+// CHECK-SAME: $@convention(thin) (Builtin.Borrow<RawInt>)
+func known_rawLayout(_: Builtin.Borrow<RawInt>) {} // loadable
+
+// CHECK-LABEL: sil {{.*}}@$s{{.*}}23known_containsRawLayout{{.*}} :
+// CHECK-SAME: $@convention(thin) (Builtin.Borrow<ContainsRawInt>)
+func known_containsRawLayout(_: Builtin.Borrow<ContainsRawInt>) {} // loadable
+
+// CHECK-LABEL: sil {{.*}}@$s{{.*}}9known_afd{{.*}} :
+// CHECK-SAME: $@convention(thin) (Builtin.Borrow<AFD>)
+func known_afd(_: Builtin.Borrow<AFD>) {} // loadable
+
+// CHECK-LABEL: sil {{.*}}@$s{{.*}}17known_containsAfd{{.*}} :
+// CHECK-SAME: $@convention(thin) (Builtin.Borrow<ContainsAFD>)
+func known_containsAfd(_: Builtin.Borrow<ContainsAFD>) {} // loadable
+
 //
 // Builtin.makeBorrow
 //
-
-@_addressableForDependencies
-struct AFD { var x: AnyObject }
-
-@_addressableForDependencies
-struct AFDTrivial { var x: Int }
 
 // CHECK-LABEL: sil{{.*}} @$s{{.*}}06value_B12_make_borrow
 // CHECK:       bb0([[REFERENT:%.*]] :

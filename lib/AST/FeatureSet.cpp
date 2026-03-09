@@ -450,6 +450,7 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
 UNINTERESTING_FEATURE(CustomAvailability)
+UNINTERESTING_FEATURE(BuiltinMarkDependence)
 
 static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   // Explicit `@concurrent` attribute on the declaration.
@@ -597,9 +598,25 @@ static bool usesFeatureReparenting(Decl *decl) {
   return false;
 }
 
-UNINTERESTING_FEATURE(AnyAppleOSAvailability)
 UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowInout)
+
+// CxxBorrowingSequence and CxxBorrowingIterator, defined in the Cxx overlay,
+// conform to BorrowingSequence and BorrowingIteratorProtocol. When a newer
+// compiler is used with an older SDK, the Cxx module interface may reference
+// these Swift stdlib protocols even though they don't exist in the SDK's
+// stdlib. To handle this, we guard them behind the `BorrowingSequence`
+// experimental flag.
+static bool usesFeatureBorrowingSequence(Decl *decl) {
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+    decl = ext->getExtendedNominal();
+
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl))
+    return proto->getNameStr() == "CxxBorrowingSequence";
+  if (auto *sd = dyn_cast<StructDecl>(decl))
+    return sd->getNameStr() == "CxxBorrowingIterator";
+  return false;
+}
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

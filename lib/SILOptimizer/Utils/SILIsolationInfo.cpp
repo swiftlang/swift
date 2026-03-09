@@ -1220,6 +1220,12 @@ void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
     opts -= Flag::UnappliedIsolatedAnyParameter;
   }
 
+  if (opts.contains(Flag::NonisolatedNonsendingTaskIsolated)) {
+    data.push_back(
+        StringLiteral("task_isolated_from_nonisolated_nonsending_parameter"));
+    opts -= Flag::NonisolatedNonsendingTaskIsolated;
+  }
+
   assert(!opts && "Unhandled flag?!");
   assert(data.size() < unsigned(Flag::MaxNumBits) &&
          "Please update MaxNumBits so that we can avoid heap allocations in "

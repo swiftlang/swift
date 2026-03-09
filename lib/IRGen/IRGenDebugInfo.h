@@ -65,7 +65,8 @@ public:
   createIRGenDebugInfo(const IRGenOptions &Opts, ClangImporter &CI,
                        IRGenModule &IGM, llvm::Module &M,
                        StringRef MainOutputFilenameForDebugInfo,
-                       StringRef PrivateDiscriminator);
+                       StringRef PrivateDiscriminator,
+                       StringRef CacheKeyForJob);
   virtual ~IRGenDebugInfo();
 
   /// Finalize the llvm::DIBuilder owned by this object.

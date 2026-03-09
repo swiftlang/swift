@@ -2347,14 +2347,16 @@ private:
     Builder.addField(*OffsetToFirstCapture,
                      /*alignment=*/sizeof(StoredPointer),
                      /*numExtraInhabitants=*/0,
-                     /*bitwiseTakable=*/true);
+                     /*borrowability=*/BitwiseBorrowability::TakableAndBorrowable,
+                     /*afd*/ false);
 
     // Skip the closure's necessary bindings struct, if it's present.
     auto SizeOfNecessaryBindings = Info.NumBindings * sizeof(StoredPointer);
     Builder.addField(/*size=*/SizeOfNecessaryBindings,
                      /*alignment=*/sizeof(StoredPointer),
                      /*numExtraInhabitants=*/0,
-                     /*bitwiseTakable=*/true);
+                     /*borrowability=*/BitwiseBorrowability::TakableAndBorrowable,
+                     /*afd*/ false);
 
     // FIXME: should be unordered_set but I'm too lazy to write a hash
     // functor

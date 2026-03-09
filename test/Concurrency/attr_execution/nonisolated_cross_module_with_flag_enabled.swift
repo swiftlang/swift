@@ -28,7 +28,7 @@ public final class Test {
   // CHECK: nonisolated(nonsending) final public func test() async
   public nonisolated func test() async {}
 
-  // CHECK: @_Concurrency.MainActor final public func compute(callback: nonisolated(nonsending) @escaping @Sendable () async -> Swift.Void)
+  // CHECK: @_Concurrency::MainActor final public func compute(callback: nonisolated(nonsending) @escaping @Sendable () async -> Swift::Void)
   public func compute(callback: @escaping @Sendable () async -> Void) {}
 }
 
@@ -36,18 +36,18 @@ public struct InferenceTest {
   // CHECK: nonisolated(nonsending) public func infersAttr() async
   public func infersAttr() async {}
 
-  // CHECK: public func testNested(callback: @escaping (nonisolated(nonsending) @Sendable () async -> Swift.Void) -> Swift.Void)
+  // CHECK: public func testNested(callback: @escaping (nonisolated(nonsending) @Sendable () async -> Swift::Void) -> Swift::Void)
   public func testNested(callback: @escaping (@Sendable () async -> Void) -> Void) {}
-  // CHECK: public func testNested(dict: [Swift.String : (nonisolated(nonsending) () async -> Swift.Void)?])
+  // CHECK: public func testNested(dict: [Swift::String : (nonisolated(nonsending) () async -> Swift::Void)?])
   public func testNested(dict: [String: (() async -> Void)?]) {}
 
-  // CHECK: nonisolated(nonsending) public func testAutoclosure(value1 fn: nonisolated(nonsending) @autoclosure () async -> Swift.Int) async
+  // CHECK: nonisolated(nonsending) public func testAutoclosure(value1 fn: nonisolated(nonsending) @autoclosure () async -> Swift::Int) async
   public func testAutoclosure(value1 fn: @autoclosure () async -> Int) async { await fn() }
-  // CHECK: nonisolated(nonsending) public func testAutoclosure(value2 fn: nonisolated(nonsending) @autoclosure () async -> Swift.Int) async
+  // CHECK: nonisolated(nonsending) public func testAutoclosure(value2 fn: nonisolated(nonsending) @autoclosure () async -> Swift::Int) async
   public func testAutoclosure(value2 fn: nonisolated(nonsending) @autoclosure () async -> Int) async { await fn() }
 }
 
-// CHECK: nonisolated extension A.InferenceTest {
+// CHECK: nonisolated extension A::InferenceTest {
 // CHECK:   nonisolated(nonsending) public func testInExtension() async
 // CHECK:   @concurrent public func testConcurrentInExtension() async
 // CHECK: }
@@ -63,7 +63,7 @@ public protocol P {
   func testWitness() async
 }
 
-// CHECK: public struct WitnessTest : nonisolated A.P {
+// CHECK: public struct WitnessTest : nonisolated A::P {
 // CHECK:   nonisolated(nonsending) public func testWitness() async
 // CHECK: }
 public struct WitnessTest: nonisolated P {
@@ -77,16 +77,16 @@ nonisolated public class NoinsolatedClassTest {
   public func test() async {}
 }
 
-// CHECK: public typealias F = nonisolated(nonsending) () async -> Swift.Void
+// CHECK: public typealias F = nonisolated(nonsending) () async -> Swift::Void
 public typealias F = () async -> Void
 // CHECK: public typealias G<T> = nonisolated(nonsending) () async -> T
 public typealias G<T> = () async -> T
 
-// CHECK: public func testTypeAlias(_: @escaping A.F)
+// CHECK: public func testTypeAlias(_: @escaping A::F)
 public func testTypeAlias(_: @escaping F) {}
 
 // CHECK: public struct TestGenericTypeAlias {
-// CHECK:   public subscript<U>(_: nonisolated(nonsending) () async -> U) -> Swift.Bool {
+// CHECK:   public subscript<U>(_: nonisolated(nonsending) () async -> U) -> Swift::Bool {
 // CHECK:     get
 // CHECK:   }
 // CHECK: }

@@ -4898,7 +4898,8 @@ void IRGenModule::emitAccessibleFunctions() {
     llvm_unreachable("Don't know how to emit accessible functions for "
                      "the selected object format.");
   case llvm::Triple::MachO:
-    fnsSectionName = "__TEXT, __swift5_acfuncs, regular";
+    // no_dead_strip - accessible functions must never be stripped
+    fnsSectionName = "__TEXT, __swift5_acfuncs, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:

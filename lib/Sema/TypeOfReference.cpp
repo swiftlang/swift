@@ -1049,7 +1049,7 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
           if (sendableDepTy->hasTypeVariable()) {
             extInfo = extInfo.withSendableDependentType(sendableDepTy);
           } else {
-            extInfo = extInfo.withSendable(sendableDepTy->isSendableType());
+            extInfo = extInfo.withSendable(isSendableCapture(sendableDepTy));
           }
           referenceTy =
               referenceTy->withExtInfo(extInfo)->castTo<FunctionType>();

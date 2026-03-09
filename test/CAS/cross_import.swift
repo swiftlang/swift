@@ -23,6 +23,11 @@
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd
 
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json D | %FileCheck --check-prefix CHECK-D %s
+
+// CHECK-D: "-disable-implicit-swift-modules"
+// CHECK-D: "-disable-cross-import-overlay-search"
+
 // RUN: %FileCheck %s --input-file=%t/MyApp.cmd --check-prefix CMD
 // CMD: -swift-module-cross-import
 // CMD-NEXT: [[CMI1:[B|C]]]
@@ -73,10 +78,18 @@ version: 1
 modules:
   - name: _C_A
 
+//--- D.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name D -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -user-module-version 1.0
+import A
+import B
+public func d() { }
+
 //--- main.swift
 import A
 import B
 import C
+import D
 
 func test () {
   b_a()

@@ -1,6 +1,6 @@
-// RUN: %target-run-simple-swift(   -parse-as-library -enable-experimental-feature Sensitive -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none)
-// RUN: %target-run-simple-swift(-O -parse-as-library -enable-experimental-feature Sensitive -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none)
-// RUN: %target-run-simple-swift(-target %module-target-future -parse-as-library -enable-experimental-feature Sensitive -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none)
+// RUN: %target-run-simple-swift(   -parse-as-library -enable-experimental-feature Sensitive -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none %target-embedded-posix-shim)
+// RUN: %target-run-simple-swift(-O -parse-as-library -enable-experimental-feature Sensitive -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none %target-embedded-posix-shim)
+// RUN: %target-run-simple-swift(-target %module-target-future -parse-as-library -enable-experimental-feature Sensitive -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none %target-embedded-posix-shim)
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test

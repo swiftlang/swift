@@ -1714,7 +1714,9 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
       auto child =
           diagnosticInfoForDiagnostic(childNotes[i],
                                       /* includeDiagnosticName= */ true);
-      assert(child);
+      assert(child || state.getSuppressNotes());
+      if (!child)
+        continue;
       assert(child->Kind == DiagnosticKind::Note &&
              "Expected child diagnostics to all be notes?!");
       childInfo.push_back(*child);

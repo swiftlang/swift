@@ -38,7 +38,6 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
-#include "clang/AST/DeclVisitor.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Specifiers.h"
@@ -47,28 +46,18 @@
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ModuleFileExtension.h"
-#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Path.h"
 #include <functional>
-#include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-namespace llvm {
-
-class SmallBitVector;
-
-}
 
 namespace clang {
 class APValue;
@@ -97,6 +86,11 @@ class Identifier;
 class Pattern;
 class SubscriptDecl;
 class ValueDecl;
+
+/// Check whether the given declaration context is from a system module.
+inline bool isInSystemModule(const DeclContext *D) {
+  return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
+}
 
 /// Describes the kind of conversion to apply to a constant value.
 enum class ConstantConvertKind {
@@ -362,7 +356,7 @@ private:
   PlatformAvailability(const PlatformAvailability&) = delete;
   PlatformAvailability &operator=(const PlatformAvailability &) = delete;
 };
-}
+} // namespace importer
 
 using LookupTableMap =
     llvm::DenseMap<StringRef, std::unique_ptr<SwiftLookupTable>>;
@@ -440,9 +434,12 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   using Version = importer::ImportNameVersion;
 
 public:
-  Implementation(ASTContext &ctx, DependencyTracker *dependencyTracker,
-                 DWARFImporterDelegate *dwarfImporterDelegate);
+  Implementation(ASTContext &ctx, DependencyTracker *dependencyTracker);
   ~Implementation();
+
+  void setDWARFImporterDelegate(DWARFImporterDelegate *dwarfImporterDelegate) {
+    DWARFImporter = dwarfImporterDelegate;
+  }
 
   class DiagnosticWalker : public clang::RecursiveASTVisitor<DiagnosticWalker> {
   public:
@@ -471,10 +468,6 @@ public:
   // purposes.
   std::unordered_set<ImportDiagnostic, ImportDiagnosticHasher>
       CollectedDiagnostics;
-
-  // Keeps track of `clang::RecordDecl`s where diagnostics have already been
-  // emitted due to failed SWIFT_SHARED_REFERENCE inference.
-  std::unordered_set<const clang::RecordDecl *> DiagnosedCxxRefDecls;
 
   // Tracks which function templates have already had a diagnostic emitted,
   // to avoid duplicate diagnostics across instantiations.
@@ -924,11 +917,6 @@ private:
   /// The DWARF importer delegate, if installed.
   DWARFImporterDelegate *DWARFImporter = nullptr;
 
-public:
-  /// Only used for testing.
-  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
-
-private:
   /// The list of Clang modules found in the debug info.
   llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
 
@@ -1995,12 +1983,6 @@ public:
 };
 
 namespace importer {
-
-/// Returns true if the given C/C++ record should be imported as a reference
-/// type into Swift.
-bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
-                                 ClangImporter::Implementation *importerImpl);
-
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
@@ -2182,6 +2164,7 @@ Identifier getOperatorName(ASTContext &ctx, clang::OverloadedOperatorKind op);
 /// correspond to an overloaded C++ operator.
 Identifier getOperatorName(ASTContext &ctx, Identifier op);
 
+bool hasSwiftAttribute(const clang::Decl *decl, StringRef attr);
 bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
 bool hasIteratorAPIAttr(const clang::Decl *decl);
@@ -2253,11 +2236,9 @@ getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
   return nullptr;
 }
 
-/// Find a unique base class that is annotated as SHARED_REFERENCE if any.
-const clang::RecordDecl *
-getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
-                   ClangImporter::Implementation *importerImpl);
-
+/// Emit diagnostics related to foreign reference types for \a decl.
+bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
+                                  ClangImporter::Implementation &Impl);
 
 /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
 /// have a valid owning module.

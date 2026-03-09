@@ -55,6 +55,7 @@ enum ContextualTypePurpose : uint8_t {
   CTP_ThrowStmt,         ///< Value specified to a 'throw' statement.
   CTP_DiscardStmt,       ///< Value specified to a 'discard' statement.
   CTP_EnumCaseRawValue,  ///< Raw value specified for "case X = 42" in enum.
+  CTP_IntGenericParam,   ///< Integer expression specified for a generic value argument.
   CTP_DefaultParameter,  ///< Default value in parameter 'foo(a : Int = 42)'.
 
   /// Default value in @autoclosure parameter
@@ -153,19 +154,19 @@ public:
     /// subclass, returning \c None if unsuccessful.
     template <class T>
     std::optional<T> getAs() const {
-      if (auto *result = dyn_cast<T>(this))
+      if (auto *result = llvm::dyn_cast<T>(this))
         return *result;
       return std::nullopt;
     }
 
     /// Cast the path element to a specific \c LocatorPathElt subclass.
     template <class T>
-    T castTo() const { return *cast<T>(this); }
+    T castTo() const { return *llvm::cast<T>(this); }
 
     /// Checks whether the path element is a specific \c LocatorPathElt
     /// subclass.
     template <class T>
-    bool is() const { return isa<T>(this); }
+    bool is() const { return llvm::isa<T>(this); }
 
     /// Return the summary flags for this particular element.
     unsigned getNewSummaryFlags() const;

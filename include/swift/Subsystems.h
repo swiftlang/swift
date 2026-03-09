@@ -38,6 +38,9 @@ namespace llvm {
   class Module;
   class TargetOptions;
   class TargetMachine;
+  namespace cas {
+    class ObjectRef;
+  }
   namespace vfs {
     class OutputBackend;
   }
@@ -261,7 +264,8 @@ namespace swift {
                       ArrayRef<std::string> parallelOutputFilenames,
                       ArrayRef<std::string> parallelIROutputFilenames,
                       llvm::GlobalVariable **outModuleHash = nullptr,
-                      cas::SwiftCASOutputBackend *casBackend = nullptr);
+                      cas::SwiftCASOutputBackend *casBackend = nullptr,
+                      std::optional<llvm::cas::ObjectRef> cacheKeyForJob = std::nullopt);
 
   /// Turn the given Swift file into LLVM IR and return the generated module.
   /// To compile and output the generated code, call \c performLLVM.
@@ -273,7 +277,8 @@ namespace swift {
                       std::shared_ptr<llvm::cas::ObjectStore> CAS,
                       StringRef PrivateDiscriminator,
                       llvm::GlobalVariable **outModuleHash = nullptr,
-                      cas::SwiftCASOutputBackend *casBackend = nullptr);
+                      cas::SwiftCASOutputBackend *casBackend = nullptr,
+                      std::optional<llvm::cas::ObjectRef> cacheKeyForJob = std::nullopt);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This will include the emission of LLVM IR

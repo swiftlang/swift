@@ -323,3 +323,49 @@ class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
 
         # Then, update using our custom scheme---a subset of the default one.
         self.call(self.base_args + ["--scheme", self.scheme_name])
+
+
+class SchemeWithAdditionalChanges(scheme_mock.SchemeMockTestCase):
+    def __init__(self, *args, **kwargs):
+        super(SchemeWithAdditionalChanges, self).__init__(*args, **kwargs)
+
+    def _add_commit_to_repo1(self):
+        local_repo_path = os.path.join(self.local_path, "repo1")
+        filename = "additional_content.txt"
+        filename_path = os.path.join(local_repo_path, filename)
+        with open(filename_path, "w") as f:
+            f.write("More stuff")
+        self.call(["git", "add", filename], cwd=local_repo_path)
+        self.call(["git", "commit", "-m", "Additional commit"], cwd=local_repo_path)
+        self.call(["git", "push", "origin", "main"], cwd=local_repo_path)
+
+    def test_call_update_checkout_twice_with_additional_commit(self):
+        """
+        Test that calling update checkout a second time will pick up
+        additional commits done after the first time.
+        """
+        update_checkout_command = [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.source_root,
+                "--clone",
+                "--scheme",
+                "main",
+                "--verbose",
+                "--reset-to-remote",
+            ]
+
+        self.call(update_checkout_command)
+        first_commit = self.call(
+            ["git", "rev-parse", "HEAD"], cwd=os.path.join(self.source_root, "repo1")
+        ).strip()
+
+        self._add_commit_to_repo1()
+        self.call(update_checkout_command)
+        second_commit = self.call(
+            ["git", "rev-parse", "HEAD"], cwd=os.path.join(self.source_root, "repo1")
+        ).strip()
+
+        self.assertNotEqual(first_commit, second_commit)

@@ -30,6 +30,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/ThrownErrorDestination.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/AccessControls.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -4137,6 +4138,8 @@ public:
   ///
   /// Closures with untyped throws will produce "any Error", functions that
   /// cannot throw or are specified to throw "Never" will return std::nullopt.
+  SWIFT_UNAVAILABLE_IN_SILGEN_MSG(
+      "use 'TypeConverter::getClosureTypeInfo' instead")
   std::optional<Type> getEffectiveThrownType() const;
 
   /// \brief Return whether this closure is async when fully applied.

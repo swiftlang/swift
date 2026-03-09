@@ -201,6 +201,13 @@ private func trySpecialize(apply: ApplySite, _ context: FunctionPassContext) -> 
     return false
   }
 
+  let specializedParameters = specialization.getSpecializedParameters()
+
+  // A function cannot have more than one "isolated" parameter.
+  guard numberOfIsolatedParameters(specializedParameters) <= 1 else {
+    return false
+  }
+
   // We need to make each captured argument of all closures a unique Value. Otherwise the Cloner would
   // wrongly map added capture arguments to the re-generated closure in the specialized function:
   //
@@ -217,7 +224,7 @@ private func trySpecialize(apply: ApplySite, _ context: FunctionPassContext) -> 
   //
   specialization.uniqueCaptureArguments(context)
 
-  let specializedFunction = specialization.getOrCreateSpecializedFunction(context)
+  let specializedFunction = specialization.getOrCreateSpecializedFunction(specializedParameters, context)
 
   specialization.unUniqueCaptureArguments(context)
 
@@ -402,14 +409,14 @@ private struct SpecializationInfo {
 
   private typealias Cloner = SIL.Cloner<FunctionPassContext>
 
-  func getOrCreateSpecializedFunction(_ context: FunctionPassContext) -> Function {
+  func getOrCreateSpecializedFunction(_ specializedParameters: [ParameterInfo],
+                                      _ context: FunctionPassContext
+  ) -> Function {
     let specializedFunctionName = getSpecializedFunctionName(context)
 
     if let existingSpecializedFunction = context.lookupFunction(name: specializedFunctionName) {
       return existingSpecializedFunction
     }
-
-    let specializedParameters = getSpecializedParameters()
 
     let specializedFunction =
       context.createSpecializedFunctionDeclaration(
@@ -435,7 +442,6 @@ private struct SpecializationInfo {
 
     return specializedFunction
   }
-
 
   private func getSpecializedFunctionName(_ context: FunctionPassContext) -> String {
     var visited = Dictionary<Closure, Int>()
@@ -470,7 +476,7 @@ private struct SpecializationInfo {
     return context.mangle(withClosureArguments: argumentManglings, from: callee)
   }
 
-  private func getSpecializedParameters() -> [ParameterInfo] {
+  func getSpecializedParameters() -> [ParameterInfo] {
     var specializedParamInfoList: [ParameterInfo] = []
 
     // Start by adding all original parameters except for the closure parameters.
@@ -537,9 +543,18 @@ private struct SpecializationInfo {
       let clonedArg = cloner.cloneRecursively(value: closureArgOp.value)
 
       let originalArg = apply.calleeArgument(of: closureArgOp, in: callee)!
-      cloner.recordFoldedValue(originalArg, mappedTo: clonedArg)
 
-      return clonedArg
+      let clonedValue: Value
+      if clonedArg.ownership == .owned && apply.convention(of: closureArgOp) == .directGuaranteed {
+        let block = cloner.targetFunction.entryBlock
+        let builder = Builder(atEndOf: block, location: block.instructions.last!.location, cloner.context)
+        clonedValue = builder.createBeginBorrow(of: clonedArg)
+      } else {
+        clonedValue = clonedArg
+      }
+      cloner.recordFoldedValue(originalArg, mappedTo: clonedValue)
+
+      return clonedValue
     }
   }
 
@@ -689,6 +704,12 @@ private func addMissingDestroysAtFunctionExits(for clonedArguments: [Value], _ c
   defer { needDestroy.deinitialize() }
 
   for clonedArg in clonedArguments {
+    if let beginBorrow = clonedArg as? BeginBorrowInst {
+      Builder.insertCleanupAtFunctionExits(of: beginBorrow.parentFunction, context) { builder in
+        builder.createEndBorrow(of: beginBorrow)
+      }
+      completeLifetime(of: beginBorrow, context)
+    }
     findValuesWhichNeedDestroyRecursively(value: clonedArg, needDestroy: &needDestroy)
   }
 
@@ -732,6 +753,14 @@ private extension ParameterInfo {
       type: self.type, convention: specializedParamConvention, options: self.options,
       hasLoweredAddresses: self.hasLoweredAddresses)
   }
+}
+
+private func numberOfIsolatedParameters(_ params: [ParameterInfo]) -> Int {
+  var count = 0
+  for param in params where param.hasOption(.isolated) {
+    count += 1
+  }
+  return count
 }
 
 private extension PartialApplyInst {

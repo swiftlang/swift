@@ -32,53 +32,53 @@ import Distributed
 // CHECK-NEXT: distributed public actor DA {
 @available(SwiftStdlib 5.7, *)
 public distributed actor DA {
-  // CHECK: @_compilerInitialized nonisolated final public let id: Distributed.LocalTestingDistributedActorSystem.ActorID
-  // CHECK: nonisolated final public let actorSystem: Library.DA.ActorSystem
-  // CHECK: public typealias ActorSystem = Distributed.LocalTestingDistributedActorSystem
+  // CHECK: @_compilerInitialized nonisolated final public let id: Distributed::LocalTestingDistributedActorSystem.Distributed::ActorID
+  // CHECK: nonisolated final public let actorSystem: Library::DA.Library::ActorSystem
+  // CHECK: public typealias ActorSystem = Distributed::LocalTestingDistributedActorSystem
   public typealias ActorSystem = LocalTestingDistributedActorSystem
 
-  // CHECK:       public static func resolve(id: Distributed.LocalTestingDistributedActorSystem.ActorID, using system: Library.DA.ActorSystem) throws -> Library.DA
-  // CHECK:       public typealias ID = Distributed.LocalTestingDistributedActorSystem.ActorID
-  // CHECK:       public typealias SerializationRequirement = any Swift.Decodable & Swift.Encodable
+  // CHECK:       public static func resolve(id: Distributed::LocalTestingDistributedActorSystem.Distributed::ActorID, using system: Library::DA.Library::ActorSystem) throws -> Library::DA
+  // CHECK:       public typealias ID = Distributed::LocalTestingDistributedActorSystem.Distributed::ActorID
+  // CHECK:       public typealias SerializationRequirement = any Swift::Decodable & Swift::Encodable
   // CHECK:       {{@objc deinit|deinit}}
-  // CHECK:       nonisolated public var hashValue: Swift.Int {
+  // CHECK:       nonisolated public var hashValue: Swift::Int {
   // CHECK-NEXT:    get
   // CHECK-NEXT:  }
-  // CHECK:       public init(actorSystem system: Library.DA.ActorSystem)
+  // CHECK:       public init(actorSystem system: Library::DA.Library::ActorSystem)
   // CHECK:       @available(iOS 16.0, tvOS 16.0, watchOS 9.0, macOS 13.0, *)
-  // CHECK-NEXT:  @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
+  // CHECK-NEXT:  @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency::UnownedSerialExecutor {
   // CHECK-NEXT:    get
   // CHECK-NEXT:  }
 }
 
 // CHECK-NOT: #if compiler(>=5.3) && $Actors
 // CHECK: @available({{.*}})
-// CHECK-NEXT: distributed public actor DAG<ActorSystem> where ActorSystem : Distributed.DistributedActorSystem, ActorSystem.SerializationRequirement == any Swift.Decodable & Swift.Encodable {
+// CHECK-NEXT: distributed public actor DAG<ActorSystem> where ActorSystem : Distributed::DistributedActorSystem, ActorSystem.SerializationRequirement == any Swift::Decodable & Swift::Encodable {
 @available(SwiftStdlib 6.0, *)
 public distributed actor DAG<ActorSystem> where ActorSystem: DistributedActorSystem<any Codable> {
   // CHECK: @_compilerInitialized nonisolated final public let id: ActorSystem.ActorID
   // CHECK: nonisolated final public let actorSystem: ActorSystem
 
-// CHECK: public static func resolve(id: ActorSystem.ActorID, using system: ActorSystem) throws -> Library.DAG<ActorSystem>
+// CHECK: public static func resolve(id: ActorSystem.ActorID, using system: ActorSystem) throws -> Library::DAG<ActorSystem>
 // CHECK: public typealias ID = ActorSystem.ActorID
-// CHECK: public typealias SerializationRequirement = any Swift.Decodable & Swift.Encodable
+// CHECK: public typealias SerializationRequirement = any Swift::Decodable & Swift::Encodable
 // CHECK: {{@objc deinit|deinit}}
-// CHECK: nonisolated public var hashValue: Swift.Int {
+// CHECK: nonisolated public var hashValue: Swift::Int {
 // CHECK:   get
 // CHECK: }
 // CHECK: public init(actorSystem system: ActorSystem)
 // CHECK: @available(iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, macOS 15.0, *)
-// CHECK: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
+// CHECK: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency::UnownedSerialExecutor {
 // CHECK:   get
 // CHECK: }
 }
 
 // CHECK-NOT: #if compiler(>=5.3) && $Actors
 // CHECK:     @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
-// CHECK-NEXT:extension Library.DA : Swift.Encodable {}
+// CHECK-NEXT:extension Library::DA : Swift::Encodable {}
 // CHECK-NOT: #if compiler(>=5.3) && $Actors
 // CHECK:     @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
-// CHECK-NEXT:extension Library.DA : Swift.Decodable {}
+// CHECK-NEXT:extension Library::DA : Swift::Decodable {}
 
 //--- Client.swift
 

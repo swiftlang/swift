@@ -336,8 +336,14 @@ bool TypeVarBindingProducer::computeNext() {
         // expression is non-optional), if we allow  both the solver would
         // find two solutions that differ only in location of optional
         // injection.
-        if (!TypeVar->getImpl().isClosureResultType() || objTy->isVoid() ||
-            objTy->isTypeVariableOrMember()) {
+        //
+        // The same applies to the result of a SingleValueStmtExpr, we want to
+        // attempt conversions as part of the join between results rather than
+        // between the expression and its context.
+        auto *loc = TypeVar->getImpl().getLocator();
+        if (!(TypeVar->getImpl().isClosureResultType() && !objTy->isVoid() &&
+              !objTy->isTypeVariableOrMember()) &&
+            !loc->directlyAt<SingleValueStmtExpr>()) {
           // If T is a type variable, only attempt this if both the
           // type variable we are trying bindings for, and the type
           // variable we will attempt to bind, both have the same

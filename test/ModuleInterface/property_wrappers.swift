@@ -62,72 +62,72 @@ public struct ProjectedValueWrapper<T> {
 
 // CHECK: public struct HasWrappers {
 public struct HasWrappers {
-  // CHECK: @TestResilient.Wrapper<Swift.Int> public var x: {{(Swift.)?}}Int {
+  // CHECK: @TestResilient::Wrapper<Swift::Int> public var x: {{(Swift::)?}}Int {
   // CHECK-NEXT: get
   // CHECK-NEXT: set
   // CHECK-NEXT: _modify  
   // CHECK-NEXT: }  
   @Wrapper public var x: Int
 
-  // CHECK: @TestResilient.WrapperWithInitialValue<Swift.Int> @_projectedValueProperty($y) public var y: Swift.Int {
+  // CHECK: @TestResilient::WrapperWithInitialValue<Swift::Int> @_projectedValueProperty($y) public var y: Swift::Int {
   // CHECK-NEXT: get
   // CHECK-NEXT: }  
   @WrapperWithInitialValue public private(set) var y = 17
 
-  // CHECK: public var $y: TestResilient.Wrapper<{{(Swift.)?}}Int> {
+  // CHECK: public var $y: TestResilient::Wrapper<{{(Swift::)?}}Int> {
   // CHECK-NEXT: get
   // CHECK-NEXT: }  
 
-  // CHECK: @TestResilient.HasTwoTypeParameters<Swift.Int, Swift.String> public var w1: Swift.Int {
+  // CHECK: @TestResilient::HasTwoTypeParameters<Swift::Int, Swift::String> public var w1: Swift::Int {
   // CHECK-NEXT:   get
   // CHECK-NEXT:   set
   // CHECK-NEXT:   _modify
   // CHECK-NEXT: }
   @HasTwoTypeParameters(wrappedValue: 0, "other") public var w1: Int
 
-  // CHECK: @TestResilient.HasTwoTypeParameters<Swift.Int, Swift.String> public var w2: Swift.Int {
+  // CHECK: @TestResilient::HasTwoTypeParameters<Swift::Int, Swift::String> public var w2: Swift::Int {
   // CHECK-NEXT:   get
   // CHECK-NEXT:   set
   // CHECK-NEXT:   _modify
   // CHECK-NEXT: }
   @HasTwoTypeParameters("other") public var w2: Int = 0
 
-  // CHECK: @TestResilient.HasTwoTypeParameters<TestResilient.HasTwoTypeParameters<Swift.Int, Swift.Double>, Swift.String> @TestResilient.HasTwoTypeParameters public var w3: Swift.Int {
+  // CHECK: @TestResilient::HasTwoTypeParameters<TestResilient::HasTwoTypeParameters<Swift::Int, Swift::Double>, Swift::String> @TestResilient::HasTwoTypeParameters public var w3: Swift::Int {
   // CHECK-NEXT:   get
   // CHECK-NEXT:   set
   // CHECK-NEXT:   _modify
   // CHECK-NEXT: }
   @HasTwoTypeParameters("a")  @HasTwoTypeParameters(1.0) public var w3: Int = 0
 
-  // CHECK: @TestResilient.WrapperWithInitialValue<Swift.Bool> @_projectedValueProperty($z) public var z: Swift.Bool {
+  // CHECK: @TestResilient::WrapperWithInitialValue<Swift::Bool> @_projectedValueProperty($z) public var z: Swift::Bool {
   // CHECK-NEXT: get
   // CHECK-NEXT: set
   // CHECK-NEXT: _modify
   // CHECK-NEXT: }  
   @WrapperWithInitialValue(alternate: false) public var z
 
-  // CHECK: @TestResilient.HasTwoTypeParameters<TestResilient.Wrapper<Swift.Int>, Swift.String> @TestResilient.Wrapper public var composed: Swift.Int {
+  // CHECK: @TestResilient::HasTwoTypeParameters<TestResilient::Wrapper<Swift::Int>, Swift::String> @TestResilient::Wrapper public var composed: Swift::Int {
   // CHECK-NEXT:   get
   // CHECK-NEXT:   set
   // CHECK-NEXT:   _modify
   // CHECK-NEXT: }
   @HasTwoTypeParameters("other") @Wrapper public var composed: Int = 42
   
-  // CHECK: public func hasParameterWithImplementationWrapper(x: Swift.Int)
+  // CHECK: public func hasParameterWithImplementationWrapper(x: Swift::Int)
   public func hasParameterWithImplementationWrapper(@Wrapper x: Int) { }
 
-  // CHECK: public func hasParameterWithImplementationWrapperComposed(x: Swift.Int)
+  // CHECK: public func hasParameterWithImplementationWrapperComposed(x: Swift::Int)
   public func hasParameterWithImplementationWrapperComposed(@Wrapper @ProjectedValueWrapper x: Int) { }
 
-  // CHECK: @inlinable public func hasParameterWithImplementationWrapperInlinable(@TestResilient.Wrapper x: Swift.Int)
+  // CHECK: @inlinable public func hasParameterWithImplementationWrapperInlinable(@TestResilient::Wrapper x: Swift::Int)
   @inlinable public func hasParameterWithImplementationWrapperInlinable(@Wrapper x: Int) { }
 
-  // CHECK: @_alwaysEmitIntoClient public func hasParameterWithImplementationWrapperAEIC(@TestResilient.Wrapper x: Swift.Int)
+  // CHECK: @_alwaysEmitIntoClient public func hasParameterWithImplementationWrapperAEIC(@TestResilient::Wrapper x: Swift::Int)
   @_alwaysEmitIntoClient public func hasParameterWithImplementationWrapperAEIC(@Wrapper x: Int) { }
 
-  // CHECK: public func hasParameterWithAPIWrapper(@TestResilient.ProjectedValueWrapper<Swift.Int> x: Swift.Int)
+  // CHECK: public func hasParameterWithAPIWrapper(@TestResilient::ProjectedValueWrapper<Swift::Int> x: Swift::Int)
   public func hasParameterWithAPIWrapper(@ProjectedValueWrapper x: Int) { }
 
-  // CHECK: public func hasParameterWithAPIWrapperComposed(@TestResilient.ProjectedValueWrapper<TestResilient.Wrapper<Swift.Int>> @TestResilient.Wrapper x: Swift.Int)
+  // CHECK: public func hasParameterWithAPIWrapperComposed(@TestResilient::ProjectedValueWrapper<TestResilient::Wrapper<Swift::Int>> @TestResilient::Wrapper x: Swift::Int)
   public func hasParameterWithAPIWrapperComposed(@ProjectedValueWrapper @Wrapper x: Int) { }
 }

@@ -11,7 +11,7 @@
 
 // REQUIRES: concurrency
 
-// CHECK: @_Concurrency.MainActor @preconcurrency public class C1 {
+// CHECK: @_Concurrency::MainActor @preconcurrency public class C1 {
 // CHECK:   {{(@objc )?}} isolated deinit
 // CHECK: }
 
@@ -23,7 +23,7 @@ public class C1 {
 }
 
 // CHECK: @preconcurrency public class C2 {
-// CHECK:   {{(@objc )?}} @_Concurrency.MainActor deinit
+// CHECK:   {{(@objc )?}} @_Concurrency::MainActor deinit
 // CHECK: }
 
 @preconcurrency

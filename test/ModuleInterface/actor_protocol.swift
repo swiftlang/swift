@@ -9,7 +9,7 @@
 /// and not via some extension. The requirement is due to the unique
 /// optimizations applied to the implementation of actors.
 
-// CHECK-NOT: extension {{.+}} : _Concurrency.Actor
+// CHECK-NOT: extension {{.+}} : _Concurrency::Actor
 
 // CHECK: public actor PlainActorClass {
 @available(SwiftStdlib 5.1, *)
@@ -17,7 +17,7 @@ public actor PlainActorClass {
   nonisolated public func enqueue(_ job: UnownedJob) { }
 }
 
-// CHECK: public actor ExplicitActorClass : _Concurrency.Actor {
+// CHECK: public actor ExplicitActorClass : _Concurrency::Actor {
 @available(SwiftStdlib 5.1, *)
 public actor ExplicitActorClass : Actor {
   nonisolated public func enqueue(_ job: UnownedJob) { }
@@ -31,13 +31,13 @@ public actor EmptyActor {}
 @available(SwiftStdlib 5.1, *)
 public actor EmptyActorClass {}
 
-// CHECK: public protocol Cat : _Concurrency.Actor {
+// CHECK: public protocol Cat : _Concurrency::Actor {
 @available(SwiftStdlib 5.1, *)
 public protocol Cat : Actor {
   func mew()
 }
 
-// CHECK: public actor HouseCat : Library.Cat {
+// CHECK: public actor HouseCat : Library::Cat {
 @available(SwiftStdlib 5.1, *)
 public actor HouseCat : Cat {
   nonisolated public func mew() {}
@@ -50,7 +50,7 @@ public protocol ToothyMouth {
   func chew()
 }
 
-// CHECK: public actor Lion : Library.ToothyMouth, _Concurrency.Actor {
+// CHECK: public actor Lion : Library::ToothyMouth, _Concurrency::Actor {
 @available(SwiftStdlib 5.1, *)
 public actor Lion : ToothyMouth, Actor {
   nonisolated public func chew() {}

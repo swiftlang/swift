@@ -954,7 +954,11 @@ public:
 #ifndef NDEBUG
     auto fnType1 = fromType->castTo<FunctionType>();
     auto fnType2 = toType->castTo<FunctionType>();
-    assert(fnType1->isThrowing() != fnType2->isThrowing());
+    // FIXME: `AnyFunctionType::isThrowing` is going to produce `true` for
+    // function that's with `throws(Never)`, we need to address that in
+    // `TypeSimplifier`.
+    assert(fnType1->getEffectiveThrownErrorType() &&
+           !fnType2->getEffectiveThrownErrorType());
 #endif
   }
 

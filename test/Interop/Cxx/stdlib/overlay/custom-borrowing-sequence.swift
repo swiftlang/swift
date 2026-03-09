@@ -12,7 +12,7 @@ import CustomBorrowingSequence
 var CxxBorrowingSequenceTestSuite = TestSuite("CxxSequence")
 
 CxxBorrowingSequenceTestSuite.test("SimpleNonCopyableSequence as Swift.BorrowingSequence") {
-  guard #available(SwiftStdlib 6.3, *) else { return }
+  guard #available(SwiftStdlib 6.4, *) else { return }
 
   let seq = SimpleNonCopyableSequence()
   let arr : [Int32] = [2, 3, 4, 5]
@@ -20,7 +20,7 @@ CxxBorrowingSequenceTestSuite.test("SimpleNonCopyableSequence as Swift.Borrowing
   var iterator = seq.makeBorrowingIterator()
     var counter = 0
     while true {
-        let span = iterator._nextSpan()
+        let span = iterator.nextSpan()
         if (span.count == 0) { break }
         for i in 0..<span.count {
             expectEqual(span[i], arr[counter])
@@ -31,14 +31,14 @@ CxxBorrowingSequenceTestSuite.test("SimpleNonCopyableSequence as Swift.Borrowing
 }
 
 CxxBorrowingSequenceTestSuite.test("SimpleNonCopArrayWrapper as Swift.BorrowingSequence") {
-  guard #available(SwiftStdlib 6.3, *) else { return }
+  guard #available(SwiftStdlib 6.4, *) else { return }
   let seq = SimpleNonCopArrayWrapper()
   let arr : [Int32] = [10, 20, 30, 40, 50]
 
   var iterator = seq.makeBorrowingIterator()
     var counter = 0
     while true {
-        let span = iterator._nextSpan()
+        let span = iterator.nextSpan()
         if (span.count == 0) { break }
         for i in 0..<span.count {
             expectEqual(span[i].number, arr[counter])
@@ -49,7 +49,7 @@ CxxBorrowingSequenceTestSuite.test("SimpleNonCopArrayWrapper as Swift.BorrowingS
 }
 
 CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.BorrowingSequence") {
-  guard #available(SwiftStdlib 6.3, *) else { return }
+  guard #available(SwiftStdlib 6.4, *) else { return }
   let seq = ContiguousNonCopyableSequence()
   let arr : [Int32] = [10, 20, 30, 40, 50]
 
@@ -57,7 +57,7 @@ CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.Borro
   var innerCounter = 0
   var outerCounter = 0
   while true {
-      let span = iterator._nextSpan()
+      let span = iterator.nextSpan()
       if (span.count == 0) { break }
       expectEqual(span.count, 5)
       for i in 0..<span.count {
@@ -71,7 +71,7 @@ CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.Borro
 }
 
 CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.BorrowingSequence, with maximumCount") {
-  guard #available(SwiftStdlib 6.3, *) else { return }
+  guard #available(SwiftStdlib 6.4, *) else { return }
   let seq = ContiguousNonCopyableSequence()
   let arr : [Int32] = [10, 20, 30, 40, 50]
 
@@ -79,7 +79,7 @@ CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.Borro
   var innerCounter = 0
   var outerCounter = 0
   while true {
-      let span = iterator._nextSpan(maximumCount: 3)
+      let span = iterator.nextSpan(maximumCount: 3)
       if (span.count == 0) { break }
       for i in 0..<span.count {
           expectEqual(span[i], arr[innerCounter])

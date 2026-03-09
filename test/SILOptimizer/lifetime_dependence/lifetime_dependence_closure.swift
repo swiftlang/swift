@@ -144,3 +144,36 @@ func testClosureLifetimes(cond: Bool) {
     }
   }
 }
+
+// MARK: Methods with lifetime dependencies
+func transfer(ne: NE) -> NE { ne }
+struct S {
+  static func staticTransfer(ne: NE) -> NE { ne }
+  @_lifetime(borrow ne)
+  static func staticTransferBorrowingNE(ne: NE) -> NE { ne }
+  func transfer(ne: NE) -> NE { ne }
+  @_lifetime(borrow self, copy ne)
+  func transferDependingOnSelf(ne: NE) -> NE { ne }
+}
+
+do {
+  typealias Transfer = @_lifetime(copy ne) (_ ne: NE) -> NE
+  let _ = transfer // OK
+  let _: (NE) -> NE = transfer // OK
+  let _: Transfer = transfer // OK
+  let _: Transfer = S.staticTransfer // OK, method is static
+
+  // Non-static methods are not supported yet
+  let s = S()
+  let _: Transfer = s.transfer
+  // expected-error@-1{{lifetime-dependent value escapes its scope}}
+  // expected-note@-2{{it depends on the lifetime of argument 'ne'}}
+  // expected-note@-3{{this use causes the lifetime-dependent value to escape}}
+  let _: Transfer = s.transferDependingOnSelf
+  // expected-error@-1{{lifetime-dependent value escapes its scope}}
+  // expected-note@-2{{it depends on the lifetime of argument 'ne'}}
+  // expected-note@-3{{this use causes the lifetime-dependent value to escape}}
+  // expected-error@-4{{lifetime-dependent value escapes its scope}}
+  // expected-note@-5{{it depends on a closure capture; this is not yet supported}}
+  // expected-note@-6{{this use causes the lifetime-dependent value to escape}}
+}

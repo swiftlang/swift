@@ -150,6 +150,11 @@ public:
         TypeVariableType *Originator;
       } Binding;
 
+      struct {
+        Constraint *Disjunction;
+        FunctionType *ArgFuncType;
+      } Disjunction;
+
       ConstraintFix *TheFix;
       ConstraintLocator *TheLocator;
       PackExpansionType *TheExpansion;
@@ -265,6 +270,10 @@ public:
     /// bindings.
     static Change RetractedBinding(TypeVariableType *typeVar,
                                    inference::PotentialBinding binding);
+
+    /// Create a change that disjunction pruning was performed.
+    static Change PrunedDisjunction(Constraint *disjunction,
+                                    FunctionType *argFuncType);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

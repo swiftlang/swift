@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
 // RUN:     -g -Xllvm -sil-print-debuginfo-verbose \
 // RUN:     -enable-experimental-feature BorrowingForLoop \
-// RUN:     -disable-availability-checking \
 // RUN:     %s | %FileCheck %s
 
 // REQUIRES: swift_feature_BorrowingForLoop
@@ -16,11 +15,12 @@ extension NoncopyableInt: Equatable {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing32testNonCopyableBorrowingSequence3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing32testNonCopyableBorrowingSequence3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
+@available(SwiftStdlib 6.4, *)
 func testNonCopyableBorrowingSequence(seq: borrowing Span<NoncopyableInt>) {
   // With borrowing feature enabled, we expect makeBorrowingIterator and nextSpan to be called
-  // CHECK: = function_ref @$ss4SpanVsRi_zrlE22_makeBorrowingIteratorAByxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @owned Span<τ_0_0>
-  // CHECK: = function_ref @$ss4SpanVsRi_zrlE05_nextA012maximumCountAByxGSi_tF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @lifetime(copy 1) @inout Span<τ_0_0>) -> @lifetime(borrow 1) @owned Span<τ_0_0>
+  // CHECK: = function_ref @$ss4SpanVsRi_zrlE21makeBorrowingIterators0aD0VyxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @out SpanIterator<τ_0_0>
+  // CHECK: = function_ref @$ss12SpanIteratorVsRi_zrlE04nextA012maximumCounts0A0VyxGSi_tF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @lifetime(copy 1) @inout SpanIterator<τ_0_0>) -> @lifetime(borrow address_for_deps 1) @owned Span<τ_0_0>
   // CHECK: [[IS_EMPTY_CHECK:%.*]] = function_ref @$ss4SpanVsRi_zrlE7isEmptySbvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> Bool
   // CHECK: [[IS_EMPTY_CALL:%.*]] = apply [[IS_EMPTY_CHECK]]
   // CHECK: [[NOT_EMPTY:%.*]] = function_ref @$sSb1nopyS2bFZ : $@convention(method) (Bool, @thin Bool.Type) -> Bool
@@ -37,11 +37,12 @@ func testNonCopyableBorrowingSequence(seq: borrowing Span<NoncopyableInt>) {
 }
 
 
-// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing29testCopyableBorrowingSequence3seqys4SpanVySiG_tF : $@convention(thin) (@guaranteed Span<Int>) -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing29testCopyableBorrowingSequence3seqys4SpanVySiG_tF : $@convention(thin) (@guaranteed Span<Int>) -> () {
+@available(SwiftStdlib 6.4, *)
 func testCopyableBorrowingSequence(seq: borrowing Span<Int>) {
   // With borrowing feature enabled, we expect makeBorrowingIterator and nextSpan to be called
-  // CHECK: = function_ref @$ss4SpanVsRi_zrlE22_makeBorrowingIteratorAByxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @owned Span<τ_0_0>
-  // CHECK: = function_ref @$ss4SpanVsRi_zrlE05_nextA012maximumCountAByxGSi_tF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @lifetime(copy 1) @inout Span<τ_0_0>) -> @lifetime(borrow 1) @owned Span<τ_0_0>
+  // CHECK: = function_ref @$ss4SpanVsRi_zrlE21makeBorrowingIterators0aD0VyxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @out SpanIterator<τ_0_0>
+  // CHECK: = function_ref @$ss12SpanIteratorVsRi_zrlE04nextA012maximumCounts0A0VyxGSi_tF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @lifetime(copy 1) @inout SpanIterator<τ_0_0>) -> @lifetime(borrow address_for_deps 1) @owned Span<τ_0_0>
   // CHECK: [[IS_EMPTY_CHECK:%.*]] = function_ref @$ss4SpanVsRi_zrlE7isEmptySbvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> Bool
   // CHECK: [[IS_EMPTY_CALL:%.*]] = apply [[IS_EMPTY_CHECK]]
   // CHECK: [[NOT_EMPTY:%.*]] = function_ref @$sSb1nopyS2bFZ : $@convention(method) (Bool, @thin Bool.Type) -> Bool
@@ -57,7 +58,8 @@ func testCopyableBorrowingSequence(seq: borrowing Span<Int>) {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing35testContinueTargetBorrowingSequenceyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing35testContinueTargetBorrowingSequenceyyF : $@convention(thin) () -> () {
+@available(SwiftStdlib 6.4, *)
 func testContinueTargetBorrowingSequence() {
   let arr = [0, 1, 2, 3]
   let seq = arr.span
@@ -87,7 +89,8 @@ func testContinueTargetBorrowingSequence() {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing32testBreakTargetBorrowingSequenceyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing32testBreakTargetBorrowingSequenceyyF : $@convention(thin) () -> () {
+@available(SwiftStdlib 6.4, *)
 func testBreakTargetBorrowingSequence() {
   let arr = [0, 1, 2, 3]
   let seq = arr.span
@@ -118,12 +121,13 @@ func testBreakTargetBorrowingSequence() {
 }
 
 
-// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing20testForEachLocations3seq3valys4SpanVySiG_SitF : $@convention(thin) (@guaranteed Span<Int>, Int) -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing20testForEachLocations3seq3valys4SpanVySiG_SitF : $@convention(thin) (@guaranteed Span<Int>, Int) -> () {
+@available(SwiftStdlib 6.4, *)
 func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
   // Test that synthesized code has correct source locations for the borrowing foreach loop.
   // The borrowing foreach desugars to:
-  //   let $x$generator = seq._makeBorrowingIterator()
-  //   while case let $span = $x$generator._nextSpan(maximumCount: Int.max),
+  //   let $x$generator = seq.makeBorrowingIterator()
+  //   while case let $span = $x$generator.nextSpan(maximumCount: Int.max),
   //      !$span.isEmpty {
   //       let $i = 0
   //       let $count = $span.count
@@ -136,12 +140,12 @@ func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
   //     }
   //   }
 
-  // _makeBorrowingIterator() function_ref should be at "for" keyword location (172:3)
-  // CHECK: [[MAKE_BORROWING_IT:%.*]] = function_ref @$ss4SpanVsRi_zrlE22_makeBorrowingIteratorAByxGyF {{.*}}, loc "{{.*}}":[[@LINE+31]]:3
+  // makeBorrowingIterator() function_ref should be at "for" keyword location (172:3)
+  // CHECK: [[MAKE_BORROWING_IT:%.*]] = function_ref @$ss4SpanVsRi_zrlE21makeBorrowingIterators0aD0VyxGyF {{.*}}, loc "{{.*}}":[[@LINE+31]]:3
   // CHECK: apply [[MAKE_BORROWING_IT]]{{.*}}, loc "{{.*}}":[[@LINE+30]]:18
 
-  // _nextSpan() function_ref should be at "for" keyword location
-  // CHECK: [[NEXT_SPAN:%.*]] = function_ref @$ss4SpanVsRi_zrlE05_nextA012maximumCountAByxGSi_tF {{.*}}, loc "{{.*}}":[[@LINE+27]]:3
+  // nextSpan() function_ref should be at "for" keyword location
+  // CHECK: [[NEXT_SPAN:%.*]] = function_ref @$ss12SpanIteratorVsRi_zrlE04nextA012maximumCounts0A0VyxGSi_tF {{.*}}, loc "{{.*}}":[[@LINE+27]]:3
   // CHECK: apply [[NEXT_SPAN]]{{.*}}, loc "{{.*}}":[[@LINE+26]]:3
 
   // $span debug_value should be at "for" keyword location
@@ -172,7 +176,8 @@ func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing34testForEachNonCopyableSILDebugInfo3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing34testForEachNonCopyableSILDebugInfo3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
+@available(SwiftStdlib 6.4, *)
 func testForEachNonCopyableSILDebugInfo(seq: borrowing Span<NoncopyableInt>){
   // CHECK: debug_value {{.*}} : $*NoncopyableInt, let, name "element", expr op_deref, loc "{{.*}}":[[@LINE+1]]:7 isImplicit: false
   for element in seq {
