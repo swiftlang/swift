@@ -21,6 +21,7 @@
 #if defined(__ELF__)
 
 #include "ImageInspection.h"
+#include "ImageInspectionCommon.h"
 
 #include <algorithm>
 
@@ -43,7 +44,7 @@ void swift::swift_elf_registerTestContent(
 struct swift::TestContentSectionBounds *
 swift::swift_elf_copyAllTestContent(size_t *outCount) {
   auto snapshot = swift::registered->snapshot();
-  auto count = snapshot.size();
+  auto count = snapshot.count();
 
   auto result = reinterpret_cast<struct swift::TestContentSectionBounds *>(
     swift_slowAlloc(
