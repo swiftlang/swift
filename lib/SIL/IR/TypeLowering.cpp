@@ -329,6 +329,8 @@ namespace {
 
     RetTy visit(CanType substType, AbstractionPattern origType,
                 IsTypeExpansionSensitive_t isSensitive) {
+      // A variadic tuple substituted with exactly one element in the expansion
+      // becomes the scalar type.
       if (auto origEltType = origType.getVanishingTupleElementPatternType()) {
         return visit(substType, *origEltType, isSensitive);
       }
