@@ -1033,8 +1033,9 @@ function(add_swift_target_library_single target name)
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
     DEPLOYMENT_VERSION_XROS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_XROS}")
 
+  set(availability_macros)
   foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
-    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}")
+    list(APPEND availability_macros "-Xfrontend -define-availability -Xfrontend \"${def}\"")
 
     if("${def}" MATCHES "SwiftStdlib .*")
       # For each SwiftStdlib x.y, also define StdlibDeploymentTarget x.y, which,
@@ -1068,9 +1069,23 @@ function(add_swift_target_library_single target name)
         endif()
       endif()
 
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${current}")
+      list(APPEND availability_macros "-Xfrontend -define-availability -Xfrontend \"${current}\"")
     endif()
   endforeach()
+  list(JOIN availability_macros "\n" availability_macros_rsp_txt)
+  string(SHA1 availability_macros_sig "${CMAKE_CURRENT_BINARY_DIR};${availability_macros_rsp_txt}")
+  set(availability_macros_rsp_target "availability-macros-${availability_macros_sig}")
+  set(availability_macros_rsp_path "${CMAKE_CURRENT_BINARY_DIR}/availability-macros-${availability_macros_sig}.rsp")
+  # FIXME: Instead of spreading exact the same response files everywhere with random file names, we could make a centrialized availability macro response file repository.
+  if (NOT TARGET ${availability_macros_rsp_target})
+    file(WRITE "${availability_macros_rsp_path}.tmp" "${availability_macros_rsp_txt}\n")
+    add_custom_command_target(unused_var
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${availability_macros_rsp_path}.tmp" "${availability_macros_rsp_path}"
+      CUSTOM_TARGET_NAME ${availability_macros_rsp_target}
+      OUTPUT "${availability_macros_rsp_path}"
+      DEPENDS "${availability_macros_rsp_path}.tmp")
+  endif()
+  list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "@${availability_macros_rsp_path}")
 
   # Enable -target-min-inlining-version
   list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-target-min-inlining-version" "-Xfrontend" "min")
@@ -1102,6 +1117,7 @@ function(add_swift_target_library_single target name)
         ${SWIFTLIB_SINGLE_DEPENDS}
         ${SWIFTLIB_SINGLE_FILE_DEPENDS}
         ${SWIFTLIB_SINGLE_LINK_LIBRARIES}
+        ${availability_macros_rsp_target}
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
       ARCHITECTURE_SUBDIR_NAME ${SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME}

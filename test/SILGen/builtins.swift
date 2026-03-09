@@ -993,3 +993,21 @@ func taskCancellationShieldPush() async {
 func taskCancellationShieldPop() async {
   Builtin.taskCancellationShieldPop()
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins20markDependencTrivialySpyxGAC_yXltlF :
+// CHECK:   [[M:%.*]] = mark_dependence %0 : $UnsafeMutablePointer<T> on %1
+// CHECK:   return [[M]]
+// CHECK: } // end sil function '$s8builtins20markDependencTrivialySpyxGAC_yXltlF'
+func markDependencTrivial<T>(_ p: UnsafeMutablePointer<T>, _ o: AnyObject) -> UnsafeMutablePointer<T> {
+  return Builtin.markDependence(p, o)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins24markDependenceGuaranteedyyXlyXl_yXltF :
+// CHECK:   [[M:%.*]] = mark_dependence %0 : $AnyObject on %1
+// CHECK:   [[C:%.*]] = copy_value [[M]]
+// CHECK:   return [[C]]
+// CHECK: } // end sil function '$s8builtins24markDependenceGuaranteedyyXlyXl_yXltF'
+func markDependenceGuaranteed(_ p: AnyObject, _ o: AnyObject) -> AnyObject {
+  return Builtin.markDependence(p, o)
+}
+

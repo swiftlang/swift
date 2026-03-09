@@ -948,6 +948,14 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
   }
 }
 
+struct ImmortalAccessors {
+  static let staticNE = NE()
+}
+
+class ClassImmortalAccessor {
+  static let staticNE = NE()
+}
+
 // ==================================================================================
 // Common mistakes with inout parameter annotations requiring custom diagnostics...
 // ==================================================================================

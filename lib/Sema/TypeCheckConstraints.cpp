@@ -674,9 +674,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         target.markInvalid();
         return true;
       }
-      // FIXME: Once we ban forward references to bindings in closures, we can
-      // add this assert (https://github.com/swiftlang/swift/pull/85141).
-      // ABORT("Cannot type-check PatternBindingDecl without closure context");
+      ABORT("Cannot type-check PatternBindingDecl without closure context");
     }
   }
 
@@ -1106,6 +1104,26 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
 //===----------------------------------------------------------------------===//
 #pragma mark Debugging
 
+void PotentialThrowSite::print(SourceManager *sm,
+                               llvm::raw_ostream &out) const {
+  switch (kind) {
+  case PotentialThrowSite::Application:
+    out << "- application @ ";
+    break;
+  case PotentialThrowSite::ExplicitThrow:
+    out << " - explicit throw @ ";
+    break;
+  case PotentialThrowSite::NonExhaustiveDoCatch:
+    out << " - non-exhaustive do..catch @ ";
+    break;
+  case PotentialThrowSite::PropertyAccess:
+    out << " - property access @ ";
+    break;
+  }
+
+  locator->dump(sm, out);
+}
+
 void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
                           raw_ostream &out) const {
   PrintOptions PO = PrintOptions::forDebugging();
@@ -1284,6 +1302,17 @@ void Solution::dump(raw_ostream &out, unsigned indent) const {
       out << ", ";
     });
     out << "\n";
+  }
+
+  if (!potentialThrowSites.empty()) {
+    out.indent(indent) << "Potential throw sites:\n";
+    interleave(
+        potentialThrowSites,
+        [&](const auto &throwSite) {
+          throwSite.second.print(sm, out.indent(indent + 2));
+        },
+        [&] { out << "\n"; });
+    out << '\n';
   }
 
   if (!Fixes.empty()) {
@@ -1543,27 +1572,13 @@ void ConstraintSystem::print(raw_ostream &out) const {
 
   if (!potentialThrowSites.empty()) {
     out.indent(indent) << "Potential throw sites:\n";
-    interleave(potentialThrowSites, [&](const auto &throwSite) {
-      out.indent(indent + 2);
-      switch (throwSite.second.kind) {
-      case PotentialThrowSite::Application:
-        out << "- application @ ";
-        break;
-      case PotentialThrowSite::ExplicitThrow:
-        out << " - explicit throw @ ";
-        break;
-      case PotentialThrowSite::NonExhaustiveDoCatch:
-        out << " - non-exhaustive do..catch @ ";
-        break;
-      case PotentialThrowSite::PropertyAccess:
-        out << " - property access @ ";
-        break;
-      }
-
-      throwSite.second.locator->dump(&getASTContext().SourceMgr, out);
-    }, [&] {
-      out << "\n";
-    });
+    interleave(
+        potentialThrowSites,
+        [&](const auto &throwSite) {
+          throwSite.second.print(&getASTContext().SourceMgr,
+                                 out.indent(indent + 2));
+        },
+        [&] { out << "\n"; });
     out << "\n";
 
   }

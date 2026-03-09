@@ -10,7 +10,7 @@
 // CHECK: import _StringProcessing
 // CHECK: import _SwiftConcurrencyShims
 
-// CHECK: public func something(with x: Builtin.RawPointer)
+// CHECK: public func something(with x: Builtin::RawPointer)
 
 import Builtin
 

@@ -279,7 +279,9 @@
     "EmbeddedPrint.swift",
     "InlineArray.swift",
     "_InlineArray.swift",
-    "Exclusivity.swift"
+    "Exclusivity.swift",
+    "Borrow.swift",
+    "Inout.swift"
   ],
   "Result": [
     "Result.swift"

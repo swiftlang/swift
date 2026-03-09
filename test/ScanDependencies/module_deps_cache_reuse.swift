@@ -136,7 +136,7 @@ import SubE
 // CHECK: "-target"
 // CHECK: "-module-name"
 // CHECK: "G"
-// CHECK: "-swift-version"
+// CHECK: {{"-language-mode"|"-swift-version"}}
 // CHECK: "5"
 // CHECK: ],
 // CHECK: "contextHash": "{{.*}}",

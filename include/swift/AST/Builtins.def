@@ -403,6 +403,10 @@ BUILTIN_SIL_OPERATION(LegacyCondFail, "condfail", Special)
 /// Fixes the lifetime of any heap references in a value.
 BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)
 
+/// result = markDependence<T, V>(value: T, base: V)
+/// Directly translates to the `mark_dependence` SIL instruction.
+BUILTIN_SIL_OPERATION(MarkDependence, "markDependence", Special)
+
 /// isUnique : <T> (inout T[?]) -> Int1
 ///
 /// This builtin takes an inout object reference and returns a boolean. Passing

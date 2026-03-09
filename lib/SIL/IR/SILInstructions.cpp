@@ -751,7 +751,9 @@ PartialApplyInst::PartialApplyInst(
     // should derive the type of its result by partially applying the callee's
     // type.
     : InstructionBase(Loc, Callee, SubstCalleeTy, Subs, Args,
-                      TypeDependentOperands, SpecializationInfo, ClosureType) {}
+                      TypeDependentOperands, SpecializationInfo, ClosureType) {
+  sharedUInt8().PartialApplyInst.isNested = true;
+}
 
 PartialApplyInst *PartialApplyInst::create(
     SILDebugLocation Loc, SILValue Callee, ArrayRef<SILValue> Args,
@@ -1734,10 +1736,6 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
     // return false.
     return false;
   }
-
-  // We found only one trivial field.
-  assert(FoundNonTrivialField && "Struct is non-trivial, but does not have a "
-                                 "non-trivial field?!");
   return true;
 }
 

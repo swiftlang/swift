@@ -379,6 +379,21 @@ public:
              ArrayRef<LifetimeTypeAttr *> lifetimeAttributes, DeclContext *dc,
              GenericEnvironment *env);
 
+  /// Compute a LifetimeDependenceInfo list for the uncurried form of a curried
+  /// function whose inner type has LifetimeDependenceInfo list
+  /// 'inner'.
+  ///
+  /// TODO: Add support for merging with lifetime dependencies from the outer
+  /// type. The outer type's result's dependencies should be copied to any
+  /// inner-type dependencies that include closure context dependencies,
+  /// replacing the closure context dependence for those entries.
+  ///
+  /// numInnerParams: number of parameters of the inner function type
+  /// numOuterParams: number of parameters of the outer function type
+  static ArrayRef<LifetimeDependenceInfo>
+  uncurry(ASTContext &ctx, ArrayRef<LifetimeDependenceInfo> inner,
+          unsigned numInnerParams, unsigned numOuterParams);
+
   bool operator==(const LifetimeDependenceInfo &other) const {
     return this->hasImmortalSpecifier() == other.hasImmortalSpecifier() &&
            this->getTargetIndex() == other.getTargetIndex() &&

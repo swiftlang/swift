@@ -74,8 +74,7 @@ import Swift
 /// not cancel tasks or resume continuations while holding that lock.
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
-nonisolated(nonsending)
-public func withTaskCancellationHandler<Return, Failure>(
+public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>(
   operation: nonisolated(nonsending) () async throws(Failure) -> Return,
   onCancel handler: sending () -> Void
 ) async throws(Failure) -> Return {
@@ -151,7 +150,8 @@ public func withTaskCancellationHandler<Return, Failure>(
 /// as resuming a continuation, may acquire these same internal locks.
 /// Therefore, if a cancellation handler must acquire a lock, other code should
 /// not cancel tasks or resume continuations while holding that lock.
-@available(SwiftStdlib 6.0, *)
+@available(SwiftStdlib 5.1, *)
+@backDeployed(before: SwiftStdlib 6.0)
 public func withTaskCancellationHandler<T>(
   operation: () async throws -> T,
   onCancel handler: @Sendable () -> Void,
@@ -225,7 +225,7 @@ extension Task {
     // This is @available(SwiftStdlib 6.4, *) but can't use SwiftStdlib in transparent function
     if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *) {
       let ignoreTaskCancellationShield: UInt64 = 0x1
-      return unsafe _taskIsCancelledWithFlags(_task, flags: ignoreTaskCancellationShield)
+      return _taskIsCancelledWithFlags(_task, flags: ignoreTaskCancellationShield)
     } else {
       return _taskIsCancelled(_task)
     }

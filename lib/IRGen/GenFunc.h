@@ -26,6 +26,8 @@ namespace llvm {
 }
 
 namespace swift {
+  enum StackAllocationIsNested_t : bool;
+
 namespace irgen {
   class Address;
   class Explosion;
@@ -58,7 +60,8 @@ namespace irgen {
       llvm::Value *fnContext, Explosion &args,
       ArrayRef<SILParameterInfo> argTypes, SubstitutionMap subs,
       CanSILFunctionType origType, CanSILFunctionType substType,
-      CanSILFunctionType outType, Explosion &out, bool isOutlined);
+      CanSILFunctionType outType, Explosion &out, bool isOutlined,
+      StackAllocationIsNested_t isNested);
   CanType getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
                                   bool isNoEscape);
 

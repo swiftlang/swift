@@ -175,14 +175,14 @@ test_combo(.genericFn(42)) // expected-error {{global function 'test_combo' requ
 
 /* Invalid result types */
 
-extension P { // expected-note 13 {{missing same-type requirement on 'Self'}} {{12-12= where Self == <#Type#>}}
+extension P { // expected-note 14 {{missing same-type requirement on 'Self'}} {{12-12= where Self == <#Type#>}}
   static func generic<T>(_: T) -> T { fatalError() }
   static func genericWithReqs<T: Collection>(_: T) -> Q where T.Element == Q { // expected-note {{required by static method 'genericWithReqs' where 'T' = '()'}}
     fatalError()
   }
 }
 
-extension P { // expected-note 6 {{missing same-type requirement on 'Self'}}
+extension P { // expected-note 7 {{missing same-type requirement on 'Self'}}
   static var invalidProp: Int { 42 }
   static var selfProp: Self { fatalError() }
   static func invalidMethod() -> Int { 42 }
@@ -255,14 +255,13 @@ test(.genericWithReqs([42]))
 test(.genericWithReqs(()))
 // expected-error@-1 {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 
-test_combo(.doesntExist) // expected-error {{reference to member 'doesntExist' cannot be resolved without a contextual type}}
-test_combo(.doesnt.exist()) // expected-error {{reference to member 'doesnt' cannot be resolved without a contextual type}}
+test_combo(.doesntExist) // expected-error {{type 'P & Q' has no member 'doesntExist'}}
+test_combo(.doesnt.exist()) // expected-error {{type 'P & Q' has no member 'doesnt'}}
 test_combo(.invalidProp)
 // expected-error@-1 {{contextual member reference to static property 'invalidProp' requires 'Self' constraint in the protocol extension}}
-test_combo(.invalidProp.doesntExist) //FIXME: Requires protocol conformance fix for expected two messages below
-// expected-error@-1{{type 'Q' has no member 'invalidProp'}}
-// {{contextual member reference to static property 'invalidProp' requires 'Self' constraint in the protocol extension}}
-// {{value of type 'Int' has no member 'doesntExist'}}
+test_combo(.invalidProp.doesntExist)
+// expected-error@-1{{contextual member reference to static property 'invalidProp' requires 'Self' constraint in the protocol extension}}
+// expected-error@-2 {{value of type 'Int' has no member 'doesntExist'}}
 test_combo(.invalidMethod())
 // expected-error@-1{{contextual member reference to static method 'invalidMethod()' requires 'Self' constraint in the protocol extension}}
 test_combo(.generic(42))
@@ -273,10 +272,9 @@ test_combo(.generic(G<Int>()))
 //expected-error@-1 {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
 test_combo(.genericWithReqs([S()]))
 // expected-error@-1{{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
-test_combo(.genericWithReqs([42])) //FIXME: Requires protocol conformance fix for expected two messages below
-// expected-error@-1{{failed to produce diagnostic for expression}}
-// {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
-// {{cannot convert value of type 'Int' to expected element type 'any Q'}}
+test_combo(.genericWithReqs([42]))
+// expected-error@-1{{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
+// expected-error@-2 {{cannot convert value of type 'Int' to expected element type 'any Q'}}
 test_combo(.genericWithReqs(()))
 // expected-error@-1{{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 
@@ -347,7 +345,7 @@ protocol Container {
 
 struct Box<T>: Container { // expected-note {{'T' declared as parameter to type 'Box'}}
   typealias Content = T
-  init(_: Content) {}
+  init(_ : Content) {}
 }
 
 extension Container {
@@ -394,3 +392,22 @@ test(.instanceProp)
 test(.instanceProp2)
 // expected-error@-1 {{instance member 'instanceProp2' cannot be used on type 'P'}}
 // expected-error@-2 {{property 'instanceProp2' requires the types 'Self' and 'S' be equivalent}}
+
+// Make sure that type variable names are kept distinct
+protocol P1 {
+  associatedtype X
+}
+
+protocol Q1{}
+
+struct I: P1 {
+  typealias X = Int
+}
+extension Int: Q1 {}
+
+extension P1 where Self == I {
+  static var sbar: I { I() }
+}
+
+func subconformance<T: P1, U>(_ x: T, _ y: U) where U == T.X, T.X: Q1 {}
+subconformance(.sbar, 5)

@@ -18,6 +18,7 @@
 #define SWIFT_SEMA_SUBTYPING_H
 
 #include "swift/Basic/OptionSet.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
@@ -122,6 +123,8 @@ enum ConflictFlag : unsigned {
   Conformance = 1 << 10
 };
 using ConflictReason = OptionSet<ConflictFlag>;
+
+void simple_display(llvm::raw_ostream &out, ConflictReason reason);
 
 /// Check whether lhs, as a type with type variables or unopened type
 /// parameters, might be a subtype of rhs, which again is a type with

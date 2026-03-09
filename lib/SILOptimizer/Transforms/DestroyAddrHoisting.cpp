@@ -109,6 +109,20 @@ using namespace swift;
 
 namespace {
 
+static bool hasUncheckedAddrCast(SILValue v) {
+  if (isa<UncheckedAddrCastInst>(v))
+    return true;
+  if (auto *bai = dyn_cast<BeginAccessInst>(v)) {
+    return hasUncheckedAddrCast(bai->getOperand());
+  }
+  if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
+    if (isAccessStorageCast(svi)) {
+      return hasUncheckedAddrCast(svi->getAllOperands()[0].get());
+    }
+  }
+  return false;
+}
+
 /// Step #1: Find all known uses of the unique storage object.
 struct KnownStorageUses : UniqueStorageUseVisitor {
   bool preserveDebugInfo;
@@ -178,6 +192,13 @@ protected:
             stripAccessAndAccessStorageCasts(use->get()))) {
       return false;
     }
+    // Don't hoist `destroy_addr` if the operand address is an `unchecked_addr_cast`.
+    // Such casts could cast from a vector to its first element. Don't hoist such
+    // `destroy_addr`s because we would also replace the address from the cast result
+    // to the cast operand.
+    if (hasUncheckedAddrCast(use->get()))
+      return false;
+
     originalDestroys.insert(use->getUser());
     return true;
   }

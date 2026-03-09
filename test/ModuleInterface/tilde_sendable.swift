@@ -6,7 +6,7 @@
 // REQUIRES: swift_feature_TildeSendable
 
 // CHECK: #if compiler(>=5.3) && $TildeSendable
-// CHECK: public class A : ~Swift.Sendable {
+// CHECK: public class A : ~Swift::Sendable {
 // CHECK: }
 // CHECK: #else
 // CHECK: public class A {
@@ -20,22 +20,22 @@ protocol P {
 }
 
 // CHECK: #if compiler(>=5.3) && $TildeSendable
-// CHECK: public struct S : ~Swift.Sendable {
-// CHECK:   public let x: Swift.Int
+// CHECK: public struct S : ~Swift::Sendable {
+// CHECK:   public let x: Swift::Int
 // CHECK: }
 // CHECK: #else
 // CHECK: public struct S {
-// CHECK:   public let x: Swift.Int
+// CHECK:   public let x: Swift::Int
 // CHECK: }
 // CHECK: #endif
 
-// CHECK-NOT: extension Library.S : Swift.Sendable {}
+// CHECK-NOT: extension Library::S : Swift::Sendable {}
 public struct S: P, ~Sendable {
   public let x: Int
 }
 
 // CHECK: #if compiler(>=5.3) && $TildeSendable
-// CHECK: public struct B<T> : ~Swift.Sendable {
+// CHECK: public struct B<T> : ~Swift::Sendable {
 // CHECK: }
 // CHECK: #else
 // CHECK: public struct B<T> {
@@ -44,7 +44,7 @@ public struct S: P, ~Sendable {
 public struct B<T>: ~Sendable {
 }
 
-// CHECK: extension Library.B : Swift.Sendable where T : Swift.Sendable {
+// CHECK: extension Library::B : Swift::Sendable where T : Swift::Sendable {
 // CHECK: }
 extension B: Sendable where T: Sendable {
 }

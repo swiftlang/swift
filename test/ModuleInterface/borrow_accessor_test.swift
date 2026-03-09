@@ -25,12 +25,12 @@ import borrow_accessors
 
 // CHECK: public protocol P {
 // CHECK:   #if compiler(>=5.3) && $BorrowAndMutateAccessors
-// CHECK:   var k: borrow_accessors.Klass { borrow mutate }
+// CHECK:   var k: borrow_accessors::Klass { borrow mutate }
 // CHECK:   #endif
 // CHECK: }
-// CHECK: public struct Wrapper : borrow_accessors.P {
+// CHECK: public struct Wrapper : borrow_accessors::P {
 // CHECK:   #if compiler(>=5.3) && $BorrowAndMutateAccessors
-// CHECK:   public var k: borrow_accessors.Klass {
+// CHECK:   public var k: borrow_accessors::Klass {
 // CHECK:     borrow
 // CHECK:     mutate
 // CHECK:   }

@@ -290,6 +290,15 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
   set(SWIFT_STDLIB_HAS_ASL FALSE)
   list(APPEND LLVM_OPTIONAL_SOURCES ExecutorImpl.cpp)
 
+  # Under Embedded Swift, all stdlib APIs should be available always. Replace
+  # all availability macros with an empty expansion (`*`).
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED)
+  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
+    string(REGEX REPLACE ":.*" ":*" replaced "${def}")
+    list(APPEND SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED "${replaced}")
+  endforeach()
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED}")
+
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
     list(GET list 0 arch)
@@ -312,6 +321,15 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         # Host is macOS with a macOS SDK. To be able to build the C++ Concurrency runtime for non-Darwin targets using the macOS SDK,
         # we need to pass some extra flags and search paths.
         set(extra_c_compile_flags -stdlib=libc++ -isystem${SWIFT_SDK_OSX_PATH}/usr/include/c++/v1 -isystem${SWIFT_SDK_OSX_PATH}/usr/include -D__APPLE__)
+        # Before Xcode 26.4, we were getting these macros from TargetConditionals.h
+        # now it's on us to define those to keep using the macOS SDK for non Darwin targets
+        if("${arch}" MATCHES "armv7")
+          list(APPEND extra_c_compile_flags -DTARGET_CPU_ARM=1)
+        elseif("${arch}" MATCHES "arm64")
+          list(APPEND extra_c_compile_flags -DTARGET_CPU_ARM64=1)
+        elseif("${arch}" MATCHES "x86_64")
+          list(APPEND extra_c_compile_flags -DTARGET_CPU_X86_64=1)
+        endif()
       endif()
     endif()
 

@@ -92,20 +92,6 @@ static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
   P.addMandatoryInlining();
 }
 
-static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("Ownership Model Eliminator");
-  P.addAddressLowering();
-  P.addOwnershipModelEliminator();
-}
-
-/// Passes for performing definite initialization. Must be run together in this
-/// order.
-static void addDefiniteInitialization(SILPassPipelinePlan &P) {
-  P.addDefiniteInitialization();
-  P.addLetPropertyLowering();
-  P.addRawSILInstLowering();
-}
-
 // This pipeline defines a set of mandatory diagnostic passes and a set of
 // supporting optimization passes that enable those diagnostics. These are run
 // before any performance optimizations and in contrast to those optimizations
@@ -137,7 +123,12 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addNoReturnFolding();
   P.addBooleanLiteralFolding();
-  addDefiniteInitialization(P);
+
+  /// Passes for performing definite initialization.
+  /// Must be run together in this order.
+  P.addDefiniteInitialization();
+  P.addLetPropertyLowering();
+  P.addRawSILInstLowering();
 
   P.addAddressLowering();
 
@@ -366,7 +357,9 @@ SILPassPipelinePlan SILPassPipelinePlan::getLowerHopToActorPassPipeline(
 SILPassPipelinePlan SILPassPipelinePlan::getOwnershipEliminatorPassPipeline(
     const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
-  addOwnershipModelEliminatorPipeline(P);
+  P.startPipeline("Ownership Model Eliminator");
+  P.addAddressLowering();
+  P.addOwnershipModelEliminator();
   return P;
 }
 

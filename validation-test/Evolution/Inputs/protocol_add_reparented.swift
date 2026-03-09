@@ -10,6 +10,7 @@ public func libraryVersion() -> Int {
 
 public protocol Bird {
   func eat(_ food: Int) -> Int
+  func containsChirps() -> Bool
 }
 
 #else
@@ -21,10 +22,16 @@ public protocol SeedEater {
   associatedtype Kind: AsInt
 
   var seedKinds: Kind { get }
+  func containsChirps() -> Bool
+}
+
+extension SeedEater {
+  public func containsChirps() -> Bool { return false }
 }
 
 public protocol Bird: SeedEater {
   func eat(_ food: Int) -> Int
+  func containsChirps() -> Bool
 }
 
 extension Bird : @reparented SeedEater where Kind == Int {
@@ -45,11 +52,18 @@ extension Int: AsInt {
 
 #endif
 
+extension Bird {
+  public func containsChirps() -> Bool { return true }
+}
+
 public struct SomeType {
   public static func feed(_ b: some Bird, _ clientVersion: Int) -> Int {
+  precondition(b.containsChirps())
+
   #if BEFORE
     return b.eat(clientVersion)
   #else
+    precondition(asBase(b).containsChirps())
     let ans1 = asBase(b).eatSeed(clientVersion)
     let ans2 = feedAsBase_Param(b, clientVersion)
     precondition(ans1 == ans2)
@@ -78,9 +92,12 @@ public struct SomeType {
 
 public struct ExistentialType {
   public static func feed(_ b: any Bird, _ clientVersion: Int) -> Int {
+  precondition(b.containsChirps())
+
   #if BEFORE
     return b.eat(clientVersion)
   #else
+    precondition(asExtBase(b).containsChirps())
     return asExtBase(b).eatSeed(clientVersion)
   #endif
   }
@@ -98,4 +115,8 @@ public struct ExistentialType {
   #endif
 }
 
-
+#if !BEFORE
+public func willChirp(_ e: some SeedEater) -> Bool {
+  return e.containsChirps()
+}
+#endif

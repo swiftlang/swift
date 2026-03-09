@@ -88,6 +88,8 @@ namespace swift {
   class DerivativeAttr;
   class DifferentiableAttr;
   class ExtensionDecl;
+  struct ExplicitSwiftModuleMap;
+  struct ExplicitClangModuleMap;
   struct ExternalSourceLocs;
   class ForeignRepresentationInfo;
   class FuncDecl;
@@ -923,6 +925,8 @@ public:
   // runtime version.
 #define FEATURE(N, V)                                                          \
   inline AvailabilityRange get##N##Availability() const {                      \
+    if (LangOpts.hasFeature(Feature::Embedded))                                \
+      return AvailabilityRange::alwaysAvailable();                             \
     return getSwiftAvailability V;                                             \
   }                                                                            \
   inline AvailabilityRange get##N##RuntimeAvailability() const {               \
@@ -1074,8 +1078,8 @@ public:
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
   void addSearchPath(StringRef searchPath, bool isFramework, bool isSystem);
 
-  /// Adds the path to the explicitly built module \c name.
-  void addExplicitModulePath(StringRef name, std::string path);
+  ExplicitSwiftModuleMap *getExplicitSwiftModuleMap();
+  ExplicitClangModuleMap *getExplicitClangModuleMap();
 
   /// Adds a module loader to this AST context.
   ///

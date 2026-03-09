@@ -544,12 +544,12 @@ public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Dependency Scanning hash.
   llvm::hash_code getModuleScanningHashComponents() const {
-    return hash_combine(ModuleName,
-                        ModuleABIName,
-                        ModuleLinkName,
-                        ImplicitObjCHeaderPath,
-                        PrebuiltModuleCachePath,
-                        UserModuleVersion);
+    return hash_combine(
+        ModuleName, ModuleABIName, ModuleLinkName, ImplicitObjCHeaderPath,
+        PrebuiltModuleCachePath,
+        llvm::hash_combine_range(ImplicitImportModuleNames.begin(),
+                                 ImplicitImportModuleNames.end()),
+        UserModuleVersion);
   }
 
   StringRef determineFallbackModuleName() const;

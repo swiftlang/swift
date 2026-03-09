@@ -5,16 +5,17 @@ While it's a virtual machine, there are considerations to be taken into account 
 
 * WebAssembly is still at an early stage, so many features you'd be expect from other platforms are not
 available yet, specifically:
-  1. `wasm64` variant is not specified yet, only the 32-bit `wasm32` variant is supported in WebAssembly
-  hosts such as browsers.
-  2. While a preview of multi-threading and atomics is available in some browsers and stand-alone 
-  WebAssembly hosts, [the corresponding proposal](https://github.com/WebAssembly/threads/) haven't 
-  formally reached the implementation phase yet.
-    The multi-threading feature is available in `wasm32-unknown-wasip1-threads` target, but it's not
-    in `wasm32-unknown-wasi` target.
-  3. Dynamic linking is not formally specified and tooling for it is not available yet.
+  1. `wasm64` variant is not supported by [WASI](https://wasi.dev) yet. While you can try and build for `wasm64-unknown-none-wasm`
+      triple with [Embedded Swift](https://docs.swift.org/embedded/documentation/embedded/), without
+      [WASI-libc](https://github.com/WebAssembly/wasi-libc) you'll have to reimplement basic functionality
+     like allocators, RNG, clocks, I/O etc on your own.
+  3. A preview of multi-threading and atomics is available in some browsers and stand-alone 
+  WebAssembly hosts. The multi-threading feature is available for `wasm32-unknown-wasip1-threads` triple, but it's not
+    in the `wasm32-unknown-wasip1` triple.
+  4. Dynamic linking is not formally specified for `wasip1` triples and tooling for it is not available yet.
 * Binary size is a high priority requirement. Since WebAssembly payloads are usually served in browsers,
-one wouldn't want end users to download multi-megabyte binaries.
+one wouldn't want end users to download multi-megabyte binaries. This means that [Embedded Swift](https://docs.swift.org/embedded/documentation/embedded/)
+is commonly used when building for Wasm.
 
 ## Running Wasm stdlib tests
 

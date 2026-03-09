@@ -45,7 +45,7 @@ func swift6_2() {}
 @available(SwiftLanguageMode 6.0, *) // expected-error {{Swift requires '-enable-experimental-feature SwiftRuntimeAvailability'}}
 func swiftLanguageMode6_0() {}
 
-@available(anyAppleOS 26, *) // expected-error {{any Apple OS requires '-enable-experimental-feature AnyAppleOSAvailability'}}
+@available(anyAppleOS 26, *)
 func anyAppleOS26() {}
 
 // <rdar://problem/17669805> Availability can't appear on a typealias

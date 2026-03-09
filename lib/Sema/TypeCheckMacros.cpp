@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckMacros.h"
-#include "../AST/InlinableText.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/ABI/MetadataValues.h"
@@ -35,6 +34,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/InlinableText.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/Defer.h"

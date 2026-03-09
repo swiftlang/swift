@@ -170,6 +170,7 @@ if(NOT SWIFT_BUILT_STANDALONE)
 
   foreach(target
       symlink_clang_headers
+      symlink_clang_headers_static
       clang-builtin-headers
       clang-resource-dir-symlink
       clang-builtin-headers-in-clang-resource-dir)

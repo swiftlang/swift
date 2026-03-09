@@ -605,10 +605,7 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     // is not enabled.
     if (gp->isParameterPack()) {
       // Variadic nominal types require runtime support.
-      //
-      // Embedded doesn't require runtime support for this feature.
-      if (isa<NominalTypeDecl>(decl) &&
-          !ctx.LangOpts.hasFeature(Feature::Embedded)) {
+      if (isa<NominalTypeDecl>(decl)) {
         TypeChecker::checkAvailability(
             gp->getSourceRange(),
             ctx.getVariadicGenericTypeAvailability(),
@@ -628,11 +625,9 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     // Value generic nominal types require runtime support.
     if (gp->isValue() && isa<NominalTypeDecl>(decl)) {
       auto nomTypeDecl = cast<NominalTypeDecl>(decl);
-      // But: Embedded doesn't require runtime support for this feature.
       // But: Stdlib/libswiftCore carries its own support,
       //      so non-public stdlib declarations are safe
-      if (!ctx.LangOpts.hasFeature(Feature::Embedded) &&
-          !(decl->getModuleContext()->isStdlibModule() &&
+      if (!(decl->getModuleContext()->isStdlibModule() &&
             !nomTypeDecl->isAccessibleFrom(nullptr))) {
         // Everything else gets diagnosed for availability
         TypeChecker::checkAvailability(

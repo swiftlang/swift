@@ -540,8 +540,8 @@ private:
                               clang::DeclarationName);
 };
 
-}
-}
+} // namespace importer
+} // namespace swift
 
 namespace llvm {
 // Provide DenseMapInfo for ImportNameVersion.
@@ -562,6 +562,6 @@ template <> struct DenseMapInfo<swift::importer::ImportNameVersion> {
     return LHS == RHS;
   }
 };
-}
+} // namespace llvm
 
 #endif

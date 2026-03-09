@@ -60,6 +60,11 @@ add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 # Ensure all symbols are fully resolved on Linux
 add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
+# Don't build on 32-bit Windows; it doesn't work there
+if(WIN32 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(i[3-6]86|x86)$")
+  message(FATAL_ERROR "Swift C-interop does not respect calling conventions on 32-bit")
+endif()
+
 add_executable(swift-backtrace
   main.swift
   AnsiColor.swift

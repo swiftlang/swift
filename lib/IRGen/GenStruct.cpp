@@ -23,6 +23,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
@@ -277,6 +278,22 @@ namespace {
       if (fields.size() != 1)
         return false;
       return fields[0].getTypeInfo().isSingleRetainablePointer(expansion, rc);
+    }
+
+    void strongCustomRetain(IRGenFunction &IGF, Explosion &e,
+                            bool needsNullCheck) const override {
+      ReferenceCounting dummy;
+      ASSERT(isSingleRetainablePointer(ResilienceExpansion::Maximal, &dummy));
+      auto fields = asImpl().getFields();
+      fields[0].getTypeInfo().strongCustomRetain(IGF, e, needsNullCheck);
+    }
+
+    void strongCustomRelease(IRGenFunction &IGF, Explosion &e,
+                             bool needsNullCheck) const override {
+      ReferenceCounting dummy;
+      ASSERT(isSingleRetainablePointer(ResilienceExpansion::Maximal, &dummy));
+      auto fields = asImpl().getFields();
+      fields[0].getTypeInfo().strongCustomRelease(IGF, e, needsNullCheck);
     }
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,

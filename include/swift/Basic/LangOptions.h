@@ -526,6 +526,10 @@ namespace swift {
     /// prevents files from being written.
     bool OpenSourcesAsVolatile = false;
 
+    /// Whether the AST is being built for SourceKit.
+    /// FIXME: Eliminate this, it's a layering violation.
+    bool IsForSourceKit = false;
+
     /// Load swiftmodule files in memory as volatile and avoid mmap.
     bool EnableVolatileModules = false;
 
@@ -1023,6 +1027,12 @@ namespace swift {
 
     /// Enable the experimental "prepared overloads" optimization.
     bool SolverEnablePreparedOverloads = true;
+
+    /// Enable generation of transitive conformance constraints.
+    bool SolverEnableTransitiveConformance = true;
+
+    /// Enable experimental optimization to speed up binding of type variables.
+    bool SolverEnableBindingOptimizations = true;
 
     /// Enable experimental optimization to skip contradictory disjunction
     /// choices.

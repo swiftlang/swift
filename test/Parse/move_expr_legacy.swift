@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-move-only
+// RUN: %target-typecheck-verify-swift -enable-experimental-move-only
 
 // Temporary `_move` syntax is still parsed but raises a warning and fixit.
 func oldMoveSyntax(x: String) {

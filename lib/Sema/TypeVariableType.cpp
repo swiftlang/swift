@@ -120,30 +120,6 @@ bool TypeVariableType::Implementation::isKeyPathSubscriptIndex() const {
          locator->isLastElement<LocatorPathElt::KeyPathSubscriptIndex>();
 }
 
-bool TypeVariableType::Implementation::isSubscriptResultType() const {
-  if (!(locator && locator->getAnchor()))
-    return false;
-
-  if (!locator->isLastElement<LocatorPathElt::FunctionResult>())
-    return false;
-
-  if (isExpr<SubscriptExpr>(locator->getAnchor()))
-    return true;
-
-  auto *KP = getAsExpr<KeyPathExpr>(locator->getAnchor());
-  if (!KP)
-    return false;
-
-  auto componentLoc = locator->findFirst<LocatorPathElt::KeyPathComponent>();
-  if (!componentLoc)
-    return false;
-
-  auto &component = KP->getComponents()[componentLoc->getIndex()];
-  return component.getKind() == KeyPathExpr::Component::Kind::Subscript ||
-         component.getKind() ==
-             KeyPathExpr::Component::Kind::UnresolvedSubscript;
-}
-
 bool TypeVariableType::Implementation::isParameterPack() const {
   return locator
       && locator->isForGenericParameter()

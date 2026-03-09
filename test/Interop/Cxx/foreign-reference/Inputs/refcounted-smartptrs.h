@@ -124,6 +124,9 @@ inline RefOfBase bridgedFunction3() {
 inline PtrOfBase bridgedFunction4() {
   return PtrOfBase(RefCountedBase::forSmartPtr());
 }
+inline void notBridgedFunction(RefOfBase &ptr) {}
+inline void notBridgedFunction2(const RefOfBase &ptr) {}
+inline void notBridgedFunction3(RefOfBase &&ptr) {}
 
 namespace errors { // expected-note * {{'errors' declared here}}
 struct __attribute__((

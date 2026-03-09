@@ -1639,8 +1639,11 @@ void CodeCompletionCallbacksImpl::readyForTypeChecking(SourceFile *SrcFile) {
   default:
     break;
   }
-  ASSERT(!ParsedExpr || Kind == CompletionKind::KeyPathExprObjC
-         && "Should use solver-based completion for expressions");
+  // FIXME: We ought to enable the below assertion to make sure expressions
+  // are handled using solver-based completion, but that can be tripped up by
+  // lookaheads in the parser (https://github.com/swiftlang/swift/issues/87338).
+  //  ASSERT(!ParsedExpr || Kind == CompletionKind::KeyPathExprObjC
+  //         && "Should use solver-based completion for expressions");
 
   // Add keywords even if type checking fails completely.
   addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);

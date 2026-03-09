@@ -84,6 +84,12 @@ module std {
       export *
     }
 
+    module cmath {
+      header "cmath"
+      requires cplusplus
+      export *
+    }
+
     module cstdlib {
       header "cstdlib"
       requires cplusplus

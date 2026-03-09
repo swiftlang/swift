@@ -698,13 +698,13 @@ func FormClassKeyPath() {
 
 // CHECK-LABEL: sil {{.*}}[ossa] @UseGetterOnInout : {{.*}} {
 // CHECK:       bb0([[CONTAINER_ADDR:%[^,]+]] :
-// CHECK:         [[KEYPATH:%[^,]+]] = keypath $WritableKeyPath<MyInt, Int>, (root $MyInt; stored_property #MyInt.int : $Int) 
 // CHECK:         [[CONTAINER_ACCESS:%[^,]+]] = begin_access [read] [unknown] [[CONTAINER_ADDR]]
-// CHECK:         [[KEYPATH_UP:%[^,]+]] = upcast [[KEYPATH]]
 // CHECK:         [[CONTAINER:%[^,]+]] = load [trivial] [[CONTAINER_ACCESS]]
+// CHECK:         end_access [[CONTAINER_ACCESS]]
+// CHECK:         [[KEYPATH:%[^,]+]] = keypath $WritableKeyPath<MyInt, Int>, (root $MyInt; stored_property #MyInt.int : $Int)
+// CHECK:         [[KEYPATH_UP:%[^,]+]] = upcast [[KEYPATH]]
 // CHECK:         [[GETTER:%[^,]+]] = function_ref @swift_getAtKeyPath
 // CHECK:         [[VALUE:%[^,]+]] = apply [[GETTER]]<MyInt, Int>([[CONTAINER]], [[KEYPATH_UP]])
-// CHECK:         end_access [[CONTAINER_ACCESS]]
 // CHECK:         destroy_value [[KEYPATH_UP]]
 // CHECK:         return [[VALUE]] : $Int                                
 // CHECK-LABEL: } // end sil function 'UseGetterOnInout'

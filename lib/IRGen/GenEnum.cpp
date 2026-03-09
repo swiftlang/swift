@@ -2671,8 +2671,8 @@ namespace {
         if (Refcounting == ReferenceCounting::Custom) {
           Explosion e;
           e.add(ptr);
-          getPayloadTypeInfo().as<ClassTypeInfo>().strongCustomRetain(
-              IGF, e, /*needsNullCheck*/ true);
+          getPayloadTypeInfo().strongCustomRetain(IGF, e,
+                                                  /*needsNullCheck*/ true);
           return;
         }
 
@@ -2708,8 +2708,8 @@ namespace {
         if (Refcounting == ReferenceCounting::Custom) {
           Explosion e;
           e.add(ptr);
-          getPayloadTypeInfo().as<ClassTypeInfo>().strongCustomRelease(
-              IGF, e, /*needsNullCheck*/ true);
+          getPayloadTypeInfo().strongCustomRelease(IGF, e,
+                                                   /*needsNullCheck*/ true);
           return;
         }
 

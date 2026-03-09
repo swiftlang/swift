@@ -16,7 +16,7 @@
 
 // REQUIRES: concurrency
 
-// CHECK: package struct S : Swift.Sendable {
+// CHECK: package struct S : Swift::Sendable {
 package struct S {
   package let x: Int = 42
 }
@@ -28,7 +28,7 @@ private class NonSendable {
 protocol P: Sendable {
 }
 
-// CHECK: final package class A : _A.P, Swift.Sendable {
+// CHECK: final package class A : _A::P, Swift::Sendable {
 package final class A: P {
   let x: Int = 42
 }
@@ -39,7 +39,7 @@ package struct NS {
   private var v: NonSendable
 }
 
-// CHECK: package enum Unavailable : Swift.Equatable {
+// CHECK: package enum Unavailable : Swift::Equatable {
 package enum Unavailable: Equatable {
   case test
 }
@@ -67,7 +67,7 @@ extension ConditionalTest: Sendable where T: Sendable {
 @available(macOS 15.0, *)
 @_originallyDefinedIn(module: "A", macOS 15.0)
 public struct Test1: Sendable {
-  // CHECK: package enum Storage : Swift.Equatable, Swift.Sendable {
+  // CHECK: package enum Storage : Swift::Equatable, Swift::Sendable {
   package enum Storage: Equatable {
     case empty
   }
@@ -78,13 +78,13 @@ public struct Test1: Sendable {
 @available(macOS 15.0, *)
 @_originallyDefinedIn(module: "A", macOS 15.0)
 public struct Test2: Sendable {
-  // CHECK: package struct Storage : Swift.Equatable {
+  // CHECK: package struct Storage : Swift::Equatable {
   package struct Storage: Equatable {  // expected-note {{consider making struct 'Storage' conform to the 'Sendable' protocol}}
     // CHECK-NOT: private var ns: NS
     private var ns: NS = NS()
   }
 
-  // CHECK: package class NS : Swift.Equatable {
+  // CHECK: package class NS : Swift::Equatable {
   package class NS : Equatable {
     package static func ==(_: NS, _: NS) -> Bool { false }
   }

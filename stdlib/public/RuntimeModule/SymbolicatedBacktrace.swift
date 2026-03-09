@@ -434,7 +434,6 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     backtrace: Backtrace,
     images: ImageMap?,
     platform symbolicationPlatform: Backtrace.SymbolicationPlatform,
-    alternativeSymbolFilePaths: [String],
     options: Backtrace.SymbolicationOptions,
     symbolLocator: SymbolLocator = DefaultSymbolLocator.shared
   ) -> SymbolicatedBacktrace? {
@@ -582,8 +581,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                       offset: 0,
                                       sourceLocation: nil)
 
-          if let hit = cache.lookup(path: theImages[imageNdx].path,
-                                    alternativePaths: alternativeSymbolFilePaths) {
+          if let imagePath = symbolLocator.find(image: theImages[imageNdx]),
+             let hit = cache.lookup(path: imagePath) {
             let symbolSource: (any SymbolSource)?
             let relativeAddress: ImageSource.Address
             switch hit {
@@ -629,8 +628,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                       offset: 0,
                                       sourceLocation: nil)
 
-          if let image = cache.lookup(path: theImages[imageNdx].path,
-                                      alternativePaths: alternativeSymbolFilePaths) {
+          if let imagePath = symbolLocator.find(image: theImages[imageNdx]),
+             let image = cache.lookup(path: imagePath) {
             let symbolSource = symbolLocator.findSymbols(for: image)
             let relativeAddress = ImageSource.Address(
               address - theImages[imageNdx].baseAddress

@@ -374,7 +374,7 @@ static void getLibStdCxxFileMapping(
     return;
   }
 
-  StringRef additionalFiles[] = {
+  constexpr StringRef additionalFiles[] = {
       // libstdc++ 4.8.5 bundled with CentOS 7 does not include corecvt.
       "codecvt",
       // C++17 and newer:

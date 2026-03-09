@@ -467,6 +467,32 @@ void ModuleDependencyInfo::addBridgingHeaderIncludeTree(StringRef ID) {
   }
 }
 
+void ModuleDependencyInfo::addDependencyOnlyImport(StringRef ID) {
+  switch (getKind()) {
+  case swift::ModuleDependencyKind::SwiftSource: {
+    auto swiftSourceStorage =
+        cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+    swiftSourceStorage->addDependencyOnlyImport(ID);
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
+  }
+}
+
+const std::vector<std::string> &
+ModuleDependencyInfo::getDependencyOnlyImports() const {
+  switch (getKind()) {
+  case swift::ModuleDependencyKind::SwiftSource: {
+    auto swiftSourceStorage =
+        cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+    return swiftSourceStorage->getDependencyOnlyImports();
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
+  }
+}
+
 void ModuleDependencyInfo::setChainedBridgingHeaderBuffer(StringRef path,
                                                           StringRef buffer) {
   switch (getKind()) {
@@ -1008,6 +1034,16 @@ ModuleDependenciesCache::getAllClangDependencies(
   return ModuleDependencyIDCollectionView(
       moduleInfo.getImportedClangDependencies(),
       moduleInfo.getHeaderClangDependencies());
+}
+
+ModuleDependencyIDCollectionView
+ModuleDependenciesCache::getAllSwiftDependencies(
+    const ModuleDependencyID &moduleID) const {
+  const auto &moduleInfo = findKnownDependency(moduleID);
+  return ModuleDependencyIDCollectionView(
+      moduleInfo.getImportedSwiftDependencies(),
+      moduleInfo.getSwiftOverlayDependencies(),
+      moduleInfo.getCrossImportOverlayDependencies());
 }
 
 llvm::ArrayRef<ModuleDependencyID>

@@ -187,6 +187,9 @@ LONG reallyHandleException(EXCEPTION_POINTERS *ExceptionInfo) {
   // It isn't safe to try to stop all the threads here on Windows, so we
   // delegate doing that to the backtracer process.
 
+  // Also, closing open file descriptors is
+  // not something we can easily do on Windows.
+
   if (!_swift_spawnBacktracer(&crashInfo)) {
     const char *message = _swift_backtraceSettings.color == OnOffTty::On
       ? " failed\n\n" : " failed ***\n\n";

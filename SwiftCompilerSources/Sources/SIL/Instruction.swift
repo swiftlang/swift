@@ -1412,6 +1412,10 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var hasUnknownResultIsolation: Bool { bridged.PartialApplyInst_hasUnknownResultIsolation() }
   public var unappliedArgumentCount: Int { bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() }
   public var calleeConvention: ArgumentConvention { type.bridged.getCalleeConvention().convention }
+  public var isNested: Bool {
+    get { bridged.PartialApplyInst_isStackAllocationNested() }
+    set { bridged.PartialApplyInst_setStackAllocationIsNested(newValue) }
+  }
 }
 
 final public class ApplyInst : SingleValueInstruction, FullApplySite {
@@ -2185,12 +2189,19 @@ final public class IgnoredUseInst : Instruction, UnaryInstruction {
 final public class ImplicitActorToOpaqueIsolationCastInst
   : SingleValueInstruction, UnaryInstruction {}
 
-final public class MakeBorrowInst
+public protocol MakeBorrowInstruction
   : SingleValueInstruction, UnaryInstruction {
+  var referent: Value { get }
+}
+
+extension MakeBorrowInstruction {
   public var referent: Value {
     operands[0].value
   }
 }
+
+final public class MakeBorrowInst 
+  : SingleValueInstruction, MakeBorrowInstruction, UnaryInstruction {}
 
 final public class DereferenceBorrowInst
   : SingleValueInstruction, UnaryInstruction {
@@ -2200,11 +2211,7 @@ final public class DereferenceBorrowInst
 }
 
 final public class MakeAddrBorrowInst
-  : SingleValueInstruction, UnaryInstruction {
-  public var referent: Value {
-    operands[0].value
-  }
-}
+  : SingleValueInstruction, MakeBorrowInstruction, UnaryInstruction {}
 
 final public class DereferenceAddrBorrowInst
   : SingleValueInstruction, UnaryInstruction {

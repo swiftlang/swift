@@ -20,6 +20,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -27,6 +28,7 @@
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/TargetParser/Triple.h"
+#include <optional>
 
 using namespace swift;
 using namespace swift::serialization;
@@ -503,7 +505,9 @@ static ValidationInfo validateControlBlock(
 static bool validateInputBlock(
     llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
-    SmallVectorImpl<SearchPath> *searchPaths) {
+    SmallVectorImpl<SearchPath> *searchPaths,
+    ExplicitSwiftModuleMap *explicitSwiftModuleMap,
+    ExplicitClangModuleMap *explicitClangModuleMap) {
   SmallVector<StringRef, 4> dependencyDirectories;
   SmallString<256> dependencyFullPathBuffer;
 
@@ -532,20 +536,20 @@ static bool validateInputBlock(
     }
     unsigned kind = maybeKind.get();
     switch (kind) {
-    case input_block::FILE_DEPENDENCY:
+    case input_block::FILE_DEPENDENCY: {
+      StringRef path = blobData;
+      size_t directoryIndex = scratch[4];
+      if (directoryIndex != 0) {
+        if (directoryIndex > dependencyDirectories.size())
+          return true;
+        dependencyFullPathBuffer = dependencyDirectories[directoryIndex - 1];
+        llvm::sys::path::append(dependencyFullPathBuffer, blobData);
+        path = dependencyFullPathBuffer;
+      }
+
       if (dependencies) {
         bool isHashBased = scratch[2] != 0;
         bool isSDKRelative = scratch[3] != 0;
-
-        StringRef path = blobData;
-        size_t directoryIndex = scratch[4];
-        if (directoryIndex != 0) {
-          if (directoryIndex > dependencyDirectories.size())
-            return true;
-          dependencyFullPathBuffer = dependencyDirectories[directoryIndex - 1];
-          llvm::sys::path::append(dependencyFullPathBuffer, blobData);
-          path = dependencyFullPathBuffer;
-        }
 
         if (isHashBased)
           dependencies->push_back(
@@ -556,10 +560,9 @@ static bool validateInputBlock(
               SerializationOptions::FileDependency::modTimeBased(
                   path, isSDKRelative, scratch[0], scratch[1]));
       }
-      break;
+    } break;
     case input_block::DEPENDENCY_DIRECTORY:
-      if (dependencies)
-        dependencyDirectories.push_back(blobData);
+      dependencyDirectories.push_back(blobData);
       break;
     case input_block::SEARCH_PATH:
       if (searchPaths) {
@@ -570,6 +573,77 @@ static bool validateInputBlock(
         searchPaths->push_back({std::string(blobData), isFramework, isSystem});
       }
       break;
+    case input_block::EXPLICIT_MODULE_MAP_ENTRY: {
+      if (!explicitSwiftModuleMap || !explicitClangModuleMap)
+        break;
+      bool isFramework;
+      bool isSystem;
+      bool isBridgedHeaderDependency;
+      unsigned modPathIdx, modDocIdx, modSrcIdx, clangMapIdx;
+      input_block::ExplicitModuleMapEntryLayout::readRecord(
+          scratch, isFramework, isSystem, isBridgedHeaderDependency, modPathIdx,
+          modDocIdx, modSrcIdx, clangMapIdx);
+      StringRef rest, moduleName, moduleAlias, modulePath, moduleDocPath,
+          moduleSourceInfoPath, moduleCacheKey, clangModuleMapPath,
+          headerDependencyPath;
+      std::string modulePathStr, moduleDocPathStr, moduleSourceInfoPathStr,
+          clangModuleMapPathStr;
+      std::tie(moduleName, rest) = blobData.split('\0');
+      std::tie(modulePath, rest) = rest.split('\0');
+      std::tie(moduleAlias, rest) = rest.split('\0');
+      std::tie(moduleDocPath, rest) = rest.split('\0');
+      std::tie(moduleSourceInfoPath, rest) = rest.split('\0');
+      std::tie(moduleCacheKey, rest) = rest.split('\0');
+      std::tie(clangModuleMapPath, rest) = rest.split('\0');
+      auto updatePath = [&](std::string &out, StringRef path,
+                            unsigned directoryIndex) {
+        if (!directoryIndex) {
+          out = path.str();
+          return false;
+        }
+        if (directoryIndex > dependencyDirectories.size())
+          return true;
+        dependencyFullPathBuffer = dependencyDirectories[directoryIndex - 1];
+        llvm::sys::path::append(dependencyFullPathBuffer, path);
+        out = dependencyFullPathBuffer.str();
+        return false;
+      };
+      if (updatePath(modulePathStr, modulePath, modPathIdx) ||
+          updatePath(moduleDocPathStr, moduleDocPath, modDocIdx) ||
+          updatePath(moduleSourceInfoPathStr, moduleSourceInfoPath,
+                     modSrcIdx) ||
+          updatePath(clangModuleMapPathStr, clangModuleMapPath, clangMapIdx))
+        return true;
+
+      auto optStr = [](std::string s) -> std::optional<std::string> {
+        if (s.empty())
+          return std::nullopt;
+        return s;
+      };
+      if (clangModuleMapPathStr.empty()) {
+        std::vector<std::string> headerDependencyPaths;
+        while (!rest.empty()) {
+          std::tie(headerDependencyPath, rest) = rest.split('\0');
+          headerDependencyPaths.push_back(headerDependencyPath.str());
+        }
+        ExplicitSwiftModuleInputInfo entry(
+            modulePathStr, optStr(moduleAlias.str()), optStr(moduleDocPathStr),
+            optStr(moduleSourceInfoPathStr),
+            headerDependencyPaths.size()
+                ? std::optional<std::vector<std::string>>(headerDependencyPaths)
+                : std::nullopt,
+            isFramework, isSystem, optStr(moduleCacheKey.str()));
+
+        explicitSwiftModuleMap->insert({moduleName, std::move(entry)});
+      } else {
+        ExplicitClangModuleInputInfo entry(
+            clangModuleMapPathStr, modulePathStr, optStr(moduleAlias.str()),
+            isFramework, isSystem, isBridgedHeaderDependency,
+            optStr(moduleCacheKey.str()));
+
+        explicitClangModuleMap->insert({moduleName, std::move(entry)});
+      }
+    } break;
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
@@ -607,11 +681,11 @@ bool serialization::isSerializedAST(StringRef data) {
 }
 
 ValidationInfo serialization::validateSerializedAST(
-    StringRef data,
-    StringRef requiredSDK,
-    ExtendedValidationInfo *extendedInfo,
+    StringRef data, StringRef requiredSDK, ExtendedValidationInfo *extendedInfo,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
     SmallVectorImpl<SearchPath> *searchPaths,
+    ExplicitSwiftModuleMap *explicitSwiftModuleMap,
+    ExplicitClangModuleMap *explicitClangModuleMap,
     std::optional<llvm::Triple> target) {
   ValidationInfo result;
 
@@ -667,7 +741,8 @@ ValidationInfo serialization::validateSerializedAST(
         result.status = Status::Malformed;
         return result;
       }
-      if (validateInputBlock(cursor, scratch, dependencies, searchPaths)) {
+      if (validateInputBlock(cursor, scratch, dependencies, searchPaths,
+                             explicitSwiftModuleMap, explicitClangModuleMap)) {
         result.status = Status::Malformed;
         return result;
       }
@@ -1561,9 +1636,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           unsigned rawImportControl;
           bool scoped;
           bool hasSPI;
-          bool hasPath;
           input_block::ImportedModuleLayout::readRecord(
-              scratch, rawImportControl, scoped, hasSPI, hasPath);
+              scratch, rawImportControl, scoped, hasSPI);
           auto importKind = getActualImportControl(rawImportControl);
           if (!importKind) {
             // We don't know how to import this dependency.
@@ -1584,23 +1658,13 @@ ModuleFileSharedCore::ModuleFileSharedCore(
             (void)recordID;
           }
 
-          StringRef pathBlob;
-          if (hasPath) {
-            scratch.clear();
-
-            llvm::BitstreamEntry entry =
-                fatalIfUnexpected(cursor.advance(AF_DontPopBlockAtEnd));
-            unsigned recordID = fatalIfUnexpected(
-                cursor.readRecord(entry.ID, scratch, &pathBlob));
-            assert(recordID == input_block::IMPORTED_MODULE_PATH);
-            input_block::ImportedModulePathLayout::readRecord(scratch);
-            (void)recordID;
-          }
-
           Dependencies.push_back(
-              {blobData, spiBlob, pathBlob, importKind.value(), scoped});
+              {blobData, spiBlob, importKind.value(), scoped});
           break;
         }
+        case input_block::EXPLICIT_MODULE_MAP_ENTRY:
+          // Consumed by validateInputBlock.
+          break;
         case input_block::LINK_LIBRARY: {
           uint8_t rawKind;
           bool isStaticLibrary;

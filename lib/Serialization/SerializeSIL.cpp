@@ -608,6 +608,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
   if (!F.section().empty())
     ++numTrailingRecords;
+  if (!F.wasmImportModuleName().empty())
+    ++numTrailingRecords;
+  if (!F.wasmImportFieldName().empty())
+    ++numTrailingRecords;
 
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
@@ -648,6 +652,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // record count above.
   writeExtraStringIfNonEmpty(ExtraStringFlavor::AsmName, F.asmName());
   writeExtraStringIfNonEmpty(ExtraStringFlavor::Section, F.section());
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::WasmImportModule,
+                             F.wasmImportModuleName());
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::WasmImportName,
+                             F.wasmImportFieldName());
 
   if (NoBody)
     return;
@@ -1495,6 +1503,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     for (auto Arg: PAI->getArguments()) {
       Args.push_back(addValueRef(Arg));
     }
+    unsigned flags = 0;
+    flags |= unsigned(PAI->isStackAllocationNested()
+                        ? IsNestedEncoding::IsNested
+                        : IsNestedEncoding::IsNotNested) << 0;
     SILInstApplyLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
         SIL_PARTIAL_APPLY, 0,
@@ -1502,7 +1514,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addTypeRef(PAI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(PAI->getType().getRawASTType()),
         addValueRef(PAI->getCallee()),
-        unsigned(swift::ActorIsolation::Unspecified),
+        flags,
         unsigned(swift::ActorIsolation::Unspecified), Args);
     break;
   }
@@ -3295,9 +3307,12 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
 }
 
 void SILSerializer::writeSILVTable(const SILVTable &vt) {
+  auto &astContext = vt.getClass()->getASTContext();
   // Do not emit vtables for non-public classes unless everything has to be
   // serialized.
   if (!Options.SerializeAllSIL &&
+      // In Embedded we should serialize everything.
+      !astContext.LangOpts.hasFeature(Feature::Embedded) &&
       vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Package)
     return;
 
@@ -3306,7 +3321,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 
   // Use the mangled name of the class as a key to distinguish between classes
   // which have the same name (but are in different contexts).
-  Mangle::ASTMangler mangler(vt.getClass()->getASTContext());
+  Mangle::ASTMangler mangler(astContext);
   std::string mangledClassName = mangler.mangleNominalType(vt.getClass());
   size_t nameLength = mangledClassName.size();
   char *stringStorage = (char *)StringTable.Allocate(nameLength, 1);
@@ -3341,12 +3356,6 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 }
 
 void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
-  // Do not emit deinit for non-public nominal types unless everything has to be
-  // serialized.
-  if (!Options.SerializeAllSIL && deinit.getNominalDecl()->getEffectiveAccess() <
-                                 swift::AccessLevel::Package)
-    return;
-
   SILFunction *impl = deinit.getImplementation();
   if (!Options.SerializeAllSIL &&
       // Package CMO for MoveOnlyDeinit is not supported so
