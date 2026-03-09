@@ -47,7 +47,7 @@ swift::swift_elf_copyAllTestContent(size_t *outCount) {
   auto count = snapshot.count();
 
   auto result = reinterpret_cast<struct swift::TestContentSectionBounds *>(
-    swift_slowAlloc(
+    swift::swift_slowAlloc(
       count * sizeof(struct swift::TestContentSectionBounds),
       alignof(struct swift::TestContentSectionBounds) - 1
     )
