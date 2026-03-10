@@ -44,9 +44,9 @@ struct Wrapper<T: AProtocol> {
   }
 }
 
-// CHECK-DAG: ![[FNTY:.*]] = !DICompositeType({{.*}}identifier: "$sxq_Ignr_D"
-// CHECK-DAG: ![[LET_FNTY:.*]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[FNTY]])
-// CHECK-DAG: !DILocalVariable(name: "f", {{.*}}, line: [[@LINE+1]], type: ![[LET_FNTY]])
+// CHECK-DAG: !DILocalVariable(name: "f", {{.*}}, line: [[@LINE+3]], type: ![[LET_FNTY:.*]])
+// CHECK-DAG: ![[LET_FNTY]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[FNTY:.*]])
+// CHECK-DAG: ![[FNTY]] = !DICompositeType({{.*}}identifier: "$sxq_Ignr_D"
 func apply<T, U> (_ x: T, f: (T) -> (U)) -> U {
   return f(x)
 }

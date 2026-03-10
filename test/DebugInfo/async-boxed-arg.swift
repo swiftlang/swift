@@ -17,5 +17,6 @@ extension Collection where Element: Sendable {
   }
 }
 
-// CHECK: ![[BOXTY:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s5IndexSlQzz_x_SlRzs8Sendable7ElementSTRpzlXXD"
-// CHECK: !DILocalVariable(name: "i", arg: 3, {{.*}}type: ![[BOXTY]]
+
+// CHECK: !DILocalVariable(name: "i", arg: 3, {{.*}} type: ![[BOXTY:[0-9]+]]
+// CHECK: ![[BOXTY]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s5IndexSlQzz_x_SlRzs8Sendable7ElementSTRpzlXXD"

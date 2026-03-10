@@ -1901,7 +1901,7 @@ private:
       // FIXME: Primary archetypes carry all sorts of auxiliary information
       // that isn't contained in their mangled name.  See also
       // getMangledName().
-      return Ty->getKind() != swift::TypeKind::PrimaryArchetype;
+      return !Ty->hasPrimaryArchetype();
     return true;
   }
 
