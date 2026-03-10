@@ -789,6 +789,8 @@ private:
   SubsumeBindingResult subsumeBinding(const PotentialBinding &binding,
                                       const PotentialBinding &existing);
 
+  void promoteBindings();
+
   void inferTransitiveKeyPathBindingFrom(const PotentialBinding &binding,
                                          TypeVariableType *keyPathTy);
 

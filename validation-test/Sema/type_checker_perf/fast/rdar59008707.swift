@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=80000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=2000
+
 // REQUIRES: objc_interop
 
 import Foundation
