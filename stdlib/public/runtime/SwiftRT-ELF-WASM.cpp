@@ -134,8 +134,8 @@ static void swift_image_constructor() {
       0
     };
     swift_elf_registerTestContent(&sectionBounds);
-#endif
   }
+#endif
 
 #undef SWIFT_SECTION_RANGE
 
