@@ -121,11 +121,13 @@ static void swift_image_constructor() {
       {},
   };
 
-  // If this image contains any test content, register that as well.
+#if defined(__ELF__)
+  // If this image contains any test content, register that as well. We only do
+  // this for ELF targets because, for all other platforms, the test content
+  // section is independently discoverable at runtime.
   if (SWIFT_UNLIKELY(&__start_swift5_tests != nullptr)) {
     sections.swift5_tests = SWIFT_SECTION_RANGE(swift5_tests);
 
-#if defined(__ELF__)
     swift::TestContentSectionBounds sectionBounds {
       baseAddress,
       SWIFT_SECTION_RANGE(swift5_tests),
