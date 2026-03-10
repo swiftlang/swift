@@ -148,7 +148,7 @@ func check(it: HasNestedIterator.NestedIterator) {
   checkInput(it)
   checkRandomAccess(it)         // expected-error {{requires}}
   checkContiguous(it)           // expected-error {{requires}}
-  checkMutableInput(it)         // expected-error {{requires}}
+  checkMutableInput(it)
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
   checkBorrowingIterator(it)    // expected-error {{requires}}

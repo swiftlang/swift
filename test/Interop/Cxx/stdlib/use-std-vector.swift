@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature BorrowingForLoop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -enable-experimental-feature BorrowingForLoop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature BorrowingForLoop)
 
 // Also test this with a bridging header instead of the StdVector module.
 // RUN: %empty-directory(%t2)
@@ -8,11 +11,15 @@
 // RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -Xfrontend -enable-experimental-cxx-interop)
 // RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=swift-6)
 // RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=upcoming-swift)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature BorrowingForLoop)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=swift-6 -enable-experimental-feature BorrowingForLoop)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature BorrowingForLoop)
 
 // FIXME: also run in C++20 mode when conformance works properly on UBI platform (rdar://109366764):
 // %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=gnu++20)
 //
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_BorrowingForLoop
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
@@ -210,5 +217,35 @@ StdVectorTestSuite.test("VectorOfImmortalRefPtr").require(.stdlib_5_8).code {
     v.push_back(i)
     expectEqual(v[0]?.value, 123)
 }
+
+StdVectorTestSuite.test("VectorOfInt borrowing for loop").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+    let arr : [Int32] = [1, 2, 3]
+    let v = Vector(arr)
+    expectEqual(v.size(), arr.count)
+    var counter = 0
+    for el in v {
+        expectEqual(el, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+}
+
+#if hasFeature(BorrowingForLoop)
+
+StdVectorTestSuite.test("VectorOfNonCopyable borrowing for loop").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+    let v = makeVectorOfNonCopyable()
+    let arr : [Int32] = [1, 2, 3]
+    expectEqual(v.size(), arr.count)
+    var counter = 0
+    for el in v {
+        expectEqual(el.number, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+}
+
+#endif
 
 runAllTests()
