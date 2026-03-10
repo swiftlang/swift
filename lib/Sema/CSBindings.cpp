@@ -2489,16 +2489,26 @@ bool swift::constraints::inference::checkTypeOfBinding(
   }
 
   {
-    auto objType = type->getWithoutSpecifierType();
+    auto objectTy = type->getWithoutSpecifierType();
 
-    // If the type is a type variable itself, don't permit the binding.
-    if (objType->is<TypeVariableType>())
+    // We don't allow binding type variables to other type variables, or
+    // to type variables wrapped in lvalue types.
+    if (objectTy->is<TypeVariableType>())
       return false;
+
+    // If the type is a one-element tuple containing a type variable,
+    // don't try binding it, instead wait until the pack is expanded.
+    if (auto *tupleTy = objectTy->getAs<TupleType>()) {
+      if (tupleTy->getNumElements() == 1 &&
+          tupleTy->getElementType(0)->isTypeVariableOrMember()) {
+        return false;
+      }
+    }
 
     // Don't bind to a dependent member type, even if it's currently
     // wrapped in any number of optionals, because binding producer
     // might unwrap and try to attempt it directly later.
-    if (objType->lookThroughAllOptionalTypes()->is<DependentMemberType>())
+    if (objectTy->lookThroughAllOptionalTypes()->is<DependentMemberType>())
       return false;
   }
 
