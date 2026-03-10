@@ -65,6 +65,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       )
     set_property(TARGET embedded-unicode-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
 
+    embedded_amend_archive_commands_on_darwin_host(embedded-unicode-${mod} ${triple})
+
     add_dependencies(embedded-unicode embedded-unicode-${mod})
   endforeach()
 endif()
