@@ -555,8 +555,11 @@ $PinnedToolchain = [IO.Path]::GetFileNameWithoutExtension($PinnedBuild)
 # Use a shorter name in paths to avoid going over the path length limit.
 $ToolchainVersionIdentifier = $PinnedToolchain -replace 'swift-(.+?)-windows10.*', '$1'
 
-if ($EnableCaching -and ($UseHostToolchain -or ($PinnedVersion -ne "0.0.0"))) {
-  throw "CAS currently requires using a main-branch pinned toolchain."
+if ($EnableCaching) {
+  if ($PinnedVersion -ne "0.0.0") {
+    throw "CAS currently requires using a main-branch pinned toolchain."
+  }
+  $UseHostToolchain = $false
 }
 
 $HostPlatform = switch ($HostArchName) {
@@ -1173,11 +1176,11 @@ function Get-Dependencies {
       # Write-Output "Extracting '$InstallerExeName' ..."
 
       # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
-      New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin | Out-Null
+      New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin | Out-Null
       Invoke-Program "$($WiX.Path)\wix.exe" -- burn extract $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
       Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
         $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
-        $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
+        $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
         Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
       }
     }
@@ -1336,19 +1339,7 @@ function Get-Dependencies {
 
 function Get-PinnedToolchainToolsDir() {
   $ToolchainsRoot = [IO.Path]::Combine("$BinaryCache\toolchains", "$ToolchainVersionIdentifier", "LocalApp", "Programs", "Swift", "Toolchains")
-
-  # NOTE: Add a workaround for the main snapshots that inadvertently used the
-  # wrong version when they were built. This allows use of the nightly snapshot
-  # as a pinned toolchain.
-  if ((Get-PinnedToolchainVersion) -eq "0.0.0") {
-    if (-not (Test-Path "$ToolchainsRoot\0.0.0+Asserts\usr\bin")) {
-      if (Test-Path "$ToolchainsRoot\6.0.0+Asserts\usr\bin") {
-        return "$ToolchainsRoot\6.0.0+Asserts\usr\bin"
-      }
-    }
-  }
-
-  $VariantToolchainPath = [IO.Path]::Combine($ToolchainsRoot, "$(Get-PinnedToolchainVersion)+Asserts", "usr", "bin")
+  $VariantToolchainPath = [IO.Path]::Combine($ToolchainsRoot, "$PinnedVersion+Asserts", "usr", "bin")
 
   if (Test-Path $VariantToolchainPath) {
     return $VariantToolchainPath
@@ -1361,21 +1352,14 @@ function Get-PinnedToolchainToolsDir() {
 
 function Get-PinnedToolchainSDK([OS] $OS = $BuildPlatform.OS, [string] $Identifier = $OS.ToString()) {
   return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainVersionIdentifier,
-    "LocalApp", "Programs", "Swift", "Platforms", (Get-PinnedToolchainVersion),
+    "LocalApp", "Programs", "Swift", "Platforms", $PinnedVersion,
     "$($OS.ToString()).platform", "Developer", "SDKs", "$Identifier.sdk")
 }
 
 function Get-PinnedToolchainRuntime() {
   return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainVersionIdentifier,
-    "LocalApp", "Programs", "Swift", "Runtimes", (Get-PinnedToolchainVersion),
+    "LocalApp", "Programs", "Swift", "Runtimes", $PinnedVersion,
     "usr", "bin")
-}
-
-function Get-PinnedToolchainVersion() {
-  if (Test-Path variable:PinnedVersion) {
-    return $PinnedVersion
-  }
-  throw "PinnedVersion must be set"
 }
 
 function Add-KeyValueIfNew([hashtable]$Hashtable, [string]$Key, [string]$Value) {
@@ -2131,15 +2115,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     @{}
   }
 
-  # In the latest versions of VS, STL typically requires a newer version of
-  # Clang than released Swift toolchains include. Relax this requirement when
-  # bootstrapping with an older toolchain. Note developer builds are (currently)
-  # up-to-date.
   $SwiftFlags = @();
-  if ([System.Version](Get-PinnedToolchainVersion) -ne [System.Version]"0.0.0") {
-    $SwiftFlags += @("-Xcc", "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
-  }
-
   if ($LTO -ne "none") {
     $SwiftFlags += @("-use-ld=lld");
   }
