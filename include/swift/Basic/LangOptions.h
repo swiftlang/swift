@@ -687,6 +687,10 @@ namespace swift {
     bool RestrictNonProductionExperimentalFeatures = false;
 #endif
 
+    /// The section and segment name to use for OSLog strings.
+    mutable std::string OSLogStringSectionName =
+        "__TEXT,__oslogstring,cstring_literals";
+
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
     }

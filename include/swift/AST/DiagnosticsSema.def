@@ -9167,5 +9167,10 @@ ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
 
 REMARK(macro_expansion_line, none, "macro content: |%0|", (StringRef))
 
+GROUPED_WARNING(oslog_missing_string_section,OSLog,none,
+                "global variable 'osLogStringSectionName' is missing from the OSLog module; defaulting to '__TEXT,__oslogstring,cstring_literals'", ())
+GROUPED_ERROR(oslog_string_section_not_literal,OSLog,none,
+              "global variable 'osLogStringSectionName' requires a string literal initializer", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -1709,6 +1709,8 @@ void CompilerInstance::finishTypeChecking() {
     loadDerivativeConfigurations(SF);
     return false;
   });
+
+  handleOSLogStringSectionName(*getMainModule());
 }
 
 SourceFile::ParsingOptions

@@ -983,6 +983,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (!loadedModuleFile->getPublicModuleName().empty())
       M.setPublicModuleName(Ctx.getIdentifier(loadedModuleFile->getPublicModuleName()));
+    if (!loadedModuleFile->getOSLogStringSectionName().empty())
+      Ctx.LangOpts.OSLogStringSectionName = loadedModuleFile->getOSLogStringSectionName();
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
     if (loadedModuleFile->strictMemorySafety())

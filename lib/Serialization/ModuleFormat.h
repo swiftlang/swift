@@ -1002,6 +1002,7 @@ namespace options_block {
     SWIFT_INTERFACE_COMPILER_VERSION,
     STRICT_MEMORY_SAFETY,
     DEFERRED_CODE_GEN,
+    OSLOG_STRING_SECTION_NAME,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1108,6 +1109,11 @@ namespace options_block {
 
   using PublicModuleNameLayout = BCRecordLayout<
     PUBLIC_MODULE_NAME,
+    BCBlob
+  >;
+
+  using OSLogStringSectionNameLayout = BCRecordLayout<
+    OSLOG_STRING_SECTION_NAME,
     BCBlob
   >;
 

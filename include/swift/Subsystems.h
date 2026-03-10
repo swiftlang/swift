@@ -186,6 +186,9 @@ namespace swift {
   /// those defined in non-primary sources).
   void loadDerivativeConfigurations(SourceFile &SF);
 
+  /// If this is the OSLog module, check for the log string section name.
+  void handleOSLogStringSectionName(ModuleDecl &module);
+
   /// Resolve the given \c TypeRepr to an interface type.
   ///
   /// This is used when dealing with partial source files (e.g. SIL parsing,

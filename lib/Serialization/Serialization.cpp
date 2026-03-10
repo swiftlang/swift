@@ -1179,6 +1179,12 @@ void Serializer::writeHeader() {
         PublicModuleName.emit(ScratchRecord, publicModuleName.str());
       }
 
+      if (M->getName().is("OSLog")) {
+        options_block::OSLogStringSectionNameLayout OSLogStringSectionName(Out);
+        OSLogStringSectionName.emit(ScratchRecord,
+                                    M->getASTContext().LangOpts.OSLogStringSectionName);
+      }
+
       version::Version compilerVersion = M->getSwiftInterfaceCompilerVersion();
       if (!compilerVersion.empty()) {
         options_block::SwiftInterfaceCompilerVersionLayout Version(Out);
