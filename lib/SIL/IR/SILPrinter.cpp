@@ -3747,6 +3747,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[signature_optimized_thunk] ";
     break;
   case IsReabstractionThunk: OS << "[reabstraction_thunk] "; break;
+  case IsDistributedThunk: OS << "[distributed_thunk] "; break;
   }
   if (isDynamicallyReplaceable()) {
     OS << "[dynamically_replacable] ";
