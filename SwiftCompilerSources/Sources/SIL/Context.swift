@@ -100,14 +100,6 @@ extension Context {
       return _bridged.lookupStdlibFunction(nameStr).function
     }
   }
-
-  public func getSpecializedConformance(of genericConformance: Conformance,
-                                        for type: AST.`Type`,
-                                        substitutions: SubstitutionMap) -> Conformance
-  {
-    let c = _bridged.getSpecializedConformance(genericConformance.bridged, type.bridged, substitutions.bridged)
-    return Conformance(bridged: c)
-  }
 }
 
 extension MutatingContext {

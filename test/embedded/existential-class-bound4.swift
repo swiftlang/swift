@@ -23,12 +23,19 @@ extension MyGenericClass: ClassBound {
     func bar() { print("MyGenericClass<\(typ)>.bar()") }
 }
 
+final class Derived: MyGenericClass<Int> {
+    init() {
+      super.init(typ: "Int")
+    }
+}
+
 @main
 struct Main {
     static func main() {
         var array: [any ClassBound] = []
         array.append(MyGenericClass<Int>(typ: "Int"))
         array.append(MyGenericClass<String>(typ: "String"))
+        array.append(Derived())
 
         for e in array {
             e.foo()
@@ -40,6 +47,9 @@ struct Main {
 
         // CHECK: MyGenericClass<String>.foo()
         // CHECK: MyGenericClass<String>.bar()
+
+        // CHECK: MyGenericClass<Int>.foo()
+        // CHECK: MyGenericClass<Int>.bar()
     }
 }
 

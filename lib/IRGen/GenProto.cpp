@@ -1476,6 +1476,16 @@ public:
   }
 };
 
+static bool isSpecializedConformance(ProtocolConformance *c) {
+  if (isa<SpecializedProtocolConformance>(c))
+    return true;
+
+  if (auto *ic = dyn_cast<InheritedProtocolConformance>(c))
+    return isa<SpecializedProtocolConformance>(ic->getInheritedConformance());
+
+  return false;
+}
+
   /// A base class for some code shared between fragile and resilient witness
   /// table layout.
   class WitnessTableBuilderBase {
@@ -1624,9 +1634,8 @@ public:
 
       // Look for conformance info.
       ProtocolConformance *astConf = nullptr;
-      if (isa<SpecializedProtocolConformance>(SILWT->getConformance())) {
+      if (isSpecializedConformance(SILWT->getConformance())) {
         astConf = entry.getBaseProtocolWitness().Witness;
-        ASSERT(isa<SpecializedProtocolConformance>(astConf));
       } else {
         astConf = ConformanceInContext.getInheritedConformance(baseProto);
         assert(astConf->getType()->isEqual(ConcreteType));

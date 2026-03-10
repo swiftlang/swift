@@ -89,6 +89,10 @@ public class NominalTypeDecl: GenericTypeDecl {
     Type(bridged: bridged.NominalType_getDeclaredInterfaceType())
   }
 
+  public var selfInterfaceType: Type {
+    Type(bridged: bridged.NominalType_getSelfInterfaceType())
+  }
+
   public func add(member: Decl) {
     bridged.NominalTypeDecl_addMember(member.bridged)
   }
