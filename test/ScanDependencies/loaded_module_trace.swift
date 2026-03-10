@@ -13,14 +13,14 @@
 // RUN: %target-swift-frontend -scan-dependencies %t/test.swift -emit-loaded-module-trace -emit-loaded-module-trace-path %t/trace.json \
 // RUN:   -enable-upcoming-feature RegionBasedIsolation -strict-memory-safety -module-name Test -dependency-only-import B \
 // RUN:   -I %t -module-cache-path %t/cache -load-plugin-library %t/%target-library-name(Plugin) \
-// RUN:   -serialize-dependency-scan-cache -dependency-scan-cache-path %t/scan-cache -o %t/deps.json
+// RUN:   -serialize-dependency-scan-cache -dependency-scan-cache-path %t/scan-cache -o %t/deps.json -enable-cross-import-overlays
 
 // RUN: %FileCheck %s < %t/trace.json
 
 // RUN: %target-swift-frontend -scan-dependencies %t/test.swift -emit-loaded-module-trace -emit-loaded-module-trace-path %t/trace2.json \
 // RUN:   -enable-upcoming-feature RegionBasedIsolation -strict-memory-safety -module-name Test -dependency-only-import B \
 // RUN:   -I %t -module-cache-path %t/cache -load-plugin-library %t/%target-library-name(Plugin) \
-// RUN:   -load-dependency-scan-cache -dependency-scan-cache-path %t/scan-cache -o %t/deps2.json
+// RUN:   -load-dependency-scan-cache -dependency-scan-cache-path %t/scan-cache -o %t/deps2.json -enable-cross-import-overlays
 
 // RUN: diff %t/trace.json %t/trace2.json
 
@@ -39,6 +39,7 @@
 
 //--- test.swift
 import Module2
+import C
 import A
 
 @freestanding(expression) macro echo<T>(_: T) -> T = #externalMacro(module: "Plugin", type: "EchoMacro")
@@ -53,3 +54,24 @@ public func funcA() { }
 // swift-interface-format-version: 1.0
 // swift-module-flags: -module-name B
 public func funcB() { }
+
+//--- C.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name C
+public func funcC() { }
+
+//--- module.modulemap
+module _C_A {
+  header "c_a.h"
+  export *
+}
+
+//--- c_a.h
+void c_a(void);
+
+//--- C.swiftcrossimport/A.swiftoverlay
+%YAML 1.2
+---
+version: 1
+modules:
+  - name: _C_A
