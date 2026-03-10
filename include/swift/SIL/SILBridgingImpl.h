@@ -2754,16 +2754,19 @@ BridgedInstruction BridgedBuilder::createPartialApply(BridgedValue funcRef,
                                                       BridgedArgumentConvention calleeConvention,
                                                       BridgedSubstitutionMap bridgedSubstitutionMap,
                                                       bool hasUnknownIsolation,
-                                                      bool isOnStack) const {
+                                                      bool isOnStack,
+                                                      bool isNested) const {
   llvm::SmallVector<swift::SILValue, 8> capturedArgs;
-  return {unbridged().createPartialApply(
+  auto *pai = unbridged().createPartialApply(
       regularLoc(), funcRef.getSILValue(), bridgedSubstitutionMap.unbridged(),
       bridgedCapturedArgs.getValues(capturedArgs),
       getParameterConvention(calleeConvention),
       hasUnknownIsolation ? swift::SILFunctionTypeIsolation::forUnknown()
                           : swift::SILFunctionTypeIsolation::forErased(),
       isOnStack ? swift::PartialApplyInst::OnStack
-                : swift::PartialApplyInst::NotOnStack)};
+                : swift::PartialApplyInst::NotOnStack);
+  pai->setStackAllocationIsNested(isNested ? swift::StackAllocationIsNested : swift::StackAllocationIsNotNested);
+  return {pai};
 }
 
 BridgedInstruction BridgedBuilder::createBranch(BridgedBasicBlock destBlock, BridgedValueArray arguments) const {

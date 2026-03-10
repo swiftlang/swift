@@ -1373,9 +1373,10 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createPartialApply(BridgedValue fn,
                                                                            BridgedValueArray bridgedCapturedArgs,
                                                                            BridgedArgumentConvention calleeConvention,
-                                                                           BridgedSubstitutionMap bridgedSubstitutionMap = BridgedSubstitutionMap(),
-                                                                           bool hasUnknownIsolation = true,
-                                                                           bool isOnStack = false) const;
+                                                                           BridgedSubstitutionMap bridgedSubstitutionMap,
+                                                                           bool hasUnknownIsolation,
+                                                                           bool isOnStack,
+                                                                           bool isNested) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBranch(BridgedBasicBlock destBlock,
                                                                      BridgedValueArray arguments) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCondBranch(BridgedValue condition,
