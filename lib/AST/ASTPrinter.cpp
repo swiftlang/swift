@@ -2707,6 +2707,31 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   bool PrintAbstract =
     Options.AbstractAccessors && !Options.FunctionDefinitions;
 
+  // For var decls, if it has an initializer, the parser only expects observing
+  // accessors. But sometimes for example in '.swiftinterface', we want to print
+  // both the initializer and the accessors. So when we print the initializer
+  // *and* the accessor block not starting with willSet/didSet, print an
+  // attribute as a disambiguation marker.
+  auto printDisambiguationMarkerIfNeeded = [&]() {
+    auto *VD = dyn_cast<VarDecl>(ASD);
+    if (!VD)
+      return;
+    auto *PBD = VD->getParentPatternBinding();
+    if (!PBD)
+      return;
+    auto i = PBD->getPatternEntryIndexForVarDecl(VD);
+
+    bool needsDisambiguationAttr = false;
+    if (Options.PrintExprs) {
+      needsDisambiguationAttr |= bool(PBD->getInit(i));
+    } else if (Options.VarInitializers) {
+      needsDisambiguationAttr |= bool(PBD->hasInitStringRepresentation(i) &&
+                                      VD->isInitExposedToClients());
+    }
+    if (needsDisambiguationAttr)
+      Printer << " @_accessorBlock";
+  };
+
   // Don't print accessors for trivially stored properties...
   if (impl.isSimpleStored()) {
     // ...unless we're printing for SIL, which expects a { get set? } on
@@ -2718,10 +2743,11 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     // ...or you're private/internal(set), at which point we'll print
     //    @_hasStorage var x: T { get }
     else if (ASD->isSettable(nullptr) && hasLessAccessibleSetter(ASD)) {
+      Printer << " {";
+      printDisambiguationMarkerIfNeeded();
       if (PrintAbstract) {
-        Printer << " { get }";
+        Printer << " get }";
       } else {
-        Printer << " {";
         {
           IndentRAII indentMore(*this);
           indent();
@@ -2928,28 +2954,9 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
 
   Printer << " {";
 
-  // For var decls, if it has an initializer, the parser only expects observing
-  // accessors. But sometimes for example in '.swiftinterface', we want to print
-  // both the initializer and the accessors. So when we print the initializer
-  // *and* the accessor block not starting with willSet/didSet, print an
-  // attribute as a disambiguation marker.
-  bool needsDisambiguationAttr = false;
-  if (auto *VD = dyn_cast<VarDecl>(ASD)) {
-    if (auto *PBD = VD->getParentPatternBinding()) {
-      if (accessorsToPrint.empty() ||
-          !accessorsToPrint.front()->isObservingAccessor()) {
-        const auto i = PBD->getPatternEntryIndexForVarDecl(VD);
-        if (Options.PrintExprs) {
-          needsDisambiguationAttr |= bool(PBD->getInit(i));
-        } else if (Options.VarInitializers) {
-          needsDisambiguationAttr |= bool(PBD->hasInitStringRepresentation(i) &&
-                                          VD->isInitExposedToClients());
-        }
-      }
-    }
-  }
-  if (needsDisambiguationAttr) {
-    Printer << " @_accessorBlock";
+  if (accessorsToPrint.empty() ||
+      !accessorsToPrint.front()->isObservingAccessor()) {
+    printDisambiguationMarkerIfNeeded();
   }
 
   // If we're not printing the accessor bodies and none of the accessors have
