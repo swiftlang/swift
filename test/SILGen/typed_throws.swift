@@ -294,6 +294,14 @@ func formerReabstractionCrash() {
   // CHECK-NEXT: // function_ref thunk
   // CHECK-NEXT: function_ref @$sSSIgo_SSs5Error_pIegrzr_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned String) -> (@out String, @error_indirect any Error)
   // CHECK-NEXT: partial_apply
+  let _: MyResult<String, Error>? = { () -> MyResult<String, Error> in
+    return MyResult{"hello"}
+  }()
+
+  // Note: the same code without the result type annotation produces a different
+  // solution in the type checker now, where the closure returns an optional.
+
+  // CHECK-LABEL: sil private [ossa] @$s12typed_throws24formerReabstractionCrashyyFAA8MyResultOySSs5Error_pGSgyXEfU0_ : $@convention(thin) () -> @owned Optional<MyResult<String, any Error>> {
   let _: MyResult<String, Error>? = {
     return MyResult{"hello"}
   }()
