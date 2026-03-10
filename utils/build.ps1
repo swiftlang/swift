@@ -75,8 +75,8 @@ Build Android SDKs. Requires Android NDK to be available.
 
 .PARAMETER AndroidNDKVersion
 The version number of the Android NDK to be used.
-Format: r{number}[{letter}] (e.g., r27c)
-Default: "r27c"
+Format: r{number}[{letter}] (e.g., r28c)
+Default: "r28c"
 
 .PARAMETER AndroidAPILevel
 The API Level to target when building the Android SDKs. Must be between 1 and 36.
@@ -186,7 +186,7 @@ param
   # Android SDK Options
   [switch] $Android = $false,
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
-  [string] $AndroidNDKVersion = "r27c",
+  [string] $AndroidNDKVersion = "r28c",
   [ValidateRange(1, 36)]
   [int] $AndroidAPILevel = 28,
   [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
@@ -470,15 +470,15 @@ $PythonModules = @{
 }
 
 $KnownNDKs = @{
-  r26b = @{
-    URL = "https://dl.google.com/android/repository/android-ndk-r26b-windows.zip"
-    SHA256 = "A478D43D4A45D0D345CDA6BE50D79642B92FB175868D9DC0DFC86181D80F691E"
-    ClangVersion = 17
-  }
-  r27c = @{
-    URL = "https://dl.google.com/android/repository/android-ndk-r27c-windows.zip"
-    SHA256 = "27E49F11E0CEE5800983D8AF8F4ACD5BF09987AA6F790D4439DDA9F3643D2494"
+  r27d = @{
+    URL = "https://dl.google.com/android/repository/android-ndk-r27d-windows.zip"
+    SHA256 = "82094f53e66a76b6a9ec4fc35a5076091a92de3b91d13c5d4a7cfdb226304c59"
     ClangVersion = 18
+  }
+  r28c = @{
+    URL = "https://dl.google.com/android/repository/android-ndk-r28c-windows.zip"
+    SHA256 = "6bec98ac2354d8a919760889a1a41d020132e5e8cfa1b1fe51610a72c36a466b"
+    ClangVersion = 19
   }
 }
 
