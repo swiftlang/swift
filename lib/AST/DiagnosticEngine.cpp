@@ -589,13 +589,17 @@ bool DiagnosticEngine::finishProcessing() {
 
 bool DiagnosticEngine::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (!sf || !sf->getExportedSourceFile())
+  if (getCheckSyntacticControls()) {
+    if (!sf || !sf->getExportedSourceFile())
+      return !state.isIgnoredDiagnosticGroupTree(groupID);
+    auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
+    return swift_ASTGen_isWarningGroupEnabledInFile(
+            sf->getExportedSourceFile(),
+            BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
+            StringRef(getDiagGroupInfoByID(groupID).name));
+  } else {
     return !state.isIgnoredDiagnosticGroupTree(groupID);
-  auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
-  return swift_ASTGen_isWarningGroupEnabledInFile(
-         sf->getExportedSourceFile(),
-         BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
-         StringRef(getDiagGroupInfoByID(groupID).name));
+  }
 #else
   // Fallback to checking only the command-line configuration
   return !state.isIgnoredDiagnosticGroupTree(groupID);
@@ -1349,6 +1353,9 @@ DiagnosticState::determineUserControlledWarningBehavior(
     }
   } else
     userControlledBehavior = std::nullopt;
+
+  if (!checkSyntacticControls)
+    return userControlledBehavior;
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
   // Use the combined global controls (command-line flags such as `-Werror`)

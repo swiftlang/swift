@@ -628,6 +628,9 @@ namespace swift {
     /// Don't emit any remarks
     bool suppressRemarks = false;
 
+    /// Check for `@warn` diagnostic group behavior controls
+    bool checkSyntacticControls = false;
+
     /// A mapping from `DiagGroupID` identifiers to `WarningGroupBehaviorRule`
     /// values indicating how warnings belonging to the respective diagnostic groups
     /// should be emitted. While there is duplication between this data structure
@@ -671,6 +674,13 @@ namespace swift {
     }
     bool getShowDiagnosticsAfterFatalError() {
       return showDiagnosticsAfterFatalError;
+    }
+
+    void setCheckSyntacticControls(bool val = true) {
+      checkSyntacticControls = val;
+    }
+    bool getCheckSyntacticControls() const {
+      return checkSyntacticControls;
     }
 
     /// Whether to skip emitting warnings
@@ -942,6 +952,14 @@ namespace swift {
     void setSuppressRemarks(bool val) { state.setSuppressRemarks(val); }
     bool getSuppressRemarks() const {
       return state.getSuppressRemarks();
+    }
+
+    /// Whether to check syntactic `@warn` controls
+    void setCheckSyntacticControls(bool val = true) {
+      state.setCheckSyntacticControls(val);
+    }
+    bool getCheckSyntacticControls() const {
+      return state.getCheckSyntacticControls();
     }
 
     /// Apply rules specifing what warnings should or shouldn't be treated as
