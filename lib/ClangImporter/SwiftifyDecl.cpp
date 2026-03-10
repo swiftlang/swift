@@ -180,7 +180,7 @@ public:
   ~TentativeFailureRemark() {
     if (!aborted) {
       SourceLoc loc = failureRemark.getLoc();
-      DIAGNOSE(Impl, false, loc, std::move(failureRemark));
+      DIAGNOSE(Impl, loc.isInvalid(), loc, std::move(failureRemark));
     }
   }
 };
