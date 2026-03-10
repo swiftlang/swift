@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=10000
-// This also fails with the default limit.
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=6000
 
 // https://github.com/swiftlang/swift/issues/62356
 
@@ -22,7 +21,6 @@ func sort4<Value,
 
 struct Foo {
     static func sort(_ lhs: Self, _ rhs: Self) -> Bool {
-        // expected-error@+1 {{reasonable}}
         sort4(lhs, rhs,
               prop1: \.a, comparator1: <,
               prop2: \.b, comparator2: <,
