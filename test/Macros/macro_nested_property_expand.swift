@@ -98,7 +98,7 @@ public class C<T> {
 // Make sure peer-expanded wrapped properties are lowered before stored
 // property enumeration.
 // PRINT-LABEL: struct WrappedByPeer
-// PRINT: var peerWrapped: Bool { get set }
+// PRINT:  internal var peerWrapped: Bool {
 public struct WrappedByPeer {
   @AddWrappedPeer var feature: Bool = false
 

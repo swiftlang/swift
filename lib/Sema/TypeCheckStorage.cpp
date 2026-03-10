@@ -1104,6 +1104,27 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
 /// decl is specified, the new decl is inserted next to the hint.
 static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
                                        Decl *Hint = nullptr) {
+  if (Hint && Hint->getDeclContext() != DC)
+    Hint = nullptr;
+
+  if (Hint) {
+    auto *dcAsDecl = DC->getAsDecl();
+    auto *idc = dcAsDecl ? dyn_cast<IterableDeclContext>(dcAsDecl) : nullptr;
+    if (!idc) {
+      Hint = nullptr;
+    } else {
+      bool foundHint = false;
+      for (auto *member : idc->getCurrentMembersWithoutLoading()) {
+        if (member == Hint) {
+          foundHint = true;
+          break;
+        }
+      }
+      if (!foundHint)
+        Hint = nullptr;
+    }
+  }
+
   if (auto *ntd = dyn_cast<NominalTypeDecl>(DC)) {
     ntd->addMember(D, Hint);
   } else if (auto *ed = dyn_cast<ExtensionDecl>(DC)) {
@@ -3499,6 +3520,29 @@ static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
   TypeChecker::checkInitializerEffects(initContext, initializer);
 }
 
+static void setMissingThrowsForNonThrowingApplyExprs(Expr *expr) {
+  if (!expr)
+    return;
+
+  class SetThrowsWalker : public ASTWalker {
+  public:
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      auto *apply = dyn_cast<ApplyExpr>(E);
+      if (!apply || apply->isThrowsSet())
+        return Action::Continue(E);
+
+      auto fnType = apply->getFn()->getType();
+      auto *funcTy = fnType->getWithoutSpecifierType()->getAs<AnyFunctionType>();
+      if (funcTy && !funcTy->isThrowing())
+        apply->setThrows(nullptr);
+
+      return Action::Continue(E);
+    }
+  } walker;
+
+  expr->walk(walker);
+}
+
 static PropertyWrapperMutability::Value
 getGetterMutatingness(VarDecl *var) {
   return var->isGetterMutating()
@@ -3777,6 +3821,8 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
     if ((initializer = parentPBD->getInit(patternNumber))) {
       assert(parentPBD->isInitializerChecked(0) &&
              "Initializer should to be type-checked");
+
+      setMissingThrowsForNonThrowingApplyExprs(initializer);
 
       pbd->setInit(0, initializer);
       pbd->setInitializerChecked(0);
