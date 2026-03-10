@@ -134,6 +134,7 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
   }
 
   computeJoinsAndMeets();
+  promoteBindings();
 
   ASSERT(!IsDirty);
 }
@@ -1533,20 +1534,22 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     }
 
     // FIXME: Remove the rest.
-    if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::NewIsBetter;
+    if (CS.shouldAttemptFixes()) {
+      if (binding.BindingType->isEqual(existing.BindingType))
+        return SubsumeBindingResult::NewIsBetter;
 
-    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
-    if (result.has_value() && *result) {
-      if (binding.BindingType->hasTypeVariable())
-        return SubsumeBindingResult::ExistingIsBetter;
+      auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+      if (result.has_value() && *result) {
+        if (binding.BindingType->hasTypeVariable())
+          return SubsumeBindingResult::ExistingIsBetter;
 
-      ASSERT(existing.BindingType->hasTypeVariable());
-      return SubsumeBindingResult::NewIsBetter;
+        ASSERT(existing.BindingType->hasTypeVariable());
+        return SubsumeBindingResult::NewIsBetter;
+      }
+
+      if (auto result = dedupCGFloatDoubleHack())
+        return *result;
     }
-
-    if (auto result = dedupCGFloatDoubleHack())
-      return *result;
   }
 
   // (Supertypes, Fallback)
@@ -1608,11 +1611,13 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     }
 
     // FIXME: Remove the rest.
-    if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::ExistingIsBetter;
+    if (CS.shouldAttemptFixes()) {
+      if (binding.BindingType->isEqual(existing.BindingType))
+        return SubsumeBindingResult::ExistingIsBetter;
 
-    if (auto result = dedupCGFloatDoubleHack())
-      return *result;
+      if (auto result = dedupCGFloatDoubleHack())
+        return *result;
+    }
   }
 
   // (Subtypes, Subtypes)
@@ -1990,6 +1995,207 @@ void BindingSet::determineLiteralCoverage() {
       break;
     }
   }
+}
+
+static int rankConversionKind(Constraint *constraint, ConstraintSystem &cs) {
+  switch (constraint->getKind()) {
+  case ConstraintKind::Bind:
+  case ConstraintKind::Equal:
+    return 0;
+  case ConstraintKind::OptionalObject:
+  case ConstraintKind::SubclassOf:
+    return 10;
+  case ConstraintKind::Subtype:
+  case ConstraintKind::Conversion:
+    return 20;
+  case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::OperatorArgumentConversion:
+    return 30;
+  case ConstraintKind::Defaultable:
+    return 40;
+  default:
+    ABORT([&](llvm::raw_ostream &out) {
+      out << "Unexpected constraint: ";
+      constraint->print(out, &cs.getASTContext().SourceMgr);
+      out << "\n";
+    });
+  }
+}
+
+/// Without the DisableEnumerateSupertypes upcoming feature enabled, we cannot
+/// promote certain supertype bindings to exact, because then
+/// enumerateDirectSupertypes() won't run.
+static bool isSupertypeEligibleForPromotionWhenHacksAreOn(Type t) {
+  if (t->is<DynamicSelfType>())
+    return false;
+
+  if (auto *archetypeTy = t->getAs<ArchetypeType>())
+    if (archetypeTy->getSuperclass())
+      return false;
+
+  auto *classDecl = t->getClassOrBoundGenericClass();
+  if (classDecl && classDecl->getSuperclassDecl())
+    return false;
+
+  return true;
+}
+
+void BindingSet::promoteBindings() {
+  // Narrow hack until we can remove enumerateDirectSupertypes().
+  bool beConservativeWithSuperclassBindings =
+      CS.getASTContext().TypeCheckerOpts.SolverEnableEnumerateSupertypes;
+
+  // FIXME: Get this working in diagnostic mode too.
+  if (CS.shouldAttemptFixes())
+    return;
+
+  // Can't do anything if this type variable appears in invariant position
+  // within some other unsolved constraint.
+  if (isDelayed() || !Info.AdjacentVars.empty())
+    return;
+
+  unsigned supertypeCount = 0;
+  std::optional<PotentialBinding> promotedSupertype;
+
+  unsigned subtypeCount = 0;
+  std::optional<PotentialBinding> promotedSubtype;
+
+  bool considerSupertypes =
+      Info.SupertypeOf.empty() &&
+      Info.SupertypeDelay.empty();
+
+  bool considerSubtypes =
+      Info.SubtypeOf.empty() &&
+      Info.SubtypeDelay.empty();
+
+  if (!considerSupertypes && !considerSubtypes)
+    return;
+
+  for (const auto binding : Bindings) {
+    switch (binding.Kind) {
+    case AllowedBindingKind::Supertypes:
+      if (considerSupertypes) {
+        // FIXME: Also check if Optional<T> conforms to all protocols
+        // and satisfies the subtype binding
+        if (llvm::all_of(Protocols, [&](ProtocolDecl *proto) -> bool {
+          return !CS.lookupConformance(binding.BindingType, proto).isInvalid();
+        })) {
+          if (beConservativeWithSuperclassBindings &&
+              !isSupertypeEligibleForPromotionWhenHacksAreOn(binding.BindingType)) {
+            LLVM_DEBUG(llvm::dbgs() << "Binding not eligible for promotion "
+                                    << "because we might have to enumerate supertypes");
+            return;
+          }
+
+          ++supertypeCount;
+          promotedSupertype = binding;
+        }
+      }
+      break;
+
+    case AllowedBindingKind::Subtypes:
+      if (considerSubtypes) {
+        // FIXME: If T = Optional<U>, check if U conforms to all protocols
+        // and satisfies the supertype binding
+        if (llvm::all_of(Protocols, [&](ProtocolDecl *proto) -> bool {
+          return !CS.lookupConformance(binding.BindingType, proto).isInvalid();
+        })) {
+          ++subtypeCount;
+          promotedSubtype = binding;
+        }
+      }
+
+      break;
+
+    case AllowedBindingKind::Exact:
+    case AllowedBindingKind::Fallback:
+      break;
+    }
+  }
+
+  auto promoteBinding = [&](PotentialBinding &&binding) {
+    // This binding will subsume all existing non-fallback bindings.
+    binding.Kind = AllowedBindingKind::Exact;
+    addBinding(binding);
+
+    // If this is a type variable representing closure result,
+    // which is on the right-side of some relational constraint
+    // let's have it try `Void` as well because there is an
+    // implicit conversion `() -> T` to `() -> Void` and this
+    // helps to avoid creating a thunk to support it.
+    // Avoid doing this is we already have a hole binding since
+    // introducing Void will just cause local solution ambiguities.
+    auto *locator = TypeVar->getImpl().getLocator();
+    if (locator->isLastElement<LocatorPathElt::ClosureResult>() &&
+        !binding.BindingType->isPlaceholder()) {
+      auto voidType = CS.getASTContext().TheEmptyTupleType;
+      addBinding(binding.withSameSource(
+          voidType, AllowedBindingKind::Fallback));
+    }
+  };
+
+  // If this type variable represents a closure result, prefer the subtype
+  // binding, to push the conversion into the closure body. This avoids
+  // creating a function conversion thunk if possible.
+  if (TypeVar->getImpl().isClosureResultType()) {
+    if (subtypeCount == 1) {
+      LLVM_DEBUG(llvm::dbgs() << "Promote subtype to exact, closure result: ";
+                 dump(llvm::dbgs(), 0);
+                 llvm::dbgs() << "\n");
+      promoteBinding(*std::move(promotedSubtype));
+      return;
+    }
+  }
+
+  // FIXME: Figure out when it is safe to promote other subtype bindings as well.
+  if (supertypeCount != 1)
+    return;
+
+  // If we have both a subtype and a supertype binding, we usually prefer the
+  // supertype binding, except for a few cases.
+  if (subtypeCount == 1) {
+    // 1) If the subtype binding comes from a weaker form of conversion constraint,
+    // for example:
+    //
+    //   Array<T> arg conv $T1
+    //   $T1 conv UnsafePointer<T>
+    //
+    // We have to bind $T1 to UnsafePointer<T> and not Array<T>, because
+    // conv constraints do not allow array-to-pointer conversions.
+    //
+    // 2) If we have something like this:
+    //
+    //  S conv $T0
+    //  $T0 bind any Sendable
+    //
+    // There is some backward compatibility logic for @preconcurrency which delays
+    // the bind constraint, and it shows up for us as a Subtype binding. Since in
+    // fact this binding must be exact, we prefer it over the supertype binding.
+    //
+    // Note that for the other direction, any Sendable bind $T0, we already get a
+    // supertype binding, and that will be what's preferred anyway.
+    auto *first = promotedSupertype->getSource();
+    auto *second = promotedSubtype->getSource();
+    if (rankConversionKind(second, CS) < rankConversionKind(first, CS)) {
+      auto type = promotedSubtype->BindingType;
+      bool isConversionToPointer =
+          !!type->lookThroughAllOptionalTypes()->getAnyPointerElementType();
+
+      if (isConversionToPointer ||  // Case 1
+          second->getKind() == ConstraintKind::Bind) {  // Case 2
+        LLVM_DEBUG(llvm::dbgs() << "Promote subtype to exact, pointer conversion: ";
+                   dump(llvm::dbgs(), 0);
+                   llvm::dbgs() << "\n");
+        promoteBinding(*std::move(promotedSubtype));
+        return;
+      }
+    }
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "Promote supertype to exact: ";
+             dump(llvm::dbgs(), 0);
+             llvm::dbgs() << "\n");
+  promoteBinding(*std::move(promotedSupertype));
 }
 
 void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {

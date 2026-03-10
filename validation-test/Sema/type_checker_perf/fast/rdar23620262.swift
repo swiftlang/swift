@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=15000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=500
 // REQUIRES: tools-release,no_asan
 
 func test() {

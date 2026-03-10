@@ -1,13 +1,6 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=80000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=15000
 
 // REQUIRES: OS=macosx
-
-// The expression here (see the end of the file) is pretty slow, but we don't
-// want it to regress further, so this is a "fast" test with a passing
-// expectation.
-//
-// FIXME: After the performance problems here are solved, turn down the
-// scope limit.
 
 import Combine
 import Foundation
