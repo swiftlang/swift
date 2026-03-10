@@ -19,9 +19,9 @@
 #include <new>
 
 #if defined(__ELF__)
-extern "C" const char __ehdr_start[] __attribute__((__weak__));
-extern "C" const char __start_swift5_tests[] __attribute__((__weak__));
-extern "C" const char __stop_swift5_tests[] __attribute__((__weak__));
+extern "C" const char __ehdr_start __attribute__((__weak__));
+extern "C" const char __start_swift5_tests __attribute__((__weak__));
+extern "C" const char __stop_swift5_tests __attribute__((__weak__));
 #endif
 
 #if SWIFT_ENABLE_BACKTRACING
@@ -90,9 +90,7 @@ static void swift_image_constructor() {
 
     const void *baseAddress = nullptr;
 #if defined(__ELF__)
-  if (&__ehdr_start != nullptr) {
-    baseAddress = __ehdr_start;
-  }
+    baseAddress = &__ehdr_start;
 #elif defined(__wasm__)
   // NOTE: Multi images in a single process is not yet stabilized in WebAssembly
   // toolchain outside of Emscripten.
