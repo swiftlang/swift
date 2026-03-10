@@ -41,16 +41,16 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
-STATISTIC(StatsNumFunctionsProcessed, "# of functions processed");
-STATISTIC(StatsNumBasicBlocksProcessed, "# of basic blocks processed");
-STATISTIC(StatsNumMarkUninitProcessed,
+ALWAYS_ENABLED_STATISTIC(StatsNumFunctionsProcessed, "# of functions processed");
+ALWAYS_ENABLED_STATISTIC(StatsNumBasicBlocksProcessed, "# of basic blocks processed");
+ALWAYS_ENABLED_STATISTIC(StatsNumMarkUninitProcessed,
           "# of times a mark uninitialized inst checked");
-STATISTIC(StatsNumMemoryElements, "# of memory elements (total)");
-STATISTIC(StatsNumLivenessAtInstQueries,
+ALWAYS_ENABLED_STATISTIC(StatsNumMemoryElements, "# of memory elements (total)");
+ALWAYS_ENABLED_STATISTIC(StatsNumLivenessAtInstQueries,
           "# of getLivenessAtInst queries issued");
-STATISTIC(StatsNumLivenessAtInstScans,
+ALWAYS_ENABLED_STATISTIC(StatsNumLivenessAtInstScans,
           "# of instructions scanned during liveness queries");
-STATISTIC(StatsNumDataflowIterations, "# of dataflow iterations performed");
+ALWAYS_ENABLED_STATISTIC(StatsNumDataflowIterations, "# of dataflow iterations performed");
 
 using namespace swift;
 using namespace ownership;
