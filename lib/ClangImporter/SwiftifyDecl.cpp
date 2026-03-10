@@ -853,7 +853,6 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
               DIAGNOSE(Self, !emitter.enabled(),
                        HeaderLoc{lifetimeboundAttr->getLoc()},
                        diag::ignoring_lifetimebound_escapable_return);
-              clangParam->dump();
             }
           } else {
             DIAGNOSE(Self, !emitter.enabled(),
