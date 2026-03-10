@@ -2547,11 +2547,13 @@ for host in "${ALL_HOSTS[@]}"; do
 
                     -DSwift_DIR="${SWIFT_BUILD_PATH}/lib/cmake/swift"
 
-                    -DENABLE_TESTING=YES
                     -DBUILD_SHARED_LIBS=$([[ ${product} == libdispatch_static ]] && echo "NO" || echo "YES")
                   )
                   if [[ $(is_cross_tools_host ${host}) ]] ; then
-                      cmake_options+=("${SWIFT_TARGET_CMAKE_OPTIONS[@]}")
+                      cmake_options+=(
+                          "${SWIFT_TARGET_CMAKE_OPTIONS[@]}"
+                          -DBUILD_TESTING=NO
+                      )
                   fi
                 ;;
                 esac
