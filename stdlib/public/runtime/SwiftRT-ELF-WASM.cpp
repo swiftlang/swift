@@ -130,10 +130,8 @@ static void swift_image_constructor() {
 #if defined(__ELF__)
     swift::TestContentSectionBounds sectionBounds {
       baseAddress,
-      {
-        reinterpret_cast<uintptr_t>(__start_swift5_tests),
-        __stop_swift5_tests - __start_swift5_tests
-      }
+      SWIFT_SECTION_RANGE(swift5_tests),
+      0
     };
     swift_elf_registerTestContent(&sectionBounds);
 #endif
@@ -144,4 +142,3 @@ static void swift_image_constructor() {
   swift_addNewDSOImage(&sections);
 }
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
-#endif
