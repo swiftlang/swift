@@ -54,13 +54,19 @@ using namespace importer;
 
 #ifndef NDEBUG
 #define DBGS llvm::dbgs() << "[swiftify:" << __LINE__ << "] "
-#define DUMP(x) DLOG(""); x->dump(llvm::errs())
+#define DUMP(x) do { DLOG(""); x->dump(llvm::errs()); } while(0)
 #define DLOG_SCOPE(x) DLOG(x); LogIndentTracker Scope
 #else
-#define DLOG_SCOPE(x) do {} while(false);
+#define DLOG_SCOPE(x) do {} while(false)
 #endif
 
 namespace {
+static bool loggingEnabled() {
+  bool debug = false;
+  LLVM_DEBUG(debug = true);
+  return debug;
+}
+
 #ifndef NDEBUG
 struct LogIndentTracker {
   static thread_local uint8_t LogIndent;
@@ -78,12 +84,6 @@ struct LogIndentTracker {
   }
 };
 thread_local uint8_t LogIndentTracker::LogIndent = 0;
-
-static bool loggingEnabled() {
-  bool debug = false;
-  LLVM_DEBUG(debug = true);
-  return debug;
-}
 
 /// Emit diag as logging when -Xllvm -debug-only=safe-interop-wrappers is
 /// enabled. This is useful because it provides a chronological order of
@@ -571,8 +571,7 @@ struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
         StringRef MName = SwiftContext.AllocateCopy(M->getFullModuleName());
         DEFERRED_NOTE(emitter, TD->getLocation(), diag::clang_module_owner, TD, MName);
       }
-      if (const clang::TagDecl *Def = TD->getDefinition())
-        LLVM_DEBUG(DUMP(Def));
+      LLVM_DEBUG(if (const clang::TagDecl *Def = TD->getDefinition()) DUMP(Def));
       return Action::Stop;
     }
 
