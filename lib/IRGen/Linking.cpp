@@ -629,6 +629,20 @@ SILDeclRef LinkEntity::getSILDeclRef() const {
   return ref;
 }
 
+/// When a module is compiled with -enable-testing, private type metadata may
+/// be referenced cross-module by @testable importers (e.g. via outline destroy
+/// helpers that instantiate generic metadata for types using private nested
+/// types). Promote Private linkage to HiddenUnique so the metadata is exported
+/// from the defining module and correctly declared as external in the importing
+/// module.
+static FormalLinkage adjustDeclLinkageForTesting(FormalLinkage linkage,
+                                                 const ValueDecl *D) {
+  if (linkage == FormalLinkage::Private &&
+      D->getModuleContext()->isTestingEnabled())
+    return FormalLinkage::HiddenUnique;
+  return linkage;
+}
+
 static bool isLazyEmissionOfPublicSymbolInMultipleModulesPossible(CanType ty) {
   // In embedded existenitals mode we generate lazy public metadata on demand
   // which makes it non unique.
@@ -732,18 +746,22 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
         return SILLinkage::Shared;
 
-      // Prespecialization of the same generic metadata may be requested 
+      // Prespecialization of the same generic metadata may be requested
       // multiple times within the same module, so it needs to be uniqued.
       if (nominal->isGenericContext())
         return SILLinkage::Shared;
 
-      // The full metadata object is private to the containing module.
-      return SILLinkage::Private;
+      // The full metadata object is private to the containing module,
+      // but must be exported when -enable-testing is active.
+      return getSILLinkage(
+          adjustDeclLinkageForTesting(FormalLinkage::Private, nominal),
+          forDefinition);
     case TypeMetadataAddress::AddressPoint: {
-      return getSILLinkage(nominal
-                           ? getDeclLinkage(nominal)
-                           : FormalLinkage::PublicUnique,
-                           forDefinition);
+      auto linkage =
+          nominal
+              ? adjustDeclLinkageForTesting(getDeclLinkage(nominal), nominal)
+              : FormalLinkage::PublicUnique;
+      return getSILLinkage(linkage, forDefinition);
     }
     }
     llvm_unreachable("bad kind");
@@ -772,8 +790,12 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       return getSILLinkage(FormalLinkage::PackageUnique, forDefinition);
     case MetadataAccessStrategy::HiddenUniqueAccessor:
       return getSILLinkage(FormalLinkage::HiddenUnique, forDefinition);
-    case MetadataAccessStrategy::PrivateAccessor:
-      return getSILLinkage(FormalLinkage::Private, forDefinition);
+    case MetadataAccessStrategy::PrivateAccessor: {
+      auto *nominal = getType().getAnyNominal();
+      auto linkage =
+          adjustDeclLinkageForTesting(FormalLinkage::Private, nominal);
+      return getSILLinkage(linkage, forDefinition);
+    }
     case MetadataAccessStrategy::ForeignAccessor:
     case MetadataAccessStrategy::NonUniqueAccessor:
       return SILLinkage::Shared;
@@ -872,8 +894,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::OpaqueTypeDescriptorAccessor:
   case Kind::OpaqueTypeDescriptorAccessorImpl:
   case Kind::OpaqueTypeDescriptorAccessorKey:
-  case Kind::OpaqueTypeDescriptorAccessorVar:
-    return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
+  case Kind::OpaqueTypeDescriptorAccessorVar: {
+    auto linkage =
+        adjustDeclLinkageForTesting(getDeclLinkage(getDecl()), getDecl());
+    return getSILLinkage(linkage, forDefinition);
+  }
 
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
     // Prespecialization of the same generic class' metaclass may be requested
