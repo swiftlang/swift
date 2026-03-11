@@ -18,7 +18,7 @@ from .. import utils
 try:
     # Python 3.3
     from unittest import mock
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import patch, mock_open, MagicMock
 except ImportError:
     mock = None
 
@@ -34,7 +34,7 @@ except ImportError:
 # Constants
 
 _SYSCTL_HW_MEMSIZE = 17179869184
-_SYSCTL_HW_MEMSIZE_OUTPUT = 'hw.memsize: {}'.format(_SYSCTL_HW_MEMSIZE)
+_SYSCTL_HW_MEMSIZE_OUTPUT = str(_SYSCTL_HW_MEMSIZE)
 
 # Safe upper bound to soundness check the LTO link job heuristics.
 _LTO_LINK_JOBS_UPPER_BOUND = 100
@@ -50,7 +50,7 @@ class TestDefaults(unittest.TestCase):
     # _system_memory
 
     @utils.requires_module('unittest.mock')
-    @patch('platform.platform', MagicMock(return_value='Darwin'))
+    @patch('platform.system', MagicMock(return_value='Darwin'))
     def test_system_memory_darwin_platform(self):
         with mock.patch.object(shell, 'check_output') as mock_check_output:
             mock_check_output.return_value = _SYSCTL_HW_MEMSIZE_OUTPUT
@@ -59,24 +59,37 @@ class TestDefaults(unittest.TestCase):
                 defaults._system_memory(), _SYSCTL_HW_MEMSIZE)
 
     @utils.requires_module('unittest.mock')
-    @patch('platform.platform', MagicMock(return_value='Darwin'))
+    @patch('platform.system', MagicMock(return_value='Darwin'))
     def test_system_memory_darwin_platform_when_sysctl_fails(self):
         with mock.patch.object(shell, 'check_output') as mock_check_output:
             mock_check_output.side_effect = shell.CalledProcessError(
                 returncode=1,
-                cmd=['sysctl', 'hw.memsize'])
+                cmd=['sysctl', '-n', 'hw.memsize'])
 
             self.assertIsNone(defaults._system_memory())
 
     @utils.requires_module('unittest.mock')
-    @patch('platform.platform', MagicMock(return_value='Linux'))
+    @patch('platform.system', MagicMock(return_value='Linux'))
+    @patch(
+        'builtins.open',
+        mock_open(read_data=f'MemTotal: {_SYSCTL_HW_MEMSIZE // 1024} kB'),
+    )
     def test_system_memory_linux_platform(self):
+        self.assertEqual(defaults._system_memory(), _SYSCTL_HW_MEMSIZE)
+
+    @utils.requires_module('unittest.mock')
+    @patch('platform.system', MagicMock(return_value='Windows'))
+    def test_system_memory_windows_platform(self):
         self.assertIsNone(defaults._system_memory())
 
     @utils.requires_module('unittest.mock')
-    @patch('platform.platform', MagicMock(return_value='Windows'))
-    def test_system_memory_windows_platform(self):
-        self.assertIsNone(defaults._system_memory())
+    @patch('platform.system', MagicMock(return_value='FreeBSD'))
+    def test_system_memory_freebsd_platform(self):
+        with mock.patch.object(shell, 'check_output') as mock_check_output:
+            mock_check_output.return_value = _SYSCTL_HW_MEMSIZE_OUTPUT
+
+            self.assertEqual(
+                defaults._system_memory(), _SYSCTL_HW_MEMSIZE)
 
     # ------------------------------------------------------------------------
     # _default_llvm_lto_link_jobs
