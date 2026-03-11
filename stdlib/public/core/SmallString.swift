@@ -267,7 +267,7 @@ extension _SmallString {
   // Overwrite stored code units, including uninitialized. `f` should return the
   // new count. This will re-establish the invariant after `f` that all bits
   // between the last code unit and the discriminator are unset.
-  @_alwaysEmitIntoClient @inline(__always)
+  @inline(__always)
   fileprivate mutating func withMutableCapacity<E: Error>(
     _ f: (UnsafeMutableRawBufferPointer) throws(E) -> Int
   ) throws(E) {
