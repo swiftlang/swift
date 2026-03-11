@@ -453,27 +453,18 @@ class InheritedProtocolCollector {
       return cache.value();
 
     cache.emplace();
-
-    // Start with the decl itself and add its @available attributes to the list.
-    // Then do the same for each parent declaration, but skip adding new
-    // availability attributes if they would be superceded by an attribute on a
-    // nested declaration since those take precedence.
-    // FIXME: This is just approximating the effects of nested availability
-    // attributes for the same platform; formally they'd need to be merged.
-    llvm::SmallVector<SemanticAvailableAttr, 8> pendingAttrs;
     while (D) {
       for (auto nextAttr : D->getSemanticAvailableAttrs()) {
-        bool hasMoreSpecificAttribute = llvm::any_of(
+        // FIXME: This is just approximating the effects of nested availability
+        // attributes for the same platform; formally they'd need to be merged.
+        bool alreadyHasMoreSpecificAttrForThisPlatform = llvm::any_of(
             *cache, [nextAttr](SemanticAvailableAttr existingAttr) {
-              return existingAttr.getDomain().contains(nextAttr.getDomain());
+              return existingAttr.getDomain() == nextAttr.getDomain();
             });
-        if (hasMoreSpecificAttribute)
+        if (alreadyHasMoreSpecificAttrForThisPlatform)
           continue;
-        pendingAttrs.push_back(nextAttr);
+        cache->push_back(nextAttr);
       }
-
-      cache->append(pendingAttrs);
-      pendingAttrs.clear();
       D = D->getDeclContext()->getAsDecl();
     }
 
