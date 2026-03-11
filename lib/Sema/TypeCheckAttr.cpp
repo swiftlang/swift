@@ -2460,6 +2460,10 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   if (ctx.LangOpts.hasFeature(Feature::AllowRuntimeSymbolDeclarations))
     return true;
 
+  // Only consider "swift_"-containing symbols.
+  if (!symbol.contains("swift_"))
+    return true;
+
   // Swift runtime functions are a private contract between the compiler and
   // runtime, and attempting to access them directly without going through
   // builtins or proper language features breaks the compiler in various hard
