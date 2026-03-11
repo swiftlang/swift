@@ -6514,7 +6514,9 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     // the matching accessor isn't a supported kind.
     if (maybeAccessorKind.has_value() &&
         maybeAccessorKind != AccessorKind::Get &&
-        maybeAccessorKind != AccessorKind::Set) {
+        maybeAccessorKind != AccessorKind::Set &&
+        maybeAccessorKind != AccessorKind::Modify &&
+        maybeAccessorKind != AccessorKind::YieldingMutate) {
       invalidCandidates.push_back(
           {decl, LookupErrorKind::CandidateUnsupportedAccessor});
       continue;
@@ -6657,6 +6659,23 @@ static bool checkFunctionSignature(
        !required->getThrownError()->isEqual(candidateFnTy->getThrownError())))
     return false;
 
+  // Check that either both are coroutines or none
+  if (required->isCoroutine() != candidateFnTy->isCoroutine())
+    return false;
+  // Check that yields match
+  if (required->getNumYields() != candidateFnTy->getNumYields())
+    return false;
+  if (!std::equal(required->getYields().begin(), required->getYields().end(),
+                  candidateFnTy->getYields().begin(),
+                  [&](AnyFunctionType::Yield x, AnyFunctionType::Yield y) {
+                    auto xInstanceTy = x.getType()->getMetatypeInstanceType();
+                    auto yInstanceTy = y.getType()->getMetatypeInstanceType();
+                    return xInstanceTy->isEqual(
+                               requiredGenSig.getReducedType(yInstanceTy)) &&
+                           x.getFlags() == y.getFlags();
+                  }))
+    return false;
+
   // Check that parameter types match, disregarding labels.
   if (required->getNumParams() != candidateFnTy->getNumParams())
     return false;
@@ -6695,23 +6714,18 @@ static bool checkFunctionSignature(
   return checkFunctionSignature(requiredResultFnTy, candidateResultTy);
 }
 
-/// Returns an `AnyFunctionType` from the given parameters, result type, and
-/// generic signature.
+/// Returns an `AnyFunctionType` from the given parameters, result type,
+/// generic signature, and ExtInfo
 static AnyFunctionType *
 makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters,
                  ArrayRef<AnyFunctionType::Yield> yields, Type resultType,
-                 bool throws, Type thrownError,
-                 GenericSignature genericSignature) {
-  // FIXME: Verify ExtInfo state is correct, not working by accident.
+                 GenericSignature genericSignature,
+                 AnyFunctionType::ExtInfo extInfo) {
   if (genericSignature) {
-    GenericFunctionType::ExtInfo info;
-    info = info.withThrows(throws, thrownError);
     return GenericFunctionType::get(genericSignature, parameters, yields,
-                                    resultType, info);
+                                    resultType, extInfo);
   }
-  FunctionType::ExtInfo info;
-  info = info.withThrows(throws, thrownError);
-  return FunctionType::get(parameters, yields, resultType, info);
+  return FunctionType::get(parameters, yields, resultType, extInfo);
 }
 
 /// Computes the original function type corresponding to the given derivative
@@ -6730,16 +6744,22 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
     currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
   }
 
-  auto derivativeResult = curryLevels.back()->getResult()->getAs<TupleType>();
-  assert(derivativeResult && derivativeResult->getNumElements() == 2 &&
-         "Expected derivative result to be a two-element tuple");
-  auto originalResult = derivativeResult->getElement(0).getType();
+  AnyFunctionType *lastType = curryLevels.back();
+  Type originalResult;
+  if (lastType->isCoroutine()) {
+    originalResult = derivativeFnTy->getASTContext().getVoidType();
+  } else {
+    auto derivativeResult = lastType->getResult()->getAs<TupleType>();
+    assert(derivativeResult && derivativeResult->getNumElements() == 2 &&
+           "Expected derivative result to be a two-element tuple");
+    originalResult = derivativeResult->getElement(0).getType();
+  }
+
   auto *originalType = makeFunctionType(
-      curryLevels.back()->getParams(), curryLevels.back()->getYields(),
-      originalResult, curryLevels.back()->isThrowing(),
-      curryLevels.back()->getThrownError(),
+      lastType->getParams(), lastType->getYields(), originalResult,
       curryLevels.size() == 1 ? derivativeFnTy->getOptGenericSignature()
-                              : nullptr);
+                              : nullptr,
+      lastType->getExtInfo());
 
   // Wrap the derivative function type in additional curry levels.
   auto curryLevelsWithoutLast =
@@ -6749,10 +6769,10 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
     AnyFunctionType *curryLevel = pair.value();
     originalType = makeFunctionType(
         curryLevel->getParams(), curryLevel->getYields(), originalType,
-        curryLevel->isThrowing(), curryLevel->getThrownError(),
         i == curryLevelsWithoutLast.size() - 1
             ? derivativeFnTy->getOptGenericSignature()
-            : nullptr);
+            : nullptr,
+        curryLevel->getExtInfo());
   }
   return originalType;
 }
@@ -6770,10 +6790,12 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   auto transposeParams = transposeFnType->getParams();
   auto transposeResult = transposeFnType->getResult();
   bool isCurried = transposeResult->is<AnyFunctionType>();
+  AnyFunctionType::ExtInfo innerInfo;
   if (isCurried) {
     auto methodType = transposeResult->castTo<AnyFunctionType>();
     transposeParams = methodType->getParams();
     transposeResult = methodType->getResult();
+    innerInfo = methodType->getExtInfo();
   }
 
   // Get the original function's result type.
@@ -6843,20 +6865,18 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   if (isCurried) {
     assert(selfType && "`Self` type should be resolved");
     originalType = makeFunctionType(originalParams, {}, originalResult,
-                                    transposeFnType->isThrowing(),
-                                    transposeFnType->getThrownError(),
-                                    /*genericSignature=*/nullptr);
-    originalType = makeFunctionType(
-        AnyFunctionType::Param(selfType), {}, originalType,
-        /*throws=*/false, Type(), transposeFnType->getOptGenericSignature());
+                                    /*genericSignature=*/nullptr, innerInfo);
+    originalType =
+        makeFunctionType(AnyFunctionType::Param(selfType), {}, originalType,
+                         transposeFnType->getOptGenericSignature(),
+                         transposeFnType->getExtInfo());
   }
   // Otherwise, the original function type is simply:
   // `(<original parameters>) -> <original result>`.
   else {
     originalType = makeFunctionType(originalParams, {}, originalResult,
-                                    transposeFnType->isThrowing(),
-                                    transposeFnType->getThrownError(),
-                                    transposeFnType->getOptGenericSignature());
+                                    transposeFnType->getOptGenericSignature(),
+                                    transposeFnType->getExtInfo());
   }
   return originalType;
 }
@@ -7340,31 +7360,49 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   //     (value: R, pullback: (R.TangentVector) -> (T.TangentVector...)
   // Or a value and differential:
   //     (value: R, differential: (T.TangentVector...) -> (R.TangentVector)
-  auto derivativeResultType = derivative->getResultInterfaceType();
-  auto derivativeResultTupleType = derivativeResultType->getAs<TupleType>();
-  if (!derivativeResultTupleType ||
-      derivativeResultTupleType->getNumElements() != 2) {
-    diags.diagnose(attr->getLocation(),
-                   diag::derivative_attr_expected_result_tuple);
-    return true;
-  }
-  auto valueResultElt = derivativeResultTupleType->getElement(0);
-  auto funcResultElt = derivativeResultTupleType->getElement(1);
-  // Get derivative kind and derivative function identifier.
+  // Derivatives of coroutines are different: they yield the result and return
+  // the pullback, so we cannot reasonably check them here.
   AutoDiffDerivativeFunctionKind kind;
-  if (valueResultElt.getName().str() != "value") {
-    diags.diagnose(attr->getLocation(),
-                   diag::derivative_attr_invalid_result_tuple_value_label);
-    return true;
-  }
-  if (funcResultElt.getName().str() == "differential") {
-    kind = AutoDiffDerivativeFunctionKind::JVP;
-  } else if (funcResultElt.getName().str() == "pullback") {
+  if (derivative->isCoroutine()) {
+    auto derivativeResultType = derivative->getResultInterfaceType();
+    // Coroutines derivatives must return VJP / JVP. We do not support normal
+    // results.
+    if (!derivativeResultType->getAs<AnyFunctionType>()) {
+      diags.diagnose(attr->getLocation(),
+                     diag::derivative_attr_expected_coro_result);
+      return true;
+    }
+
+    // TODO: Invent a way to specify JVPs
     kind = AutoDiffDerivativeFunctionKind::VJP;
   } else {
-    diags.diagnose(attr->getLocation(),
-                   diag::derivative_attr_invalid_result_tuple_func_label);
-    return true;
+    auto derivativeResultType = derivative->getResultInterfaceType();
+    auto derivativeResultTupleType = derivativeResultType->getAs<TupleType>();
+    if (!derivativeResultTupleType ||
+        derivativeResultTupleType->getNumElements() != 2) {
+      diags.diagnose(attr->getLocation(),
+                     diag::derivative_attr_expected_result_tuple);
+      return true;
+    }
+
+    auto valueResultElt = derivativeResultTupleType->getElement(0);
+    if (valueResultElt.getName().str() != "value") {
+      diags.diagnose(attr->getLocation(),
+                     diag::derivative_attr_invalid_result_tuple_value_label);
+      return true;
+    }
+
+    // Get derivative kind and derivative function identifier.
+    auto funcResultElt = derivativeResultTupleType->getElement(1);
+    if (funcResultElt.getName().str() == "differential") {
+      kind = AutoDiffDerivativeFunctionKind::JVP;
+    } else if (funcResultElt.getName().str() == "pullback") {
+      kind = AutoDiffDerivativeFunctionKind::VJP;
+    } else {
+      diags.diagnose(attr->getLocation(),
+                     diag::derivative_attr_invalid_result_tuple_func_label);
+      return true;
+    }
   }
   attr->setDerivativeKind(kind);
 
@@ -7661,29 +7699,52 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   // expected type. We must canonicalize the derivative interface type before
   // extracting the differential/pullback type from it so that types are
   // simplified via the canonical generic signature.
-  CanType canActualResultType = derivativeInterfaceType->getCanonicalType();
-  while (isa<AnyFunctionType>(canActualResultType)) {
-    canActualResultType =
-        cast<AnyFunctionType>(canActualResultType).getResult();
+  CanType actualLinearMapType;
+  if (derivative->isCoroutine()) {
+    CanType canActualResultType = derivativeInterfaceType->getCanonicalType();
+    // Coroutines return their linear maps (they yield values).
+    do {
+      actualLinearMapType = canActualResultType;
+      canActualResultType =
+          cast<AnyFunctionType>(canActualResultType).getResult();
+    } while (isa<AnyFunctionType>(canActualResultType));
+  } else {
+    CanType canActualResultType = derivativeInterfaceType->getCanonicalType();
+    while (isa<AnyFunctionType>(canActualResultType)) {
+      canActualResultType =
+          cast<AnyFunctionType>(canActualResultType).getResult();
+    }
+    actualLinearMapType =
+        cast<TupleType>(canActualResultType).getElementType(1);
   }
-  CanType actualLinearMapType =
-      cast<TupleType>(canActualResultType).getElementType(1);
 
   // Check if differential/pullback type matches expected type.
   if (!actualLinearMapType->isEqual(expectedLinearMapType)) {
     // Emit differential/pullback type mismatch error on attribute.
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_result_func_type_mismatch,
-                   funcResultElt.getName(), originalAFD);
+                   Ctx.getIdentifier(kind == AutoDiffDerivativeFunctionKind::VJP
+                                         ? "pullback"
+                                         : "differential"),
+                   originalAFD);
     // Emit note with expected differential/pullback type on actual type
     // location.
-    auto *tupleReturnTypeRepr =
-        cast<TupleTypeRepr>(derivative->getResultTypeRepr());
-    auto *funcEltTypeRepr = tupleReturnTypeRepr->getElementType(1);
+    TypeRepr *funcEltTypeRepr;
+    if (derivative->isCoroutine()) {
+      funcEltTypeRepr = derivative->getResultTypeRepr();
+    } else {
+      auto *tupleReturnTypeRepr =
+          cast<TupleTypeRepr>(derivative->getResultTypeRepr());
+      funcEltTypeRepr = tupleReturnTypeRepr->getElementType(1);
+    }
+
     diags
         .diagnose(funcEltTypeRepr->getStartLoc(),
                   diag::derivative_attr_result_func_type_mismatch_note,
-                  funcResultElt.getName(), expectedLinearMapType)
+                  Ctx.getIdentifier(kind == AutoDiffDerivativeFunctionKind::VJP
+                                        ? "pullback"
+                                        : "differential"),
+                  expectedLinearMapType)
         .highlight(funcEltTypeRepr->getSourceRange());
     // Emit note showing original function location, if possible.
     if (originalAFD->getLoc().isValid())

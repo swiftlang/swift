@@ -4542,6 +4542,10 @@ ERROR(derivative_attr_invalid_result_tuple_func_label,none,
       "'@derivative(of:)' attribute requires function to return a two-element "
       "tuple; second element must have label 'pullback:' or 'differential:'",
       ())
+ERROR(derivative_attr_expected_coro_result,none,
+      "'@derivative(of:)' attribute requires coroutine function to return a  "
+      "linear map", ())
+
 ERROR(derivative_attr_result_func_type_mismatch,none,
       "function result's %0 type does not match %1",
       (Identifier, const ValueDecl *))
