@@ -8289,6 +8289,8 @@ ERROR(inverse_generic_but_also_conforms, none,
 ERROR(inverse_associatedtype_restriction, none,
       "cannot suppress '%0' requirement of an associated type",
       (StringRef))
+WARNING(legacy_suppressed_assoc_types, none,
+      "experimental feature 'SuppressedAssociatedTypes' is deprecated; see SE-0503 for the official version", ())
 ERROR(inverse_on_class, none,
       "%select{classes|actors}1 cannot be '~%0'",
       (StringRef, bool))

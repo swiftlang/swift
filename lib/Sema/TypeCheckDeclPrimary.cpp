@@ -2021,6 +2021,20 @@ static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
   }
 }
 
+static void checkDeprecatedSuppressedAssociatedTypes(ProtocolDecl *proto) {
+  auto &ctx = proto->getASTContext();
+
+  if (!ctx.LangOpts.hasFeature(SuppressedAssociatedTypes))
+    return;
+
+  for (auto req : proto->getInverseRequirements()) {
+    if (req.subject->getCanonicalType() == ctx.TheSelfType)
+      continue;
+
+    ctx.Diags.diagnose(req.loc, diag::legacy_suppressed_assoc_types);
+  }
+}
+
 /// Make sure that every protocol conformance requirement on 'Self' is
 /// directly stated in the protocol's inheritance clause.
 ///
@@ -3517,6 +3531,8 @@ public:
     // Copyable that will appear as if deserialized, so skip checking those.
     if (PD->getParentSourceFile())
       TypeChecker::checkConformancesInContext(PD);
+
+    checkDeprecatedSuppressedAssociatedTypes(PD);
   }
 
   void visitVarDecl(VarDecl *VD) {

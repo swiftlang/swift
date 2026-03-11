@@ -1,9 +1,9 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:   -enable-experimental-feature Lifetimes \
-// RUN:   -enable-experimental-feature SuppressedAssociatedTypes
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypesWithDefaults
 
 // REQUIRES: swift_feature_Lifetimes
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 // Coverage testing for LifetimeDependence inferrence logic. The tests are sorted and grouped according to
 // docs/ReferenceGuides/LifetimeAnnotation.md. To find the cases that cover the default lifetime
