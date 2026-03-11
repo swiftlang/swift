@@ -107,13 +107,8 @@ public:
     if (IntroVer.has_value())
       return false;
 
-    if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      diagnose(attr->AtLoc, diag::attr_requires_decl_availability_for_platform,
-               attr, VD->getName(), prettyPlatformString(platform));
-    } else {
-      diagnose(attr->AtLoc, diag::attr_requires_availability_for_platform, attr,
-               prettyPlatformString(platform));
-    }
+    diagnose(attr->AtLoc, diag::attr_requires_decl_availability_for_platform,
+             attr, D, prettyPlatformString(platform));
     return true;
   }
 

@@ -7341,11 +7341,7 @@ ERROR(public_decl_needs_availability, none,
 
 ERROR(attr_requires_decl_availability_for_platform,none,
       "'%0' requires that %1 have explicit availability for %2",
-      (DeclAttribute, DeclName, StringRef))
-
-ERROR(attr_requires_availability_for_platform,none,
-      "'%0' requires explicit availability for %1",
-      (DeclAttribute, StringRef))
+      (DeclAttribute, const Decl *, StringRef))
 
 // This doesn't display as an availability diagnostic, but it's
 // implemented there and fires when these subscripts are marked
