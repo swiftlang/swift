@@ -365,29 +365,26 @@ public:
   }
 };
 
-struct NonReferenceDereferenceOperator {
-private:
-  int value;
-
-public:
+struct DifferentResultsDereferenceOperator {
   using iterator_category = std::input_iterator_tag;
   using value_type = int;
   using pointer = int *;
   using reference = const int &;
   using difference_type = int;
 
-  NonReferenceDereferenceOperator(int value) : value(value) {}
-  NonReferenceDereferenceOperator(
-      const NonReferenceDereferenceOperator &other) = default;
+  int value;
+  long ghost;
 
-  int operator*() const { return value; }
+  DifferentResultsDereferenceOperator(int value, long ghost)
+      : value(value), ghost(ghost) {}
 
-  NonReferenceDereferenceOperator &operator++() {
+  long &operator*() { return ghost; }
+  const int &operator*() const { return value; }
+  DifferentResultsDereferenceOperator &operator++() {
     value++;
     return *this;
   }
-
-  bool operator==(const NonReferenceDereferenceOperator &other) const {
+  bool operator==(const DifferentResultsDereferenceOperator &other) const {
     return value == other.value;
   }
 };
@@ -618,6 +615,144 @@ public:
   }
 };
 #endif
+
+// MARK: Iterators with dereference operators that prevent conformance to
+// CxxBorrowingSequence.
+
+struct NonInlineDereferenceOperator {
+  using iterator_category = std::input_iterator_tag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  NonInlineDereferenceOperator(int value) : value(value) {}
+  NonInlineDereferenceOperator(const NonInlineDereferenceOperator &other) =
+      default;
+
+  NonInlineDereferenceOperator &operator++() {
+    value++;
+    return *this;
+  }
+
+  bool operator==(const NonInlineDereferenceOperator &other) const {
+    return value == other.value;
+  }
+
+  int value;
+};
+
+inline int &operator*(NonInlineDereferenceOperator &s) { return s.value; }
+
+struct NonReferenceDereferenceOperator {
+private:
+  int value;
+
+public:
+  using iterator_category = std::input_iterator_tag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  NonReferenceDereferenceOperator(int value) : value(value) {}
+  NonReferenceDereferenceOperator(
+      const NonReferenceDereferenceOperator &other) = default;
+
+  int operator*() const { return value; }
+
+  NonReferenceDereferenceOperator &operator++() {
+    value++;
+    return *this;
+  }
+
+  bool operator==(const NonReferenceDereferenceOperator &other) const {
+    return value == other.value;
+  }
+};
+
+struct NoConstDereferenceOperator {
+  using iterator_category = std::input_iterator_tag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  int value;
+  NoConstDereferenceOperator(int value) : value(value) {}
+
+  int &operator*() { return value; }
+
+  // This is the binary variant of operator* (i.e., multiply) and should be
+  // accessible via the synthesized static func *(lhs, rhs) operator. Since
+  // there's no const deref operator, NoConstDereferenceOperator shouldn't
+  // conform to UnsafeCxxInputIterator.
+  int operator*(const NoConstDereferenceOperator &other) const {
+    return other.value;
+  }
+  NoConstDereferenceOperator &operator++() {
+    value++;
+    return *this;
+  }
+  bool operator==(const NoConstDereferenceOperator &other) const {
+    return value == other.value;
+  }
+};
+
+struct ConstRACButNotBorrowingIterator {
+private:
+  const int *value;
+
+public:
+  using iterator_category = std::random_access_iterator_tag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  ConstRACButNotBorrowingIterator(const int *value) : value(value) {}
+  ConstRACButNotBorrowingIterator(
+      const ConstRACButNotBorrowingIterator &other) = default;
+
+  int operator*() const { return *value; }
+
+  ConstRACButNotBorrowingIterator &operator++() {
+    value++;
+    return *this;
+  }
+  ConstRACButNotBorrowingIterator operator++(int) {
+    auto tmp = ConstRACButNotBorrowingIterator(value);
+    value++;
+    return tmp;
+  }
+
+  void operator+=(difference_type v) { value += v; }
+  void operator-=(difference_type v) { value -= v; }
+  ConstRACButNotBorrowingIterator operator+(difference_type v) const {
+    return ConstRACButNotBorrowingIterator(value + v);
+  }
+  ConstRACButNotBorrowingIterator operator-(difference_type v) const {
+    return ConstRACButNotBorrowingIterator(value - v);
+  }
+  friend ConstRACButNotBorrowingIterator
+  operator+(difference_type v, const ConstRACButNotBorrowingIterator &it) {
+    return it + v;
+  }
+  int operator-(const ConstRACButNotBorrowingIterator &other) const {
+    return value - other.value;
+  }
+
+  bool operator<(const ConstRACButNotBorrowingIterator &other) const {
+    return value < other.value;
+  }
+
+  bool operator==(const ConstRACButNotBorrowingIterator &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const ConstRACButNotBorrowingIterator &other) const {
+    return value != other.value;
+  }
+};
 
 // MARK: Types that are not actually iterators
 

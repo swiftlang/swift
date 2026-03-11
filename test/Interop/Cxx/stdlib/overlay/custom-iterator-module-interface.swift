@@ -1,6 +1,7 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=CustomIterator -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default | %FileCheck %s
 
 // CHECK: struct ConstIterator : UnsafeCxxInputIterator {
+// CHECK:   func __operatorStar() -> UnsafePointer<Int32>
 // CHECK:   func successor() -> ConstIterator
 // CHECK:   typealias Pointee = Int32
 // CHECK:   static func == (lhs: ConstIterator, other: ConstIterator) -> Bool
@@ -99,6 +100,52 @@
 // CHECK:   func successor() -> MutableRACIterator
 // CHECK:   typealias Pointee = Int32
 // CHECK:   typealias Distance = Int32
+// CHECK: }
+
+// CHECK: struct DifferentResultsDereferenceOperator : UnsafeCxxMutableInputIterator {
+// CHECK:   mutating func __operatorStar() -> UnsafeMutablePointer<Int>
+// CHECK:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK:   func successor() -> DifferentResultsDereferenceOperator
+// CHECK:   typealias Pointee = Int32
+// CHECK:   typealias DereferenceResult = UnsafePointer<Int32>
+// CHECK:   static func == (lhs: DifferentResultsDereferenceOperator, other: DifferentResultsDereferenceOperator) -> Bool
+// CHECK:   var pointee: Int32
+// CHECK: }
+
+// CHECK: struct NonInlineDereferenceOperator {
+// CHECK-NOT:   func __operatorStar()
+// CHECK:   func successor() -> NonInlineDereferenceOperator
+// CHECK-NOT:   typealias Pointee
+// CHECK-NOT:   typealias DereferenceResult
+// CHECK-NOT:   var pointee
+// CHECK: }
+
+// CHECK: struct NonReferenceDereferenceOperator : UnsafeCxxInputIterator {
+// CHECK:   func __operatorStar() -> Int32
+// CHECK:   func successor() -> NonReferenceDereferenceOperator
+// CHECK:   typealias Pointee = Int32
+// CHECK:   typealias DereferenceResult = Int32
+// CHECK:   var pointee: Int32 { get }
+// CHECK: }
+
+// CHECK: struct NoConstDereferenceOperator {
+// CHECK:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
+// CHECK:   static func * (lhs: NoConstDereferenceOperator, other: NoConstDereferenceOperator) -> Int32
+// CHECK:   static func == (lhs: NoConstDereferenceOperator, other: NoConstDereferenceOperator) -> Bool
+// CHECK:   func successor() -> NoConstDereferenceOperator
+// CHECK:   var pointee: Int32 { mutating get set }
+// CHECK: }
+
+// CHECK: struct ConstRACButNotBorrowingIterator : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK:   func __operatorStar() -> Int32
+// CHECK:   func successor() -> ConstRACButNotBorrowingIterator
+// CHECK:   typealias Pointee = Int32
+// CHECK:   typealias DereferenceResult = Int32
+// CHECK:   typealias Distance = Int32
+// CHECK:   static func += (lhs: inout ConstRACButNotBorrowingIterator, v: ConstRACButNotBorrowingIterator.difference_type)
+// CHECK:   static func - (lhs: ConstRACButNotBorrowingIterator, other: ConstRACButNotBorrowingIterator) -> Int32
+// CHECK:   static func == (lhs: ConstRACButNotBorrowingIterator, other: ConstRACButNotBorrowingIterator) -> Bool
+// CHECK:   var pointee: Int32 { get }
 // CHECK: }
 
 // CHECK-NOT: struct HasNoIteratorCategory : UnsafeCxxInputIterator
