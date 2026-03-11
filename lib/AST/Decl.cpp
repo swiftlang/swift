@@ -8196,6 +8196,25 @@ VarDecl::mutability(const DeclContext *UseDC,
       }
     }
 
+    // A wrapped property can be initialized through 'self.prop = value' in a
+    // designated initializer when every wrapper in the chain supports
+    // init(wrappedValue:), even if regular mutation is unavailable.
+    if (!supportsMutation() && hasAttachedPropertyWrapper() &&
+        allAttachedPropertyWrappersHaveWrappedValueInit()) {
+      if (auto *CD = dyn_cast_or_null<ConstructorDecl>(UseDC)) {
+        auto *CDC = CD->getDeclContext();
+        if (CDC->getSelfNominalTypeDecl() ==
+            getDeclContext()->getSelfNominalTypeDecl()) {
+          auto initKindAndExpr = CD->getDelegatingOrChainedInitKind();
+          if (initKindAndExpr.initKind != BodyInitKind::Delegating) {
+            if (!base ||
+                (*base && CD->getImplicitSelfDecl() == (*base)->getDecl()))
+              return StorageMutability::Initializable;
+          }
+        }
+      }
+    }
+
     return storageIsMutable(supportsMutation());
   }
 
