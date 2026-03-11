@@ -74,6 +74,9 @@ enum class ConversionBehavior : unsigned {
   /// Function types and metatypes.
   Structural,
 
+  /// Tuples.
+  Tuple,
+
   /// InOut types have Pointer types as supertypes.
   InOut,
 
@@ -109,6 +112,16 @@ bool hasProperSubtypes(Type type);
 /// Optional<T> and existentials.
 bool hasProperSupertypes(Type type);
 
+/// Check if this type can be a supertype of a function type. This
+/// is true if it is already a function type, an existential that
+/// only involves marker protocols, or an optional of the above.
+///
+/// Note that an lvalue type is never a supertype of an rvalue type
+/// such as a function type, so given an lvalue type, this will
+/// always return false. If this is not intended behavior, unwrap
+/// the lvalue type first before calling this entry point.
+bool isPossibleSupertypeOfFunctionType(Type type);
+
 enum ConflictFlag : unsigned {
   Category = 1 << 0,
   Exact = 1 << 1,
@@ -120,7 +133,9 @@ enum ConflictFlag : unsigned {
   Set = 1 << 7,
   Optional = 1 << 8,
   Double = 1 << 9,
-  Conformance = 1 << 10
+  Conformance = 1 << 10,
+  TupleArity = 1 << 11,
+  TupleElement = 1 << 11
 };
 using ConflictReason = OptionSet<ConflictFlag>;
 

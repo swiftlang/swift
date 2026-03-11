@@ -42,6 +42,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SetVector.h"
@@ -7084,6 +7085,9 @@ static bool isDependentMemberTypeWithBaseThatContainsUnresolvedPackExpansions(
 
 ConstraintSystem::ImpliedResultConversionKind
 ConstraintSystem::getImpliedResultConversionKind(ConstraintLocator *locator) {
+  if (locator->isLastElement<LocatorPathElt::ClosureResult>())
+    return ImpliedResultConversionKind::ToVoid;
+
   if (locator->isLastElement<LocatorPathElt::ClosureBody>() ||
       locator->isForContextualType(CTP_ReturnStmt) ||
       locator->isForContextualType(CTP_ClosureResult) ||
@@ -12008,25 +12012,10 @@ ConstraintSystem::simplifyUnresolvedMemberChainBaseConstraint(
     if (shouldAttemptFixes() && hasFixFor(memberLoc))
       return SolutionKind::Solved;
 
-    auto *memberRef = findResolvedMemberRef(memberLoc);
-    if (memberRef && (memberRef->isStatic() || isa<TypeAliasDecl>(memberRef))) {
-      auto layout = baseTy->getExistentialLayout();
-      ASSERT(!layout.explicitSuperclass);
-      auto locator =
-        getConstraintLocator(memberLoc, ConstraintLocator::MemberRefBase);
-      auto lFlags = getDefaultDecompositionOptions(flags);
-
-      for (auto *proto : layout.getProtocols()) {
-        auto solution =
-          simplifyConformsToConstraint(resultTy, proto,
-                                       ConstraintKind::ConformsTo,
-                                       locator, lFlags);
-        if (solution == SolutionKind::Error) {
-          return SolutionKind::Error;
-        }
-      }
-      return SolutionKind::Solved;
-    }
+    return simplifyConformsToConstraint(
+        resultTy, baseTy, ConstraintKind::ConformsTo,
+        getConstraintLocator(memberLoc, ConstraintLocator::MemberRefBase),
+        flags);
   }
 
   return matchTypes(baseTy, resultTy, ConstraintKind::Equal, flags, locator);
@@ -12209,14 +12198,13 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     return true;
   };
 
-  // If contextual type is not a function type or `Any` and this
-  // closure is used as an argument, let's skip resolution.
+  // If the contextual type cannot possibly be a supertype of a function type,
+  // and this closure is used as an argument, let's skip resolution.
   //
   // Doing so improves performance if closure is passed as an argument
   // to a (heavily) overloaded declaration, avoid unrelated errors,
   // propagate holes, and record a more impactful fix.
-  if (!contextualType->isTypeVariableOrMember() &&
-      !(contextualType->is<FunctionType>() || contextualType->isAny()) &&
+  if (!isPossibleSupertypeOfFunctionType(contextualType) &&
       locator.endsWith<LocatorPathElt::ApplyArgToParam>()) {
     if (!shouldAttemptFixes())
       return false;

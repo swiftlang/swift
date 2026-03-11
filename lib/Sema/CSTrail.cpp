@@ -1000,6 +1000,10 @@ void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
     for (const auto &typeVar : addedTypeVars) {
       out.indent(indent + 4);
       out << "> $T" << typeVar->getImpl().getID();
+      if (auto *locator = typeVar->getImpl().getLocator()) {
+        out << " @ ";
+        locator->dump(&CS.getASTContext().SourceMgr, out);
+      }
       out << '\n';
     }
     out.indent(indent + 2);

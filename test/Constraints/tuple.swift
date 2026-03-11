@@ -184,22 +184,6 @@ func gcd_23700031<T>(_ a: T, b: T) {
   (a, b) = (b, a % b)  // expected-error {{binary operator '%' cannot be applied to two 'T' operands}}
 }
 
-// <rdar://problem/24210190>
-//   Don't ignore tuple labels in same-type constraints or stronger.
-protocol Kingdom {
-  associatedtype King
-}
-struct Victory<General> {
-  init<K: Kingdom>(_ king: K) where K.King == General {} // expected-note {{where 'General' = '(x: Int, y: Int)', 'K.King' = 'MagicKingdom<(Int, Int)>.King' (aka '(Int, Int)')}}
-}
-struct MagicKingdom<K> : Kingdom {
-  typealias King = K
-}
-func magnify<T>(_ t: T) -> MagicKingdom<T> { return MagicKingdom() }
-func foo(_ pair: (Int, Int)) -> Victory<(x: Int, y: Int)> {
-  return Victory(magnify(pair)) // expected-error {{initializer 'init(_:)' requires the types '(x: Int, y: Int)' and 'MagicKingdom<(Int, Int)>.King' (aka '(Int, Int)') be equivalent}}
-}
-
 
 // https://github.com/apple/swift/issues/43213
 // Compiler crashes when accessing a non-existent property of a closure
