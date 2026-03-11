@@ -278,6 +278,16 @@ FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 /// warnings in Swift 5 mode.
 FRONTEND_STATISTIC(Sema, NumSwift6Errors)
 
+/// TODO: remove
+/// DI stats
+FRONTEND_STATISTIC(DI, DINumFunctionsProcessed)
+FRONTEND_STATISTIC(DI, DINumBasicBlocksProcessed)
+FRONTEND_STATISTIC(DI, DINumMarkUninitProcessed)
+FRONTEND_STATISTIC(DI, DINumMemoryElements)
+FRONTEND_STATISTIC(DI, DINumLivenessAtInstQueries)
+FRONTEND_STATISTIC(DI, DINumLivenessAtInstScans)
+FRONTEND_STATISTIC(DI, DINumDataflowIterations)
+
 /// Number of lookups into a module and its imports.
 
 /// All type check requests go into the Sema area.
