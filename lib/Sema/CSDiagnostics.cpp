@@ -6256,8 +6256,8 @@ bool ExtraneousArgumentsFailure::diagnoseAsNote() {
                      (numArgs == 1));
   } else {
     emitDiagnosticAt(decl, diag::candidate_with_extraneous_args,
-                     overload->adjustedOpenedType, numArgs, ContextualType,
-                     ContextualType->getNumParams());
+                     resolveType(overload->adjustedOpenedType), numArgs,
+                     ContextualType, ContextualType->getNumParams());
   }
   return true;
 }
