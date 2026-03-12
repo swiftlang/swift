@@ -29,6 +29,7 @@
 
 #include <sys/mman.h>
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -126,6 +127,7 @@ ssize_t safe_write(int fd, const void *buf, size_t len) {
 }
 
 CrashInfo crashInfo;
+int maxFdToClose = 1024;
 
 const int signalsToHandle[] = {
   SIGQUIT,
@@ -192,6 +194,11 @@ _swift_installCrashHandler()
     }
   }
 
+  // Read the per-process open-file limit once, for use in closeFds()
+  struct rlimit rl;
+  if (getrlimit(RLIMIT_NOFILE, &rl) == 0)
+    maxFdToClose = (int)rl.rlim_cur;
+
   return 0;
 }
 
@@ -217,7 +224,14 @@ tgkill(int tgid, int tid, int sig) {
 #define CLOSE_RANGE_CLOEXEC 0x4
 
 static int _close_range(unsigned int first, unsigned int last, int flags) {
+#ifdef SYS_close_range
   return syscall(SYS_close_range, first, last, flags);
+#else
+  for (unsigned int i = first; i <= last; i++) {
+    close(i);
+  }
+  return 0;
+#endif
 }
 
 void
@@ -690,7 +704,6 @@ sigjmp_buf memserver_fault_buf;
 pid_t memserver_pid;
 
 #define MIN_FD_TO_CLOSE 3
-#define MAX_FD_TO_CLOSE ~0
 
 void
 closeFds(int memserver_master_fd) {
@@ -700,24 +713,15 @@ closeFds(int memserver_master_fd) {
   // Otherwise we close all file descriptors after stderr except the end of
   // the pipe used by swift-backtrace.
 
-  int keepOpen1 = memserver_master_fd;
-  int keepOpen2 = memserver_fd;
+  int keepOpen1 = memserver_master_fd < memserver_fd
+    ? memserver_master_fd : memserver_fd;
+  int keepOpen2 = memserver_master_fd < memserver_fd
+    ? memserver_fd : memserver_master_fd;
 
-  if (keepOpen2 > keepOpen1+1) {
-    _close_range(MIN_FD_TO_CLOSE, keepOpen1-1, 0);
+  _close_range(MIN_FD_TO_CLOSE, keepOpen1-1, 0);
+  if (keepOpen2 > keepOpen1+1)
     _close_range(keepOpen1+1, keepOpen2-1, 0);
-    _close_range(keepOpen2+1, MAX_FD_TO_CLOSE, 0);
-  } else if (keepOpen2+1 < keepOpen1) {
-    _close_range(MIN_FD_TO_CLOSE, keepOpen2-1, 0);
-    _close_range(keepOpen2+1, keepOpen1-1, 0);
-    _close_range(keepOpen1+1, MAX_FD_TO_CLOSE, 0);
-  } else {
-    // the file descriptors are adjacent
-    int fd1 = keepOpen2 > keepOpen1 ? keepOpen1 : keepOpen2;
-    int fd2 = keepOpen2 > keepOpen1 ? keepOpen2 : keepOpen1;
-    _close_range(MIN_FD_TO_CLOSE, fd1-1, 0);
-    _close_range(fd2+1, MAX_FD_TO_CLOSE, 0);    
-  }
+  _close_range(keepOpen2+1, maxFdToClose, 0);
 }
 
 int
