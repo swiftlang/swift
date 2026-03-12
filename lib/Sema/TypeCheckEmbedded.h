@@ -46,9 +46,6 @@ shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
 /// Check embedded restrictions in the signature of the given function.
 void checkEmbeddedRestrictionsInSignature(const AbstractFunctionDecl *func);
 
-/// Diagnose a declaration of typed throws at the given location.
-void diagnoseUntypedThrowsInEmbedded(const DeclContext *dc, SourceLoc throwsLoc);
-
 /// Diagnose references to a generic member via an existential type, which are
 /// not available in Embedded Swift.
 void diagnoseGenericMemberOfExistentialInEmbedded(
