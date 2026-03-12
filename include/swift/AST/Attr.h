@@ -47,6 +47,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/bit.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -2759,26 +2760,28 @@ class DerivativeAttr final
   TypeRepr *BaseTypeRepr;
   /// The original function name.
   DeclNameRefWithLoc OriginalFunctionName;
-  /// The original function.
+  /// The list of original functions.
   ///
   /// The states are:
   /// - nullptr:
   ///   The original function is unknown. The typechecker is responsible for
   ///   eventually resolving it.
-  /// - AbstractFunctionDecl:
-  ///   The original function is known to be this `AbstractFunctionDecl`.
-  /// - LazyMemberLoader:
-  ///   This `LazyMemberLoader` knows how to resolve the original function.
-  ///   `ResolverContextData` is an additional piece of data that the
-  ///   `LazyMemberLoader` needs.
+  /// - AbstractFunctionDecl*:
+  ///   Array of original functions that are known to be `AbstractFunctionDecl`.
+  /// - uint64_t:
+  ///   Array of decl ids that `LazyMemberLoader` needs.
+  /// Array sizes are stores in `NumOriginalFunctions`
   // TODO(TF-1235): Making `DerivativeAttr` immutable will simplify this by
   // removing the `AbstractFunctionDecl` state.
-  llvm::PointerUnion<AbstractFunctionDecl *, LazyMemberLoader *> OriginalFunction;
-  /// Data representing the original function declaration. See doc comment for
-  /// `OriginalFunction`.
-  uint64_t ResolverContextData = 0;
+  llvm::PointerUnion<AbstractFunctionDecl **, uint64_t *> OriginalFunctions =
+      nullptr;
+  /// Resolver used to resolve declarations from decl IDs stored in
+  /// OriginalFunctions.
+  LazyMemberLoader *Resolver = nullptr;
+  //  The number of original functions derivative corresponds to.
+  unsigned NumOriginalFunctions : 16;
   /// The number of parsed differentiability parameters specified in 'wrt:'.
-  unsigned NumParsedParameters = 0;
+  unsigned NumParsedParameters : 16;
   /// The differentiability parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
   /// The derivative function kind (JVP or VJP), resolved by the type checker.
@@ -2811,10 +2814,13 @@ public:
   DeclNameRefWithLoc getOriginalFunctionName() const {
     return OriginalFunctionName;
   }
-  AbstractFunctionDecl *getOriginalFunction(ASTContext &context) const;
-  void setOriginalFunction(AbstractFunctionDecl *decl);
-  void setOriginalFunctionResolver(LazyMemberLoader *resolver,
-                                   uint64_t resolverContextData);
+  TinyPtrVector<AbstractFunctionDecl *>
+  getOriginalFunction(ASTContext &context) const;
+  void setOriginalFunction(ASTContext &context,
+                           ArrayRef<AbstractFunctionDecl *> decls);
+  void setOriginalFunctionResolver(ASTContext &context,
+                                   LazyMemberLoader *resolver,
+                                   ArrayRef<uint64_t> resolverContextData);
 
   AutoDiffDerivativeFunctionKind getDerivativeKind() const {
     assert(Kind && "Derivative function kind has not yet been resolved");

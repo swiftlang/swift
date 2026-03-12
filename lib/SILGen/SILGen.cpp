@@ -1448,6 +1448,9 @@ void SILGenModule::emitDifferentiabilityWitness(
   auto origSilFnType = originalFunction->getLoweredFunctionType();
   auto *silParamIndices =
       autodiff::getLoweredParameterIndices(config.parameterIndices, origFnType);
+  bool isDefaultDerivative =
+      isa<ProtocolDecl>(originalAFD->getDeclContext()) &&
+      !originalAFD->getAttrs().hasAttribute<DifferentiableAttr>();
 
   // NOTE(TF-893): Extending capacity is necessary when `origSilFnType` has
   // parameters corresponding to captured variables. These parameters do not
@@ -1482,7 +1485,8 @@ void SILGenModule::emitDifferentiabilityWitness(
         M, linkage, originalFunction, diffKind, silConfig.parameterIndices,
         silConfig.resultIndices, config.derivativeGenericSignature,
         /*jvp*/ nullptr, /*vjp*/ nullptr,
-        /*isSerialized*/ hasPublicVisibility(linkage), attr);
+        /*isSerialized*/ hasPublicVisibility(linkage), isDefaultDerivative,
+        attr);
   }
 
   // Set derivative function in differentiability witness.
@@ -1569,21 +1573,22 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
         vjp = f;
         break;
       }
-      auto *origAFD = derivAttr->getOriginalFunction(getASTContext());
-      auto origDeclRef =
-          SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
-      auto *origFn = getFunction(origDeclRef, NotForDefinition);
-      auto witnessGenSig =
-          autodiff::getDifferentiabilityWitnessGenericSignature(
-              origAFD->getGenericSignature(), AFD->getGenericSignature());
-      auto *resultIndices =
-        autodiff::getFunctionSemanticResultIndices(origAFD,
-                                                   derivAttr->getParameterIndices());
-      AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
-                            witnessGenSig);
-      emitDifferentiabilityWitness(origAFD, origFn,
-                                   DifferentiabilityKind::Reverse, config, jvp,
-                                   vjp, derivAttr);
+
+      for (auto *origAFD : derivAttr->getOriginalFunction(getASTContext())) {
+        auto origDeclRef =
+            SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
+        auto *origFn = getFunction(origDeclRef, NotForDefinition);
+        auto witnessGenSig =
+            autodiff::getDifferentiabilityWitnessGenericSignature(
+                origAFD->getGenericSignature(), AFD->getGenericSignature());
+        auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
+            origAFD, derivAttr->getParameterIndices());
+        AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
+                              witnessGenSig);
+        emitDifferentiabilityWitness(origAFD, origFn,
+                                     DifferentiabilityKind::Reverse, config,
+                                     jvp, vjp, derivAttr);
+      }
     }
 }
 

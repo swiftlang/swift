@@ -1485,12 +1485,11 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
     assert(!w->getJVP() && !w->getVJP() && "does not expect custom derivatives here");
     auto linkage = stripExternalFromLinkage(clonedFn->getLinkage());
     SILDifferentiabilityWitness::createDefinition(
-      mod, linkage, clonedFn,
-      w->getKind(), w->getParameterIndices(), w->getResultIndices(),
-      w->getDerivativeGenericSignature(),
-      /*jvp*/ nullptr, /*vjp*/ nullptr,
-      /*isSerialized*/ hasPublicVisibility(clonedFn->getLinkage()),
-      w->getAttribute());
+        mod, linkage, clonedFn, w->getKind(), w->getParameterIndices(),
+        w->getResultIndices(), w->getDerivativeGenericSignature(),
+        /*jvp*/ nullptr, /*vjp*/ nullptr,
+        /*isSerialized*/ hasPublicVisibility(clonedFn->getLinkage()),
+        w->isDefault(), w->getAttribute());
   }
 
   // Mark the original partial apply function as deletable if it doesn't have

@@ -325,6 +325,7 @@ namespace sil_block {
     SILLinkageField,            // Linkage
     BCFixed<1>,                 // Is declaration?
     BCFixed<2>,                 // Is serialized?
+    BCFixed<1>,                 // Is default?    
     DifferentiabilityKindField, // Differentiability kind
     GenericSignatureIDField,    // Derivative function generic signature
     DeclIDField,                // JVP function name

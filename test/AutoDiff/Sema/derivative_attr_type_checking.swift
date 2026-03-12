@@ -249,15 +249,14 @@ extension StaticMethod {
 // Test instance methods.
 
 protocol InstanceMethod: Differentiable {
+  // expected-note @+1 {{'foo' declared here}}
   func foo(_ x: Self) -> Self
+  // expected-note @+1 {{'generic' declared here}}
   func generic<T: Differentiable>(_ x: T) -> Self
 }
 
 extension InstanceMethod {
-  // expected-note @+1 {{'foo' defined here}}
   func foo(_ x: Self) -> Self { x }
-
-  // expected-note @+1 {{'generic' defined here}}
   func generic<T: Differentiable>(_ x: T) -> Self { self }
 }
 
@@ -805,17 +804,23 @@ extension HasStoredProperty {
   }
 }
 
-// Test derivative registration for protocol requirements. Currently unsupported.
-// TODO(TF-982): Lift this restriction and add proper support.
-
+// Test derivative registration for protocol requirements.
 protocol ProtocolRequirementDerivative {
-  // expected-note @+1 {{cannot yet register derivative default implementation for protocol requirements}}
   func requirement(_ x: Float) -> Float
+  func requirementWithDefault(_ x: Float) -> Float
 }
 extension ProtocolRequirementDerivative {
-  // expected-error @+1 {{referenced declaration 'requirement' could not be resolved}}
+  func requirementWithDefault(_ x: Float) -> Float {
+    fatalError()
+  }
+}
+extension ProtocolRequirementDerivative {
   @derivative(of: requirement)
   func vjpRequirement(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    fatalError()
+  }
+  @derivative(of: requirementWithDefault)
+  func vjpRequirementWithDefault(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     fatalError()
   }
 }
@@ -1049,7 +1054,8 @@ extension Differentiable where Self: AdditiveArithmetic {
 
 extension AdditiveArithmetic
 where Self: Differentiable, Self == Self.TangentVector {
-  // expected-error @+1 {{referenced declaration '+' could not be resolved}}
+  // expected-error @+2 {{unexpected derivative function declaration; '+' requires the derivative function 'vjpPlusInstanceMethod(x:y:)' to be a 'static' method}}
+  // expected-note @+2 {{make derivative function 'vjpPlusInstanceMethod(x:y:)' a 'static' method}}
   @derivative(of: +)
   func vjpPlusInstanceMethod(x: Self, y: Self) -> (
     value: Self, pullback: (Self) -> (Self, Self)
@@ -1073,12 +1079,9 @@ extension HasADefaultImplementation {
 
 // Test default derivatives of requirements.
 protocol HasADefaultDerivative {
-  // expected-note @+1 {{cannot yet register derivative default implementation for protocol requirements}}
   func req(_ x: Float) -> Float
 }
 extension HasADefaultDerivative {
-  // TODO(TF-982): Support default derivatives for protocol requirements.
-  // expected-error @+1 {{referenced declaration 'req' could not be resolved}}
   @derivative(of: req)
   func vjpReq(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     (x, { 10 * $0 })

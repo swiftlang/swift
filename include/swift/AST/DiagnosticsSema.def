@@ -4476,7 +4476,7 @@ ERROR(derivative_attr_result_func_type_mismatch,none,
 NOTE(derivative_attr_result_func_type_mismatch_note,none,
      "%0 does not have expected type %1", (Identifier, Type))
 NOTE(derivative_attr_result_func_original_note,none,
-     "%0 defined here", (const ValueDecl *))
+     "%0 %select{declared|defined}1 here", (const ValueDecl *, bool))
 ERROR(derivative_attr_original_stored_property_unsupported,none,
       "cannot register derivative for stored property %0", (DeclNameRef))
 ERROR(derivative_attr_class_member_dynamic_self_result_unsupported,none,
@@ -4491,10 +4491,6 @@ NOTE(derivative_attr_unsupported_accessor_kind,none,
 ERROR(derivative_attr_class_setter_unsupported,none,
       "cannot yet register derivative for class property or subscript setters",
       ())
-// TODO(TF-982): Remove this temporary diagnostic.
-NOTE(derivative_attr_protocol_requirement_unsupported,none,
-     "cannot yet register derivative default implementation for protocol "
-     "requirements", ())
 ERROR(derivative_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (const ValueDecl *))
 NOTE(derivative_attr_duplicate_note,none,

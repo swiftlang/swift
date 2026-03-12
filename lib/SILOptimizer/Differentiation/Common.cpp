@@ -14,13 +14,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/STLExtras.h"
+#include "swift/SILOptimizer/Differentiation/Common.h"
+#include "swift/SIL/SILDifferentiabilityWitness.h"
+
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/SIL/ApplySite.h"
-#include "swift/SILOptimizer/Differentiation/Common.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/STLExtras.h"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 
 namespace swift {
@@ -452,7 +457,7 @@ SILValue emitProjectTopLevelSubcontext(
 
 /// Returns the AbstractFunctionDecl corresponding to `F`. If there isn't one,
 /// returns `nullptr`.
-static AbstractFunctionDecl *findAbstractFunctionDecl(SILFunction *F) {
+AbstractFunctionDecl *findAbstractFunctionDecl(SILFunction *F) {
   auto *DC = F->getDeclContext();
   if (!DC)
     return nullptr;
@@ -548,6 +553,10 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
          "SILGen should create differentiability witnesses for all function "
          "definitions with explicit differentiable attributes");
 
+  bool isDefaultDerivative =
+      isa<ProtocolDecl>(originalAFD->getDeclContext()) &&
+      !originalAFD->getAttrs().hasAttribute<DifferentiableAttr>();
+
   return SILDifferentiabilityWitness::createDeclaration(
       module,
       // Witness for @_alwaysEmitIntoClient original function must be emitted,
@@ -556,7 +565,8 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
       original->markedAsAlwaysEmitIntoClient() ? SILLinkage::PublicNonABI
                                                : SILLinkage::PublicExternal,
       original, kind, minimalConfig->parameterIndices,
-      minimalConfig->resultIndices, minimalConfig->derivativeGenericSignature);
+      minimalConfig->resultIndices, minimalConfig->derivativeGenericSignature,
+      isDefaultDerivative);
 }
 
 } // end namespace autodiff

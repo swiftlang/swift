@@ -784,6 +784,14 @@ bool SILModule::loadDifferentiabilityWitness(SILDifferentiabilityWitness *dw) {
   return true;
 }
 
+SILDifferentiabilityWitness *
+SILModule::loadDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
+  if (auto *dw = lookUpDifferentiabilityWitness(key))
+    return dw;
+
+  return getSILLoader()->lookupDifferentiabilityWitness(key);
+}
+
 void SILModule::registerDeserializationNotificationHandler(
     std::unique_ptr<DeserializationNotificationHandler> &&handler) {
   deserializationNotificationHandlers.add(std::move(handler));
