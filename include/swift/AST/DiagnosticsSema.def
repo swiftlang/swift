@@ -8289,6 +8289,8 @@ ERROR(inverse_generic_but_also_conforms, none,
 ERROR(inverse_associatedtype_restriction, none,
       "cannot suppress '%0' requirement of an associated type",
       (StringRef))
+WARNING(legacy_suppressed_assoc_types, none,
+      "experimental feature 'SuppressedAssociatedTypes' is deprecated; see SE-0503 for the official version", ())
 ERROR(inverse_on_class, none,
       "%select{classes|actors}1 cannot be '~%0'",
       (StringRef, bool))
@@ -8793,9 +8795,6 @@ GROUPED_ERROR(weak_unowned_in_embedded_swift, EmbeddedRestrictions, none,
               "attribute %0 cannot be used in Embedded Swift",
               (ReferenceOwnership))
 
-GROUPED_WARNING(untyped_throws_in_embedded_swift, EmbeddedRestrictions,
-                none,
-                "untyped throws is not available in Embedded Swift; add a thrown error type with '(type)'", ())
 GROUPED_WARNING(generic_nonfinal_in_embedded_swift, EmbeddedRestrictions,
                 none,
                 "generic %kind0 in a class %select{must be 'final'|cannot be 'required'}1 in Embedded Swift",

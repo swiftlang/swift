@@ -635,7 +635,6 @@ function(_compile_swift_files
   endif()
 
   list(APPEND swift_flags "-enable-experimental-feature" "SuppressedAssociatedTypesWithDefaults")
-  list(APPEND swift_flags "-enable-experimental-feature" "SE427NoInferenceOnExtension")
 
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
   list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependence")

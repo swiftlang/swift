@@ -4,8 +4,8 @@
 //
 // RUN: %target-swift-frontend -emit-module -module-name Lib -emit-module-path %t/Lib.swiftmodule -DLib %s \
 // RUN:   -language-mode 5
-// RUN: not --crash %target-swift-emit-silgen -I %t %s \
-// RUN:   -language-mode 6
+// RUN: %target-swift-emit-silgen -I %t %s \
+// RUN:   -language-mode 6 -verify
 //
 // rdar://171146729
 #if Lib

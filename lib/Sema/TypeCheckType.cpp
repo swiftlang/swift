@@ -4637,8 +4637,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
             thrownTy);
       }
     }
-  } else if (repr->getThrowsLoc().isValid()) {
-    diagnoseUntypedThrowsInEmbedded(getDeclContext(), repr->getThrowsLoc());
   }
 
   bool hasSendingResult =
@@ -7347,7 +7345,6 @@ Type ExplicitCaughtTypeRequest::evaluate(
 
     // Explicit 'throws' implies that this throws 'any Error'.
     if (closure->getThrowsLoc().isValid()) {
-      diagnoseUntypedThrowsInEmbedded(closure, closure->getThrowsLoc());
       return ctx.getErrorExistentialType();
     }
 
@@ -7367,8 +7364,6 @@ Type ExplicitCaughtTypeRequest::evaluate(
 
     // If there is no explicitly-specified thrown error type, it's 'any Error'.
     if (!typeRepr) {
-      diagnoseUntypedThrowsInEmbedded(doCatch->getDeclContext(),
-                                      doCatch->getThrowsLoc());
       return ctx.getErrorExistentialType();
     }
 

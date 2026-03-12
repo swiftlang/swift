@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature SuppressedAssociatedTypes -solver-enable-optimize-operator-defaults
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature SuppressedAssociatedTypesWithDefaults -solver-enable-optimize-operator-defaults
 
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 protocol U {}
 

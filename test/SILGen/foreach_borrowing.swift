@@ -1,9 +1,11 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
 // RUN:     -g -Xllvm -sil-print-debuginfo-verbose \
 // RUN:     -enable-experimental-feature BorrowingForLoop \
+// RUN:     -enable-experimental-feature BorrowingSequence \
 // RUN:     %s | %FileCheck %s
 
 // REQUIRES: swift_feature_BorrowingForLoop
+// REQUIRES: swift_feature_BorrowingSequence
 
 struct NoncopyableInt: ~Copyable {
   var value: Int
@@ -186,3 +188,56 @@ func testForEachNonCopyableSILDebugInfo(seq: borrowing Span<NoncopyableInt>){
       }
   }
 }
+
+// A struct conforming to both Sequence and BorrowingSequence. The default
+// makeBorrowingIterator() is provided by the Sequence where Self: BorrowingSequence
+// extension in BorrowingSequence.swift.
+@available(SwiftStdlib 6.4, *)
+struct DualSeq: Sequence, BorrowingSequence {
+  typealias Element = Int
+  typealias BorrowingIterator = BorrowingIteratorAdapter<IndexingIterator<[Int]>>
+
+  func makeIterator() -> IndexingIterator<[Int]> {
+    return [1, 2, 3].makeIterator()
+  }
+}
+
+// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing34testSequencePreferredOverBorrowing3seqyAA7DualSeqV_tF : $@convention(thin) (DualSeq) -> () {
+@available(SwiftStdlib 6.4, *)
+func testSequencePreferredOverBorrowing(seq: borrowing DualSeq) {
+  // DualSeq conforms to Sequence, so shouldUseBorrowingSequence returns false.
+  // CHECK: = function_ref @$s17foreach_borrowing7DualSeqV12makeIterators08IndexingF0VySaySiGGyF : $@convention(method) (DualSeq) -> @owned IndexingIterator<Array<Int>>
+  // CHECK: } // end sil function '$s17foreach_borrowing34testSequencePreferredOverBorrowing3seqyAA7DualSeqV_tF'
+  for element in seq {
+    print(element)
+  }
+}
+
+// A type that unconditionally conforms to Sequence but whose BorrowingSequence
+// conformance is only available under SwiftStdlib 6.4. When a for-in loop over
+// this type appears in a context without that availability,
+// shouldUseBorrowingSequence returns false at the Sequence check, and the loop
+// desugars via the Sequence path (makeIterator), not the BorrowingSequence path.
+struct BorrowingFallbackWithSequence: Sequence {
+  typealias Element = Int
+  func makeIterator() -> IndexingIterator<[Int]> {
+    return [1, 2, 3].makeIterator()
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension BorrowingFallbackWithSequence: BorrowingSequence {
+  typealias BorrowingIterator = BorrowingIteratorAdapter<IndexingIterator<[Int]>>
+}
+
+// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing36testUnavailableBorrowingWithSequence3seqyAA0e8FallbackfG0V_tF : $@convention(thin) (BorrowingFallbackWithSequence) -> () {
+func testUnavailableBorrowingWithSequence(seq: BorrowingFallbackWithSequence) {
+  // BorrowingFallbackWithSequence conforms to Sequence, so
+  // shouldUseBorrowingSequence returns false and makeIterator() is called.
+  // CHECK: = function_ref @$s17foreach_borrowing29BorrowingFallbackWithSequenceV12makeIterators08IndexingH0VySaySiGGyF : $@convention(method) (BorrowingFallbackWithSequence) -> @owned IndexingIterator<Array<Int>>
+  // CHECK: } // end sil function '$s17foreach_borrowing36testUnavailableBorrowingWithSequence3seqyAA0e8FallbackfG0V_tF'
+  for element in seq {
+    _ = element
+  }
+}
+

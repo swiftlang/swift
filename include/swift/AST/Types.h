@@ -1410,6 +1410,11 @@ public:
   /// Otherwise, it returns the type itself.
   Type getReferenceStorageReferent();
 
+  /// Replace all type variables and placeholders in the type with ErrorType.
+  /// This is necessary in a small number of cases where we need to ensure that
+  /// a type isn't solver allocated, for e.g diagnostic printing.
+  Type replaceTypeVariablesAndPlaceholdersWithErrors();
+
   /// Assumes this is a nominal type. Returns a substitution map that sends each
   /// generic parameter of the declaration's generic signature to the corresponding
   /// generic argument of this nominal type.
