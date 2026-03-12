@@ -13,8 +13,8 @@
 /// Bridged C++ iterator that allows to traverse the elements of a sequence 
 /// using a for-in loop.
 ///
-/// Mostly useful for conforming a type to the `CxxSequence` protocol and should
-/// not generally be used directly.
+/// Mostly useful for conforming a type to the `CxxSequence` protocol.
+/// Do not directly use this protocol in Swift.
 ///
 /// - SeeAlso: https://en.cppreference.com/w/cpp/named_req/InputIterator
 public protocol UnsafeCxxInputIterator: Equatable {

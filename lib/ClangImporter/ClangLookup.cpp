@@ -511,15 +511,17 @@ static FuncDecl *importUnavailableMethod(ClangImporter::Implementation &Impl,
   return func;
 }
 
-VarDecl *
-ClangImporter::Implementation::lookupAndImportPointee(NominalTypeDecl *Struct) {
+std::tuple<VarDecl *, FuncDecl *, FuncDecl *>
+ClangImporter::Implementation::lookupAndImportPointeeAndOperatorStar(
+    NominalTypeDecl *Struct) {
   const auto *CXXRecord =
       dyn_cast<clang::CXXRecordDecl>(Struct->getClangDecl());
 
   if (!CXXRecord)
-    return nullptr;
+    return {};
 
-  if (auto [it, inserted] = importedPointeeCache.try_emplace(Struct, nullptr);
+  if (auto [it, inserted] = importedPointeeCache.try_emplace(
+          Struct, std::make_tuple(nullptr, nullptr, nullptr));
       !inserted)
     return it->second;
 
@@ -534,7 +536,7 @@ ClangImporter::Implementation::lookupAndImportPointee(NominalTypeDecl *Struct) {
       clang::OverloadedOperatorKind::OO_Star);
   auto R = lookupCXXMember(Sema, name, CXXRecord);
   if (!R.has_value())
-    return nullptr;
+    return {};
 
   auto overloads = filterMethodOverloads(R.value(), CXXRecord);
 
@@ -576,7 +578,7 @@ ClangImporter::Implementation::lookupAndImportPointee(NominalTypeDecl *Struct) {
   }
 
   if (!CXXGetter && !CXXSetter)
-    return nullptr;
+    return {};
 
   FuncDecl *getter = nullptr, *setter = nullptr;
 
@@ -584,7 +586,7 @@ ClangImporter::Implementation::lookupAndImportPointee(NominalTypeDecl *Struct) {
     setter = importUnavailableMethod(*this, CXXSetter, CXXSetterAccess, Struct,
                                      "use .pointee property");
     if (!setter)
-      return nullptr;
+      return {};
   }
 
   if (CXXGetter == CXXSetter) {
@@ -593,19 +595,26 @@ ClangImporter::Implementation::lookupAndImportPointee(NominalTypeDecl *Struct) {
     getter = importUnavailableMethod(*this, CXXGetter, CXXGetterAccess, Struct,
                                      "use .pointee property");
     if (!getter)
-      return nullptr;
+      return {};
   }
 
   SwiftDeclSynthesizer synth{*this};
   auto *pointee = synth.makeDereferencedPointeeProperty(getter, setter);
   if (!pointee)
-    return nullptr;
+    return {};
 
   importAttributes(CXXGetter ? CXXGetter : CXXSetter, pointee);
 
   Struct->addMember(pointee);
-  importedPointeeCache[Struct] = pointee;
-  return pointee;
+  auto pointeeAndOpStar =
+      std::make_tuple(pointee, getter ? getter : setter, setter);
+  importedPointeeCache[Struct] = pointeeAndOpStar;
+  return pointeeAndOpStar;
+}
+
+VarDecl *
+ClangImporter::Implementation::lookupAndImportPointee(NominalTypeDecl *Struct) {
+  return std::get<0>(lookupAndImportPointeeAndOperatorStar(Struct));
 }
 
 FuncDecl *ClangImporter::Implementation::lookupAndImportSuccessor(
