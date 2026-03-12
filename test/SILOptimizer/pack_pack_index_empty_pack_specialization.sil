@@ -1,0 +1,39 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -inline | %FileCheck %s
+
+// Verify that inlining a function containing pack_pack_index with an empty
+// pack substitution does not crash. When `each T` is substituted with `Pack{}`,
+// a pack_pack_index pointing to the trailing expansion component gets a
+// componentStartIndex that equals the number of elements in the specialized
+// pack type (a valid past-the-end index for the empty component).
+
+import Swift
+import Builtin
+
+sil [ossa] [always_inline] @pack_pack_index_trailing : $<each T> (Builtin.Word) -> () {
+bb0(%i: $Builtin.Word):
+  %index = dynamic_pack_index %i of $Pack{repeat each T}
+  // componentStartIndex=2 points to `repeat each T` in the 3-element pack
+  %0 = pack_pack_index 2, %index of $Pack{Int, String, repeat each T}
+  // componentStartIndex=1 points to `repeat each T` in the 2-element pack
+  %1 = pack_pack_index 1, %index of $Pack{Int, repeat each T}
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// When inlined with `each T = Pack{}`, the pack types become:
+//   $Pack{Int, String, repeat each T} -> $Pack{Int, String}  (2 elements)
+//   $Pack{Int, repeat each T}         -> $Pack{Int}          (1 element)
+// The remapped componentStartIndex (2 and 1 respectively) equals numElements,
+// which previously triggered an assertion failure.
+//
+// CHECK-LABEL: sil @test_pack_pack_index_empty_pack
+// CHECK:         dynamic_pack_index %0 of $Pack{}
+// CHECK:         pack_pack_index 2, {{%.*}} of $Pack{Int, String}
+// CHECK:         pack_pack_index 1, {{%.*}} of $Pack{Int}
+sil @test_pack_pack_index_empty_pack : $(Builtin.Word) -> () {
+bb0(%i: $Builtin.Word):
+  %fn = function_ref @pack_pack_index_trailing : $@convention(thin) <each T> (Builtin.Word) -> ()
+  apply %fn<Pack{}>(%i) : $@convention(thin) <each T> (Builtin.Word) -> ()
+  %ret = tuple ()
+  return %ret : $()
+}
