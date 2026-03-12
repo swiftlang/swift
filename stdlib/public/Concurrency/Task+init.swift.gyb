@@ -16,8 +16,7 @@ import Swift
 %   # ==== -------------------------------------------------------------------------------------------------------------
 %   # ==== Without task executor, but available ever since 5.1
 %   ([ # METHOD_VARIANT
-%      'init',
-%      'init/*throws*/',
+%      'init/*throws(Failure)*/',
 %   ],
 %   [ # ALL_AVAILABILITY
 %     '@_alwaysEmitIntoClient',
@@ -30,8 +29,7 @@ import Swift
 %   ]),
 %   # ==== --------------------------------------------------------------------
 %   ([ # METHOD_VARIANT
-%      'static func detached',
-%      'static func detached/*throws*/',
+%      'static func detached/*throws(Failure)*/',
 %   ],
 %   [
 %     '@_alwaysEmitIntoClient',
@@ -45,8 +43,7 @@ import Swift
 %   # ==== -------------------------------------------------------------------------------------------------------------
 %   # ==== With task executor, but available only since 6.0
 %   ([ # METHOD_VARIANT
-%      'init',
-%      'init/*throws*/',
+%      'init/*throws(Failure)*/',
 %   ],
 %   [ # ALL_AVAILABILITY
 %     '@_alwaysEmitIntoClient',
@@ -60,8 +57,7 @@ import Swift
 %   ]),
 %   # ==== --------------------------------------------------------------------
 %   ([ # METHOD_VARIANT
-%      'static func detached',
-%      'static func detached/*throws*/',
+%      'static func detached/*throws(Failure)*/',
 %   ],
 %   [
 %     '@_alwaysEmitIntoClient',

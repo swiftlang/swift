@@ -17,9 +17,7 @@ import Swift
 
 % METHOD_VARIANTS = [
 %   ('immediate', 'THROWING'),
-%   ('immediate', 'NON_THROWING'),
 %   ('immediateDetached', 'THROWING'),
-%   ('immediateDetached', 'NON_THROWING'),
 % ]
 % for (METHOD_NAME, THROWING_VARIANT) in METHOD_VARIANTS:
 
