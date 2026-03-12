@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-DIAG
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-PERF
 
 import Swift
 import Builtin
@@ -1199,3 +1199,38 @@ bb0(%arg : @owned $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
+
+sil [heuristic_always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+
+// CHECK-LABEL: sil [ossa] @remove_dead_string :
+// CHECK-DIAG-NOT:     apply
+// CHECK-DIAG-NOT:     copy_value
+// CHECK-DIAG-NOT:     begin_borrow
+// CHECK-DIAG-NOT:     destroy_value
+// CHECK-PERF:         apply
+// CHECK-PERF:         copy_value
+// CHECK-PERF:         begin_borrow
+// CHECK-PERF:         destroy_value
+// CHECK: } // end sil function 'remove_dead_string'
+sil [ossa] @remove_dead_string : $@convention(thin) () -> () {
+bb0:
+  %0 = string_literal oslog "%s - %s"
+  %1 = integer_literal $Builtin.Word, 7
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = metatype $@thin String.Type
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = begin_borrow %5
+  %7 = copy_value %6
+  end_borrow %6
+  destroy_value %5
+  %10 = move_value [var_decl] %7
+  %11 = begin_borrow %10
+  %12 = builtin "globalStringTablePointer"(%11) : $Builtin.RawPointer
+  %13 = struct $UnsafePointer<Int8> (%12)
+  end_borrow %11
+  destroy_value %10
+  %16 = tuple ()
+  return %16
+}
+

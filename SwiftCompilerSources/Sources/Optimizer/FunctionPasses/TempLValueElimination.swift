@@ -95,6 +95,17 @@ private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassCont
   // ```
   let needDestroyEarly = !copy.isInitializationOfDestination && !isTrivial
 
+  if needDestroyEarly && !copy.parentFunction.hasOwnership {
+    // In non-OSSA we cannot insert an early `destroy_addr`, because a loaded value could be retained later, e.g.
+    // ```
+    //   %1 = load %destination
+    //   ...                     // we cannot insert a `destroy_addr %destination` here!
+    //   stores to %temp
+    //   strong_retain %1
+    // ```
+    return
+  }
+
   let firstUseOfAllocStack = InstructionList(first: allocStack).first(where: { $0.isUsing(allocStack) }) ??
                                // The conservative default, if the fist use is not in the alloc_stack's block.
                                allocStack.parentBlock.terminator
