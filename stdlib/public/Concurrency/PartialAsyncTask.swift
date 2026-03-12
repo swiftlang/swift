@@ -903,9 +903,12 @@ public nonisolated(nonsending) func withUnsafeContinuation<T>(
   }
 }
 
+/// Source-compatibility overload; replaced by
+/// ``withUnsafeContinuation(_:)``.
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @unsafe
+@_disfavoredOverload
 @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
 public func withUnsafeContinuation<T>( // source-compatibility overload
   isolation: isolated (any Actor)?,
@@ -962,6 +965,22 @@ public nonisolated(nonsending) func withUnsafeThrowingContinuation<T, E>(
 public nonisolated(nonsending) func withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeContinuation<T, Error>) -> Void
 ) async throws(Error) -> sending T {
+  return try await Builtin.withUnsafeThrowingContinuation {
+    unsafe fn(UnsafeContinuation<T, Error>($0))
+  }
+}
+
+/// Source-compatibility overload; replaced by
+/// ``withUnsafeThrowingContinuation(_:)``.
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@unsafe
+@_disfavoredOverload
+@available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
+public func withUnsafeThrowingContinuation<T>( // source-compatibility overload
+  isolation: isolated (any Actor)?,
+  _ fn: (UnsafeContinuation<T, Error>) -> Void
+) async throws -> sending T {
   return try await Builtin.withUnsafeThrowingContinuation {
     unsafe fn(UnsafeContinuation<T, Error>($0))
   }
