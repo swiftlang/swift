@@ -554,7 +554,7 @@ extension Sequence {
   internal func __rethrows_flatMap_deprecated<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
   ) throws -> [ElementOfResult] {
-    try flatMap(transform)
+    return try _compactMap(transform)
   }
 #endif // !hasFeature(Embedded)
 }

@@ -130,7 +130,7 @@ extension Sequence {
   internal func __rethrows_min(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) throws -> Element? {
-    try min(by: areInIncreasingOrder)
+    return try self.min(by: areInIncreasingOrder)
   }
 #endif // !hasFeature(Embedded)
 
@@ -189,7 +189,7 @@ extension Sequence {
   internal func __rethrows_max(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) throws -> Element? {
-    try max(by: areInIncreasingOrder)
+    return try self.max(by: areInIncreasingOrder)
   }
 #endif // !hasFeature(Embedded)
 }
@@ -294,7 +294,7 @@ extension Sequence  {
     with possiblePrefix: PossiblePrefix,
     by areEquivalent: (Element, PossiblePrefix.Element) throws -> Bool
   ) throws -> Bool {
-    try starts(with: possiblePrefix, by: areEquivalent)
+    return try self.starts(with: possiblePrefix, by: areEquivalent)
   }
 #endif // !hasFeature(Embedded)
 }
@@ -395,7 +395,7 @@ extension Sequence {
     _ other: OtherSequence,
     by areEquivalent: (Element, OtherSequence.Element) throws -> Bool
   ) throws -> Bool {
-    try elementsEqual(other, by: areEquivalent)
+    return try self.elementsEqual(other, by: areEquivalent)
   }
 #endif // !hasFeature(Embedded)
 }
@@ -508,7 +508,7 @@ extension Sequence {
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) throws -> Bool
   where OtherSequence.Element == Element {
-    try lexicographicallyPrecedes(other, by: areInIncreasingOrder)
+    return try self.lexicographicallyPrecedes(other, by: areInIncreasingOrder)
   }
 #endif // !hasFeature(Embedded)
 }
@@ -613,7 +613,7 @@ extension Sequence {
   internal func __rethrows_contains(
     where predicate: (Element) throws -> Bool
   ) throws -> Bool {
-    try contains(where: predicate)
+    return try self.contains(where: predicate)
   }
 #endif // !hasFeature(Embedded)
 
@@ -654,7 +654,7 @@ extension Sequence {
   internal func __rethrows_allSatisfy(
     _ predicate: (Element) throws -> Bool
   ) throws -> Bool {
-    try allSatisfy(predicate)
+    return try self.allSatisfy(predicate)
   }
 #endif // !hasFeature(Embedded)
 }
@@ -805,7 +805,7 @@ extension Sequence {
     _ nextPartialResult:
       (_ partialResult: Result, Element) throws -> Result
   ) throws -> Result {
-    try reduce(initialResult, nextPartialResult)
+    return try self.reduce(initialResult, nextPartialResult)
   }
 #endif // !hasFeature(Embedded)
 
@@ -881,7 +881,7 @@ extension Sequence {
     _ updateAccumulatingResult:
       (_ partialResult: inout Result, Element) throws -> ()
   ) throws -> Result {
-    try reduce(into: initialResult, updateAccumulatingResult)
+    return try self.reduce(into: initialResult, updateAccumulatingResult)
   }
 #endif // !hasFeature(Embedded)
 }
@@ -967,7 +967,7 @@ extension Sequence {
   internal func __rethrows_flatMap<SegmentOfResult: Sequence>(
     _ transform: (Element) throws -> SegmentOfResult
   ) throws -> [SegmentOfResult.Element] {
-    try flatMap(transform)
+    return try self.flatMap(transform)
   }
 #endif // !hasFeature(Embedded)
 }
@@ -1014,7 +1014,7 @@ extension Sequence {
   internal func __rethrows_compactMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
   ) throws -> [ElementOfResult] {
-    try compactMap(transform)
+    return try self.compactMap(transform)
   }
 #endif // !hasFeature(Embedded)
 
@@ -1046,7 +1046,7 @@ extension Sequence {
   internal func __rethrows_underscore_compactMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
   ) throws -> [ElementOfResult] {
-    try _compactMap(transform)
+    return try self._compactMap(transform)
   }
 #endif // !hasFeature(Embedded)
 }
