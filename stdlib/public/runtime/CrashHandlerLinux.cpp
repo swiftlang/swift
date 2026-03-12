@@ -220,18 +220,22 @@ tgkill(int tgid, int tid, int sig) {
   return syscall(SYS_tgkill, tgid, tid, sig);
 }
 
+#ifndef SYS_close_range
+#define SYS_close_range 436
+#endif
+
 #define CLOSE_RANGE_UNSHARE 0x2
 #define CLOSE_RANGE_CLOEXEC 0x4
 
 static int _close_range(unsigned int first, unsigned int last, int flags) {
-#ifdef SYS_close_range
-  return syscall(SYS_close_range, first, last, flags);
-#else
+  if (syscall(SYS_close_range, first, last, flags) == 0)
+    return 0;
+  if (errno != ENOSYS)
+    return -1;
   for (unsigned int i = first; i <= last; i++) {
     close(i);
   }
   return 0;
-#endif
 }
 
 void
