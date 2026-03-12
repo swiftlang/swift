@@ -251,12 +251,31 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
 /// semantic result (an `inout`) parameter type. Used in derivative function type
 /// calculation.
 struct AutoDiffSemanticFunctionResultType {
+  enum class ResultKind : uint8_t {
+    Result = 0x0,
+    SemanticResultParameter = 0x1,
+    DirectYield = 0x2,
+    IndirectYield = 0x3,
+  };
+
   Type type;
   unsigned index : 30;
-  bool isSemanticResultParameter : 1;
+  uint8_t kind : 2;
 
-  AutoDiffSemanticFunctionResultType(Type t, unsigned idx, bool param)
-    : type(t), index(idx), isSemanticResultParameter(param) { }
+  AutoDiffSemanticFunctionResultType(Type t, unsigned idx, ResultKind kind)
+      : type(t), index(idx), kind(uint8_t(kind)) {}
+
+  ResultKind getKind() const { return ResultKind(kind); }
+  bool isResult() const { return kind == uint8_t(ResultKind::Result); }
+  bool isSemanticResultParameter() const {
+    return kind == uint8_t(ResultKind::SemanticResultParameter);
+  }
+  bool isDirectYield() const {
+    return kind == uint8_t(ResultKind::DirectYield);
+  }
+  bool isIndirectYield() const {
+    return kind == uint8_t(ResultKind::IndirectYield);
+  }
 };
 
 /// Key for caching SIL derivative function types.
@@ -412,7 +431,9 @@ public:
     /// A differentiability parameter does not conform to `Differentiable`.
     NonDifferentiableDifferentiabilityParameter,
     /// The original result type does not conform to `Differentiable`.
-    NonDifferentiableResult
+    NonDifferentiableResult,
+    /// Non-differentiable (direct) yield
+    NonDifferentiableYield
   };
 
   static const char ID;
@@ -449,12 +470,14 @@ public:
                                        TypeAndIndex nonDiffTypeAndIndex)
       : functionType(functionType), kind(kind), value(nonDiffTypeAndIndex) {
     assert(kind == Kind::NonDifferentiableDifferentiabilityParameter ||
-           kind == Kind::NonDifferentiableResult);
+           kind == Kind::NonDifferentiableResult ||
+           kind == Kind::NonDifferentiableYield);
   };
 
   TypeAndIndex getNonDifferentiableTypeAndIndex() const {
     assert(kind == Kind::NonDifferentiableDifferentiabilityParameter ||
-           kind == Kind::NonDifferentiableResult);
+           kind == Kind::NonDifferentiableResult ||
+           kind == Kind::NonDifferentiableYield);
     return value.typeAndIndex;
   }
 

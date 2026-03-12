@@ -7034,12 +7034,20 @@ bool resolveDifferentiableAttrDifferentiabilityParameters(
                      nonDiffParam.first);
       return;
     }
-    case DerivativeFunctionTypeError::Kind::NonDifferentiableResult:
+    case DerivativeFunctionTypeError::Kind::NonDifferentiableResult: {
       auto nonDiffResult = error.getNonDifferentiableTypeAndIndex();
       diags.diagnose(attr->getLocation(),
                      diag::autodiff_attr_result_not_differentiable,
                      nonDiffResult.first);
       return;
+    }
+    case DerivativeFunctionTypeError::Kind::NonDifferentiableYield: {
+      auto nonDiffYield = error.getNonDifferentiableTypeAndIndex();
+      diags.diagnose(attr->getLocation(),
+                     diag::autodiff_attr_yield_not_differentiable,
+                     nonDiffYield.first);
+      return;
+    }
     }
   };
   // Diagnose any derivative function type errors.
@@ -7674,12 +7682,20 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
                      nonDiffParam.first);
       return;
     }
-    case DerivativeFunctionTypeError::Kind::NonDifferentiableResult:
+    case DerivativeFunctionTypeError::Kind::NonDifferentiableResult: {
       auto nonDiffResult = error.getNonDifferentiableTypeAndIndex();
       diags.diagnose(attr->getLocation(),
                      diag::autodiff_attr_result_not_differentiable,
                      nonDiffResult.first);
       return;
+    }
+    case DerivativeFunctionTypeError::Kind::NonDifferentiableYield: {
+      auto nonDiffYield = error.getNonDifferentiableTypeAndIndex();
+      diags.diagnose(attr->getLocation(),
+                     diag::autodiff_attr_yield_not_differentiable,
+                     nonDiffYield.first);
+      return;
+    }
     }
   };
   // Diagnose any derivative function type errors.

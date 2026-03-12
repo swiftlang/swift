@@ -5135,7 +5135,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
         this, DerivativeFunctionTypeError::Kind::NoSemanticResults);
 
   // Accumulate non-semantic result tangent spaces.
-  SmallVector<Type, 1> resultTanTypes, inoutTanTypes;
+  SmallVector<Type, 1> resultTanTypes, inoutTanTypes, yieldTanTypes;
   for (auto i : range(originalResults.size())) {
     auto originalResult = originalResults[i];
     auto originalResultType = originalResult.type;
@@ -5154,12 +5154,28 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
         DerivativeFunctionTypeError::TypeAndIndex(
           originalResultType, unsigned(originalResult.index)));
 
-    if (!originalResult.isSemanticResultParameter)
+    if (originalResult.isResult())
       resultTanTypes.push_back(resultTan->getType());
+    else if (originalResult.isIndirectYield())
+      yieldTanTypes.push_back(resultTan->getType());
+    else if (originalResult.isDirectYield())
+      return llvm::make_error<DerivativeFunctionTypeError>(
+          this, DerivativeFunctionTypeError::Kind::NonDifferentiableYield,
+          DerivativeFunctionTypeError::TypeAndIndex(
+              originalResultType, unsigned(originalResult.index)));
   }
 
   // Compute the result linear map function type.
   FunctionType *linearMapType;
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  FunctionType::ExtInfo info;
+
+  SmallVector<AnyFunctionType::Yield, 1> differentialYields;
+  for (auto yieldTy : yieldTanTypes)
+    differentialYields.emplace_back(yieldTy, YieldTypeFlags().withInOut(true));
+  if (differentialYields.size())
+    info = info.withCoroutine();
+
   switch (kind) {
   case AutoDiffLinearMapKind::Differential: {
     // Compute the differential type, returned by JVP functions.
@@ -5171,6 +5187,9 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     // Case 2: original function has a wrt `inout` parameter.
     // - Original:      `(T0, inout T1, ...) -> Void`
     // - Differential:  `(T0.Tan, inout T1.Tan, ...) -> Void`
+    //
+    // Yields are on their own. We do support only indirect (inout) yields
+    // therefore we will just yield corresponding tangents.
     SmallVector<AnyFunctionType::Param, 4> differentialParams;
     for (auto i : range(diffParams.size())) {
       auto diffParam = diffParams[i];
@@ -5187,6 +5206,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
       differentialParams.push_back(AnyFunctionType::Param(
           paramTan->getType(), Identifier(), diffParam.getParameterFlags()));
     }
+
     Type differentialResult;
     if (resultTanTypes.empty()) {
       differentialResult = ctx.TheEmptyTupleType;
@@ -5202,10 +5222,8 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
       differentialResult = TupleType::get(differentialResults, ctx);
     }
 
-    // FIXME: Verify ExtInfo state is correct, not working by accident.
-    FunctionType::ExtInfo info;
-    linearMapType =
-        FunctionType::get(differentialParams, {}, differentialResult, info);
+    linearMapType = FunctionType::get(differentialParams, differentialYields,
+                                      differentialResult, info);
     break;
   }
   case AutoDiffLinearMapKind::Pullback: {
@@ -5218,6 +5236,8 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     // Case 2: original function has wrt `inout` parameters.
     // - Original: `(T0, inout T1, ...) -> R`
     // - Pullback: `(R.Tan, inout T1.Tan) -> (T0.Tan, ...)`
+    // Yields are on their own. We do support only indirect (inout) yields
+    // therefore we will just yield corresponding tangents.
     SmallVector<TupleTypeElt, 4> pullbackResults;
     SmallVector<AnyFunctionType::Param, 2> semanticResultParams;
     for (auto i : range(diffParams.size())) {
@@ -5266,9 +5286,8 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
       pullbackParams.push_back(AnyFunctionType::Param(
           semanticResultParamTan->getType(), Identifier(), flags));
     }
-    // FIXME: Verify ExtInfo state is correct, not working by accident.
-    FunctionType::ExtInfo info;
-    linearMapType = FunctionType::get(pullbackParams, {}, pullbackResult, info);
+    linearMapType = FunctionType::get(pullbackParams, differentialYields,
+                                      pullbackResult, info);
     break;
   }
   }

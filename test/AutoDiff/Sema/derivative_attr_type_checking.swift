@@ -1,9 +1,10 @@
-// RUN: %target-swift-frontend-typecheck -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg -enable-experimental-feature CoroutineAccessors
-// RUN: %target-swift-frontend-typecheck -enable-testing -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg -enable-experimental-feature CoroutineAccessors
+// RUN: %target-swift-frontend-typecheck -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg -enable-experimental-feature CoroutineAccessors -enable-experimental-feature CoroutineFunctions
+// RUN: %target-swift-frontend-typecheck -enable-testing -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg -enable-experimental-feature CoroutineAccessors -enable-experimental-feature CoroutineFunctions
 
 // Swift.AdditiveArithmetic:3:17: note: cannot yet register derivative default implementation for protocol requirements
 
 // REQUIRES: swift_feature_CoroutineAccessors
+// REQUIRES: swift_feature_CoroutineFunctions
 
 import _Differentiation
 
@@ -429,7 +430,6 @@ extension Class: Differentiable where T: Differentiable {}
 // Test computed properties.
 
 extension Struct {
-  // expected-note @+1 {{cannot register derivative for _modify accessor}}
   var computedProperty: T {
     get { x }
     set { x = newValue }
@@ -437,15 +437,13 @@ extension Struct {
   }
   // The `@derivative(of:)` annotations below specify
   // .`yielding borrow` and .`yielding mutate`
-  // expected-note @+2 {{cannot register derivative for yielding borrow accessor}}
-  // expected-note @+1 {{cannot register derivative for yielding mutate accessor}}
+  // expected-note @+1 {{cannot register derivative for yielding borrow accessor}}
   var computedProperty2: T {
     yielding borrow { yield x }
     yielding mutate { yield &x }
   }
   // The `@derivative(of:)` annotations below specify .borrow and .mutate
-  // expected-note @+2 {{cannot register derivative for yielding borrow accessor}}
-  // expected-note @+1 {{cannot register derivative for yielding mutate accessor}}
+  // expected-note @+1 {{cannot register derivative for yielding borrow accessor}}
   var computedProperty2a: T {
     yielding borrow { yield x }
     yielding mutate { yield &x }
@@ -475,11 +473,10 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     fatalError()
   }
 
-  // expected-error @+1 {{referenced declaration 'computedProperty' could not be resolved}}
   @derivative(of: computedProperty._modify)
-  mutating func vjpPropertyModify(_ newValue: T) -> (
-    value: (), pullback: (inout TangentVector) -> T.TangentVector
-  ) {
+  @yield_once
+  mutating func vjpPropertyModify() yields(inout T) -> @yield_once (inout TangentVector) yields(inout T.TangentVector) -> ()
+  {
     fatalError()
   }
 
@@ -491,12 +488,10 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     fatalError()
   }
 
-
-  // expected-error @+1 {{referenced declaration 'computedProperty2' could not be resolved}}
   @derivative(of: computedProperty2.`yielding mutate`)
-  mutating func vjpPropertyYieldingMutate(_ newValue: T) -> (
-    value: (), pullback: (inout TangentVector) -> T.TangentVector
-  ) {
+  @yield_once
+  mutating func vjpPropertyYieldingMutate() yields(inout T) -> @yield_once (inout TangentVector) yields(inout T.TangentVector) -> ()
+  {
     fatalError()
   }
 
@@ -510,11 +505,10 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   }
 
   // We can match `.borrow` or `.mutate` to a yielding borrow or mutate
-  // expected-error @+1 {{referenced declaration 'computedProperty2a' could not be resolved}}
   @derivative(of: computedProperty2a.mutate)
-  mutating func vjpProperty2Mutate(_ newValue: T) -> (
-    value: (), pullback: (inout TangentVector) -> T.TangentVector
-  ) {
+  @yield_once
+  mutating func vjpProperty2Mutate() yields(inout T) -> @yield_once (inout TangentVector) yields(inout T.TangentVector) -> ()
+  {
     fatalError()
   }
 
