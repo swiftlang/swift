@@ -6109,6 +6109,13 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
             // If this is an extension of a nonisolated type, its isolation
             // is independent of the type.
             if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+              // Isolation of an extension synthesized by a macro expansion
+              // should match isolation of the type. Conformances/members
+              // declared in such extensions are handled as-if they are
+              // associated directly with the primary declaration of the type.
+              if (ext->isInMacroExpansionInContext())
+                return {};
+
               // If there were isolation attributes on the extension, respect
               // them.
               if (getIsolationFromAttributes(ext).has_value())
