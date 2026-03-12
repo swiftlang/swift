@@ -313,6 +313,18 @@ public enum _DebuggerSupport {
     }
   }
 
+  /// Returns a string representation of `value` for display by the `po` LLDB
+  /// command.
+  ///
+  /// When the value conforms to `CustomDebugStringConvertible`, its
+  /// `debugDescription` is returned. Otherwise, if it conforms to
+  /// `CustomStringConvertible`, its `description` is returned. When it conforms
+  /// to neither, a mirror-based tree of the value's contents is produced,
+  /// similar to `dump(_:)`.
+  ///
+  /// Types that conform to `CustomReflectable` in addition to one of the string
+  /// convertible protocols will display both the custom description and their
+  /// mirrored contents.
   public static func stringForPrintObject(_ value: Any) -> String {
     var maxItemCounter = Int.max
     var refs = Set<ObjectIdentifier>()
