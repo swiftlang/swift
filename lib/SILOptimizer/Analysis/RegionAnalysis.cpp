@@ -2855,6 +2855,14 @@ public:
       return translateSILBuiltin(bi);
     }
 
+    if (auto *eai = dyn_cast<EndApplyInst>(inst)) {
+      // FIXME: This might not be not entirely correct.
+      auto *bai = eai->getBeginApply();
+      return translateSILMultiAssign(
+          eai->getResults(), ArrayRef<Operand *>(),
+          makeOperandRefRange(bai->getAllOperands()), {});
+    }
+
     auto fas = FullApplySite::isa(inst);
     assert(bool(fas) && "Builtins should be handled above");
 
@@ -3863,7 +3871,6 @@ CONSTANT_TRANSLATION(EndUnpairedAccessInst, Ignored)
 CONSTANT_TRANSLATION(HopToExecutorInst, Ignored)
 CONSTANT_TRANSLATION(InjectEnumAddrInst, Ignored)
 CONSTANT_TRANSLATION(DestroyNotEscapedClosureInst, Ignored)
-CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 CONSTANT_TRANSLATION(DebugStepInst, Ignored)
 CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Ignored)
@@ -3985,6 +3992,7 @@ CONSTANT_TRANSLATION(ApplyInst, Apply)
 CONSTANT_TRANSLATION(BeginApplyInst, Apply)
 CONSTANT_TRANSLATION(BuiltinInst, Apply)
 CONSTANT_TRANSLATION(TryApplyInst, Apply)
+CONSTANT_TRANSLATION(EndApplyInst, Apply)
 
 //===---
 // Asserting
