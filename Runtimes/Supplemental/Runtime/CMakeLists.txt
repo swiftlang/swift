@@ -97,6 +97,18 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
+# Generate BacktracingDT 6.2
+set(backgtracingdt62_version)
+if(NOT SwiftCore_ENABLE_STRICT_AVAILABILITY AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "26.0")
+  set(backtracingdt62_version "macOS ${CMAKE_OSX_DEPLOYMENT_TARGET}")
+else()
+  set(backtracingdt62_version "macOS 26.0")
+endif()
+
+add_compile_options(
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -define-availability>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend 'BacktracingDT 6.2:${backtracingdt62_version}'>")
+
 if(WIN32 AND CMAKE_SYSTEM_PROCESSOR MATCHES "X86")
   # Turn on /safeseh for 32-bit x86 or we won't be able to link
   add_compile_options($<$<COMPILE_LANGUAGE:ASM_MASM>:/safeseh>)
