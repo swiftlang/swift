@@ -81,8 +81,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[CVT_FN]])
 // CHECK-NEXT: store [[T1]] to [init] [[SUPER_ADDR]]
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
-// CHECK-NEXT: end_apply [[TOKEN]]
-// CHECK-NEXT: tuple ()
+// CHECK-NEXT: end_apply [[TOKEN]] as $()
 // CHECK-NEXT: end_borrow [[T0]]
 // CHECK-NEXT: return
 
@@ -109,8 +108,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[CVT_FN]])
 // CHECK-NEXT: store [[T1]] to [init] [[SUPER_ADDR]]
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
-// CHECK-NEXT: end_apply [[TOKEN]]
-// CHECK-NEXT: tuple ()
+// CHECK-NEXT: end_apply [[TOKEN]] as $()
 // CHECK-NEXT: end_borrow [[T0]]
 // CHECK-NEXT: return
 
@@ -136,8 +134,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[CVT_FN]])
 // CHECK-NEXT: store [[T1]] to [init] [[SUPER_ADDR]]
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
-// CHECK-NEXT: end_apply [[TOKEN]]
-// CHECK-NEXT: tuple ()
+// CHECK-NEXT: end_apply [[TOKEN]] as $()
 // CHECK-NEXT: return
 
 protocol ClassAbstractable : class {
@@ -300,8 +297,7 @@ struct Bill : Totalled {
 // CHECK-NEXT:     ([[T1:%.*]], [[TOKEN:%.*]]) = begin_apply [[T0]]([[SELF]])
 // CHECK-NEXT:     yield [[T1]] : $*Int, resume bb1, unwind bb2
 // CHECK:        bb1:
-// CHECK-NEXT:     end_apply [[TOKEN]]
-// CHECK-NEXT:     [[T1:%.*]] = tuple ()
+// CHECK-NEXT:     [[T1:%.*]] = end_apply [[TOKEN]] as $()
 // CHECK-NEXT:     return [[T1]] :
 
 protocol AddressOnlySubscript {

@@ -2310,14 +2310,19 @@ bb0:
 // CHECK-LABEL: begin running test {{.*}} on test_end_apply: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 // CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
 // CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $NonSendableKlass
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: // function_ref coro_callee
+// CHECK-NEXT:       %1 = function_ref @coro_callee : $@yield_once @convention(thin) (@guaranteed NonSendableKlass) -> @yields @inout NonSendableKlass
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %4 = end_apply %3 as $()
+// CHECK-NEXT: require %%0: %4 = end_apply %3 as $()
 // CHECK-NEXT: end running test {{.*}} on test_end_apply: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_end_apply : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $NonSendableKlass):
   %f = function_ref @coro_callee : $@yield_once @convention(thin) (@guaranteed NonSendableKlass) -> @yields @inout NonSendableKlass
   (%1, %token) = begin_apply %f(%0) : $@yield_once @convention(thin) (@guaranteed NonSendableKlass) -> @yields @inout NonSendableKlass
-  end_apply %token as $()
+  %r = end_apply %token as $()
   specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
-  %r = tuple ()
   return %r : $()
 }
 
