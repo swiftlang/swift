@@ -36,9 +36,13 @@ extension StructWithModifyAccessor : Differentiable {
 
 // CHECK-NOT: // differentiability witness for StructWithModifyAccessor.x.modify
 
+// CHECK-LABEL: // differentiability witness for GenStructWithModifyAccessor.x.modify
+// CHECK-NEXT: sil_differentiability_witness hidden [reverse] [parameters 0] [results 0 1] <T where T : Differentiable, T == T.TangentVector> @$s30coro_differentiability_witness27GenStructWithModifyAccessorV1xxvM : $@yield_once @convention(method) <T> (@inout GenStructWithModifyAccessor<T>) -> @yields @inout T {
+// CHECK-NEXT:   vjp
+// CHECK-NEXT: }
 
-// TODO: Enable then thunked coroutine linear maps will be added
-/*
+// CHECK-NOT: // differentiability witness for GenStructWithModifyAccessor.x.modify
+
 struct GenStructWithModifyAccessor<T> {
   private var _x : T
 
@@ -63,4 +67,3 @@ extension GenStructWithModifyAccessor : Differentiable where T : Differentiable,
     return pb
   }
 }
-*/
