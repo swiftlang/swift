@@ -3560,8 +3560,8 @@ function(embedded_amend_archive_commands_on_darwin_host target triple)
         COMMAND ${CMAKE_COMMAND} -E rm $<TARGET_FILE:${target}>
         COMMAND ${SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS}
           $<TARGET_FILE:${target}>
-          "$<LIST:JOIN,$<TARGET_PROPERTY:${target},STATIC_LIBRARY_OPTIONS>,;>"
-          "$<LIST:JOIN,$<TARGET_OBJECTS:${target}>,;>"
+          "$<JOIN:$<TARGET_PROPERTY:${target},STATIC_LIBRARY_OPTIONS>,;>"
+          "$<JOIN:$<TARGET_OBJECTS:${target}>,;>"
         COMMAND ${CMAKE_COMMAND} -E touch $<TARGET_FILE:${target}>
         VERBATIM
         COMMAND_EXPAND_LISTS)
