@@ -258,7 +258,7 @@ class BuildScriptInvocation(object):
                     '-DSWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL=TRUE')
 
         if args.build_early_swift_driver:
-            configuration = 'release' if str(args.swift_build_variant) in [
+            configuration = 'release' if str(args.build_variant) in [
                 'Release',
                 'RelWithDebInfo'
             ] else 'debug'
@@ -662,10 +662,19 @@ class BuildScriptInvocation(object):
         builder.begin_impl_pipeline(should_run_epilogue_operations=True)
         builder.add_impl_product(products.Foundation,
                                  is_enabled=self.args.build_foundation)
-        builder.add_impl_product(products.XCTest,
-                                 is_enabled=self.args.build_xctest)
+
+        # Build Swift Testing here because it has to come before XCTest but after Foundation
+        builder.begin_pipeline()
+        builder.add_product(products.SwiftTestingMacros,
+                            is_enabled=self.args.build_swift_testing_macros)
+        builder.add_product(products.SwiftTesting,
+                            is_enabled=self.args.build_swift_testing)
+
+        builder.begin_impl_pipeline(should_run_epilogue_operations=True)
         builder.add_impl_product(products.LLBuild,
                                  is_enabled=self.args.build_llbuild)
+        builder.add_impl_product(products.XCTest,
+                                 is_enabled=self.args.build_xctest)
 
         # Begin the post build-script-impl build phase.
         builder.begin_pipeline()
@@ -675,19 +684,13 @@ class BuildScriptInvocation(object):
         builder.add_product(products.WasmLLVMRuntimeLibs,
                             is_enabled=self.args.build_wasmstdlib)
 
-        builder.add_product(products.SwiftTestingMacros,
-                            is_enabled=self.args.build_swift_testing_macros)
-        builder.add_product(products.SwiftTesting,
-                            is_enabled=self.args.build_swift_testing)
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
 
         builder.add_product(products.WasmKit,
                             is_enabled=self.args.build_wasmkit)
         builder.add_product(products.WasmStdlib,
-                            # Revert `or self.args.test_wasmstdlib` once we adopt `wasi-sdk-26`
-                            # or higher version that includes https://github.com/WebAssembly/wasi-libc/commit/eadb436d5c09f7983c3a687086e5af6b6e9f5510.patch
-                            is_enabled=self.args.build_wasmstdlib or self.args.test_wasmstdlib)
+                            is_enabled=self.args.build_wasmstdlib)
         builder.add_product(products.WasmThreadsStdlib,
                             is_enabled=self.args.build_wasmstdlib)
         builder.add_product(products.WasmSwiftSDK,

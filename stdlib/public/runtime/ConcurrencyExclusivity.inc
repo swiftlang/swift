@@ -215,17 +215,17 @@ struct SwiftTaskThreadLocalContext {
     return bool(state[0]);
   }
 
-  Access *getTaskAccessSetHead() const {
-    return reinterpret_cast<Access *>(state[0]);
+  void *getTaskAccessSetHead() const {
+    return reinterpret_cast<void *>(state[0]);
   }
 
-  Access *getTaskAccessSetTail() const {
-    return reinterpret_cast<Access *>(state[1]);
+  void *getTaskAccessSetTail() const {
+    return reinterpret_cast<void *>(state[1]);
   }
 
-  void setTaskAccessSetHead(Access *newHead) { state[0] = uintptr_t(newHead); }
+  void setTaskAccessSetHead(void *newHead) { state[0] = uintptr_t(newHead); }
 
-  void setTaskAccessSetTail(Access *newTail) { state[1] = uintptr_t(newTail); }
+  void setTaskAccessSetTail(void *newTail) { state[1] = uintptr_t(newTail); }
 
 #ifndef NDEBUG
   const char *getTaskAddress() const {
@@ -251,8 +251,8 @@ struct SwiftTaskThreadLocalContext {
 
 // See algorithm description on SwiftTaskThreadLocalContext.
 void swift::swift_task_enterThreadLocalContext(char *state) {
+  auto *tlsHead = _swift_getExclusivityTLSImpl();
   auto &taskCtx = *reinterpret_cast<SwiftTaskThreadLocalContext *>(state);
-  auto &tlsCtxAccessSet = SwiftTLSContext::get().accessSet;
 
 #ifndef NDEBUG
   if (isExclusivityLoggingEnabled()) {
@@ -291,7 +291,7 @@ void swift::swift_task_enterThreadLocalContext(char *state) {
     // can just return early.
     //
     // Handles push cases 1-2.
-    if (!tlsCtxAccessSet) {
+    if (!tlsHead) {
       logEndState();
       return;
     }
@@ -302,7 +302,7 @@ void swift::swift_task_enterThreadLocalContext(char *state) {
     // nullptr.
     //
     // Handles push cases 3-4.
-    taskCtx.setTaskAccessSetHead(tlsCtxAccessSet.getHead());
+    taskCtx.setTaskAccessSetHead(tlsHead);
     logEndState();
     return;
   }
@@ -316,8 +316,8 @@ void swift::swift_task_enterThreadLocalContext(char *state) {
   // TEnd to be nullptr and set the tlsCtx to point to TBegin.
   //
   // Handles push cases 5-6.
-  if (!bool(tlsCtxAccessSet)) {
-    tlsCtxAccessSet = taskCtx.getTaskAccessSetHead();
+  if (!tlsHead) {
+    _swift_setExclusivityTLSImpl(taskCtx.getTaskAccessSetHead());
     taskCtx.setTaskAccessSetHead(nullptr);
     taskCtx.setTaskAccessSetTail(nullptr);
     logEndState();
@@ -329,11 +329,11 @@ void swift::swift_task_enterThreadLocalContext(char *state) {
   // set tail->next to point at old head and stash oldhead into the task ctx.
   //
   // Handles push cases 7-8.
-  auto *oldHead = tlsCtxAccessSet.getHead();
+  auto *oldHead = tlsHead;
   auto *tail = taskCtx.getTaskAccessSetTail();
 
-  tlsCtxAccessSet.setHead(taskCtx.getTaskAccessSetHead());
-  tail->setNext(oldHead);
+  _swift_setExclusivityTLSImpl(taskCtx.getTaskAccessSetHead());
+  _swift_exclusivityAccessSetNext(tail, oldHead);
   taskCtx.setTaskAccessSetHead(oldHead);
   taskCtx.setTaskAccessSetTail(nullptr);
   logEndState();
@@ -341,8 +341,8 @@ void swift::swift_task_enterThreadLocalContext(char *state) {
 
 // See algorithm description on SwiftTaskThreadLocalContext.
 void swift::swift_task_exitThreadLocalContext(char *state) {
+  auto *tlsHead = _swift_getExclusivityTLSImpl();
   auto &taskCtx = *reinterpret_cast<SwiftTaskThreadLocalContext *>(state);
-  auto &tlsCtxAccessSet = SwiftTLSContext::get().accessSet;
 
 #ifndef NDEBUG
   if (isExclusivityLoggingEnabled()) {
@@ -379,7 +379,7 @@ void swift::swift_task_exitThreadLocalContext(char *state) {
   // initially tracking any accesses.
   //
   // Handles pop cases 1,2,5,6
-  Access *oldHead = taskCtx.getTaskAccessSetHead();
+  void *oldHead = taskCtx.getTaskAccessSetHead();
   if (!oldHead) {
     // Then check if we are currently tracking an access set in the TLS. If we
     // aren't, then we know that either we did not start with a task specific
@@ -389,7 +389,7 @@ void swift::swift_task_exitThreadLocalContext(char *state) {
     // we can just exit.
     //
     // Handles pop cases 1,5
-    if (!tlsCtxAccessSet) {
+    if (!tlsHead) {
       assert(taskCtx.getTaskAccessSetTail() == nullptr &&
              "Make sure we set this to nullptr when we pushed");
       logEndState();
@@ -403,10 +403,10 @@ void swift::swift_task_exitThreadLocalContext(char *state) {
     // tail to the TLS linked list tail and set tlsCtx.accessSet to nullptr.
     //
     // Handles pop cases 2,6
-    auto *newHead = tlsCtxAccessSet.getHead();
-    auto *newTail = tlsCtxAccessSet.getTail();
+    auto *newHead = tlsHead;
+    auto *newTail = _swift_exclusivityAccessGetParent(newHead, nullptr);
     assert(newTail && "Failed to find tail?!");
-    tlsCtxAccessSet = nullptr;
+    _swift_setExclusivityTLSImpl(nullptr);
     taskCtx.setTaskAccessSetHead(newHead);
     taskCtx.setTaskAccessSetTail(newTail);
     logEndState();
@@ -424,7 +424,7 @@ void swift::swift_task_exitThreadLocalContext(char *state) {
   // access head/tail to nullptr. The end access should be nullptr.
   //
   // Handles pop cases 3.
-  if (tlsCtxAccessSet.getHead() == oldHead) {
+  if (tlsHead == oldHead) {
     taskCtx.setTaskAccessSetHead(nullptr);
     taskCtx.setTaskAccessSetTail(nullptr);
     logEndState();
@@ -440,10 +440,10 @@ void swift::swift_task_exitThreadLocalContext(char *state) {
   // we could perhaps avoid the search for newEnd.
   //
   // Handles pop cases 4,7,8.
-  auto *newHead = tlsCtxAccessSet.getHead();
-  auto *newEnd = tlsCtxAccessSet.findParentAccess(oldHead);
-  tlsCtxAccessSet.setHead(oldHead);
-  newEnd->setNext(nullptr);
+  auto *newHead = tlsHead;
+  auto *newEnd = _swift_exclusivityAccessGetParent(tlsHead, oldHead);
+  _swift_setExclusivityTLSImpl(oldHead);
+  _swift_exclusivityAccessSetNext(newEnd, nullptr);
   taskCtx.setTaskAccessSetHead(newHead);
   taskCtx.setTaskAccessSetTail(newEnd);
   logEndState();

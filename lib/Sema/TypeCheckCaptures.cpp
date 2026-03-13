@@ -413,6 +413,19 @@ public:
       Flags |= CapturedValue::IsNoEscape;
 
     addCapture(CapturedValue(D, Flags, DRE->getStartLoc()));
+
+    // Check is the local function captures and isolated parameter, and if so
+    // propagate it up.
+    if (auto *F = dyn_cast<FuncDecl>(D)) {
+      auto isolation = getActorIsolation(F);
+
+      if (isolation.isActorInstanceIsolated() &&
+          isolation.isActorInstanceForCapture()) {
+        addCapture(CapturedValue(isolation.getActorInstance(), Flags,
+                                 DRE->getStartLoc()));
+      }
+    }
+
     return Action::SkipNode(DRE);
   }
 
@@ -742,7 +755,7 @@ public:
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *forEachStmt = dyn_cast<ForEachStmt>(S)) {
       if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(forEachStmt->getParsedSequence())) {
+              dyn_cast<PackExpansionExpr>(forEachStmt->getSequence())) {
         if (auto *env = expansion->getGenericEnvironment()) {
           // Remember this generic environment, so that it remains on the
           // visited stack until the end of the for .. in loop.
@@ -758,7 +771,7 @@ public:
   PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
     if (auto *forEachStmt = dyn_cast<ForEachStmt>(S)) {
       if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(forEachStmt->getParsedSequence())) {
+              dyn_cast<PackExpansionExpr>(forEachStmt->getSequence())) {
         if (auto *env = expansion->getGenericEnvironment()) {
           assert(VisitingForEachEnv.back() == env);
           (void) env;
@@ -812,7 +825,7 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
 
   bool isNoEscape = type->castTo<AnyFunctionType>()->isNoEscape();
   FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape,
-                          AFD->isObjC(), AFD->isGeneric());
+                          AFD->isObjC(), AFD->hasGenericParamList());
 
   if (auto *body = AFD->getTypecheckedBody())
     body->walk(finder);

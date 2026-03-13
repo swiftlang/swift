@@ -18,13 +18,33 @@ bb0:
 
 // CHECK-LABEL: sil @failing
 // CHECK:         cond_fail
+// CHECK-NEXT:    unreachable
 // CHECK:       } // end sil function 'failing'
 sil @failing : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int1, -1
   cond_fail %0 : $Builtin.Int1, "failing"
+  br bb1
+
+bb1:
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_lifetime_ending_instructions :
+// CHECK:         cond_fail
+// CHECK-NEXT:    end_borrow %1
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'dont_remove_lifetime_ending_instructions'
+sil [ossa] @dont_remove_lifetime_ending_instructions : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = begin_borrow %0
+  %2 = integer_literal $Builtin.Int1, -1
+  cond_fail %2 : $Builtin.Int1, "failing"
+  end_borrow %1
+  destroy_value [dead_end] %0
+  unreachable
 }
 
 // CHECK-LABEL: sil @unknown

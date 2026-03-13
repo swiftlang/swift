@@ -840,4 +840,7 @@ func testUndefinedInClosureVar() {
   _ = {
     var x: Undefined // expected-error {{cannot find type 'Undefined' in scope}}
   }
+  _ = {
+    for x: Undefined in [0] {} // expected-error {{cannot find type 'Undefined' in scope}}
+  }
 }

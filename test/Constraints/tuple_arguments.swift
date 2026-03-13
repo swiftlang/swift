@@ -1728,7 +1728,7 @@ do {
 do {
   func f(_: Int...) {}
   let _ = [(1, 2, 3)].map(f) // expected-error {{no exact matches in call to instance method 'map'}}
-  // expected-note@-1 {{found candidate with type '(((Int, Int, Int)) -> _) -> Array<_>'}}
+  // expected-note@-1 {{found candidate with type '(((Int, Int, Int)) -> T) -> [T]'}}
 }
 
 // rdar://problem/48443263 - cannot convert value of type '() -> Void' to expected argument type '(_) -> Void'

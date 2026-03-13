@@ -18,11 +18,20 @@ private protocol VerifiableInstruction : Instruction {
   func verify(_ context: VerifierContext)
 }
 
-private func require(_ condition: Bool, _ message: @autoclosure () -> String, atInstruction: Instruction? = nil) {
+private func require(_ condition: Bool, _ message: @autoclosure () -> String, atInstruction: Instruction) {
   if !condition {
     let msg = message()
     msg._withBridgedStringRef { stringRef in
-      BridgedVerifier.verifierError(stringRef, atInstruction.bridged, Optional<Argument>.none.bridged)
+      BridgedVerifier.verifierError(stringRef, atInstruction.bridged)
+    }
+  }
+}
+
+private func require(_ condition: Bool, _ message: @autoclosure () -> String, atArgument: Argument) {
+  if !condition {
+    let msg = message()
+    msg._withBridgedStringRef { stringRef in
+      BridgedVerifier.verifierError(stringRef, atArgument.bridged)
     }
   }
 }
@@ -47,22 +56,61 @@ extension Function {
         }
       }
     }
+
+    if hasOwnership, isDefinition {
+      verifyNoUnreachableBlocks(context)
+      verifyNoInfiniteLoops(context)
+    }
+  }
+
+  private func verifyNoUnreachableBlocks(_ context: VerifierContext) {
+    var reachableBlocks = BasicBlockWorklist(context)
+    defer { reachableBlocks.deinitialize() }
+    reachableBlocks.transitivelyAddBlockWithSuccessors(startingAt: entryBlock)
+
+    for block in blocks {
+      require(reachableBlocks.hasBeenPushed(block),
+              "block is unreachable",
+              atInstruction: block.instructions.first!)
+    }
+  }
+
+  private func verifyNoInfiniteLoops(_ context: VerifierContext) {
+    var noInfiniteLoops = BasicBlockWorklist(context)
+    defer { noInfiniteLoops.deinitialize() }
+
+    for block in blocks {
+      if block.successors.isEmpty {
+        noInfiniteLoops.transitivelyAddBlockWithPredecessors(startingAt: block)
+      }
+    }
+
+    for block in blocks {
+      require(noInfiniteLoops.hasBeenPushed(block),
+              "function has infinite loop",
+              atInstruction: block.instructions.first!)
+    }
   }
 }
 
 private extension Instruction {
   func checkForwardingConformance() {
     if bridged.shouldBeForwarding() {
-      require(self is ForwardingInstruction, "instruction \(self)\nshould conform to ForwardingInstruction")
+      require(self is ForwardingInstruction,
+              "instruction \(self)\nshould conform to ForwardingInstruction",
+              atInstruction: self)
     } else {
-      require(!(self is ForwardingInstruction), "instruction \(self)\nshould not conform to ForwardingInstruction")
+      require(!(self is ForwardingInstruction),
+              "instruction \(self)\nshould not conform to ForwardingInstruction",
+              atInstruction: self)
     }
   }
 
   func checkGuaranteedResults() {
     for result in results where result.ownership == .guaranteed {
       require(BeginBorrowValue(result) != nil || self is ForwardingInstruction || result.isGuaranteedApplyResult,
-              "\(result) must either be a BeginBorrowValue or a ForwardingInstruction")
+              "\(result) must either be a BeginBorrowValue or a ForwardingInstruction",
+              atInstruction: self)
     }
   }
 }
@@ -73,12 +121,8 @@ private extension Argument {
 
       phi.verifyBorrowedFromUse()
 
-      // TODO: enable this check once we have complete OSSA lifetimes.
-      // In a dead-end block an end_borrow might have been deleted.
-      /*
       require(phi.isReborrow == phi.hasBorrowEndingUse,
-              "\(self) has stale reborrow flag");
-      */
+              "\(self) has stale reborrow flag", atArgument: self);
     }
   }
 
@@ -89,14 +133,17 @@ private extension Phi {
     var forwardingBorrowedFromFound = false
     for use in value.uses {
       require(use.instruction is BorrowedFromInst,
-              "guaranteed phi: \(self)\n has non borrowed-from use: \(use)")
+              "guaranteed phi: \(self)\n has non borrowed-from use: \(use)",
+              atArgument: self.value)
       if use.index == 0 {
-        require(!forwardingBorrowedFromFound, "phi \(self) has multiple forwarding borrowed-from uses")
+        require(!forwardingBorrowedFromFound, "phi \(self) has multiple forwarding borrowed-from uses",
+                atArgument: self.value)
         forwardingBorrowedFromFound = true
       }
     }
     require(forwardingBorrowedFromFound,
-            "missing forwarding borrowed-from user of guaranteed phi \(self)")
+            "missing forwarding borrowed-from user of guaranteed phi \(self)",
+            atArgument: self.value)
   }
 }
 
@@ -104,7 +151,9 @@ extension BorrowedFromInst : VerifiableInstruction {
   func verify(_ context: VerifierContext) {
 
     for ev in enclosingValues {
-      require(ev.isValidEnclosingValueInBorrowedFrom, "invalid enclosing value in borrowed-from: \(ev)")
+      require(ev.isValidEnclosingValueInBorrowedFrom,
+              "invalid enclosing value in borrowed-from: \(ev)",
+              atInstruction: self)
     }
 
     var computedEVs = Stack<Value>(context)
@@ -120,7 +169,8 @@ extension BorrowedFromInst : VerifiableInstruction {
 
     for computedEV in computedEVs {
       require(existingEVs.contains(computedEV),
-                   "\(computedEV)\n  missing in enclosing values of \(self)")
+              "\(computedEV)\n  missing in enclosing values of \(self)",
+              atInstruction: self)
     }
   }
 }
@@ -130,11 +180,19 @@ private extension Value {
     switch ownership {
     case .owned:
       return true
+    case .none:
+      // "none" is like "owned" and can happen e.g. if a non-trivial enum is constructed with a trivial case:
+      // ```
+      //   %1 = enum $Optional<AnyObject>, #Optional.none!enumelt   // ownership: none
+      //   ...
+      //   %3 = borrowed %phi from (%1)
+      // ```
+      return true
     case .guaranteed:
       return BeginBorrowValue(self) != nil ||
              self is BorrowedFromInst ||
              forwardingInstruction != nil
-    case .none, .unowned:
+    case .unowned:
       return false
     }
   }
@@ -154,13 +212,47 @@ extension LoadBorrowInst : VerifiableInstruction {
   }
 }
 
+extension BeginAccessInst : VerifiableInstruction {
+  func verify(_ context: VerifierContext) {
+    // Catch violations like
+    // ```
+    //   %1 = begin_access [read] %0
+    //   store %2 to %0
+    //   end_access %1
+    // ```
+
+    guard context.silStage == .canonical else {
+      // Mandatory passes on raw SIL need to be completed until we can verify this.
+      // Also, LoadableByAddress in lowered SIL can insert `copy_addr`s inside read-only access scope.
+      // Therefore we can only run this verification in canonical SIL.
+      return
+    }
+
+    if enforcement == .static {
+      // This is a workaround for a bug in the move-only checker: rdar://151841926.
+      // The move-only checker sometimes inserts destroy_addr within read-only static access scopes.
+      // TODO: remove this once the bug is fixed.
+      return
+    }
+    if accessKind == .read {
+      var mutatingInstructions = MutatingUsesWalker(context)
+      defer { mutatingInstructions.deinitialize() }
+
+      mutatingInstructions.findMutatingUses(of: self.address)
+      mutatingInstructions.verifyNoMutatingUsesInLinearLiverange(of: self)
+    }
+  }
+}
+
 extension VectorBaseAddrInst : VerifiableInstruction {
   func verify(_ context: VerifierContext) {
     require(vector.type.isBuiltinFixedArray,
-            "vector operand of vector_element_addr must be a Builtin.FixedArray")
+            "vector operand of vector_element_addr must be a Builtin.FixedArray",
+            atInstruction: self)
     require(type == vector.type.builtinFixedArrayElementType(in: parentFunction,
                                                              maximallyAbstracted: true).addressType,
-            "result of vector_element_addr has wrong type")
+            "result of vector_element_addr has wrong type",
+            atInstruction: self)
   }
 }
 
@@ -203,16 +295,15 @@ private struct MutatingUsesWalker : AddressDefUseWalker {
           if let bf = phi.borrowedFrom {
             linearLiveranges.pushIfNotVisited(bf)
           } else {
-            require(false, "missing borrowed-from for \(phi.value)")
+            require(false, "missing borrowed-from for \(phi.value)",
+                    atArgument: phi.value)
           }
         }
       }
     }
   }
 
-  private mutating func verifyNoMutatingUsesInLinearLiverange(of startInst: SingleValueInstruction) {
-    assert(startInst is LoadBorrowInst || startInst is BorrowedFromInst)
-
+  mutating func verifyNoMutatingUsesInLinearLiverange(of startInst: SingleValueInstruction) {
     var instWorklist = InstructionWorklist(context)
     defer { instWorklist.deinitialize() }
 
@@ -223,9 +314,18 @@ private struct MutatingUsesWalker : AddressDefUseWalker {
 
     while let inst = instWorklist.pop() {
       require(!mutatingInstructions.contains(inst),
-              "Load borrow invalidated by a local write", atInstruction: inst)
+              "read-only scope invalidated by a local write", atInstruction: inst)
       instWorklist.pushPredecessors(of: inst, ignoring: startInst)
     }
+  }
+
+  mutating func walkDown(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+    if let beginAccess = address.instruction as? BeginAccessInst, beginAccess.accessKind != .read {
+      // Don't verify that there are no stores in read-only access scopes if there is a conflicting scope.
+      // This is a programming error, but the compiler should not crash. The violation is caught at runtime.
+      return .continueWalk
+    }
+    return walkDownDefault(address: address, path: path)
   }
 
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
@@ -258,7 +358,7 @@ private extension Operand {
       {
         switch convention {
         case .indirectIn, .indirectInGuaranteed:
-          // Such operands are consumed by the `partial_apply` and therefore cound as "written".
+          // Such operands are consumed by the `partial_apply` and therefore count as "written".
           return true
         default:
           return false

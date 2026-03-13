@@ -82,7 +82,7 @@ SILLayout::SILLayout(CanGenericSignature Sig,
 #ifndef NDEBUG
   verifyFields(Sig, Fields);
 #endif
-  auto FieldsMem = getTrailingObjects<SILField>();
+  auto *FieldsMem = getTrailingObjects();
   for (unsigned i : indices(Fields)) {
     new (FieldsMem + i) SILField(Fields[i]);
   }

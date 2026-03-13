@@ -154,6 +154,10 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
           ctx.Diags.diagnose(conformanceLoc,
                              diag::invertible_conformance_other_source_file,
                              getInvertibleProtocolKindName(ip), nominalDecl);
+
+          // Skip further work to avoid asking for stored properties of
+          // resilient types.
+          return;
         }
       }
 
@@ -306,7 +310,7 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
   // Walk the stored properties of classes and structs.
   if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
     for (auto property : nominal->getStoredProperties()) {
-      auto propertyType = dc->mapTypeIntoContext(
+      auto propertyType = dc->mapTypeIntoEnvironment(
           property->getValueInterfaceType());
       if ((*this)(property, propertyType))
         return true;
@@ -343,7 +347,7 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
           continue;
 
         // Check that the associated value type is Sendable.
-        auto elementType = dc->mapTypeIntoContext(
+        auto elementType = dc->mapTypeIntoEnvironment(
             element->getPayloadInterfaceType());
         if ((*this)(element, elementType))
           return true;

@@ -96,7 +96,7 @@ public:
   Type getBodyResultType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))
-        return FD->mapTypeIntoContext(FD->getResultInterfaceType());
+        return FD->mapTypeIntoEnvironment(FD->getResultInterfaceType());
       return TupleType::getEmpty(AFD->getASTContext());
     }
     return cast<AbstractClosureExpr *>(TheFunction)->getResultType();
@@ -265,34 +265,15 @@ public:
     return DeclAttributes();
   }
 
-  MacroDecl *getResolvedMacro(CustomAttr *attr) const {
-    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      return afd->getResolvedMacro(attr);
-    }
-
-    if (auto ace = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
-      if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
-        return ce->getResolvedMacro(attr);
-      }
-    }
-
-    return nullptr;
-  }
-
   using MacroCallback = llvm::function_ref<void(CustomAttr *, MacroDecl *)>;
 
   void
   forEachAttachedMacro(MacroRole role,
                        MacroCallback macroCallback) const {
     auto attrs = getDeclAttributes();
-    for (auto customAttrConst : attrs.getAttributes<CustomAttr>()) {
-      auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-      auto *macroDecl = getResolvedMacro(customAttr);
-
-      if (!macroDecl)
-        continue;
-
-      if (!macroDecl->getMacroRoles().contains(role))
+    for (auto *customAttr : attrs.getAttributes<CustomAttr>()) {
+      auto *macroDecl = customAttr->getResolvedMacro();
+      if (!macroDecl || !macroDecl->getMacroRoles().contains(role))
         continue;
 
       macroCallback(customAttr, macroDecl);
@@ -327,7 +308,7 @@ private:
           auto valueTy = AD->getStorage()->getValueInterfaceType()
                                          ->getReferenceStorageReferent();
           if (mapIntoContext)
-            valueTy = AD->mapTypeIntoContext(valueTy);
+            valueTy = AD->mapTypeIntoEnvironment(valueTy);
           YieldTypeFlags flags(isYieldingMutableAccessor(AD->getAccessorKind())
                                    ? ParamSpecifier::InOut
                                    : ParamSpecifier::LegacyShared);

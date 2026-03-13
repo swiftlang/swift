@@ -53,15 +53,15 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
   _ = anno.counter
 
   // make sure it's just a warning if someone was awaiting on it previously
-  _ = await ext.point // expected-warning {{no 'async' operations occur within 'await' expression}}
-  _ = await formance.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}
-  _ = await anno.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}
+  _ = await ext.point // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
+  _ = await formance.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
+  _ = await anno.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
   
   // this does not need an await, since the property is 'Sendable' and of a
   // value type
   _ = anno.point
   _ = await anno.point
-  // expected-warning@-1 {{no 'async' operations occur within 'await' expression}}
+  // expected-warning@-1 {{no 'async' operations occur within 'await' expression}}{{7-13=}}
 
   // these do need await, regardless of reference or value type
   _ = await (formance as any MainCounter).counter
@@ -122,7 +122,7 @@ struct ReferenceSelfDotMethods {
 }
 
 actor UserDefinedActorSelfDotMethod {
-  func actorAffinedFunc() {} // expected-note {{calls to instance method 'actorAffinedFunc()' from outside of its actor context are implicitly asynchronous}}
+  func actorAffinedFunc() {}
 
   // Unfortunately we can't express the desired isolation of this returned closure statically to
   // be able to call it on the desired actor. This may be possible with the acceptance of
@@ -130,7 +130,43 @@ actor UserDefinedActorSelfDotMethod {
   // in the type system to express this sort of curry.
   nonisolated
   private func testCurry() -> (UserDefinedActorSelfDotMethod) -> (@isolated(any) () -> Void) {
-    let functionRef = Self.actorAffinedFunc // expected-error {{call to actor-isolated instance method 'actorAffinedFunc()' in a synchronous nonisolated context}}
-    return functionRef // expected-error {{cannot convert return expression of type '@Sendable (isolated Self) -> @Sendable () -> ()' to return type '(UserDefinedActorSelfDotMethod) -> @isolated(any) () -> Void'}}
+    let functionRef = Self.actorAffinedFunc
+    return functionRef // expected-error {{cannot convert return expression of type '@Sendable (isolated Self) -> () -> ()' to return type '(UserDefinedActorSelfDotMethod) -> @isolated(any) () -> Void'}}
+  }
+}
+
+actor PartialApplyTest {
+  func compute(_: Int) {}
+  func expensiveCompute() async {}
+
+  func test() {
+    _ = Self.compute // Ok
+    _ = Self.compute(_:) // Ok
+
+    _ = Self.expensiveCompute // Ok
+    _ = self.expensiveCompute // Ok (this is okay because method is async)
+  }
+
+  nonisolated static func test(a: PartialApplyTest) {
+    _ = PartialApplyTest.compute // Ok
+    _ = PartialApplyTest.compute(_:) // Ok
+
+    _ = a.compute // expected-error {{actor-isolated instance method 'compute' can not be partially applied}}
+    _ = a.compute(_:) // expected-error {{actor-isolated instance method 'compute' can not be partially applied}}
+
+    _ = Self.expensiveCompute // Ok
+    _ = a.expensiveCompute // Ok (this is okay because method is async)
+  }
+}
+
+func testPartialApplyWithIsolatedParameters() {
+  func isolatedFn(v: Int, _: isolated PartialApplyTest) {
+  }
+
+  let fn = isolatedFn(v:_:) // expected-note {{calls to let 'fn' from outside of its actor context are implicitly asynchronous}}
+  let _: (Int, isolated PartialApplyTest) -> Void = fn // Ok
+
+  func apply(a: PartialApplyTest) {
+    fn(42, a) //expected-error {{call to actor-isolated let 'fn' in a synchronous nonisolated context}}
   }
 }

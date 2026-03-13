@@ -60,13 +60,12 @@ extension String {
   public // @testable
   func _classify() -> _StringRepresentation { return _guts._classify() }
 
-#if !$Embedded
   @_alwaysEmitIntoClient
   public // @testable
   func _deconstructUTF8<ToPointer: _Pointer>(
     scratch: UnsafeMutableRawBufferPointer?
   ) -> (
-    owner: AnyObject?,
+    owner: _ConvertedObject?,
     ToPointer,
     length: Int,
     usesScratch: Bool,
@@ -74,7 +73,6 @@ extension String {
   ) {
     unsafe _guts._deconstructUTF8(scratch: scratch)
   }
-#endif
 }
 
 extension _StringGuts {
@@ -115,8 +113,6 @@ extension _StringGuts {
     fatalError()
   }
 
-#if !$Embedded
-
 /*
 
  Deconstruct the string into contiguous UTF-8, allocating memory if necessary
@@ -145,7 +141,7 @@ extension _StringGuts {
   func _deconstructUTF8<ToPointer: _Pointer>(
     scratch: UnsafeMutableRawBufferPointer?
   ) -> (
-    owner: AnyObject?,
+    owner: _ConvertedObject?,
     ToPointer,
     length: Int,
     usesScratch: Bool,
@@ -191,18 +187,15 @@ extension _StringGuts {
   @inline(never) // slow path
   internal
   func _allocateForDeconstruct() -> (
-    owner: AnyObject,
+    owner: _ConvertedObject,
     UnsafeRawPointer,
     length: Int
   ) {
     let utf8 = Array(String(self).utf8) + [0]
-    let (owner, ptr): (AnyObject?, UnsafeRawPointer) =
+    let (owner, ptr): (_ConvertedObject?, UnsafeRawPointer) =
       unsafe _convertConstArrayToPointerArgument(utf8)
 
     // Array's owner cannot be nil, even though it is declared optional...
     return unsafe (owner: owner!, ptr, length: utf8.count - 1)
   }
-
-#endif
-
 }

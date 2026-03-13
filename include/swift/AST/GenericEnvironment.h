@@ -61,13 +61,13 @@ struct OpaqueEnvironmentData {
 };
 
 /// Extra data in a generic environment for an opened existential.
-struct OpenedExistentialEnvironmentData {
+struct ExistentialEnvironmentData {
   Type existential;
   UUID uuid;
 };
 
 /// Extra data in a generic environment for an opened pack element.
-struct OpenedElementEnvironmentData {
+struct ElementEnvironmentData {
   UUID uuid;
   CanGenericTypeParamType shapeClass;
 };
@@ -75,47 +75,48 @@ struct OpenedElementEnvironmentData {
 /// Describes the mapping between archetypes and interface types for the
 /// generic parameters of a DeclContext.
 ///
-/// The most frequently used method here is mapTypeIntoContext(), which
+/// The most frequently used method here is mapTypeIntoEnvironment(), which
 /// maps an interface type to a type written in terms of the generic
 /// environment's archetypes; to go in the other direction, use
-/// TypeBase::mapTypeOutOfContext().
+/// TypeBase::mapTypeOutOfEnvironment().
 ///
 class alignas(1 << DeclAlignInBits) GenericEnvironment final
     : private llvm::TrailingObjects<
         GenericEnvironment,
         SubstitutionMap,
         OpaqueEnvironmentData,
-        OpenedExistentialEnvironmentData,
-        OpenedElementEnvironmentData,
+        ExistentialEnvironmentData,
+        ElementEnvironmentData,
         Type> {
 public:
-  enum class Kind {
+  enum class Kind: uint8_t {
     /// A normal generic environment, determined only by its generic
     /// signature.
     Primary,
     /// A generic environment describing an opaque type archetype.
     Opaque,
     /// A generic environment describing an opened existential archetype.
-    OpenedExistential,
+    Existential,
     /// A generic environment describing an opened element type of a
     /// pack archetype inside a pack expansion expression.
-    OpenedElement,
+    Element,
   };
 
   class NestedTypeStorage;
 
 private:
-  mutable llvm::PointerIntPair<GenericSignature, 2, Kind> SignatureAndKind{
-      GenericSignature(), Kind::Primary};
+  GenericSignature sig;
   NestedTypeStorage *nestedTypeStorage = nullptr;
+  Kind kind;
+  bool canonical;
 
   friend TrailingObjects;
   friend OpaqueTypeArchetypeType;
 
   size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const;
   size_t numTrailingObjects(OverloadToken<OpaqueEnvironmentData>) const;
-  size_t numTrailingObjects(OverloadToken<OpenedExistentialEnvironmentData>) const;
-  size_t numTrailingObjects(OverloadToken<OpenedElementEnvironmentData>) const;
+  size_t numTrailingObjects(OverloadToken<ExistentialEnvironmentData>) const;
+  size_t numTrailingObjects(OverloadToken<ElementEnvironmentData>) const;
   size_t numTrailingObjects(OverloadToken<Type>) const;
 
   /// Retrieve the array containing the context types associated with the
@@ -168,10 +169,13 @@ private:
 
 public:
   GenericSignature getGenericSignature() const {
-    return SignatureAndKind.getPointer();
+    return sig;
   }
 
-  Kind getKind() const { return SignatureAndKind.getInt(); }
+  Kind getKind() const { return kind; }
+
+  /// Returns if the archetypes from this environment are canonical types.
+  bool isCanonical() const { return canonical; }
 
   ArrayRef<GenericTypeParamType *> getGenericParams() const;
 
@@ -275,14 +279,14 @@ public:
   Type maybeApplyOuterContextSubstitutions(Type type) const;
 
   /// Map an interface type to a contextual type.
-  static Type mapTypeIntoContext(GenericEnvironment *genericEnv,
+  static Type mapTypeIntoEnvironment(GenericEnvironment *genericEnv,
                                  Type type);
 
   /// Map an interface type to a contextual type.
-  Type mapTypeIntoContext(Type type) const;
+  Type mapTypeIntoEnvironment(Type type) const;
 
   /// Map a generic parameter type to a contextual type.
-  Type mapTypeIntoContext(GenericTypeParamType *type) const;
+  Type mapTypeIntoEnvironment(GenericTypeParamType *type) const;
 
   /// Map a type parameter type to a contextual type.
   Type getOrCreateArchetypeFromInterfaceType(Type depType);
@@ -323,7 +327,7 @@ public:
   ///
   /// This operation will also reabstract dependent types according to the
   /// abstraction level of their associated type requirements.
-  SILType mapTypeIntoContext(SILModule &M, SILType type) const;
+  SILType mapTypeIntoEnvironment(SILModule &M, SILType type) const;
 
   /// Returns a substitution map that sends every generic parameter to its
   /// corresponding archetype in this generic environment.

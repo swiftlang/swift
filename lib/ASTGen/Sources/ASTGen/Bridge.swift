@@ -31,21 +31,21 @@ extension BridgedNullable {
   }
 }
 
-extension SourceLoc: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension Identifier: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension BridgedNullableDecl: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension BridgedNullableExpr: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension BridgedNullableStmt: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension BridgedNullableTypeRepr: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension BridgedNullablePattern: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension BridgedNullableGenericParamList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension BridgedNullableTrailingWhereClause: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension BridgedNullableParameterList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension BridgedNullablePatternBindingInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension BridgedNullableDefaultArgumentInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension BridgedNullableCustomAttributeInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension BridgedNullableArgumentList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
-extension BridgedNullableVarDecl: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension SourceLoc: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension Identifier: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullableDecl: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullableExpr: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullableStmt: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullableTypeRepr: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullablePattern: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullableGenericParamList: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullableTrailingWhereClause: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullableParameterList: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullablePatternBindingInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullableDefaultArgumentInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullableCustomAttributeInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullableArgumentList: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullableVarDecl: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
 
 extension Identifier: /*@retroactive*/ Swift.Equatable {
   public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -126,21 +126,6 @@ extension BridgedLabeledStmtInfo: /*@retroactive*/ Swift.ExpressibleByNilLiteral
   }
 }
 
-extension String {
-  init(bridged: BridgedStringRef) {
-    self.init(
-      decoding: UnsafeBufferPointer(start: bridged.data, count: bridged.count),
-      as: UTF8.self
-    )
-  }
-
-  public mutating func withBridgedString<R>(_ body: (BridgedStringRef) throws -> R) rethrows -> R {
-    try withUTF8 { buffer in
-      try body(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))
-    }
-  }
-}
-
 extension SyntaxText {
   var bridged: BridgedStringRef {
     BridgedStringRef(data: self.baseAddress, count: self.count)
@@ -172,7 +157,11 @@ public func freeBridgedString(bridged: BridgedStringRef) {
   bridged.data?.deallocate()
 }
 
-extension BridgedStringRef: /*@retroactive*/ Swift.ExpressibleByStringLiteral {
+extension BridgedStringRef:
+  /*@retroactive*/ Swift.ExpressibleByStringLiteral,
+                   Swift.ExpressibleByExtendedGraphemeClusterLiteral,
+                   Swift.ExpressibleByUnicodeScalarLiteral
+{
   public init(stringLiteral str: StaticString) {
     self.init(data: str.utf8Start, count: str.utf8CodeUnitCount)
   }

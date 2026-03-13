@@ -52,3 +52,11 @@ func test_ambigity_with_generic_funcs(a: CGFloat, b: CGFloat) -> [CGFloat] {
   let result = [round(abs(a - b) * 100) / 100.0]
   return result
 }
+
+func testMultipleClosureInference(_ d: Double, i: Int) {
+  struct S<T> {
+    init(_ get: () -> T, _ set: (T) -> Void) {}
+  }
+  func foo<T>(_: S<T>, _: T) {}
+  foo(S({ CGFloat(i) }, { _ in }), d)
+}

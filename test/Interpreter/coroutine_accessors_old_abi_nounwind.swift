@@ -15,10 +15,10 @@ struct Thrower {
 struct S {
   var _thrower = Thrower()
   var thrower: Thrower {
-    read {
+    yielding borrow {
       yield _thrower
     }
-    modify {
+    yielding mutate {
       // CHECK: first
       print("first")
       yield &_thrower

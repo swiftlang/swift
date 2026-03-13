@@ -1757,12 +1757,12 @@ bb0:
 // and the caller storage is an Argument at a different position.
 //
 // CHECK-LABEL: sil [ossa] @testTransformArgumentCaller : $@convention(thin) (Int64, @guaranteed { var Int64 }, @guaranteed { var Int64 }) -> Int64 {
-// CHECK: begin_access [read] [dynamic] [no_nested_conflict]
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict]
 // CHECK-LABEL: } // end sil function 'testTransformArgumentCaller'
 sil [ossa] @testTransformArgumentCaller : $@convention(thin) (Int64, @guaranteed { var Int64 }, @guaranteed { var Int64 }) -> Int64 {
 bb0(%0 : $Int64, %1 : @guaranteed ${ var Int64 }, %2 : @guaranteed ${ var Int64 }):
   %boxadr = project_box %1 : $ { var Int64 }, 0
-  %access = begin_access [read] [dynamic] [no_nested_conflict] %boxadr : $*Int64
+  %access = begin_access [modify] [dynamic] [no_nested_conflict] %boxadr : $*Int64
   %f = function_ref @testTransformArgumentCallee : $@convention(thin) (@guaranteed { var Int64 }) -> Int64
   %call = apply %f(%2) : $@convention(thin) (@guaranteed { var Int64 }) -> Int64
   store %0 to [trivial] %access : $*Int64

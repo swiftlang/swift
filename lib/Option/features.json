@@ -50,6 +50,15 @@
     },
     {
        "name": "Isystem"
+    },
+    {
+       "name": "internal-import-bridging-header"
+    },
+    {
+       "name": "api-digester-Xcc"
+    },
+    {
+       "name": "debug-info-explicit-dependency"
     }
   ]
 }

@@ -22,6 +22,8 @@ public func computeSendable(_: @escaping @Sendable () -> Void) {}
 
 public func computeSending(_: sending @escaping () -> Void) {}
 
+public func computeIsolatedAny(_: @isolated(any) @Sendable () -> Void) {}
+
 //--- Client.swift
 import API
 
@@ -106,3 +108,21 @@ func test_global_actor_sendable_and_sending_closures() {
     forceIsolation(isolation: #isolation)
   }
 }
+
+@MainActor
+func test_isolated_any_and_closures() {
+  // CHECK-LABEL: sil private [ossa] @$s6Client30test_isolated_any_and_closuresyyFyyYbXEfU_
+  // CHECK-NOT: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+  // CHECK: } // end sil function '$s6Client30test_isolated_any_and_closuresyyFyyYbXEfU_'
+  computeIsolatedAny {
+  }
+
+  // CHECK-LABEL: sil private [ossa] @$s6Client30test_isolated_any_and_closuresyyFyyYbScMYcXEfU0_
+  // CHECK: [[EXPECTED_EXECUTOR:%.*]] = extract_executor {{.*}} : $MainActor
+  // CHECK: [[CHECK_EXECUTOR_FN:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+  // CHECK: apply [[CHECK_EXECUTOR_FN]]({{.*}}, [[EXPECTED_EXECUTOR]]) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+  // CHECK: } // end sil function '$s6Client30test_isolated_any_and_closuresyyFyyYbScMYcXEfU0_'
+  computeIsolatedAny { @MainActor in
+  }
+}
+

@@ -36,6 +36,7 @@
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
+#include "swift/IDE/SignatureHelpFormatter.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -3645,7 +3646,8 @@ signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
   public:
     Consumer(ResponseBuilder Builder) : SKResult(Builder.getDictionary()) {}
 
-    void handleResult(const SignatureHelpResponse &Result) override {
+    void
+    handleResult(const swift::ide::FormattedSignatureHelp &Result) override {
       SKResult.set(KeyActiveSignature, Result.ActiveSignature);
 
       auto Signatures = SKResult.setArray(KeySignatures);
@@ -3658,8 +3660,8 @@ signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
         if (auto ActiveParam = Signature.ActiveParam)
           SignatureElem.set(KeyActiveParameter, ActiveParam.value());
 
-        if (!Signature.Doc.empty())
-          SignatureElem.set(KeyDocComment, Signature.Doc);
+        if (!Signature.DocComment.empty())
+          SignatureElem.set(KeyDocComment, Signature.DocComment);
 
         auto Params = SignatureElem.setArray(KeyParameters);
 
@@ -3671,9 +3673,6 @@ signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
 
           ParamElem.set(KeyNameOffset, Param.Offset);
           ParamElem.set(KeyNameLength, Param.Length);
-
-          if (!Param.DocComment.empty())
-            ParamElem.set(KeyDocComment, Param.DocComment);
         }
       }
     }

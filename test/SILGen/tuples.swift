@@ -148,9 +148,9 @@ extension P {
   //
   // Initialize the RValue. (This is here to help pattern matching).
   // CHECK:   [[ZERO_ADDR:%.*]] = tuple_element_addr [[RVALUE]] : $*(index: C, value: Self), 0
+  // CHECK:   [[ONE_ADDR:%.*]] = tuple_element_addr [[RVALUE]] : $*(index: C, value: Self), 1
   // CHECK:   [[TUP0_COPY:%.*]] = copy_value [[TUP0]]
   // CHECK:   store [[TUP0_COPY]] to [init] [[ZERO_ADDR]]
-  // CHECK:   [[ONE_ADDR:%.*]] = tuple_element_addr [[RVALUE]] : $*(index: C, value: Self), 1
   // CHECK:   copy_addr [[TUP1]] to [init] [[ONE_ADDR]]
   //
   // What we are actually trying to check. Note that there is no actual use of

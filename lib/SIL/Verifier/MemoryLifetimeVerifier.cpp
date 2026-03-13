@@ -295,16 +295,25 @@ void MemoryLifetimeVerifier::requireBitsSet(const Bits &bits, SILValue addr,
 }
 
 void MemoryLifetimeVerifier::requireBitsSetForArgument(const Bits &bits, Operand *argOp) {
-  if (auto *loc = locations.getLocation(argOp->get())) {
-    Bits missingBits = ~bits & loc->subLocations;
-    for (int errorLocIdx = missingBits.find_first(); errorLocIdx >= 0;
-         errorLocIdx = missingBits.find_next(errorLocIdx)) {
-      auto *errorLoc = locations.getLocation(errorLocIdx);
+  int locIdx = locations.getLocationIdx(argOp->get());
+  if (locIdx < 0)
+    return;
 
-      if (applyMayRead(argOp, errorLoc->representativeValue)) {
-        reportError("memory is not initialized, but should be",
-                    errorLocIdx, argOp->getUser());
-      }
+  auto *loc = locations.getLocation(locIdx);
+  Bits missingBits = ~bits & loc->subLocations;
+  for (int errorLocIdx = missingBits.find_first(); errorLocIdx >= 0;
+       errorLocIdx = missingBits.find_next(errorLocIdx)) {
+    auto *errorLoc = locations.getLocation(errorLocIdx);
+
+    // We only have a valid address if this is not the "self" bit which represents
+    // unknown sub-fields.
+    SILValue addr;
+    if (errorLocIdx != locIdx || !errorLoc->selfBitRepresentsUnknownSubFields())
+      addr = errorLoc->representativeValue;
+
+    if (applyMayRead(argOp, addr)) {
+      reportError("memory is not initialized, but should be",
+                  errorLocIdx, argOp->getUser());
     }
   }
 }
@@ -326,16 +335,24 @@ bool MemoryLifetimeVerifier::applyMayRead(Operand *argOp, SILValue addr) {
     return false;
   }
 
+  if (!addr)
+    return false;
+
   for (SILFunction *callee : callees) {
-    if (callee->argumentMayRead(argOp, addr))
+    // If the callee has no side-effects computed, yet, ignore it.
+    // This can happen if a store to an unused inout has been eliminated at a call site
+    // and afterwards the callee is specialized and therefore doesn't have the required
+    // side-effects computed, yet.
+    if (callee->hasArgumentEffects() && callee->argumentMayRead(argOp, addr)) {
       return true;
+    }
   }
   return false;
 }
 
 void MemoryLifetimeVerifier::requireNoStoreBorrowLocation(
     SILValue addr, SILInstruction *where) {
-  if (isa<StoreBorrowInst>(addr)) {
+  if (isStoreBorrowLocation(addr)) {
     reportError("store-borrow location cannot be written",
                 locations.getLocationIdx(addr), where);
   }
@@ -702,6 +719,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
             break;
           case StoreOwnershipQualifier::Assign:
             requireBitsSet(bits | ~nonTrivialLocations, SI->getDest(), &I);
+            locations.setBits(bits, SI->getDest());
             break;
           case StoreOwnershipQualifier::Trivial:
             locations.setBits(bits, SI->getDest());
@@ -749,11 +767,14 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         requireNoStoreBorrowLocation(IEAI->getOperand(), &I);
         break;
       }
-      case SILInstructionKind::InitExistentialAddrInst:
-      case SILInstructionKind::InitEnumDataAddrInst: {
+      case SILInstructionKind::InitExistentialAddrInst: {
         SILValue addr = I.getOperand(0);
         requireBitsClear(bits & nonTrivialLocations, addr, &I);
         requireNoStoreBorrowLocation(addr, &I);
+        break;
+      }
+      case SILInstructionKind::InitEnumDataAddrInst: {
+        requireNoStoreBorrowLocation(I.getOperand(0), &I);
         break;
       }
       case SILInstructionKind::OpenExistentialAddrInst:
@@ -927,7 +948,7 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
   switch (argumentConvention) {
     case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
-      requireBitsSetForArgument(bits, &argumentOp);
+      requireBitsSet(bits, argumentOp.get(), applyInst);
       locations.clearBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_Out:
@@ -936,6 +957,8 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
       locations.setBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:
+      requireBitsSet(bits, argumentOp.get(), applyInst);
+      break;
     case SILArgumentConvention::Indirect_Inout:
       requireBitsSetForArgument(bits, &argumentOp);
       break;

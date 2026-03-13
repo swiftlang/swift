@@ -477,6 +477,8 @@ extension OwnershipUseVisitor {
       return dependentUse(of: operand, dependentValue: mdi)
     case let bfi as BorrowedFromInst where !bfi.borrowedPhi.isReborrow:
       return dependentUse(of: operand, dependentValue: bfi)
+    case let mbi as MakeBorrowInst:
+      return dependentUse(of: operand, dependentValue: mbi)
     default:
       return borrowingUse(of: operand,
                           by: BorrowingInstruction(operand.instruction)!)
@@ -626,9 +628,13 @@ extension InteriorUseWalker: OwnershipUseVisitor {
     if value.type.isTrivial(in: function) {
       return .continueWalk
     }
-    guard value.type.isEscapable(in: function) else {
+    guard value.mayEscape else {
       // Non-escapable dependent values can be lifetime-extended by copying, which is not handled by
-      // InteriorUseWalker. LifetimeDependenceDefUseWalker does this.
+      // InteriorUseWalker. LifetimeDependenceDefUseWalker does this. Alternatively, we could continue to `walkDownUses`
+      // but later recognize a copy of a `mayEscape` value to be a pointer escape at that point.
+      //
+      // This includes partial_apply [on_stack] which can currently be copied. Although a better solution would be to
+      // make copying an on-stack closure illegal SIL.
       return pointerEscapingUse(of: operand)
     }
     if useVisitor(operand) == .abortWalk {
@@ -717,7 +723,7 @@ extension InteriorUseWalker: AddressUseVisitor {
       if handleInner(borrowed: sb) == .abortWalk {
         return .abortWalk
       }
-      return sb.uses.filterUses(ofType: EndBorrowInst.self).walk {
+      return sb.uses.filter(usersOfType: EndBorrowInst.self).walk {
         useVisitor($0)
       }
     case let load as LoadBorrowInst:

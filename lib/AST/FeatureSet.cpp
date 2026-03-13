@@ -83,7 +83,6 @@ UNINTERESTING_FEATURE(FlowSensitiveConcurrencyCaptures)
 UNINTERESTING_FEATURE(CodeItemMacros)
 UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
-UNINTERESTING_FEATURE(SymbolLinkageMarkers)
 UNINTERESTING_FEATURE(DeferredCodeGen)
 UNINTERESTING_FEATURE(LazyImmediate)
 UNINTERESTING_FEATURE(MoveOnlyClasses)
@@ -110,23 +109,32 @@ UNINTERESTING_FEATURE(ImplicitSome)
 UNINTERESTING_FEATURE(ParserASTGen)
 UNINTERESTING_FEATURE(BuiltinMacros)
 UNINTERESTING_FEATURE(GenerateBindingsForThrowingFunctionsInCXX)
+UNINTERESTING_FEATURE(DeprecateCompatMemberwiseInit)
 UNINTERESTING_FEATURE(ReferenceBindings)
 UNINTERESTING_FEATURE(BuiltinModule)
 UNINTERESTING_FEATURE(RegionBasedIsolation)
 UNINTERESTING_FEATURE(PlaygroundExtendedCallbacks)
 UNINTERESTING_FEATURE(ThenStatements)
 UNINTERESTING_FEATURE(DoExpressions)
+UNINTERESTING_FEATURE(ForExpressions)
 UNINTERESTING_FEATURE(ImplicitLastExprResults)
 UNINTERESTING_FEATURE(RawLayout)
 UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
+UNINTERESTING_FEATURE(SuppressedAssociatedTypesWithDefaults)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
+UNINTERESTING_FEATURE(EmbeddedExistentials)
+UNINTERESTING_FEATURE(EmbeddedDynamicExclusivity)
+
+static bool usesFeatureUnderscoreOwned(Decl *D) {
+  return D->getAttrs().hasAttribute<OwnedAttr>();
+}
 
 // TODO: Return true for inlinable function bodies with module selectors in them
 UNINTERESTING_FEATURE(ModuleSelector)
@@ -140,40 +148,58 @@ static bool usesFeatureInlineArrayTypeSugar(Decl *D) {
 UNINTERESTING_FEATURE(StaticExclusiveOnly)
 UNINTERESTING_FEATURE(ManualOwnership)
 UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
-UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(SendingArgsAndResults)
+UNINTERESTING_FEATURE(CheckImplementationOnly)
+UNINTERESTING_FEATURE(CheckImplementationOnlyStrict)
+UNINTERESTING_FEATURE(EnforceSPIOperatorGroup)
 
-static bool findUnderscoredLifetimeAttr(Decl *decl) {
-  auto hasUnderscoredLifetimeAttr = [](Decl *decl) {
+static bool usesFeatureCAttribute(Decl *decl) {
+  for (auto attr : decl->getAttrs()) {
+    if (auto cdeclAttr = dyn_cast<CDeclAttr>(attr))
+      if (!cdeclAttr->Underscored)
+        return true;
+  }
+
+  return false;
+}
+
+static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
+  auto hasLifetimeAttr = [&](Decl *decl) {
     if (!decl->getAttrs().hasAttribute<LifetimeAttr>()) {
       return false;
     }
     // Since we ban mixing @lifetime and @_lifetime on the same decl, checking
     // any one LifetimeAttr on the decl is sufficient.
     // FIXME: Implement the ban.
-    return decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
+    if (findUnderscored) {
+      return decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
+    }
+    return !decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
   };
 
   switch (decl->getKind()) {
   case DeclKind::Var: {
     auto *var = cast<VarDecl>(decl);
-    return llvm::any_of(var->getAllAccessors(), hasUnderscoredLifetimeAttr);
+    return llvm::any_of(var->getAllAccessors(), hasLifetimeAttr);
   }
   default:
-    return hasUnderscoredLifetimeAttr(decl);
+    return hasLifetimeAttr(decl);
   }
 }
 
 static bool usesFeatureLifetimeDependence(Decl *decl) {
-  if (decl->getAttrs().hasAttribute<LifetimeAttr>()) {
-    if (findUnderscoredLifetimeAttr(decl)) {
-      // Experimental feature Lifetimes will guard the decl.
-      return false;
-    }
+  if (findLifetimeAttr(decl, /*findUnderscored*/ false)) {
     return true;
   }
 
+  // Guard inferred lifetime dependencies with LifetimeDependence if it was
+  // enabled.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::LifetimeDependence)) {
+    return false;
+  }
+
+  // Check for inferred lifetime dependencies
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
     return afd->getInterfaceType()
       ->getAs<AnyFunctionType>()
@@ -186,7 +212,75 @@ static bool usesFeatureLifetimeDependence(Decl *decl) {
 }
 
 static bool usesFeatureLifetimes(Decl *decl) {
-  return findUnderscoredLifetimeAttr(decl);
+  if (findLifetimeAttr(decl, /*findUnderscored*/ true)) {
+    return true;
+  }
+
+  // Guard inferred lifetime dependencies with Lifetimes if it was enabled.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::Lifetimes)) {
+    return false;
+  }
+
+  // Check for inferred lifetime dependencies
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+    return afd->getInterfaceType()
+        ->getAs<AnyFunctionType>()
+        ->hasLifetimeDependencies();
+  }
+  if (auto *varDecl = dyn_cast<VarDecl>(decl)) {
+    return !varDecl->getTypeInContext()->isEscapable();
+  }
+  return false;
+}
+
+static bool hasLifetimeDependencies(Type type) {
+  if (auto *aft = type->getAs<AnyFunctionType>()) {
+    return aft->hasExplicitLifetimeDependencies();
+  }
+  return false;
+}
+
+/// Search for any types within decl with lifetime dependencies. Ignore
+/// lifetimes on AbstractFunctionDecl decls, since those are supported by the
+/// Lifetimes feature, not ClosureLifetimes.
+static bool findClosureLifetimes(Decl *decl) {
+  // Search for any Decl that uses a type with lifetime dependencies, possibly
+  // restricting this to explicit dependencies.
+  class ClosureLifetimesWalker : public ASTWalker {
+
+  public:
+    bool useFound = false;
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+        // Check the parameters and result, but not the AFD itself, since
+        // lifetimes on AFDs are supported by the Lifetimes feature.
+        Type resultType =
+            afd->getInterfaceType()->getAs<AnyFunctionType>()->getResult();
+        useFound = resultType.findIf(hasLifetimeDependencies);
+        return Action::StopIf(useFound);
+      }
+
+      // Check for lifetime dependence info on param and type decls.
+      if (isa<ParamDecl>(D) || isa<TypeDecl>(D)) {
+        useFound = usesTypeMatching(D, hasLifetimeDependencies);
+        return Action::StopIf(useFound);
+      }
+
+      // Any other Decl kinds are irrelevant.
+      return Action::SkipChildren();
+    }
+  };
+
+  ClosureLifetimesWalker walker;
+  decl->walk(walker);
+  return walker.useFound;
+}
+
+static bool usesFeatureClosureLifetimes(Decl *decl) {
+  // This will find function types with lifetimes & closures with lifetimes,
+  // since it walks the AST rooted at decl, checking types.
+  return findClosureLifetimes(decl);
 }
 
 static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
@@ -276,11 +370,9 @@ UNINTERESTING_FEATURE(IsolatedAny2)
 UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)
 UNINTERESTING_FEATURE(ObjCImplementationWithResilientStorage)
-UNINTERESTING_FEATURE(CImplementation)
 UNINTERESTING_FEATURE(Sensitive)
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
 UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
-UNINTERESTING_FEATURE(SE427NoInferenceOnExtension)
 UNINTERESTING_FEATURE(TrailingComma)
 UNINTERESTING_FEATURE(RawIdentifiers)
 UNINTERESTING_FEATURE(InferIsolatedConformances)
@@ -308,30 +400,31 @@ static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureSourceWarningControl(Decl *decl) {
+  return decl->getAttrs().hasAttribute<WarnAttr>();
+}
+
 static bool usesFeatureCompileTimeValues(Decl *decl) {
   return decl->getAttrs().hasAttribute<ConstValAttr>() ||
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
-}
-
-static bool usesFeatureCompileTimeValuesPreview(Decl *decl) {
-  return false;
 }
 
 static bool usesFeatureClosureBodyMacro(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureCDecl(Decl *decl) {
-  auto attr = decl->getAttrs().getAttribute<CDeclAttr>();
-  return attr && !attr->Underscored;
+static bool usesFeatureBuiltinConcurrencyStackNesting(Decl *decl) {
+  return false;
 }
 
+UNINTERESTING_FEATURE(CompileTimeValuesPreview)
+UNINTERESTING_FEATURE(LiteralExpressions)
 UNINTERESTING_FEATURE(StrictMemorySafety)
+UNINTERESTING_FEATURE(LibraryEvolution)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
-UNINTERESTING_FEATURE(SuppressCXXForeignReferenceTypeInitializers)
-UNINTERESTING_FEATURE(WarnUnannotatedReturnOfCxxFrt)
+UNINTERESTING_FEATURE(ImportCxxMembersLazily)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
@@ -356,6 +449,7 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
 UNINTERESTING_FEATURE(CustomAvailability)
+UNINTERESTING_FEATURE(BuiltinMarkDependence)
 
 static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   // Explicit `@concurrent` attribute on the declaration.
@@ -436,8 +530,92 @@ UNINTERESTING_FEATURE(BuiltinInterleave)
 UNINTERESTING_FEATURE(BuiltinVectorsExternC)
 UNINTERESTING_FEATURE(AddressOfProperty2)
 UNINTERESTING_FEATURE(ImmutableWeakCaptures)
-// Ignore borrow and mutate accessors until it is used in the standard library.
-UNINTERESTING_FEATURE(BorrowAndMutateAccessors)
+UNINTERESTING_FEATURE(BorrowingForLoop)
+
+static bool usesFeatureBorrowAndMutateAccessors(Decl *decl) {
+  auto accessorDeclUsesFeatureBorrowAndMutateAccessors =
+      [](AccessorDecl *accessor) {
+        return requiresFeatureBorrowAndMutateAccessors(
+            accessor->getAccessorKind());
+      };
+  switch (decl->getKind()) {
+  case DeclKind::Var: {
+    auto *var = cast<VarDecl>(decl);
+    return llvm::any_of(var->getAllAccessors(),
+                        accessorDeclUsesFeatureBorrowAndMutateAccessors);
+  }
+  case DeclKind::Accessor: {
+    auto *accessor = cast<AccessorDecl>(decl);
+    return accessorDeclUsesFeatureBorrowAndMutateAccessors(accessor);
+  }
+  default:
+    return false;
+  }
+}
+
+static bool usesFeatureInlineAlways(Decl *decl) {
+  if (auto *inlineAttr = decl->getAttrs().getAttribute<InlineAttr>()) {
+    return inlineAttr->getKind() == InlineKind::Always;
+  }
+  return false;
+}
+
+UNINTERESTING_FEATURE(SwiftRuntimeAvailability)
+UNINTERESTING_FEATURE(StandaloneSwiftAvailability)
+
+static bool usesFeatureTildeSendable(Decl *decl) {
+  auto *TD = dyn_cast<TypeDecl>(decl);
+  if (!TD)
+    return false;
+
+  return llvm::any_of(
+      TD->getInherited().getEntries(), [&decl](const auto &entry) {
+        if (!entry.isSuppressed())
+          return false;
+
+        auto T = entry.getType();
+        if (!T)
+          return false;
+
+        auto &C = decl->getASTContext();
+        return C.getProtocol(KnownProtocolKind::Sendable) == T->getAnyNominal();
+      });
+}
+
+static bool usesFeatureReparenting(Decl *decl) {
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    if (proto->getAttrs().hasAttribute<ReparentableAttr>())
+      return true;
+  }
+
+  InheritedTypes inherited(decl);
+  for (auto const &entry : inherited.getEntries()) {
+    if (entry.isReparented())
+      return true;
+  }
+
+  return false;
+}
+
+UNINTERESTING_FEATURE(StrictAccessControl)
+UNINTERESTING_FEATURE(BorrowInout)
+
+// CxxBorrowingSequence and CxxBorrowingIterator, defined in the Cxx overlay,
+// conform to BorrowingSequence and BorrowingIteratorProtocol. When a newer
+// compiler is used with an older SDK, the Cxx module interface may reference
+// these Swift stdlib protocols even though they don't exist in the SDK's
+// stdlib. To handle this, we guard them behind the `BorrowingSequence`
+// experimental flag.
+static bool usesFeatureBorrowingSequence(Decl *decl) {
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+    decl = ext->getExtendedNominal();
+
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl))
+    return proto->getNameStr() == "CxxBorrowingSequence";
+  if (auto *sd = dyn_cast<StructDecl>(decl))
+    return sd->getNameStr() == "CxxBorrowingIterator";
+  return false;
+}
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

@@ -87,6 +87,9 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Whether the immediate context has an @escaping attribute.
   DirectEscaping = 1 << 14,
+
+  /// Whether the name being resolved has a module selector or not.
+  HasModuleSelector = 1 << 15,
 };
 
 /// Type resolution contexts that require special handling.
@@ -673,6 +676,12 @@ public:
 
   OpenUnboundGenericTypeFn getUnboundTypeOpener() const {
     return unboundTyOpener;
+  }
+
+  static Type defaultUnboundTypeOpener(UnboundGenericType *ty) {
+    // FIXME: Don't let unbound generic types escape type resolution.
+    // For now, just return the unbound generic type.
+    return ty;
   }
 
   HandlePlaceholderTypeReprFn getPlaceholderHandler() const {

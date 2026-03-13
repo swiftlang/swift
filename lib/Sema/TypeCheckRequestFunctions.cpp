@@ -172,27 +172,23 @@ bool SuppressesConformanceRequest::evaluate(Evaluator &evaluator,
     if (other == kp)
       return true;
   }
+
+  for (auto *attr :
+       nominal->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    if (attr->getProtocol()->isSpecificProtocol(kp) && attr->isSuppressed())
+      return true;
+  }
+
   return false;
 }
 
-CustomAttr *
-AttachedResultBuilderRequest::evaluate(Evaluator &evaluator,
-                                         ValueDecl *decl) const {
-  ASTContext &ctx = decl->getASTContext();
-  auto dc = decl->getDeclContext();
+CustomAttr *AttachedResultBuilderRequest::evaluate(Evaluator &evaluator,
+                                                   ValueDecl *decl) const {
   for (auto attr : decl->getAttrs().getAttributes<CustomAttr>()) {
-    auto mutableAttr = const_cast<CustomAttr *>(attr);
-    // Figure out which nominal declaration this custom attribute refers to.
-    auto *nominal = evaluateOrDefault(ctx.evaluator,
-                                      CustomAttrNominalRequest{mutableAttr, dc},
-                                      nullptr);
-
-    if (!nominal)
-      continue;
-
     // Return the first custom attribute that is a result builder type.
-    if (nominal->getAttrs().hasAttribute<ResultBuilderAttr>())
-      return mutableAttr;
+    auto *nominal = attr->getNominalDecl();
+    if (nominal && nominal->getAttrs().hasAttribute<ResultBuilderAttr>())
+      return attr;
   }
 
   return nullptr;
@@ -483,7 +479,7 @@ Type ResultBuilderTypeRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  return type->mapTypeOutOfContext();
+  return type->mapTypeOutOfEnvironment();
 }
 
 Type GenericTypeParamDeclGetValueTypeRequest::evaluate(

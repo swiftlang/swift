@@ -28,7 +28,8 @@ def language_feature(feature_name, enabled):
     if enabled or "asserts" in config.available_features:
         config.available_features.add("swift_feature_" + feature_name)
 
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version) language_feature(#FeatureName, True)
+#define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)                  \
+  language_feature(#FeatureName, True)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) language_feature(#FeatureName, #AvailableInProd == "true")
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   language_feature(#FeatureName, True)

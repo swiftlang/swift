@@ -113,9 +113,9 @@ static std::optional<AvailabilityQuery>
 getAvailabilityQueryForBackDeployment(AbstractFunctionDecl *AFD) {
   auto &ctx = AFD->getASTContext();
   if (ctx.LangOpts.TargetVariant) {
-    auto primaryAttrAndRange = AFD->getBackDeployedAttrAndRange(ctx);
+    auto primaryAttrAndRange = AFD->getBackDeployedAttrAndRange();
     auto variantAttrAndRange =
-        AFD->getBackDeployedAttrAndRange(ctx, /*forTargetVariant=*/true);
+        AFD->getBackDeployedAttrAndRange(/*forTargetVariant=*/true);
 
     if (!primaryAttrAndRange && !variantAttrAndRange)
       return std::nullopt;
@@ -134,7 +134,7 @@ getAvailabilityQueryForBackDeployment(AbstractFunctionDecl *AFD) {
                                       primaryRange, variantRange);
   }
 
-  if (auto primaryAttrAndRange = AFD->getBackDeployedAttrAndRange(ctx))
+  if (auto primaryAttrAndRange = AFD->getBackDeployedAttrAndRange())
     return AvailabilityQuery::dynamic(
         primaryAttrAndRange->first->getAvailabilityDomain(),
         primaryAttrAndRange->second, std::nullopt);
@@ -199,23 +199,32 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
     SILBasicBlock *unwindBB = SGF.createBasicBlock();
 
     auto *apply = SGF.B.createBeginApply(loc, functionRef, subs, params);
-    SmallVector<SILValue, 4> rawResults;
-    for (auto result : apply->getAllResults())
-      rawResults.push_back(result);
 
-    auto token = rawResults.pop_back_val();
-    SGF.B.createYield(loc, rawResults, resumeBB, unwindBB);
+    SmallVector<SILValue, 4> yields;
+    auto yieldResults = apply->getYieldedValues();
+    yields.append(yieldResults.begin(), yieldResults.end());
+
+    SGF.B.createYield(loc, yields, resumeBB, unwindBB);
 
     // Emit resume block.
     SGF.B.emitBlock(resumeBB);
-    SGF.B.createEndApply(loc, token,
+    SGF.B.createEndApply(loc, apply->getTokenResult(),
                          SILType::getEmptyTupleType(SGF.getASTContext()));
+    if (apply->isCalleeAllocated()) {
+      SGF.B.createDeallocStack(loc, apply->getCalleeAllocationResult());
+    }
+
     SGF.B.createBranch(loc, SGF.ReturnDest.getBlock());
 
     // Emit unwind block.
     SGF.B.emitBlock(unwindBB);
-    SGF.B.createEndApply(loc, token,
+    SGF.B.createEndApply(loc, apply->getTokenResult(),
                          SILType::getEmptyTupleType(SGF.getASTContext()));
+
+    if (apply->isCalleeAllocated()) {
+      SGF.B.createDeallocStack(loc, apply->getCalleeAllocationResult());
+    }
+
     SGF.B.createBranch(loc, SGF.CoroutineUnwindDest.getBlock());
     return;
   }
@@ -233,14 +242,14 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
     // Emit error block.
     SGF.B.emitBlock(errorBB);
     ManagedValue error =
-        SGF.B.createPhi(SGF.F.mapTypeIntoContext(fnConv.getSILErrorType(TEC)),
+        SGF.B.createPhi(SGF.F.mapTypeIntoEnvironment(fnConv.getSILErrorType(TEC)),
                         OwnershipKind::Owned);
     SGF.B.createBranch(loc, SGF.ThrowDest.getBlock(), {error});
 
     // Emit normal block.
     SGF.B.emitBlock(normalBB);
     SILValue result = normalBB->createPhiArgument(
-        SGF.F.mapTypeIntoContext(fnConv.getSILResultType(TEC)),
+        SGF.F.mapTypeIntoEnvironment(fnConv.getSILResultType(TEC)),
         OwnershipKind::Owned);
     SmallVector<SILValue, 4> directResults;
     extractAllElements(result, loc, SGF.B, directResults);
@@ -284,7 +293,7 @@ SILGenFunction::emitIfAvailableQuery(SILLocation loc,
 bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,
                                                ResilienceExpansion expansion) {
   auto &ctx = getASTContext();
-  auto attrAndRange = decl->getBackDeployedAttrAndRange(ctx);
+  auto attrAndRange = decl->getBackDeployedAttrAndRange();
   if (!attrAndRange)
     return false;
 

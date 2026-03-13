@@ -5,6 +5,16 @@
 
 // REQUIRES: swift_feature_Lifetimes
 
+struct NE: ~Escapable {}
+
+// CHECK-LABEL: typealias ImplicitNestedType = ((NE, inout NE) -> NE, consuming NE, inout NE) -> NE
+typealias ImplicitNestedType = ((NE, inout NE) -> NE, consuming NE, inout NE) -> NE
+
+// CHECK-LABEL: func takeImplicitNestedType(f: ((NE, inout NE) -> NE, consuming NE, inout NE) -> NE)
+
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence22takeImplicitNestedType1fyAA2NEVA2E_AEztXE_AEnAEztXE_tF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed @noescape @callee_guaranteed (@guaranteed NE, @lifetime(copy 1) @inout NE) -> @lifetime(copy 0) @owned NE, @owned NE, @lifetime(copy 2) @inout NE) -> @lifetime(copy 1) @owned NE) -> () {
+func takeImplicitNestedType(f: ImplicitNestedType) {}
+
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
   let c: Int
@@ -210,21 +220,18 @@ public struct OuterNE: ~Escapable {
     set { inner1 = newValue }
   }
 
-  public struct InnerNE: ~Escapable {
-    @_lifetime(copy owner)
-    init<Owner: ~Escapable & ~Copyable>(
-      owner: borrowing Owner
-    ) {}
-  }
+  public struct InnerNE: ~Escapable {}
 
-  @_lifetime(copy owner)
-  init<Owner: ~Copyable & ~Escapable>(owner: borrowing Owner) {
-    self.inner1 = InnerNE(owner: owner)
-  }
-
-  // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7OuterNEV8setInner5valueyAC0gE0V_tF : $@convention(method) (@guaranteed OuterNE.InnerNE, @lifetime(copy 0) @inout OuterNE) -> () {
+  // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7OuterNEV8setInner5valueyAC0gE0V_tF : $@convention(method)
+  // (@guaranteed OuterNE.InnerNE, @lifetime(copy 0, copy 1) @inout OuterNE) -> () {
   @_lifetime(self: copy value)
   mutating func setInner(value: InnerNE) {
     self.inner1 = value
   }
+}
+
+// rdar://160894371 (Infer @_lifetime(param: copy param) for inout closure arguments)
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence20inoutClosureArgument1fyyAA2NEVzXE_tF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@lifetime(copy 0) @inout NE) -> ()) -> () {
+// CHECK-LABEL: } // end sil function '$s28implicit_lifetime_dependence20inoutClosureArgument1fyyAA2NEVzXE_tF'
+func inoutClosureArgument(f: (inout NE) -> ()) {
 }

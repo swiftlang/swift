@@ -558,7 +558,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (WalkGenerics && visitTrailingRequirements(AFD))
       return true;
 
-    if (AFD->getBody(/*canSynthesize=*/false)) {
+    // If we're not walking macro expansions, avoid walking into a body if it
+    // was expanded from a macro.
+    auto SkipBody = !Walker.shouldWalkMacroArgumentsAndExpansion().second &&
+                    AFD->isBodyMacroExpanded();
+
+    if (!SkipBody && AFD->getBody(/*canSynthesize=*/false)) {
       AbstractFunctionDecl::BodyKind PreservedKind = AFD->getBodyKind();
       if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(AFD->getBody())))
         AFD->setBody(S, PreservedKind);
@@ -584,10 +589,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return true;
     }
 
-    if (auto *rawLiteralExpr = ED->getRawValueUnchecked()) {
-      if (Expr *newRawExpr = doIt(rawLiteralExpr)) {
-        auto *newLiteralRawExpr = cast<LiteralExpr>(newRawExpr);
-        ED->setRawValueExpr(newLiteralRawExpr);
+    if (auto *rawExpr = ED->getRawValueUnchecked()) {
+      if (Expr *newRawExpr = doIt(rawExpr)) {
+        ED->setRawValueExpr(newRawExpr);
       } else {
         return true;
       }
@@ -598,23 +602,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   //===--------------------------------------------------------------------===//
   //                                  Exprs
   //===--------------------------------------------------------------------===//
-
-  // A macro for handling the "semantic expressions" that are common
-  // on sugared expression nodes like string interpolation.  The
-  // semantic expression is set up by type-checking to include all the
-  // other children as sub-expressions, so if it exists, we should
-  // just bypass the rest of the visitation.
-#define HANDLE_SEMANTIC_EXPR(NODE)                         \
-  do {                                                     \
-    if (Expr *_semanticExpr = NODE->getSemanticExpr()) {   \
-      if ((_semanticExpr = doIt(_semanticExpr))) {         \
-        NODE->setSemanticExpr(_semanticExpr);              \
-      } else {                                             \
-        return nullptr;                                    \
-      }                                                    \
-      return NODE;                                         \
-    }                                                      \
-  } while (false)
 
   Expr *visitErrorExpr(ErrorExpr *E) {
     if (auto *origExpr = E->getOriginalExpr()) {
@@ -1267,7 +1254,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
     return E;
   }
 
@@ -1385,6 +1371,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
   Expr *visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
+    if (auto preamble = E->getForExpressionPreamble()) {
+      if (doIt(preamble->ForAccumulatorDecl)) {
+        return nullptr;
+      }
+
+      if (doIt(preamble->ForAccumulatorBinding)) {
+        return nullptr;
+      }
+    }
+
     if (auto *S = doIt(E->getStmt())) {
       E->setStmt(S);
     } else {
@@ -1899,6 +1895,11 @@ Stmt *Traversal::visitPoundAssertStmt(PoundAssertStmt *S) {
   return S;
 }
 
+Stmt *Traversal::visitOpaqueStmt(OpaqueStmt *OS) {
+  // We do not want to visit it.
+  return OS;
+}
+
 Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
   for (auto &Elem : BS->getElements()) {
     if (auto *SubExpr = Elem.dyn_cast<Expr*>()) {
@@ -2069,28 +2070,11 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  // The iterator decl is built directly on top of the sequence
-  // expression, so don't visit both.
-  //
-  // If for-in is already type-checked, the type-checked version
-  // of the sequence is going to be visited as part of `iteratorVar`.
-  if (auto IteratorVar = S->getIteratorVar()) {
-    if (doIt(IteratorVar))
+  if (Expr *Sequence = S->getSequence()) {
+    if ((Sequence = doIt(Sequence)))
+      S->setSequence(Sequence);
+    else
       return nullptr;
-
-    if (auto NextCall = S->getNextCall()) {
-      if ((NextCall = doIt(NextCall)))
-        S->setNextCall(NextCall);
-      else
-        return nullptr;
-    }
-  } else {
-    if (Expr *Sequence = S->getParsedSequence()) {
-      if ((Sequence = doIt(Sequence)))
-        S->setParsedSequence(Sequence);
-      else
-        return nullptr;
-    }
   }
 
   if (Expr *Where = S->getWhere()) {
@@ -2100,18 +2084,20 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  if (auto IteratorNext = S->getConvertElementExpr()) {
-    if ((IteratorNext = doIt(IteratorNext)))
-      S->setConvertElementExpr(IteratorNext);
-    else
-      return nullptr;
-  }
-
   if (Stmt *Body = S->getBody()) {
     if ((Body = doIt(Body)))
       S->setBody(cast<BraceStmt>(Body));
     else
       return nullptr;
+  }
+
+  if (Walker.shouldWalkIntoForEachDesugaredStmt()) {
+    if (Stmt *Desugared = S->getCachedDesugaredStmt()) {
+      if ((Desugared = doIt(Desugared)))
+        S->setDesugaredStmt(cast<BraceStmt>(Desugared));
+      else
+        return nullptr;
+    }
   }
 
   return S;
@@ -2244,6 +2230,8 @@ Pattern *Traversal::visitExprPattern(ExprPattern *P) {
   }
   return nullptr;
 }
+
+Pattern *Traversal::visitOpaquePattern(OpaquePattern *P) { return P; }
 
 Pattern *Traversal::visitBindingPattern(BindingPattern *P) {
   if (Pattern *newSub = doIt(P->getSubPattern())) {
@@ -2448,8 +2436,10 @@ bool Traversal::visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T) {
   return doIt(T->getBase());
 }
 
-bool Traversal::visitIntegerTypeRepr(IntegerTypeRepr *T) {
-  return false;
+bool Traversal::visitGenericArgumentExprTypeRepr(
+    GenericArgumentExprTypeRepr *T) {
+  return false; // Don't walk the inner expression; it will be type-checked
+                // independently by `resolveGenericArgumentExprTypeRepr`
 }
 
 Expr *Expr::walk(ASTWalker &walker) {

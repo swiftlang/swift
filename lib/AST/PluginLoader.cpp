@@ -67,7 +67,7 @@ getPluginLoadingFS(ASTContext &Ctx) {
   // If there is an immutable file system, using real file system to load plugin
   // as the FS in SourceMgr doesn't support directory iterator.
   if (Ctx.CASOpts.HasImmutableFileSystem)
-    return llvm::vfs::getRealFileSystem();
+    return llvm::vfs::createPhysicalFileSystem();
   return Ctx.SourceMgr.getFileSystem();
 }
 

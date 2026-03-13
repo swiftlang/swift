@@ -151,3 +151,12 @@ public func silgenNamedFunc() {}
 public class SinkingClass {
   public init() {}
 }
+
+@available(anyAppleOS 26, *)
+public func availableAnyAppleOS26() {}
+
+@available(anyAppleOS 26, macOS 26.4, *)
+public func availableAnyAppleOS26ButMacOS26_4() {}
+
+@available(anyAppleOS, unavailable)
+public func unavailableAnyAppleOS() {}

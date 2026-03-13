@@ -57,7 +57,7 @@ import SwiftShims
 ///
 /// The description implementation has the following requirements:
 ///
-/// * The body of the description implementation must a single string
+/// * The body of the description implementation must be a single string
 ///   expression. String concatenation is not supported, use string interpolation
 ///   instead.
 /// * String interpolation can reference stored properties only, functions calls
@@ -327,6 +327,38 @@ public enum _DebuggerSupport {
       target: &target)
 
     return target
+  }
+
+  // Print an object or value without the caller having a concrete type.
+  //
+  // For simplicity of data handling in LLDB avoids using an enum return type,
+  // using (Bool, String) instead of Optional<String>.
+  @available(SwiftStdlib 6.3, *)
+  public static func stringForPrintObject(_ pointer: UnsafeRawPointer?, mangledTypeName: String) -> (Bool, String) {
+    guard let pointer = unsafe pointer else {
+      return (false, "invalid pointer")
+    }
+
+    guard let type =
+      unsafe _getTypeByMangledNameInContext(
+        mangledTypeName,
+        UInt(mangledTypeName.count),
+        genericContext: nil,
+        genericArguments: nil)
+      else {
+        return (false, "type not found for mangled name: \(mangledTypeName)")
+      }
+
+    func loadPointer<T>(type: T.Type) -> Any {
+      if type is AnyObject.Type {
+        unsafe unsafeBitCast(pointer, to: T.self)
+      } else {
+        unsafe pointer.load(as: T.self)
+      }
+    }
+
+    let anyValue = _openExistential(type, do: loadPointer)
+    return (true, stringForPrintObject(anyValue))
   }
 }
 

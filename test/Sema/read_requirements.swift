@@ -18,9 +18,9 @@ protocol P : ~Copyable {
   @_borrowed
   var ubgs: U { get set }
 
-  var urs: U { read set }
+  var urs: U { yielding borrow set }
 
-  var ur: U { read }
+  var ur: U { yielding borrow }
 }
 
 struct ImplStored : ~Copyable & P {
@@ -60,25 +60,25 @@ struct ImplUnderscoredCoroutineAccessors : ~Copyable & P {
 struct ImplCoroutineAccessors : ~Copyable & P {
   var _i: U
   var ubgs: U {
-    read {
+    yielding borrow {
       yield _i
     }
-    modify {
+    yielding mutate {
       yield &_i
     }
   }
 
   var urs: U {
-    read {
+    yielding borrow {
       yield _i
     }
-    modify {
+    yielding mutate {
       yield &_i
     }
   }
 
   var ur: U {
-    read {
+    yielding borrow {
       yield _i
     }
   }

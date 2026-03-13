@@ -80,6 +80,7 @@
     "RangeSetRanges.swift",
     "CollectionOfOne.swift",
     "BridgingBuffer.swift",
+    "BorrowingSequence.swift",
     "Sequence.swift",
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollection.swift",
@@ -178,7 +179,9 @@
       "UInt128.swift"],
     "Floating": [
       "FloatingPoint.swift",
+      "FloatingPointFromString.swift",
       "FloatingPointParsing.swift",
+      "FloatingPointToString.swift",
       "FloatingPointTypes.swift",
       "FloatingPointRandom.swift"],
     "Vector": [
@@ -274,7 +277,11 @@
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
-    "InlineArray.swift"
+    "InlineArray.swift",
+    "_InlineArray.swift",
+    "Exclusivity.swift",
+    "Borrow.swift",
+    "Inout.swift"
   ],
   "Result": [
     "Result.swift"

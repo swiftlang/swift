@@ -13,6 +13,8 @@
 #ifndef SILGEN_H
 #define SILGEN_H
 
+#define SWIFT_INCLUDED_IN_SILGEN_SOURCES
+
 #include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "swift/AST/ASTContext.h"
@@ -523,14 +525,10 @@ public:
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();
 
-  /// Retrieve the _Concurrency._asyncLetStart intrinsic.
-  FuncDecl *getAsyncLetStart();
   /// Retrieve the _Concurrency._asyncLetGet intrinsic.
   FuncDecl *getAsyncLetGet();
   /// Retrieve the _Concurrency._asyncLetGetThrowing intrinsic.
   FuncDecl *getAsyncLetGetThrowing();
-  /// Retrieve the _Concurrency._asyncLetFinish intrinsic.
-  FuncDecl *getFinishAsyncLet();
 
   /// Retrieve the _Concurrency._taskFutureGet intrinsic.
   FuncDecl *getTaskFutureGet();
@@ -609,18 +607,19 @@ public:
   void emitLazyConformancesForType(NominalTypeDecl *NTD);
 
   /// Mark a protocol conformance as used, so we know we need to emit it if
-  /// it's in our TU.
-  void useConformance(ProtocolConformanceRef conformance);
+  /// it's in our TU. The SILInstruction is printed for debugging purposes if
+  /// the conformance turns out to be invalid.
+  void useConformance(SILInstruction *inst, ProtocolConformanceRef conformance);
 
   /// Mark protocol conformances from the given type as used.
-  void useConformancesFromType(CanType type);
+  void useConformancesFromType(SILInstruction *inst, CanType type);
 
   /// Mark protocol conformances from the given set of substitutions as used.
-  void useConformancesFromSubstitutions(SubstitutionMap subs);
+  void useConformancesFromSubstitutions(SILInstruction *inst, SubstitutionMap subs);
 
   /// Mark _ObjectiveCBridgeable conformances as used for any imported types
   /// mentioned by the given type.
-  void useConformancesFromObjectiveCType(CanType type);
+  void useConformancesFromObjectiveCType(SILInstruction *inst, CanType type);
 
   /// Make a note of a member reference expression, which allows us
   /// to ensure that the conformance above is emitted wherever it

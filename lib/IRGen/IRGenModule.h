@@ -349,8 +349,9 @@ private:
   llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedClassMetadata;
 
   llvm::SmallVector<CanType, 4> LazySpecializedClassMetadata;
+  llvm::SmallVector<CanType, 4> LazySpecializedValueMetadata;
 
-  llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedSpecializedClassMetadata;
+  llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedSpecializedMetadata;
 
   llvm::SmallVector<ClassDecl *, 4> ClassesForEagerInitialization;
 
@@ -362,12 +363,16 @@ private:
 
   /// The queue of IRGenModules for multi-threaded compilation.
   SmallVector<IRGenModule *, 8> Queue;
+
+  /// ObjectStore for MCCAS backend if used.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
   
   std::atomic<int> QueueIndex;
   
   friend class CurrentIGMPtr;
 public:
-  explicit IRGenerator(const IRGenOptions &opts, SILModule &module);
+  explicit IRGenerator(const IRGenOptions &opts, SILModule &module,
+                       std::shared_ptr<llvm::cas::ObjectStore> CAS = nullptr);
 
   /// Attempt to create an llvm::TargetMachine for the current target.
   std::unique_ptr<llvm::TargetMachine> createTargetMachine();
@@ -509,6 +514,7 @@ public:
 
   void noteUseOfClassMetadata(CanType classType);
   void noteUseOfSpecializedClassMetadata(CanType classType);
+  void noteUseOfSpecializedValueMetadata(CanType valueType);
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
     noteUseOfTypeGlobals(type, true, RequireMetadata);
@@ -669,6 +675,18 @@ public:
                                            llvm::Constant *address);
 };
 
+enum class CStringSectionType {
+  Default,
+  ObjCClassName,
+  ObjCMethodName,
+  ObjCMethodType,
+  OSLogString,
+  // Place all new section types above this line
+  NumTypes,
+  // Place all alias below this line
+  ObjCPropertyName = ObjCMethodName,
+};
+
 /// IRGenModule - Primary class for emitting IR for global declarations.
 /// 
 class IRGenModule {
@@ -698,6 +716,7 @@ public:
   llvm::StringMap<ModuleDecl*> OriginalModules;
   llvm::SmallString<128> OutputFilename;
   llvm::SmallString<128> MainInputFilenameForDebugInfo;
+  llvm::SmallString<128> CacheKeyForJob;
 
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
@@ -816,6 +835,7 @@ public:
   llvm::StructType *TupleTypeMetadataTy;     /// %swift.tuple_type
   llvm::StructType *FullHeapMetadataStructTy; /// %swift.full_heapmetadata = type { ... }
   llvm::StructType *FullBoxMetadataStructTy; /// %swift.full_boxmetadata = type { ... }
+  llvm::StructType *EmbeddedExistentialsMetadataStructTy;
   llvm::StructType *FullTypeMetadataStructTy; /// %swift.full_type = type { ... }
   llvm::StructType *FullExistentialTypeMetadataStructTy; /// %swift.full_existential_type = type { ... }
   llvm::StructType *FullForeignTypeMetadataStructTy; /// %swift.full_foreign_type = type { ... }
@@ -870,11 +890,13 @@ public:
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
   // clang-format on
 
-  llvm::StructType *CoroFunctionPointerTy; // { i32, i32 }
+  llvm::StructType *CoroFunctionPointerTy; // { i32, i32, i64 }
   llvm::FunctionType *CoroAllocateFnTy;
   llvm::FunctionType *CoroDeallocateFnTy;
   llvm::IntegerType *CoroAllocatorFlagsTy;
   llvm::StructType *CoroAllocatorTy;
+
+  llvm::StructType *SwiftImplicitActorType; // { %swift.refcounted, i8* }
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
@@ -907,6 +929,7 @@ public:
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
   llvm::CallingConv::ID SwiftAsyncCC;  /// swift calling convention for async
   llvm::CallingConv::ID SwiftCoroCC;   /// swift calling convention for callee-allocated coroutines
+  llvm::CallingConv::ID SwiftDirectRR_CC; /// swift direct retain/release calling convention
 
   /// What kind of tail call should be used for async->async calls.
   llvm::CallInst::TailCallKind AsyncTailCallKind;
@@ -1119,6 +1142,7 @@ public:
   const LoadableTypeInfo &
   getReferenceObjectTypeInfo(ReferenceCounting refcounting);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
+  const LoadableTypeInfo &getImplicitActorTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
@@ -1147,10 +1171,9 @@ public:
   CanType getRuntimeReifiedType(CanType type);
   Type substOpaqueTypesWithUnderlyingTypes(Type type);
   CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
-  SILType substOpaqueTypesWithUnderlyingTypes(SILType type, CanGenericSignature genericSig);
-  std::pair<CanType, ProtocolConformanceRef>
-  substOpaqueTypesWithUnderlyingTypes(CanType type,
-                                      ProtocolConformanceRef conformance);
+  SILType substOpaqueTypesWithUnderlyingTypes(SILType type);
+  ProtocolConformanceRef
+  substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef conformance);
 
   bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion,
                    ClassDecl *asViewedFromRootClass = nullptr);
@@ -1181,7 +1204,7 @@ public:
 
   ClassMetadataStrategy getClassMetadataStrategy(const ClassDecl *theClass);
 
-  bool IsWellKnownBuiltinOrStructralType(CanType type) const;
+  bool isWellKnownBuiltinOrStructuralType(CanType type) const;
 
 private:
   TypeConverter &Types;
@@ -1203,9 +1226,10 @@ public:
   std::pair<llvm::GlobalVariable *, llvm::Constant *> createStringConstant(
       StringRef Str, bool willBeRelativelyAddressed = false,
       StringRef sectionName = "", StringRef name = "");
-  llvm::Constant *getAddrOfGlobalString(StringRef utf8,
-                                        bool willBeRelativelyAddressed = false,
-                                        bool useOSLogSection = false);
+  llvm::Constant *getAddrOfGlobalString(
+      StringRef utf8,
+      CStringSectionType sectionType = CStringSectionType::Default,
+      bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *
   getAddrOfGlobalIdentifierString(StringRef utf8,
@@ -1329,10 +1353,11 @@ private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
-  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
-    GlobalStrings;
-  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
-    GlobalOSLogStrings;
+  // Maps sectionName -> string data -> constant
+  std::array<
+      llvm::StringMap<std::pair<llvm::GlobalVariable *, llvm::Constant *>>,
+      static_cast<size_t>(CStringSectionType::NumTypes)>
+      GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     StringsForTypeRef;
@@ -1543,6 +1568,13 @@ public:
   const char *getReflectionTypeRefSectionName();
   const char *getMultiPayloadEnumDescriptorSectionName();
 
+  static constexpr const char ObjCClassNameSectionName[] =
+      "__TEXT,__objc_classname,cstring_literals";
+  static constexpr const char ObjCMethodNameSectionName[] =
+      "__TEXT,__objc_methname,cstring_literals";
+  static constexpr const char ObjCMethodTypeSectionName[] =
+      "__TEXT,__objc_methtype,cstring_literals";
+
   /// Returns the special builtin types that should be emitted in the stdlib
   /// module.
   llvm::ArrayRef<CanType> getOrCreateSpecialStlibBuiltinTypes();
@@ -1610,13 +1642,14 @@ public:
               SourceFile *SF,
               StringRef ModuleName, StringRef OutputFilename,
               StringRef MainInputFilenameForDebugInfo,
-              StringRef PrivateDiscriminator);
+              StringRef PrivateDiscriminator,
+              StringRef CacheKeyForJob);
 
   /// The constructor used when we just need an IRGenModule for type lowering.
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target)
     : IRGenModule(irgen, std::move(target), /*SF=*/nullptr,
                   "<fake module name>", "<fake output filename>",
-                  "<fake main input filename>", "") {}
+                  "<fake main input filename>", "", "") {}
 
   ~IRGenModule();
 
@@ -1647,6 +1680,8 @@ public:
   void setMustHaveFramePointer(llvm::Function *F);
   llvm::AttributeList constructInitialAttributes();
   StackProtectorMode shouldEmitStackProtector(SILFunction *f);
+
+  llvm::ConstantInt *getMallocTypeId(llvm::Function *fn);
 
   void emitProtocolDecl(ProtocolDecl *D);
   void emitEnumDecl(EnumDecl *D);
@@ -1690,7 +1725,7 @@ public:
   llvm::ConstantInt *getInt32(uint32_t value);
   llvm::ConstantInt *getSize(Size size);
   llvm::Constant *getAlignment(Alignment align);
-  llvm::Constant *getBool(bool condition);
+  llvm::ConstantInt *getBool(bool condition);
 
   /// Cast the given constant to i8*.
   llvm::Constant *getOpaquePtr(llvm::Constant *pointer);
@@ -1708,6 +1743,7 @@ public:
   SILFunction *getSILFunctionForCoroFunctionPointer(llvm::Constant *cfp);
 
   llvm::Constant *getAddrOfGlobalCoroMallocAllocator();
+  llvm::Constant *getAddrOfGlobalCoroTypedMallocAllocator();
   llvm::Constant *getAddrOfGlobalCoroAsyncTaskAllocator();
 
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
@@ -2024,6 +2060,8 @@ public:
 
   /// Returns true if the given Clang function does not throw exceptions.
   bool isCxxNoThrow(clang::FunctionDecl *fd, bool defaultNoThrow = false);
+
+  bool isEmbeddedWithExistentials() const;
 
 private:
   llvm::Constant *

@@ -872,33 +872,43 @@ llvm::Constant *irgen::getCoroFrameAllocStubFn(IRGenModule &IGM) {
   // Otherwise, create a stub function to call it when available, or malloc
   // when it isn't.
   return IGM.getOrCreateHelperFunction(
-    "__swift_coroFrameAllocStub", IGM.Int8PtrTy,
-    {IGM.SizeTy, IGM.Int64Ty},
-    [&](IRGenFunction &IGF) {
-      auto parameters = IGF.collectParameters();
-      auto *size = parameters.claimNext();
-      auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
-      auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(
-        llvm::CmpInst::Predicate::ICMP_NE, coroFrameAllocFn,
-        llvm::ConstantPointerNull::get(
-            cast<llvm::PointerType>(coroFrameAllocFn->getType())));
-      auto *coroFrameAllocReturn = IGF.createBasicBlock("return-coroFrameAlloc");
-      auto *mallocReturn = IGF.createBasicBlock("return-malloc");
-      IGF.Builder.CreateCondBr(nullSwiftCoroFrameAlloc, coroFrameAllocReturn, mallocReturn);
+      "__swift_coroFrameAllocStub", IGM.Int8PtrTy, {IGM.SizeTy, IGM.Int64Ty},
+      [&](IRGenFunction &IGF) {
+        auto parameters = IGF.collectParameters();
+        auto *size = parameters.claimNext();
+        auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
+        auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(
+            llvm::CmpInst::Predicate::ICMP_NE, coroFrameAllocFn,
+            llvm::ConstantPointerNull::get(
+                cast<llvm::PointerType>(coroFrameAllocFn->getType())));
+        auto *coroFrameAllocReturn =
+            IGF.createBasicBlock("return-coroFrameAlloc");
+        auto *mallocReturn = IGF.createBasicBlock("return-malloc");
+        IGF.Builder.CreateCondBr(nullSwiftCoroFrameAlloc, coroFrameAllocReturn,
+                                 mallocReturn);
 
-      IGF.Builder.emitBlock(coroFrameAllocReturn);
-      auto *mallocTypeId = parameters.claimNext();
-      auto *coroFrameAllocCall = IGF.Builder.CreateCall(IGF.IGM.getCoroFrameAllocFunctionPointer(), {size, mallocTypeId});
-      IGF.Builder.CreateRet(coroFrameAllocCall);
+        IGF.Builder.emitBlock(coroFrameAllocReturn);
+        auto *mallocTypeId = parameters.claimNext();
+        auto *coroFrameAllocCall = IGF.Builder.CreateCall(
+            IGF.IGM.getCoroFrameAllocFunctionPointer(), {size, mallocTypeId});
+        IGF.Builder.CreateRet(coroFrameAllocCall);
 
-      IGF.Builder.emitBlock(mallocReturn);
-      auto *mallocCall = IGF.Builder.CreateCall(IGF.IGM.getMallocFunctionPointer(), {size});
-      IGF.Builder.CreateRet(mallocCall);
-    },
-    /*setIsNoInline=*/false,
-    /*forPrologue=*/false,
-    /*isPerformanceConstraint=*/false,
-    /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::C);
+        IGF.Builder.emitBlock(mallocReturn);
+        auto *mallocCall =
+            IGF.Builder.CreateCall(IGF.IGM.getMallocFunctionPointer(), {size});
+        IGF.Builder.CreateRet(mallocCall);
+      },
+      /*setIsNoInline=*/false,
+      /*forPrologue=*/false,
+      /*isPerformanceConstraint=*/false,
+      /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::C);
+}
+
+FunctionPointer irgen::getCoroFrameAllocStubFunctionPointer(IRGenModule &IGM) {
+  auto *fn = cast<llvm::Function>(getCoroFrameAllocStubFn(IGM));
+  auto sig = Signature::forFunction(fn);
+  return FunctionPointer::forDirect(FunctionPointerKind::Function, fn, nullptr,
+                                    sig);
 }
 
 static Size getOffsetOfOpaqueIsolationField(IRGenModule &IGM,
@@ -987,7 +997,7 @@ protected:
 
   // Create a new explosion for potentially reabstracted parameters.
   Explosion args;
-  Address resultValueAddr;
+  StackAddress resultValueAddr;
 
   PartialApplicationForwarderEmission(
       IRGenModule &IGM, IRGenFunction &subIGF, llvm::Function *fwd,
@@ -1034,13 +1044,13 @@ public:
       useSRet = false;
     } else if (origNativeSchema.requiresIndirect()) {
       assert(!nativeResultSchema.requiresIndirect());
-      auto stackAddr = outResultTI.allocateStack(
+      resultValueAddr = outResultTI.allocateStack(
           subIGF,
           outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()),
           "return.temp");
-      resultValueAddr = stackAddr.getAddress();
       auto resultAddr = subIGF.Builder.CreateElementBitCast(
-          resultValueAddr, IGM.getStorageType(origConv.getSILResultType(
+          resultValueAddr.getAddress(),
+          IGM.getStorageType(origConv.getSILResultType(
                                IGM.getMaximalTypeExpansionContext())));
       args.add(resultAddr.getAddress());
       useSRet = false;
@@ -1248,7 +1258,7 @@ public:
         assert(!nativeResultSchema.requiresIndirect());
         Explosion loadedResult;
         cast<LoadableTypeInfo>(outResultTI)
-            .loadAsTake(subIGF, resultValueAddr, loadedResult);
+            .loadAsTake(subIGF, resultValueAddr.getAddress(), loadedResult);
         Explosion nativeResult = nativeResultSchema.mapIntoNative(
             IGM, subIGF, loadedResult,
             outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()),
@@ -1491,7 +1501,7 @@ public:
     auto prototype = subIGF.IGM.getOpaquePtr(
       subIGF.IGM.getAddrOfContinuationPrototype(
         cast<SILFunctionType>(
-          unsubstType->mapTypeOutOfContext()->getCanonicalType()),
+          unsubstType->mapTypeOutOfEnvironment()->getCanonicalType()),
         origType->getInvocationGenericSignature()));
 
     
@@ -1631,7 +1641,6 @@ public:
 
     /// Get the continuation function pointer
     ///
-    auto sig = Signature::forCoroutineContinuation(subIGF.IGM, origType);
     auto schemaAndEntity =
       getCoroutineResumeFunctionPointerAuth(subIGF.IGM, origType);
     auto pointerAuth = PointerAuthInfo::emit(subIGF, schemaAndEntity.first,
@@ -2290,7 +2299,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     llvm::Value *fnContext, Explosion &args, ArrayRef<SILParameterInfo> params,
     SubstitutionMap subs, CanSILFunctionType origType,
     CanSILFunctionType substType, CanSILFunctionType outType, Explosion &out,
-    bool isOutlined) {
+    bool isOutlined, StackAllocationIsNested_t isNested) {
   // If we have a single Swift-refcounted context value, we can adopt it
   // directly as our closure context without creating a box and thunk.
   enum HasSingleSwiftRefcountedContext { Maybe, Yes, No, Thunkable }
@@ -2564,10 +2573,9 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     // Allocate a new object on the heap or stack.
     HeapNonFixedOffsets offsets(IGF, layout);
     if (outType->isNoEscape()) {
-      stackAddr = IGF.emitDynamicAlloca(
-          IGF.IGM.Int8Ty,
-          layout.isFixedLayout() ? layout.emitSize(IGF.IGM) : offsets.getSize(),
-          Alignment(16));
+      stackAddr = IGF.emitStackAllocation(
+        layout.isFixedLayout() ? layout.emitSize(IGF.IGM) : offsets.getSize(),
+        Alignment(MaximumAlignment), isNested);
       stackAddr = stackAddr->withAddress(IGF.Builder.CreateElementBitCast(
           stackAddr->getAddress(), IGF.IGM.OpaqueTy));
       data = stackAddr->getAddress().getAddress();

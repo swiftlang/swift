@@ -1,7 +1,6 @@
 #ifndef SWIFT_CXXMETHODBRIDGING_H
 #define SWIFT_CXXMETHODBRIDGING_H
 
-#include "swift/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
@@ -13,7 +12,8 @@ struct CXXMethodBridging {
 
   enum class NameKind { unknown, snake, lower, camel, title };
 
-  CXXMethodBridging(const clang::CXXMethodDecl *method) : method(method) {}
+  explicit CXXMethodBridging(const clang::CXXMethodDecl *method)
+      : method(method) {}
 
   Kind classify() {
     if (nameIsBlacklist())
@@ -66,15 +66,13 @@ struct CXXMethodBridging {
     bool hasUpper = llvm::any_of(
         getClangName(), [](unsigned char ch) { return std::isupper(ch); });
 
-    if (getClangName().empty()) {
+    if (getClangName().empty())
       return NameKind::unknown;
-    }
 
-    if (getClangName().contains('_')) {
+    if (getClangName().contains('_'))
       return hasUpper ? NameKind::unknown : NameKind::snake;
-    } else if (!hasUpper) {
+    if (!hasUpper)
       return NameKind::lower;
-    }
 
     return islower(getClangName().front()) ? NameKind::camel : NameKind::title;
   }

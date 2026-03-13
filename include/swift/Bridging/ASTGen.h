@@ -117,6 +117,17 @@ intptr_t swift_ASTGen_configuredRegions(
 void swift_ASTGen_freeConfiguredRegions(
     BridgedIfConfigClauseRangeInfo *_Nullable regions, intptr_t numRegions);
 
+swift::WarningGroupBehavior swift_ASTGen_warningGroupBehaviorAtPosition(
+    void *_Nonnull sourceFile,
+    BridgedArrayRef globalRules,
+    BridgedStringRef diagnosticGroupNameStrRef,
+    swift::SourceLoc loc);
+
+bool swift_ASTGen_isWarningGroupEnabledInFile(
+    void *_Nonnull sourceFile,
+    BridgedArrayRef globalRules,
+    BridgedStringRef diagnosticGroupNameStrRef);
+
 intptr_t swift_ASTGen_activeInEmbeddedSwift(
     BridgedASTContext astContext,
     void *_Nonnull sourceFile,

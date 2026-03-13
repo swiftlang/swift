@@ -77,6 +77,13 @@ struct SymbolGraphOptions {
 
   /// Whether `AvailabilityPlatforms` is an allow list or a block list.
   bool AvailabilityIsBlockList = false;
+
+  /// Whether to use shortened, by using a hash of the module names, file names
+  /// when writing symbol graph files to `OutputDir`.
+  /// An additional JSON file is written at `OutputDir` that contains a mapping
+  /// of the shortened file names to the module name(s) in the symbol graph
+  /// files.
+  bool ShortenOutputNames = false;
 };
 
 } // end namespace symbolgraphgen

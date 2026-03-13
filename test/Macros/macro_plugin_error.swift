@@ -18,15 +18,16 @@
 
 // CHECK: ->(plugin:[[#PID1:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION:]]}}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"getCapabilityResult":{"capability":{"protocolVersion":1}}}
-// CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"TestPlugin","name":"fooMacro","typeName":"FooMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":7,"offset":[[#]]},"source":"#fooMacro(1)"}}}
+// CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"TestPlugin","name":"fooMacro","typeName":"FooMacro"},"macroRole":"expression","staticBuildConfiguration"{{.*}},"syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":7,"offset":[[#]]},"source":"#fooMacro(1)"}}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"invalidResponse":{}}
-// CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"TestPlugin","name":"fooMacro","typeName":"FooMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":9,"offset":[[#]]},"source":"#fooMacro(2)"}}}
+// CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"TestPlugin","name":"fooMacro","typeName":"FooMacro"},"macroRole":"expression","staticBuildConfiguration"{{.*}},"syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":9,"offset":[[#]]},"source":"#fooMacro(2)"}}}
 // ^ This messages causes the mock plugin exit because there's no matching expected message.
 
 // CHECK: ->(plugin:[[#PID2:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION]]}}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"getCapabilityResult":{"capability":{"protocolVersion":1}}}
-// CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"TestPlugin","name":"fooMacro","typeName":"FooMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":11,"offset":[[#]]},"source":"#fooMacro(3)"}}}
+// CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"TestPlugin","name":"fooMacro","typeName":"FooMacro"},"macroRole":"expression","staticBuildConfiguration"{{.*}},"syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":11,"offset":[[#]]},"source":"#fooMacro(3)"}}}
 // CHECK-NEXT: <-(plugin:[[#PID2:]]) {"expandFreestandingMacroResult":{"diagnostics":[],"expandedSource":"3.description"}}
+// CHECK-NEXT: ->(plugin:[[#PID2:]]) {{$}}
 
 //--- test.swift
 @freestanding(expression) macro fooMacro(_: Any) -> String = #externalMacro(module: "TestPlugin", type: "FooMacro")
@@ -36,7 +37,7 @@ func test() {
   // FIXME: -module-abi-name ABI name is leaking.
 
   let _: String = #fooMacro(1)
-  // expected-error @-1 {{typeMismatch(_CompilerSwiftCompilerPluginMessageHandling.PluginToHostMessage}}
+  // expected-error @-1 {{typeMismatch}}
   let _: String = #fooMacro(2)
   // expected-error @-1 {{failed to receive result from plugin (from macro 'fooMacro')}}
   let _: String = #fooMacro(3)

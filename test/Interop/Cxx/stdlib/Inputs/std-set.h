@@ -13,10 +13,12 @@ inline UnorderedSetOfCInt initUnorderedSetOfCInt() { return {2, 4, 6}; }
 inline MultisetOfCInt initMultisetOfCInt() { return {2, 2, 4, 6}; }
 
 struct NonCopyable {
-  NonCopyable() = default;
+  NonCopyable(int n) : number(n) {}
   NonCopyable(const NonCopyable &other) = delete;
   NonCopyable(NonCopyable &&other) = default;
   ~NonCopyable() {}
+
+  int number;
 };
 
 using SetOfNonCopyable = std::set<NonCopyable>;

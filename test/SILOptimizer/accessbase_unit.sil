@@ -86,3 +86,33 @@ bb0(%0 : @owned $C):
   %9999 = tuple()
   return %9999 : $()
 }
+
+public struct GenWrapper<T> {
+  @_hasStorage var _prop: T { get set }
+  public var prop: T
+}
+
+sil @borrow_addressonly_prop : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK: begin running test 1 of 2 on test_borrow_base: get_access_base with: %2
+// CHECK: sil [ossa] @test_borrow_base : $@convention(thin) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_address T {
+// CHECK: bb0(%0 : $*GenWrapper<T>):
+// CHECK:   %1 = function_ref @borrow_addressonly_prop : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:   %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:   return %2
+// CHECK: }
+// CHECK: Address:   %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK: Base: %0 = argument of bb0 : $*GenWrapper<T>
+// CHECK: end running test 1 of 2 on test_borrow_base: get_access_base with: %2
+// CHECK: begin running test 2 of 2 on test_borrow_base: swift_get_access_base with: %2
+// CHECK: Address:   %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK: Base: argument - %0 = argument of bb0 : $*GenWrapper<T>
+
+sil [ossa] @test_borrow_base : $@convention(thin) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_address T {
+bb0(%0 : $*GenWrapper<T>):
+  %1 = function_ref @borrow_addressonly_prop : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+  %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+  specify_test "get_access_base %2"
+  specify_test "swift_get_access_base %2"
+  return %2
+}
+

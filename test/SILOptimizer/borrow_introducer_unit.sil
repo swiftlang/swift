@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -test-runner -sil-disable-input-verify %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -test-runner -sil-disable-input-verify %s -o /dev/null 2>&1 | %FileCheck %s
 //
 // REQUIRES: swift_in_compiler
 
@@ -75,7 +75,7 @@ sil @coro : $@yield_once @convention(thin) () -> @yields @guaranteed C
 
 // CHECK-LABEL: introducer_identity: borrow_introducers with: %reborrow
 // CHECK: } // end sil function 'introducer_identity'
-// CHECK: Borrow introducers for: %{{.*}} = argument of bb1 : $C
+// CHECK: Borrow introducers for:   %7 = borrowed %6 : $C from (%0 : $C)
 // CHECK-NEXT: argument of bb1 : $C
 // CHECK-NEXT: introducer_identity: borrow_introducers with: %reborrow
 sil [ossa] @introducer_identity : $@convention(thin) (@guaranteed C, @in C) -> () {
@@ -93,7 +93,8 @@ entry(%0 : @guaranteed $C, %1 : $*C):
 
   br exit(%borrow1 : $C)
 
-exit(%reborrow : @guaranteed $C):
+exit(%12 : @guaranteed $C):
+  %reborrow = borrowed %12 from (%0)
   specify_test "find_borrow_introducers %reborrow"
   specify_test "borrow_introducers %reborrow"
   end_borrow %reborrow : $C
@@ -112,7 +113,7 @@ exit(%reborrow : @guaranteed $C):
 
 // CHECK-LABEL: introducer_trivial: borrow_introducers with: %phi
 // CHECK: } // end sil function 'introducer_trivial'
-// CHECK: Borrow introducers for:  %2 = argument of bb1 : $FakeOptional<C>
+// CHECK: Borrow introducers for:   %3 = borrowed %2 : $FakeOptional<C> from ()
 // CHECK-NEXT: introducer_trivial: borrow_introducers with: %phi
 
 sil [ossa] @introducer_trivial : $@convention(thin) () -> () {
@@ -120,34 +121,10 @@ entry:
   %trivial = enum $FakeOptional<C>, #FakeOptional.none!enumelt
   br none(%trivial : $FakeOptional<C>)
 
-none(%phi : @guaranteed $FakeOptional<C>):
+none(%2 : @guaranteed $FakeOptional<C>):
+  %phi = borrowed %2 from ()
   specify_test "find_borrow_introducers %phi"
   specify_test "borrow_introducers %phi"
-  %retval = tuple ()
-  return %retval : $()
-}
-
-// An unreachable phi can be either a reborrow or forwarded, as long as it has no end_borrow.
-
-// CHECK-LABEL: introducer_unreachable: find_borrow_introducers with: %phiCycle
-// CHECK: } // end sil function 'introducer_unreachable'
-// CHECK: Introducers:
-// CHECK-NEXT: introducer_unreachable: find_borrow_introducers with: %phiCycle
-
-// CHECK-LABEL: introducer_unreachable: borrow_introducers with: %phiCycle
-// CHECK: } // end sil function 'introducer_unreachable'
-// CHECK: Borrow introducers for: %1 = argument of bb1 : $C
-// CHECK-NEXT: introducer_unreachable: borrow_introducers with: %phiCycle
-sil [ossa] @introducer_unreachable : $@convention(thin) () -> () {
-entry:
-  br exit
-
-unreachable_loop(%phiCycle : @guaranteed $C):
-  specify_test "find_borrow_introducers %phiCycle"
-  specify_test "borrow_introducers %phiCycle"
-  br unreachable_loop(%phiCycle : $C)
-
-exit:
   %retval = tuple ()
   return %retval : $()
 }
@@ -172,7 +149,8 @@ entry(%0 : @guaranteed $C):
   %some = enum $FakeOptional<D>, #FakeOptional.some!enumelt, %cast : $D
   br switch(%some : $FakeOptional<D>)
 
-switch(%somePhi : @guaranteed $FakeOptional<D>):
+switch(%4 : @guaranteed $FakeOptional<D>):
+  %somePhi = borrowed %4 from (%0)
   switch_enum %somePhi : $FakeOptional<D>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%payload : @guaranteed $D):
@@ -222,7 +200,9 @@ entry(%0 : @guaranteed $C):
   %aggregate = struct $PairC(%0 : $C, %borrow1 : $C)
   br bb2(%borrow1 : $C, %aggregate : $PairC)
 
-bb2(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
+bb2(%4 : @guaranteed $C, %5 : @guaranteed $PairC):
+  %phi = borrowed %5 from (%4, %0)
+  %reborrow = borrowed %4 from (%0)
   %first = struct_extract %phi : $PairC, #PairC.first
   %aggregate2 = struct $PairC(%reborrow : $C, %first : $C)
   specify_test "find_borrow_introducers %aggregate2"
@@ -266,7 +246,9 @@ entry(%0 : @guaranteed $C):
   %aggregate = struct $PairC(%0 : $C, %borrow2 : $C)
   br bb2(%borrow1 : $C, %aggregate : $PairC)
 
-bb2(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
+bb2(%5 : @guaranteed $C, %6 : @guaranteed $PairC):
+  %phi = borrowed %6 from (%borrow2, %0)
+  %reborrow = borrowed %5 from (%0)
   %first = struct_extract %phi : $PairC, #PairC.first
   %aggregate2 = struct $PairC(%reborrow : $C, %first : $C)
   specify_test "find_borrow_introducers %aggregate2"
@@ -370,12 +352,12 @@ bb0(%0 : @owned $C,
 }
 
 // CHECK-LABEL: testSelfIntroducer: borrow_introducers with: %phi
-// CHECK: Borrow introducers for: %{{.*}} = argument of bb1 : $D
+// CHECK: Borrow introducers for:   %6 = borrowed %5 : $D from (%4 : $C)
 // CHECK-NEXT: %{{.*}} = argument of bb1 : $C
 // CHECK-NEXT: testSelfIntroducer: borrow_introducers with: %phi
 
 // CHECK-LABEL: testSelfIntroducer: enclosing_values with: %reborrow
-// CHECK: Enclosing values for: %4 = argument of bb1 : $C
+// CHECK: Enclosing values for:   %7 = borrowed %4 : $C from (%0 : $C)
 // CHECK-NEXT: %0 = argument of bb0 : $C
 // CHECK-NEXT: testSelfIntroducer: enclosing_values with: %reborrow
 sil [ossa] @testSelfIntroducer : $@convention(thin) (@guaranteed C) -> () {
@@ -384,7 +366,9 @@ bb0(%0 : @guaranteed $C):
   %d = unconditional_checked_cast %borrow : $C to D
   br bb1(%borrow : $C, %d : $D)
  
-bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $D):
+bb1(%4 : @guaranteed $C, %5 : @guaranteed $D):
+  %phi = borrowed %5 from (%4)
+  %reborrow = borrowed %4 from (%0)
   specify_test "borrow_introducers %phi"
   specify_test "enclosing_values %reborrow"
   cond_br undef, bb2, bb3
@@ -405,7 +389,7 @@ bb3:
 // one of the outer adjacent phis as an enclosing value for %inner.
 //
 // CHECK-LABEL: testEnclosingRevisitReborrow: enclosing_values with: %inner
-// CHECK: Enclosing values for: %11 = argument of bb4 : $C
+// CHECK: Enclosing values for:   %12 = borrowed %11 : $C from (%10 : $C, %9 : $C)
 // CHECK-NEXT: %{{.*}} = argument of bb4 : $C
 // CHECK-NEXT: %{{.*}} = argument of bb4 : $C
 // CHECK-NEXT: end running test 1 of 1 on testEnclosingRevisitReborrow: enclosing_values with: %inner
@@ -414,7 +398,8 @@ bb0(%0 : @owned $C, %1 : @owned $C):
   %borrow = begin_borrow %0 : $C
   br bb1(%borrow : $C)
 
-bb1(%reborrow : @guaranteed $C):
+bb1(%4 : @guaranteed $C):
+  %reborrow = borrowed %4 from (%0)
   cond_br undef, bb2, bb3
 
 bb2:
@@ -423,7 +408,8 @@ bb2:
 bb3:
   br bb4(%1 : $C, %0 : $C, %reborrow : $C)
 
-bb4(%outer0 : @owned $C, %outer1 : @owned $C, %inner : @guaranteed $C):
+bb4(%outer0 : @owned $C, %outer1 : @owned $C, %11 : @guaranteed $C):
+  %inner = borrowed %11 from (%outer1, %outer0)
   specify_test "enclosing_values %inner"
   end_borrow %inner : $C
   destroy_value %outer0 : $C

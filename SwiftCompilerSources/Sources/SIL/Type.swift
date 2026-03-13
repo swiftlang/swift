@@ -92,6 +92,9 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     bridged.isExactSuperclassOf(type.bridged)
   }
 
+  /// True if this type references a "ref" type that has a single pointer representation.
+  public var isHeapObjectReferenceType: Bool { bridged.isHeapObjectReferenceType() }
+
   public func loweredInstanceTypeOfMetatype(in function: Function) -> Type {
     return canonicalType.instanceTypeOfMetatype.loweredType(in: function)
   }
@@ -113,6 +116,19 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     .init(bridgedOrNil: bridged.getRawLayoutSubstitutedCountType())
   }
 
+  public var approximateFormalPackType: CanonicalType {
+    precondition(isSILPack);
+    return CanonicalType(bridged: bridged.getApproximateFormalPackType());
+  }
+
+  /// True if destroying a value of this type might invoke a custom deinitialer
+  /// with side effects. This includes any recursive deinitializers that may be
+  /// invoked by releasing a reference. False if this only has default
+  /// deinitialization.
+  public func mayHaveCustomDeinit(in function: Function) -> Bool {
+    return bridged.mayHaveCustomDeinit(function.bridged)
+  }
+
   //===--------------------------------------------------------------------===//
   //                Properties of lowered `SILFunctionType`s
   //===--------------------------------------------------------------------===//
@@ -131,7 +147,7 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   public var hasValidSignatureForEmbedded: Bool {
     let genericSignature = invocationGenericSignatureOfFunction
     for genParam in genericSignature.genericParameters {
-      let mappedParam = genericSignature.mapTypeIntoContext(genParam)
+      let mappedParam = genericSignature.mapTypeIntoEnvironment(genParam)
       if mappedParam.isArchetype && !mappedParam.archetypeRequiresClass {
         return false
       }
@@ -159,6 +175,11 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   public func getBoxFields(in function: Function) -> BoxFieldsArray {
     precondition(isBox)
     return BoxFieldsArray(boxType: canonicalType, function: function)
+  }
+
+  public var packElements: PackElementArray {
+    precondition(isSILPack)
+    return PackElementArray(type: self)
   }
 
   /// Returns nil if the nominal is a resilient type because in this case the complete list
@@ -214,11 +235,19 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     }
     return false
   }
+
+  public func mapOutOfEnvironment(in function: Function) -> Type {
+    rawType.mapOutOfEnvironment().canonical.loweredType(in: function)
+  }
 }
 
-extension Type: Equatable {
+extension Type: Equatable, Hashable {
   public static func ==(lhs: Type, rhs: Type) -> Bool { 
     lhs.bridged.opaqueValue == rhs.bridged.opaqueValue
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(bridged.opaqueValue)
   }
 }
 
@@ -265,9 +294,15 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
   }
 }
 
-public struct EnumCase {
+public struct EnumCase : Equatable {
+  public let enumElementDecl : EnumElementDecl
   public let payload: Type?
   public let index: Int
+  public var name: StringRef { enumElementDecl.name }
+
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    return lhs.enumElementDecl == rhs.enumElementDecl
+  }
 }
 
 public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
@@ -288,8 +323,25 @@ public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
         caseIterator = caseIterator.getNext()
         caseIndex += 1
       }
-      return EnumCase(payload: enumType.bridged.getEnumCasePayload(caseIterator, function.bridged).typeOrNil,
+      return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(caseIterator).getAs(EnumElementDecl.self),
+                      payload: enumType.bridged.getEnumCasePayload(caseIterator, function.bridged).typeOrNil,
                       index: caseIndex)
+    }
+    return nil
+  }
+
+  // Note: this has O(n) complexity where n is number of enum cases
+  public subscript(_ index: Int) -> EnumCase? {
+    var iterator = enumType.bridged.getFirstEnumCaseIterator()
+    var currentIndex = 0
+    while currentIndex != index && !enumType.bridged.isEndCaseIterator(iterator) {
+      iterator = iterator.getNext()
+      currentIndex += 1
+    }
+    if currentIndex == index && !enumType.bridged.isEndCaseIterator(iterator) {
+      return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(iterator).getAs(EnumElementDecl.self),
+                      payload: enumType.bridged.getEnumCasePayload(iterator, function.bridged).typeOrNil,
+                      index: index)
     }
     return nil
   }
@@ -303,6 +355,10 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 
   public subscript(_ index: Int) -> Type {
     type.bridged.getTupleElementType(index).type
+  }
+
+  public func label(at index: Int) -> Identifier {
+    type.bridged.getTupleElementLabel(index)
   }
 }
 
@@ -319,6 +375,17 @@ public struct BoxFieldsArray : RandomAccessCollection, FormattedLikeArray {
 
   public func isMutable(fieldIndex: Int) -> Bool {
     BridgedType.getBoxFieldIsMutable(boxType.bridged, fieldIndex)
+  }
+}
+
+public struct PackElementArray : RandomAccessCollection, FormattedLikeArray {
+  fileprivate let type: Type
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { Int(type.bridged.getNumPackElements()) }
+
+  public subscript(_ index: Int) -> Type {
+    type.bridged.getPackElementType(index).type
   }
 }
 

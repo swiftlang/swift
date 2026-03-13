@@ -54,7 +54,7 @@ actor Act {
 nonisolated let act = Act()
 
 func bad() async {
-    // expected-warning@+3 {{no 'async' operations occur within 'await' expression}}
+    // expected-warning@+3 {{no 'async' operations occur within 'await' expression}}{{5-11=}}
     // expected-error@+2 {{actor-isolated property 'i' can not be mutated from a nonisolated context}}
     // expected-note@+1 {{consider declaring an isolated method on 'Act' to perform the mutation}}
     await act.i = 666
@@ -66,13 +66,13 @@ protocol Proto: Actor {
 extension Act: Proto {}
 
 func good() async {
-    // expected-warning@+3 {{no 'async' operations occur within 'await' expression}}
+    // expected-warning@+3 {{no 'async' operations occur within 'await' expression}}{{5-11=}}
     // expected-error@+2 {{actor-isolated property 'i' can not be mutated from a nonisolated context}}
     // expected-note@+1 {{consider declaring an isolated method on 'Proto' to perform the mutation}}
     await (act as any Proto).i = 42
     let aIndirect: any Proto = act
 
-    // expected-warning@+3 {{no 'async' operations occur within 'await' expression}}
+    // expected-warning@+3 {{no 'async' operations occur within 'await' expression}}{{5-11=}}
     // expected-error@+2 {{actor-isolated property 'i' can not be mutated from a nonisolated context}}
     // expected-note@+1 {{consider declaring an isolated method on 'Proto' to perform the mutation}}
     await aIndirect.i = 777

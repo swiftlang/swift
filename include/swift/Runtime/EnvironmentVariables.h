@@ -14,6 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_RUNTIME_ENVIRONMENTVARIABLES_H
+#define SWIFT_RUNTIME_ENVIRONMENTVARIABLES_H
+
 #include "swift/Threading/Once.h"
 #include "swift/shims/Visibility.h"
 
@@ -63,6 +66,12 @@ SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations();
 // Concurrency library can call.
 SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyIsCurrentExecutorLegacyModeOverride();
 
+// Wrapper around SWIFT_DEBUG_ENABLE_TASK_SLAB_ALLOCATOR that the Concurrency
+// library can call.
+SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableTaskSlabAllocator();
+
 } // end namespace environment
 } // end namespace runtime
 } // end namespace swift
+
+#endif // SWIFT_RUNTIME_ENVIRONMENTVARIABLES_H

@@ -6,16 +6,20 @@
 // RUN: %target-swift-frontend -emit-module %S/Inputs/spi_helper.swift -module-name SPIHelper -emit-module-path %t/SPIHelper.swiftmodule -emit-module-interface-path %t/SPIHelper.swiftinterface -emit-private-module-interface-path %t/SPIHelper.private.swiftinterface -enable-library-evolution -swift-version 5 -parse-as-library
 
 /// Reading from swiftmodule
-// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t -verify-ignore-unknown \
+// RUN:   -enable-experimental-feature EnforceSPIOperatorGroup
 
 /// Reading from .private.swiftinterface
 // RUN: rm %t/SPIHelper.swiftmodule
-// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t -verify-ignore-unknown \
+// RUN:   -enable-experimental-feature EnforceSPIOperatorGroup
 
 /// Reading from the public .swiftinterface should raise errors on missing
 /// declarations.
 // RUN: rm %t/SPIHelper.private.swiftinterface
 // RUN: not %target-swift-frontend -typecheck -I %t %s
+
+// REQUIRES: swift_feature_EnforceSPIOperatorGroup
 
 import SPIHelper
 
@@ -40,8 +44,14 @@ otherApiFunc() // expected-error {{cannot find 'otherApiFunc' in scope}}
 public func publicUseOfSPI(param: SPIClass) -> SPIClass {} // expected-error 2{{cannot find type 'SPIClass' in scope}}
 public func publicUseOfSPI2() -> [SPIClass] {} // expected-error {{cannot find type 'SPIClass' in scope}}
 
+public let o1 = PublicType()
+public let o2 = PublicType()
+
 @inlinable
-func inlinable() -> SPIClass { // expected-error {{cannot find type 'SPIClass' in scope}}
+public func inlinable() -> SPIClass { // expected-error {{cannot find type 'SPIClass' in scope}}
   spiFunc() // expected-error {{cannot find 'spiFunc' in scope}}
   _ = SPIClass() // expected-error {{cannot find 'SPIClass' in scope}}
+  let _ = o1 - o2 // expected-error {{binary operator '-' cannot be applied to two 'PublicType' operands}}
 }
+
+let _ = o1 - o2 // expected-error {{binary operator '-' cannot be applied to two 'PublicType' operands}}

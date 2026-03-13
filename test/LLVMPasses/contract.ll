@@ -10,9 +10,9 @@ target triple = "x86_64-apple-macosx10.9"
 declare ptr @swift_allocObject(ptr , i64, i64) nounwind
 declare ptr @swift_bridgeObjectRetain(ptr)
 declare void @swift_bridgeObjectRelease(ptr )
-declare void @swift_release(ptr nocapture)
+declare void @swift_release(ptr captures(none))
 declare ptr @swift_retain(ptr ) nounwind
-declare void @swift_unknownObjectRelease(ptr nocapture)
+declare void @swift_unknownObjectRelease(ptr captures(none))
 declare ptr @swift_unknownObjectRetain(ptr ) nounwind
 declare void @__swift_fixLifetime(ptr)
 declare void @noread_user(ptr) readnone

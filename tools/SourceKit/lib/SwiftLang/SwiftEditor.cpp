@@ -1027,12 +1027,11 @@ public:
     if (!Range.isValid())
       return;
 
-    // If we are walking into macro expansions, make sure we only report ranges
-    // from the requested buffer, not any buffers of child macro expansions.
-    if (IsWalkingMacroExpansionBuffer &&
-        SM.findBufferContainingLoc(Range.getStart()) != BufferID) {
+    // Make sure we only report from the requested buffer, not any buffers of
+    // child macro expansions.
+    if (SM.findBufferContainingLoc(Range.getStart()) != BufferID)
       return;
-    }
+
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
     auto Kind = ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(D);
@@ -2217,7 +2216,7 @@ llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
 SwiftEditorDocument::getFileSystem() const {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
   return Impl.SemanticInfo ? Impl.SemanticInfo->getFileSystem()
-                           : llvm::vfs::getRealFileSystem();
+                           : llvm::vfs::createPhysicalFileSystem();
 }
 
 void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,

@@ -990,8 +990,7 @@ public:
                      function_ref<SILBasicBlock *(const SILInstruction *&)>>;
   NonLifetimeEndingUsesInLiveOutBlocksRange
   getNonLifetimeEndingUsesInLiveOutBlocks() const {
-    function_ref<SILBasicBlock *(const SILInstruction *&)> op;
-    op = [](const SILInstruction *&ptr) -> SILBasicBlock * {
+    auto op = [](const SILInstruction *&ptr) -> SILBasicBlock * {
       return ptr->getParent();
     };
     return NonLifetimeEndingUsesInLiveOutBlocksRange(

@@ -1,4 +1,4 @@
-// RUN: not %target-typecheck-verify-swift
+// RUN: not %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // This is highly invalid, so just don't crash.
 

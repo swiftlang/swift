@@ -28,6 +28,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 
@@ -112,7 +113,7 @@ std::string toFullyQualifiedProtocolNameString(const swift::ProtocolDecl &Protoc
 std::string toMangledTypeNameString(const swift::Type &Type) {
   auto PrintingType = Type;
   if (Type->hasArchetype())
-    PrintingType = Type->mapTypeOutOfContext();
+    PrintingType = Type->mapTypeOutOfEnvironment();
   return Mangle::ASTMangler(Type->getASTContext()).mangleTypeWithoutPrefix(PrintingType->getCanonicalType());
 }
 
@@ -123,10 +124,10 @@ namespace swift {
 bool
 parseProtocolListFromFile(StringRef protocolListFilePath,
                           DiagnosticEngine &diags,
+                          llvm::vfs::FileSystem &fs,
                           std::unordered_set<std::string> &protocols) {
   // Load the input file.
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFile(protocolListFilePath);
+  auto FileBufOrErr = fs.getBufferForFile(protocolListFilePath);
   if (!FileBufOrErr) {
     diags.diagnose(SourceLoc(),
                    diag::const_extract_protocol_list_input_file_missing,
@@ -517,6 +518,16 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
     case ExprKind::OpenExistential: {
       auto openExistentialExpr = cast<OpenExistentialExpr>(expr);
       return extractCompileTimeValue(openExistentialExpr->getExistentialValue(), declContext);
+    }
+
+    case ExprKind::VarargExpansion: {
+      auto varargExpansionExpr = cast<VarargExpansionExpr>(expr);
+      return extractCompileTimeValue(varargExpansionExpr->getSubExpr(), declContext);
+    }
+
+    case ExprKind::ForceValue: {
+      auto forceValueExpr = cast<ForceValueExpr>(expr);
+      return extractCompileTimeValue(forceValueExpr->getSubExpr(), declContext);
     }
 
     default: {
@@ -1387,7 +1398,7 @@ void writeAssociatedTypeAliases(llvm::json::OStream &JSON,
                              toFullyQualifiedTypeNameString(type));
               JSON.attribute("substitutedMangledTypeName",
                              toMangledTypeNameString(type));
-              if (auto OpaqueTy = dyn_cast<OpaqueTypeArchetypeType>(type)) {
+              if (auto *OpaqueTy = type->getAs<OpaqueTypeArchetypeType>()) {
                 writeSubstitutedOpaqueTypeAliasDetails(JSON, *OpaqueTy);
               }
             });

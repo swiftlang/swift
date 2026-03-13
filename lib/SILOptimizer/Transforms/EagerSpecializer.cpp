@@ -38,8 +38,10 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/Support/Debug.h"
 
@@ -440,7 +442,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   else {
     auto resultTy = GenericFunc->getConventions().getSILResultType(
         Builder.getTypeExpansionContext());
-    auto GenResultTy = GenericFunc->mapTypeIntoContext(resultTy);
+    auto GenResultTy = GenericFunc->mapTypeIntoEnvironment(resultTy);
 
     SILValue CastResult =
         Builder.createUncheckedForwardingCast(Loc, Result, GenResultTy);
@@ -469,7 +471,7 @@ void EagerDispatch::
 emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
               Type SubTy) {
   // Instantiate a thick metatype for T.Type
-  auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);
+  auto ContextTy = GenericFunc->mapTypeIntoEnvironment(ParamTy);
   auto GenericMT = Builder.createMetatype(
     Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
 
@@ -506,7 +508,7 @@ void EagerDispatch::emitIsTrivialCheck(SILBasicBlock *FailedTypeCheckBB,
                                        LayoutConstraint Layout) {
   auto &Ctx = Builder.getASTContext();
   // Instantiate a thick metatype for T.Type
-  auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);
+  auto ContextTy = GenericFunc->mapTypeIntoEnvironment(ParamTy);
   auto GenericMT = Builder.createMetatype(
       Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
   auto BoolTy = SILType::getBuiltinIntegerType(1, Ctx);
@@ -531,7 +533,7 @@ void EagerDispatch::emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
   }
   auto &Ctx = Builder.getASTContext();
   // Instantiate a thick metatype for T.Type
-  auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);
+  auto ContextTy = GenericFunc->mapTypeIntoEnvironment(ParamTy);
   auto GenericMT = Builder.createMetatype(
     Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
 
@@ -568,7 +570,7 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
                                               LayoutConstraint Layout) {
   auto &Ctx = Builder.getASTContext();
   // Instantiate a thick metatype for T.Type
-  auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);
+  auto ContextTy = GenericFunc->mapTypeIntoEnvironment(ParamTy);
   auto GenericMT = Builder.createMetatype(
     Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
 
@@ -898,6 +900,12 @@ void EagerSpecializerTransform::run() {
   // calls and branches.
   if (Changed) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    removeUnreachableBlocks(F);
+    if (F.needBreakInfiniteLoops())
+      breakInfiniteLoops(getPassManager(), &F);
+    if (F.needCompleteLifetimes())
+      completeAllLifetimes(getPassManager(), &F);
   }
 
   // As specializations are created, the non-exported attributes should be

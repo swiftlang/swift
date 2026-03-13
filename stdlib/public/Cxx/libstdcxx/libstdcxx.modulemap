@@ -22,6 +22,7 @@ module std {
   header "algorithm"
   header "bitset"
   header "complex"
+  header "cstddef"
   header "deque"
   header "exception"
   header "fstream"
@@ -79,6 +80,12 @@ module std {
   module compat {
     module cassert {
       header "cassert"
+      requires cplusplus
+      export *
+    }
+
+    module cmath {
+      header "cmath"
       requires cplusplus
       export *
     }

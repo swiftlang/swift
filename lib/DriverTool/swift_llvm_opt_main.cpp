@@ -135,7 +135,7 @@ getTargetMachine(llvm::Triple TheTriple, StringRef CPUStr,
   }
 
   return TheTarget->createTargetMachine(
-      TheTriple.getTriple(), CPUStr, FeaturesStr, targetOptions,
+      TheTriple, CPUStr, FeaturesStr, targetOptions,
       std::optional<llvm::Reloc::Model>(llvm::codegen::getExplicitRelocModel()),
       llvm::codegen::getExplicitCodeModel(), GetCodeGenOptLevel(options));
 }
@@ -174,7 +174,8 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   // If we are supposed to override the target triple, do so now.
   if (!options.TargetTriple.empty())
-    M->setTargetTriple(llvm::Triple::normalize(options.TargetTriple));
+    M->setTargetTriple(
+        llvm::Triple(llvm::Triple::normalize(options.TargetTriple)));
 
   // Figure out what stream we are supposed to write to...
   std::unique_ptr<llvm::ToolOutputFile> Out;
@@ -216,7 +217,9 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     // Then perform the optimizations.
     SourceManager SM;
     DiagnosticEngine Diags(SM);
-    performLLVMOptimizations(Opts, Diags, nullptr, M.get(), TM.get(),
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
+        llvm::vfs::createPhysicalFileSystem();
+    performLLVMOptimizations(Opts, Diags, nullptr, M.get(), TM.get(), FS,
                              &Out->os());
   } else {
     std::string Pipeline = PassPipeline;

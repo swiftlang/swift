@@ -79,7 +79,8 @@ llvm::StringRef getAccessLevelSpelling(AccessLevel value);
 
 enum class ENUM_EXTENSIBILITY_ATTR(closed) InlineKind : uint8_t {
   Never SWIFT_NAME("never") = 0,
-  Always SWIFT_NAME("always") = 1,
+  AlwaysUnderscored SWIFT_NAME("alwaysUnderscored") = 1,
+  Always SWIFT_NAME("always") = 2,
   Last_InlineKind = Always
 };
 

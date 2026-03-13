@@ -66,10 +66,15 @@ MemoryLocations::Location::Location(SILValue val, unsigned index, int parentIdx)
       representativeValue(val),
       parentIdx(parentIdx) {
   assert(((parentIdx >= 0) ==
-    (isa<StructElementAddrInst>(val) || isa<TupleElementAddrInst>(val) ||
-     isa<InitEnumDataAddrInst>(val) || isa<UncheckedTakeEnumDataAddrInst>(val) ||
-     isa<InitExistentialAddrInst>(val) || isa<OpenExistentialAddrInst>(val)))
-    && "sub-locations can only be introduced with struct/tuple/enum projections");
+          (isa<StructElementAddrInst>(val) || isa<TupleElementAddrInst>(val) ||
+           isa<InitEnumDataAddrInst>(val) ||
+           isa<UncheckedTakeEnumDataAddrInst>(val) ||
+           isa<InitExistentialAddrInst>(val) ||
+           isa<OpenExistentialAddrInst>(val) || isa<ApplyInst>(val) ||
+           isa<StoreBorrowInst>(val))) &&
+         "sub-locations can only be introduced with "
+         "struct/tuple/enum/store_borrow/borrow accessor "
+         "projections");
   setBitAndResize(subLocations, index);
   setBitAndResize(selfAndParents, index);
 }
@@ -349,6 +354,21 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
         if (cast<DebugValueInst>(user)->hasAddrVal())
           break;
         return false;
+      case SILInstructionKind::ApplyInst: {
+        auto *apply = cast<ApplyInst>(user);
+        if (apply->hasAddressResult()) {
+          if (!analyzeAddrProjection(apply, locIdx, 0, collectedVals,
+                                     subLocationMap))
+            return false;
+        }
+        break;
+      }
+      case SILInstructionKind::StoreBorrowInst: {
+        if (!analyzeAddrProjection(cast<StoreBorrowInst>(user), locIdx, 0,
+                                   collectedVals, subLocationMap))
+          return false;
+        break;
+      }
       case SILInstructionKind::InjectEnumAddrInst:
       case SILInstructionKind::SelectEnumAddrInst:
       case SILInstructionKind::ExistentialMetatypeInst:
@@ -357,13 +377,11 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
       case SILInstructionKind::FixLifetimeInst:
       case SILInstructionKind::LoadInst:
       case SILInstructionKind::StoreInst:
-      case SILInstructionKind::StoreBorrowInst:
       case SILInstructionKind::EndAccessInst:
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::CheckedCastAddrBranchInst:
       case SILInstructionKind::UncheckedRefCastAddrInst:
       case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-      case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst:
       case SILInstructionKind::BeginApplyInst:
       case SILInstructionKind::CopyAddrInst:
@@ -371,6 +389,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
       case SILInstructionKind::DeallocStackInst:
       case SILInstructionKind::SwitchEnumAddrInst:
       case SILInstructionKind::WitnessMethodInst:
+      case SILInstructionKind::EndBorrowInst:
         break;
       case SILInstructionKind::MarkUnresolvedMoveAddrInst:
         // We do not want the memory lifetime verifier to verify move_addr inst

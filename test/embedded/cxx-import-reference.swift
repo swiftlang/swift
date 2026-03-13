@@ -40,3 +40,12 @@ public func test()
   let c =  C.create()
   c.foo()
 }
+
+public func cast<S,D>(_ s:S, to type:D.Type) -> D {
+  return unsafeBitCast(s, to: type.self)
+}
+
+public func testcast(_ provider: AnyObject) -> C {
+  return cast (provider, to: C.self)
+}
+

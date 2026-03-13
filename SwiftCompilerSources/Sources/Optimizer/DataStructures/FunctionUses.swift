@@ -162,3 +162,22 @@ struct FunctionUses {
     uses[function, default: FirstUse(of: function)].hasUnknownUses = true
   }
 }
+
+//===--------------------------------------------------------------------===//
+//                              Tests
+//===--------------------------------------------------------------------===//
+
+let functionUsesTest = ModuleTest("function-uses") {
+    (context: ModulePassContext) in
+
+  var functionUses = FunctionUses()
+  functionUses.collect(context: context)
+
+  for function in context.functions {
+    let uses = functionUses.getUses(of: function)
+
+    print("Uses of \(function.name)")
+    print(uses)
+    print("End function \(function.name)\n")
+  }
+}

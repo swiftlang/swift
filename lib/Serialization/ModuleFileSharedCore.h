@@ -106,6 +106,9 @@ class ModuleFileSharedCore {
   /// Name to use in public facing diagnostics and documentation.
   StringRef PublicModuleName;
 
+  /// Section name to use for OSLog strings.
+  StringRef OSLogStringSectionName;
+
   /// The version of the Swift compiler used to produce swiftinterface
   /// this module is based on. This is the most precise version possible
   /// - a compiler tag or version if this is a development compiler.
@@ -113,9 +116,6 @@ class ModuleFileSharedCore {
 
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;
-
-  /// \c true if this module was compiled with -enable-ossa-modules.
-  bool RequiresOSSAModules;
 
   /// An array of module names that are allowed to import this one.
   ArrayRef<StringRef> AllowableClientNames;
@@ -142,25 +142,23 @@ public:
 
     Dependency(StringRef path, StringRef spiGroups, bool isHeader,
                ImportFilterKind importControl, bool isScoped)
-        : RawPath(path),
-          RawSPIs(spiGroups),
+        : RawPath(path), RawSPIs(spiGroups),
           RawImportControl(rawControlFromKind(importControl)),
-          IsHeader(isHeader),
-          IsScoped(isScoped) {
+          IsHeader(isHeader), IsScoped(isScoped) {
       assert(llvm::popcount(static_cast<unsigned>(importControl)) == 1 &&
              "must be a particular filter option, not a bitset");
       assert(getImportControl() == importControl && "not enough bits");
     }
 
   public:
-   Dependency(StringRef path, StringRef spiGroups,
-              ImportFilterKind importControl, bool isScoped)
-       : Dependency(path, spiGroups, false, importControl, isScoped) {}
+    Dependency(StringRef path, StringRef spiGroups,
+               ImportFilterKind importControl, bool isScoped)
+        : Dependency(path, spiGroups, false, importControl, isScoped) {}
 
-   static Dependency forHeader(StringRef headerPath, bool exported) {
-     auto importControl =
-         exported ? ImportFilterKind::Exported : ImportFilterKind::Default;
-     return Dependency(headerPath, StringRef(), true, importControl, false);
+    static Dependency forHeader(StringRef headerPath, bool exported) {
+      auto importControl =
+          exported ? ImportFilterKind::Exported : ImportFilterKind::Default;
+      return Dependency(headerPath, {}, true, importControl, false);
     }
 
     bool isExported() const {
@@ -445,7 +443,6 @@ private:
       std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
       std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
       bool isFramework,
-      bool requiresOSSAModules,
       StringRef requiredSDK,
       std::optional<llvm::Triple> target,
       serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
@@ -573,8 +570,6 @@ public:
   /// of the buffer, even if there's an error in loading.
   /// \param isFramework If true, this is treated as a framework module for
   /// linking purposes.
-  /// \param requiresOSSAModules If true, this requires dependent modules to be
-  /// compiled with -enable-ossa-modules.
   /// \param requiredSDK A string denoting the name of the currently-used SDK,
   /// to ensure that the loaded module was built with a compatible SDK.
   /// \param target The target triple of the current compilation for
@@ -587,7 +582,7 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-       bool isFramework, bool requiresOSSAModules,
+       bool isFramework,
        StringRef requiredSDK, std::optional<llvm::Triple> target,
        PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
@@ -595,7 +590,7 @@ public:
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiresOSSAModules, requiredSDK, target, info,
+        requiredSDK, target, info,
         pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
@@ -675,9 +670,9 @@ public:
   }
 
   /// Get embedded bridging header.
-  std::string getEmbeddedHeader() const {
+  StringRef getEmbeddedHeader() const {
     // Don't include the '\0' in the end.
-    return importedHeaderInfo.contents.drop_back().str();
+    return importedHeaderInfo.contents.drop_back();
   }
 
   /// If the module-defining `.swiftinterface` file is an SDK-relative path,

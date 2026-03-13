@@ -625,6 +625,7 @@ bb0:
 
 bb1:
   dealloc_stack %stack : $*Builtin.Int16
+  end_borrow %token
   unreachable
 
 bb2:
@@ -820,3 +821,50 @@ sil [ossa] @simplest_begin_apply_yield_once_2 : $@convention(thin) () -> () {
   %retval = tuple ()
   return %retval : $()
 }
+
+// Just make sure that inlining doesn't produce invalid SIL
+// CHECK-LABEL: sil [ossa] @co_routine_lifetime_completion :
+// CHECK:         function_ref @co_routine :
+// CHECK:       } // end sil function 'co_routine_lifetime_completion'
+sil [ossa] @co_routine_lifetime_completion : $@convention(thin) (@owned String, @in_guaranteed String) -> @owned String {
+bb0(%0 : @owned $String, %1 : $*String):
+  %2 = function_ref @call_co_routine : $@yield_once @convention(thin) (@guaranteed String, @guaranteed String) -> @yields @inout Optional<Int>
+  %3 = load_borrow %1
+  (%4, %5) = begin_apply %2(%0, %3) : $@yield_once @convention(thin) (@guaranteed String, @guaranteed String) -> @yields @inout Optional<Int>
+  %6 = load [trivial] %4
+  switch_enum %6, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  end_borrow %5
+  end_borrow %3
+  destroy_value [dead_end] %0
+  unreachable
+
+bb2(%12 : $Int):
+  %13 = end_apply %5 as $()
+  end_borrow %3
+  return %0
+}
+
+sil @co_routine : $@yield_once @convention(thin) (@guaranteed String) -> @yields @inout Optional<Int>
+
+sil [ossa] [transparent] @call_co_routine : $@yield_once @convention(thin) (@guaranteed String, @guaranteed String) -> @yields @inout Optional<Int> {
+bb0(%0 : @guaranteed $String, %1 : @guaranteed $String):
+
+  %2 = function_ref @co_routine : $@yield_once @convention(thin) (@guaranteed String) -> @yields @inout Optional<Int>
+  %3 = alloc_ref $SomeClass
+  (%4, %5) = begin_apply %2(%0) : $@yield_once @convention(thin) (@guaranteed String) -> @yields @inout Optional<Int>
+  yield %4, resume bb1, unwind bb2
+
+bb1:
+  %7 = end_apply %5 as $()
+  destroy_value %3
+  %9 = tuple ()
+  return %9
+
+bb2:
+  %11 = end_apply %5 as $()
+  destroy_value %3
+  unwind
+}
+

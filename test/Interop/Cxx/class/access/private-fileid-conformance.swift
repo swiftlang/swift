@@ -1,7 +1,7 @@
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -I %t/Cxx/include %t/PrivateFile.swift -cxx-interoperability-mode=default -module-name Module
-// RUN: %target-swift-frontend -typecheck -verify -I %t/Cxx/include %t/HasRetroactive.swift -cxx-interoperability-mode=default -module-name Module
-// RUN: %target-swift-frontend -typecheck -verify -I %t/Cxx/include %t/NoRetroactive.swift -cxx-interoperability-mode=default -module-name Module
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %t/Cxx/include %t/PrivateFile.swift -cxx-interoperability-mode=default -module-name Module
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %t/Cxx/include %t/HasRetroactive.swift -cxx-interoperability-mode=default -module-name Module
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %t/Cxx/include %t/NoRetroactive.swift -cxx-interoperability-mode=default -module-name Module
 
 //--- Cxx/include/module.modulemap
 module CxxModule {

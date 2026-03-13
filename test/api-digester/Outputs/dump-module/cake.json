@@ -1833,6 +1833,50 @@
         ]
       },
       {
+        "kind": "Function",
+        "name": "availableAnyAppleOS26",
+        "printedName": "availableAnyAppleOS26()",
+        "children": [
+          {
+            "kind": "TypeNominal",
+            "name": "Void",
+            "printedName": "()"
+          }
+        ],
+        "declKind": "Func",
+        "usr": "s:4cake21availableAnyAppleOS26yyF",
+        "mangledName": "$s4cake21availableAnyAppleOS26yyF",
+        "moduleName": "cake",
+        "intro_anyAppleOS": "26",
+        "declAttributes": [
+          "Available"
+        ],
+        "funcSelfKind": "NonMutating"
+      },
+      {
+        "kind": "Function",
+        "name": "availableAnyAppleOS26ButMacOS26_4",
+        "printedName": "availableAnyAppleOS26ButMacOS26_4()",
+        "children": [
+          {
+            "kind": "TypeNominal",
+            "name": "Void",
+            "printedName": "()"
+          }
+        ],
+        "declKind": "Func",
+        "usr": "s:4cake027availableAnyAppleOS26ButMacE2_4yyF",
+        "mangledName": "$s4cake027availableAnyAppleOS26ButMacE2_4yyF",
+        "moduleName": "cake",
+        "intro_Macosx": "26.4",
+        "intro_anyAppleOS": "26",
+        "declAttributes": [
+          "Available",
+          "Available"
+        ],
+        "funcSelfKind": "NonMutating"
+      },
+      {
         "kind": "TypeDecl",
         "name": "Int",
         "printedName": "Int",

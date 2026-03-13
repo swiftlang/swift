@@ -109,6 +109,11 @@ public:
   bool isAnyWitnessTable() const {
     return kind == Kind::WitnessTable || kind == Kind::WitnessTablePack;
   }
+
+  bool isAnyPack() const {
+    return kind == Kind::MetadataPack || kind == Kind::WitnessTablePack;
+  }
+
   bool isValue() const {
     return kind == Kind::Value;
   }

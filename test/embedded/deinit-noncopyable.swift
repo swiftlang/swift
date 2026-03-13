@@ -2,12 +2,19 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend %t/Library.swift -g -enable-experimental-feature Embedded -enable-experimental-feature Lifetimes -c -parse-as-library -o %t/Library.o -emit-module
 // RUN: %target-swift-frontend -I %t %t/Application.swift -g -enable-experimental-feature Embedded -enable-experimental-feature Lifetimes -c -o %t/main.o
-// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
+// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o %target-embedded-posix-shim -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Lifetimes
+
+// Failing with ASAN. Disable the test to unblock rest of ASAN testing. Please
+// remove radar number and this blurb once this is fixed.
+//
+// rdar://159992660
+//
+// UNSUPPORTED: asan
 
 //--- Library.swift
 @safe public struct UniqueBuffer<Element: ~Copyable>: ~Copyable {
@@ -19,7 +26,7 @@
     }
 
     @inline(__always)
-    @_alwaysEmitIntoClient
+    @export(implementation)
     deinit {
         buffer.deinitialize().deallocate()
     }

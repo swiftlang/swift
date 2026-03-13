@@ -353,6 +353,9 @@ static Type substPrefixType(Type type, unsigned suffixLength, Type prefixType,
 Type RequirementMachine::getReducedTypeParameter(
     CanType t,
     ArrayRef<GenericTypeParamType *> genericParams) const {
+  if (Failed)
+    return ErrorType::get(t);
+
   // Get a simplified term T.
   auto term = Context.getMutableTermForType(t, /*proto=*/nullptr);
   System.simplify(term);
@@ -752,7 +755,7 @@ RequirementMachine::getReducedShapeTerm(Type type) const {
   // Get the term T', which is the reduced shape of T.
   if (term.size() != 2 ||
       term[0].getKind() != Symbol::Kind::GenericParam ||
-      term[1].getKind() != Symbol::Kind::Shape) {
+      !term.hasShape()) {
     ABORT([&](auto &out) {
       out << "Invalid reduced shape\n";
       out << "Type: " << type << "\n";
@@ -760,8 +763,8 @@ RequirementMachine::getReducedShapeTerm(Type type) const {
     });
   }
 
-  MutableTerm reducedTerm(term.begin(), term.end() - 1);
-  return reducedTerm;
+  term.removeShape();
+  return term;
 }
 
 Type RequirementMachine::getReducedShape(Type type,
@@ -800,6 +803,9 @@ void RequirementMachine::verify(const MutableTerm &term) const {
       });
     }
   }
+
+  if (Failed)
+    return;
 
   MutableTerm erased;
 

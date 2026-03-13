@@ -53,6 +53,10 @@ struct S5: ~Copyable {
   @_hasStorage let b: AnyObject
 }
 
+struct S6: ~Copyable {
+  deinit
+}
+
 // CHECK-LABEL: sil [ossa] @test_simple_struct :
 // CHECK:         [[D:%.*]] = function_ref @s1_deinit
 // CHECK:         apply [[D]](%0) : $@convention(method) (@owned S1) -> ()
@@ -62,6 +66,16 @@ bb0(%0 : @owned $S1):
   destroy_value %0 : $S1
   %r = tuple()
   return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_devirtualize_deadend_destroys :
+// CHECK:         destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'dont_devirtualize_deadend_destroys'
+sil [ossa] @dont_devirtualize_deadend_destroys : $@convention(thin) (@owned S1) -> () {
+bb0(%0 : @owned $S1):
+  destroy_value [dead_end] %0
+  unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @test_two_field_deinits :
@@ -331,11 +345,30 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   return %r
 }
 
+// CHECK-LABEL: sil [serialized] [ossa] @dont_create_non_public_function_ref_in_serialized_func :
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
+// CHECK:       } // end sil function 'dont_create_non_public_function_ref_in_serialized_func'
+sil [serialized] [ossa] @dont_create_non_public_function_ref_in_serialized_func : $@convention(thin) (@owned S6) -> () {
+bb0(%0 : @owned $S6):
+  destroy_value %0
+  %r = tuple()
+  return %r
+}
+
 
 sil @s1_deinit : $@convention(method) (@owned S1) -> ()
 sil @s2_deinit : $@convention(method) (@owned S2) -> ()
 sil @s3_deinit : $@convention(method) <T> (@in S3<T>) -> ()
 sil @s4_deinit : $@convention(method) (@owned S4) -> ()
+
+sil hidden [ossa] @s6_deinit : $@convention(method) (@owned S6) -> () {
+bb0(%0 : @owned $S6):
+  %1 = drop_deinit %0
+  () = destructure_struct %1
+  %r = tuple ()
+  return %r
+}
 
 sil_moveonlydeinit S1 {
   @s1_deinit
@@ -351,4 +384,8 @@ sil_moveonlydeinit S3 {
 
 sil_moveonlydeinit S4 {
   @s4_deinit
+}
+
+sil_moveonlydeinit S6 {
+  @s6_deinit
 }

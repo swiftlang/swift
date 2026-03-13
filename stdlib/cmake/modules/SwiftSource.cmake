@@ -549,7 +549,9 @@ function(_compile_swift_files
   endif()
 
   # The standard library and overlays are built resiliently when SWIFT_STDLIB_STABLE_ABI=On.
-  if(SWIFTFILE_IS_STDLIB AND NOT SWIFTFILE_IS_FRAGILE AND SWIFT_STDLIB_STABLE_ABI)
+  if(SWIFTFILE_IS_STDLIB AND NOT SWIFTFILE_IS_FRAGILE
+      AND SWIFT_STDLIB_STABLE_ABI
+      AND NOT "${SWIFTFILE_SDK}" STREQUAL "LINUX_STATIC")
     list(APPEND swift_flags "-enable-library-evolution")
     list(APPEND swift_flags "-library-level" "api")
     list(APPEND swift_flags "-Xfrontend" "-require-explicit-availability=ignore")
@@ -632,19 +634,24 @@ function(_compile_swift_files
     list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
   endif()
 
-  list(APPEND swift_flags "-enable-experimental-feature" "NoncopyableGenerics2")
-  list(APPEND swift_flags "-enable-experimental-feature" "SuppressedAssociatedTypes")
-  list(APPEND swift_flags "-enable-experimental-feature" "SE427NoInferenceOnExtension")
+  list(APPEND swift_flags "-enable-experimental-feature" "SuppressedAssociatedTypesWithDefaults")
 
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
   list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependence")
   list(APPEND swift_flags "-enable-experimental-feature" "InoutLifetimeDependence")
   list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependenceMutableAccessors")
+  list(APPEND swift_flags "-enable-experimental-feature" "Lifetimes")
 
   list(APPEND swift_flags "-enable-upcoming-feature" "MemberImportVisibility")
 
   if (SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE)
     list(APPEND swift_flags "-strict-concurrency=complete")
+  endif()
+
+  list(APPEND swift_flags "-Werror" "StrictMemorySafety")
+
+  if (SWIFT_STDLIB_ENABLE_SIL_OPAQUE_VALUES)
+    list(APPEND swift_flags "-Xfrontend" "-enable-sil-opaque-values")
   endif()
 
   if (SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES)
@@ -659,6 +666,13 @@ function(_compile_swift_files
   if(SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES)
     list(APPEND swift_flags "-Xfrontend" "-disable-preallocated-instantiation-caches")
   endif()
+
+  # Catch expressions where the type checker fails in normal mode and then finds a
+  # valid solution in diagnostic mode.
+  #
+  # We're not ready to enable this flag uconditionally yet, but turn it on for the
+  # standard library.
+  list(APPEND swift_flags "-Xfrontend" "-solver-enable-crash-on-valid-salvage")
 
   list(APPEND swift_flags ${SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS})
 
@@ -721,7 +735,9 @@ function(_compile_swift_files
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
 
-    if(SWIFT_ENABLE_MODULE_INTERFACES AND NOT SWIFTFILE_IS_FRAGILE)
+    if(SWIFT_ENABLE_MODULE_INTERFACES
+        AND NOT SWIFTFILE_IS_FRAGILE
+        AND NOT "${SWIFTFILE_SDK}" STREQUAL "LINUX_STATIC")
       set(interface_file "${module_base}.swiftinterface")
       set(interface_file_static "${module_base_static}.swiftinterface")
       set(private_interface_file "${module_base}.private.swiftinterface")

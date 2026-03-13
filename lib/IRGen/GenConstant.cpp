@@ -79,7 +79,9 @@ llvm::Constant *irgen::emitAddrOfConstantString(IRGenModule &IGM,
   case StringLiteralInst::Encoding::Bytes:
   case StringLiteralInst::Encoding::UTF8:
   case StringLiteralInst::Encoding::UTF8_OSLOG:
-    return IGM.getAddrOfGlobalString(SLI->getValue(), false, useOSLogEncoding);
+    return IGM.getAddrOfGlobalString(
+        SLI->getValue(), useOSLogEncoding ? CStringSectionType::OSLogString
+                                          : CStringSectionType::Default);
 
   case StringLiteralInst::Encoding::ObjCSelector:
     llvm_unreachable("cannot get the address of an Objective-C selector");
@@ -267,6 +269,13 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     strategy.emitValueInjection(IGM, builder, ei->getElement(), data, out);
     return replaceUnalignedIntegerValues(IGM, std::move(out));
   } else if (auto *ILI = dyn_cast<IntegerLiteralInst>(operand)) {
+    if (ILI->getType().is<BuiltinIntegerLiteralType>()) {
+      auto pair = emitConstantIntegerLiteral(IGM, ILI);
+      Explosion e;
+      e.add(pair.Data);
+      e.add(pair.Flags);
+      return e;
+    }
     return emitConstantInt(IGM, ILI);
   } else if (auto *FLI = dyn_cast<FloatLiteralInst>(operand)) {
     return emitConstantFP(IGM, FLI);

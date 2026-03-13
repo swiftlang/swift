@@ -32,20 +32,31 @@ raw_ostream &getADDebugStream() { return llvm::dbgs() << "[AD] "; }
 // Helpers
 //===----------------------------------------------------------------------===//
 
+static SILValue getArrayValueOfElementAddress(SILValue v) {
+  while (true) {
+    switch (v->getKind()) {
+    case ValueKind::IndexAddrInst:
+    case ValueKind::RefTailAddrInst:
+    case ValueKind::UncheckedRefCastInst:
+    case ValueKind::StructExtractInst:
+    case ValueKind::BeginBorrowInst:
+      v = cast<SingleValueInstruction>(v)->getOperand(0);
+      break;
+    default:
+      return v;
+    }
+  }
+}
+
 ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v) {
-  // Find the `pointer_to_address` result, peering through `index_addr`.
-  auto *ptai = dyn_cast<PointerToAddressInst>(v);
-  if (auto *iai = dyn_cast<IndexAddrInst>(v))
-    ptai = dyn_cast<PointerToAddressInst>(iai->getOperand(0));
-  if (!ptai)
+  SILValue arr = getArrayValueOfElementAddress(v);
+
+  auto *mvir = dyn_cast<MultipleValueInstructionResult>(arr);
+  if (!mvir)
     return nullptr;
-  auto *mdi = dyn_cast<MarkDependenceInst>(
-      ptai->getOperand()->getDefiningInstruction());
-  if (!mdi)
-    return nullptr;
+
   // Return the `array.uninitialized_intrinsic` application, if it exists.
-  if (auto *dti = dyn_cast<DestructureTupleInst>(
-          mdi->getValue()->getDefiningInstruction()))
+  if (auto *dti = dyn_cast<DestructureTupleInst>(mvir->getParent()))
     return ArraySemanticsCall(dti->getOperand(),
                               semantics::ARRAY_UNINITIALIZED_INTRINSIC);
   return nullptr;

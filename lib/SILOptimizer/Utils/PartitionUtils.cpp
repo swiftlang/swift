@@ -111,6 +111,49 @@ void PartitionOpError::InOutSendingReturnedError::print(
      << "        Rep: " << valueMap.getRepresentativeValue(returnedValue);
 }
 
+void PartitionOpError::InOutSendingParametersInSameRegionError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: InOutSendingParametersInSameRegion!\n"
+     << "        First ID:  %%" << firstInoutSendingParam
+     << "        First Rep: "
+     << valueMap.getRepresentativeValue(firstInoutSendingParam);
+  for (auto other : otherInOutSendingParams) {
+    os << "        Other ID:  %%" << other
+       << "        Other Rep: " << valueMap.getRepresentativeValue(other);
+  }
+}
+
+void PartitionOpError::IncompatibleRegionMergeError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: IncompatibleRegionMergeError!\n"
+     << "        Src ID:  %%" << srcRegionElt
+     << "        Src Rep: " << valueMap.getRepresentativeValue(srcRegionElt)
+     << "        Dst ID:  %%" << dstRegionElt
+     << "        Dst Rep: " << valueMap.getRepresentativeValue(dstRegionElt)
+     << "        Reason: ";
+  switch (reason) {
+  case Reason::Unknown:
+    os << "unknown\n";
+    return;
+  case Reason::Assign:
+    os << "assign\n";
+    return;
+  case Reason::IsolatedFunction:
+    os << "isolated_function\n";
+    return;
+  case Reason::NonisolatedClosure:
+    os << "nonisolated_closure\n";
+    return;
+  case Reason::Builtin:
+    os << "builtin\n";
+    return;
+  case Reason::NonisolatedFunction:
+    os << "nonisolated_function\n";
+    return;
+  }
+  llvm_unreachable("Unhandled case");
+}
+
 //===----------------------------------------------------------------------===//
 //                             MARK: PartitionOp
 //===----------------------------------------------------------------------===//
@@ -118,11 +161,19 @@ void PartitionOpError::InOutSendingReturnedError::print(
 void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
   constexpr static char extraSpaceLiteral[10] = "     ";
   switch (opKind) {
-  case PartitionOpKind::Assign: {
-    os << "assign ";
+  case PartitionOpKind::AssignDirect: {
+    os << "assign_direct ";
     if (extraSpace)
       os << extraSpaceLiteral;
     os << "%%" << getOpArg1() << " = %%" << getOpArg2();
+    break;
+  }
+  case PartitionOpKind::AssignIndirect: {
+    os << "assign_indirect ";
+    if (extraSpace)
+      os << extraSpaceLiteral;
+    os << "%%" << getOpArg1() << " = %%" << getOpArg2()
+       << ". Overwritten Value: " << getOpArg3();
     break;
   }
   case PartitionOpKind::AssignFresh:

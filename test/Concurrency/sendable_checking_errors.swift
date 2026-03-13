@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -strict-concurrency=complete %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -strict-concurrency=complete %s
 
 // Don't test TransferNonSendable because this test will not make
 // it past Sema to the SIL pass.

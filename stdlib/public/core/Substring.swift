@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -517,13 +517,28 @@ extension Substring: StringProtocol {
   ///   `withCString(_:)` method. The pointer argument is valid only for the
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable // specialization
-  public func withCString<Result>(
-    _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
+  @_alwaysEmitIntoClient // (Primarily @inlinable) specialization
+  public func withCString<Result, E: Error>(
+    _ body: (UnsafePointer<CChar>) throws(E) -> Result) throws(E) -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
     return try unsafe String(self).withCString(body)
   }
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withCString<Result>(
+      _ body: (UnsafePointer<CChar>) throws -> Result
+    ) throws -> Result
+  )
+  @usableFromInline
+  internal func __rethrows_withCString<Result>(
+    _ body: (UnsafePointer<CChar>) throws -> Result
+  ) throws -> Result {
+    return try unsafe withCString(body)
+  }
+#endif // !hasFeature(Embedded)
 
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of code units.
@@ -541,15 +556,32 @@ extension Substring: StringProtocol {
   ///   - targetEncoding: The encoding in which the code units should be
   ///     interpreted.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable // specialization
-  public func withCString<Result, TargetEncoding: _UnicodeEncoding>(
+  @_alwaysEmitIntoClient // (Primarily @inlinable) specialization
+  public func withCString<Result, TargetEncoding: _UnicodeEncoding, E: Error>(
     encodedAs targetEncoding: TargetEncoding.Type,
-    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
+  ) throws(E) -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
     return try unsafe String(self).withCString(encodedAs: targetEncoding, body)
   }
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withCString<Result, TargetEncoding: Unicode.Encoding>(
+      encodedAs targetEncoding: TargetEncoding.Type,
+      _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+    ) throws -> Result
+  )
+  @usableFromInline
+  internal func __rethrows_withCString<Result, TargetEncoding: Unicode.Encoding>(
+    encodedAs targetEncoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+  ) throws -> Result {
+    return try unsafe withCString(encodedAs: targetEncoding, body)
+  }
+#endif // !hasFeature(Embedded)
 }
 
 extension Substring {
@@ -882,6 +914,18 @@ extension Substring.UTF8View {
 #endif // !(os(watchOS) && _pointerBitWidth(_32))
 }
 
+extension Substring.UTF8View {
+  /// Returns a boolean value indicating whether this UTF8 view
+  /// is trivially identical to `other`.
+  ///
+  /// - Complexity: O(1)
+  @available(StdlibDeploymentTarget 6.4, *)
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._base.isTriviallyIdentical(to: other._base)
+    && self._bounds == other._bounds
+  }
+}
+
 extension Substring {
   @inlinable
   public var utf8: UTF8View {
@@ -1034,6 +1078,18 @@ extension Substring.UTF16View: BidirectionalCollection {
   public subscript(r: Range<Index>) -> Substring.UTF16View {
     let r = _wholeGuts.validateSubscalarRange(r, in: _bounds)
     return Substring.UTF16View(_slice.base, _bounds: r)
+  }
+}
+
+extension Substring.UTF16View {
+  /// Returns a boolean value indicating whether this UTF16 view
+  /// is trivially identical to `other`.
+  ///
+  /// - Complexity: O(1)
+  @available(StdlibDeploymentTarget 6.4, *)
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._base.isTriviallyIdentical(to: other._base)
+    && self._bounds == other._bounds
   }
 }
 
@@ -1281,6 +1337,18 @@ extension Substring.UnicodeScalarView: RangeReplaceableCollection {
   }
 }
 
+extension Substring.UnicodeScalarView {
+  /// Returns a boolean value indicating whether this unicode scalar view
+  /// is trivially identical to `other`.
+  ///
+  /// - Complexity: O(1)
+  @available(StdlibDeploymentTarget 6.4, *)
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._slice._base.isTriviallyIdentical(to: other._slice._base)
+    && self._bounds == other._bounds
+  }
+}
+
 extension Substring: RangeReplaceableCollection {
   @_specialize(where S == String)
   @_specialize(where S == Substring)
@@ -1317,11 +1385,26 @@ extension Substring {
     return String(self).uppercased()
   }
 
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> String {
-    return try String(self.lazy.filter(isIncluded))
+  @_alwaysEmitIntoClient
+  public func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> String {
+    try String(self.lazy.filter(isIncluded))
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(func filter(_ isIncluded: (Element) throws -> Bool) throws -> String)
+  @usableFromInline
+  internal func __legacyABI_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> String {
+    try filter(isIncluded)
+  }
+#endif // !$Embedded
 }
 
 extension Substring: TextOutputStream {
@@ -1383,5 +1466,45 @@ extension Substring {
   public subscript(r: Range<Index>) -> Substring {
     let r = _wholeGuts.validateScalarRange(r, in: _bounds)
     return Substring(_unchecked: Slice(base: base, bounds: r))
+  }
+}
+
+extension Substring {
+  /// Returns a boolean value indicating whether this substring is identical to
+  /// `other`.
+  ///
+  /// Two substring values are identical if there is no way to distinguish
+  /// between them.
+  /// 
+  /// For any values `a`, `b`, and `c`:
+  ///
+  /// - `a.isTriviallyIdentical(to: a)` is always `true`. (Reflexivity)
+  /// - `a.isTriviallyIdentical(to: b)` implies `b.isTriviallyIdentical(to: a)`.
+  /// (Symmetry)
+  /// - If `a.isTriviallyIdentical(to: b)` and `b.isTriviallyIdentical(to: c)`
+  /// are both `true`, then `a.isTriviallyIdentical(to: c)` is also `true`.
+  /// (Transitivity)
+  /// - `a.isTriviallyIdentical(b)` implies `a == b`. `a == b` does not imply `a.isTriviallyIdentical(b)`
+  ///
+  /// Values produced by copying the same value, with no intervening mutations,
+  /// will compare identical:
+  ///
+  /// ```swift
+  /// let d = c
+  /// print(c.isTriviallyIdentical(to: d))
+  /// // Prints true
+  /// ```
+  ///
+  /// Comparing substrings this way includes comparing (normally) hidden
+  /// implementation details such as the memory location of any underlying
+  /// substring storage object. Therefore, identical substrings are guaranteed
+  /// to compare equal with `==`, but not all equal substrings are considered
+  /// identical.
+  ///
+  /// - Complexity: O(1)
+  @available(StdlibDeploymentTarget 6.4, *)
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._wholeGuts.isTriviallyIdentical(to: other._wholeGuts) &&
+    self._offsetRange == other._offsetRange
   }
 }

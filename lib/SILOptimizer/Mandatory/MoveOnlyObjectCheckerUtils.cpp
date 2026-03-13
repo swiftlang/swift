@@ -561,7 +561,13 @@ bool MoveOnlyObjectCheckerPImpl::eraseMarkWithCopiedOperand(
   //   %copy = copy_value %yield
   //   %mark = mark_unresolved_noncopyable_value [no_consume_or_assign]
   //   %copy
-  if (isa_and_nonnull<BeginApplyInst>(orig->getDefiningInstruction())) {
+  //   Borrow accessors:
+  //   %borrowed_return = apply
+  //   %copy = copy_value %borrowed_return
+  //   %mark = mark_unresolved_noncopyable_value [no_consume_or_assign]
+  //   %copy
+  if (isa_and_nonnull<BeginApplyInst>(orig->getDefiningInstruction()) ||
+      isa_and_nonnull<ApplyInst>(orig->getDefiningInstruction())) {
     if (orig->getOwnershipKind() == OwnershipKind::Guaranteed) {
       for (auto *use : markedInst->getConsumingUses()) {
         destroys.push_back(cast<DestroyValueInst>(use->getUser()));
@@ -574,6 +580,7 @@ bool MoveOnlyObjectCheckerPImpl::eraseMarkWithCopiedOperand(
       return true;
     }
   }
+
   return false;
 }
 

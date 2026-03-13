@@ -420,7 +420,7 @@ void PostfixCompletionCallback::collectResults(
     // tuple. But that doesn’t really make sense so we shouldn't be suggesting
     // any operators based on `Void`.
     if (IncludeOperators && !Result.BaseIsStaticMetaType &&
-        !Result.BaseTy->isVoid() &&
+        !Result.BaseTy->isVoid() && !Result.BaseTy->hasError() &&
         !ProcessedBaseTypes.contains(Result.BaseTy)) {
       addOperatorResults(Result.BaseTy, Operators, DC, Lookup);
     }

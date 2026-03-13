@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-experimental-feature MoveOnlyEnumDeinits -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 // OSSA form of tests from simplify_cfg.sil and simplify_cfg_simple.sil.
 //
@@ -62,6 +64,12 @@ struct NonTrivial {
 struct S {
   var a: Int
   var b: NonTrivial
+}
+
+enum NCE: ~Copyable {
+  case a
+  case b(AnyObject)
+  deinit
 }
 
 ///////////
@@ -564,18 +572,6 @@ bb5:
 
 bb6(%8 : $Int64):
   return %8 : $Int64
-}
-
-// CHECK-LABEL: @infinite_loop
-// CHECK: bb0
-// CHECK-NEXT: br bb1
-// CHECK: bb1
-// CHECK-NEXT: br bb1
-sil [ossa] @infinite_loop : $@convention(thin) () -> () {
-bb0:
-  br bb1
-bb1:
-  br bb1
 }
 
 // CHECK-LABEL: @dead_loop
@@ -1942,6 +1938,44 @@ bb2(%defaultArg : $A):
 bb3:
   %t = tuple ()
   return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @insert_compensating_endlifetime_in_switch_enum_destination_block :
+// CHECK:       bb0(%0 : @owned $Optional<AnyObject>):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'insert_compensating_endlifetime_in_switch_enum_destination_block'
+sil [ossa] @insert_compensating_endlifetime_in_switch_enum_destination_block : $@convention(thin) (@owned Optional<AnyObject>) -> () {
+bb0(%0 : @owned $Optional<AnyObject>):
+  switch_enum %0, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
+
+bb1:
+  %15 = tuple ()
+  return %15
+
+bb2(%4 : @owned $AnyObject):
+  destroy_value %4
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @insert_compensating_endlifetime_in_switch_enum_destination_block2 :
+// CHECK:       bb0(%0 : @owned $NCE):
+// CHECK-NEXT:    %1 = drop_deinit %0
+// CHECK-NEXT:    end_lifetime %1
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'insert_compensating_endlifetime_in_switch_enum_destination_block2'
+sil [ossa] @insert_compensating_endlifetime_in_switch_enum_destination_block2 : $@convention(thin) (@owned NCE) -> () {
+bb0(%0 : @owned $NCE):
+  %1 = drop_deinit %0
+  switch_enum %1, case #NCE.a!enumelt: bb1, case #NCE.b!enumelt: bb2
+
+bb1:
+  %15 = tuple ()
+  return %15
+
+bb2(%4 : @owned $AnyObject):
+  destroy_value %4
+  unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @replace_phi_arg_with_borrowed_from_use :

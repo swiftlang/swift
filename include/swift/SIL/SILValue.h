@@ -38,6 +38,7 @@ class DominanceInfo;
 class PostOrderFunctionInfo;
 class ReversePostOrderInfo;
 class Operand;
+class InstructionIndices;
 class SILInstruction;
 class SILArgument;
 class SILLocation;
@@ -616,6 +617,8 @@ public:
 
   bool isBeginApplyToken() const;
 
+  bool isBorrowAccessorResult() const;
+
   /// Unsafely eliminate moveonly from this value's type. Returns true if the
   /// value's underlying type was move only and thus was changed. Returns false
   /// otherwise.
@@ -726,7 +729,7 @@ public:
   /// Verify that this SILValue and its uses respects ownership invariants.
   ///
   /// \p DEBlocks is nullptr when OSSA lifetimes are complete.
-  void verifyOwnership(DeadEndBlocks *DEBlocks) const;
+  void verifyOwnership(DeadEndBlocks *DEBlocks, InstructionIndices *instIndices) const;
 
   SWIFT_DEBUG_DUMP;
 };
@@ -1234,6 +1237,11 @@ private:
   template <unsigned N> friend class FixedOperandList;
   friend class TrailingOperandsList;
 };
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Operand &op) {
+  op.print(OS);
+  return OS;
+}
 
 /// A class which adapts an array of Operands into an array of Values.
 ///

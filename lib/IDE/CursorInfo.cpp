@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CursorInfo.h"
-#include "ExprContextAnalysis.h"
 #include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -325,7 +324,7 @@ private:
       return;
     }
     Type SolutionInterfaceTy =
-        S.simplifyType(S.getType(DeclToResolve))->mapTypeOutOfContext();
+        S.simplifyType(S.getType(DeclToResolve))->mapTypeOutOfEnvironment();
 
     addResult({/*BaseType=*/nullptr, /*IsDynamicRef=*/false, DeclToResolve,
                SolutionInterfaceTy});

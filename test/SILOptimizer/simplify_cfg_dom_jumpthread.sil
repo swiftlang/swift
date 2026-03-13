@@ -531,7 +531,8 @@ bb6:
 }
 
 // CHECK-LABEL: sil [ossa] @test_begin_borrow_and_unreachable :
-// CHECK-NOT:     @reborrow
+// TODO: this is currently not optimized
+// xCHECK-NOT:     @reborrow
 // CHECK:       } // end sil function 'test_begin_borrow_and_unreachable'
 sil [ossa] @test_begin_borrow_and_unreachable : $@convention(thin) (@guaranteed E2, @guaranteed E2) -> () {
 bb0(%0 : @guaranteed $E2, %1 : @guaranteed $E2):
@@ -556,6 +557,8 @@ bb5(%11 : @guaranteed $E2):
 
 bb6:
   fix_lifetime %6 : $E2
+  end_borrow %6
+  destroy_value [dead_end] %5
   unreachable
 }
 

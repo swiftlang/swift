@@ -105,10 +105,19 @@ public class KVOCookieMonster {
 // CHECK-NEXT: SWIFT_EXTERN id <ObjCProtocol> _Nullable $s9UseObjCTy03retB17CProtocolNullableSo0bE0_pSgyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // retObjCProtocolNullable()
 // CHECK-NEXT: #endif
 // CHECK: ObjCKlass *_Nonnull $s9UseObjCTy03retB5ClassSo0B6CKlassCyF(void) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: #endif // defined(__OBJC__)
+// CHECK-NEXT: #if defined(__OBJC__)
 // CHECK-NEXT: ObjCKlass *_Nullable $s9UseObjCTy03retB13ClassNullableSo0B6CKlassCSgyF(void) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: #endif // defined(__OBJC__)
+// CHECK-NEXT: #if defined(__OBJC__)
 // CHECK-NEXT: void $s9UseObjCTy04takeB6CClassyySo0B6CKlassCF(ObjCKlass *_Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: #endif // defined(__OBJC__)
+// CHECK-NEXT: #if defined(__OBJC__)
 // CHECK-NEXT: void $s9UseObjCTy04takeB11CClassInoutyySo0B6CKlassCzF(ObjCKlass *_Nonnull __strong * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: #endif // defined(__OBJC__)
+// CHECK-NEXT: #if defined(__OBJC__)
 // CHECK-NEXT: void $s9UseObjCTy04takeB14CClassNullableyySo0B6CKlassCSgF(ObjCKlass *_Nullable x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: #endif // defined(__OBJC__)
 // CHECK-NEXT: #if defined(__OBJC__)
 // CHECK-NEXT: SWIFT_EXTERN void $s9UseObjCTy04takeB9CProtocolyySo0bE0_pF(id <ObjCProtocol> _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeObjCProtocol(_:)
 // CHECK-NEXT: #endif
@@ -124,17 +133,16 @@ public class KVOCookieMonster {
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 
-// CHECK: #if defined(__OBJC__)
-// CHECK-NEXT: SWIFT_INLINE_THUNK id <ObjCProtocol> _Nonnull retObjCProtocol() noexcept SWIFT_SYMBOL("s:9UseObjCTy03retB9CProtocolSo0bE0_pyF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK id <ObjCProtocol> _Nonnull retObjCProtocol() noexcept SWIFT_SYMBOL("s:9UseObjCTy03retB9CProtocolSo0bE0_pyF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return (__bridge_transfer id <ObjCProtocol>)(__bridge void *)UseObjCTy::_impl::$s9UseObjCTy03retB9CProtocolSo0bE0_pyF();
 // CHECK-NEXT: }
-// CHECK-NEXT: #endif
+// CHECK-NEXT: #endif // defined(__OBJC__)
 
 // CHECK: #if defined(__OBJC__)
 // CHECK-NEXT: SWIFT_INLINE_THUNK id <ObjCProtocol> _Nullable retObjCProtocolNullable() noexcept SWIFT_SYMBOL("s:9UseObjCTy03retB17CProtocolNullableSo0bE0_pSgyF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: return (__bridge_transfer id <ObjCProtocol>)(__bridge void *)UseObjCTy::_impl::$s9UseObjCTy03retB17CProtocolNullableSo0bE0_pSgyF();
 // CHECK-NEXT: }
-// CHECK-NEXT: #endif
+// CHECK-NEXT: #endif // defined(__OBJC__)
 
 // CHECK: SWIFT_INLINE_THUNK ObjCKlass *_Nonnull retObjClass() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: return (__bridge_transfer ObjCKlass *)(__bridge void *)UseObjCTy::_impl::$s9UseObjCTy03retB5ClassSo0B6CKlassCyF();

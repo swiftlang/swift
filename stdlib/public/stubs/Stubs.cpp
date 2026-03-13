@@ -63,7 +63,6 @@
 #endif
 
 #include "swift/Runtime/Debug.h"
-#include "swift/Runtime/SwiftDtoa.h"
 #include "swift/Basic/Lazy.h"
 
 #include "swift/Threading/Thread.h"
@@ -73,71 +72,6 @@
 #include "swift/shims/RuntimeStubs.h"
 
 #include "llvm/ADT/StringExtras.h"
-
-static uint64_t uint64ToStringImpl(char *Buffer, uint64_t Value,
-                                   int64_t Radix, bool Uppercase,
-                                   bool Negative) {
-  char *P = Buffer;
-  uint64_t Y = Value;
-
-  if (Y == 0) {
-    *P++ = '0';
-  } else if (Radix == 10) {
-    while (Y) {
-      *P++ = '0' + char(Y % 10);
-      Y /= 10;
-    }
-  } else {
-    unsigned Radix32 = Radix;
-    while (Y) {
-      *P++ = llvm::hexdigit(Y % Radix32, !Uppercase);
-      Y /= Radix32;
-    }
-  }
-
-  if (Negative)
-    *P++ = '-';
-  std::reverse(Buffer, P);
-  return size_t(P - Buffer);
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-uint64_t swift_int64ToString(char *Buffer, size_t BufferLength,
-                             int64_t Value, int64_t Radix,
-                             bool Uppercase) {
-  if ((Radix >= 10 && BufferLength < 32) || (Radix < 10 && BufferLength < 65))
-    swift::crash("swift_int64ToString: insufficient buffer size");
-
-  if (Radix == 0 || Radix > 36)
-    swift::crash("swift_int64ToString: invalid radix for string conversion");
-
-  bool Negative = Value < 0;
-
-  // Compute an absolute value safely, without using unary negation on INT_MIN,
-  // which is undefined behavior.
-  uint64_t UnsignedValue = Value;
-  if (Negative) {
-    // Assumes two's complement representation.
-    UnsignedValue = ~UnsignedValue + 1;
-  }
-
-  return uint64ToStringImpl(Buffer, UnsignedValue, Radix, Uppercase,
-                            Negative);
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-uint64_t swift_uint64ToString(char *Buffer, intptr_t BufferLength,
-                              uint64_t Value, int64_t Radix,
-                              bool Uppercase) {
-  if ((Radix >= 10 && BufferLength < 32) || (Radix < 10 && BufferLength < 64))
-    swift::crash("swift_int64ToString: insufficient buffer size");
-
-  if (Radix == 0 || Radix > 36)
-    swift::crash("swift_int64ToString: invalid radix for string conversion");
-
-  return uint64ToStringImpl(Buffer, Value, Radix, Uppercase,
-                            /*Negative=*/false);
-}
 
 #if SWIFT_STDLIB_HAS_LOCALE
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__ANDROID__)
@@ -172,46 +106,6 @@ static locale_t getCLocale() {
 }
 #endif
 #endif // SWIFT_STDLIB_HAS_LOCALE
-
-#if SWIFT_DTOA_PASS_FLOAT16_AS_FLOAT
-using _CFloat16Argument = float;
-#else
-using _CFloat16Argument = _Float16;
-#endif
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-__swift_ssize_t swift_float16ToString(char *Buffer, size_t BufferLength,
-                                      _CFloat16Argument Value, bool Debug) {
-#if SWIFT_DTOA_PASS_FLOAT16_AS_FLOAT
-  __fp16 v = Value;
-  return swift_dtoa_optimal_binary16_p(&v, Buffer, BufferLength);
-#else
-  return swift_dtoa_optimal_binary16_p(&Value, Buffer, BufferLength);
-#endif
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-uint64_t swift_float32ToString(char *Buffer, size_t BufferLength,
-                               float Value, bool Debug) {
-  return swift_dtoa_optimal_float(Value, Buffer, BufferLength);
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-uint64_t swift_float64ToString(char *Buffer, size_t BufferLength,
-                               double Value, bool Debug) {
-  return swift_dtoa_optimal_double(Value, Buffer, BufferLength);
-}
-
-// We only support float80 on platforms that use that exact format for 'long double'
-// This should match the conditionals in Runtime.swift
-#if !defined(_WIN32) && !defined(__ANDROID__) && (defined(__i386__) || defined(__i686__) || defined(__x86_64__))
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
-                               long double Value, bool Debug) {
-  // SwiftDtoa.cpp automatically enables float80 on platforms that use it for 'long double'
-  return swift_dtoa_optimal_float80_p(&Value, Buffer, BufferLength);
-}
-#endif
 
 #if SWIFT_STDLIB_HAS_STDIN
 
@@ -435,30 +329,9 @@ const char *_swift_stdlib_strtold_clocale(const char *nptr, void *outResult) {
 #endif
 }
 
-const char *_swift_stdlib_strtod_clocale(const char *nptr, double *outResult) {
-#if SWIFT_STDLIB_HAS_LOCALE
-  return _swift_stdlib_strtoX_clocale_impl(nptr, outResult, HUGE_VAL, strtod_l);
-#else
-  return _swift_stdlib_strtoX_impl(nptr, outResult, strtod);
-#endif
-}
-
-const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult) {
-#if SWIFT_STDLIB_HAS_LOCALE
-  return _swift_stdlib_strtoX_clocale_impl(nptr, outResult, HUGE_VALF,
-                                           strtof_l);
-#else
-  return _swift_stdlib_strtoX_impl(nptr, outResult, strtof);
-#endif
-}
-
-const char *_swift_stdlib_strtof16_clocale(const char *nptr,
-                                           __fp16 *outResult) {
-  float tmp;
-  const char *result = _swift_stdlib_strtof_clocale(nptr, &tmp);
-  *outResult = tmp;
-  return result;
-}
+// _swift_stdlib_strto{d,f,f16}_clocale were reimplemented in Swift
+// in December 2025.  See FloatingPointFromString.swift.
+// _swift_stdlib_strtold_clocale was not reimplemented in Swift at that time.
 
 void _swift_stdlib_flockfile_stdout() {
 #if defined(_WIN32)

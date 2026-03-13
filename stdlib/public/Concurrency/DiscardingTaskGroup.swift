@@ -70,9 +70,7 @@ import Swift
 /// - SeeAlso: ``TaskGroup``
 /// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:body:)``
 @available(SwiftStdlib 5.9, *)
-#if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
-#endif
 @inlinable
 public func withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
@@ -189,7 +187,7 @@ public struct DiscardingTaskGroup {
 
   /// A Boolean value that indicates whether the group has any remaining tasks.
   ///
-  /// At the start of the body of a `withDiscardingTaskGroup(of:returning:body:)` call,
+  /// At the start of the body of a `withDiscardingTaskGroup(returning:body:)` call,
   /// the task group is always empty.
   ///
   /// It's guaranteed to be empty when returning from that body
@@ -227,6 +225,14 @@ public struct DiscardingTaskGroup {
   /// If the task that's currently running this group is canceled,
   /// the group is also implicitly canceled,
   /// which is also reflected in this property's value.
+  ///
+  /// ### Interaction with task cancellation shields
+  ///
+  /// Cancellation may be suppressed by an active task cancellation shield
+  /// (``withTaskCancellationShield(operation:)``), which may cause `isCancelled`
+  /// to return `false` even though the task has been cancelled externally.
+  ///
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -258,7 +264,7 @@ extension DiscardingTaskGroup: Sendable { }
 /// before returning from this function:
 ///
 /// ```
-/// try await withThrowingDiscardingTaskGroup(of: Void.self) { group in
+/// try await withThrowingDiscardingTaskGroup { group in
 ///   group.addTask { /* slow-task */ }
 ///   // slow-task executes...
 /// }
@@ -337,9 +343,7 @@ extension DiscardingTaskGroup: Sendable { }
 /// }
 /// ```
 @available(SwiftStdlib 5.9, *)
-#if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
-#endif
 @inlinable
 public func withThrowingDiscardingTaskGroup<GroupResult>(
     returning returnType: GroupResult.Type = GroupResult.self,
@@ -519,6 +523,14 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   /// If the task that's currently running this group is canceled,
   /// the group is also implicitly canceled,
   /// which is also reflected in this property's value.
+  ///
+  /// ### Interaction with task cancellation shields
+  ///
+  /// Cancellation may be suppressed by an active task cancellation shield
+  /// (``withTaskCancellationShield(operation:)``), which may cause `isCancelled`
+  /// to return `false` even though the task has been cancelled externally.
+  ///
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }

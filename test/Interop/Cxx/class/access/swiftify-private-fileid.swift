@@ -1,12 +1,9 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -plugin-path %swift-plugin-dir %t/blessed.swift -module-name main -I %t/Inputs -o %t/out -Xcc -std=c++20  -cxx-interoperability-mode=default -enable-experimental-feature SafeInteropWrappers -verify
+// RUN: %target-swift-frontend -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -plugin-path %swift-plugin-dir %t/blessed.swift -module-name main -I %t/Inputs -o %t/out -Xcc -std=c++20  -cxx-interoperability-mode=default -verify
 
-// REQUIRES: swift_feature_SafeInteropWrappers
-
-// FIXME swift-ci linux tests do not support std::span
-// UNSUPPORTED: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
+// REQUIRES: std_span
 
 //--- Inputs/swiftify-non-public.h
 #pragma once

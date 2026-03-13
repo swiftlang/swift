@@ -600,6 +600,18 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
 %end
 }
 
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
+  /// Returns a Boolean value indicating whether two instances refer to the same
+  /// memory region.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  @safe
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    unsafe (self._position == other._position) && (self.count == other.count)
+  }
+}
+
 extension Unsafe${Mutable}BufferPointer {
   /// Accesses the element at the specified position.
   ///

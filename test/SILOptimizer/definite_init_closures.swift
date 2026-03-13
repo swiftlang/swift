@@ -45,6 +45,15 @@ func forward(_ b: inout Bool) -> Bool {
   return b
 }
 
+struct T {
+  var i: Int
+
+  mutating func foo() -> Bool {
+    i == 0
+  }
+}
+
+
 struct InoutUse {
   var x: Bool
   var y: Bool
@@ -52,6 +61,18 @@ struct InoutUse {
   init() {
     x = false
     y = false || forward(&x)
+  }
+}
+
+struct InoutSelfUse {
+  var a: T
+  var b: T
+
+  init(_ x: T) {
+    a = x
+    if a.foo() || a.foo() {
+    }
+    b = x
   }
 }
 

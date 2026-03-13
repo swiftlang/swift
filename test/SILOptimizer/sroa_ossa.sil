@@ -15,6 +15,20 @@ struct S1 {
   var z : Builtin.Int64
 }
 
+struct NC: ~Copyable {
+  var t: NCWithDeinit
+}
+
+struct NCWithDeinit: ~Copyable {
+  var i: NCInner
+
+  deinit
+}
+
+struct NCInner: ~Copyable {
+  var i: Int
+}
+
 sil [ossa] @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 
 // CHECK-LABEL: sil [ossa] @struct_with_scalar_fields : $@convention(thin) (S1) -> ()
@@ -583,3 +597,29 @@ bb6:
   %res = tuple ()
   return %res : $()
 }
+
+// CHECK-LABEL: sil [ossa] @dont_expand_non_copyable_with_deinit :
+// CHECK:         %1 = alloc_stack $NCWithDeinit
+// CHECK:         [[N:%.*]] = struct $NC (
+// CHECK-NEXT:    [[D:%.*]] = destructure_struct [[N]]
+// CHECK-NEXT:    store [[D]] to [init] %1
+// CHECK-LABEL: } // end sil function 'dont_expand_non_copyable_with_deinit'
+sil [ossa] @dont_expand_non_copyable_with_deinit : $@convention(thin) (Int) -> @owned NC {
+bb0(%0 : $Int):
+  %1 = alloc_stack $NC
+  %i = struct $NCInner (%0)
+  %2 = struct $NCWithDeinit (%i)
+  %3 = struct $NC (%2)
+  store %3 to [init] %1
+
+  %5 = struct_element_addr %1, #NC.t
+  %6 = struct_element_addr %5, #NCWithDeinit.i
+  %7 = struct_element_addr %6, #NCInner.i
+  %8 = load [trivial] %7
+  fix_lifetime %8
+
+  %10 = load [take] %1
+  dealloc_stack %1
+  return %10
+}
+

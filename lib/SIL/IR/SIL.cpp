@@ -41,6 +41,9 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
           !D->getObjCImplementationDecl())
     return FormalLinkage::PublicNonUnique;
 
+  if (SILDeclRef::declHasNonUniqueDefinition(D))
+    return FormalLinkage::PublicUnique;
+
   switch (D->getEffectiveAccess()) {
   case AccessLevel::Package:
     return FormalLinkage::PackageUnique;
@@ -330,9 +333,9 @@ getKeyPathSupportingGenericSignature(Type ty, GenericSignature contextSig) {
   // If the type is an archetype, then it just needs Copyable and Escapable
   // constraints imposed.
   if (ty->is<ArchetypeType>()) {
-    copyable = ProtocolConformanceRef::forAbstract(ty->mapTypeOutOfContext(),
+    copyable = ProtocolConformanceRef::forAbstract(ty->mapTypeOutOfEnvironment(),
                                                    copyableProtocol);
-    escapable = ProtocolConformanceRef::forAbstract(ty->mapTypeOutOfContext(),
+    escapable = ProtocolConformanceRef::forAbstract(ty->mapTypeOutOfEnvironment(),
                                                     escapableProtocol);
   } else {
     // Look for any conditional conformances.
@@ -355,9 +358,9 @@ getKeyPathSupportingGenericSignature(Type ty, GenericSignature contextSig) {
       // The only requirements are that the abstract type itself be copyable
       // and escapable.
       ceRequirements.push_back(Requirement(RequirementKind::Conformance,
-               ty->mapTypeOutOfContext(), copyableProtocol->getDeclaredType()));
+               ty->mapTypeOutOfEnvironment(), copyableProtocol->getDeclaredType()));
       ceRequirements.push_back(Requirement(RequirementKind::Conformance,
-              ty->mapTypeOutOfContext(), escapableProtocol->getDeclaredType()));
+              ty->mapTypeOutOfEnvironment(), escapableProtocol->getDeclaredType()));
       return;
     }
     
@@ -518,7 +521,7 @@ AbstractStorageDecl::getPropertyDescriptorGenericSignature() const {
     llvm_unreachable("should be definition linkage?");
   }
 
-  auto typeInContext = contextSig.getGenericEnvironment()->mapTypeIntoContext(
+  auto typeInContext = contextSig.getGenericEnvironment()->mapTypeIntoEnvironment(
       getValueInterfaceType());
   auto valueTypeSig = getKeyPathSupportingGenericSignatureForValueType(typeInContext, contextSig);
   if (!valueTypeSig) {

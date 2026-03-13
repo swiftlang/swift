@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/deserialized_witness_mismatch_other.swift -emit-module-path %t/deserialized_witness_mismatch_other.swiftmodule
-// RUN: %target-swift-frontend -I %t/ %s -typecheck -verify
+// RUN: %target-swift-frontend -I %t/ %s -typecheck -verify -verify-ignore-unrelated
 
 // Deserialized computed properties don't have a PatternBindingDecl, so
 // make sure we don't expect to find one.

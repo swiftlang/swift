@@ -246,10 +246,12 @@ class LLVM(cmake_product.CMakeProduct):
                 platform, arch,
                 crosscompiling=self.is_cross_compile_target(host_target))
             llvm_cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
-            if not self.is_release():
-                # On Linux build LLVM and subprojects with -gsplit-dwarf which is more
-                # space/time efficient than -g on that platform.
-                llvm_cmake_options.define('LLVM_USE_SPLIT_DWARF:BOOL', 'YES')
+
+        target_supports_split_dwarf = host_target.startswith(('linux', 'freebsd'))
+        if target_supports_split_dwarf and self.is_debug_info():
+            # On platforms that support split-dwarf, build LLVM and subprojects with
+            #  -gsplit-dwarf which is more space/time efficient than -g on that platform.
+            llvm_cmake_options.define('LLVM_USE_SPLIT_DWARF:BOOL', 'YES')
 
         build = True
         if not self.args._build_llvm or (not self.args.cross_compile_build_swift_tools
@@ -446,8 +448,6 @@ class LLVM(cmake_product.CMakeProduct):
                                                 'clang-tidy-confusable-chars-gen')
             llvm_cmake_options.define('CLANG_TIDY_CONFUSABLE_CHARS_GEN',
                                       confusable_chars_gen)
-            pseudo_gen = os.path.join(host_build_dir, 'bin', 'clang-pseudo-gen')
-            llvm_cmake_options.define('CLANG_PSEUDO_GEN', pseudo_gen)
             llvm = os.path.join(host_build_dir, 'llvm')
             llvm_cmake_options.define('LLVM_NATIVE_BUILD', llvm)
 

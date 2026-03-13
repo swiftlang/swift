@@ -247,6 +247,87 @@ extension ASTGenVisitor {
     )
   }
 
+  /// Obtains the bridged declaration based name and bridged source location from a token.
+  func generateDeclBaseName(_ token: TokenSyntax) -> (baseName: DeclBaseName, sourceLoc: SourceLoc) {
+    let baseName: DeclBaseName
+    switch token.keywordKind {
+    case .`init`:
+      baseName = .createConstructor()
+    case .deinit:
+      baseName = .createDestructor()
+    case .subscript:
+      baseName = .createSubscript()
+    default:
+      baseName = .init(self.generateIdentifier(token))
+    }
+    let baseNameLoc = self.generateSourceLoc(token)
+    return (baseName, baseNameLoc)
+  }
+
+  /// Obtains the bridged module name and bridged source location from a module selector.
+  func generateModuleSelector(_ node: ModuleSelectorSyntax?) -> (moduleName: Identifier, sourceLoc: SourceLoc) {
+    let moduleName = self.self.generateIdentifierAndSourceLoc(node?.moduleName)
+    return (moduleName: moduleName.identifier, sourceLoc: moduleName.sourceLoc)
+  }
+
+  func generateDeclNameRef(
+    moduleSelector: ModuleSelectorSyntax?,
+    baseName: TokenSyntax,
+    arguments: DeclNameArgumentsSyntax? = nil
+  ) -> (name: BridgedDeclNameRef, loc: BridgedDeclNameLoc) {
+    let moduleSelectorLoc = self.generateModuleSelector(moduleSelector)
+    let baseNameLoc = self.generateDeclBaseName(baseName)
+
+    // Create the name itself.
+    let nameRef: BridgedDeclNameRef
+    if let arguments {
+      let bridgedLabels: BridgedArrayRef
+      if arguments.arguments.isEmpty {
+        bridgedLabels = BridgedArrayRef()
+      } else {
+        let labels = arguments.arguments.lazy.map {
+          self.generateIdentifier($0.name)
+        }
+        bridgedLabels = labels.bridgedArray(in: self)
+      }
+      nameRef = .createParsed(
+        self.ctx,
+        moduleSelector: moduleSelectorLoc.moduleName,
+        baseName: baseNameLoc.baseName,
+        argumentLabels: bridgedLabels
+      )
+    } else {
+      nameRef = .createParsed(self.ctx, moduleSelector: moduleSelectorLoc.moduleName, baseName: baseNameLoc.baseName)
+    }
+
+    // Create the location. Complication: if the argument list has no labels, the paren locs aren't provided either.
+    // FIXME: This is silly but I'm pretty sure it's load-bearing.
+    let nameLoc: BridgedDeclNameLoc
+    if let arguments, !arguments.arguments.isEmpty {
+      let labelLocs = arguments.arguments.lazy.map {
+        self.generateSourceLoc($0.name)
+      }
+      let bridgedLabelLocs = labelLocs.bridgedArray(in: self)
+
+      nameLoc = .createParsed(
+        self.ctx,
+        moduleSelectorLoc: moduleSelectorLoc.sourceLoc,
+        baseNameLoc: baseNameLoc.sourceLoc,
+        lParenLoc: self.generateSourceLoc(arguments.leftParen),
+        argumentLabelLocs: bridgedLabelLocs,
+        rParenLoc: self.generateSourceLoc(arguments.rightParen)
+      )
+    } else {
+      nameLoc = .createParsed(
+        self.ctx,
+        moduleSelectorLoc: moduleSelectorLoc.sourceLoc,
+        baseNameLoc: baseNameLoc.sourceLoc
+      )
+    }
+
+    return (name: nameRef, loc: nameLoc)
+  }
+
   /// Obtains a C++ source range from a pair of token nodes.
   @inline(__always)
   func generateSourceRange(start: TokenSyntax, end: TokenSyntax) -> SourceRange {

@@ -13,6 +13,7 @@ list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_SOURCE_DIR}/../cmake/modules"
   "${CMAKE_SOURCE_DIR}/../../cmake/modules")
 
+include(LanguageVersions)
 include(SwiftProjectVersion)
 project(SwiftSynchronization
   LANGUAGES Swift
@@ -71,10 +72,8 @@ add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-enable-builtin-module>
   $<$<COMPILE_LANGUAGE:Swift>:-strict-memory-safety>
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-swift-version 5>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Werror StrictMemorySafety>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypesWithDefaults>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature InoutLifetimeDependence>"
@@ -95,6 +94,8 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
+find_package(SwiftSwiftDirectRuntime)
+
 # LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
 # LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
 # LNK4217: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj' in function 'function'
@@ -104,7 +105,7 @@ add_compile_options(
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 # Ensure all symbols are fully resolved on Linux
-add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
+add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 gyb_expand(Atomics/AtomicIntegers.swift.gyb Atomics/AtomicIntegers.swift)
 gyb_expand(Atomics/AtomicStorage.swift.gyb Atomics/AtomicStorage.swift)
@@ -130,9 +131,18 @@ if(${PROJECT_NAME}_SINGLE_THREADED_MODE)
 else()
   target_sources(swiftSynchronization PRIVATE
     Mutex/Mutex.swift
+    # Apple Sources
     $<$<PLATFORM_ID:Darwin>:Mutex/DarwinImpl.swift>
+    # Android and Linux Sources
     $<$<PLATFORM_ID:Android,Linux>:Mutex/LinuxImpl.swift>
-    $<$<PLATFORM_ID:Android,WASI>:Mutex/SpinLoopHint.swift>
+    $<$<PLATFORM_ID:Android,Linux>:Mutex/SpinLoopHint.swift>
+    # FreeBSD Sources
+    $<$<PLATFORM_ID:FreeBSD>:Mutex/FreeBSDImpl.swift>
+    # OpenBSD Sources
+    $<$<PLATFORM_ID:OpenBSD>:Mutex/OpenBSDImpl.swift>
+    # Wasm Sources
+    $<$<PLATFORM_ID:WASI>:Mutex/WasmImpl.swift>
+    # Windows Sources
     $<$<PLATFORM_ID:Windows>:Mutex/WindowsImpl.swift>)
 endif()
 
@@ -143,7 +153,8 @@ target_link_libraries(swiftSynchronization PRIVATE
   swiftCore
   $<$<PLATFORM_ID:Android>:swiftAndroid>
   $<$<PLATFORM_ID:Darwin>:swiftDarwin>
-  $<$<PLATFORM_ID:Windows>:ClangModules>)
+  $<$<PLATFORM_ID:Windows>:ClangModules>
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
 if(WIN32 AND CMAKE_SYSTEM_PROCESSOR STREQUAL i686)
   # FIXME(#83765) `-whole-module-optimization` should not be needed. However,

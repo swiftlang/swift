@@ -45,7 +45,7 @@ public protocol WithAssoc {
 import A
 
 // CHECK-NOT: #if {{.*}} $DynamicActorIsolation
-// CHECK: @_Concurrency.MainActor public struct GlobalActorTest : @preconcurrency A.P
+// CHECK: @_Concurrency::MainActor public struct GlobalActorTest : @preconcurrency A::P
 
 @MainActor
 public struct GlobalActorTest : @preconcurrency P {
@@ -57,13 +57,13 @@ public class ExtTest {
 }
 
 // CHECK-NOT: #if {{.*}} $DynamicActorIsolation
-// CHECK: extension Client.ExtTest : @preconcurrency A.P
+// CHECK: extension Client::ExtTest : @preconcurrency A::P
 extension ExtTest : @preconcurrency P {
   public func test() -> Int { 1 }
 }
 
 // CHECK-NOT: #if {{.*}} && $DynamicActorIsolation
-// CHECK: public actor ActorTest : @preconcurrency A.P
+// CHECK: public actor ActorTest : @preconcurrency A::P
 public actor ActorTest : @preconcurrency P {
   public func test() -> Int { 2 }
 }
@@ -72,7 +72,7 @@ public actor ActorExtTest {
 }
 
 // CHECK-NOT: #if {{.*}} $DynamicActorIsolation
-// CHECK: extension Client.ActorExtTest : @preconcurrency A.Q
+// CHECK: extension Client::ActorExtTest : @preconcurrency A::Q
 extension ActorExtTest : @preconcurrency Q {
   public var x: Int { 42 }
 }
@@ -80,12 +80,12 @@ extension ActorExtTest : @preconcurrency Q {
 public struct TestConditional<T> {}
 
 // CHECK-NOT: #if {{.*}} $DynamicActorIsolation
-// CHECK: extension Client.TestConditional : @preconcurrency A.WithAssoc where T == Swift.Int {
-// CHECK-NEXT:  @_Concurrency.MainActor public func test() -> T
+// CHECK: extension Client::TestConditional : @preconcurrency A::WithAssoc where T == Swift::Int {
+// CHECK-NEXT:  @_Concurrency::MainActor public func test() -> T
 // CHECK-NEXT: }
 extension TestConditional : @preconcurrency WithAssoc where T == Int {
   @MainActor public func test() -> T { 42 } // Ok
 }
 
 // CHECK-NOT: #if {{.*}} $DynamicActorIsolation
-// CHECK: extension Client.GlobalActorTest : Swift.Sendable {}
+// CHECK: extension Client::GlobalActorTest : Swift::Sendable {}

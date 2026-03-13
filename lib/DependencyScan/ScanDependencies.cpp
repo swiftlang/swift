@@ -45,6 +45,7 @@
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
+#include "swift/FrontendTool/Dependencies.h"
 #include "swift/Strings.h"
 #include "clang/CAS/IncludeTree.h"
 #include "llvm/ADT/STLExtras.h"
@@ -143,11 +144,12 @@ public:
         auto &dep = cache.findKnownDependency(bridgingDep);
         auto *clangDep = dep.getAsClangModule();
         assert(clangDep && "wrong module dependency kind");
+        auto pcmPath = llvm::sys::path::filename(clangDep->mappedPCMPath).str();
         if (!clangDep->moduleCacheKey.empty()) {
           bridgingHeaderBuildCmd.push_back("-Xcc");
           bridgingHeaderBuildCmd.push_back("-fmodule-file-cache-key");
           bridgingHeaderBuildCmd.push_back("-Xcc");
-          bridgingHeaderBuildCmd.push_back(clangDep->mappedPCMPath);
+          bridgingHeaderBuildCmd.push_back(pcmPath);
           bridgingHeaderBuildCmd.push_back("-Xcc");
           bridgingHeaderBuildCmd.push_back(clangDep->moduleCacheKey);
         }
@@ -277,17 +279,21 @@ private:
   bool handleClangModuleDependency(
       ModuleDependencyID depModuleID,
       const ClangModuleDependencyStorage &clangDepDetails) {
+    auto pcmPath =
+        clangDepDetails.moduleCacheKey.empty()
+            ? clangDepDetails.mappedPCMPath
+            : llvm::sys::path::filename(clangDepDetails.mappedPCMPath).str();
     if (!resolvingDepInfo.isSwiftSourceModule()) {
       if (!resolvingDepInfo.isClangModule()) {
         commandline.push_back("-Xcc");
         commandline.push_back("-fmodule-file=" + depModuleID.ModuleName + "=" +
-                              clangDepDetails.mappedPCMPath);
+                              pcmPath);
       }
       if (!clangDepDetails.moduleCacheKey.empty()) {
         commandline.push_back("-Xcc");
         commandline.push_back("-fmodule-file-cache-key");
         commandline.push_back("-Xcc");
-        commandline.push_back(clangDepDetails.mappedPCMPath);
+        commandline.push_back(pcmPath);
         commandline.push_back("-Xcc");
         commandline.push_back(clangDepDetails.moduleCacheKey);
       }
@@ -471,6 +477,40 @@ private:
                      [this](const auto &entry) {
                        tracker->trackFile(entry.second.LibraryPath);
                      });
+      StringRef readLegacyTypeInfoPath =
+          instance.getInvocation().getIRGenOptions().ReadLegacyTypeInfoPath;
+      if (!readLegacyTypeInfoPath.empty()) {
+        // If legacy layout is specifed, just need to track that file.
+        if (tracker->trackFile(readLegacyTypeInfoPath))
+          commandline.push_back("-read-legacy-type-info-path=" +
+                                scanner.remapPath(readLegacyTypeInfoPath));
+      } else {
+        // Otherwise, search RuntimeLibrary Path for implicit legacy layout.
+        // Search logic need to match IRGen/GenType.cpp.
+        const auto &triple = instance.getInvocation().getLangOptions().Target;
+        auto archName = swift::getMajorArchitectureName(triple);
+        SmallString<256> legacyLayoutPath(instance.getInvocation()
+                                              .getSearchPathOptions()
+                                              .RuntimeLibraryPaths[0]);
+        llvm::sys::path::append(legacyLayoutPath,
+                                "layouts-" + archName + ".yaml");
+        if (tracker->trackFile(legacyLayoutPath))
+          commandline.push_back("-read-legacy-type-info-path=" +
+                                scanner.remapPath(legacyLayoutPath));
+      }
+      // const-gather-protocols-file
+      StringRef ConstProtocolFile = instance.getInvocation()
+                                        .getSearchPathOptions()
+                                        .ConstGatherProtocolListFilePath;
+      if (!ConstProtocolFile.empty())
+        tracker->trackFile(ConstProtocolFile);
+
+      // Profile Data.
+      tracker->trackFile(instance.getInvocation().getIRGenOptions().UseProfile);
+      tracker->trackFile(instance.getInvocation().getIRGenOptions().UseIRProfile);
+      tracker->trackFile(
+          instance.getInvocation().getIRGenOptions().UseSampleProfile);
+
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return diagnoseCASFSCreationError(root.takeError());
@@ -549,14 +589,14 @@ private:
     // action cache. We just use the CASID of the binary module itself as key.
     auto Ref = CASFS.getObjectRefForFileContent(path);
     if (!Ref) {
-      instance.getDiags().diagnose(SourceLoc(), diag::error_cas_file_ref, path);
+      instance.getDiags().diagnose(SourceLoc(), diag::error_cas_file_ref, path,
+                                   toString(Ref.takeError()));
       return true;
     }
-    assert(*Ref && "Binary module should be loaded into CASFS already");
-    depInfo.updateModuleCacheKey(CAS.getID(**Ref).toString());
+    depInfo.updateModuleCacheKey(CAS.getID(*Ref).toString());
 
     swift::cas::CompileJobCacheResult::Builder Builder;
-    Builder.addOutput(file_types::ID::TY_SwiftModuleFile, **Ref);
+    Builder.addOutput(file_types::ID::TY_SwiftModuleFile, *Ref);
     auto Result = Builder.build(CAS);
     if (!Result) {
       instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
@@ -564,7 +604,7 @@ private:
                                    toString(Result.takeError()));
       return true;
     }
-    if (auto E = instance.getActionCache().put(CAS.getID(**Ref),
+    if (auto E = instance.getActionCache().put(CAS.getID(*Ref),
                                                CAS.getID(*Result))) {
       instance.getDiags().diagnose(
           SourceLoc(), diag::error_cas,
@@ -887,7 +927,6 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
             create_clone(clangDeps->moduleMapFile.c_str()),
             create_clone(clangDeps->contextHash.c_str()),
             create_set(clangDeps->buildCommandLine),
-            create_clone(clangDeps->CASFileSystemRootID.c_str()),
             create_clone(clangDeps->CASClangIncludeTreeRootID.c_str()),
             create_clone(clangDeps->moduleCacheKey.c_str())};
       }
@@ -1379,12 +1418,13 @@ performModuleScanImpl(
     }
   }
 
-  auto scanner = ModuleDependencyScanner(
-      service, instance->getInvocation(), instance->getSILOptions(),
-      instance->getASTContext(), *instance->getDependencyTracker(),
-      instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
-      instance->getDiags(),
-      instance->getInvocation().getFrontendOptions().ParallelDependencyScan);
+  auto expectedScannerPtr =
+      ModuleDependencyScanner::create(service, instance, cache);
+
+  if (!expectedScannerPtr)
+    return expectedScannerPtr.getError();
+
+  auto &scanner = **expectedScannerPtr;
 
   // Identify imports of the main module and add an entry for it
   // to the dependency graph.
@@ -1396,7 +1436,7 @@ performModuleScanImpl(
                                                instance->getMainModule()));
 
   // Perform the full module scan starting at the main module.
-  auto allModules = scanner.performDependencyScan(mainModuleID, cache);
+  auto allModules = scanner.performDependencyScan(mainModuleID);
   if (diagnoseCycle(*instance, cache, mainModuleID))
     return std::make_error_code(std::errc::not_supported);
 
@@ -1411,6 +1451,12 @@ performModuleScanImpl(
   if (ctx.Stats)
     ctx.Stats->getFrontendCounters().NumDepScanFilesystemLookups =
         scanner.getNumLookups();
+
+  if (!ctx.hadError()) {
+    emitLoadedModuleTraceIfNeeded(
+        mainModuleID, cache, ctx,
+        instance->getInvocation().getFrontendOptions());
+  }
 
   // Serialize the dependency cache if -serialize-dependency-scan-cache
   // is specified
@@ -1431,12 +1477,14 @@ static llvm::ErrorOr<swiftscan_import_set_t> performModulePrescanImpl(
     ModuleDependenciesCache &cache,
     DepScanInMemoryDiagnosticCollector *diagnosticCollector) {
   // Setup the scanner
-  auto scanner = ModuleDependencyScanner(
-      service, instance->getInvocation(), instance->getSILOptions(),
-      instance->getASTContext(), *instance->getDependencyTracker(),
-      instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
-      instance->getDiags(),
-      instance->getInvocation().getFrontendOptions().ParallelDependencyScan);
+  auto expectedScannerPtr =
+      ModuleDependencyScanner::create(service, instance, cache);
+
+  if (!expectedScannerPtr)
+    return expectedScannerPtr.getError();
+
+  auto &scanner = **expectedScannerPtr;
+
   // Execute import prescan, and write JSON output to the output stream
   auto mainDependencies =
       scanner.getMainModuleDependencyInfo(instance->getMainModule());
@@ -1476,7 +1524,6 @@ bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
       ctx.Allocate<SwiftDependencyScanningService>();
   ModuleDependenciesCache cache(CI.getMainModule()->getNameStr().str(),
                                 CI.getInvocation().getModuleScanningHash());
-
   if (service->setupCachingDependencyScanningService(CI))
     return true;
 
@@ -1574,7 +1621,6 @@ void swift::dependencies::incremental::validateInterModuleDependenciesCache(
                       emitRemarks, visited, modulesRequiringRescan);
   for (const auto &outOfDateModID : modulesRequiringRescan)
     cache.removeDependency(outOfDateModID);
-
   // Regardless of invalidation, always re-scan main module.
   cache.removeDependency(rootModuleID);
 }

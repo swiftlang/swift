@@ -357,7 +357,8 @@ static bool isOptimizableApplySite(ApplySite Apply) {
     return false;
 
   // Do not optimize always_inlinable functions.
-  if (callee->getInlineStrategy() == Inline_t::AlwaysInline)
+  if (callee->getInlineStrategy() == Inline_t::HeuristicAlwaysInline ||
+      callee->getInlineStrategy() == Inline_t::AlwaysInline)
     return false;
 
   if (callee->getLinkage() != SILLinkage::Private)
@@ -1197,10 +1198,12 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
   switch (Apply.getKind()) {
   case ApplySiteKind::PartialApplyInst: {
     auto *PAI = cast<PartialApplyInst>(ApplyInst);
-    return Builder.createPartialApply(
+    auto NewPAI = Builder.createPartialApply(
         Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
         PAI->getCalleeConvention(), PAI->getResultIsolation(), PAI->isOnStack(),
         GenericSpecializationInformation::create(ApplyInst, Builder));
+    NewPAI->setStackAllocationIsNested(PAI->isStackAllocationNested());
+    return NewPAI;
   }
   case ApplySiteKind::ApplyInst:
     return Builder.createApply(

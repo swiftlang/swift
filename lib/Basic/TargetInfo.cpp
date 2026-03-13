@@ -145,13 +145,13 @@ void printTripleInfo(const CompilerInvocation &invocation,
   out << "    \"arch\": \"" << swift::getMajorArchitectureName(triple)
       << "\",\n";
 
-  clang::DiagnosticsEngine DE{new clang::DiagnosticIDs(),
-                              new clang::DiagnosticOptions(),
+  clang::DiagnosticOptions diagOpts;
+  clang::DiagnosticsEngine DE{new clang::DiagnosticIDs(), diagOpts,
                               new clang::IgnoringDiagConsumer()};
-  std::shared_ptr<clang::TargetOptions> TO =
-      std::make_shared<clang::TargetOptions>();
-  TO->Triple = triple.str();
-  clang::TargetInfo *TI = clang::TargetInfo::CreateTargetInfo(DE, TO);
+
+  clang::TargetOptions targetOpts;
+  targetOpts.Triple = triple.str();
+  clang::TargetInfo *TI = clang::TargetInfo::CreateTargetInfo(DE, targetOpts);
   out << "    \"pointerWidthInBits\": "
       << TI->getPointerWidth(clang::LangAS::Default) << ",\n";
   out << "    \"pointerWidthInBytes\": "

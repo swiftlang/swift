@@ -1077,9 +1077,9 @@ struct Str: _ObjectiveCBridgeable {
 // CHECK: bb1:
 // CHECK-NEXT:   [[RESULT:%.*]] = load [[TEMP_MEM]]
 // CHECK-NEXT:   [[ENUM:%.*]] = enum $Optional<ObjCClass>, #Optional.some!enumelt, [[RESULT]]
-// CHECK-NEXT:   br bb3([[ENUM]] :
+// CHECK-NEXT:   br bb2([[ENUM]] :
 //
-// CHECK: bb3([[RESULT:%.*]] : $Optional<ObjCClass>):
+// CHECK: bb2([[RESULT:%.*]] : $Optional<ObjCClass>):
 // CHECK-NEXT: dealloc_stack [[TEMP_MEM]]
 // CHECK-NEXT: return [[RESULT]]
 // CHECK: } // end sil function 'checked_cast_with_take_always'
@@ -1114,9 +1114,9 @@ bb3(%result : $Optional<ObjCClass>):
 // CHECK-NEXT:   release_value [[LOADED_VALUE]]
 // CHECK-NEXT:   [[RESULT:%.*]] = load [[TEMP_MEM]]
 // CHECK-NEXT:   [[ENUM:%.*]] = enum $Optional<ObjCClass>, #Optional.some!enumelt, [[RESULT]]
-// CHECK-NEXT:   br bb3([[ENUM]] :
+// CHECK-NEXT:   br bb2([[ENUM]] :
 //
-// CHECK: bb3([[RESULT:%.*]] : $Optional<ObjCClass>):
+// CHECK: bb2([[RESULT:%.*]] : $Optional<ObjCClass>):
 // CHECK-NEXT: dealloc_stack [[TEMP_MEM]]
 // CHECK-NEXT: return [[RESULT]]
 // CHECK: } // end sil function 'checked_cast_with_take_on_success'
@@ -1152,9 +1152,9 @@ bb3(%result : $Optional<ObjCClass>):
 // CHECK-NEXT:   store [[LOADED_VALUE]] to [[ARG]]
 // CHECK-NEXT:   [[RESULT:%.*]] = load [[TEMP_MEM]]
 // CHECK-NEXT:   [[ENUM:%.*]] = enum $Optional<ObjCClass>, #Optional.some!enumelt, [[RESULT]]
-// CHECK-NEXT:   br bb3([[ENUM]] :
+// CHECK-NEXT:   br bb2([[ENUM]] :
 //
-// CHECK: bb3([[RESULT:%.*]] : $Optional<ObjCClass>):
+// CHECK: bb2([[RESULT:%.*]] : $Optional<ObjCClass>):
 // CHECK-NEXT: destroy_addr [[ARG]]
 // CHECK-NEXT: dealloc_stack [[TEMP_MEM]]
 // CHECK-NEXT: return [[RESULT]]

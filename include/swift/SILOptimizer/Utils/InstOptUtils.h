@@ -89,7 +89,8 @@ unsigned getNumInOutArguments(FullApplySite applySite);
 ///
 /// \p callbacks.onDelete() is invoked to delete each instruction.
 void eliminateDeadInstruction(SILInstruction *inst,
-                              InstModCallbacks callbacks = InstModCallbacks());
+                              InstModCallbacks callbacks = InstModCallbacks(),
+                              bool assumeFixedLifetimes = true);
 
 /// For each of the given instructions, if they are dead delete them
 /// along with their dead operands. Note this utility must be phased out and
@@ -212,14 +213,6 @@ castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
 ///    }
 /// ```
 bool layoutIsTypeDependent(NominalTypeDecl *decl);
-
-/// Peek through trivial Enum initialization, typically for pointless
-/// Optionals.
-///
-/// The returned InitEnumDataAddr dominates the given
-/// UncheckedTakeEnumDataAddrInst.
-InitEnumDataAddrInst *
-findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *utedai);
 
 /// Returns a project_box if it is the next instruction after \p ABI and
 /// and has \p ABI as operand. Otherwise it creates a new project_box right
@@ -625,6 +618,8 @@ SILValue getInitOfTemporaryAllocStack(AllocStackInst *asi);
 
 bool isDestructorSideEffectFree(SILInstruction *mayRelease,
                                 DestructorAnalysis *DA);
+
+bool shouldRemoveCondFail(StringRef withMessage, StringRef functionName);
 
 } // end namespace swift
 

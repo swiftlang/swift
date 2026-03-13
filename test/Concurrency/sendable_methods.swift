@@ -332,3 +332,13 @@ do {
     static func ff() {}
   }
 }
+
+extension GenericE {
+  func foo() -> T { fatalError() }
+}
+
+func testClosureSendableDependence(_ x: NonSendable, _ fn: @Sendable () -> Void) {
+  // This is fine since we resolve the closure before we bind T.
+  func foo<T>(_ x: T, _ y: T) {}
+  foo(GenericE.a.foo, { (x, 0).1 })
+}

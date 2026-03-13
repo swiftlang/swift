@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -update-borrowed-from -sil-combine -semantic-arc-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-combine -semantic-arc-opts %s | %FileCheck %s
 
 // Make sure that we can perform all of these RAUW without producing ARC traffic
 // that semantic arc opts can't eliminate.
@@ -140,11 +140,8 @@ bb0(%0 : @owned $Klass):
   return %2 : $Klass
 }
 
-// We get ARC traffic here today since we do not get rid of PhiArguments kept
-// alive only by destroys/end_borrows. We will eventually though.
-//
 // CHECK-LABEL: sil [ossa] @owned_to_owned_consuming : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
-// CHECK: copy_value
+// CHECK-NOT: copy_value
 // CHECK-NOT: enum $FakeOptional<Klass>, #FakeOptional.some!enumelt
 // CHECK: } // end sil function 'owned_to_owned_consuming'
 sil [ossa] @owned_to_owned_consuming : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
@@ -302,51 +299,56 @@ bbExitBlock(%result : @owned $FakeOptional<Klass>):
   return %result : $FakeOptional<Klass>
 }
 
-// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2 : $@convention(thin) (@guaranteed Klass) -> (Klass, Klass) {
+// CHECK-LABEL: sil [ossa] @owned_to_guaranteed_rauw_2 : $@convention(thin) (@guaranteed Klass) -> @owned (Klass, Klass) {
 // CHECK: bb0(
 // CHECK-NEXT: tuple
+// CHECK-NEXT: copy_value
 // CHECK-NEXT: return
-// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_2'
-sil [ossa] @unowned_to_guaranteed_rauw_2 : $@convention(thin) (@guaranteed Klass) -> (Klass, Klass) {
+// CHECK: } // end sil function 'owned_to_guaranteed_rauw_2'
+sil [ossa] @owned_to_guaranteed_rauw_2 : $@convention(thin) (@guaranteed Klass) -> @owned (Klass, Klass) {
 bb0(%0 : @guaranteed $Klass):
   %1 = unchecked_bitwise_cast %0 : $Klass to $SubKlass
   %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
   %3 = tuple(%2 : $Klass, %2 : $Klass)
-  return %3 : $(Klass, Klass)
+  %4 = copy_value %3
+  return %4 : $(Klass, Klass)
 }
 
-// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2a : $@convention(thin) (@guaranteed Builtin.NativeObject) -> (Klass, Klass) {
+// CHECK-LABEL: sil [ossa] @owned_to_guaranteed_rauw_2a : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned (Klass, Klass) {
 // CHECK: bb0(
 // CHECK-NEXT: unchecked_ref_cast
 // CHECK-NEXT: tuple
+// CHECK-NEXT: copy_value
 // CHECK-NEXT: return
-// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_2a'
-sil [ossa] @unowned_to_guaranteed_rauw_2a : $@convention(thin) (@guaranteed Builtin.NativeObject) -> (Klass, Klass) {
+// CHECK: } // end sil function 'owned_to_guaranteed_rauw_2a'
+sil [ossa] @owned_to_guaranteed_rauw_2a : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned (Klass, Klass) {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   %0a = unchecked_ref_cast %0 : $Builtin.NativeObject to $Klass
   %1 = unchecked_bitwise_cast %0a : $Klass to $SubKlass
   %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
   %3 = tuple(%2 : $Klass, %2 : $Klass)
-  return %3 : $(Klass, Klass)
+  %4 = copy_value %3
+  return %4 : $(Klass, Klass)
 }
 
 // We need the unchecked_ownership_conversion since our base value is
 // guaranteed, not a function argument, and our user is a function exiting
 // terminator.
 //
-// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Klass {
+// CHECK-LABEL: sil [ossa] @owned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Klass {
 // CHECK: bb0(
 // CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: copy_value
 // CHECK-NEXT: return
-// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_2b'
-sil [ossa] @unowned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Klass {
+// CHECK: } // end sil function 'owned_to_guaranteed_rauw_2b'
+sil [ossa] @owned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Klass {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   %0a = unchecked_ref_cast %0 : $Builtin.NativeObject to $Klass
   %1 = unchecked_bitwise_cast %0a : $Klass to $SubKlass
   %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
-  return %2 : $Klass
+  %3 = copy_value %2
+  return %3 : $Klass
 }
-
 
 // CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2_loop : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<(Klass, Klass)> {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Klass):
@@ -404,15 +406,17 @@ bbExitBlock(%result : @owned $FakeOptional<(Klass, Klass)>):
   return %result : $FakeOptional<(Klass, Klass)>
 }
 
-// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_3 : $@convention(thin) (@guaranteed Klass) -> Klass {
+// CHECK-LABEL: sil [ossa] @owned_to_guaranteed_rauw_3 : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
 // CHECK: bb0(
+// CHECK-NEXT: copy_value
 // CHECK-NEXT: return
-// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_3'
-sil [ossa] @unowned_to_guaranteed_rauw_3 : $@convention(thin) (@guaranteed Klass) -> Klass {
+// CHECK: } // end sil function 'owned_to_guaranteed_rauw_3'
+sil [ossa] @owned_to_guaranteed_rauw_3 : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
 bb0(%0 : @guaranteed $Klass):
   %1 = unchecked_bitwise_cast %0 : $Klass to $SubKlass
   %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
-  return %2 : $Klass
+  %3 = copy_value %2
+  return %3 : $Klass
 }
 
 //===---
@@ -592,19 +596,20 @@ bbExit:
 // MandatoryCombine does not handle this pattern
 sil [ossa] @guaranteed_to_guaranteed_consuming : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
 bb0(%0 : @guaranteed $FakeOptional<Klass>):
-  switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.some: bb1, case #FakeOptional.none: bb2
+  switch_enum %0, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
-bb1(%0a : @guaranteed $Klass):
-  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $Klass
-  br bb3(%1 : $FakeOptional<Klass>)
+bb1(%2 : @guaranteed $Klass):
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %2
+  br bb3(%3)
 
 bb2:
-  %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
-  br bb3(%3 : $FakeOptional<Klass>)
+  %5 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%5)
 
-bb3(%4 : @guaranteed $FakeOptional<Klass>):
-  %9999 = tuple()
-  return %9999 : $()
+bb3(%7 : @guaranteed $FakeOptional<Klass>):
+  %8 = borrowed %7 from (%0)
+  %9 = tuple ()
+  return %9
 }
 
 // Make sure we performed the optimization.
@@ -898,43 +903,45 @@ bb7:
 // CHECK:       } // end sil function 'invalid_use_after_lifetime6'
 sil [ossa] @invalid_use_after_lifetime6 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Klass):
-  %0a = begin_borrow %0 : $Klass
+  %1 = begin_borrow %0
   br bb1
 
 bb1:
   br bb2
 
 bb2:
-  br bb3(%0a : $Klass, undef : $Klass)
+  br bb3(%1, undef : $Klass)
 
-bb3(%arg : @guaranteed $Klass, %base : @owned $Klass):
-  %0b = ref_element_addr %arg : $Klass, #Klass.structField
-  %0c = struct_element_addr %0b : $*NativeObjectWrapper, #NativeObjectWrapper.obj
+bb3(%5 : @reborrow $Klass, %6 : @owned $Klass):
+  %7 = borrowed %5 from (%0)
+  %8 = ref_element_addr %7, #Klass.structField
+  %9 = struct_element_addr %8, #NativeObjectWrapper.obj
   br bb4
 
 bb4:
-  %f = function_ref @inguaranteed_nativeobject_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
-  apply %f(%0c) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
-  %1 = address_to_pointer %0c : $*Builtin.NativeObject to $Builtin.RawPointer
-  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+
+  %11 = function_ref @inguaranteed_nativeobject_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  %12 = apply %11(%9) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  %13 = address_to_pointer %9 to $Builtin.RawPointer
+  %14 = pointer_to_address %13 to [strict] $*Builtin.NativeObject
   br bb5
 
 bb5:
-  end_borrow %arg : $Klass
-  destroy_value %base : $Klass
-  %3 = load [copy] %2 : $*Builtin.NativeObject
+  end_borrow %7
+  destroy_value %6
+  %18 = load [copy] %14
   cond_br undef, bb6, bb7
 
 bb6:
-  destroy_value %3 : $Builtin.NativeObject
+  destroy_value %18
   br bb3(undef : $Klass, undef : $Klass)
 
 bb7:
   br bb8
 
 bb8:
-  destroy_value %0 : $Klass
-  return %3 : $Builtin.NativeObject
+  destroy_value %0
+  return %18
 }
 
 // Make sure that we always RAUW if our new value address is from a

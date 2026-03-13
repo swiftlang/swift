@@ -128,26 +128,35 @@ private func analyze(dependence: LifetimeDependence, _ context: FunctionPassCont
   var range = dependence.computeRange(context)
   defer { range?.deinitialize() }
 
-  var error = false
-  let diagnostics =
-    DiagnoseDependence(dependence: dependence, range: range,
-                       onError: { error = true }, context: context)
+  let diagnostics = DiagnoseDependence(dependence: dependence, range: range, context: context)
 
   // Check each lifetime-dependent use via a def-use visitor
   var walker = DiagnoseDependenceWalker(diagnostics, context)
   defer { walker.deinitialize() }
   let result = walker.walkDown(dependence: dependence)
-  // The walk may abort without a diagnostic error.
-  assert(!error || result == .abortWalk)
+  assert(result == .continueWalk || diagnostics.errorStatus != nil,
+         "Lifetime diagnostics failed without raising an error")
   return result == .continueWalk
 }
 
 /// Analyze and diagnose a single LifetimeDependence.
-private struct DiagnoseDependence {
+private class DiagnoseDependence {
+  enum ErrorStatus {
+    case diagnostic
+    case unresolvedDependence
+  }
+
   let dependence: LifetimeDependence
   let range: InstructionRange?
-  let onError: ()->()
   let context: FunctionPassContext
+
+  init(dependence: LifetimeDependence, range: InstructionRange?, context: FunctionPassContext) {
+    self.dependence = dependence
+    self.range = range
+    self.context = context
+  }
+
+  var errorStatus: ErrorStatus? = nil
 
   var function: Function { dependence.function }
 
@@ -160,7 +169,7 @@ private struct DiagnoseDependence {
   func checkInScope(operand: Operand) -> WalkResult {
     if let range, !range.inclusiveRangeContains(operand.instruction) {
       log("  out-of-range error: \(operand.instruction)")
-      reportError(operand: operand, diagID: .lifetime_outside_scope_use)
+      reportError(escapingValue: operand.value, user: operand.instruction, diagID: .lifetime_outside_scope_use)
       return .abortWalk
     }
     log("  contains: \(operand.instruction)")
@@ -169,7 +178,12 @@ private struct DiagnoseDependence {
 
   func reportEscaping(operand: Operand) {
     log("  escaping error: \(operand.instruction)")
-    reportError(operand: operand, diagID: .lifetime_outside_scope_escape)
+    reportError(escapingValue: operand.value, user: operand.instruction, diagID: .lifetime_outside_scope_escape)
+  }
+
+  func reportEscaping(value: Value, user: Instruction) {
+    log("  escaping error: \(value) at \(user)")
+    reportError(escapingValue: value, user: user, diagID: .lifetime_outside_scope_escape)
   }
 
   func reportUnknown(operand: Operand) {
@@ -184,7 +198,8 @@ private struct DiagnoseDependence {
       if inoutArg == sourceArg {
         return .continueWalk
       }
-      if function.argumentConventions.getDependence(target: inoutArg.index, source: sourceArg.index) != nil {
+      if function.argumentConventions.parameterDependence(targetArgumentIndex: inoutArg.index,
+                                                          sourceArgumentIndex: sourceArg.index) != nil {
         // The inout result depends on a lifetime that is inherited or borrowed in the caller.
         log("  has dependent inout argument: \(inoutArg)")
         return .continueWalk
@@ -257,15 +272,16 @@ private struct DiagnoseDependence {
     return .abortWalk
   }
 
-  func reportError(operand: Operand, diagID: DiagID) {
+  func reportError(escapingValue: Value, user: Instruction, diagID: DiagID) {
     // If the dependent value is Escapable, then mark_dependence resolution fails, but this is not a diagnostic error.
     if dependence.dependentValue.isEscapable {
+      errorStatus = .unresolvedDependence
       return
     }
-    onError()
+    errorStatus = .diagnostic
 
     // Identify the escaping variable.
-    let escapingVar = LifetimeVariable(usedBy: operand, context)
+    let escapingVar = LifetimeVariable(definedBy: escapingValue, user: user, context)
     if let varDecl = escapingVar.varDecl {
       // Use the variable location, not the access location.
       // Variable names like $return_value and $implicit_value don't have source locations.
@@ -284,9 +300,10 @@ private struct DiagnoseDependence {
         diagnose(sourceLoc, .lifetime_value_outside_thunk, thunkSelect, function.name)
       }
     }
+    diagnoseImplicitFunction()
     reportScope()
     // Identify the use point.
-    if let userSourceLoc = operand.instruction.location.sourceLoc {
+    if let userSourceLoc = user.location.sourceLoc {
       diagnose(userSourceLoc, diagID)
     }
   }
@@ -323,6 +340,23 @@ private struct DiagnoseDependence {
       }
     }
   }
+
+  func diagnoseImplicitFunction() {
+    guard let funcLoc = function.location.sourceLoc else {
+      return
+    }
+    if let kindName = {
+         if function.isInitializer {
+           return "init"
+         }
+         if function.isDeinitializer {
+           return "deinit"
+         }
+         return function.accessorKindName
+       }() {
+      diagnose(funcLoc, .implicit_function_note, kindName)
+    }
+  }
 }
 
 // Identify a best-effort variable declaration based on a defining SIL
@@ -340,13 +374,12 @@ private struct LifetimeVariable {
     return varDecl?.userFacingName
   }
 
-  init(usedBy operand: Operand, _ context: some Context) {
-    self = .init(dependent: operand.value, context)
+  init(definedBy value: Value, user: Instruction, _ context: some Context) {
+    self = .init(dependent: value, context)
     // variable names like $return_value and $implicit_value don't have source locations.
-    // For @out arguments, the operand's location is the best answer.
+    // For @out arguments, the user's location is the best answer.
     // Otherwise, fall back to the function's location.
-    self.sourceLoc = self.sourceLoc ?? operand.instruction.location.sourceLoc
-      ?? operand.instruction.parentFunction.location.sourceLoc
+    self.sourceLoc = self.sourceLoc ?? user.location.sourceLoc ?? user.parentFunction.location.sourceLoc
   }
 
   init(definedBy value: Value, _ context: some Context) {
@@ -534,9 +567,9 @@ extension DiagnoseDependenceWalker : LifetimeDependenceDefUseWalker {
     return .abortWalk
   }
 
-  mutating func inoutDependence(argument: FunctionArgument, on operand: Operand) -> WalkResult {
+  mutating func inoutDependence(argument: FunctionArgument, functionExit: Instruction) -> WalkResult {
     if diagnostics.checkInoutResult(argument: argument) == .abortWalk {
-      diagnostics.reportEscaping(operand: operand)
+      diagnostics.reportEscaping(value: argument, user: functionExit)
       return .abortWalk
     }
     return .continueWalk
@@ -575,10 +608,10 @@ extension DiagnoseDependenceWalker : LifetimeDependenceDefUseWalker {
     return .continueWalk
   }
 
-  // Override AddressUseVisitor here because LifetimeDependenceDefUseWalker
-  // returns .abortWalk, and we want a more useful crash report.
+  // Override AddressUseVisitor here because LifetimeDependenceDefUseWalker returns .abortWalk and
+  // DiagnoseDependenceWalker requires a diagnostic error for all aborts.
   mutating func unknownAddressUse(of operand: Operand) -> WalkResult {
     diagnostics.reportUnknown(operand: operand)
-    return .continueWalk
+    return .abortWalk
   }
 }

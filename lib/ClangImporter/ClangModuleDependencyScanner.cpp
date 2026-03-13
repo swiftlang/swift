@@ -55,9 +55,8 @@ std::vector<std::string> ClangImporter::getClangDepScanningInvocationArguments(
   // HACK! Drop the -fmodule-format= argument and the one that
   // precedes it.
   {
-    auto moduleFormatPos = std::find_if(commandLineArgs.begin(),
-                                        commandLineArgs.end(),
-                                        [](StringRef arg) {
+    auto moduleFormatPos = llvm::find_if(commandLineArgs,
+                                         [](StringRef arg) {
       return arg.starts_with("-fmodule-format=");
     });
     assert(moduleFormatPos != commandLineArgs.end());
@@ -66,8 +65,7 @@ std::vector<std::string> ClangImporter::getClangDepScanningInvocationArguments(
   }
 
   // Use `-fsyntax-only` to do dependency scanning and assert if not there.
-  assert(std::find(commandLineArgs.begin(), commandLineArgs.end(),
-                   "-fsyntax-only") != commandLineArgs.end() &&
+  assert(llvm::is_contained(commandLineArgs, "-fsyntax-only") &&
          "missing -fsyntax-only option");
 
   // The Clang modules produced by ClangImporter are always embedded in an
@@ -106,8 +104,8 @@ void ClangImporter::getBridgingHeaderOptions(
   // Round-trip clang args to canonicalize and clear the options that swift
   // compiler doesn't need.
   clang::CompilerInvocation depsInvocation;
-  clang::DiagnosticsEngine clangDiags(new clang::DiagnosticIDs(),
-                                      new clang::DiagnosticOptions(),
+  clang::DiagnosticOptions diagOpts;
+  clang::DiagnosticsEngine clangDiags(new clang::DiagnosticIDs(), diagOpts,
                                       new clang::IgnoringDiagConsumer());
 
   llvm::SmallVector<const char *> clangArgs;

@@ -18,3 +18,7 @@ module StructAsOptionSet {
 module NoncopyableStructs {
   header "noncopyable-struct.h"
 }
+
+module ReturnForeignReference {
+  header "return-foreign-reference.h"
+}

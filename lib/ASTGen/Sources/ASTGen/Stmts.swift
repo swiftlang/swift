@@ -221,7 +221,11 @@ extension ASTGenVisitor {
         let identifier = pat.boundName
         if identifier != nil {
           // For `if let foo { }` Create a `foo` expression as the initializer.
-          let ref = BridgedDeclNameRef.createParsed(.init(identifier))
+          let ref = BridgedDeclNameRef.createParsed(
+            self.ctx,
+            moduleSelector: nil,
+            baseName: .init(identifier)
+          )
           let loc = BridgedDeclNameLoc.createParsed(self.generateSourceLoc(node.pattern))
           initializer =
             BridgedUnresolvedDeclRefExpr.createParsed(
@@ -385,7 +389,8 @@ extension ASTGenVisitor {
       sequence: self.generate(expr: node.sequence),
       whereLoc: self.generateSourceLoc(node.whereClause?.whereKeyword),
       whereExpr: self.generate(expr: node.whereClause?.condition),
-      body: self.generate(codeBlock: node.body)
+      body: self.generate(codeBlock: node.body),
+      declContext: self.declContext
     )
   }
 

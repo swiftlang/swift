@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/WarningGroupBehaviorRule.h"
 
 using namespace swift;
 
@@ -163,4 +164,29 @@ void BridgedDiagnostic_fixItReplace(BridgedDiagnostic cDiag, SourceLoc startLoc,
 void BridgedDiagnostic_finish(BridgedDiagnostic cDiag) {
   BridgedDiagnostic::Impl *diag = cDiag.unbridged();
   delete diag;
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: WarningGroupBehaviorRule
+//===----------------------------------------------------------------------===//
+
+BridgedStringRef BridgedWarningGroupBehaviorRule_getGroupName(BridgedWarningGroupBehaviorRule rule) {
+  if (rule.unbridged()->hasGroup())
+    return BridgedStringRef(getDiagGroupInfoByID(rule.unbridged()->getGroup()).name);
+  return BridgedStringRef("no_group");
+}
+
+swift::WarningGroupBehavior
+BridgedWarningGroupBehaviorRule_getBehavior(BridgedWarningGroupBehaviorRule rule) {
+  return rule.unbridged()->getBehavior();
+}
+
+SwiftInt BridgedDiagnosticGroupLinks_getCount() {
+  return DiagLinksCount;
+}
+
+std::pair<BridgedStringRef, BridgedStringRef>
+BridgedDiagnosticGroupLinks_getLink(SwiftInt index) {
+  return std::make_pair(BridgedStringRef(DiagnosticGroupLinks[index].first),
+                        BridgedStringRef(DiagnosticGroupLinks[index].second));
 }

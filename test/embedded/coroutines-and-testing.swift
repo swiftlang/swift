@@ -4,8 +4,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -o /dev/null -enable-experimental-feature Embedded -enable-testing -no-allocations
 
 
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 
 public protocol P {

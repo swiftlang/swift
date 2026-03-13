@@ -1,9 +1,8 @@
 // RUN: %target-swift-frontend -typecheck -target %target-swift-5.1-abi-triple -swift-version 6 %s -verify
 
-// Even though enable-experimental-async-top-level is enabled, there are no
-// 'await's made from the top-level, thus the top-level is not an asynchronous
-// context. `a` is just a normal top-level global variable with no actor
-// isolation.
+// There are no 'await's made from the top-level, thus the top-level is not an
+// asynchronous context. `a` is just a normal top-level global variable with no
+// actor isolation.
 
 var a = 10 // expected-note 2 {{var declared here}}
 // expected-note@-1 2{{mutation of this var is only permitted within the actor}}

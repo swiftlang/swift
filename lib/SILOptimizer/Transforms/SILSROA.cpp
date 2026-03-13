@@ -357,13 +357,15 @@ static bool runSROAOnFunction(SILFunction &Fn, bool splitSemanticTypes) {
         if (!splitSemanticTypes && isSemanticType(ctxt, AI->getElementType()))
           continue;
 
-        if (shouldExpand(Fn.getModule(), AI->getElementType()))
-          Worklist.push_back(AI);
+        Worklist.push_back(AI);
       }
 
   while (!Worklist.empty()) {
     AllocStackInst *AI = Worklist.back();
     Worklist.pop_back();
+
+    if (!shouldExpand(Fn.getModule(), AI->getElementType()))
+      continue;
 
     SROAMemoryUseAnalyzer Analyzer(AI);
 

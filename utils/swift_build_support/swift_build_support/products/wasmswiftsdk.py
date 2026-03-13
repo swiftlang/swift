@@ -224,7 +224,7 @@ class WasmSwiftSDK(product.Product):
 
     def _build_target_package(self, swift_host_triple, clang_multiarch_triple, has_pthread,
                               stdlib_build_path, llvm_runtime_libs_build_path,
-                              wasi_sysroot):
+                              wasi_sysroot, wasi_resource_dir):
 
         dest_dir = self._target_package_path(swift_host_triple)
         shell.rmtree(dest_dir)
@@ -235,13 +235,15 @@ class WasmSwiftSDK(product.Product):
             shell.call([self.toolchain.cmake, '--install', '.'],
                        env={'DESTDIR': dest_dir})
 
-        # Copy clang builtin libraries
-        with shell.pushd(llvm_runtime_libs_build_path):
-            for dirname in ['clang', 'swift/clang', 'swift_static/clang']:
-                clang_dir = os.path.join(dest_dir, f'usr/lib/{dirname}')
-                shell.call([self.toolchain.cmake, '--install', '.',
-                            '--component', 'clang_rt.builtins-wasm32'],
-                           env={'DESTDIR': clang_dir})
+        # Copy clang resource dir
+        for dirname in ['clang', 'swift/clang', 'swift_static/clang']:
+            dest_clang_resource_dir = os.path.join(
+                dest_dir, 'usr', 'lib', dirname)
+            shell.makedirs(dest_clang_resource_dir)
+            resource_lib_dir = os.path.join(dest_clang_resource_dir, 'lib')
+            # Remove existing (empty) lib directory, which is created by stdlib CMake install step
+            shell.rmtree(resource_lib_dir)
+            shell.copytree(os.path.join(wasi_resource_dir, 'lib'), resource_lib_dir)
 
         self._build_libxml2(swift_host_triple, clang_multiarch_triple, has_pthread, wasi_sysroot)
         self._build_foundation(swift_host_triple, clang_multiarch_triple, has_pthread, wasi_sysroot)
@@ -270,18 +272,24 @@ class WasmSwiftSDK(product.Product):
                 build_root, '%s-%s' % (build_basename, host_target))
             wasi_sysroot = wasisysroot.WASILibc.sysroot_install_path(
                 build_root, clang_multiarch_triple)
+            wasi_resource_dir = wasisysroot.WASILibc.resource_dir_install_path(
+                build_root, clang_multiarch_triple)
             llvm_runtime_libs_build_path = os.path.join(
                 build_root, '%s-%s' % ('wasmllvmruntimelibs', host_target),
                 clang_multiarch_triple)
             package_path = self._build_target_package(
                 swift_host_triple, clang_multiarch_triple, has_pthread, stdlib_build_path,
-                llvm_runtime_libs_build_path, wasi_sysroot)
+                llvm_runtime_libs_build_path, wasi_sysroot, wasi_resource_dir)
             if build_sdk:
                 target_packages.append((swift_host_triple, wasi_sysroot, package_path))
 
-        swiftc_path = os.path.abspath(self.toolchain.swiftc)
-        toolchain_path = os.path.dirname(os.path.dirname(swiftc_path))
-        swift_run = os.path.join(toolchain_path, 'bin', 'swift-run')
+
+        if self.args.build_swift and self.args.build_swiftpm and self.args.install_swiftpm:
+            swift_run = os.path.join(self.install_toolchain_path(host_target), "bin", "swift-run")
+        else:
+            swiftc_path = os.path.abspath(self.toolchain.swiftc)
+            toolchain_path = os.path.dirname(os.path.dirname(swiftc_path))
+            swift_run = os.path.join(toolchain_path, 'bin', 'swift-run')
 
         swift_version = os.environ.get('TOOLCHAIN_VERSION',
                                        'swift-DEVELOPMENT-SNAPSHOT')

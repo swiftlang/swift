@@ -43,6 +43,7 @@
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/APSInt.h"
@@ -99,6 +100,24 @@ private:
   SILValue promoteToLinearFunction(LinearFunctionInst *inst,
                                    SILBuilder &builder, SILLocation loc,
                                    DifferentiationInvoker invoker);
+
+  /// Creates and canonicalizes private differentiability witness for
+  /// `originalFn`, differentiating with respect to
+  /// `desiredParameterIndices`. Returns `nullptr` on failure signifying that a
+  /// diagnostic has been emitted using `invoker`.
+  SILDifferentiabilityWitness *createPrivateDifferentiabilityWitness(
+      CanSILFunctionType originalFnTy, SILFunction *originalFn,
+      IndexSubset *desiredParameterIndices, IndexSubset *desiredResultIndices,
+      SILValue original, DifferentiationInvoker invoker);
+
+  /// Resolves differentiability witness for `originalFn`. Either by looking up
+  /// for registered one with respect to posible superset of `desiredIndices`,
+  /// or creating a new private one. Returns `nullptr` on failure signifying
+  /// that a diagnostic has been emitted using `invoker`.
+  SILDifferentiabilityWitness *getOrCreateMinimalDifferentiabilitywitness(
+      CanSILFunctionType originalFnTy, SILFunction *originalFn,
+      IndexSubset *desiredParameterIndices, IndexSubset *desiredResultIndices,
+      SILValue original, DifferentiationInvoker invoker);
 
   /// Emits a reference to a derivative function of `original`, differentiated
   /// with respect to a superset of `desiredIndices`. Returns the `SILValue` for
@@ -527,12 +546,142 @@ SILFunction *DifferentiationTransformer::getUnwrappedCurryThunkFunction(
   return silFnIt->second;
 }
 
+SILDifferentiabilityWitness *
+DifferentiationTransformer::createPrivateDifferentiabilityWitness(
+    CanSILFunctionType originalFnTy, SILFunction *originalFn,
+    IndexSubset *desiredParameterIndices, IndexSubset *desiredResultIndices,
+    SILValue original, DifferentiationInvoker invoker) {
+
+  // Check non-differentiable cases before creating a new private
+  // differentiability witness.
+
+  // If the function is intentionally marked as being opaque to
+  // differentiation, then we should not create a task for it.
+  if (originalFn->hasSemanticsAttr("autodiff.opaque")) {
+    context.emitNondifferentiabilityError(
+        original, invoker, diag::autodiff_opaque_function_not_differentiable);
+    return nullptr;
+  }
+
+  // Check and diagnose non-differentiable arguments.
+  for (auto [paramIndex, param] :
+       llvm::enumerate(originalFnTy->getParameters())) {
+    if (!desiredParameterIndices->contains(paramIndex))
+      continue;
+
+    SILType paramType = param.getSILStorageInterfaceType();
+    if (!paramType.isDifferentiable(context.getModule())) {
+      context.emitNondifferentiabilityError(
+          original, invoker, diag::autodiff_nondifferentiable_argument);
+      return nullptr;
+    }
+  }
+
+  // Check and diagnose non-differentiable results.
+  unsigned firstSemanticParamResultIdx = originalFnTy->getNumResults();
+  unsigned firstYieldResultIndex =
+      firstSemanticParamResultIdx +
+      originalFnTy->getNumAutoDiffSemanticResultsParameters();
+  for (auto resultIndex : desiredResultIndices->getIndices()) {
+    SILType resultType;
+    if (resultIndex >= firstYieldResultIndex) {
+      auto yieldResultIndex = resultIndex - firstYieldResultIndex;
+      auto yield = originalFnTy->getYields()[yieldResultIndex];
+      // We can only differentiate indirect yields. This should be diagnosed
+      // earlier in VJPCloner.
+      assert(yield.isAutoDiffSemanticResult() && "unsupported result");
+      resultType = yield.getSILStorageInterfaceType();
+    } else if (resultIndex >= firstSemanticParamResultIdx) {
+      auto semanticResultParamIdx = resultIndex - firstSemanticParamResultIdx;
+      auto semanticResultParam = *std::next(
+          originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
+          semanticResultParamIdx);
+      resultType = semanticResultParam.getSILStorageInterfaceType();
+    } else {
+      resultType =
+          originalFnTy->getResults()[resultIndex].getSILStorageInterfaceType();
+    }
+
+    if (!resultType || !resultType.isDifferentiable(context.getModule())) {
+      context.emitNondifferentiabilityError(
+          original, invoker, diag::autodiff_nondifferentiable_result);
+      return nullptr;
+    }
+  }
+
+  // Check and diagnose external declarations.
+  if (originalFn->isExternalDeclaration()) {
+    context.emitNondifferentiabilityError(
+        original, invoker, diag::autodiff_external_nondifferentiable_function);
+    return nullptr;
+  }
+
+  // Soundness check passed. Create a new differentiability witness
+  GenericSignature contextualDerivativeGenSig = GenericSignature();
+  if (invoker.getKind() ==
+      DifferentiationInvoker::Kind::IndirectDifferentiation)
+    contextualDerivativeGenSig = invoker.getIndirectDifferentiation()
+                                     .second->getDerivativeGenericSignature();
+  auto derivativeConstrainedGenSig =
+      autodiff::getConstrainedDerivativeGenericSignature(
+          originalFnTy, desiredParameterIndices, desiredResultIndices,
+          contextualDerivativeGenSig, LookUpConformanceInModule());
+
+  auto *witness = SILDifferentiabilityWitness::createDefinition(
+      context.getModule(), SILLinkage::Private, originalFn,
+      DifferentiabilityKind::Reverse, desiredParameterIndices,
+      desiredResultIndices, derivativeConstrainedGenSig, /*jvp*/ nullptr,
+      /*vjp*/ nullptr, /*isSerialized*/ false);
+  if (canonicalizeDifferentiabilityWitness(witness, invoker, IsNotSerialized))
+    return nullptr;
+
+  return witness;
+}
+
+SILDifferentiabilityWitness *
+DifferentiationTransformer::getOrCreateMinimalDifferentiabilitywitness(
+    CanSILFunctionType originalFnTy, SILFunction *originalFn,
+    IndexSubset *desiredParameterIndices, IndexSubset *desiredResultIndices,
+    SILValue original, DifferentiationInvoker invoker) {
+  // NOTE(TF-893): Extending capacity is necessary when `originalFnTy` has
+  // parameters corresponding to captured variables.
+  // TODO: If possible, change `autodiff::getLoweredParameterIndices` to
+  // take `CaptureInfo` into account.
+  if (originalFnTy->getNumParameters() >
+      desiredParameterIndices->getCapacity()) {
+    desiredParameterIndices = desiredParameterIndices->extendingCapacity(
+        context.getASTContext(), originalFnTy->getNumParameters());
+  }
+
+  // Look up a differentiability witness with the exact configuration.
+  auto *minimalWitness = getExactDifferentiabilityWitness(
+      context.getModule(), originalFn, desiredParameterIndices,
+      desiredResultIndices);
+
+  // Otherwise, look up a differentiability witness with a minimal superset
+  // configuration.
+  if (!minimalWitness)
+    minimalWitness = getOrCreateMinimalASTDifferentiabilityWitness(
+        context.getModule(), originalFn, DifferentiabilityKind::Reverse,
+        desiredParameterIndices, desiredResultIndices);
+
+  // Finally, try to create private differentiability witness
+  if (!minimalWitness)
+    minimalWitness = createPrivateDifferentiabilityWitness(
+        originalFnTy, originalFn, desiredParameterIndices, desiredResultIndices,
+        original, invoker);
+
+  return minimalWitness;
+}
+
 std::optional<std::pair<SILValue, AutoDiffConfig>>
 DifferentiationTransformer::emitDerivativeFunctionReference(
     SILBuilder &builder, const AutoDiffConfig &desiredConfig,
     AutoDiffDerivativeFunctionKind kind, SILValue original,
     DifferentiationInvoker invoker,
     SmallVectorImpl<AllocStackInst *> &newBuffersToDealloc) {
+  SILFunction *parentFn = original->getFunction();
+
   // If `original` is itself an `DifferentiableFunctionExtractInst` whose kind
   // matches the given kind and desired differentiation parameter indices,
   // simply extract the derivative function of its function operand, retain the
@@ -576,111 +725,16 @@ DifferentiationTransformer::emitDerivativeFunctionReference(
     auto loc = originalFRI->getLoc();
     auto *originalFn = originalFRI->getReferencedFunction();
     auto originalFnTy = originalFn->getLoweredFunctionType();
-    auto *desiredParameterIndices = desiredConfig.parameterIndices;
-    auto *desiredResultIndices = desiredConfig.resultIndices;
-    // NOTE(TF-893): Extending capacity is necessary when `originalFnTy` has
-    // parameters corresponding to captured variables.
-    // TODO: If possible, change `autodiff::getLoweredParameterIndices` to
-    // take `CaptureInfo` into account.
-    if (originalFnTy->getNumParameters() >
-        desiredParameterIndices->getCapacity()) {
-      desiredParameterIndices = desiredParameterIndices->extendingCapacity(
-          context.getASTContext(), originalFnTy->getNumParameters());
-    }
-    // Look up a differentiability witness with the exact configuration.
-    auto *minimalWitness = getExactDifferentiabilityWitness(
-        context.getModule(), originalFn, desiredParameterIndices,
-        desiredResultIndices);
-    // Otherwise, look up a differentiability witness with a minimal superset
-    // configuration.
+
+    auto *minimalWitness = getOrCreateMinimalDifferentiabilitywitness(
+        originalFnTy, originalFn, desiredConfig.parameterIndices,
+        desiredConfig.resultIndices, original, invoker);
+
+    // All non-differentiability cases should be diagnosted
     if (!minimalWitness)
-      minimalWitness = getOrCreateMinimalASTDifferentiabilityWitness(
-          context.getModule(), originalFn, DifferentiabilityKind::Reverse,
-          desiredParameterIndices, desiredResultIndices);
-    // If no minimal witness exists, check non-differentiable cases before
-    // creating a new private differentiability witness.
-    if (!minimalWitness) {
-      // If the function is intentionally marked as being opaque to
-      // differentiation, then we should not create a task for it.
-      if (originalFn->hasSemanticsAttr("autodiff.opaque")) {
-        context.emitNondifferentiabilityError(
-            original, invoker,
-            diag::autodiff_opaque_function_not_differentiable);
-        return std::nullopt;
-      }
-      // Check and diagnose non-differentiable arguments.
-      auto originalFnTy = originalFn->getLoweredFunctionType();
-      for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
-        if (desiredConfig.isWrtParameter(paramIndex) &&
-            !originalFnTy->getParameters()[paramIndex]
-                 .getSILStorageInterfaceType()
-                 .isDifferentiable(context.getModule())) {
-          auto diag = context.emitNondifferentiabilityError(
-              original, invoker, diag::autodiff_nondifferentiable_argument);
-          return std::nullopt;
-        }
-      }
-      // Check and diagnose non-differentiable results.
-      unsigned firstSemanticParamResultIdx = originalFnTy->getNumResults();
-      unsigned firstYieldResultIndex = originalFnTy->getNumResults() +
-        originalFnTy->getNumAutoDiffSemanticResultsParameters();
-      for (auto resultIndex : desiredResultIndices->getIndices()) {
-        SILType resultType;
-        if (resultIndex >= firstYieldResultIndex) {
-          auto yieldResultIndex = resultIndex - firstYieldResultIndex;
-          auto yield = originalFnTy->getYields()[yieldResultIndex];
-          // We can only differentiate indirect yields. This should be diagnosed
-          // earlier in VJPCloner.
-          assert(yield.isAutoDiffSemanticResult() && "unsupported result");
-          resultType = yield.getSILStorageInterfaceType();
-        } else if (resultIndex >= firstSemanticParamResultIdx) {
-          auto semanticResultParamIdx = resultIndex - firstSemanticParamResultIdx;
-          auto semanticResultParam =
-              *std::next(originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
-                         semanticResultParamIdx);
-          resultType = semanticResultParam.getSILStorageInterfaceType();
-        } else {
-          resultType = originalFnTy->getResults()[resultIndex]
-                           .getSILStorageInterfaceType();
-        }
-        if (!resultType || !resultType.isDifferentiable(context.getModule())) {
-          context.emitNondifferentiabilityError(
-              original, invoker, diag::autodiff_nondifferentiable_result);
-          return std::nullopt;
-        }
-      }
-      // Check and diagnose external declarations.
-      if (originalFn->isExternalDeclaration()) {
-        context.emitNondifferentiabilityError(
-            original, invoker,
-            diag::autodiff_external_nondifferentiable_function);
-        return std::nullopt;
-      }
-      // Soundness check passed. Create a new differentiability witness and
-      // canonicalize it.
-      GenericSignature contextualDerivativeGenSig = GenericSignature();
-      if (invoker.getKind() ==
-          DifferentiationInvoker::Kind::IndirectDifferentiation)
-        contextualDerivativeGenSig =
-            invoker.getIndirectDifferentiation()
-                .second->getDerivativeGenericSignature();
-      auto derivativeConstrainedGenSig =
-          autodiff::getConstrainedDerivativeGenericSignature(
-              originalFn->getLoweredFunctionType(),
-              desiredParameterIndices, desiredResultIndices,
-              contextualDerivativeGenSig,
-              LookUpConformanceInModule());
-      minimalWitness = SILDifferentiabilityWitness::createDefinition(
-          context.getModule(), SILLinkage::Private, originalFn,
-          DifferentiabilityKind::Reverse, desiredParameterIndices,
-          desiredResultIndices, derivativeConstrainedGenSig, /*jvp*/ nullptr,
-          /*vjp*/ nullptr, /*isSerialized*/ false);
-      if (canonicalizeDifferentiabilityWitness(minimalWitness, invoker,
-                                               IsNotSerialized))
-        return std::nullopt;
-    }
-    assert(minimalWitness);
-    if (original->getFunction()->isSerialized()) {
+      return std::nullopt;
+
+    if (parentFn->isSerialized()) {
       bool isWitnessPublic;
       if (SILFunction *unwrappedFn =
               getUnwrappedCurryThunkFunction(originalFn)) {
@@ -691,15 +745,12 @@ DifferentiationTransformer::emitDerivativeFunctionReference(
         // private linkage.
         isWitnessPublic = hasPublicVisibility(unwrappedFn->getLinkage());
       } else if (originalFn->getDeclRef().getAbstractClosureExpr() &&
-                 originalFRI->getFunction()
-                     ->getDeclRef()
-                     .isDefaultArgGenerator()) {
+                 parentFn->getDeclRef().isDefaultArgGenerator()) {
         // If we reference a closure from inside default argument generator,
         // check against generator's visibility. If the function having this
         // default argument has public visibility, it's OK to have a closure
         // (which always has private visibility) as its default value.
-        isWitnessPublic =
-            hasPublicVisibility(originalFRI->getFunction()->getLinkage());
+        isWitnessPublic = hasPublicVisibility(parentFn->getLinkage());
       } else {
         isWitnessPublic = hasPublicVisibility(minimalWitness->getLinkage());
       }
@@ -709,16 +760,16 @@ DifferentiationTransformer::emitDerivativeFunctionReference(
         // FIXME: This is not a very robust way of determining if the function
         // is a default argument. Also, we have not exhaustively listed all the
         // kinds of fragility.
-        if (original->getFunction()->getLinkage() == SILLinkage::PublicNonABI)
+        if (parentFn->getLinkage() == SILLinkage::PublicNonABI)
           fragileKind = DefaultArgument;
         context.emitNondifferentiabilityError(
             original, invoker, diag::autodiff_private_derivative_from_fragile,
             fragileKind,
-            isa_and_nonnull<AbstractClosureExpr>(
-                originalFRI->getLoc().getAsASTNode<Expr>()));
+            isa_and_nonnull<AbstractClosureExpr>(loc.getAsASTNode<Expr>()));
         return std::nullopt;
       }
     }
+
     // TODO(TF-482): Move generic requirement checking logic to
     // `getExactDifferentiabilityWitness` and
     // `getOrCreateMinimalASTDifferentiabilityWitness`.
@@ -726,18 +777,17 @@ DifferentiationTransformer::emitDerivativeFunctionReference(
     // By default, use the forwarding substitution map of the original function.
     // If the original callee is a `partial_apply` or `apply` instruction, use
     // its substitution map instead.
-    auto substMap = original->getFunction()->getForwardingSubstitutionMap();
-    if (auto *pai =
-            peerThroughFunctionConversions<PartialApplyInst>(original)) {
+    auto substMap = parentFn->getForwardingSubstitutionMap();
+    if (auto *pai = peerThroughFunctionConversions<PartialApplyInst>(original))
       substMap = pai->getSubstitutionMap();
-    } else if (auto *ai = peerThroughFunctionConversions<ApplyInst>(original)) {
+    else if (auto *ai = peerThroughFunctionConversions<ApplyInst>(original))
       substMap = ai->getSubstitutionMap();
-    }
     if (diagnoseUnsatisfiedRequirements(
             context, original->getType().castTo<SILFunctionType>(),
             minimalWitness->getDerivativeGenericSignature(), substMap, invoker,
             original.getLoc().getSourceLoc()))
       return std::nullopt;
+
     DifferentiabilityWitnessFunctionKind witnessKind;
     switch (kind) {
     case AutoDiffDerivativeFunctionKind::JVP:
@@ -764,6 +814,79 @@ DifferentiationTransformer::emitDerivativeFunctionReference(
   if (auto *witnessMethod =
           peerThroughFunctionConversions<WitnessMethodInst>(original)) {
     auto loc = witnessMethod->getLoc();
+    // See if we can derive derivatives for a method statically
+    auto [method, table] = lookUpFunctionInWitnessTable(
+        witnessMethod, SILModule::LinkingMode::LinkNormal);
+    if (method) {
+      auto *originalFn = method;
+      auto originalFnTy = method->getLoweredFunctionTypeInContext(
+          TypeExpansionContext(*original->getFunction()));
+
+      auto *minimalWitness = getOrCreateMinimalDifferentiabilitywitness(
+          originalFnTy, originalFn, desiredConfig.parameterIndices,
+          desiredConfig.resultIndices, original, invoker);
+
+      // All non-differentiability cases should be diagnosted
+      if (!minimalWitness)
+        return std::nullopt;
+
+      if (parentFn->isSerialized() &&
+          !hasPublicVisibility(minimalWitness->getLinkage())) {
+        enum { Inlinable = 0, DefaultArgument = 1 };
+        unsigned fragileKind = Inlinable;
+        // FIXME: This is not a very robust way of determining if the function
+        // is a default argument. Also, we have not exhaustively listed all the
+        // kinds of fragility.
+        if (parentFn->getLinkage() == SILLinkage::PublicNonABI)
+          fragileKind = DefaultArgument;
+        context.emitNondifferentiabilityError(
+            original, invoker, diag::autodiff_private_derivative_from_fragile,
+            fragileKind,
+            isa_and_nonnull<AbstractClosureExpr>(loc.getAsASTNode<Expr>()));
+        return std::nullopt;
+      }
+
+      auto substMap = parentFn->getForwardingSubstitutionMap();
+      if (auto *pai =
+              peerThroughFunctionConversions<PartialApplyInst>(original))
+        substMap =
+            getWitnessMethodSubstitutions(context.getModule(), pai, originalFn,
+                                          witnessMethod->getConformance());
+      else if (auto *ai = peerThroughFunctionConversions<ApplyInst>(original))
+        substMap =
+            getWitnessMethodSubstitutions(context.getModule(), ai, originalFn,
+                                          witnessMethod->getConformance());
+      if (diagnoseUnsatisfiedRequirements(
+              context, original->getType().castTo<SILFunctionType>(),
+              minimalWitness->getDerivativeGenericSignature(), substMap,
+              invoker, original.getLoc().getSourceLoc()))
+        return std::nullopt;
+
+      DifferentiabilityWitnessFunctionKind witnessKind;
+      switch (kind) {
+      case AutoDiffDerivativeFunctionKind::JVP:
+        witnessKind = DifferentiabilityWitnessFunctionKind::JVP;
+        break;
+      case AutoDiffDerivativeFunctionKind::VJP:
+        witnessKind = DifferentiabilityWitnessFunctionKind::VJP;
+        break;
+      }
+
+      auto *derivativeFnRef = builder.createDifferentiabilityWitnessFunction(
+          loc, witnessKind, minimalWitness);
+
+      auto convertedRef = reapplyFunctionConversion(
+          context, derivativeFnRef, witnessMethod, original, builder, loc,
+          newBuffersToDealloc, desiredConfig.parameterIndices,
+          desiredConfig.resultIndices,
+          derivativeFnRef->getType()
+              .getASTType()
+              ->castTo<SILFunctionType>()
+              ->getSubstGenericSignature());
+
+      return std::make_pair(convertedRef, minimalWitness->getConfig());
+    }
+
     auto requirementDeclRef = witnessMethod->getMember();
     auto *requirementDecl = requirementDeclRef.getAbstractFunctionDecl();
     // If requirement declaration does not have any derivative function
@@ -860,6 +983,13 @@ DifferentiationTransformer::emitDerivativeFunctionReference(
 // `SILDifferentiabilityWitness` processing
 //===----------------------------------------------------------------------===//
 
+static StringRef getIRName(SILFunction *F) {
+  if (!F->asmName().empty())
+    return F->asmName();
+
+  return F->getName();
+}
+
 static SILFunction *createEmptyVJP(ADContext &context,
                                    SILDifferentiabilityWitness *witness,
                                    SerializedKind_t isSerialized) {
@@ -867,7 +997,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   auto config = witness->getConfig();
   LLVM_DEBUG({
     auto &s = getADDebugStream();
-    s << "Creating VJP for " << original->getName() << ":\n\t";
+    s << "Creating VJP for " << getIRName(original) << ":\n\t";
     s << "Original type: " << original->getLoweredFunctionType() << "\n\t";
     s << "Config: " << config << "\n\t";
   });
@@ -878,7 +1008,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   // === Create an empty VJP. ===
   Mangle::DifferentiationMangler mangler(context.getASTContext());
   auto vjpName = mangler.mangleDerivativeFunction(
-      original->getName(), AutoDiffDerivativeFunctionKind::VJP, config);
+      getIRName(original), AutoDiffDerivativeFunctionKind::VJP, config);
   auto vjpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *vjpGenericEnv = nullptr;
   if (vjpCanGenSig && !vjpCanGenSig->areAllParamsConcrete())
@@ -912,7 +1042,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
   auto config = witness->getConfig();
   LLVM_DEBUG({
     auto &s = getADDebugStream();
-    s << "Creating JVP for " << original->getName() << ":\n\t";
+    s << "Creating JVP for " << getIRName(original) << ":\n\t";
     s << "Original type: " << original->getLoweredFunctionType() << "\n\t";
     s << "Config: " << config << "\n\t";
   });
@@ -922,7 +1052,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
 
   Mangle::DifferentiationMangler mangler(context.getASTContext());
   auto jvpName = mangler.mangleDerivativeFunction(
-      original->getName(), AutoDiffDerivativeFunctionKind::JVP, config);
+      getIRName(original), AutoDiffDerivativeFunctionKind::JVP, config);
   auto jvpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *jvpGenericEnv = nullptr;
   if (jvpCanGenSig && !jvpCanGenSig->areAllParamsConcrete())
@@ -979,6 +1109,10 @@ static void emitFatalError(ADContext &context, SILFunction *f,
   auto *fatalErrorFnRef = builder.createFunctionRef(loc, fatalErrorFn);
   builder.createApply(loc, fatalErrorFnRef, SubstitutionMap(), {});
   builder.createUnreachable(loc);
+
+  // Replacing the whole function with an `fatalError` call and an `unreachable`
+  // does not create incomplete lifetimes.
+  f->setNeedCompleteLifetimes(false);
 }
 
 /// Returns true on error.
@@ -1051,7 +1185,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
                      "_fatalErrorForwardModeDifferentiationDisabled");
       LLVM_DEBUG(getADDebugStream()
                  << "Generated empty JVP for "
-                 << orig->getName() << ":\n"
+                 << getIRName(orig) << ":\n"
                  << *jvp);
     }
   }
@@ -1122,7 +1256,7 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   // Create a new curry thunk.
   AutoDiffConfig desiredConfig(parameterIndices, resultIndices);
   // TODO(TF-685): Use more principled mangling for thunks.
-  auto newThunkName = "AD__" + thunk->getName().str() +
+  auto newThunkName = "AD__" + getIRName(thunk).str() +
                       "__differentiable_curry_thunk_" + desiredConfig.mangle();
 
   // Construct new curry thunk type with `@differentiable` function

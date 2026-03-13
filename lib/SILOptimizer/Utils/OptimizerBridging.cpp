@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "../../IRGen/IRGenModule.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/SILCloner.h"
@@ -60,9 +61,9 @@ void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
     return;
   }
 
-  getSwiftPassInvocation()->beginVerifyFunction(f);
+  SILFunction *prevFunction = getSwiftPassInvocation()->beginVerifyFunction(f);
   BridgedVerifier::runSwiftFunctionVerification(f, getSwiftPassInvocation());
-  getSwiftPassInvocation()->endVerifyFunction();
+  getSwiftPassInvocation()->endVerifyFunction(prevFunction);
 }
 
 void SILPassManager::runSwiftModuleVerification() {
@@ -274,32 +275,21 @@ BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(BridgedArrayRef bridge
 }
 
 BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
-  BridgedArrayRef bridgedClosureArgs, BridgedFunction applySiteCallee
+  BridgedArrayRef closureArgManglings, BridgedFunction applySiteCallee
 ) const {
-
-  struct ClosureArgElement {
-    SwiftInt argIdx;
-    BridgeValueExistential argValue;
-  };
-
   auto pass = Demangle::SpecializationPass::ClosureSpecializer;
   auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
   Mangle::FunctionSignatureSpecializationMangler mangler(applySiteCallee.getFunction()->getASTContext(),
       pass, serializedKind, applySiteCallee.getFunction());
 
-  auto closureArgs = bridgedClosureArgs.unbridged<ClosureArgElement>();
+  auto closureArgs = closureArgManglings.unbridged<ClosureArgMangling>();
 
-  for (ClosureArgElement argElmt : closureArgs) {
-    auto closureArg = argElmt.argValue.value.getSILValue();
-    auto closureArgIndex = argElmt.argIdx;
-
-    if (auto *PAI = dyn_cast<PartialApplyInst>(closureArg)) {
-      mangler.setArgumentClosureProp(closureArgIndex,
-                                     const_cast<PartialApplyInst *>(PAI));
+  for (ClosureArgMangling argElmt : closureArgs) {
+    auto closureArgIndex = (unsigned)argElmt.argIdx;
+    if (SILInstruction *inst = argElmt.inst.unbridged()) {
+      mangler.setArgumentClosureProp(closureArgIndex, inst);
     } else {
-      auto *TTTFI = cast<ThinToThickFunctionInst>(closureArg);
-      mangler.setArgumentClosureProp(closureArgIndex,
-                                     const_cast<ThinToThickFunctionInst *>(TTTFI));
+      mangler.setArgumentClosurePropPreviousArg(closureArgIndex, argElmt.otherArgIdx);
     }
   }
 
@@ -344,6 +334,35 @@ BridgedOwnedString BridgedPassContext::mangleWithBoxToStackPromotedArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
+BridgedOwnedString BridgedPassContext::mangleWithExplodedPackArgs(
+    BridgedArrayRef bridgedPackArgs,
+    BridgedFunction applySiteCallee
+  ) const {
+  auto pass = Demangle::SpecializationPass::PackSpecialization;
+
+  auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
+  Mangle::FunctionSignatureSpecializationMangler mangler(
+      applySiteCallee.getFunction()->getASTContext(),
+      pass, serializedKind, applySiteCallee.getFunction());
+
+  for (SwiftInt i : bridgedPackArgs.unbridged<SwiftInt>()) {
+    mangler.setArgumentSROA((unsigned)i);
+  }
+
+  return BridgedOwnedString(mangler.mangle());
+}
+
+BridgedOwnedString BridgedPassContext::mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const {
+  auto pass = Demangle::SpecializationPass::EmbeddedWitnessCallSpecialization;
+
+  Mangle::FunctionSignatureSpecializationMangler mangler(
+      applySiteCallee.getFunction()->getASTContext(),
+      pass, IsNotSerialized, applySiteCallee.getFunction());
+
+  mangler.setChangedRepresentation();
+  return BridgedOwnedString(mangler.mangle());
+}
+
 void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
   switch (StackNesting::fixNesting(function.getFunction())) {
     case StackNesting::Changes::None:
@@ -383,8 +402,10 @@ BridgedFunction BridgedPassContext::
 createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                      const BridgedParameterInfo * _Nullable specializedBridgedParams,
                                      SwiftInt paramCount,
+                                     const BridgedResultInfo * _Nullable specializedBridgedResults,
+                                     SwiftInt resultCount,
                                      BridgedFunction bridgedOriginal,
-                                     bool makeThin,
+                                     BridgedASTType::FunctionTypeRepresentation representation,
                                      bool makeBare,
                                      bool preserveGenericSignature) const {
   auto *original = bridgedOriginal.getFunction();
@@ -395,19 +416,25 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
     specializedParams.push_back(specializedBridgedParams[idx].unbridged());
   }
 
+  // If no results list is passed, use the original function's results.
+  llvm::SmallVector<SILResultInfo> specializedResults;
+  if (specializedBridgedResults != nullptr) {
+    for (unsigned idx = 0; idx < resultCount; ++idx) {
+      specializedResults.push_back(specializedBridgedResults[idx].unbridged());
+    }
+  }
+
   // The specialized function is always a thin function. This is important
   // because we may add additional parameters after the Self parameter of
   // witness methods. In this case the new function is not a method anymore.
-  auto extInfo = originalType->getExtInfo();
-  if (makeThin)
-    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+  auto extInfo = originalType->getExtInfo().withRepresentation((SILFunctionTypeRepresentation)representation);
 
   auto ClonedTy = SILFunctionType::get(
       preserveGenericSignature ? originalType->getInvocationGenericSignature() : GenericSignature(),
       extInfo,
       originalType->getCoroutineKind(),
       originalType->getCalleeConvention(), specializedParams,
-      originalType->getYields(), originalType->getResults(),
+      originalType->getYields(), specializedBridgedResults ? specializedResults : originalType->getResults(),
       originalType->getOptionalErrorResult(),
       preserveGenericSignature ? originalType->getPatternSubstitutions() : SubstitutionMap(),
       preserveGenericSignature ? originalType->getInvocationSubstitutions() : SubstitutionMap(),
@@ -450,8 +477,7 @@ bool BridgedPassContext::completeLifetime(BridgedValue value) const {
   SILValue v = value.getSILValue();
   SILFunction *f = v->getFunction();
   DeadEndBlocks *deb = invocation->getPassManager()->getAnalysis<DeadEndBlocksAnalysis>()->get(f);
-  DominanceInfo *domInfo = invocation->getPassManager()->getAnalysis<DominanceAnalysis>()->get(f);
-  OSSACompleteLifetime completion(f, domInfo, *deb);
+  OSSACompleteLifetime completion(f, *deb);
   auto result = completion.completeOSSALifetime(
       v, OSSACompleteLifetime::Boundary::Availability);
   return result == LifetimeCompletion::WasCompleted;
@@ -522,9 +548,83 @@ bool BridgedFunction::isConvertPointerToPointerArgument() const {
   return false;
 }
 
+bool BridgedFunction::isAddressor() const {
+  if (auto declRef = dyn_cast_or_null<AccessorDecl>(getFunction()->getDeclRef().getDecl())) {
+    return declRef->isAnyAddressor();
+  }
+  return false;
+}
+
 bool BridgedFunction::isAutodiffVJP() const {
   return swift::isDifferentiableFuncComponent(
       getFunction(), swift::AutoDiffFunctionComponent::VJP);
+}
+
+bool BridgedFunction::isAutodiffSubsetParametersThunk() const {
+  Demangle::Context Ctx;
+  if (auto *root = Ctx.demangleSymbolAsNode(getFunction()->getName())) {
+    // root node has Global kind, the AutoDiffSubsetParametersThunk node (if
+    // present) is direct child of root.
+    return root->findByKind(Demangle::Node::Kind::AutoDiffSubsetParametersThunk,
+                            /*maxDepth=*/1) != nullptr;
+  }
+  return false;
+}
+
+// See also ASTMangler::mangleAutoDiffGeneratedDeclaration.
+bool BridgedType::isAutodiffBranchTracingEnumInVJP(BridgedFunction vjp) const {
+  assert(vjp.isAutodiffVJP());
+  EnumDecl *ed = unbridged().getEnumOrBoundGenericEnum();
+  if (ed == nullptr)
+    return false;
+
+  llvm::StringRef edName = ed->getNameStr();
+  if (!edName.starts_with("_AD__"))
+    return false;
+  if (!llvm::StringRef(edName.data() + 5, edName.size() - 5)
+           .starts_with(MANGLING_PREFIX_STR))
+    return false;
+
+  // At this point, we know that the type is indeed a branch tracing enum.
+  // Now we need to ensure that it is the enum related to the given VJP.
+
+  std::size_t idx = edName.rfind("__Pred__");
+  assert(idx != std::string::npos);
+
+  // Before "__Pred__", we have "_bbX", where X is a number.
+  // The loop calculates the start position of X.
+  for (; idx != 0 && std::isdigit(edName[idx - 1]); --idx)
+    ;
+
+  assert(std::isdigit(edName[idx]));
+  assert(!std::isdigit(edName[idx - 1]));
+
+  // The branch tracing enum decl name has the following components:
+  // 1) "_AD__";
+  // 2) MANGLING_PREFIX;
+  // 3) original function name;
+  // 4) "_bb";
+  // 5) X at position idx (see above);
+  // 6) the rest of the enum decl name.
+  // Thus, "_AD__", MANGLING_PREFIX and "_bb" must have total length less than
+  // idx.
+  std::size_t manglingPrefixSize = std::strlen(MANGLING_PREFIX_STR);
+  assert(idx > 5 + manglingPrefixSize + 3);
+  assert(std::string_view(edName.data() + idx - 3, 3) == "_bb");
+  assert(std::string_view(edName.data(), 5 + manglingPrefixSize) == "_AD__$s");
+
+  llvm::StringRef enumOrigFuncName =
+      std::string_view(edName.data() + 5 + manglingPrefixSize,
+                       idx - (5 + manglingPrefixSize + 3));
+
+  Demangle::Context Ctx;
+  if (auto *root = Ctx.demangleSymbolAsNode(vjp.getFunction()->getName()))
+    if (auto *node =
+            root->findByKind(Demangle::Node::Kind::Function, /*maxDepth=*/3))
+      if (mangleNode(node).result() == enumOrigFuncName)
+        return true;
+
+  return false;
 }
 
 SwiftInt BridgedFunction::specializationLevel() const {

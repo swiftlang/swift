@@ -231,7 +231,7 @@ const {
 
   // Empty payload addresses can be left undefined.
   if (payloadI == ElementsWithPayload.end()) {
-    auto payloadTy = elt->getParentEnum()->mapTypeIntoContext(
+    auto payloadTy = elt->getParentEnum()->mapTypeIntoEnvironment(
       elt->getPayloadInterfaceType());
     return IGF.getTypeInfoForUnlowered(payloadTy)
       .getUndefAddress();
@@ -254,7 +254,7 @@ const {
 
   // Empty payload addresses can be left undefined.
   if (payloadI == ElementsWithPayload.end()) {
-    auto payloadTy = Case->getParentEnum()->mapTypeIntoContext(
+    auto payloadTy = Case->getParentEnum()->mapTypeIntoEnvironment(
       Case->getPayloadInterfaceType());
     return IGF.getTypeInfoForUnlowered(payloadTy)
       .getUndefAddress();
@@ -1825,11 +1825,6 @@ namespace {
       return cast<LoadableTypeInfo>(*ElementsWithPayload[0].ti);
     }
 
-    llvm::Value *emitPayloadMetadataForLayout(IRGenFunction &IGF,
-                                     SILType T) const {
-      return IGF.emitTypeMetadataRefForLayout(getPayloadType(IGF.IGM, T));
-    }
-
     /// More efficient value semantics implementations for certain enum layouts.
     enum CopyDestroyStrategy {
       /// No special behavior.
@@ -2676,8 +2671,8 @@ namespace {
         if (Refcounting == ReferenceCounting::Custom) {
           Explosion e;
           e.add(ptr);
-          getPayloadTypeInfo().as<ClassTypeInfo>().strongCustomRetain(
-              IGF, e, /*needsNullCheck*/ true);
+          getPayloadTypeInfo().strongCustomRetain(IGF, e,
+                                                  /*needsNullCheck*/ true);
           return;
         }
 
@@ -2713,8 +2708,8 @@ namespace {
         if (Refcounting == ReferenceCounting::Custom) {
           Explosion e;
           e.add(ptr);
-          getPayloadTypeInfo().as<ClassTypeInfo>().strongCustomRelease(
-              IGF, e, /*needsNullCheck*/ true);
+          getPayloadTypeInfo().strongCustomRelease(IGF, e,
+                                                   /*needsNullCheck*/ true);
           return;
         }
 
@@ -6467,7 +6462,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     // parameters, then we additionally need to constrain any layout
     // optimizations we perform to things that are reproducible by the runtime.
     Type origPayloadType = elt->getPayloadInterfaceType();
-    origPayloadType = theEnum->mapTypeIntoContext(origPayloadType);
+    origPayloadType = theEnum->mapTypeIntoEnvironment(origPayloadType);
 
     auto origArgLoweredTy = TC.IGM.getLoweredType(origPayloadType);
     auto *origArgTI = &TC.getCompleteTypeInfo(origArgLoweredTy.getASTType());
@@ -6536,7 +6531,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
         std::move(elementsWithPayload), std::move(elementsWithNoPayload)));
   }
 
-  // Enums imported from Clang or marked with @objc or @cdecl use a
+  // Enums imported from Clang or marked with @objc or @c use a
   // C-compatible layout.
   if (theEnum->hasClangNode() || theEnum->isCCompatibleEnum()) {
     assert(elementsWithPayload.empty() && "C enum with payload?!");

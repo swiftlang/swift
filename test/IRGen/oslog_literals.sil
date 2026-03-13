@@ -1,12 +1,23 @@
+// RUN: %empty-directory(%t)
+
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OSLog.swiftmodule -module-name OSLog %S/Inputs/OSLogAltName.swift
+// RUN: %target-swift-frontend -emit-ir %s -I %t -DIMPORT_OSLOG | %FileCheck -check-prefix ALT-NAME %s
 
 // REQUIRES: OS=macosx || OS=ios || OS=watchos
 
 // CHECK: [[U8_0:@.*]] = private unnamed_addr constant [8 x i8] c"help\09me\00", section "__TEXT,__oslogstring,cstring_literals"
 
+// ALT-NAME: [[U8_0:@.*]] = private unnamed_addr constant [8 x i8] c"help\09me\00", section "__TEXT,__logit"
+
 sil_stage canonical
 
 import Builtin
+
+#if IMPORT_OSLOG
+import OSLog
+#endif
 
 sil @oslog_utf8_literal : $@convention(thin) () -> Builtin.RawPointer {
 bb0:

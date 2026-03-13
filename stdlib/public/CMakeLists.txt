@@ -100,7 +100,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp"
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/Errors.cpp")
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/DemanglingErrorHandling.cpp")
   set(swiftDemanglingCRSources
     "${SWIFT_SOURCE_DIR}/lib/Demangling/CrashReporter.cpp")
 
@@ -152,8 +152,29 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING
       "Enable build of the embedded Swift standard library and runtime for cross-compiling targets"
       FALSE)
 
+option(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM
+       "Whether to build the Embedded Swift standard library using the hooks in swift/EmbeddedPlatform.h"
+       FALSE)
+
 set(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES "" CACHE STRING
     "List of extra target triples to build the embedded Swift standard library for")
+
+set(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES "" CACHE STRING
+    "List of SDKs to use for target triples, in the form triple@sdkpath.
+    Using this variable precludes setting directly the value for  SWIFT_SDK_embedded_ARCH_\$\{ARCH\}_PATH")
+
+set(SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/llvm-ar";crsU
+    CACHE STRING
+    "Archiver to use when building static archives for non Darwin platform targeting the macOS SDK.
+    This is required when using Xcode 26.4 beta 1 and later.")
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_HOST_VARIANT STREQUAL "macosx")
+  list(GET SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS 0 ARCHIVER_EXECUTABLE)
+  if(NOT EXISTS "${ARCHIVER_EXECUTABLE}" OR IS_DIRECTORY "${ARCHIVER_EXECUTABLE}")
+    message(WARNING "'${ARCHIVER_EXECUTABLE}' is not a valid program, unsetting SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS to be able to pick up a different value at next run.")
+    unset(SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS CACHE)
+  endif()
+endif()
 
 if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "linux") AND
@@ -273,7 +294,7 @@ foreach(triple ${SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES})
   list(GET list 0 arch)
   list(GET list 1 vendor)
   list(GET list 2 os)
-  string(REGEX REPLACE "[0-9]+(\\.[0-9]+)+" " " mod "${triple}")
+  string(REGEX REPLACE "[0-9]+(\\.[0-9]+)+" "" mod "${triple}")
 
   list(FILTER EMBEDDED_STDLIB_TARGET_TRIPLES EXCLUDE REGEX " ${mod} ")
 
@@ -281,6 +302,25 @@ foreach(triple ${SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES})
     "${arch} ${mod} ${triple}"
   )
 endforeach()
+
+if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
+  message(WARNING "Configuring SDKs using content of SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES \
+    Setting directly SWIFT_SDK_embedded_ARCH_\$\{ARCH\}_PATH will not work")
+  foreach(triple_configuration ${SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES})
+    if(triple_configuration STREQUAL "")
+      continue()
+    endif()
+
+    # Line format: <triple>[@<path to SDK>]
+    string(REPLACE "@" ";" triple_configuration_list "${triple_configuration}")
+    list(LENGTH triple_configuration_list triple_configuration_list_length)
+    if(triple_configuration_list_length GREATER_EQUAL 2)
+      list(GET triple_configuration_list 0 triple)
+      list(GET triple_configuration_list 1 sdk_path)
+      set(EMBEDDED_STDLIB_SDK_FOR_${triple} "${sdk_path}")
+    endif()
+  endforeach()
+endif()
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(triples)
@@ -297,10 +337,15 @@ endif()
 if(SWIFT_BUILD_STDLIB)
   # These must be kept in dependency order so that any referenced targets
   # exist at the time we look for them in add_swift_*.
+  if(SWIFT_BUILD_SWIFT_DIRECT_RUNTIME)
+    add_subdirectory(SwiftDirectRuntime)
+  endif()
+
   add_subdirectory(runtime)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
+  add_subdirectory(EmbeddedPlatform)
 
   if(SWIFT_BUILD_CLANG_OVERLAYS OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
     add_subdirectory(ClangOverlays)
@@ -366,4 +411,3 @@ endif()
 if(SWIFT_BUILD_LIBEXEC)
 add_subdirectory(libexec)
 endif()
-

@@ -81,7 +81,7 @@ private extension BuiltinInst {
       return
     }
     let builder = Builder(before: self, context)
-    let result = builder.createIntegerLiteral(hasArchetype ? 0 : 1, type: type)
+    let result = builder.createBoolLiteral(!hasArchetype)
     uses.replaceAll(with: result, context)
     context.erase(instruction: self)
   }
@@ -94,7 +94,7 @@ private extension BuiltinInst {
       return
     }
     let builder = Builder(before: self, context)
-    let result = builder.createIntegerLiteral(equal ? 1 : 0, type: type)
+    let result = builder.createBoolLiteral(equal)
 
     uses.replaceAll(with: result, context)
   }
@@ -250,7 +250,7 @@ private extension BuiltinInst {
        operands[0].value.lookThroughScalarCasts is StringLiteralInst
     {
       let builder = Builder(before: self, context)
-      let result = builder.createIntegerLiteral(isEqual ? 0 : 1, type: type)
+      let result = builder.createBoolLiteral(!isEqual)
       uses.replaceAll(with: result, context)
       context.erase(instruction: self)
       return true

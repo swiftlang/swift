@@ -287,3 +287,66 @@ extension IntrusiveSet {
     insert(contentsOf: source)
   }
 }
+
+/// A set which supports iterating over its elements.
+/// The iteration order is deterministic. All set operations are O(1).
+public struct IterableSet<Set: IntrusiveSet> : CollectionLikeSequence {
+  public typealias Element = Set.Element
+
+  private var set: Set
+
+  // Erased elements do not get removed from `list`, because this would be O(n).
+  private var list: Stack<Element>
+
+  // Elements which are in `list. This is different from `set` if elements get erased.
+  private var inList: Set
+
+  public init(_ context: some Context) {
+    self.set = Set(context)
+    self.list = Stack(context)
+    self.inList = Set(context)
+  }
+
+  public mutating func deinitialize() {
+    inList.deinitialize()
+    list.deinitialize()
+    set.deinitialize()
+  }
+
+  public func contains(_ element: Element) -> Bool {
+    set.contains(element)
+  }
+
+  /// Returns true if `element` was not contained in the set before inserting.
+  @discardableResult
+  public mutating func insert(_ element: Element) -> Bool {
+    if inList.insert(element) {
+      list.append(element)
+    }
+    return set.insert(element)
+  }
+
+  public mutating func erase(_ element: Element) {
+    set.erase(element)
+  }
+
+  public func makeIterator() -> Iterator { Iterator(base: list.makeIterator(), set: set) }
+
+  public struct Iterator: IteratorProtocol {
+    var base: Stack<Element>.Iterator
+    let set: Set
+
+    public mutating func next() -> Element? {
+      while let n = base.next() {
+        if set.contains(n) {
+          return n
+        }
+      }
+      return nil
+    }
+  }
+}
+
+public typealias IterableInstructionSet = IterableSet<InstructionSet>
+public typealias SpecificIterableInstructionSet<InstType: Instruction> = IterableSet<SpecificInstructionSet<InstType>>
+public typealias IterableBasicBlockSet = IterableSet<BasicBlockSet>

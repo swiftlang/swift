@@ -30,6 +30,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/CAS/CASFileSystem.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/Debug.h"
@@ -643,13 +644,13 @@ DiagnosticSerializer::serializeEmittedDiagnostics(llvm::raw_ostream &os) {
     if (!File.Content.empty() || !File.ContentCASID.empty())
       continue;
 
-    auto Ref =
-        SrcMgr.getFileSystem()->getObjectRefForFileContent(File.FileName);
-    if (!Ref)
-      return llvm::createFileError(File.FileName, Ref.getError());
+    if (auto CASFS =
+            dyn_cast<llvm::cas::CASBackedFileSystem>(SrcMgr.getFileSystem())) {
+      auto Ref = CASFS->getObjectRefForFileContent(File.FileName);
+      if (!Ref)
+        return Ref.takeError();
 
-    if (*Ref) {
-      File.ContentCASID = CAS.getID(**Ref).toString();
+      File.ContentCASID = CAS.getID(*Ref).toString();
       continue;
     }
 

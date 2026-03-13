@@ -299,7 +299,7 @@ static unsigned getBaseMachOPlatformID(const llvm::Triple &TT) {
   case llvm::Triple::XROS:
     return llvm::MachO::PLATFORM_XROS;
   default:
-    return /*Unknown platform*/ 0;
+    return llvm::MachO::PLATFORM_UNKNOWN;
   }
 }
 
@@ -307,11 +307,18 @@ llvm::Value *
 IRGenFunction::emitTargetOSVersionAtLeastCall(llvm::Value *major,
                                               llvm::Value *minor,
                                               llvm::Value *patch) {
-  auto fn = IGM.getPlatformVersionAtLeastFunctionPointer();
+  // compiler-rt in the NDK does not include __isPlatformVersionAtLeast
+  // but only __isOSVersionAtLeast
+  if (IGM.Triple.isAndroid()) {
+    auto fn = IGM.getOSVersionAtLeastFunctionPointer();
+    return Builder.CreateCall(fn, {major, minor, patch});
+  } else {
+    auto fn = IGM.getPlatformVersionAtLeastFunctionPointer();
 
-  llvm::Value *platformID =
-    llvm::ConstantInt::get(IGM.Int32Ty, getBaseMachOPlatformID(IGM.Triple));
-  return Builder.CreateCall(fn, {platformID, major, minor, patch});
+    llvm::Value *platformID =
+      llvm::ConstantInt::get(IGM.Int32Ty, getBaseMachOPlatformID(IGM.Triple));
+    return Builder.CreateCall(fn, {platformID, major, minor, patch});
+  }
 }
 
 llvm::Value *
@@ -524,8 +531,8 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
   }
 
   // Emit the trap instruction.
-  llvm::Function *trapIntrinsic =
-      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::trap);
+  llvm::Function *trapIntrinsic = llvm::Intrinsic::getOrInsertDeclaration(
+      &IGM.Module, llvm::Intrinsic::trap);
   if (EnableTrapDebugInfo && IGM.DebugInfo && !failureMsg.empty()) {
     IGM.DebugInfo->addFailureMessageToCurrentLoc(*this, failureMsg);
   }
@@ -655,7 +662,7 @@ static Address emitAddrOfContinuationErrorResultPointer(IRGenFunction &IGF,
 }
 
 void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
-                                             StackAddress resultAddr,
+                                             Address resultAddr,
                                              Explosion &out,
                                              bool canThrow) {
   // A continuation is just a reference to the current async task,
@@ -701,13 +708,14 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
   //   lifetime.end within the await after we take from the slot.
   auto normalResultAddr =
     emitAddrOfContinuationNormalResultPointer(*this, continuationContext);
-  if (!resultAddr.getAddress().isValid()) {
+  if (!resultAddr.isValid()) {
     auto &resumeTI = getTypeInfo(resumeTy);
     resultAddr =
-      resumeTI.allocateStack(*this, resumeTy, "async.continuation.result");
+      resumeTI.allocateStack(*this, resumeTy, "async.continuation.result")
+        .getAddress();
   }
   Builder.CreateStore(Builder.CreateBitOrPointerCast(
-                            resultAddr.getAddress().getAddress(),
+                            resultAddr.getAddress(),
                             IGM.OpaquePtrTy),
                       normalResultAddr);
 

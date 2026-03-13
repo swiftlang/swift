@@ -1,5 +1,4 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle -enable-experimental-async-top-level %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 

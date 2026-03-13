@@ -188,8 +188,8 @@ switch (clock_id) {
 #elif WE_HAVE_STD_CHRONO
       auto num = std::chrono::steady_clock::period::num;
       auto den = std::chrono::steady_clock::period::den;
-      continuous.tv_sec = num / den;
-      continuous.tv_nsec = (num * 1'000'000'000ll) % den
+      suspending.tv_sec = num / den;
+      suspending.tv_nsec = (num * 1'000'000'000ll) % den
 #else
 #error Missing platform suspending time definition
 #endif
@@ -240,7 +240,7 @@ void swift_sleep(
     delay = deadline - now;
   }
 #elif defined(__linux__) || defined(__APPLE__) || defined(__wasi__) \
-  || defined(__OpenBSD) || defined(__FreeBSD__)
+  || defined(__OpenBSD__) || defined(__FreeBSD__)
   struct timespec ts;
   ts.tv_sec = seconds;
   ts.tv_nsec = nanoseconds;

@@ -472,6 +472,22 @@ static bool visitScopeEndsRequiringInit(
     return true;
   }
 
+  // Check for mutate accessor.
+  if (auto ai =
+          dyn_cast_or_null<ApplyInst>(operand->getDefiningInstruction())) {
+    if (ai->hasInoutResult()) {
+      auto *access =
+          dyn_cast<BeginAccessInst>(getAccessScope(ai->getSelfArgument()));
+      if (access) {
+        assert(access->getAccessKind() == SILAccessKind::Modify);
+        for (auto *inst : access->getEndAccesses()) {
+          visit(inst, ScopeRequiringFinalInit::ModifyMemoryAccess);
+        }
+        return true;
+      }
+      return false;
+    }
+  }
   return false;
 }
 
@@ -1115,7 +1131,7 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
 
   if (auto *applyInst = dyn_cast_or_null<ApplyInst>(
           stripAccessMarkers(operand)->getDefiningInstruction())) {
-    if (applyInst->hasGuaranteedAddressResult()) {
+    if (applyInst->hasAddressResult()) {
       LLVM_DEBUG(llvm::dbgs() << "Adding apply as init!\n");
       return true;
     }
@@ -2239,11 +2255,30 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
 
+  // Initializing a borrow from the value as a referent counts as a liveness
+  // use.
+  if (isa<InitBorrowAddrInst>(user)) {
+    assert(op->getOperandNumber() == InitBorrowAddrInst::Referent
+           && "should have handled dest above in memInstMustInitialize");
+
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+      return false;
+    }
+
+    for (auto leafRange : leafRanges) {
+      useState.recordLivenessUse(user, leafRange);
+    }
+    return true;
+  }
+
   // At this point, we have handled all of the non-loadTakeOrCopy/consuming
   // uses.
   if (auto *copyAddr = dyn_cast<CopyAddrInst>(user)) {
     assert(op->getOperandNumber() == CopyAddrInst::Src &&
-           "Should have dest above in memInstMust{Rei,I}nitialize");
+           "Should have handled dest above in memInstMust{Rei,I}nitialize");
 
     SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
     TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
@@ -2416,6 +2451,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
             checkKind == MarkUnresolvedNonCopyableValueInst::CheckKind::
                              NoConsumeOrAssign &&
             !moveChecker.canonicalizer.hasPartialApplyConsumingUse()) {
+          moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
+              markedValue);
+          return true;
+        }
+
+        if (operand->isBorrowAccessorResult()) {
           moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
               markedValue);
           return true;
@@ -2788,6 +2829,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     if (!ue || ue->isDestructive()) {
       llvm::errs() << "Found a write classified as a liveness use?!\n";
       llvm::errs() << "Use: " << *user;
+      user->getFunction()->dump();
       llvm_unreachable("standard failure");
     }
   }
@@ -4084,7 +4126,7 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
 
   // Lifetimes must be completed inside out (bottom-up in the CFG).
   PostOrderFunctionInfo *postOrder = poa->get(fn);
-  OSSACompleteLifetime completion(fn, domTree, *deadEndBlocksAnalysis->get(fn));
+  OSSACompleteLifetime completion(fn, *deadEndBlocksAnalysis->get(fn));
   for (auto *block : postOrder->getPostOrder()) {
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {

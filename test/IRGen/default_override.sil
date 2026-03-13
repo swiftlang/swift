@@ -18,7 +18,7 @@ struct Int {
 }
 
 open class B {
-  open var i: Int { read set }
+  open var i: Int { yielding borrow set }
 }
 
 sil @B_i_read : $@yield_once @convention(method) (@guaranteed B) -> @yields Int

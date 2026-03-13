@@ -2,6 +2,10 @@
   return x
 }
 
+@inline(always) @inlinable public func testAlwaysInlineGuaranteed(x: Bool) -> Bool {
+  return x
+}
+
 @frozen
 public struct AlwaysInlineInitStruct {
   @usableFromInline

@@ -89,6 +89,11 @@ func eliminateRedundantLoads(in function: Function,
                              variant: RedundantLoadEliminationVariant,
                              _ context: FunctionPassContext) -> Bool
 {
+  // FIXME: this skip is a hack for ManualOwnership prototyping, to workaround rdar://161359163
+  if function.performanceConstraints == .manualOwnership && variant == .mandatory {
+    return false
+  }
+
   // Avoid quadratic complexity by limiting the number of visited instructions.
   // This limit is sufficient for most "real-world" functions, by far.
   var complexityBudget = 50_000
@@ -98,9 +103,9 @@ func eliminateRedundantLoads(in function: Function,
 
     // We cannot use for-in iteration here because if the load is split, the new
     // individual loads are inserted right before and they would be ignored by a for-in iteration.
-    var inst = block.instructions.reversed().first
-    while let i = inst {
-      defer { inst = i.previous }
+    // Also the `load` might be moved to another location instead of being deleted.
+    var iter = block.instructions.reversed().first
+    while let succ = iter, let inst = succ.previous {
 
       if let load = inst as? LoadingInstruction {
         if !context.continueWithNextSubpassRun(for: load) {
@@ -109,11 +114,16 @@ func eliminateRedundantLoads(in function: Function,
         if complexityBudget < 20 {
           complexityBudget = 20
         }
-        if !load.isEligibleForElimination(in: variant, context) {
-          continue;
+        if load.isEligibleForElimination(in: variant, context) {
+          if tryEliminate(load: load, complexityBudget: &complexityBudget, context) {
+            changed = true
+            // The `load` has been deleted: do not advance `iter`, because the next instruction to process is
+            // now its new predecessor.
+            continue
+          }
         }
-        changed = tryEliminate(load: load, complexityBudget: &complexityBudget, context) || changed
       }
+      iter = succ.previous
     }
   }
   return changed
@@ -136,6 +146,24 @@ extension LoadInst : LoadingInstruction {
 
   // Nothing to materialize, because this is already a `load`.
   func materializeLoadForReplacement(_ context: FunctionPassContext) -> LoadInst { return self }
+
+  func replaceEfficiently(with newValue: Value, _ context: FunctionPassContext) {
+    if let existingLoad = newValue as? LoadInst {
+      // As we are processing the loads in reverse control flow order, the replaced loads might accumulate
+      // quite a lot of users. This happens if the are many loads from the same location in a row.
+      // To avoid quadratic complexity in `uses.replaceAll`, we swap both load instructions and move the uses
+      // from the `existingLoad` (which usually has a small number of uses) to this load - and delete the
+      // `existingLoad`.
+      existingLoad.uses.replaceAll(with: self, context)
+      self.operand.set(to: existingLoad.address, context)
+      self.set(ownership: existingLoad.loadOwnership, context)
+      self.set(location: existingLoad.location, context)
+      self.move(before: existingLoad, context)
+      context.erase(instruction: existingLoad)
+    } else {
+      replace(with: newValue, context)
+    }
+  }
 }
 
 extension CopyAddrInst : LoadingInstruction {
@@ -205,7 +233,7 @@ private extension LoadingInstruction {
         return false
       }
       switch address.accessBase {
-      case .box, .stack:
+      case .box, .stack, .global:
         break
       default:
         return false
@@ -284,8 +312,6 @@ private extension LoadingInstruction {
       return true
 
     case .copy, .take:
-      let deadEndBlocks = context.deadEndBlocks
-
       // The liverange of the value has an "exit", i.e. a path which doesn't lead to the load,
       // it means that we would have to insert a destroy on that exit to satisfy ownership rules.
       // But an inserted destroy also means that we would need to insert copies of the value which
@@ -307,21 +333,7 @@ private extension LoadingInstruction {
       //   bb2:
       //     end_borrow %b
       //
-      if liverange.hasExits(deadEndBlocks) {
-        return false
-      }
-
-      // Handle a corner case: if the load is in an infinite loop, the liverange doesn't have an exit,
-      // but we still would need to insert a copy. For example:
-      //
-      //     store %1 to [init] %addr
-      //     br bb1
-      //   bb1:
-      //     %2 = load [copy] %addr   // would need to insert a copy here
-      //    br bb1                    // no exit from the liverange
-      //
-      // For simplicity, we don't handle this in OSSA.
-      if deadEndBlocks.isDeadEnd(parentBlock) {
+      if liverange.hasExits {
         return false
       }
       return true
@@ -330,8 +342,9 @@ private extension LoadingInstruction {
 }
 
 private func replace(load: LoadingInstruction, with availableValues: [AvailableValue], _ context: FunctionPassContext) {
+  let ownership = load.ownership
   var ssaUpdater = SSAUpdater(function: load.parentFunction,
-                              type: load.type, ownership: load.ownership, context)
+                              type: load.type, ownership: ownership, context)
 
   for availableValue in availableValues.replaceCopyAddrsWithLoadsAndStores(context) {
     let block = availableValue.instruction.parentBlock
@@ -367,7 +380,7 @@ private func replace(load: LoadingInstruction, with availableValues: [AvailableV
   // Make sure to keep dependencies valid after replacing the load
   insertMarkDependencies(for: originalLoad, context)
 
-  originalLoad.replace(with: newValue, context)
+  originalLoad.replaceEfficiently(with: newValue, context)
 }
 
 private func provideValue(
@@ -759,12 +772,10 @@ private struct Liverange {
   ///   bb2:
   ///     ...                 // exit
   ///
-  func hasExits(_ deadEndBlocks: DeadEndBlocksAnalysis) -> Bool {
+  var hasExits: Bool {
     for block in containingBlocks {
       for succ in block.successors {
-        if succ != endBlock,
-           (!worklist.hasBeenPushed(succ) || beginBlocks.contains(succ)),
-           !deadEndBlocks.isDeadEnd(succ) {
+        if succ != endBlock, (!worklist.hasBeenPushed(succ) || beginBlocks.contains(succ)) {
           return true
         }
       }

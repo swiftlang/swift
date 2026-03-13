@@ -15,11 +15,11 @@ struct Int {
 }
 
 class Base {
-  var x : Int { read }
+  var x : Int { yielding borrow }
 }
 
 class Derived : Base {
-  override var x : Int { read }
+  override var x : Int { yielding borrow }
 }
 
 // CHECK-LABEL: sil [ossa] @utilize_begin_apply : {{.*}} {

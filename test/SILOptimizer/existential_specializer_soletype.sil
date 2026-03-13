@@ -194,7 +194,7 @@ public struct S : P {
 }
 
 // Check the thunk.
-// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s6test2_6storePyyAA1P_p_AaC_pztF : $@convention(thin) (@in any P, @inout any P) -> () {
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [heuristic_always_inline] @$s6test2_6storePyyAA1P_p_AaC_pztF : $@convention(thin) (@in any P, @inout any P) -> () {
 // CHECK: bb0(%0 : $*any P, %1 : $*any P):
 // CHECK: [[F:%.*]] = function_ref @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @inout any P) -> ()
 // CHECK: [[ADR:%.*]] = open_existential_addr mutable_access %0 : $*any P to $*@opened([[TY:".*"]], any P) Self
@@ -274,7 +274,7 @@ sil_witness_table S: P module test {}
 // Test an existential in_guaranteed argument.
 //===----------------------------------------------------------------------===//
 
-// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s6test3_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@in_guaranteed any P, @inout any P) -> () {
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [heuristic_always_inline] @$s6test3_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@in_guaranteed any P, @inout any P) -> () {
 // CHECK: bb0(%0 : $*any P, %1 : $*any P):
 // CHECK: [[F:%.*]] = function_ref @$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @inout any P) -> ()
 // CHECK: [[ADR:%.*]] = open_existential_addr immutable_access %0 : $*any P to $*@opened("{{.*}}", any P) Self

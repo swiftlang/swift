@@ -1,9 +1,9 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN: -enable-experimental-feature Lifetimes \
-// RUN: -enable-experimental-feature SuppressedAssociatedTypes
+// RUN: -enable-experimental-feature SuppressedAssociatedTypesWithDefaults
 
 // REQUIRES: swift_feature_Lifetimes
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 // expected-note@+1 {{'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance}}
 struct AttemptImplicitConditionalConformance<T: ~Copyable>: ~Copyable {
@@ -538,5 +538,5 @@ func testYap(_ y: Yapping<NC>) {
 protocol Veggie: ~Copyable {}
 func generalized(_ x: Any.Type) {}
 func testMetatypes(_ t: (any Veggie & ~Copyable).Type) {
-  generalized(t) // expected-error {{cannot convert value of type '(any Veggie & ~Copyable).Type' to expected argument type 'any Any.Type'}}
+  generalized(t) // expected-error {{argument type 'any Veggie & ~Copyable' does not conform to expected type 'Copyable'}}
 }

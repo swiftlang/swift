@@ -22,7 +22,8 @@ enum class tls_key {
   concurrency_task,
   concurrency_executor_tracking_info,
   concurrency_fallback,
-  observation_transaction
+  observation_transaction,
+  exclusivity,
 };
 
 } // namespace swift

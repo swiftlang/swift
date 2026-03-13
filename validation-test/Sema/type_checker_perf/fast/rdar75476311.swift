@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -solver-expression-time-threshold=1 -swift-version 5
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -solver-scope-threshold=1000 -swift-version 5
 // REQUIRES: tools-release,no_asan,objc_interop
 // REQUIRES: OS=macosx
 

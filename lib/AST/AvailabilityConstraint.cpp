@@ -162,7 +162,7 @@ static bool canIgnoreConstraintInUnavailableContexts(
   if (!flags.contains(AvailabilityConstraintFlag::
                       AllowUniversallyUnavailableInCompatibleContexts)) {
     if (!isa<TypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
-      if (domain.isUniversal() || domain.isSwiftLanguage())
+      if (domain.isUniversal() || domain.isSwiftLanguageMode())
         return false;
     }
   }
@@ -294,6 +294,16 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
 
   getAvailabilityConstraintsForDecl(constraints, decl, context, flags);
 
+  // For requirements of reparentable protocols, add constraints from the
+  // enclosing protocol itself. We don't need to do this for ordinary protocols
+  // because of the rule that a protocol P cannot inherit from Q if Q is less
+  // available than P. Thus, the availability of the most derived protocol
+  // already carries the same or stricter constraints than its ancestors.
+  if (auto *proto = decl->getDeclContext()->getSelfProtocolDecl()) {
+    if (proto->getAttrs().hasAttribute<ReparentableAttr>())
+      getAvailabilityConstraintsForDecl(constraints, proto, context, flags);
+  }
+
   if (flags.contains(AvailabilityConstraintFlag::SkipEnclosingExtension))
     return constraints;
 
@@ -342,7 +352,8 @@ domainCanBeUnconditionallyUnavailableAtRuntime(AvailabilityDomain domain,
       return true;
     return domain.isActive(ctx);
 
-  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
   case AvailabilityDomain::Kind::PackageDescription:
     return false;
 
@@ -369,7 +380,8 @@ domainIsUnavailableAtRuntimeIfUnintroduced(AvailabilityDomain domain,
   switch (domain.getKind()) {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::Platform:
-  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
   case AvailabilityDomain::Kind::PackageDescription:
     return false;
 

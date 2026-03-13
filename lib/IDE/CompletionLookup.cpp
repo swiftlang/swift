@@ -12,7 +12,6 @@
 
 #include "swift/IDE/CompletionLookup.h"
 #include "CodeCompletionResultBuilder.h"
-#include "ExprContextAnalysis.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -266,7 +265,7 @@ void CompletionLookup::foundFunction(const AnyFunctionType *AFT) {
 
 bool CompletionLookup::canBeUsedAsRequirementFirstType(Type selfTy,
                                                        TypeAliasDecl *TAD) {
-  if (TAD->isGeneric())
+  if (TAD->hasGenericParamList())
     return false;
 
   auto T = TAD->getDeclaredInterfaceType();
@@ -693,7 +692,7 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
 
       // For a GenericFunctionType, we only want to substitute the
       // param/result types, as otherwise we might end up with a bad generic
-      // signature if there are UnresolvedTypes present in the base type. Note
+      // signature if there are ErrorTypes present in the base type. Note
       // we pass in DesugarMemberTypes so that we see the actual concrete type
       // witnesses instead of type alias types.
       if (auto *GFT = T->getAs<GenericFunctionType>()) {
@@ -2020,7 +2019,7 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
 
     if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
       addTypeAliasRef(TAD, Reason, dynamicLookupInfo);
-      auto type = TAD->mapTypeIntoContext(TAD->getDeclaredInterfaceType());
+      auto type = TAD->mapTypeIntoEnvironment(TAD->getDeclaredInterfaceType());
       if (type->mayHaveMembers())
         addConstructorCallsForType(type, TAD->getName(), Reason,
                                    dynamicLookupInfo);
@@ -2030,7 +2029,7 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
     if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
       addGenericTypeParamRef(GP, Reason, dynamicLookupInfo);
       auto type =
-          CurrDeclContext->mapTypeIntoContext(GP->getDeclaredInterfaceType());
+          CurrDeclContext->mapTypeIntoEnvironment(GP->getDeclaredInterfaceType());
       addConstructorCallsForType(type, GP->getName(), Reason,
                                  dynamicLookupInfo);
       return;
@@ -2182,11 +2181,9 @@ bool CompletionLookup::tryModuleCompletions(Type ExprType,
     // If the module is shadowed by a separately imported overlay(s), look up
     // the symbols from the overlay(s) instead.
     SmallVector<ModuleDecl *, 1> ShadowingOrOriginal;
-    if (auto *SF = CurrDeclContext->getParentSourceFile()) {
-      SF->getSeparatelyImportedOverlays(M, ShadowingOrOriginal);
-      if (ShadowingOrOriginal.empty())
-        ShadowingOrOriginal.push_back(M);
-    }
+    CurrDeclContext->getSeparatelyImportedOverlays(M, ShadowingOrOriginal);
+    if (ShadowingOrOriginal.empty())
+      ShadowingOrOriginal.push_back(M);
     for (ModuleDecl *M : ShadowingOrOriginal) {
       RequestedResultsTy Request =
           RequestedResultsTy::fromModule(M, Filter).needLeadingDot(needDot());
@@ -3022,6 +3019,7 @@ void CompletionLookup::getTypeAttributeKeywordCompletions(
       case TypeAttrKind::Nonisolated:
       case TypeAttrKind::Unchecked:
       case TypeAttrKind::Unsafe:
+      case TypeAttrKind::Reparented:
         // These attributes are only available in inheritance clasuses.
         return;
       default:
@@ -3121,7 +3119,7 @@ void CompletionLookup::getSelfTypeCompletionInDeclContext(
     return;
 
   Type selfType =
-      CurrDeclContext->mapTypeIntoContext(typeDC->getSelfInterfaceType());
+      CurrDeclContext->mapTypeIntoEnvironment(typeDC->getSelfInterfaceType());
 
   if (typeDC->getSelfClassDecl()) {
     // In classes, 'Self' can be used in result type of func, subscript and

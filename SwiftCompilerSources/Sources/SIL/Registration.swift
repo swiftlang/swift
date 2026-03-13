@@ -120,6 +120,7 @@ private func registerSILClasses() {
   register(MoveOnlyWrapperToCopyableBoxInst.self)
   register(CopyableToMoveOnlyWrapperAddrInst.self)
   register(MoveOnlyWrapperToCopyableAddrInst.self)
+  register(UncheckedOwnershipInst.self) 
   register(ObjectInst.self)
   register(VectorInst.self)
   register(VectorBaseAddrInst.self)
@@ -247,6 +248,7 @@ private func registerSILClasses() {
 
   register(UnreachableInst.self)
   register(ReturnInst.self)
+  register(ReturnBorrowInst.self)
   register(ThrowInst.self)
   register(ThrowAddrInst.self)
   register(YieldInst.self)
@@ -265,6 +267,14 @@ private func registerSILClasses() {
   register(ThunkInst.self)
   register(MergeIsolationRegionInst.self)
   register(IgnoredUseInst.self)
+  register(ImplicitActorToOpaqueIsolationCastInst.self)
+
+  register(MakeBorrowInst.self)
+  register(DereferenceBorrowInst.self)
+  register(MakeAddrBorrowInst.self)
+  register(DereferenceAddrBorrowInst.self)
+  register(InitBorrowAddrInst.self)
+  register(DereferenceBorrowAddrInst.self)
 }
 
 private func registerUtilities() {

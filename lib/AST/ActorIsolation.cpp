@@ -20,7 +20,7 @@ using namespace swift;
 
 ActorIsolation ActorIsolation::forMainActor(ASTContext &ctx) {
   return ActorIsolation::forGlobalActor(
-      ctx.getMainActorType()->mapTypeOutOfContext());
+      ctx.getMainActorType()->mapTypeOutOfEnvironment());
 }
 
 // These constructors are defined out-of-line so that including ActorIsolation.h

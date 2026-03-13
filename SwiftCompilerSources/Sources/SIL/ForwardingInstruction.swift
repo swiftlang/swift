@@ -467,6 +467,12 @@ extension BorrowedFromInst: ForwardingInstruction {
   public var canForwardOwnedValues: Bool { false }
 }
 
+extension ImplicitActorToOpaqueIsolationCastInst: ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { false }
+}
+
 // -----------------------------------------------------------------------------
 // ownership transition instructions
 

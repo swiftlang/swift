@@ -23,7 +23,7 @@ public:
     return AvailabilityDomain::forPlatform(kind);
   }
   AvailabilityDomain Universal = AvailabilityDomain::forUniversal();
-  AvailabilityDomain Swift = AvailabilityDomain::forSwiftLanguage();
+  AvailabilityDomain Swift = AvailabilityDomain::forSwiftLanguageMode();
   AvailabilityDomain Package = AvailabilityDomain::forPackageDescription();
   AvailabilityDomain Embedded = AvailabilityDomain::forEmbedded();
   AvailabilityDomain macOS = domainForPlatform(PlatformKind::macOS);
@@ -53,7 +53,7 @@ TEST_F(AvailabilityDomainLattice, Contains) {
     EXPECT_TRUE(Universal.contains(domain));
 
     // These domains only contain themselves.
-    EXPECT_EQ(Swift.contains(domain), domain.isSwiftLanguage());
+    EXPECT_EQ(Swift.contains(domain), domain.isSwiftLanguageMode());
     EXPECT_EQ(Package.contains(domain), domain.isPackageDescription());
     EXPECT_EQ(Embedded.contains(domain), domain.isEmbedded());
   }

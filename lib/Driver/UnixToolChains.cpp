@@ -40,6 +40,7 @@
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
+using namespace swift::driver::toolchains;
 
 std::string
 toolchains::GenericUnix::sanitizerRuntimeLibName(StringRef Sanitizer,
@@ -330,7 +331,7 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     }
   }
 
-  if (context.Args.hasArg(options::OPT_profile_generate)) {
+  if (needsInstrProfileRuntime(context.Args)) {
     SmallString<128> LibProfile(SharedResourceDirPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", "lib");

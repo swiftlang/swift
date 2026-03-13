@@ -278,8 +278,10 @@ extension Unicode._WordRecognizer {
       }
       return _accept()
 
-    case (.zwj, .extendedPictographic), // WB3c
-         (.wSegSpace, .wSegSpace): // WB3d
+    case (.wSegSpace, .wSegSpace): // WB3d
+      return _reject()
+
+    case (.zwj, _) where nextScalar._isExtendedPictographic: // WB3c
       return _reject()
 
     case (_, .format), // WB4
@@ -523,8 +525,12 @@ extension Unicode._RandomAccessWordRecognizer {
       }
       return _accept()
 
-    case (.zwj, .extendedPictographic), // WB3c
-         (.wSegSpace, .wSegSpace): // WB3d
+    case (.wSegSpace, .wSegSpace): // WB3d
+      newBase = _baseCategory
+      newState = _state
+      return _reject()
+
+    case (.zwj, _) where _nextScalar._isExtendedPictographic: // WB3c
       newBase = _baseCategory
       newState = _state
       return _reject()

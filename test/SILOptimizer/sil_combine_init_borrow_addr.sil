@@ -1,0 +1,73 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=init_borrow_addr | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+// Declare this SIL to be canonical because some tests break raw SIL
+// conventions. e.g. address-type block args. -enforce-exclusivity=none is also
+// required to allow address-type block args in canonical SIL.
+sil_stage canonical
+
+import Builtin
+import Swift
+
+enum AddressOnlyEnum {
+  case Loadable(Builtin.Int32)
+  case AddressOnly(Any)
+}
+
+struct MyInt {
+  var value: Builtin.Int32
+}
+
+struct MoveOnlyStruct: ~Copyable {
+  var value: MyInt
+}
+
+// CHECK-LABEL: sil @test_init_borrow_addr_generic : $@convention(thin) <T> (@in_guaranteed T) -> @out Builtin.Borrow<T> {
+// CHECK:         init_borrow_addr %0 : $*Builtin.Borrow<T> with %1 : $*T
+// CHECK-LABEL: } // end sil function 'test_init_borrow_addr_generic'
+sil @test_init_borrow_addr_generic : $@convention(thin) <T> (@in_guaranteed T) -> @out Builtin.Borrow<T> {
+bb0(%0 : $*Builtin.Borrow<T>, %1 : $*T):
+  init_borrow_addr %0 : $*Builtin.Borrow<T> with %1 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_init_borrow_addr_loadable : $@convention(thin) (@in_guaranteed Int) -> @out Builtin.Borrow<Int> {
+// CHECK-NOT:     init_borrow_addr
+// CHECK:         [[LOADED_INT:%.*]] = load %1 : $*Int
+// CHECK:         [[BORROW:%.*]] = make_borrow [[LOADED_INT]]
+// CHECK:         store [[BORROW]] to %0 : $*Builtin.Borrow<Int>
+// CHECK-LABEL: } // end sil function 'test_init_borrow_addr_loadable'
+sil @test_init_borrow_addr_loadable : $@convention(thin) (@in_guaranteed Int) -> @out Builtin.Borrow<Int> {
+bb0(%0 : $*Builtin.Borrow<Int>, %1 : $*Int):
+  init_borrow_addr %0 : $*Builtin.Borrow<Int> with %1 : $*Int
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_init_borrow_addr_addressonly : $@convention(thin) (@in_guaranteed AddressOnlyEnum) -> @out Builtin.Borrow<AddressOnlyEnum> {
+// CHECK-NOT:     init_borrow_addr
+// CHECK:         [[BORROW:%.*]] = make_addr_borrow %1 : $*AddressOnlyEnum
+// CHECK:         store [[BORROW]] to %0 : $*Builtin.Borrow<AddressOnlyEnum>
+// CHECK-LABEL: } // end sil function 'test_init_borrow_addr_addressonly'
+sil @test_init_borrow_addr_addressonly : $@convention(thin) (@in_guaranteed AddressOnlyEnum) -> @out Builtin.Borrow<AddressOnlyEnum> {
+bb0(%0 : $*Builtin.Borrow<AddressOnlyEnum>, %1 : $*AddressOnlyEnum):
+  init_borrow_addr %0 : $*Builtin.Borrow<AddressOnlyEnum> with %1 : $*AddressOnlyEnum
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_init_borrow_addr_ossa : $@convention(thin) (@in_guaranteed MoveOnlyStruct) -> @out Builtin.Borrow<MoveOnlyStruct> {
+// CHECK-NOT:     init_borrow_addr
+// CHECK:         [[LOADED:%.*]] = load_borrow %1 : $*MoveOnlyStruct
+// CHECK:         [[BORROW:%.*]] = make_borrow [[LOADED]]
+// CHECK:         store [[BORROW]] to [trivial] %0 : $*Builtin.Borrow<MoveOnlyStruct>
+// CHECK:         end_borrow [[LOADED]]
+// CHECK-LABEL: } // end sil function 'test_init_borrow_addr_ossa'
+sil [ossa] @test_init_borrow_addr_ossa : $@convention(thin) (@in_guaranteed MoveOnlyStruct) -> @out Builtin.Borrow<MoveOnlyStruct> {
+bb0(%0 : $*Builtin.Borrow<MoveOnlyStruct>, %1 : $*MoveOnlyStruct):
+  init_borrow_addr %0 : $*Builtin.Borrow<MoveOnlyStruct> with %1 : $*MoveOnlyStruct
+  %r = tuple ()
+  return %r : $()
+}

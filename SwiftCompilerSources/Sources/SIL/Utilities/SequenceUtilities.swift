@@ -12,8 +12,8 @@
 
 import Basic
 
-/// Types conforming to `HasName` will be displayed by their name (instead of the
-/// full object) in collection descriptions.
+/// Types conforming to `HasShortDescription` will be displayed by their name (instead
+/// of the full object) in collection descriptions.
 ///
 /// This is useful to make collections, e.g. of BasicBlocks or Functions, readable.
 public protocol HasShortDescription {

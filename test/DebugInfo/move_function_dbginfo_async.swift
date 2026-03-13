@@ -43,9 +43,12 @@ public func forceSplit5() async {}
 // Tests //
 ///////////
 
-// CHECK-LABEL: define swifttailcc void @"$s27move_function_dbginfo_async13letSimpleTestyyxnYalF"(ptr swiftasync %0, ptr noalias %1, ptr %T)
+// CHECK-LABEL: define swifttailcc void @"$s27move_function_dbginfo_async13letSimpleTestyyxnYalF"(
+// CHECK-SAME:     ptr swiftasync %[[frame_ptr:.*]], ptr noalias %1, ptr %T)
 // CHECK: entry:
-// CHECK:   #dbg_value(ptr %{{[0-9]+}}, ![[SIMPLE_TEST_METADATA:[0-9]+]], !DIExpression(DW_OP_plus_uconst, 24, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]+]]
+// CHECK:   %[[frame_ptr_alloca:.*]] = alloca ptr,
+// CHECK:   store ptr %[[frame_ptr]], ptr %[[frame_ptr_alloca]]
+// CHECK:   #dbg_value(ptr %[[frame_ptr_alloca]], ![[SIMPLE_TEST_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_plus_uconst, 24, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]+]]
 // CHECK:   musttail call swifttailcc void
 // CHECK-NEXT: ret void
 
@@ -89,8 +92,11 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
     use(consume msg)
 }
 
-// CHECK-LABEL: define swifttailcc void @"$s27move_function_dbginfo_async13varSimpleTestyyxz_xtYalF"(ptr swiftasync %0, ptr %1, ptr noalias %2, ptr %T)
-// CHECK:   #dbg_value(ptr %{{[0-9]+}}, !{{[0-9]+}}, !DIExpression(DW_OP_plus_uconst, 24, DW_OP_deref, DW_OP_deref)
+// CHECK-LABEL: define swifttailcc void @"$s27move_function_dbginfo_async13varSimpleTestyyxz_xtYalF"(
+// CHECK-SAME:     ptr swiftasync %[[frame_ptr:.*]], ptr %1, ptr noalias %2, ptr %T)
+// CHECK:   %[[frame_ptr_alloca:.*]] = alloca ptr,
+// CHECK:   store ptr %[[frame_ptr]], ptr %[[frame_ptr_alloca]]
+// CHECK:   #dbg_value(ptr %[[frame_ptr_alloca]], !{{[0-9]+}}, !DIExpression(DW_OP_deref, DW_OP_plus_uconst, 24, DW_OP_deref, DW_OP_deref)
 // CHECK:   musttail call swifttailcc void @"$s27move_function_dbginfo_async10forceSplityyYaF"(ptr swiftasync %{{[0-9]+}})
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
@@ -440,7 +446,10 @@ public func letArgCCFlowTrueTest<T>(_ msg: __owned T) async {
 // SIL: } // end sil function '$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlF'
 
 // CHECK-LABEL: define swifttailcc void @"$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlF"(
-// CHECK: #dbg_value(ptr %{{[0-9]+}}, !{{[0-9]+}}, !DIExpression(DW_OP_plus_uconst, 64, DW_OP_deref, DW_OP_deref),
+// CHECK-SAME:     ptr swiftasync %[[frame_ptr:[0-9]+]],
+// CHECK:   %[[frame_ptr_alloca:.*]] = alloca ptr,
+// CHECK:   store ptr %[[frame_ptr]], ptr %[[frame_ptr_alloca]]
+// CHECK: #dbg_value(ptr %[[frame_ptr_alloca]], !{{[0-9]+}}, !DIExpression(DW_OP_deref, DW_OP_plus_uconst, 64, DW_OP_deref, DW_OP_deref),
 // CHECK: musttail call swifttailcc void @"$s27move_function_dbginfo_async11forceSplit1yyYaF"(
 
 // CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlFTQ0_"(

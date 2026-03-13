@@ -490,12 +490,12 @@ public:
       bool reflection = false,
       UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
           DoesNotUseMoveableValueDebugInfo,
-      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape) {
-    return createAllocBox(loc, SILBoxType::get(fieldType.getASTType()), Var,
-                          hasDynamicLifetime, reflection,
-                          usesMoveableValueDebugInfo,
-                          /*skipVarDeclAssert*/ false,
-                          hasPointerEscape);
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+      bool inferredImmutable = false) {
+    return createAllocBox(
+        loc, SILBoxType::get(fieldType.getASTType()), Var, hasDynamicLifetime,
+        reflection, usesMoveableValueDebugInfo,
+        /*skipVarDeclAssert*/ false, hasPointerEscape, inferredImmutable);
   }
 
   AllocBoxInst *createAllocBox(
@@ -506,7 +506,8 @@ public:
       UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
           DoesNotUseMoveableValueDebugInfo,
       bool skipVarDeclAssert = false,
-      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape) {
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+      bool inferredImmutable = false) {
 #if NDEBUG
     (void)skipVarDeclAssert;
 #endif
@@ -521,7 +522,7 @@ public:
     return insert(AllocBoxInst::create(
         getSILDebugLocation(Loc, true), BoxType, *F,
         substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime, reflection,
-        usesMoveableValueDebugInfo, hasPointerEscape));
+        usesMoveableValueDebugInfo, hasPointerEscape, inferredImmutable));
   }
 
   AllocExistentialBoxInst *
@@ -609,6 +610,12 @@ public:
                              ArrayRef<SILValue> Args) {
     return insert(BuiltinInst::create(getSILDebugLocation(Loc), Name, ResultTy,
                                       Subs, Args, getInstructionContext()));
+  }
+
+  BuiltinInst *createBuiltin(SILLocation Loc, StringRef Name, SILType ResultTy,
+                             SubstitutionMap Subs, ArrayRef<SILValue> Args) {
+    return createBuiltin(Loc, getASTContext().getIdentifier(Name), ResultTy,
+                         Subs, Args);
   }
 
   /// Create a binary function with the signature: OpdTy, OpdTy -> ResultTy.
@@ -1330,6 +1337,17 @@ public:
         forwardingOwnershipKind));
   }
 
+  /// Create an unchecked_value_cast when Ownership SSA is enabled and
+  /// unchecked_bitwise_cast otherwise.
+  ///
+  /// Intended to be used in utility code that needs to support both Ownership
+  /// SSA and non-Ownership SSA code.
+  SILValue emitUncheckedValueCast(SILLocation loc, SILValue op, SILType ty) {
+    if (hasOwnership())
+      return createUncheckedValueCast(loc, op, ty);
+    return createUncheckedBitwiseCast(loc, op, ty);
+  }
+
   RefToBridgeObjectInst *createRefToBridgeObject(SILLocation Loc, SILValue Ref,
                                                  SILValue Bits) {
     return createRefToBridgeObject(Loc, Ref, Bits, Ref->getOwnershipKind());
@@ -1542,6 +1560,12 @@ public:
     return insert(new (getModule()) MoveOnlyWrapperToCopyableValueInst(
         *F, getSILDebugLocation(loc), src,
         MoveOnlyWrapperToCopyableValueInst::Guaranteed));
+  }
+
+  UncheckedOwnershipInst *createUncheckedOwnership(SILLocation Loc,
+                                                   SILValue Operand) {
+    return insert(new (getModule()) UncheckedOwnershipInst(
+        getSILDebugLocation(Loc), Operand, Operand->getOwnershipKind()));
   }
 
   UnconditionalCheckedCastInst *
@@ -2151,6 +2175,7 @@ public:
                            CanType FormalConcreteType, SILValue Concrete,
                            ArrayRef<ProtocolConformanceRef> Conformances,
                            ValueOwnershipKind forwardingOwnershipKind) {
+    ASSERT(FormalConcreteType->isBridgeableObjectType());
     return insert(InitExistentialRefInst::create(
         getSILDebugLocation(Loc), ExistentialType, FormalConcreteType, Concrete,
         Conformances, &getFunction(), forwardingOwnershipKind));
@@ -2334,6 +2359,19 @@ public:
         getSILDebugLocation(Loc), Operand, Kind));
   }
 
+  SILValue emitUncheckedOwnershipConversion(SILLocation Loc, SILValue Operand,
+                                            ValueOwnershipKind Kind) {
+    if (!hasOwnership())
+      return Operand;
+    return createUncheckedOwnershipConversion(Loc, Operand, Kind);
+  }
+
+  ImplicitActorToOpaqueIsolationCastInst *
+  createImplicitActorToOpaqueIsolationCast(SILLocation Loc, SILValue Value) {
+    return insert(new (getModule()) ImplicitActorToOpaqueIsolationCastInst(
+        getSILDebugLocation(Loc), Value));
+  }
+
   FixLifetimeInst *createFixLifetime(SILLocation Loc, SILValue Operand) {
     return insert(new (getModule())
                       FixLifetimeInst(getSILDebugLocation(Loc), Operand));
@@ -2351,6 +2389,18 @@ public:
                                            MarkDependenceKind dependenceKind) {
     return createMarkDependence(Loc, value, base, value->getOwnershipKind(),
                                 dependenceKind);
+  }
+
+  /// Emit a mark_dependence instruction placing the kind only if ownership is
+  /// set in the current function.
+  ///
+  /// This is intended to be used in code that is generic over Ownership SSA and
+  /// non-Ownership SSA code.
+  SILValue emitMarkDependence(SILLocation Loc, SILValue value, SILValue base,
+                              MarkDependenceKind dependenceKind) {
+    return createMarkDependence(Loc, value, base, value->getOwnershipKind(),
+                                hasOwnership() ? dependenceKind
+                                               : MarkDependenceKind::Escaping);
   }
 
   MarkDependenceInst *
@@ -2613,6 +2663,11 @@ public:
   //===--------------------------------------------------------------------===//
 
   UnreachableInst *createUnreachable(SILLocation Loc) {
+    if (F->hasOwnership()) {
+      // Notify the current pass that lifetimes may have been cut off at the
+      // `unreachable` which must be completed again.
+      F->setNeedCompleteLifetimes();
+    }
     return insertTerminator(new (getModule())
                                 UnreachableInst(getSILDebugLocation(Loc)));
   }
@@ -2620,6 +2675,12 @@ public:
   ReturnInst *createReturn(SILLocation Loc, SILValue ReturnValue) {
     return insertTerminator(new (getModule()) ReturnInst(
         getFunction(), getSILDebugLocation(Loc), ReturnValue));
+  }
+
+  ReturnBorrowInst *createReturnBorrow(SILLocation Loc, SILValue returnValue,
+                                       ArrayRef<SILValue> enclosingValues) {
+    return insertTerminator(ReturnBorrowInst::create(
+        getSILDebugLocation(Loc), returnValue, enclosingValues, getModule()));
   }
 
   ThrowInst *createThrow(SILLocation Loc, SILValue errorValue) {
@@ -3123,6 +3184,57 @@ public:
   HasSymbolInst *createHasSymbol(SILLocation Loc, ValueDecl *Decl) {
     return insert(new (getModule()) HasSymbolInst(
         getModule(), getSILDebugLocation(Loc), Decl));
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Borrows
+  //===--------------------------------------------------------------------===//
+
+  MakeBorrowInst *createMakeBorrow(SILLocation Loc, SILValue referent) {
+    auto borrowTy = BuiltinBorrowType::get(referent->getType().getASTType());
+    return insert(new (getModule()) MakeBorrowInst(
+      getSILDebugLocation(Loc), referent,
+      SILType::getPrimitiveObjectType(borrowTy->getCanonicalType())));
+  }
+
+  DereferenceBorrowInst *createDereferenceBorrow(SILLocation Loc, SILValue borrow) {
+    auto referentTy = borrow->getType().castTo<BuiltinBorrowType>()
+      ->getReferentType();
+    return insert(new (getModule()) DereferenceBorrowInst(
+      getSILDebugLocation(Loc), borrow,
+      SILType::getPrimitiveObjectType(referentTy)));
+  }
+
+  MakeAddrBorrowInst *createMakeAddrBorrow(SILLocation Loc, SILValue referent) {
+    auto borrowTy = BuiltinBorrowType::get(referent->getType().getASTType());
+    return insert(new (getModule()) MakeAddrBorrowInst(
+      getSILDebugLocation(Loc), referent,
+      SILType::getPrimitiveObjectType(borrowTy->getCanonicalType())));
+  }
+
+  DereferenceAddrBorrowInst *createDereferenceAddrBorrow(SILLocation Loc,
+                                                         SILValue borrow) {
+    auto referentTy = borrow->getType().castTo<BuiltinBorrowType>()
+      ->getReferentType();
+    return insert(new (getModule()) DereferenceAddrBorrowInst(
+      getSILDebugLocation(Loc), borrow,
+      SILType::getPrimitiveAddressType(referentTy)));
+  }
+
+  InitBorrowAddrInst *createInitBorrowAddr(SILLocation Loc,
+                                           SILValue dest,
+                                           SILValue referent) {
+    return insert(new (getModule()) InitBorrowAddrInst(
+      getSILDebugLocation(Loc), dest, referent));
+  }
+
+  DereferenceBorrowAddrInst *createDereferenceBorrowAddr(SILLocation Loc,
+                                                         SILValue borrow) {
+    auto referentTy = borrow->getType().castTo<BuiltinBorrowType>()
+      ->getReferentType();
+    return insert(new (getModule()) DereferenceBorrowAddrInst(
+      getSILDebugLocation(Loc), borrow,
+      SILType::getPrimitiveAddressType(referentTy)));
   }
 
   //===--------------------------------------------------------------------===//

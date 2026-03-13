@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -enable-experimental-distributed -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
@@ -14,6 +14,7 @@ distributed actor MyActor {
   // expected-note@-2{{you can provide a module-wide default actor system by declaring:}}
   // expected-error@-3{{type 'MyActor' does not conform to protocol 'DistributedActor'}}
   // expected-note@-4 {{add stubs for conformance}}
+  // expected-error@-5 {{type 'MyActor' does not conform to protocol 'Identifiable'}}
 
   distributed var foo: String {
     return "xyz"
@@ -25,6 +26,7 @@ distributed actor BadSystemActor {
   // expected-note@-2{{you can provide a module-wide default actor system by declaring:}}
   // expected-error@-3{{type 'BadSystemActor' does not conform to protocol 'DistributedActor'}}
   // expected-note@-4 {{add stubs for conformance}}
+  // expected-error@-5 {{type 'BadSystemActor' does not conform to protocol 'Identifiable'}}
 
   // This system does not exist: but we should not crash, but just diagnose about it:
   typealias ActorSystem = ClusterSystem // expected-error{{cannot find type 'ClusterSystem' in scope}}

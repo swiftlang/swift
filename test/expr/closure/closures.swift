@@ -56,7 +56,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   var b = a.1+a.f
 
   // Tuple expressions with named elements.
-  var i : (y : Int, x : Int) = (x : 42, y : 11) // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
+  var i : (y : Int, x : Int) = (x : 42, y : 11) // expected-warning {{implicit reordering of tuple elements from 'x:y:' to 'y:x:' is deprecated; this will be an error in a future Swift language mode}}
   funcdecl1(123, 444)
   
   // Calls.
@@ -551,7 +551,7 @@ do {
   let qux: () -> Void
 
   f(qux)
-  f(id(qux)) // expected-error {{conflicting arguments to generic parameter 'T' ('() -> Void' vs. '@convention(block) () -> Void')}}
+  f(id(qux))
 
   func forceUnwrap<T>(_: T?) -> T {}
 
@@ -575,7 +575,7 @@ do {
   class C {
     init() {
       // expected-warning@+1{{capture 'self' was never used}}
-      let _ = f { fn in { [unowned self, fn] x in x != 1000 ? fn(x + 1) : "success" } }(0)
+      let _ = f { fn in { [unowned self = self, fn] x in x != 1000 ? fn(x + 1) : "success" } }(0)
     }
   }
 }
@@ -1849,6 +1849,18 @@ class TestLazyLocal {
       // expected-note@-2 {{reference 'self.' explicitly}}
       return x
     }
+  }
+}
+
+class TestLocalPropertyShadowing {
+  var str: String = ""
+
+  func foo() {
+    let str = { str }
+    // expected-error@-1 {{reference to property 'str' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-note@-2 {{reference 'self.' explicitly}}
+    // expected-note@-3 {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+    _ = str
   }
 }
 

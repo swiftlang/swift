@@ -8,6 +8,48 @@
 
 import Builtin
 
+struct NE: ~Escapable {}
+
+// Function type lifetime dependencies are printed as they appeared in Swift.
+// Internal labels are preserved when a function type has explicit lifetime
+// dependence information, since these may be used to refer to the sources and
+// targets of lifetimes.
+
+// CHECK-LABEL: typealias LabelledNE2NE = @_lifetime(copy ne) (_ ne: NE) -> NE
+typealias LabelledNE2NE = @_lifetime(copy ne) (_ ne: NE) -> NE
+// CHECK-LABEL: typealias InferredNE2NE = (NE) -> NE
+typealias InferredNE2NE = (NE) -> NE
+// CHECK-LABEL: typealias InferredLabelledNE2NE = (NE) -> NE
+typealias InferredLabelledNE2NE = (_ ne: NE) -> NE
+
+// CHECK-LABEL: typealias NamedLifetimeType = @_lifetime(copy ne) (_ ne: NE, _ ne2: NE) -> NE
+typealias NamedLifetimeType = @_lifetime(copy ne) (_ ne: NE, _ ne2: NE) -> NE
+// CHECK-LABEL: typealias InferredLifetimeType = (NE, NE) -> NE
+typealias InferredLifetimeType = (_ ne: NE, NE) -> NE
+// CHECK-LABEL: typealias ImmortalLifetimeType = @_lifetime(immortal) (_ ne: NE, _ ne2: NE) -> NE
+typealias ImmortalLifetimeType = @_lifetime(immortal) (_ ne: NE, _ ne2: NE) -> NE
+
+// CHECK-LABEL: typealias NoLifetimeType = (Int) -> Int
+typealias NoLifetimeType = (_ x: Int) -> Int
+
+// CHECK: typealias MixedLifetimeType = @_lifetime(copy ne0) (_ ne0: NE, _ neio: inout NE) -> NE
+typealias MixedLifetimeType = @_lifetime(copy ne0) (_ ne0: NE, _ neio: inout NE) -> NE
+// CHECK: typealias NestedLifetimeType = @_lifetime(neo: copy ne0, copy neo) (_ nei: inout NE, _ ne0: NE, _ neo: inout NE) -> (NE) -> NE
+typealias NestedLifetimeType = @_lifetime(neo: copy ne0) (_ nei: inout NE, _ ne0: NE, _ neo: inout NE) -> (_ ne1: NE) -> NE
+
+// CHECK-LABEL: typealias NestedType = @_lifetime(copy ne2) @_lifetime(ne3: copy ne2, copy ne3) (@_lifetime(copy ne0) @_lifetime(ne1: copy ne1) (_ ne0: NE, _ ne1: inout NE) -> NE, _ ne2: consuming NE, _ ne3: inout NE) -> NE
+typealias NestedType =
+  @_lifetime(copy ne2) @_lifetime(ne3: copy ne2)
+  (@_lifetime(copy ne0) @_lifetime(ne1: copy ne1) (_ ne0: NE, _ ne1: inout NE) -> NE,
+   _ ne2: consuming NE, _ ne3: inout NE) -> NE
+
+// CHECK-LABEL: func takeNestedType(f: @_lifetime(copy ne2) @_lifetime(ne3: copy ne2, copy ne3) (@_lifetime(copy ne0) @_lifetime(ne1: copy ne1) (_ ne0: NE, _ ne1: inout NE) -> NE, _ ne2: consuming NE, _ ne3: inout NE) -> NE)
+
+// CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers14takeNestedType1fyAA2NEVA2E_AEztXE_AEnAEztXE_tF
+// : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed @noescape @callee_guaranteed (@guaranteed
+// NE, @lifetime(copy 1) @inout NE) -> @lifetime(copy 0) @owned NE, @owned NE, @lifetime(copy 1, copy 2) @inout NE) -> @lifetime(copy 1) @owned NE) -> () {
+func takeNestedType(f: NestedType) {}
+
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSWcfC : $@convention(method) (UnsafeRawBufferPointer, @thin BufferView.Type) -> @lifetime(borrow 0)  @owned BufferView {

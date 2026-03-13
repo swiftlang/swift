@@ -28,7 +28,7 @@
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -parse-as-library
-// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o -o %t/Application
+// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o %target-embedded-posix-shim -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
 // Test #2: Root is an "intermediate" library for everything
@@ -36,7 +36,7 @@
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -parse-as-library
-// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o -o %t/Application
+// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o %target-embedded-posix-shim -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
 // Test #3: ClientA as an "intermediate" library
@@ -44,7 +44,7 @@
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -parse-as-library
-// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o -o %t/Application
+// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o %target-embedded-posix-shim -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
 // Test #4: Root and ClientA as "intermediate" libraries
@@ -52,7 +52,7 @@
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -parse-as-library
-// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o -o %t/Application
+// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o %target-embedded-posix-shim -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
 // Test #%: All "intermediate", all the time. Main drives code generation
@@ -60,7 +60,7 @@
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
-// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o -o %t/Application
+// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o %target-embedded-posix-shim -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
 
@@ -86,6 +86,25 @@ public func getPointOffsets() -> [Int] {
   enumerateByteOffsets(Point.self)
 }
 
+public class PointClass {
+  public var x, y: Int
+
+  public init(x: Int, y: Int) {
+    self.x = x
+    self.y = y
+  }
+}
+
+public protocol Reflectable: AnyObject {
+  func reflect()
+}
+
+extension PointClass: Reflectable {
+  public func reflect() {
+    swap(&x, &y)
+  }
+}
+
 //--- ClientA.swift
 import Root
 
@@ -97,6 +116,10 @@ public struct Color {
 
 public func getPointAndColorOffsets() -> [Int] {
   getPointOffsets() + enumerateByteOffsets(Color.self)
+}
+
+public func getReflectableA() -> any AnyObject & Reflectable {
+  return PointClass(x: 5, y: 5)
 }
 
 //--- ClientB.swift
@@ -112,6 +135,10 @@ public func getExtraPoint3DOffsets() -> [Int] {
   return Array(point3DOffsets[pointOffsets.count...])
 }
 
+public func getReflectableB() -> any AnyObject & Reflectable {
+  return PointClass(x: 5, y: 5)
+}
+
 //--- Application.swift
 import ClientA
 import ClientB
@@ -124,6 +151,7 @@ struct Main {
     print(pointAndColorOffsets.count)
     print(extraColor3DOffsets.count)
 
+    let reflected = [getReflectableA(), getReflectableB()]
     // CHECK: DONE
     print("DONE")
   }

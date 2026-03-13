@@ -2,7 +2,7 @@ import SwiftDiagnostics
 import SwiftOperators
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 import SwiftSyntaxBuilder
-@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntaxMacros
 
 /// Replace the label of the first element in the tuple with the given
 /// new label.
@@ -2051,7 +2051,7 @@ public struct DefineAnonymousTypesMacro: DeclarationMacro {
 
       results += ["""
 
-      struct \(context.makeUniqueName("name"))<T> where T == Equatable { // expect error: need 'any'
+      struct \(context.makeUniqueName("name"))<T> where T == Equatable { // expected-warning{{must be written 'any Hashable'}}
         #introduceTypeCheckingErrors // make sure we get nested errors
       }
       """]
@@ -2070,7 +2070,7 @@ public struct IntroduceTypeCheckingErrorsMacro: DeclarationMacro {
       """
 
       struct \(context.makeUniqueName("name")) {
-        struct \(context.makeUniqueName("name"))<T> where T == Hashable { // expect error: need 'any'
+        struct \(context.makeUniqueName("name"))<T> where T == Hashable { // expected-warning{{must be written 'any Hashable'}}
         }
       }
       """
@@ -2662,7 +2662,6 @@ extension FunctionParameterSyntax {
   }
 }
 
-@_spi(ExperimentalLanguageFeature)
 public struct RemoteBodyMacro: BodyMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2701,7 +2700,6 @@ public struct RemoteBodyMacro: BodyMacro {
   }
 }
 
-@_spi(ExperimentalLanguageFeature)
 public struct BodyMacroWithControlFlow: BodyMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2725,7 +2723,25 @@ struct ThrowCancellationMacro: BodyMacro {
   }
 }
 
-@_spi(ExperimentalLanguageFeature)
+struct EmptyBodyMacro: BodyMacro {
+  static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    []
+  }
+
+  static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor closure: ClosureExprSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    []
+  }
+}
+
+@_spi(ExperimentalLanguageFeatures)
 public struct TracedPreambleMacro: PreambleMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2766,7 +2782,7 @@ public struct TracedPreambleMacro: PreambleMacro {
   }
 }
 
-@_spi(ExperimentalLanguageFeature)
+@_spi(ExperimentalLanguageFeatures)
 public struct LoggerMacro: PreambleMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2979,4 +2995,22 @@ public struct BigEndianAccessorMacro: AccessorMacro {
             """
         ]
     }
+}
+
+public struct CustomConditionCheckMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    guard let firstElement = node.arguments.first,
+          let stringLiteral = firstElement.expression
+      .as(StringLiteralExprSyntax.self),
+          stringLiteral.segments.count == 1,
+          case let .stringSegment(conditionName)? = stringLiteral.segments.first else {
+      throw CustomError.message("macro requires a string literal containing the name of a custom condition")
+    }
+
+    let isSet = try context.buildConfiguration?.isCustomConditionSet(name: conditionName.content.text) ?? false
+    return "\(literal: isSet)"
+  }
 }

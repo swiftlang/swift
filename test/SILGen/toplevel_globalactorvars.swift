@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle -target %target-swift-5.1-abi-triple -enable-experimental-async-top-level %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle -target %target-swift-5.1-abi-triple %s | %FileCheck %s
 
 // a
 // CHECK-LABEL: sil_global hidden @$s24toplevel_globalactorvars1aSivp : $Int
@@ -130,7 +130,8 @@ if a < 10 {
 
 nonisolated(nonsending) func nonisolatedNonSendingFunction() async {}
 
-// CHECK: [[FUNC:%.*]] = function_ref @$s24toplevel_globalactorvars29nonisolatedNonSendingFunctionyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
-// CHECK: apply [[FUNC]]([[ACTOR]])
+// CHECK: [[ACTOR_CAST:%.*]] = unchecked_value_cast [[ACTOR]] : $Optional<any Actor> to $Builtin.ImplicitActor
+// CHECK: [[FUNC:%.*]] = function_ref @$s24toplevel_globalactorvars29nonisolatedNonSendingFunctionyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// CHECK: apply [[FUNC]]([[ACTOR_CAST]])
 // CHECK-NEXT: hop_to_executor [[ACTOR]]
 await nonisolatedNonSendingFunction()

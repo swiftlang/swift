@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-6.0-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift -plugin-path %swift-plugin-dir
 // RUN: %target-build-swift -module-name ActorsFramework -target %target-swift-6.0-abi-triple -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -plugin-path %swift-plugin-dir -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %env-SWIFT_DUMP_ACCESSIBLE_FUNCTIONS=true %target-run %t/a.out 2>&1 | %FileCheck %s --color --dump-input=always
+// RUN: env %env-SWIFT_DUMP_ACCESSIBLE_FUNCTIONS=true %target-run %t/a.out 2>&1 | %FileCheck %s --color --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

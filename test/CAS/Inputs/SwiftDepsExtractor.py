@@ -10,6 +10,7 @@ module_name = sys.argv[2]
 key = sys.argv[3]
 
 mode = 'swift'
+is_bridging_header = False
 
 if module_name.startswith('clang:'):
     mode = 'clang'
@@ -17,6 +18,9 @@ if module_name.startswith('clang:'):
 elif module_name.startswith('swiftPrebuiltExternal:'):
     mode = 'swiftPrebuiltExternal'
     module_name = module_name[22:]
+elif module_name.startswith('bridgingHeader:'):
+    is_bridging_header = True
+    module_name = module_name[15:]
 
 with open(input_json, 'r') as file:
     deps = json.load(file)
@@ -28,6 +32,11 @@ with open(input_json, 'r') as file:
 
         if key in detail.keys():
             json.dump(detail[key], sys.stdout, indent=2)
+            break
+
+        if is_bridging_header:
+            json.dump(detail['details'][mode]['bridgingHeader']
+                      [key], sys.stdout, indent=2)
             break
 
         json.dump(detail['details'][mode][key], sys.stdout, indent=2)

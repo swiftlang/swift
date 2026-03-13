@@ -11,7 +11,7 @@
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -c -o %t/main.o -cache-compile-job -cas-path %t/cas -Rcache-compile-job \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
@@ -23,7 +23,7 @@
 // RUN: %FileCheck %s --check-prefix=DEPS --input-file=%t/main.d -DTMP=%t
 // DEPS: [[TMP]]{{/|\\}}main.o :
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -c -o %t/main-2.o -cache-compile-job -cas-path %t/cas -Rcache-compile-job \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
@@ -45,7 +45,7 @@
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/map-1.json > %t/map-1.casid
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps-1.json Test > %t/MyApp-1.cmd
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -c -o %t/main-3.o -cache-compile-job -cas-path %t/cas -Rcache-compile-job \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
@@ -58,7 +58,7 @@
 
 /// Test replay from driver interface
 // RUN: %swift-scan-test -action compute_cache_key_from_index -cas-path %t/cas -input 0 -- \
-// RUN:   %target-swift-frontend \
+// RUN:   %target-swift-frontend-plain \
 // RUN:   -c -o %t/main-4.o -cache-compile-job -cas-path %t/cas -Rcache-compile-job \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
@@ -67,7 +67,7 @@
 // RUN:   /^tmp/main.swift @%t/MyApp-1.cmd -emit-dependencies -emit-dependencies-path %t/main-4.d > %t/key.casid
 
 // RUN: %swift-scan-test -action replay_result -cas-path %t/cas -id @%t/key.casid -- \
-// RUN:   %target-swift-frontend \
+// RUN:   %target-swift-frontend-plain \
 // RUN:   -c -o %t/main-4.o -cache-compile-job -cas-path %t/cas -Rcache-compile-job \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \

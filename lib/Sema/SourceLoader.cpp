@@ -139,7 +139,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
     addFile(new (Ctx) SourceFile(*importMod, SourceFileKind::Library, bufferID,
                                  opts));
   });
-  if (EnableLibraryEvolution)
+  if (Ctx.LangOpts.hasFeature(Feature::LibraryEvolution))
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
   Ctx.addLoadedModule(importMod);
   Ctx.bumpGeneration();

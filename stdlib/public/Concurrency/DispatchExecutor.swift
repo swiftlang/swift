@@ -24,7 +24,7 @@ import Swift
 // .. Main Executor ............................................................
 
 /// A Dispatch-based main executor.
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
                             @unchecked Sendable {
   var threaded = false
@@ -57,7 +57,7 @@ class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
   }
 }
 
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 extension DispatchMainExecutor: SerialExecutor {
 
   public func enqueue(_ job: consuming ExecutorJob) {
@@ -71,13 +71,13 @@ extension DispatchMainExecutor: SerialExecutor {
   }
 }
 
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 extension DispatchMainExecutor: MainExecutor {}
 
 // .. Task Executor ............................................................
 
 /// A Dispatch-based `TaskExecutor`
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
                                   @unchecked Sendable {
   public init() {}
@@ -148,7 +148,7 @@ fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C
   fatalError("unknown clock in Dispatch Executor")
 }
 
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
   _ job: consuming ExecutorJob,
   at instant: C.Instant,

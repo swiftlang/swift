@@ -260,6 +260,7 @@ public:
     PartialApplyStack,
     MarkDependenceNonEscaping,
     BeginAsyncLet,
+    MakeBorrow,
   };
 
 private:
@@ -294,6 +295,8 @@ public:
       return Kind::PartialApplyStack;
     case SILInstructionKind::MarkDependenceInst:
       return Kind::MarkDependenceNonEscaping;
+    case SILInstructionKind::MakeBorrowInst:
+      return Kind::MakeBorrow;
     case SILInstructionKind::BuiltinInst: {
       auto bi = cast<BuiltinInst>(i);
       if (bi->getBuiltinKind() == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
@@ -415,6 +418,7 @@ struct BorrowingOperand {
     case BorrowingOperandKind::PartialApplyStack:
     case BorrowingOperandKind::MarkDependenceNonEscaping:
     case BorrowingOperandKind::BeginAsyncLet:
+    case BorrowingOperandKind::MakeBorrow:
       return false;
     case BorrowingOperandKind::Branch:
       return true;
@@ -482,6 +486,7 @@ public:
     SILFunctionArgument,
     Phi,
     BeginApplyToken,
+    DereferenceBorrow,
   };
 
 private:
@@ -519,7 +524,10 @@ public:
         return Kind::BeginApplyToken;
       }
       return Kind::Invalid;
+    case ValueKind::DereferenceBorrowInst:
+      return Kind::DereferenceBorrow;
     }
+       
   }
 
   BorrowedValueKind(Kind newValue) : value(newValue) {}
@@ -538,6 +546,7 @@ public:
       llvm_unreachable("Using invalid case?!");
     case BorrowedValueKind::BeginBorrow:
     case BorrowedValueKind::LoadBorrow:
+    case BorrowedValueKind::DereferenceBorrow:
     case BorrowedValueKind::Phi:
     case BorrowedValueKind::BeginApplyToken:
       return true;

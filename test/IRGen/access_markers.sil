@@ -95,13 +95,13 @@ sil @testPairedBox : $(@guaranteed { var () }) -> () {
 bb0(%0 : ${ var () }):
   // CHECK: entry:
   %2 = project_box %0 : ${ var () }, 0
-  //  CHECK-NEXT: call {{.*}}void @writeEmptyTuple(ptr {{(nocapture|captures\(none\))}} undef)
+  //  CHECK-NEXT: call {{.*}}void @writeEmptyTuple(ptr captures(none) undef)
   %3 = begin_access [modify] [dynamic] %2 : $*()
   %write_fn = function_ref @writeEmptyTuple : $@convention(thin) (@inout ()) -> ()
   apply %write_fn(%3) : $@convention(thin) (@inout ()) -> ()
   end_access %3 : $*()
 
-  // CHECK-NEXT: call {{.*}}void @readEmptyTuple(ptr noalias {{(nocapture|captures\(none\))}} undef)
+  // CHECK-NEXT: call {{.*}}void @readEmptyTuple(ptr noalias captures(none) undef)
   %5 = begin_access [read] [dynamic] %2 : $*()
   %read_fn = function_ref @readEmptyTuple : $@convention(thin) (@in_guaranteed ()) -> ()
   apply %read_fn(%5) : $@convention(thin) (@in_guaranteed ()) -> ()

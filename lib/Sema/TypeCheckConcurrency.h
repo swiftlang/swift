@@ -231,6 +231,8 @@ struct ActorReferenceResult {
   const ActorIsolation isolation;
 
 private:
+  struct Builder;
+
   static ActorReferenceResult
   forSameConcurrencyDomain(ActorIsolation isolation,
                            Options options = std::nullopt);
@@ -557,7 +559,7 @@ bool diagnoseIfAnyNonSendableTypes(
 
         if (!diagnosed) {
           ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
-              .limitBehaviorUntilSwiftVersion(behavior, 6)
+              .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6)
               .limitBehaviorIf(preconcurrency);
           diagnosed = true;
         }
@@ -609,8 +611,7 @@ bool diagnoseSendabilityErrorBasedOn(
 /// and perform any necessary resolution and diagnostics, returning the
 /// global actor attribute and type it refers to (or \c std::nullopt).
 std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
-                           ArrayRef<CustomAttr *> attrs);
+checkGlobalActorAttributes(SourceLoc loc, ArrayRef<CustomAttr *> attrs);
 
 /// Get the explicit global actor specified for a closure.
 Type getExplicitGlobalActor(ClosureExpr *closure);

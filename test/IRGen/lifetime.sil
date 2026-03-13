@@ -99,7 +99,7 @@ bb0(%x : $*Builtin.Int64):
   %0 = tuple ()
   return %0 : $()
 }
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @fixed_size(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable(8) %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @fixed_size(ptr noalias captures(none) dereferenceable(8) %0)
 // CHECK:         [[XBUF:%.*]] = alloca i64
 // CHECK-NEXT:    call void @llvm.lifetime.start.p0({{(i32|i64)}} 8, ptr [[XBUF]])
 // CHECK-NEXT:    load

@@ -474,9 +474,6 @@ namespace {
 
     AvailabilitySet getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt,
                                       unsigned NumElts);
-    AvailabilitySet getLivenessAtNonTupleInst(SILInstruction *Inst,
-                                              SILBasicBlock *InstBB,
-                                              AvailabilitySet &CurrentSet);
     int getAnyUninitializedMemberAtInst(SILInstruction *Inst, unsigned FirstElt,
                                         unsigned NumElts);
 
@@ -625,7 +622,7 @@ bool LifetimeChecker::isBlockIsReachableFromEntry(const SILBasicBlock *BB) {
   // Lazily compute reachability, so we only have to do it in the case of an
   // error.
   if (BlocksReachableFromEntry.empty()) {
-    SmallVector<const SILBasicBlock*, 128> Worklist;
+    SmallVector<const SILBasicBlock*, 8> Worklist;
     Worklist.push_back(&BB->getParent()->front());
     BlocksReachableFromEntry.insert(Worklist.back());
     
@@ -1197,13 +1194,14 @@ void LifetimeChecker::doIt() {
 
   // All of the indirect results marked as "out" have to be fully initialized
   // before their lifetime ends.
-  if (TheMemory.isOut()) {
+  if (TheMemory.isOut() &&
+      !TheMemory.getType().isEmptyTuple(TheMemory.getFunction())) {
     auto diagnoseMissingInit = [&]() {
       std::string propertyName;
-      auto *property = TheMemory.getPathStringToElement(0, propertyName);
+      TheMemory.getPathStringToElement(0, propertyName);
       diagnose(Module, F.getLocation(),
                diag::ivar_not_initialized_by_init_accessor,
-               property->getName());
+               StringRef("'" + propertyName + "'"));
       EmittedErrorLocs.push_back(TheMemory.getLoc());
     };
 
@@ -1796,13 +1794,13 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
         case AccessorKind::Get:
         case AccessorKind::DistributedGet:
         case AccessorKind::Read:
-        case AccessorKind::Read2:
+        case AccessorKind::YieldingBorrow:
         case AccessorKind::Address:
         case AccessorKind::Borrow:
           return false;
         case AccessorKind::Set:
         case AccessorKind::Modify:
-        case AccessorKind::Modify2:
+        case AccessorKind::YieldingMutate:
         case AccessorKind::MutableAddress:
         case AccessorKind::DidSet:
         case AccessorKind::WillSet:
@@ -3592,43 +3590,6 @@ void LifetimeChecker::getOutSelfInitialized(SILBasicBlock *BB,
     Result = mergeKinds(Result, getBlockInfo(Pred).OutSelfInitialized);
 }
 
-AvailabilitySet
-LifetimeChecker::getLivenessAtNonTupleInst(swift::SILInstruction *Inst,
-                                           swift::SILBasicBlock *InstBB,
-                                           AvailabilitySet &Result) {
-  // If there is a store in the current block, scan the block to see if the
-  // store is before or after the load.  If it is before, it produces the value
-  // we are looking for.
-  if (getBlockInfo(InstBB).HasNonLoadUse) {
-    for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
-      --BBI;
-      SILInstruction *TheInst = &*BBI;
-
-      if (TheInst == TheMemory.getUninitializedValue()) {
-        Result.set(0, DIKind::No);
-        return Result;
-      }
-
-      if (NonLoadUses.count(TheInst)) {
-        // We've found a definition, or something else that will require that
-        // the memory is initialized at this point.
-        Result.set(0, DIKind::Yes);
-        return Result;
-      }
-    }
-  }
-
-  getOutAvailability(InstBB, Result);
-
-  // If the result element wasn't computed, we must be analyzing code within
-  // an unreachable cycle that is not dominated by "TheMemory".  Just force
-  // the unset element to yes so that clients don't have to handle this.
-  if (!Result.getConditional(0))
-    Result.set(0, DIKind::Yes);
-
-  return Result;
-}
-
 /// getLivenessAtInst - Compute the liveness state for any number of tuple
 /// elements at the specified instruction.  The elements are returned as an
 /// AvailabilitySet.  Elements outside of the range specified may not be
@@ -3647,12 +3608,6 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
     return Result;
 
   SILBasicBlock *InstBB = Inst->getParent();
-
-  // The vastly most common case is memory allocations that are not tuples,
-  // so special case this with a more efficient algorithm.
-  if (TheMemory.getNumElements() == 1) {
-    return getLivenessAtNonTupleInst(Inst, InstBB, Result);
-  }
 
   // Check locally to see if any elements are satisfied within the block, and
   // keep track of which ones are still needed in the NeededElements set.

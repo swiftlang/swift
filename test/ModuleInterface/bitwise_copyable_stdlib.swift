@@ -6,7 +6,7 @@
 // CHECK:      public protocol BitwiseCopyable {
 // CHECK-NEXT: }
 
-// CHECK-NEXT: public typealias _BitwiseCopyable = Swift.BitwiseCopyable
+// CHECK-NEXT: public typealias _BitwiseCopyable = Swift::BitwiseCopyable
 public protocol BitwiseCopyable {}
 public typealias _BitwiseCopyable = BitwiseCopyable
 

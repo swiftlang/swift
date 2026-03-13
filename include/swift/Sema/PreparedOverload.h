@@ -18,6 +18,10 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
 
+namespace llvm {
+class raw_ostream;
+}
+
 namespace swift {
 
 class ExistentialArchetypeType;
@@ -104,9 +108,10 @@ struct PreparedOverloadChange {
     /// For ChangeKind::AddedConstraint.
     Constraint *TheConstraint;
 
+    /// For ChangeKind::AddedBindConstraint.
     struct {
       TypeBase *FirstType;
-      TypeBase * SecondType;
+      TypeBase *SecondType;
     } Bind;
 
     /// For ChangeKind::OpenedTypes.
@@ -146,6 +151,10 @@ struct PreparedOverloadChange {
   PreparedOverloadChange()
       : Kind(ChangeKind::AddedTypeVariable),
         TypeVar(nullptr) { }
+
+  void dump(llvm::raw_ostream &out,
+            ConstraintSystem &cs,
+            unsigned indent = 0) const;
 };
 
 /// A "pre-cooked" representation of all type variables and constraints
@@ -159,7 +168,11 @@ public:
 private:
   Type OpenedType;
   Type ThrownErrorType;
-  size_t Count;
+  unsigned Count : 31;
+
+  /// A prepared overload for diagnostics is different than one without,
+  /// because of fixes and such.
+  unsigned ForDiagnostics : 1;
 
   size_t numTrailingObjects(OverloadToken<Change>) const {
     return Count;
@@ -167,11 +180,11 @@ private:
 
 public:
   PreparedOverload(Type openedType, Type thrownErrorType,
-                   ArrayRef<Change> changes)
+                   ArrayRef<Change> changes, bool forDiagnostics)
     : OpenedType(openedType), ThrownErrorType(thrownErrorType),
-      Count(changes.size()) {
+      Count(changes.size()), ForDiagnostics(forDiagnostics) {
     std::uninitialized_copy(changes.begin(), changes.end(),
-                            getTrailingObjects<Change>());
+                            getTrailingObjects());
   }
 
   Type getOpenedType() const {
@@ -182,13 +195,19 @@ public:
     return ThrownErrorType;
   }
 
-  ArrayRef<Change> getChanges() const {
-    return ArrayRef<Change>(getTrailingObjects<Change>(), Count);
+  bool wasForDiagnostics() const {
+    return ForDiagnostics;
   }
+
+  ArrayRef<Change> getChanges() const { return getTrailingObjects(Count); }
 };
 
 struct PreparedOverloadBuilder {
   SmallVector<PreparedOverload::Change, 8> Changes;
+  ConstraintLocator *Locator;
+
+  PreparedOverloadBuilder(ConstraintLocator *locator)
+    : Locator(locator) {}
 
   void addedTypeVariable(TypeVariableType *typeVar) {
     PreparedOverload::Change change;
@@ -259,6 +278,10 @@ struct PreparedOverloadBuilder {
     change.Node.TheType = type;
     Changes.push_back(change);
   }
+
+  void dump(llvm::raw_ostream &out,
+            ConstraintSystem &cs,
+            unsigned indent = 0) const;
 };
 
 }  // end namespace constraints

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify -verify-additional-prefix ni- %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify -verify-additional-prefix ni-ns- %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // READ THIS: This test is intended to centralize all tests that use
 // nonisolated(unsafe).
@@ -327,6 +327,18 @@ func useAfterTransferLetSquelchedIndirectAddressOnly<T : ProvidesStaticValue>(_ 
   // expected-note @-2 {{sending task-isolated 'ns4' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'T' into main actor-isolated context may introduce data races}}
   print(ns4)
+}
+
+func testNonisolatedUnsafeForwardDeclaredVar<T: Sendable>(_ body: @escaping @Sendable () async throws -> T) throws -> T {
+  nonisolated(unsafe) var result: Result<T, Error>!
+  Task {
+    do {
+      result = .success(try await body())
+    } catch {
+      result = .failure(error)
+    }
+  }
+  return try result.get()
 }
 
 ////////////////////////
@@ -823,9 +835,9 @@ actor ActorContainingSendableStruct {
 }
 
 
-////////////////////
-// MARK: Closures //
-////////////////////
+////////////////////////////
+// MARK: Sending Closures //
+////////////////////////////
 
 func closureTests() async {
   func sendingClosure(_ x: sending () -> ()) {
@@ -1009,8 +1021,12 @@ func closureTests() async {
 
   func testWithTaskDetached() async {
     let x1 = NonSendableKlass()
-    Task.detached { _ = x1 } // expected-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-    // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+    Task.detached { _ = x1 }
+    // expected-ni-warning @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+    // expected-ni-note @-2 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+    // expected-ni-ns-warning @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+    // expected-ni-ns-note @-4 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+
     Task.detached { _ = x1 } // expected-note {{access can happen concurrently}}
 
     nonisolated(unsafe) let x2 = NonSendableKlass()
@@ -1024,8 +1040,12 @@ func closureTests() async {
 
     nonisolated(unsafe) let x4a = NonSendableKlass()
     let x4b = NonSendableKlass()
-    Task.detached { _ = x4a; _ = x4b } // expected-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-    // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+    Task.detached { _ = x4a; _ = x4b }
+    // expected-ni-warning @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+    // expected-ni-note @-2 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+    // expected-ni-ns-warning @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+    // expected-ni-ns-note @-4 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+
     Task.detached { _ = x4a; _ = x4b } // expected-note {{access can happen concurrently}}
   }
 
@@ -1041,5 +1061,66 @@ func closureTests() async {
     sendingClosure(y) // expected-warning {{sending 'y' risks causing data races}}
     // expected-note @-1 {{'y' used after being passed as a 'sending' parameter}}
     sendingClosure(y) // expected-note {{access can happen concurrently}}
+  }
+}
+
+///////////////////////////////////////
+// MARK: Closure Capture Propagation //
+///////////////////////////////////////
+//
+// DISCUSSION: For tests that involve closure captures with nonisolated(unsafe)
+// and suppressing errors in the closure itself. Tests where the suppressed
+// error is outside the closure itself are in other places in the file.
+
+enum NonisolatedUnsafeCapture {
+  func testSimple() {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    let _ = {
+      await transferToMainDirect(x)
+      print(x)
+    }
+  }
+
+  func testAsyncLet() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    async let y: () = {
+      await transferToMainDirect(x)
+      await transferToMainDirect(x)
+    }()
+    _ = await y
+  }
+
+  func testIsolatedParamViaActor() async {
+    actor A {
+      let y = NonSendableKlass()
+      func test() {
+        nonisolated(unsafe) let x = y
+        _ = {
+          await transferToMainDirect(x)
+        }
+      }
+    }
+  }
+
+  func testExplicitIsolatedParam() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    _ = { (y: isolated CustomActorInstance) in
+      await transferToMainDirect(x)
+    }
+  }
+
+  func testIsolatedParamNonisolatedNonSending() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    let _: nonisolated(nonsending) () async -> () = {
+      await transferToMainDirect(x)
+      await transferToMainDirect(x)
+    }
+  }
+
+  func testGlobalActorIsolated() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    _ = { @MainActor in
+      await transferToCustom(x)
+    }
   }
 }

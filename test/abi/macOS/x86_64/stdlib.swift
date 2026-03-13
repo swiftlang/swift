@@ -752,6 +752,7 @@ Added: _$ss8SIMDMaskVss6SIMD64Vys5Int64VGRszrlE7allTrueAByAGGvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_2_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_3_0ABvpZMV
+Added: _$sSo19_SwiftStdlibVersionasE6v6_4_0ABvpZMV
 Added: _$ss7Float80V12signalingNaNABvpZMV
 Added: _$ss7Float80V13_exponentBiasSuvpZMV
 Added: _$ss7Float80V13_quietNaNMasks6UInt64VvpZMV
@@ -1057,39 +1058,39 @@ Added: _$ss18EnumeratedSequenceVyxGSKsSkRzrlMc
 Added: __swift_stdlib_CreateIndirectTaggedPointerString
 
 // Span backward deployment
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss11MutableSpanVMa$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss11MutableSpanVMn$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss11MutableSpanVsRi_zrlE6_countSivg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss14MutableRawSpanV6_countSivg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss14MutableRawSpanV8_pointerSvSgvg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss14MutableRawSpanVMa$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss14MutableRawSpanVMn$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss14MutableRawSpanVN$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVMa$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVMn$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVsRi_zrlE6_countSivM$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVsRi_zrlE6_countSivg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVsRi_zrlE6_countSivs$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVsRi_zrlE8_pointerSvSgvg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVsRi_zrlE8capacitySivg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanV6_countSivM$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanV6_countSivg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanV6_countSivs$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanV8_pointerSvSgvg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanV8capacitySivg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanVMa$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanVMn$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanVN$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss4SpanVMa$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss4SpanVMn$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss4SpanVsRi_zrlE6_countSivg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss4SpanVsRi_zrlE8_pointerSVSgvg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss7RawSpanV6_countSivg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss7RawSpanV8_pointerSVSgvg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss7RawSpanVMa$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss7RawSpanVMn$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss7RawSpanVN$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss11MutableSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss11MutableSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss11MutableSpanVsRi_zrlE6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss14MutableRawSpanV6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss14MutableRawSpanV8_pointerSvSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss14MutableRawSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss14MutableRawSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss14MutableRawSpanVN$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss10OutputSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss10OutputSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss10OutputSpanVsRi_zrlE6_countSivM$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss10OutputSpanVsRi_zrlE6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss10OutputSpanVsRi_zrlE6_countSivs$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss10OutputSpanVsRi_zrlE8_pointerSvSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss10OutputSpanVsRi_zrlE8capacitySivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss13OutputRawSpanV6_countSivM$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss13OutputRawSpanV6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss13OutputRawSpanV6_countSivs$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss13OutputRawSpanV8_pointerSvSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss13OutputRawSpanV8capacitySivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss13OutputRawSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss13OutputRawSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss13OutputRawSpanVN$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss4SpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss4SpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss4SpanVsRi_zrlE6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss4SpanVsRi_zrlE8_pointerSVSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss7RawSpanV6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss7RawSpanV8_pointerSVSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss7RawSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss7RawSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss7RawSpanVN$
 
 // Duration.nanoseconds(_:)
 Added: _$ss8DurationV11nanosecondsyABSdFZ
@@ -1139,3 +1140,127 @@ Added: _$ss7UnicodeO27_RandomAccessWordRecognizerVN
 // Obsolete/broken SPIs removed in 6.3
 Removed: _$sSS17_nearestWordIndex9atOrBelowSS0C0VAD_tF
 Removed: _$sSS10_wordIndex6beforeSS0B0VAD_tF
+
+// Internal info exposed for swift-inspect.
+Added: __swift_debug_allocationPoolSize
+Added: __swift_debug_metadataAllocatorPageSize
+
+// New debug environment variable for the concurrency runtime.
+Added: _concurrencyEnableTaskSlabAllocator
+
+// SE-0489 Better debugDescription for EncodingError and DecodingError
+Added: _$ss13DecodingErrorO16debugDescriptionSSvg
+Added: _$ss13DecodingErrorO16debugDescriptionSSvpMV
+Added: _$ss13DecodingErrorOs28CustomDebugStringConvertiblesMc
+Added: _$ss13DecodingErrorOs28CustomDebugStringConvertiblesWP
+Added: _$ss13EncodingErrorO16debugDescriptionSSvg
+Added: _$ss13EncodingErrorO16debugDescriptionSSvpMV
+Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesMc
+Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesWP
+
+// SE-0494 Add isTriviallyIdentical(to:) Methods to String and Substring
+Added: _$sSS20isTriviallyIdentical2toSbSS_tF
+Added: _$sSs20isTriviallyIdentical2toSbSs_tF
+Added: _$sSS17UnicodeScalarViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSS8UTF8ViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSS9UTF16ViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSs17UnicodeScalarViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSs8UTF8ViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSs9UTF16ViewV20isTriviallyIdentical2toSbAB_tF
+
+// SE-0498: Add Runtime.demangle function
+Added: __swift_runtime_demangle
+Added: __swift_runtime_demangle_allocate
+
+// New SPI for dynamic exclusivity checking.
+Added: __swift_exclusivityAccessGetParent
+Added: __swift_exclusivityAccessSetNext
+
+// Runtime support for `Builtin.Borrow`
+Added: _swift_dereferenceBorrow
+Added: _swift_getBorrowTypeMetadata
+Added: _swift_initBorrow
+
+// BorrowingSequence + supporting symbols
+Added: _$s17BorrowingIterators0A8SequencePTl
+Added: _$s7Elements17BorrowingSequencePTl
+Added: _$s7Elements25BorrowingIteratorProtocolPTl
+Added: _$sSTss17BorrowingSequenceRzrlE04makeA8Iterators0aD7AdapterVy0D0STQzGyF
+Added: _$sSqsRi_zrlE5_spans4SpanVyxGvg
+Added: _$ss11InlineArrayVyxq_Gs17BorrowingSequencesRi__rlMc
+Added: _$ss11MutableSpanVyxGs17BorrowingSequencesRi_zrlMc
+Added: _$ss14MutableRawSpanVs17BorrowingSequencesMc
+Added: _$ss14MutableRawSpanVs17BorrowingSequencesWP
+Added: _$ss17BorrowingSequenceMp
+Added: _$ss17BorrowingSequenceP04makeA8Iterator0aD0QzyFTj
+Added: _$ss17BorrowingSequenceP04makeA8Iterator0aD0QzyFTq
+Added: _$ss17BorrowingSequenceP19underestimatedCountSivgTj
+Added: _$ss17BorrowingSequenceP0A8IteratorAB_s0aC8ProtocolTn
+Added: _$ss17BorrowingSequenceTL
+Added: _$ss24BorrowingIteratorAdapterV8curValue7ElementQzSgvM
+Added: _$ss24BorrowingIteratorAdapterV8curValue7ElementQzSgvg
+Added: _$ss24BorrowingIteratorAdapterV8curValue7ElementQzSgvpMV
+Added: _$ss24BorrowingIteratorAdapterV8curValue7ElementQzSgvs
+Added: _$ss24BorrowingIteratorAdapterV8iteratorAByxGx_tcfC
+Added: _$ss24BorrowingIteratorAdapterV8iteratorxvM
+Added: _$ss24BorrowingIteratorAdapterV8iteratorxvg
+Added: _$ss24BorrowingIteratorAdapterV8iteratorxvpMV
+Added: _$ss24BorrowingIteratorAdapterV8iteratorxvs
+Added: _$ss24BorrowingIteratorAdapterV8nextSpan12maximumCounts0E0Vy7ElementQzGSi_tF
+Added: _$ss24BorrowingIteratorAdapterVMa
+Added: _$ss24BorrowingIteratorAdapterVMn
+Added: _$ss24BorrowingIteratorAdapterVyxGs0aB8ProtocolsMc
+Added: _$ss25BorrowingIteratorProtocolMp
+Added: _$ss25BorrowingIteratorProtocolP4skip2byS2i_tFTj
+Added: _$ss25BorrowingIteratorProtocolP4skip2byS2i_tFTq
+Added: _$ss25BorrowingIteratorProtocolP8nextSpan12maximumCounts0E0Vy7ElementQzGSi_tFTj
+Added: _$ss25BorrowingIteratorProtocolP8nextSpan12maximumCounts0E0Vy7ElementQzGSi_tFTq
+Added: _$ss25BorrowingIteratorProtocolTL
+Added: _$ss4SpanVyxGs17BorrowingSequencesRi_zrlMc
+Added: _$ss7RawSpanV5_spans0B0Vys5UInt8VGvg
+Added: _$ss7RawSpanVs17BorrowingSequencesMc
+Added: _$ss7RawSpanVs17BorrowingSequencesWP
+Added: _$ss11InlineArrayVsRi__rlE21makeBorrowingIterators04SpanE0Vyq_GyF
+Added: _$ss11MutableSpanVsRi_zrlE21makeBorrowingIterators0bE0VyxGyF
+Added: _$ss12SpanIteratorVMa
+Added: _$ss12SpanIteratorVMn
+Added: _$ss12SpanIteratorVsRi_zrlE5_spans0A0VyxGvM
+Added: _$ss12SpanIteratorVsRi_zrlE5_spans0A0VyxGvg
+Added: _$ss12SpanIteratorVsRi_zrlE5_spans0A0VyxGvs
+Added: _$ss12SpanIteratorVsRi_zrlE6_countSivM
+Added: _$ss12SpanIteratorVsRi_zrlE6_countSivg
+Added: _$ss12SpanIteratorVsRi_zrlE6_countSivs
+Added: _$ss12SpanIteratorVsRi_zrlE6_startSivM
+Added: _$ss12SpanIteratorVsRi_zrlE6_startSivg
+Added: _$ss12SpanIteratorVsRi_zrlE6_startSivs
+Added: _$ss12SpanIteratorVsRi_zrlEyAByxGs0A0VyxGcfC
+Added: _$ss12SpanIteratorVyxGs09BorrowingB8ProtocolsRi_zrlMc
+Added: _$ss14MutableRawSpanV21makeBorrowingIterators0cF0Vys5UInt8VGyF
+Added: _$ss17BorrowingSequenceP19underestimatedCountSivgTj
+Added: _$ss17BorrowingSequenceP19underestimatedCountSivgTq
+Added: _$ss17BorrowingSequenceP31_customContainsEquatableElementySbSg0F0QzFTj
+Added: _$ss17BorrowingSequenceP31_customContainsEquatableElementySbSg0F0QzFTq
+Added: _$ss17BorrowingSequencePsRi_zRi0_z7ElementRj_zrlE024_customContainsEquatableC0ySbSgADF
+Added: _$ss17BorrowingSequencePsRi_zRi0_z7ElementRj_zrlE19underestimatedCountSivg
+Added: _$ss17BorrowingSequencePsRi_zRi0_z7ElementRj_zrlE19underestimatedCountSivpMV
+Added: _$ss4SpanVsRi_zrlE21makeBorrowingIterators0aD0VyxGyF
+Added: _$ss7RawSpanV21makeBorrowingIterators0bE0Vys5UInt8VGyF
+Added: _$sSTss17BorrowingSequenceRzrlE19underestimatedCountSivg
+Added: _$sSTss17BorrowingSequenceRzrlE19underestimatedCountSivpMV
+Added: _$sSTss17BorrowingSequenceRzrlE31_customContainsEquatableElementySbSg0F0STQzF
+Added: _$sSlss17BorrowingSequenceRzrlE19underestimatedCountSivg
+Added: _$sSlss17BorrowingSequenceRzrlE19underestimatedCountSivpMV
+Added: _$sSlss17BorrowingSequenceRzrlE31_customContainsEquatableElementySbSg0F0STQzF
+
+// Necessary for Distributed to compute distributed remote reference object size
+Added: __ZN5swift26getResilientMetadataBoundsEPKNS_21TargetClassDescriptorINS_9InProcessEEE
+
+// Borrow
+Added: _$ss6BorrowVMa
+Added: _$ss6BorrowVMn
+Added: _$ss6BorrowVsRi_zrlE7builtinxBWvg
+
+// Inout
+Added: _$ss5InoutVMa
+Added: _$ss5InoutVMn
+Added: _$ss5InoutVsRi_zrlE7pointerSpyxGvg

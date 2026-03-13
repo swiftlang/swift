@@ -897,10 +897,7 @@ public:
                      const std::pair<SILInstruction *, InterestingUser> &)>>;
   UserBlockRange getAllUserBlocks() const {
     assert(isInitialized());
-    function_ref<SILBasicBlock *(
-        const std::pair<SILInstruction *, InterestingUser> &)>
-        op;
-    op = [](const std::pair<SILInstruction *, InterestingUser> &pair)
+    auto op = [](const std::pair<SILInstruction *, InterestingUser> &pair)
         -> SILBasicBlock * { return pair.first->getParent(); };
     return UserBlockRange(getAllUsers(), op);
   }

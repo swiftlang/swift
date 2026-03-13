@@ -565,7 +565,7 @@ static bool isCaptured(SILValue def, bool *inSingleBlock) {
 }
 
 /// Returns true if the \p def is only stored into.
-static bool isWriteOnlyAllocation(SILValue def) {
+static bool isWriteOnlyAllocation(SILValue def, DeadEndBlocks *deb) {
   assert(isa<AllocStackInst>(def) || isa<StoreBorrowInst>(def));
 
   // For all users of the def:
@@ -573,14 +573,20 @@ static bool isWriteOnlyAllocation(SILValue def) {
     SILInstruction *user = use->getUser();
 
     // It is okay to store into the AllocStack.
-    if (auto *si = dyn_cast<StoreInst>(user))
+    if (auto *si = dyn_cast<StoreInst>(user)) {
+      if (deb && deb->isDeadEnd(user->getParent())) {
+        // Bail for stores in dead-end blocks, because this could result in the stored
+        // value to leak. We are not doing lifetime completion for the stored value.
+        return false;
+      }
       if (!isa<AllocStackInst>(si->getSrc()))
         continue;
+    }
 
     if (auto *sbi = dyn_cast<StoreBorrowInst>(user)) {
       // Since all uses of the alloc_stack will be via store_borrow, check if
       // there are any non-writes from the store_borrow location.
-      if (!isWriteOnlyAllocation(sbi)) {
+      if (!isWriteOnlyAllocation(sbi, deb)) {
         return false;
       }
       continue;
@@ -1186,9 +1192,9 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       if (sbi->getDest() != asi) {
         continue;
       }
-      assert(!deinitializationPoints[blockPromotingWithin]);
-      deinitializationPoints[blockPromotingWithin] = inst;
       if (!runningVals.has_value()) {
+        assert(!deinitializationPoints[blockPromotingWithin]);
+        deinitializationPoints[blockPromotingWithin] = inst;
         continue;
       }
       if (!runningVals->value.isGuaranteed()) {
@@ -1798,15 +1804,16 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   promoteAllocationToPhi(livePhiBlocks);
 
   // Make sure that all of the allocations were promoted into registers.
-  assert(isWriteOnlyAllocation(asi) && "Non-write uses left behind");
+  assert(isWriteOnlyAllocation(asi, nullptr) && "Non-write uses left behind");
 
   SmallVector<SILValue> valuesToComplete;
 
-  // Enum types may have incomplete lifetimes in address form, when promoted to
-  // value form after mem2reg, they will end up with incomplete ossa lifetimes.
+  // Stack locations may have incomplete lifetimes, i.e. a `destroy_addr` might
+  // be missing in dead-end blocks. Therefore, after promotion to an SSA value,
+  // we need to make sure that the SSA value is complete.
   // Use the lifetime completion utility to complete such lifetimes.
   // First, collect the stored values to complete.
-  if (asi->getType().isOrHasEnum()) {
+  if (function->hasOwnership() && !asi->getType().isTrivial(*function)) {
     for (auto *block : livePhiBlocks) {
       SILPhiArgument *argument = cast<SILPhiArgument>(
           block->getArgument(block->getNumArguments() - 1));
@@ -1831,7 +1838,7 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   // complete their lifetimes with `end_lifetime` instead of `destroy_value`.
   // This is especially important for embedded swift where we are not allowed
   // to insert destroys which were not there before.
-  OSSACompleteLifetime completion(function, domInfo,
+  OSSACompleteLifetime completion(function,
                                   *deadEndBlocksAnalysis->get(function),
                                   OSSACompleteLifetime::IgnoreTrivialVariable,
                                   /*forceLivenessVerification=*/false,
@@ -1968,11 +1975,16 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
       if (!runningVals) {
         // Loading from uninitialized memory is only acceptable if the type is
         // empty--an aggregate of types without storage.
+        const auto initialValue =
+            createEmptyAndUndefValue(asi->getElementType(), inst, ctx);
         runningVals = {
             LiveValues::toReplace(asi,
-                                  /*replacement=*/createEmptyAndUndefValue(
-                                      asi->getElementType(), inst, ctx)),
+                                  /*replacement=*/initialValue),
             /*isStorageValid=*/!doesLoadInvalidateStorage(inst)};
+        if (auto varInfo = asi->getVarInfo()) {
+          SILBuilderWithScope(inst, ctx).createDebugValue(
+              inst->getLoc(), initialValue, *varInfo);
+        }
       }
       auto *loadInst = dyn_cast<LoadInst>(inst);
       if (loadInst &&
@@ -2112,18 +2124,15 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
 
   auto *deadEndBlocks = deadEndBlocksAnalysis->get(function);
 
-  if (!deadEndBlocks->isDeadEnd(parentBlock)) {
-    // We may have incomplete lifetimes for enum locations on trivial paths.
-    // After promoting them, complete lifetime here.
-    ASSERT(asi->getElementType().isOrHasEnum());
-    OSSACompleteLifetime completion(function, domInfo, *deadEndBlocks,
-                                    OSSACompleteLifetime::IgnoreTrivialVariable,
-                                    /*forceLivenessVerification=*/false,
-                                    /*nonDestroyingEnd=*/true);
-    completion.completeOSSALifetime(
-        runningVals->value.replacement(asi, nullptr),
-        OSSACompleteLifetime::Boundary::Liveness);
-  }
+  // We may have incomplete lifetimes for enum locations on trivial paths.
+  // After promoting them, complete lifetime here.
+  OSSACompleteLifetime completion(function, *deadEndBlocks,
+                                  OSSACompleteLifetime::IgnoreTrivialVariable,
+                                  /*forceLivenessVerification=*/false,
+                                  /*nonDestroyingEnd=*/true);
+  completion.completeOSSALifetime(
+      runningVals->value.replacement(asi, nullptr),
+      OSSACompleteLifetime::Boundary::Liveness);
 }
 
 void MemoryToRegisters::collectStoredValues(AllocStackInst *asi,
@@ -2222,7 +2231,8 @@ bool MemoryToRegisters::promoteAllocation(AllocStackInst *alloc,
   }
 
   // Remove write-only AllocStacks.
-  if (isWriteOnlyAllocation(alloc) && !alloc->getType().isOrHasEnum() &&
+  if (isWriteOnlyAllocation(alloc, deadEndBlocksAnalysis->get(alloc->getFunction())) &&
+      !alloc->getType().isOrHasEnum() &&
       !lexicalLifetimeEnsured(alloc)) {
     LLVM_DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: "<< *alloc);
     deleter.forceDeleteWithUsers(alloc);
@@ -2308,6 +2318,12 @@ namespace {
 
 class SILMem2Reg : public SILFunctionTransform {
   void run() override {
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
+    // This pass relies on complete lifetimes.
+    LLVM_DEBUG(llvm::dbgs() << "SILMem2Reg disabled in C++-only Swift compiler\n");
+    return;
+#endif //!SWIFT_ENABLE_SWIFT_IN_SWIFT
+
     SILFunction *f = getFunction();
 
     LLVM_DEBUG(llvm::dbgs()

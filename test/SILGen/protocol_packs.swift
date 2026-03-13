@@ -225,8 +225,8 @@ struct ConsumingBorrowingAccepterImpl: BorrowingAccepter {
 // CHECK:       bb2:
 // CHECK-NEXT:    [[PACK_INDEX:%.*]] = dynamic_pack_index [[INDEX]] of $Pack{repeat NonTrivialGeneric<each τ_0_0>}
 // CHECK-NEXT:    open_pack_element [[PACK_INDEX]] of <each τ_0_0> at <Pack{repeat each τ_0_0}>, shape $each τ_0_0, uuid [[UUID:".*"]]
-// CHECK-NEXT:    [[TEMP_ELT_ADDR:%.*]] = tuple_pack_element_addr [[PACK_INDEX]] of [[TEMP_TUPLE]] as $*NonTrivialGeneric<@pack_element([[UUID]]) each τ_0_0>
 // CHECK-NEXT:    [[ARG_ADDR:%.*]] = pack_element_get [[PACK_INDEX]] of %0 as $*NonTrivialGeneric<@pack_element([[UUID]]) each τ_0_0>
+// CHECK-NEXT:    [[TEMP_ELT_ADDR:%.*]] = tuple_pack_element_addr [[PACK_INDEX]] of [[TEMP_TUPLE]] as $*NonTrivialGeneric<@pack_element([[UUID]]) each τ_0_0>
 // CHECK-NEXT:    [[BORROW:%.*]] = load_borrow [[ARG_ADDR]]
 // CHECK-NEXT:    [[COPY:%.*]] = copy_value [[BORROW]]
 // CHECK-NEXT:    store [[COPY]] to [init] [[TEMP_ELT_ADDR]]

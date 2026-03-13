@@ -51,6 +51,11 @@ func checkSync() async {
     // CHECK: Error: Empty()
     await invoke { try impl.f5(false) }
 
+    // CHECK: Success: ManyBytes(x0: 0, x1: 1, x2: 2, x3: 3, x4: 4, x5: 5, x6: 6, x7: 7, x8: 8, x9: 9, x10: 10, x11: 11, x12: 12, x13: 13, x14: 14, x15: 15)
+    await invoke { try impl.fManyBytes(true) }
+    // CHECK: Error: Empty()
+    await invoke { try impl.fManyBytes(false) }
+
     // CHECK: Success: ()
     await invoke { try impl.g0(true) }
     // CHECK: Error: OneWord(x: 0)
@@ -183,6 +188,11 @@ func checkAsync() async {
     await invoke { try await impl.f5(true) }
     // CHECK: Error: Empty()
     await invoke { try await impl.f5(false) }
+
+    // CHECK: Success: ManyBytes(x0: 0, x1: 1, x2: 2, x3: 3, x4: 4, x5: 5, x6: 6, x7: 7, x8: 8, x9: 9, x10: 10, x11: 11, x12: 12, x13: 13, x14: 14, x15: 15)
+    await invoke { try await impl.fManyBytes(true) }
+    // CHECK: Error: Empty()
+    await invoke { try await impl.fManyBytes(false) }
 
     // CHECK: Success: ()
     await invoke { try await impl.g0(true) }

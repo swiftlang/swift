@@ -665,7 +665,7 @@ class SuperSub : SuperBase {
 // -- We enter with an assumed strong +1.
 // CHECK:  bb0([[SELF:%.*]] : @guaranteed $UnownedSelfNestedCapture):
 // CHECK:         [[OUTER_SELF_CAPTURE:%.*]] = alloc_box ${ var @sil_unowned UnownedSelfNestedCapture }
-// CHECK:         [[OUTER_SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[OUTER_SELF_CAPTURE]]
+// CHECK:         [[OUTER_SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[OUTER_SELF_CAPTURE]]
 // CHECK:         [[PB:%.*]] = project_box [[OUTER_SELF_LIFETIME]]
 // -- strong +2
 // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]

@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: not --crash %target-sil-opt -enable-sil-verify-all %s 2> %t/err.txt
-// RUN: %FileCheck %s < %t/err.txt
+// RUN: %target-sil-opt -sil-verify-all=false -enable-sil-verify-all=false -emit-sorted-sil -verify-continue-on-failure %s 2>&1 | %FileCheck %s
 
 // REQUIRES: asserts
 

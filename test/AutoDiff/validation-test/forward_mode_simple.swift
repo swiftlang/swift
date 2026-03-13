@@ -1,5 +1,8 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation)
 // REQUIRES: executable_test
+/* Temporary disabled until https://github.com/swiftlang/swift/issues/84840 is fixed
+   We cannot use `Tracked<T>` :( */
+// XFAIL: *
 
 import StdlibUnittest
 import DifferentiationUnittest

@@ -182,3 +182,13 @@ module VariableTemplate {
   header "variable-template.h"
   requires cplusplus
 }
+
+module ForwardDeclaredSpecialization {
+  header "ForwardDeclaredSpecialization.h"
+  requires cplusplus
+}
+
+module ClassTemplateWithFrt {
+  header "class-template-with-frt.h"
+  requires cplusplus
+}

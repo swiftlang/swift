@@ -22,6 +22,7 @@
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/CAS/CASReference.h"
 #include "llvm/Target/TargetMachine.h"
 
 namespace swift {
@@ -32,6 +33,10 @@ class SILModule;
 class SILOptions;
 struct TBDGenOptions;
 class TBDGenDescriptor;
+
+namespace cas {
+  class SwiftCASOutputBackend;
+}
 
 namespace irgen {
   class IRGenModule;
@@ -149,10 +154,14 @@ struct IRGenDescriptor {
 
   StringRef ModuleName;
   const PrimarySpecificPaths &PSPs;
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
   StringRef PrivateDiscriminator;
   ArrayRef<std::string> parallelOutputFilenames;
+  ArrayRef<std::string> parallelIROutputFilenames;
   llvm::GlobalVariable **outModuleHash;
+  swift::cas::SwiftCASOutputBackend *casBackend = nullptr;
   llvm::raw_pwrite_stream *out = nullptr;
+  std::optional<llvm::cas::ObjectRef> cacheKeyForJob;
 
   friend llvm::hash_code hash_value(const IRGenDescriptor &owner) {
     return llvm::hash_combine(owner.Ctx, owner.SymbolsToEmit, owner.SILMod);
@@ -175,8 +184,11 @@ public:
           const TBDGenOptions &TBDOpts, const SILOptions &SILOpts,
           Lowering::TypeConverter &Conv, std::unique_ptr<SILModule> &&SILMod,
           StringRef ModuleName, const PrimarySpecificPaths &PSPs,
+          std::shared_ptr<llvm::cas::ObjectStore> CAS,
           StringRef PrivateDiscriminator, SymsToEmit symsToEmit = std::nullopt,
-          llvm::GlobalVariable **outModuleHash = nullptr) {
+          llvm::GlobalVariable **outModuleHash = nullptr,
+          cas::SwiftCASOutputBackend *casBackend = nullptr,
+          std::optional<llvm::cas::ObjectRef> cacheKeyForJob = std::nullopt) {
     return IRGenDescriptor{file,
                            symsToEmit,
                            Opts,
@@ -186,18 +198,28 @@ public:
                            SILMod.release(),
                            ModuleName,
                            PSPs,
+                           std::move(CAS),
                            PrivateDiscriminator,
                            {},
-                           outModuleHash};
+                           {},
+                           outModuleHash,
+                           casBackend,
+                           nullptr,
+                           cacheKeyForJob};
   }
 
   static IRGenDescriptor forWholeModule(
       ModuleDecl *M, const IRGenOptions &Opts, const TBDGenOptions &TBDOpts,
       const SILOptions &SILOpts, Lowering::TypeConverter &Conv,
       std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
-      const PrimarySpecificPaths &PSPs, SymsToEmit symsToEmit = std::nullopt,
+      const PrimarySpecificPaths &PSPs,
+      std::shared_ptr<llvm::cas::ObjectStore> CAS,
+      SymsToEmit symsToEmit = std::nullopt,
       ArrayRef<std::string> parallelOutputFilenames = {},
-      llvm::GlobalVariable **outModuleHash = nullptr) {
+      ArrayRef<std::string> parallelIROutputFilenames = {},
+      llvm::GlobalVariable **outModuleHash = nullptr,
+      cas::SwiftCASOutputBackend *casBackend = nullptr,
+      std::optional<llvm::cas::ObjectRef> cacheKeyForJob = std::nullopt) {
     return IRGenDescriptor{M,
                            symsToEmit,
                            Opts,
@@ -207,9 +229,14 @@ public:
                            SILMod.release(),
                            ModuleName,
                            PSPs,
+                           std::move(CAS),
                            "",
                            parallelOutputFilenames,
-                           outModuleHash};
+                           parallelIROutputFilenames,
+                           outModuleHash,
+                           casBackend,
+                           nullptr,
+                           cacheKeyForJob};
   }
 
   /// Retrieves the files to perform IR generation for. If the descriptor is

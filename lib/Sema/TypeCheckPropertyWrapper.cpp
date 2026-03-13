@@ -148,7 +148,8 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
 
   for (const auto &decl : decls) {
     auto init = dyn_cast<ConstructorDecl>(decl);
-    if (!init || init->getDeclContext() != nominal || init->isGeneric())
+    if (!init || init->getDeclContext() != nominal ||
+        init->hasGenericParamList())
       continue;
 
     ParamDecl *argumentParam = nullptr;
@@ -328,6 +329,33 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
   return subscript;
 }
 
+/// Validate key path parameter types for an enclosing-self subscript.
+static bool validateEnclosingSelfSubscript(SubscriptDecl *subscript) {
+  auto *indices = subscript->getIndices();
+  if (!indices || indices->size() != 3)
+    return false;
+
+  auto checkKeyPathParam = [&](unsigned index) -> bool {
+    auto *param = indices->get(index);
+    auto paramTy = param->getInterfaceType();
+    if (paramTy->hasError())
+      return true;
+
+    if (!(paramTy->isKeyPath() || paramTy->isWritableKeyPath() ||
+          paramTy->isReferenceWritableKeyPath())) {
+      param->diagnose(
+          diag::property_wrapper_enclosing_self_subscript_keypath_type,
+          param->getArgumentName(), paramTy);
+      return false;
+    }
+    return true;
+  };
+
+  bool wrappedOrProjectedOK = checkKeyPathParam(/*wrapped/projected*/ 1);
+  bool storageOK = checkKeyPathParam(/*storage*/ 2);
+  return wrappedOrProjectedOK && storageOK;
+}
+
 PropertyWrapperTypeInfo
 PropertyWrapperTypeInfoRequest::evaluate(
     Evaluator &eval, NominalTypeDecl *nominal) const {
@@ -391,9 +419,20 @@ PropertyWrapperTypeInfoRequest::evaluate(
   }
 
   result.enclosingInstanceWrappedSubscript =
-    findEnclosingSelfSubscript(ctx, nominal, ctx.Id_wrapped);
+      findEnclosingSelfSubscript(ctx, nominal, ctx.Id_wrapped);
+  if (result.enclosingInstanceWrappedSubscript &&
+      !validateEnclosingSelfSubscript(
+          result.enclosingInstanceWrappedSubscript)) {
+    result.enclosingInstanceWrappedSubscript = nullptr;
+  }
+
   result.enclosingInstanceProjectedSubscript =
-    findEnclosingSelfSubscript(ctx, nominal, ctx.Id_projected);
+      findEnclosingSelfSubscript(ctx, nominal, ctx.Id_projected);
+  if (result.enclosingInstanceProjectedSubscript &&
+      !validateEnclosingSelfSubscript(
+          result.enclosingInstanceProjectedSubscript)) {
+    result.enclosingInstanceProjectedSubscript = nullptr;
+  }
 
   // If there was no projectedValue property, but there is a wrapperValue,
   // property, use that and warn.
@@ -440,13 +479,9 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
   llvm::TinyPtrVector<CustomAttr *> result;
 
   for (auto attr : var->getExpandedAttrs().getAttributes<CustomAttr>()) {
-    auto mutableAttr = const_cast<CustomAttr *>(attr);
-    // Figure out which nominal declaration this custom attribute refers to.
-    auto *nominal = evaluateOrDefault(
-      ctx.evaluator, CustomAttrNominalRequest{mutableAttr, dc}, nullptr);
-
     // If we didn't find a nominal type with a @propertyWrapper attribute,
     // skip this custom attribute.
+    auto *nominal = attr->getNominalDecl();
     if (!nominal || !nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())
       continue;
 
@@ -454,7 +489,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
     // the semantic checking required.
     auto sourceFile = dc->getParentSourceFile();
     if (!sourceFile) {
-      result.push_back(mutableAttr);
+      result.push_back(attr);
       continue;
     }
       
@@ -545,7 +580,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       }
     }
 
-    result.push_back(mutableAttr);
+    result.push_back(attr);
   }
 
   // Attributes are stored in reverse order in the AST, but we want them in

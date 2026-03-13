@@ -28,7 +28,7 @@ extension Task where Success == Never, Failure == Never {
           priority: Int(Task.currentPriority.rawValue),
           continuation: continuation)
 
-      if #available(StdlibDeploymentTarget 6.2, *) {
+      if #available(StdlibDeploymentTarget 6.3, *) {
         #if !$Embedded
         if let executor = Task.currentSchedulingExecutor {
           executor.enqueue(ExecutorJob(context: job),
@@ -272,7 +272,7 @@ extension Task where Success == Never, Failure == Never {
 
               let job = Builtin.convertTaskToJob(sleepTask)
 
-              if #available(StdlibDeploymentTarget 6.2, *) {
+              if #available(StdlibDeploymentTarget 6.3, *) {
                 #if !$Embedded
                 if let executor = Task.currentSchedulingExecutor {
                   executor.enqueue(ExecutorJob(context: job),

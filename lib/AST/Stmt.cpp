@@ -89,6 +89,8 @@ StringRef Stmt::getDescriptiveKindName(StmtKind K) {
     return "discard";
   case StmtKind::PoundAssert:
     return "#assert";
+  case StmtKind::Opaque:
+    llvm_unreachable("OpaqueStmt only exists for SILGen, the type-checker should never care about it");
   }
   llvm_unreachable("Unhandled case in switch!");
 }
@@ -184,8 +186,7 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts, SourceLoc rbloc,
     : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
       LBLoc(lbloc), RBLoc(rbloc) {
   Bits.BraceStmt.NumElements = elts.size();
-  std::uninitialized_copy(elts.begin(), elts.end(),
-                          getTrailingObjects<ASTNode>());
+  std::uninitialized_copy(elts.begin(), elts.end(), getTrailingObjects());
 
 #ifndef NDEBUG
   for (auto elt : elts)
@@ -222,7 +223,11 @@ SourceLoc BraceStmt::getEndLoc() const {
 
 SourceLoc BraceStmt::getContentStartLoc() const {
   for (auto elt : getElements()) {
-    if (auto loc = elt.getStartLoc()) {
+    if (auto *D = elt.dyn_cast<Decl *>()) {
+      // FIXME: This should really be the default behavior of Decl::getStartLoc.
+      if (auto range = D->getSourceRangeIncludingAttrs())
+        return range.Start;
+    } else if (auto loc = elt.getStartLoc()) {
       return loc;
     }
   }
@@ -450,13 +455,6 @@ void ForEachStmt::setPattern(Pattern *p) {
   Pat->markOwnedByStatement(this);
 }
 
-Expr *ForEachStmt::getTypeCheckedSequence() const {
-  if (auto *expansion = dyn_cast<PackExpansionExpr>(getParsedSequence()))
-    return expansion;
-
-  return iteratorVar ? iteratorVar->getInit(/*index=*/0) : nullptr;
-}
-
 DoCatchStmt *DoCatchStmt::create(DeclContext *dc, LabeledStmtInfo labelInfo,
                                  SourceLoc doLoc, SourceLoc throwsLoc,
                                  TypeLoc thrownType, Stmt *body,
@@ -470,7 +468,8 @@ DoCatchStmt *DoCatchStmt::create(DeclContext *dc, LabeledStmtInfo labelInfo,
 }
 
 bool CaseLabelItem::isSyntacticallyExhaustive() const {
-  return getGuardExpr() == nullptr && !getPattern()->isRefutablePattern();
+  return getGuardExpr() == nullptr &&
+         !getPattern()->isRefutablePattern(/*allowIsPatternCoercion*/ true);
 }
 
 bool DoCatchStmt::isSyntacticallyExhaustive() const {
@@ -481,6 +480,12 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
     }
   }
   return false;
+}
+
+BraceStmt *ForEachStmt::getDesugaredStmt() {
+  auto &ctx = DC->getASTContext();
+  return evaluateOrDefault(ctx.evaluator, DesugarForEachStmtRequest{this},
+                           nullptr);
 }
 
 Type DoCatchStmt::getExplicitCaughtType() const {
@@ -592,6 +597,28 @@ bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
   }
 
   return false;
+}
+
+Expr *StmtConditionElement::getSynthesizedShorthandInitOrNull() const {
+  auto *init = getInitializerOrNull();
+  if (!init)
+    return nullptr;
+
+  auto *pattern = dyn_cast_or_null<OptionalSomePattern>(getPattern());
+  if (!pattern)
+    return nullptr;
+
+  auto *var = pattern->getSubPattern()->getSingleVar();
+  if (!var)
+    return nullptr;
+
+  // If the right-hand side has the same location as the variable, it was
+  // synthesized.
+  if (var->getLoc().isValid() && var->getLoc() == init->getStartLoc() &&
+      init->getStartLoc() == init->getEndLoc()) {
+    return init;
+  }
+  return nullptr;
 }
 
 SourceRange ConditionalPatternBindingInfo::getSourceRange() const {
@@ -998,7 +1025,7 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                                EndLoc);
 
   std::uninitialized_copy(Cases.begin(), Cases.end(),
-                          theSwitch->getTrailingObjects<CaseStmt *>());
+                          theSwitch->getTrailingObjects());
   for (auto *caseStmt : theSwitch->getCases())
     caseStmt->setParentStmt(theSwitch);
 

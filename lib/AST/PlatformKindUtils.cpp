@@ -115,9 +115,13 @@ swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
   case PlatformKind::tvOS:
   case PlatformKind::watchOS:
   case PlatformKind::visionOS:
+  case PlatformKind::DriverKit:
+  case PlatformKind::Swift:
+  case PlatformKind::anyAppleOS:
   case PlatformKind::FreeBSD:
   case PlatformKind::OpenBSD:
   case PlatformKind::Windows:
+  case PlatformKind::Android:
   case PlatformKind::none:
     return std::nullopt;
   }
@@ -126,12 +130,12 @@ swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
 
 static bool isPlatformActiveForTarget(PlatformKind Platform,
                                       const llvm::Triple &Target,
-                                      bool EnableAppExtensionRestrictions,
+                                      const LangOptions &LangOpts,
                                       bool ForRuntimeQuery) {
   if (Platform == PlatformKind::none)
     return true;
 
-  if (!EnableAppExtensionRestrictions &&
+  if (!LangOpts.EnableAppExtensionRestrictions &&
       isApplicationExtensionPlatform(Platform))
     return false;
 
@@ -158,12 +162,19 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
     case PlatformKind::visionOS:
     case PlatformKind::visionOSApplicationExtension:
       return Target.isXROS();
+    case PlatformKind::DriverKit:
+      return Target.isDriverKit();
+    case PlatformKind::Swift:
+    case PlatformKind::anyAppleOS:
+      return Target.isOSDarwin();
     case PlatformKind::OpenBSD:
       return Target.isOSOpenBSD();
     case PlatformKind::FreeBSD:
       return Target.isOSFreeBSD();
     case PlatformKind::Windows:
       return Target.isOSWindows();
+    case PlatformKind::Android:
+      return Target.isAndroid();
     case PlatformKind::none:
       llvm_unreachable("handled above");
   }
@@ -175,12 +186,11 @@ bool swift::isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
   if (ForTargetVariant) {
     assert(LangOpts.TargetVariant && "Must have target variant triple");
     return isPlatformActiveForTarget(Platform, *LangOpts.TargetVariant,
-                                     LangOpts.EnableAppExtensionRestrictions,
-                                     ForRuntimeQuery);
+                                     LangOpts, ForRuntimeQuery);
   }
 
-  return isPlatformActiveForTarget(Platform, LangOpts.Target,
-                                   LangOpts.EnableAppExtensionRestrictions, ForRuntimeQuery);
+  return isPlatformActiveForTarget(Platform, LangOpts.Target, LangOpts,
+                                   ForRuntimeQuery);
 }
 
 static PlatformKind platformForTriple(const llvm::Triple &triple,
@@ -219,6 +229,10 @@ static PlatformKind platformForTriple(const llvm::Triple &triple,
                 : PlatformKind::visionOS);
   }
 
+  if (triple.isAndroid()) {
+    return PlatformKind::Android;
+  }
+
   return PlatformKind::none;
 }
 
@@ -233,6 +247,33 @@ PlatformKind swift::targetVariantPlatform(const LangOptions &LangOpts) {
                              LangOpts.EnableAppExtensionRestrictions);
 
   return PlatformKind::none;
+}
+
+static bool inheritsAvailabilityFromAnyAppleOS(PlatformKind platform) {
+  switch (platform) {
+  case PlatformKind::macOSApplicationExtension:
+  case PlatformKind::iOSApplicationExtension:
+  case PlatformKind::macCatalystApplicationExtension:
+  case PlatformKind::tvOSApplicationExtension:
+  case PlatformKind::watchOSApplicationExtension:
+  case PlatformKind::visionOSApplicationExtension:
+  case PlatformKind::macOS:
+  case PlatformKind::iOS:
+  case PlatformKind::macCatalyst:
+  case PlatformKind::tvOS:
+  case PlatformKind::watchOS:
+  case PlatformKind::visionOS:
+    return true;
+  case PlatformKind::DriverKit:
+  case PlatformKind::anyAppleOS:
+  case PlatformKind::Swift:
+  case PlatformKind::FreeBSD:
+  case PlatformKind::OpenBSD:
+  case PlatformKind::Windows:
+  case PlatformKind::Android:
+  case PlatformKind::none:
+    return false;
+  }
 }
 
 bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
@@ -262,6 +303,10 @@ bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
     }
   }
 
+  if (Parent == PlatformKind::anyAppleOS &&
+      inheritsAvailabilityFromAnyAppleOS(Child))
+    return true;
+
   return false;
 }
 
@@ -285,12 +330,19 @@ swift::tripleOSTypeForPlatform(PlatformKind platform) {
   case PlatformKind::visionOS:
   case PlatformKind::visionOSApplicationExtension:
     return llvm::Triple::XROS;
+  case PlatformKind::DriverKit:
+    return llvm::Triple::DriverKit;
+  case PlatformKind::Swift:
+  case PlatformKind::anyAppleOS:
+      return std::nullopt;
   case PlatformKind::FreeBSD:
     return llvm::Triple::FreeBSD;
   case PlatformKind::OpenBSD:
     return llvm::Triple::OpenBSD;
   case PlatformKind::Windows:
     return llvm::Triple::Win32;
+  case PlatformKind::Android:
+    return llvm::Triple::Linux;
   case PlatformKind::none:
     return std::nullopt;
   }
@@ -323,9 +375,13 @@ bool swift::isPlatformSPI(PlatformKind Platform) {
   case PlatformKind::watchOSApplicationExtension:
   case PlatformKind::visionOS:
   case PlatformKind::visionOSApplicationExtension:
+  case PlatformKind::DriverKit:
+  case PlatformKind::Swift:
+  case PlatformKind::anyAppleOS:
   case PlatformKind::OpenBSD:
   case PlatformKind::FreeBSD:
   case PlatformKind::Windows:
+  case PlatformKind::Android:
   case PlatformKind::none:
     return false;
   }

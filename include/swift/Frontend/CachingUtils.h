@@ -69,6 +69,11 @@ std::unique_ptr<llvm::MemoryBuffer> loadCachedCompileResultFromCacheKey(
     DiagnosticEngine &Diag, llvm::StringRef CacheKey, file_types::ID Type,
     llvm::StringRef Filename = "");
 
+llvm::Expected<std::optional<llvm::cas::ObjectProxy>>
+loadCachedCompileResultProxy(llvm::cas::ObjectStore &CAS,
+                             llvm::cas::ActionCache &Cache,
+                             llvm::StringRef CacheKey, file_types::ID Type);
+
 llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
 createCASFileSystem(llvm::cas::ObjectStore &CAS,
                     const std::string &IncludeTreeRoot,

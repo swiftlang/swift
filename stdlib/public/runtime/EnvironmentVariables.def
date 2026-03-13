@@ -62,6 +62,11 @@ VARIABLE(SWIFT_DEBUG_ENABLE_SHARED_CACHE_PROTOCOL_CONFORMANCES, bool, true,
 
 #endif
 
+VARIABLE(SWIFT_DEBUG_ENABLE_CACHE_PROTOCOL_CONFORMANCES_BY_TYPE_DESCRIPTOR,
+         bool, true,
+         "Enable caching protocol conformances by type descriptor in addition "
+         "to the cache by metadata.")
+
 VARIABLE(SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES, bool, true,
          "Enable dispatch cooperative queues in the global executor.")
 
@@ -69,6 +74,10 @@ VARIABLE(SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES, bool, true,
 
 VARIABLE(SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING, bool, false,
          "Enable the an asserts runtime to emit logging as it works.")
+
+VARIABLE(SWIFT_DEBUG_ENABLE_PROTOCOL_CONFORMANCES_LOOKUP_LOG,
+         bool, false,
+         "Enable logs for the conformance lookup routine.")
 
 #endif
 
@@ -116,6 +125,9 @@ VARIABLE(SWIFT_BACKTRACE, string, "",
          "crash catching and backtracing support in the runtime. "
          "See docs/Backtracing.rst in the Swift repository for details.")
 
+VARIABLE(SWIFT_IS_BACKTRACING, bool, false,
+         "Set to `true` if we are running the backtracer.")
+
 VARIABLE(SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE, string, "",
          "Allows for suppressing 'is current executor' equality check crashes. "
          "As since Swift 6.0 checking for current executor equality, may crash "
@@ -137,5 +149,10 @@ VARIABLE(SWIFT_DUMP_ACCESSIBLE_FUNCTIONS, bool, false,
          "These are used to obtain function pointers from accessible function "
          "record names, e.g. by the Distributed runtime to invoke distributed "
          "functions.")
+
+VARIABLE(SWIFT_DEBUG_ENABLE_TASK_SLAB_ALLOCATOR, bool, true,
+         "Use a slab allocator for the async stack. If not enabled, directly "
+         "call malloc/free. Direct use of malloc/free enables use of memory "
+         "debugging tools for async stack allocations.")
 
 #undef VARIABLE

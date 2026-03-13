@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -DLIB %s -module-name Lib -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -swift-version 5 -enable-library-evolution
-// RUN: %target-typecheck-verify-swift -DCLIENT -I %t \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -DCLIENT -I %t \
 // RUN:   -swift-version 5 -enable-library-evolution
 
 #if LIB
@@ -34,8 +34,8 @@ public protocol IOIProtocol {}
 
 public struct PublicStruct : IOIProtocol, SPIProtocol { // expected-error {{cannot use protocol 'IOIProtocol' in a public or '@usableFromInline' conformance; 'Lib' has been imported as implementation-only}}
 // expected-error @-1 {{cannot use protocol 'SPIProtocol' in a public or '@usableFromInline' conformance; 'Lib' has been imported as implementation-only}}
-  public var spiStruct = SPIStruct() // expected-error {{cannot use struct 'SPIStruct' here; 'Lib' has been imported as implementation-only}}
-  public var ioiStruct = IOIStruct() // expected-error {{cannot use struct 'IOIStruct' here; 'Lib' has been imported as implementation-only}}
+  public var spiStruct = SPIStruct() // expected-error {{cannot use struct 'SPIStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'Lib' has been imported as implementation-only}}
+  public var ioiStruct = IOIStruct() // expected-error {{cannot use struct 'IOIStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'Lib' has been imported as implementation-only}}
 
   @inlinable
   public func publicInlinable() {

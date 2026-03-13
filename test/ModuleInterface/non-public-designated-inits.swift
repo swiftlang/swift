@@ -12,7 +12,7 @@ open class A {
   // init should not be inheritable.
   init() {}
 
-  // CHECK-NEXT: public init(_: Swift.Int)
+  // CHECK-NEXT: public init(_: Swift::Int)
   public init(_: Int) {}
 
   // CHECK-NEXT: convenience public init(hi: ())

@@ -150,7 +150,7 @@ MacroDecl *SyntacticMacroExpansionInstance::getSynthesizedMacroDecl(
                                        /*lParenLoc=*/{}, role, /*names=*/{},
                                        /*conformances=*/{},
                                        /*rParenLoc=*/{}, /*implicit=*/true);
-    macro->getAttrs().add(attr);
+    macro->addAttribute(attr);
   }
 
   // Set the macro definition.

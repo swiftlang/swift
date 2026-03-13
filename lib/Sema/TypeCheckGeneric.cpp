@@ -215,7 +215,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   }
 
   // Create the OpaqueTypeDecl for the result type.
-  auto opaqueDecl = OpaqueTypeDecl::get(
+  auto opaqueDecl = OpaqueTypeDecl::create(
       originatingDecl, genericParams, parentDC, interfaceSignature,
       opaqueReprs);
   if (auto originatingSig = originatingDC->getGenericSignatureOfContext()) {
@@ -225,10 +225,17 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     opaqueDecl->setGenericSignature(GenericSignature());
   }
 
+  TypeResolverContext resolverContext = TypeResolverContext::FunctionResult;
+  if (isa<VarDecl>(originatingDecl)) {
+    // Non-opaque result types are resolved against this context, so
+    // replicate that logic here.
+    resolverContext = TypeResolverContext::PatternBindingDecl;
+  }
+
   // Resolving in the context of `opaqueDecl` allows type resolution to create
   // opaque archetypes where needed
   auto interfaceType =
-      TypeResolution::forInterface(opaqueDecl, TypeResolverContext::None,
+      TypeResolution::forInterface(opaqueDecl, resolverContext,
                                    /*unboundTyOpener*/ nullptr,
                                    /*placeholderHandler*/ nullptr,
                                    /*packElementOpener*/ nullptr)
@@ -375,7 +382,7 @@ static bool checkProtocolSelfRequirementsImpl(
                        secondType.getString())
         // FIXME: This should become an unconditional error since violating
         // this invariant can introduce compiler and run time crashes.
-        .warnUntilFutureSwiftVersionIf(downgrade);
+        .warnUntilLanguageModeIf(downgrade, LanguageMode::future);
     return true;
   }
 
@@ -538,6 +545,16 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
   // Collect all generic params referenced in parameter types and
   // return type.
   auto *funcTy = decl->getInterfaceType()->castTo<GenericFunctionType>();
+
+  // Generic parameters of the outer context are implicitly referenced, but a
+  // subscript's interface type doesn't include the (Self) -> ... part, for
+  // historical reasons.
+  if (isa<SubscriptDecl>(decl)) {
+    collectReferencedGenericParams(
+        decl->getDeclContext()->getSelfInterfaceType(),
+        referencedGenericParams);
+  }
+
   for (const auto &param : funcTy->getParams())
     collectReferencedGenericParams(param.getPlainType(), referencedGenericParams);
   collectReferencedGenericParams(funcTy->getResult(), referencedGenericParams);
@@ -705,9 +722,9 @@ void TypeChecker::checkShadowedGenericParams(GenericContext *dc) {
       if (existingParamDecl->getDeclContext() == dc) {
         genericParamDecl->diagnose(diag::invalid_redecl, genericParamDecl);
       } else {
-        genericParamDecl->diagnose(
-            diag::shadowed_generic_param,
-            genericParamDecl).warnUntilSwiftVersion(6);
+        genericParamDecl
+            ->diagnose(diag::shadowed_generic_param, genericParamDecl)
+            .warnUntilLanguageMode(LanguageMode::v6);
       }
 
       if (existingParamDecl->getLoc()) {
@@ -942,22 +959,17 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
     auto *extendedNominal = ext->getExtendedNominal();
 
-    // Avoid building a generic signature if we have an unconstrained protocol
-    // extension of a protocol that does not suppress conformance to ~Copyable
-    // or ~Escapable. This avoids a request cycle when referencing a protocol
-    // extension type alias via an unqualified name from a `where` clause on
-    // the protocol.
+    // Optimization: avoid building a generic signature if we have an
+    // unconstrained protocol extension, as they have the same signature as the
+    // protocol itself.
+    //
+    // Protocols who suppress conformance to ~Copyable or ~Escapable either on
+    // Self or its associated types will infer default requirements in
+    // ordinary extensions of that protocol, so the signature can differ there.
     if (auto *proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
-      if (extraReqs.empty() &&
-          !ext->getTrailingWhereClause()) {
-        InvertibleProtocolSet protos;
-        for (auto *inherited : proto->getAllInheritedProtocols()) {
-          if (auto kind = inherited->getInvertibleProtocolKind())
-            protos.insert(*kind);
-        }
-
-        if (protos == InvertibleProtocolSet::allKnown())
-          return extendedNominal->getGenericSignatureOfContext();
+      if (extraReqs.empty() && !ext->getTrailingWhereClause() &&
+          proto->getInverseRequirements().empty()) {
+        return extendedNominal->getGenericSignatureOfContext();
       }
     }
 

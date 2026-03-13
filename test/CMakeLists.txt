@@ -104,7 +104,9 @@ function(get_test_dependencies SDK result_var_name)
     endif()
 
     if(SWIFT_BUILD_SWIFT_SYNTAX)
-      list(APPEND deps_binaries swift-plugin-server)
+      list(APPEND deps_binaries
+        swift-plugin-server
+        swift-function-caller-generator)
     endif()
   endif()
 
@@ -135,7 +137,8 @@ function(get_test_dependencies SDK result_var_name)
       llvm-strings
       llvm-readtapi
       not
-      split-file)
+      split-file
+      yaml2obj)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR
@@ -471,9 +474,11 @@ foreach(SDK ${SWIFT_SDKS})
         list(APPEND test_dependencies "touch-covering-tests")
       endif()
 
-      list(APPEND test_dependencies
-        "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-        "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+      if(SWIFT_BUILD_STDLIB)
+        list(APPEND test_dependencies
+          "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
+          "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+      endif()
 
       set(validation_test_dependencies)
 

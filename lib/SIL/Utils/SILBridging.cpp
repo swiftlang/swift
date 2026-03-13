@@ -190,6 +190,7 @@ static_assert((int)BridgedFunction::PerformanceConstraints::ManualOwnership == (
 
 static_assert((int)BridgedFunction::InlineStrategy::InlineDefault == (int)swift::InlineDefault);
 static_assert((int)BridgedFunction::InlineStrategy::NoInline == (int)swift::NoInline);
+static_assert((int)BridgedFunction::InlineStrategy::HeuristicAlwaysInline == (int)swift::HeuristicAlwaysInline);
 static_assert((int)BridgedFunction::InlineStrategy::AlwaysInline == (int)swift::AlwaysInline);
 
 static_assert((int)BridgedFunction::ABILanguage::Swift == (int)swift::SILFunctionLanguage::Swift);
@@ -698,6 +699,11 @@ BridgedInstruction BridgedCloner::clone(BridgedInstruction inst) const {
   return {cloner->cloneInst(inst.unbridged())->asSILNode()};
 }
 
+void BridgedCloner::setInsertionBlockIfNotSet(BridgedBasicBlock block) const {
+  if (!cloner->getBuilder().hasValidInsertionPoint())
+    cloner->getBuilder().setInsertionPoint(block.unbridged());
+}
+
 BridgedBasicBlock BridgedCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
   return { cloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
 }
@@ -912,8 +918,19 @@ void BridgedVerifier::runSwiftFunctionVerification(SILFunction * _Nonnull f, SIL
 }
 
 void BridgedVerifier::verifierError(BridgedStringRef message,
-                                    OptionalBridgedInstruction atInstruction,
-                                    OptionalBridgedArgument atArgument) {
-  Twine msg(message.unbridged());
-  verificationFailure(msg, atInstruction.unbridged(), atArgument.unbridged(), /*extraContext=*/nullptr);
+                                    BridgedInstruction atInstruction) {
+  verificationFailure(message.unbridged(), atInstruction.unbridged(),
+                      /*extraContext=*/nullptr);
+}
+
+void BridgedVerifier::verifierError(BridgedStringRef message,
+                                    BridgedArgument atArgument) {
+  verificationFailure(message.unbridged(), atArgument.getArgument(),
+                      /*extraContext=*/nullptr);
+}
+
+void BridgedVerifier::verifierError(BridgedStringRef message,
+                                    BridgedValue atValue) {
+  verificationFailure(message.unbridged(), SILValue(atValue.getSILValue()),
+                      /*extraContext=*/nullptr);
 }

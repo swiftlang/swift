@@ -52,7 +52,7 @@ namespace ns {
     };
 
     #define IMMORTAL_REF                                \
-         __attribute__((swift_attr("import_as_ref")))   \
+         __attribute__((swift_attr("import_reference")))   \
          __attribute__((swift_attr("retain:immortal"))) \
          __attribute__((swift_attr("release:immortal")))
     struct IMMORTAL_REF Immortal {
@@ -181,6 +181,7 @@ public struct Strct {
     public let transform2: ns.anonStructInNS
 }
 
+// CHECK: #if __has_feature(objc_modules)
 // CHECK: #if __has_feature(objc_modules)
 // CHECK: #if __has_feature(objc_modules)
 // CHECK-NEXT: #if __has_warning("-Watimport-in-framework-header")

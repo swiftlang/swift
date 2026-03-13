@@ -18,6 +18,7 @@
 #define SWIFT_SIL_NODEDATASTRUCTURES_H
 
 #include "swift/SIL/NodeBits.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SIL/StackList.h"
 
 namespace swift {
@@ -140,6 +141,18 @@ public:
       return true;
     }
     return false;
+  }
+
+  /// Pushes each instruction in \p instructions onto the worklist if that
+  /// instruction has never been pushed before. Returns true if any instruction
+  /// was added.
+  template <typename Collection>
+  bool pushInstructionsIfNotVisited(Collection &&instructions) {
+    bool visited = false;
+    for (auto *instruction : instructions) {
+      visited |= pushIfNotVisited(instruction);
+    }
+    return visited;
   }
 
   /// Like `pushIfNotVisited`, but requires that \p instruction has never been

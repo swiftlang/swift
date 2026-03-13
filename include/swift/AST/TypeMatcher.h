@@ -112,16 +112,10 @@ private:
     TRIVIAL_CASE(BuiltinFloatType)
     TRIVIAL_CASE(BuiltinVectorType)
     TRIVIAL_CASE(BuiltinUnboundGenericType)
-    TRIVIAL_CASE(BuiltinFixedArrayType)
+    TRIVIAL_CASE(BuiltinGenericType)
     TRIVIAL_CASE(IntegerType)
 #define SINGLETON_TYPE(SHORT_ID, ID) TRIVIAL_CASE(ID##Type)
 #include "swift/AST/TypeNodes.def"
-
-    bool visitUnresolvedType(CanUnresolvedType firstType, Type secondType,
-                             Type sugaredFirstType) {
-      // Unresolved types never match.
-      return mismatch(firstType.getPointer(), secondType, sugaredFirstType);
-    }
 
     bool visitTupleType(CanTupleType firstTuple, Type secondType,
                         Type sugaredFirstType) {

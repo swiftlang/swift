@@ -27,6 +27,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Bitstream/BitstreamReader.h"
@@ -198,10 +199,9 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
 
-  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, "",
-                                               nullptr, nullptr,
-                                               true),
-                         true);
+  IRGenOptions IRGenOpts;
+  ASTCtx.addModuleLoader(
+      ClangImporter::create(ASTCtx, &IRGenOpts, "", "", nullptr, true), true);
   ModuleDecl *M =
       ModuleDecl::createEmpty(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   std::unique_ptr<Lowering::TypeConverter> TC(

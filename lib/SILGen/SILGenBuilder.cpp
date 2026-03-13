@@ -537,6 +537,10 @@ static ManagedValue createInputFunctionArgument(
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
     }
+
+    // ManualOwnership checks everything for implicit copies already.
+    if (B.hasManualOwnershipAttr())
+      isNoImplicitCopy = false;
   }
   if (isNoImplicitCopy)
     arg->setNoImplicitCopy(isNoImplicitCopy);
@@ -1243,4 +1247,27 @@ ManagedValue SILGenBuilder::borrowObjectRValue(SILGenFunction &SGF,
     return SGF.emitManagedBeginBorrow(loc, value);
   }
   return SGF.emitFormalEvaluationManagedBeginBorrow(loc, value);
+}
+
+SILValue SILGenBuilder::convertToImplicitActor(SILLocation loc,
+                                               SILValue value) {
+  auto type = SILType::getBuiltinImplicitActorType(getASTContext());
+  if (value->getType() == type)
+    return value;
+  assert(value->getType() == SILType::getOpaqueIsolationType(getASTContext()) &&
+         "Can only convert Optional<any Actor> to "
+         "Builtin.ImplicitActor");
+  if (value->getOwnershipKind() != OwnershipKind::Guaranteed)
+    value = SGF.emitManagedBeginBorrow(loc, value).getValue();
+  return createUncheckedValueCast(loc, value, type);
+}
+
+ManagedValue SILGenBuilder::createUncheckedOwnership(SILLocation loc,
+                                                     ManagedValue base) {
+  if (SGF.getTypeProperties(base.getType()).isTrivial()) {
+    return ManagedValue::forBorrowedRValue(base.getValue());
+  }
+
+  return ManagedValue::forBorrowedRValue(
+      createUncheckedOwnership(loc, base.getValue()));
 }

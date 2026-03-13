@@ -127,6 +127,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::Deinterleave:
     case BuiltinValueKind::StaticReport:
     case BuiltinValueKind::AssertConf:
+    case BuiltinValueKind::InfiniteLoopTrueCondition:
     case BuiltinValueKind::StringObjectOr:
     case BuiltinValueKind::UToSCheckedTrunc:
     case BuiltinValueKind::SToUCheckedTrunc:
@@ -153,7 +154,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::GetCurrentAsyncTask:
     case BuiltinValueKind::GetCurrentExecutor:
     case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
-    case BuiltinValueKind::EndAsyncLet:
     case BuiltinValueKind::EndAsyncLetLifetime:
     case BuiltinValueKind::CreateTaskGroup:
     case BuiltinValueKind::CreateTaskGroupWithFlags:
@@ -193,10 +193,10 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AssignCopyArrayBackToFront:
     case BuiltinValueKind::AssignTakeArray:
     case BuiltinValueKind::CancelAsyncTask:
-    case BuiltinValueKind::StartAsyncLet:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::TaskRunInline:
     case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
+    case BuiltinValueKind::FinishAsyncLet:
     case BuiltinValueKind::ConvertTaskToJob:
     case BuiltinValueKind::InitializeDefaultActor:
     case BuiltinValueKind::DestroyDefaultActor:
@@ -215,6 +215,14 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AddressOfBorrowOpaque:
     case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
     case BuiltinValueKind::DistributedActorAsAnyActor:
+    case BuiltinValueKind::TaskAddCancellationHandler:
+    case BuiltinValueKind::TaskRemoveCancellationHandler:
+    case BuiltinValueKind::TaskAddPriorityEscalationHandler:
+    case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
+    case BuiltinValueKind::TaskLocalValuePush:
+    case BuiltinValueKind::TaskLocalValuePop:
+    case BuiltinValueKind::TaskCancellationShieldPush:
+    case BuiltinValueKind::TaskCancellationShieldPop:
       return true;
     }
   }

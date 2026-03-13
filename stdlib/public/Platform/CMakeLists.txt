@@ -167,6 +167,7 @@ add_swift_target_library(swift_math ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_O
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS "ANDROID"
     INSTALL_IN_COMPONENT sdk-overlay
+    SWIFT_MODULE_DEPENDS_ANDROID _Builtin_float
     DEPENDS android_modulemap)
 
 add_swift_target_library(swiftAndroid ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY

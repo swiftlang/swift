@@ -197,7 +197,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.DocOutputPath = outs.ModuleDocOutputPath;
   serializationOpts.SourceInfoOutputPath = outs.ModuleSourceInfoOutputPath;
   serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-  if (opts.ModuleHasBridgingHeader && !outs.ModuleOutputPath.empty())
+  if (opts.ModuleHasBridgingHeader && !outs.ModuleOutputPath.empty() &&
+      !opts.ImportHeaderAsInternal)
     serializationOpts.SerializeBridgingHeader = true;
   // For batch mode, emit empty header path as placeholder.
   if (serializationOpts.SerializeBridgingHeader &&
@@ -280,10 +281,11 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.SerializeDebugInfoSIL = true;
   }
 
-  serializationOpts.IsOSSA = getSILOptions().EnableOSSAModules;
-
   serializationOpts.SkipNonExportableDecls =
       getLangOptions().SkipNonExportableDecls;
+
+  serializationOpts.SkipImplementationOnlyDecls =
+      getLangOptions().hasFeature(Feature::CheckImplementationOnly);
 
   serializationOpts.ExplicitModuleBuild = FrontendOpts.DisableImplicitModules;
 
@@ -435,7 +437,8 @@ bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
     DiagVerifier = std::make_unique<DiagnosticVerifier>(
         SourceMgr, InputSourceCodeBufferIDs, diagOpts.AdditionalVerifierFiles,
         diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
-        diagOpts.VerifyIgnoreUnknown, diagOpts.UseColor,
+        diagOpts.VerifyIgnoreUnknown, diagOpts.VerifyIgnoreUnrelated,
+        diagOpts.VerifyIgnoreMacroLocationNote, diagOpts.UseColor,
         diagOpts.AdditionalDiagnosticVerifierPrefixes);
 
     addDiagnosticConsumer(DiagVerifier.get());
@@ -673,16 +676,23 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
     const auto &ClangOpts = getInvocation().getClangImporterOptions();
 
     if (!CASOpts.BridgingHeaderPCHCacheKey.empty()) {
-      if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
-              getObjectStore(), getActionCache(), Diagnostics,
-              CASOpts.BridgingHeaderPCHCacheKey, file_types::ID::TY_PCH,
-              ClangOpts.getPCHInputPath()))
-        MemFS->addFile(Invocation.getClangImporterOptions().getPCHInputPath(),
-                       0, std::move(loadedBuffer));
-      else
-        Diagnostics.diagnose(
-            SourceLoc(), diag::error_load_input_from_cas,
-            Invocation.getClangImporterOptions().getPCHInputPath());
+      auto Proxy = loadCachedCompileResultProxy(
+          getObjectStore(), getActionCache(), CASOpts.BridgingHeaderPCHCacheKey,
+          file_types::ID::TY_PCH);
+
+      if (!Proxy) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas, "loading pch file",
+                             llvm::toString(Proxy.takeError()));
+        return true;
+      }
+      if (!*Proxy) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_load_input_from_cas,
+                             ClangOpts.getPCHInputPath());
+        return true;
+      }
+      MemFS->addFile(ClangOpts.getPCHInputPath(), 0,
+                     (*Proxy)->getMemoryBuffer());
+      CASIDForPCH = (*Proxy)->getID().toString();
     }
     if (!CASOpts.InputFileKey.empty()) {
       if (Invocation.getFrontendOptions()
@@ -791,8 +801,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleInterfaceChecker(
         std::make_unique<ModuleInterfaceCheckerImpl>(
             *Context, ModuleCachePathFromInvocation, FEOpts.PrebuiltModuleCachePath,
-            FEOpts.BackupModuleInterfaceDir, LoaderOpts,
-            RequireOSSAModules_t(Invocation.getSILOptions())));
+            FEOpts.BackupModuleInterfaceDir, LoaderOpts));
 
     if (MLM != ModuleLoadingMode::OnlySerialized) {
       // We only need ModuleInterfaceLoader for implicit modules.
@@ -812,10 +821,7 @@ bool CompilerInstance::setUpModuleLoaders() {
   }
 
   if (hasSourceImport()) {
-    bool enableLibraryEvolution =
-      Invocation.getFrontendOptions().EnableLibraryEvolution;
     Context->addModuleLoader(SourceLoader::create(*Context,
-                                                  enableLibraryEvolution,
                                                   getDependencyTracker()));
   }
 
@@ -853,9 +859,9 @@ bool CompilerInstance::setUpModuleLoaders() {
   // Wire up the Clang importer. If the user has specified an SDK, use it.
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
-  std::unique_ptr<ClangImporter> clangImporter =
-    ClangImporter::create(*Context, Invocation.getPCHHash(),
-                          getDependencyTracker());
+  std::unique_ptr<ClangImporter> clangImporter = ClangImporter::create(
+      *Context, &Invocation.getIRGenOptions(), Invocation.getPCHHash(),
+      CASIDForPCH, getDependencyTracker());
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
     return true;
@@ -869,13 +875,12 @@ bool CompilerInstance::setUpModuleLoaders() {
   Context->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(
           *Context, ModuleCachePath, FEOpts.PrebuiltModuleCachePath,
-          FEOpts.BackupModuleInterfaceDir, LoaderOpts,
-          RequireOSSAModules_t(Invocation.getSILOptions())));
+          FEOpts.BackupModuleInterfaceDir, LoaderOpts));
 
   // Install an explicit module loader if it was created earlier.
   if (ESML) {
     this->DefaultSerializedLoader = ESML.get();
-    Context->addModuleLoader(std::move(ESML));
+    Context->addModuleLoader(std::move(ESML), false, false, false, true);
   }
 
   if (!ExplicitModuleBuild) {
@@ -912,8 +917,7 @@ bool CompilerInstance::setUpModuleLoaders() {
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
         FEOpts.CacheReplayPrefixMap,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
-        FEOpts.shouldTrackSystemDependencies(),
-        RequireOSSAModules_t(Invocation.getSILOptions()));
+        FEOpts.shouldTrackSystemDependencies());
   }
 
   return false;
@@ -975,10 +979,10 @@ std::string CompilerInstance::getBridgingHeaderPath() const {
 }
 
 bool CompilerInstance::setUpInputs() {
-  // There is no input file when building PCM using Caching.
+  // There is no need to setup input when emit PCM. Let ClangImporter and the
+  // underlying clang CompilerInstance to handle inputs.
   if (Invocation.getFrontendOptions().RequestedAction ==
-          FrontendOptions::ActionType::EmitPCM &&
-      Invocation.getCASOptions().EnableCaching)
+      FrontendOptions::ActionType::EmitPCM)
     return false;
 
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
@@ -1172,7 +1176,7 @@ bool CompilerInvocation::shouldImportCxx() const {
   if (getFrontendOptions().ModuleName == CXX_MODULE_NAME)
     return false;
   // Cxx cannot be imported when Library evolution is enabled
-  if (getFrontendOptions().EnableLibraryEvolution)
+  if (getLangOptions().hasFeature(Feature::LibraryEvolution))
     return false;
   // Implicit import of Cxx is disabled
   if (getLangOptions().DisableImplicitCxxModuleImport)
@@ -1471,6 +1475,21 @@ static void configureAvailabilityDomains(const ASTContext &ctx,
   for (auto dynamic : opts.AvailabilityDomains.DynamicDomains)
     createAndInsertDomain(dynamic, CustomAvailabilityDomain::Kind::Dynamic);
 
+  // If we didn't see the UnicodeNormalization availability domain, set it
+  // appropriately.
+  if (domainMap.count(ctx.getIdentifier("UnicodeNormalization")) == 0) {
+    if (ctx.LangOpts.hasFeature(Feature::Embedded)) {
+      // Embedded Swift disables this domain by default.
+      createAndInsertDomain("UnicodeNormalization",
+                            CustomAvailabilityDomain::Kind::Enabled);
+    } else {
+      // Non-Embedded Swift always enables the Unicode tables.
+      createAndInsertDomain("UnicodeNormalization",
+                            CustomAvailabilityDomain::Kind::AlwaysEnabled);
+    }
+  }
+
+
   mainModule->setAvailabilityDomains(std::move(domainMap));
 }
 
@@ -1506,9 +1525,9 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setPublicModuleName(getASTContext().getIdentifier(
           Invocation.getFrontendOptions().PublicModuleName));
     }
-    if (Invocation.getFrontendOptions().EnableLibraryEvolution)
+    if (Invocation.getLangOptions().hasFeature(Feature::LibraryEvolution))
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
-    if (Invocation.getLangOptions().isSwiftVersionAtLeast(6))
+    if (Invocation.getLangOptions().isLanguageModeAtLeast(LanguageMode::v6))
       MainModule->setIsConcurrencyChecked(true);
     if (Invocation.getLangOptions().EnableCXXInterop &&
         Invocation.getLangOptions()
@@ -1696,6 +1715,8 @@ void CompilerInstance::finishTypeChecking() {
     loadDerivativeConfigurations(SF);
     return false;
   });
+
+  handleOSLogStringSectionName(*getMainModule());
 }
 
 SourceFile::ParsingOptions

@@ -659,14 +659,9 @@ void writeJSON(llvm::raw_ostream &out,
 
       // Command line.
       writeJSONSingleField(out, "commandLine", clangDeps->command_line, 5,
-                           clangDeps->cas_fs_root_id.length != 0 ||
                            clangDeps->clang_include_tree.length != 0 ||
                            clangDeps->module_cache_key.length != 0);
 
-      if (clangDeps->cas_fs_root_id.length != 0)
-        writeJSONSingleField(out, "casFSRootID", clangDeps->cas_fs_root_id, 5,
-                             clangDeps->clang_include_tree.length != 0 ||
-                             clangDeps->module_cache_key.length != 0);
       if (clangDeps->clang_include_tree.length != 0)
         writeJSONSingleField(out, "clangIncludeTree",
                              clangDeps->clang_include_tree, 5,

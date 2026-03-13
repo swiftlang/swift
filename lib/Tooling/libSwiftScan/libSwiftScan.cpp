@@ -97,7 +97,6 @@ void swiftscan_dependency_info_details_dispose(
     swiftscan_string_dispose(details_impl->clang_details.module_map_path);
     swiftscan_string_dispose(details_impl->clang_details.context_hash);
     swiftscan_string_set_dispose(details_impl->clang_details.command_line);
-    swiftscan_string_dispose(details_impl->clang_details.cas_fs_root_id);
     swiftscan_string_dispose(details_impl->clang_details.module_cache_key);
     break;
   }
@@ -463,7 +462,7 @@ swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details) {
 
 swiftscan_string_ref_t
 swiftscan_clang_detail_get_cas_fs_root_id(swiftscan_module_details_t details) {
-  return details->clang_details.cas_fs_root_id;
+  return swift::c_string_utils::create_null();
 }
 
 swiftscan_string_ref_t swiftscan_clang_detail_get_module_cache_key(

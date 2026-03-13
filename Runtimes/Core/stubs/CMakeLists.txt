@@ -7,6 +7,7 @@ add_library(swiftStdlibStubs OBJECT
   ThreadLocalStorage.cpp
   MathStubs.cpp
   Unicode/UnicodeData.cpp
+  Unicode/UnicodeEmoji.cpp
   Unicode/UnicodeGrapheme.cpp
   Unicode/UnicodeNormalization.cpp
   Unicode/UnicodeScalarProps.cpp

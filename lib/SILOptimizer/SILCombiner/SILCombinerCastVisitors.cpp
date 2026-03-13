@@ -595,7 +595,7 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
                                                 UBCI->getType());
     }
 
-    OwnershipRAUWHelper helper(ownershipFixupContext, UBCI, Oper);
+    OwnershipRAUWHelper helper(ownershipFixupContext, UBCI, Oper, /*respectLexicalFlags=*/ false);
     if (helper) {
       auto replacement = helper.prepareReplacement();
       auto *transformedOper = Builder.createUncheckedBitwiseCast(
@@ -611,6 +611,12 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
         UBCI->getLoc(), UBCI->getOperand(), UBCI->getType());
   }
 
+  // In ownership converting an unowned bitwise cast to a "real" ownership
+  // forwarding instruction can cause various troubles.
+  // Let's don't go into this business.
+  if (Builder.hasOwnership())
+    return nullptr;
+
   if (!SILType::canRefCast(UBCI->getOperand()->getType(), UBCI->getType(),
                            Builder.getModule()))
     return nullptr;
@@ -623,12 +629,6 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
   // an extra copy in the case that UBCI->getOperand() is Owned.
   auto *refCast = Builder.createUncheckedRefCast(
       UBCI->getLoc(), UBCI->getOperand(), UBCI->getType());
-  if (Builder.hasOwnership()) {
-    // A bitwise cast is always unowned, so we can safely force the reference
-    // cast to forward as unowned and no ownership adjustment is needed.
-    assert(UBCI->getOwnershipKind() == OwnershipKind::Unowned);
-    refCast->setForwardingOwnershipKind(OwnershipKind::Unowned);
-  }
   return refCast;
 }
 
@@ -679,7 +679,7 @@ SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
 }
 
 SILInstruction *
-SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
+SILCombiner::legacyVisitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
   if (CastOpt.optimizeCheckedCastBranchInst(CBI))
     MadeChange = true;
 
@@ -906,7 +906,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
         // may be a value with a different lifetime from our original value
         // beyond the initial base value.
         OwnershipReplaceSingleUseHelper helper(ownershipFixupContext, use,
-                                               newValue);
+                                               newValue, /*respectLexicalFlags=*/ false);
         if (!helper)
           continue;
         helper.perform();
@@ -930,6 +930,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
             pa->getLoc(), cfi->getOperand(), pa->getSubstitutionMap(), args,
             pa->getFunctionType()->getCalleeConvention(),
             pa->getResultIsolation());
+        newPA->setStackAllocationIsNested(pa->isStackAllocationNested());
         auto newConvert = Builder.createConvertFunction(pa->getLoc(), newPA,
                                                         partialApplyTy, false);
         replaceInstUsesWith(*pa, newConvert);
@@ -938,7 +939,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
       }
 
       OwnershipRAUWHelper checkRAUW(ownershipFixupContext, pa,
-                                    cfi->getOperand());
+                                    cfi->getOperand(), /*respectLexicalFlags=*/ false);
       if (!checkRAUW)
         continue;
 
@@ -952,6 +953,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
           pa->getLoc(), newValue, pa->getSubstitutionMap(), args,
           pa->getFunctionType()->getCalleeConvention(),
           pa->getResultIsolation());
+      newPA->setStackAllocationIsNested(pa->isStackAllocationNested());
       if (!use->isLifetimeEnding()) {
         localBuilder.emitDestroyValueOperation(pa->getLoc(), newValue);
       }
@@ -965,7 +967,8 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
       // validity depends on the ownership kind. Reinstantiate
       // OwnershipRAUWHelper to verify that it is still valid
       // (a very fast check in this case).
-      OwnershipRAUWHelper(ownershipFixupContext, pa, newConvert).perform();
+      OwnershipRAUWHelper(ownershipFixupContext, pa, newConvert,
+                          /*respectLexicalFlags=*/ false).perform();
     }
   }
 

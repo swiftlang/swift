@@ -474,7 +474,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         //       explicit '{' or '}', so the start and end locations should be
         //       the same as those of the result node, plus any junk consumed
         //       afterwards
-        auto Brace = BraceStmt::create(Context, Result.getStartLoc(),
+        auto Brace = BraceStmt::create(Context, StartLoc,
                                        Result, PreviousLoc, /*Implicit=*/true);
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
@@ -1304,7 +1304,7 @@ validateAvailabilitySpecList(Parser &P,
     }
   }
 
-  if (WildcardSpecLoc)
+  if (WildcardSpecLoc && Specs.size() > 1)
     P.diagnose(*WildcardSpecLoc, diag::attr_availability_wildcard_in_macro);
 }
 
@@ -2502,11 +2502,10 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
         Body, BraceStmt::create(Context, ForLoc, {}, PreviousLoc, true));
 
   return makeParserResult(
-      Status,
-      new (Context) ForEachStmt(LabelInfo, ForLoc, TryLoc, AwaitLoc, UnsafeLoc,
-                                pattern.get(), InLoc,
-                                Container.get(), WhereLoc, Where.getPtrOrNull(),
-                                Body.get()));
+      Status, new (Context) ForEachStmt(
+                  LabelInfo, ForLoc, TryLoc, AwaitLoc, UnsafeLoc, pattern.get(),
+                  InLoc, Container.get(), WhereLoc, Where.getPtrOrNull(),
+                  Body.get(), CurDeclContext));
 }
 
 ///

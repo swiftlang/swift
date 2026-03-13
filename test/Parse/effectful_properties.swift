@@ -70,7 +70,7 @@ struct S {
 
 var prop3 : Bool {
   // expected-error@+2 {{'_read' accessor is not allowed on property with 'get' accessor that is 'async' or 'throws'}}
-  // expected-error@+1 {{variable cannot provide both a 'read' accessor and a getter}}
+  // expected-error@+1 {{variable cannot provide both a '_read' accessor and a getter}}
   _read { yield prop3 }
 
   // expected-note@+2 {{getter defined here}}
@@ -156,13 +156,13 @@ var bad8 : Double {
 }
 
 protocol BadP {
-  var prop2 : Int { get bogus rethrows set } // expected-error{{expected get or set in a protocol property}}
+  var prop2 : Int { get bogus rethrows set } // expected-error{{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
 
   // expected-error@+2 {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}}
-  // expected-error@+1 {{expected get or set in a protocol property}}
+  // expected-error@+1 {{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
   var prop3 : Int { get rethrows bogus set }
 
-  // expected-error@+1 {{expected get or set in a protocol property}}
+  // expected-error@+1 {{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
   var prop4 : Int { get reasync bogus set }
 
   var prop5 : Int { get throws async } // expected-error {{'async' must precede 'throws'}}

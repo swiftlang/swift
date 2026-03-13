@@ -66,6 +66,14 @@ DefaultArgTestSuite.test("func with non-trailing argument") {
   expectEqual(11, t1)
 }
 
+DefaultArgTestSuite.test("func with unnamed argument") {
+  let t0 = takesUnnamedParam()
+  expectEqual(456, t0)
+
+  let t1 = takesUnnamedParam(321)
+  expectEqual(456, t1)
+}
+
 DefaultArgTestSuite.test("method with integer parameter") {
   let s = HasMethodWithDefaultArg()
   let z0 = s.isZero()

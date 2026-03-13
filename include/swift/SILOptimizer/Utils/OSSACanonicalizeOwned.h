@@ -480,11 +480,16 @@ private:
   }
 
   bool respectsDeinitBarriers() const {
-    if (!currentDef->isLexical())
+    auto &module = currentDef->getFunction()->getModule();
+
+    // The move-only checker (which runs in raw SIL) relies on ignoring deinit
+    // barriers for non-lexical lifetimes.
+    // Optimizations, on the other hand, should always respect deinit barriers.
+    if (module.getStage() == SILStage::Raw && !currentDef->isLexical())
       return false;
+
     if (currentDef->getFunction()->forceEnableLexicalLifetimes())
       return true;
-    auto &module = currentDef->getFunction()->getModule();
     return module.getASTContext().SILOpts.supportsLexicalLifetimes(module);
   }
 

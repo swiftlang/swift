@@ -624,7 +624,7 @@ public:
     });
 
     // Emit the witness table for the base conformance if it is shared.
-    SGM.useConformance(ProtocolConformanceRef(conformance));
+    SGM.useConformance(nullptr, ProtocolConformanceRef(conformance));
   }
 
   Witness getWitness(ValueDecl *decl) {
@@ -695,7 +695,7 @@ public:
     auto assocConformance =
       Conformance->getAssociatedConformance(req.getAssociation(),
                                             req.getAssociatedRequirement());
-    SGM.useConformance(assocConformance);
+    SGM.useConformance(nullptr, assocConformance);
     Entries.push_back(SILWitnessTable::AssociatedConformanceWitness{
         req.getAssociation(), assocConformance});
   }
@@ -771,7 +771,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(
     reqtOrigTy->substGenericArgs(reqtSubMap)
-              ->mapTypeOutOfContext()
+              ->mapTypeOutOfEnvironment()
               ->getCanonicalType());
 
   // Rewrite the conformance in terms of the requirement environment's Self
@@ -787,7 +787,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   if (conformance.isConcrete()) {
     conformance = reqtSubMap.lookupConformance(M.getASTContext().TheSelfType,
                                                origConformance.getProtocol())
-        .mapConformanceOutOfContext();
+        .mapConformanceOutOfEnvironment();
     ASSERT(!conformance.isAbstract());
 
     manglingConformance = conformance.getConcrete();
@@ -821,7 +821,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   if (auto accessor = dyn_cast<AccessorDecl>(requirement.getDecl())) {
     if (accessor->isCoroutine()) {
       witnessSubsForTypeLowering =
-        witness.getSubstitutions().mapReplacementTypesOutOfContext();
+        witness.getSubstitutions().mapReplacementTypesOutOfEnvironment();
       if (accessor->isRequirementWithSynthesizedDefaultImplementation())
         allowDuplicateThunk = true;
     }
@@ -863,8 +863,13 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // setting on the theory that forcing inlining off should only
   // effect the user's function, not otherwise invisible thunks.
   Inline_t InlineStrategy = InlineDefault;
-  if (witnessRef.isAlwaysInline())
-    InlineStrategy = AlwaysInline;
+  if (witnessRef.isUnderscoredAlwaysInline())
+    InlineStrategy = HeuristicAlwaysInline;
+  // We don't guarantee @inline(always) will inline devirtualized thunks. But we
+  // want to make an best-effort attempt to inline.
+  else if (witnessRef.isAlwaysInline())
+    InlineStrategy = HeuristicAlwaysInline;
+
 
   SILFunction *f = M.lookUpFunction(nameBuffer);
   if (allowDuplicateThunk && f)
@@ -1079,6 +1084,25 @@ public:
   void addProtocolConformanceDescriptor() { }
 
   void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
+    // Check if there is a reparented base protocol conformance.
+    auto local = Proto->getLocalConformances();
+    for (auto conf : local) {
+      if (conf->getProtocol() != baseProto)
+        continue;
+
+      if (isa<SelfProtocolConformance>(conf))
+        continue;
+
+      ASSERT(conf->isReparented());
+      DefaultWitnesses.push_back(
+          SILWitnessTable::BaseProtocolWitness{baseProto, conf});
+
+      // Ensure the witness table is emitted for this conformance.
+      SGM.useConformance(/*inst=*/nullptr, ProtocolConformanceRef(conf));
+      return;
+    }
+
+    // Otherwise, there is no default conformance for this base protocol.
     addMissingDefault();
   }
 
@@ -1117,7 +1141,7 @@ public:
     if (!witness)
       return addMissingDefault();
 
-    Type witnessInContext = Proto->mapTypeIntoContext(witness);
+    Type witnessInContext = Proto->mapTypeIntoEnvironment(witness);
     auto entry = SILWitnessTable::AssociatedTypeWitness{
                                           assocType,
                                           witnessInContext->getCanonicalType()};
@@ -1157,9 +1181,9 @@ namespace {
 std::optional<AccessorKind>
 originalAccessorKindForReplacementKind(AccessorKind kind) {
   switch (kind) {
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
     return {AccessorKind::Read};
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return {AccessorKind::Modify};
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
@@ -1208,7 +1232,8 @@ public:
     if (!accessor) {
       return std::nullopt;
     }
-    // Specifically, read2 can replace _read and modify2 can replace _modify.
+    // Specifically, `yielding borrow` can replace _read and
+    // `yielding mutate` can replace _modify.
     auto originalKind =
         originalAccessorKindForReplacementKind(accessor->getAccessorKind());
     if (!originalKind) {
@@ -1349,7 +1374,7 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
   for (auto result : originalConvention.getDirectSILResults()) {
     auto ty = originalConvention.getSILType(
         result, function->getTypeExpansionContext());
-    ty = function->mapTypeIntoContext(ty);
+    ty = function->mapTypeIntoEnvironment(ty);
     directResultTypes.push_back(ty.getASTType());
   }
   SILType resultTy;

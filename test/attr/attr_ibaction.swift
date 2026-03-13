@@ -142,7 +142,7 @@ extension String: @retroactive _ObjectiveCBridgeable {
 
   // Other bad cases
   @IBAction func action30(_: S) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
-  @IBAction func action31(_: E) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}} expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
+  @IBAction func action31(_: E) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift enums not marked '@c' or '@objc' cannot be represented in Objective-C}}
 
   init() { }
 }

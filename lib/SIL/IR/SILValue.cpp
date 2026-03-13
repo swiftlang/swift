@@ -196,11 +196,7 @@ bool ValueBase::isGuaranteedForwarding() const {
     return phi->isGuaranteedForwarding();
   }
 
-  auto *applyInst = dyn_cast_or_null<ApplyInst>(getDefiningInstruction());
-  if (!applyInst) {
-    return false;
-  }
-  return applyInst->hasGuaranteedResult();
+  return isBorrowAccessorResult();
 }
 
 bool ValueBase::isBeginApplyToken() const {
@@ -208,6 +204,19 @@ bool ValueBase::isBeginApplyToken() const {
   if (!result)
     return false;
   return result->isBeginApplyToken();
+}
+
+bool ValueBase::isBorrowAccessorResult() const {
+  auto *apply = dyn_cast_or_null<ApplyInst>(getDefiningInstruction());
+  if (!apply)
+    return false;
+  if (apply->getSubstCalleeConv().funcTy->getNumResults() != 1) {
+    return false;
+  }
+  auto resultConvention =
+      apply->getSubstCalleeConv().funcTy->getSingleResult().getConvention();
+  return resultConvention == ResultConvention::Guaranteed ||
+         resultConvention == ResultConvention::GuaranteedAddress;
 }
 
 bool ValueBase::hasDebugTrace() const {

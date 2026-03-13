@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Embedded -wmo) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Embedded -wmo %target-embedded-posix-shim) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test

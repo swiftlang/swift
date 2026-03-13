@@ -208,8 +208,38 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     if (!val.isConstant()) {
       return val;
     }
+    if (val.getKind() == SymbolicValue::Array) {
+      // Extracting some internal members of Array.
+      // This code pattern appears for Array literal initialization:
+      //   %buffer = struct_extract %array
+      //   %element0 = ref_tail_addr %buffer
+      return val;
+    }
     assert(val.getKind() == SymbolicValue::Aggregate);
     return val.getAggregateMembers()[sei->getFieldIndex()];
+  }
+
+  if (auto *urc = dyn_cast<UncheckedRefCastInst>(value)) {
+    auto val = getConstantValue(urc->getOperand());
+    if (val.getKind() == SymbolicValue::Array) {
+      // Casting the array buffer for Array literal initialization:
+      //   %b1 = struct_extract %array
+      //   %buffer = unchecked_ref_cast %b1 to __ContiguousArrayStorageBase
+      //   %element0 = ref_tail_addr %buffer
+      return val;
+    }
+    return getUnknown(evaluator, value, UnknownReason::UnsupportedInstruction);
+  }
+
+  if (auto *rta = dyn_cast<RefTailAddrInst>(value)) {
+    auto val = getConstantValue(rta->getOperand());
+    if (val.getKind() == SymbolicValue::Array) {
+      // Projecting the elements base address from an Array buffer:
+      //   %buffer = struct_extract %array
+      //   %element0 = ref_tail_addr %buffer
+      return val.getAddressOfArrayElement(evaluator.getAllocator(), 0);
+    }
+    return getUnknown(evaluator, value, UnknownReason::UnsupportedInstruction);
   }
 
   // If this is an unchecked_enum_data from a fragile type, then we can return
@@ -298,7 +328,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // Try to resolve a witness method against our known conformances.
   if (auto *wmi = dyn_cast<WitnessMethodInst>(value)) {
     auto conf = substitutionMap.lookupConformance(
-        wmi->getLookupType()->mapTypeOutOfContext()->getCanonicalType(),
+        wmi->getLookupType()->mapTypeOutOfEnvironment()->getCanonicalType(),
         wmi->getConformance().getProtocol());
     if (conf.isInvalid())
       return getUnknown(evaluator, value,
@@ -425,6 +455,9 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
       break;
     case BuiltinValueKind::AssertConf:
       return SymbolicValue::getInteger(evaluator.getAssertConfig(), 32);
+    case BuiltinValueKind::InfiniteLoopTrueCondition:
+      return getUnknown(evaluator, SILValue(inst),
+                        UnknownReason::Loop);
     }
   }
 

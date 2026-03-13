@@ -114,6 +114,12 @@ static SILValue skipStructAndExtract(SILValue value) {
       value = sei->getOperand();
       continue;
     }
+    if (auto *mv = dyn_cast<MultipleValueInstructionResult>(value)) {
+      if (auto *dsi = dyn_cast<DestructureStructInst>(mv->getParent())) {
+        value = dsi->getOperand();
+        continue;
+      }
+    }
     return value;
   }
 }
@@ -146,6 +152,8 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
       } else if (auto *ECM = dyn_cast<EndCOWMutationInst>(v)) {
         if (endCOWMutationsFound.insert(ECM))
           endCOWMutationInsts.push_back(ECM);
+      } else if (auto *urc = dyn_cast<UncheckedRefCastInst>(v)) {
+        workList.push_back(urc->getOperand());
       } else {
         return false;
       }
@@ -273,6 +281,7 @@ void COWOptsPass::collectEscapePoints(SILValue v,
       case SILInstructionKind::BeginCOWMutationInst:
       case SILInstructionKind::RefElementAddrInst:
       case SILInstructionKind::RefTailAddrInst:
+      case SILInstructionKind::EndBorrowInst:
       case SILInstructionKind::DebugValueInst:
         break;
       case SILInstructionKind::BranchInst:
@@ -290,8 +299,15 @@ void COWOptsPass::collectEscapePoints(SILValue v,
       case SILInstructionKind::TupleInst:
       case SILInstructionKind::TupleExtractInst:
       case SILInstructionKind::UncheckedRefCastInst:
+      case SILInstructionKind::BeginBorrowInst:
         collectEscapePoints(cast<SingleValueInstruction>(user),
                             escapePoints, handled);
+        break;
+      case SILInstructionKind::DestructureStructInst:
+        for (SILValue result : user->getResults()) {
+          if (!result->getType().isTrivial(user->getFunction()))
+            collectEscapePoints(result, escapePoints, handled);
+        }
         break;
       default:
         // Everything else is considered to be a potential escape of the buffer.

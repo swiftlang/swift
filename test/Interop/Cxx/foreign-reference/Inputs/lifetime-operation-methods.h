@@ -4,6 +4,7 @@ struct RefCountedBox {
   int value;
   int refCount = 1;
 
+  SWIFT_RETURNS_RETAINED
   RefCountedBox(int value) : value(value) {}
 
   void doRetain() { refCount++; }
@@ -12,6 +13,7 @@ struct RefCountedBox {
 
 struct DerivedRefCountedBox : RefCountedBox {
   int secondValue = 1;
+  SWIFT_RETURNS_RETAINED
   DerivedRefCountedBox(int value, int secondValue)
       : RefCountedBox(value), secondValue(secondValue) {}
 };
@@ -25,6 +27,7 @@ struct BaseHasRetain {
 
 struct DerivedHasRelease : BaseHasRetain {
   int value;
+  SWIFT_RETURNS_RETAINED
   DerivedHasRelease(int value) : value(value) {}
 
   void doRelease() const { refCount--; }
@@ -35,6 +38,7 @@ struct DerivedHasRelease : BaseHasRetain {
 template <typename T>
 struct TemplatedDerivedHasRelease : BaseHasRetain {
   T value;
+  SWIFT_RETURNS_RETAINED
   TemplatedDerivedHasRelease(T value) : value(value) {}
 
   void doReleaseTemplated() const { refCount--; }
@@ -54,6 +58,7 @@ struct CRTPBase {
 
 struct CRTPDerived : CRTPBase<CRTPDerived> {
   int value;
+  SWIFT_RETURNS_RETAINED
   CRTPDerived(int value) : value(value) {}
 };
 
@@ -62,18 +67,20 @@ struct CRTPDerived : CRTPBase<CRTPDerived> {
 struct VirtualRetainRelease {
   int value;
   mutable int refCount = 1;
+  mutable bool calledBase = false;
+  SWIFT_RETURNS_RETAINED
   VirtualRetainRelease(int value) : value(value) {}
 
-  virtual void doRetainVirtual() const { refCount++; }
-  virtual void doReleaseVirtual() const { refCount--; }
+  virtual void doRetainVirtual() const { refCount++; calledBase = true; }
+  virtual void doReleaseVirtual() const { refCount--; calledBase = true; }
   virtual ~VirtualRetainRelease() = default;
 } SWIFT_SHARED_REFERENCE(.doRetainVirtual, .doReleaseVirtual);
 
 struct DerivedVirtualRetainRelease : VirtualRetainRelease {
+  SWIFT_RETURNS_RETAINED
   DerivedVirtualRetainRelease(int value) : VirtualRetainRelease(value) {}
 
-  mutable bool calledDerived = false;
-  void doRetainVirtual() const override { refCount++; calledDerived = true; }
+  void doRetainVirtual() const override { refCount++; }
   void doReleaseVirtual() const override { refCount--; }
 };
 
@@ -82,6 +89,7 @@ struct DerivedVirtualRetainRelease : VirtualRetainRelease {
 struct PureVirtualRetainRelease {
   int value;
   mutable int refCount = 1;
+  SWIFT_RETURNS_RETAINED
   PureVirtualRetainRelease(int value) : value(value) {}
 
   virtual void doRetainPure() const = 0;
@@ -92,6 +100,7 @@ struct PureVirtualRetainRelease {
 struct DerivedPureVirtualRetainRelease : PureVirtualRetainRelease {
   mutable int refCount = 1;
 
+  SWIFT_RETURNS_RETAINED
   DerivedPureVirtualRetainRelease(int value) : PureVirtualRetainRelease(value) {}
   void doRetainPure() const override { refCount++; }
   void doReleasePure() const override { refCount--; }
@@ -105,6 +114,7 @@ struct StaticRetainRelease {
   int value;
   int refCount = 1;
 
+  SWIFT_RETURNS_RETAINED
   StaticRetainRelease(int value) : value(value) {}
 
   static void staticRetain(StaticRetainRelease* o) { o->refCount++; }
@@ -112,9 +122,10 @@ struct StaticRetainRelease {
 } SWIFT_SHARED_REFERENCE(.staticRetain, .staticRelease);
 
 struct DerivedStaticRetainRelease : StaticRetainRelease {
-// expected-error@-1 {{cannot find retain function '.staticRetain' for reference type 'DerivedStaticRetainRelease'}}
-// expected-error@-2 {{cannot find release function '.staticRelease' for reference type 'DerivedStaticRetainRelease'}}
+// expected-error@-1 {{specified release function '.staticRelease' is a static function; expected an instance function}}
+// expected-error@-2 {{specified retain function '.staticRetain' is a static function; expected an instance function}}
   int secondValue = 1;
+  SWIFT_RETURNS_RETAINED
   DerivedStaticRetainRelease(int value, int secondValue)
       : StaticRetainRelease(value), secondValue(secondValue) {}
 };
