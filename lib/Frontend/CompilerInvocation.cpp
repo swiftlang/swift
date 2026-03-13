@@ -3655,6 +3655,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Opts.DebugModulePath = A->getValue();
   }
 
+  if (Opts.DebugModuleSelfKey || !Opts.DebugModulePath.empty())
+    Opts.BridgingPCHCacheKey = CASOpts.BridgingHeaderPCHCacheKey;
+
   for (auto A : Args.getAllArgValues(options::OPT_file_prefix_map)) {
     auto SplitMap = StringRef(A).split('=');
     Opts.FilePrefixMap.addMapping(SplitMap.first, SplitMap.second);

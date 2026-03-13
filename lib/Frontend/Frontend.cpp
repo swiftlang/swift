@@ -676,16 +676,23 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
     const auto &ClangOpts = getInvocation().getClangImporterOptions();
 
     if (!CASOpts.BridgingHeaderPCHCacheKey.empty()) {
-      if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
-              getObjectStore(), getActionCache(), Diagnostics,
-              CASOpts.BridgingHeaderPCHCacheKey, file_types::ID::TY_PCH,
-              ClangOpts.getPCHInputPath()))
-        MemFS->addFile(Invocation.getClangImporterOptions().getPCHInputPath(),
-                       0, std::move(loadedBuffer));
-      else
-        Diagnostics.diagnose(
-            SourceLoc(), diag::error_load_input_from_cas,
-            Invocation.getClangImporterOptions().getPCHInputPath());
+      auto Proxy = loadCachedCompileResultProxy(
+          getObjectStore(), getActionCache(), CASOpts.BridgingHeaderPCHCacheKey,
+          file_types::ID::TY_PCH);
+
+      if (!Proxy) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas, "loading pch file",
+                             llvm::toString(Proxy.takeError()));
+        return true;
+      }
+      if (!*Proxy) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_load_input_from_cas,
+                             ClangOpts.getPCHInputPath());
+        return true;
+      }
+      MemFS->addFile(ClangOpts.getPCHInputPath(), 0,
+                     (*Proxy)->getMemoryBuffer());
+      CASIDForPCH = (*Proxy)->getID().toString();
     }
     if (!CASOpts.InputFileKey.empty()) {
       if (Invocation.getFrontendOptions()
@@ -852,10 +859,9 @@ bool CompilerInstance::setUpModuleLoaders() {
   // Wire up the Clang importer. If the user has specified an SDK, use it.
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
-  std::unique_ptr<ClangImporter> clangImporter =
-    ClangImporter::create(*Context, &Invocation.getIRGenOptions(),
-                          Invocation.getPCHHash(),
-                          getDependencyTracker());
+  std::unique_ptr<ClangImporter> clangImporter = ClangImporter::create(
+      *Context, &Invocation.getIRGenOptions(), Invocation.getPCHHash(),
+      CASIDForPCH, getDependencyTracker());
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
     return true;

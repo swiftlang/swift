@@ -26,6 +26,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/ImportCache.h"
@@ -48,6 +49,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Frontend/CachingUtils.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
@@ -167,6 +169,14 @@ namespace {
       if (Impl.IsReadingBridgingPCH) {
         Impl.PCHImportedSubmodules.push_back(ID);
       }
+    }
+
+    void ReaderInitialized(clang::ASTReader *Reader) override {
+      if (!Impl.IsReadingBridgingPCH)
+        return;
+
+      if (Impl.CASIDForPCH)
+        Reader->getModuleManager().getPrimaryModule().CASID = *Impl.CASIDForPCH;
     }
   };
 
@@ -1417,8 +1427,8 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
 
 std::unique_ptr<ClangImporter>
 ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
-                      std::string swiftPCHHash, DependencyTracker *tracker,
-                      bool ignoreFileMapping) {
+                      std::string swiftPCHHash, std::string casidForPCH,
+                      DependencyTracker *tracker, bool ignoreFileMapping) {
   std::unique_ptr<ClangImporter> importer{new ClangImporter(ctx, tracker)};
   auto &importerOpts = ctx.ClangImporterOpts;
 
@@ -1590,7 +1600,11 @@ ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
     // avoid a Clang crash when attempting to emit coverage for decls without
     // source locations (rdar://100172217).
     CGO.CoverageMapping = false;
+
   }
+
+  // Set up PCH content CASID.
+  importer->Impl.CASIDForPCH = casidForPCH;
 
   // Create the associated action.
   importer->Impl.Action.reset(new ParsingAction(*importer,

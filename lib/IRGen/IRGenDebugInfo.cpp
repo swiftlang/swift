@@ -968,6 +968,10 @@ private:
     // the module on disk is Bar (.swiftmodule or .swiftinterface), and is used
     // for loading and mangling.
     StringRef Name = M->getRealName().str();
+    // Handle bridging header imports. If there is a cache key, use cache key as
+    // path if debug module path is specified.
+    if (Name == CLANG_HEADER_MODULE_NAME && !Opts.BridgingPCHCacheKey.empty())
+      Path = Opts.BridgingPCHCacheKey;
     return getOrCreateModule(M, TheCU, Name, Path);
   }
 

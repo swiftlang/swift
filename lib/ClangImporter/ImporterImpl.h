@@ -919,6 +919,9 @@ public:
   /// Tracks included headers from the bridging header.
   llvm::DenseSet<clang::FileEntryRef> BridgeHeaderFiles;
 
+  /// The CASID for PCH file if applicable. Otherwise, it should be std::nullopt.
+  std::optional<std::string> CASIDForPCH = std::nullopt;
+
   void addBridgeHeaderTopLevelDecls(clang::Decl *D);
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
 

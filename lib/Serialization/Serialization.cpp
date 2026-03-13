@@ -1344,20 +1344,6 @@ static void flattenImportPath(const ImportedModule &import,
   outStream << accessPathElem.Item.str();
 }
 
-/// Heuristic to detect a path like "llvmcas://12345ABCDE"
-static bool isURI(StringRef path) { return path.contains("://"); }
-static StringRef getFileName(StringRef path) {
-  if (isURI(path))
-    return path;
-  return llvm::sys::path::filename(path);
-}
-
-static StringRef getDirectory(StringRef path) {
-  if (isURI(path))
-    return path;
-  return llvm::sys::path::parent_path(path);
-}
-
 static llvm::SmallString<1024>
 flattenModuleMapEntry(StringRef name,
                       const ExplicitSwiftModuleInputInfo &info) {
@@ -1365,10 +1351,11 @@ flattenModuleMapEntry(StringRef name,
   {
     llvm::raw_svector_ostream s(out);
     s << name << '\0';
-    s << getFileName(info.modulePath) << '\0';
+    s << llvm::sys::path::filename(info.modulePath) << '\0';
     s << info.moduleAlias.value_or("") << '\0';
-    s << getFileName(info.moduleDocPath.value_or("")) << '\0';
-    s << getFileName(info.moduleSourceInfoPath.value_or("")) << '\0';
+    s << llvm::sys::path::filename(info.moduleDocPath.value_or("")) << '\0';
+    s << llvm::sys::path::filename(info.moduleSourceInfoPath.value_or(""))
+      << '\0';
     s << info.moduleCacheKey.value_or("") << '\0';
     s << '\0'; // clangModuleMap
     if (info.headerDependencyPaths)
@@ -1385,12 +1372,12 @@ flattenModuleMapEntry(StringRef name,
   {
     llvm::raw_svector_ostream s(out);
     s << name << '\0';
-    s << getFileName(info.modulePath) << '\0';
+    s << llvm::sys::path::filename(info.modulePath) << '\0';
     s << info.moduleAlias.value_or("") << '\0';
     s << '\0'; // moduleDocPath
     s << '\0'; // moduleSourceInfoPath
     s << info.moduleCacheKey.value_or("") << '\0';
-    s << getFileName(info.moduleMapPath) << '\0';
+    s << llvm::sys::path::filename(info.moduleMapPath) << '\0';
   }
   return out;
 }
@@ -1443,7 +1430,7 @@ void Serializer::writeInputBlock() {
   llvm::DenseMap<StringRef, unsigned> dependencyDirectories;
 
   auto getOrCreateDependencyDir = [&](llvm::StringRef path) -> unsigned {
-    StringRef directoryName = getDirectory(path);
+    StringRef directoryName = llvm::sys::path::parent_path(path);
     unsigned &dependencyDirectoryIndex = dependencyDirectories[directoryName];
     if (!dependencyDirectoryIndex) {
       // This name must be newly-added. Give it a new ID (and skip 0).
@@ -1457,7 +1444,8 @@ void Serializer::writeInputBlock() {
     unsigned dependencyDirectoryIndex = getOrCreateDependencyDir(dep.getPath());
     FileDependency.emit(ScratchRecord, dep.getSize(), getRawModTimeOrHash(dep),
                         dep.isHashBased(), dep.isSDKRelative(),
-                        dependencyDirectoryIndex, getFileName(dep.getPath()));
+                        dependencyDirectoryIndex,
+                        llvm::sys::path::filename(dep.getPath()));
   }
 
   if (!Options.ModuleInterface.empty())

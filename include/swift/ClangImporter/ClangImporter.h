@@ -204,14 +204,17 @@ public:
   /// \param swiftPCHHash A hash of Swift's various options in a compiler
   /// invocation, used to create a unique Bridging PCH if requested.
   ///
+  /// \param casidForPCH The CASID for the PCH buffer, used to create CASID
+  /// reference to PCH in debug info.
+  ///
   /// \param tracker The object tracking files this compilation depends on.
   ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx, const IRGenOptions *IRGenOpts = nullptr,
-         std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
-         bool ignoreFileMapping = false);
+         std::string swiftPCHHash = "", std::string casidForPCH = "",
+         DependencyTracker *tracker = nullptr, bool ignoreFileMapping = false);
 
   static std::string getClangSystemOverlayFile(const SearchPathOptions &Opts);
 
