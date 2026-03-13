@@ -100,6 +100,7 @@ namespace swift {
   class GenericRequirement;
   class LinkLibrary;
   class SILFunction;
+  class SILInstruction;
   class IRGenOptions;
   class NormalProtocolConformance;
   class ProtocolConformance;
@@ -2099,10 +2100,9 @@ public:
   void emitTypeVerifier();
   llvm::Function *emitHasSymbolFunction(ValueDecl *decl);
 
-  /// Create llvm metadata which encodes the branch weights given by
-  /// \p TrueCount and \p FalseCount.
-  llvm::MDNode *createProfileWeights(uint64_t TrueCount,
-                                     uint64_t FalseCount) const;
+  /// Create llvm branch weight metadata from an ordered list of counts.
+  /// Returns nullptr if none of the counters have any value.
+  llvm::MDNode *createProfileWeights(ArrayRef<ProfileCounter> Counts) const;
 
 private:
   void emitGlobalDecl(Decl *D);
