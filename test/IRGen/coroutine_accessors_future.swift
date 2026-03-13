@@ -6,6 +6,7 @@
 // REQUIRES: swift_feature_CoroutineAccessors
 
 // REQUIRES: OS_FAMILY=darwin || OS=linux-gnu
+// REQUIRES: PTRSIZE=64
 
 // Simple struct available well after CoroutineAccessors feature is present.
 // We don't need old `_modify` accessors for this because no older

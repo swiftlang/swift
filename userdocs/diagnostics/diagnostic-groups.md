@@ -41,6 +41,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:isolated-conformances>
 - <doc:error-in-future-swift-version>
 - <doc:module-version-missing>
+- <doc:oslog>
 - <doc:result-builder-methods>
 - <doc:semantic-copies>
 - <doc:strict-language-features>
@@ -72,6 +73,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:module-not-testable>
 - <doc:multiple-inheritance>
 - <doc:nominal-types>
+- <doc:oslog>
 - <doc:exclusivity-violation>
 - <doc:performance-hints>
 - <doc:property-wrapper-requirements>

@@ -2712,6 +2712,7 @@ void LoadableByAddress::recreateSingleApply(
     auto newApply = applyBuilder.createPartialApply(
         castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
         partialApplyConvention, resultIsolation, castedApply->isOnStack());
+    newApply->setStackAllocationIsNested(castedApply->isStackAllocationNested());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }

@@ -1,7 +1,7 @@
-// RUN:%target-swift-frontend -emit-silgen %s -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature SuppressedAssociatedTypes -enable-library-evolution | %FileCheck %s
+// RUN:%target-swift-frontend -emit-silgen %s -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature SuppressedAssociatedTypesWithDefaults -enable-library-evolution | %FileCheck %s
 
 // REQUIRES: swift_feature_BorrowAndMutateAccessors
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 public protocol P {
   associatedtype Element

@@ -106,6 +106,9 @@ class ModuleFileSharedCore {
   /// Name to use in public facing diagnostics and documentation.
   StringRef PublicModuleName;
 
+  /// Section name to use for OSLog strings.
+  StringRef OSLogStringSectionName;
+
   /// The version of the Swift compiler used to produce swiftinterface
   /// this module is based on. This is the most precise version possible
   /// - a compiler tag or version if this is a development compiler.

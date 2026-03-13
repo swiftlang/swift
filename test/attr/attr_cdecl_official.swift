@@ -209,3 +209,6 @@ func anyParam(e:Any) {}
 
 @c func swift_allocBox() {} // expected-warning {{symbol name 'swift_allocBox' is reserved for the Swift runtime and cannot be directly referenced without causing unpredictable behavior; this will become an error}}
 @c(swift_allocObject) func swift_allocObject_renamed() {} // expected-warning {{symbol name 'swift_allocObject' is reserved for the Swift runtime and cannot be directly referenced without causing unpredictable behavior; this will become an error}}
+
+// No warning
+@c func free(_: UnsafeMutableRawPointer?) { }

@@ -2001,7 +2001,7 @@ private:
       }
     }
 
-    if (ty->isObjCExistentialType() && !isCFTypeRef(ty))
+    if ((ty->isObjCExistentialType() || ty->isAny()) && !isCFTypeRef(ty))
       return true;
 
     return false;

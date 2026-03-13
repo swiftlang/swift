@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -158,10 +158,10 @@ extension _StringGuts {
      return _slowPath(_object.isForeign)
   }
 
-  @inlinable @inline(__always)
-  internal func withFastUTF8<R>(
-    _ f: (UnsafeBufferPointer<UInt8>) throws -> R
-  ) rethrows -> R {
+  @_alwaysEmitIntoClient @inline(__always)
+  internal func withFastUTF8<R, E: Error>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws(E) -> R
+  ) throws(E) -> R {
     _internalInvariant(isFastUTF8)
 
     if self.isSmall { return try _SmallString(_object).withUTF8(f) }
@@ -170,24 +170,71 @@ extension _StringGuts {
     return try unsafe f(_object.fastUTF8)
   }
 
-  @inlinable @inline(__always)
-  internal func withFastUTF8<R>(
-    range: Range<Int>,
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withFastUTF8<R>(
+      _ f: (UnsafeBufferPointer<UInt8>) throws -> R
+    ) throws -> R
+  )
+  @usableFromInline
+  internal func __rethrows_withFastUTF8<R>(
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
-  ) rethrows -> R {
-    return try unsafe self.withFastUTF8 { wholeUTF8 in
+  ) throws -> R {
+    return try unsafe self.withFastUTF8(f)
+  }
+#endif // !hasFeature(Embedded)
+
+  @_alwaysEmitIntoClient @inline(__always)
+  internal func withFastUTF8<R, E: Error>(
+    range: Range<Int>,
+    _ f: (UnsafeBufferPointer<UInt8>) throws(E) -> R
+  ) throws(E) -> R {
+    return try unsafe self.withFastUTF8 { wholeUTF8 throws(E) in
       return try unsafe f(unsafe UnsafeBufferPointer(rebasing: wholeUTF8[range]))
     }
   }
 
-  @inlinable @inline(__always)
-  internal func withFastCChar<R>(
-    _ f: (UnsafeBufferPointer<CChar>) throws -> R
-  ) rethrows -> R {
-    return try unsafe self.withFastUTF8 { utf8 in
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withFastUTF8<R>(
+      range: Range<Int>,
+      _ f: (UnsafeBufferPointer<UInt8>) throws -> R
+    ) throws -> R
+  )
+  @usableFromInline
+  internal func __rethrows_withFastUTF8<R>(
+    range: Range<Int>,
+    _ f: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) throws -> R {
+    return try unsafe self.withFastUTF8(range: range, f)
+  }
+#endif // !hasFeature(Embedded)
+
+  @_alwaysEmitIntoClient @inline(__always)
+  internal func withFastCChar<R, E: Error>(
+    _ f: (UnsafeBufferPointer<CChar>) throws(E) -> R
+  ) throws(E) -> R {
+    return try unsafe self.withFastUTF8 { utf8 throws(E) in
       return try unsafe utf8.withMemoryRebound(to: CChar.self, f)
     }
   }
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withFastCChar<R>(
+      _ f: (UnsafeBufferPointer<CChar>) throws -> R
+    ) throws -> R
+  )
+  @usableFromInline
+  internal func __rethrows_withFastCChar<R>(
+    _ f: (UnsafeBufferPointer<CChar>) throws -> R
+  ) throws -> R {
+    return try unsafe self.withFastCChar(f)
+  }
+#endif // !hasFeature(Embedded)
 }
 
 // Internal invariants
@@ -218,30 +265,60 @@ extension _StringGuts {
 
 // C String interop
 extension _StringGuts {
-  @inlinable @inline(__always) // fast-path: already C-string compatible
-  internal func withCString<Result>(
-    _ body: (UnsafePointer<Int8>) throws -> Result
-  ) rethrows -> Result {
+  @_alwaysEmitIntoClient @inline(__always) // fast-path: already C-string compatible
+  internal func withCString<Result, E: Error>(
+    _ body: (UnsafePointer<Int8>) throws(E) -> Result
+  ) throws(E) -> Result {
     if _slowPath(!_object.isFastZeroTerminated) {
       return try unsafe _slowWithCString(body)
     }
 
-    return try unsafe self.withFastCChar {
-      return try unsafe body($0.baseAddress._unsafelyUnwrappedUnchecked)
+    return try unsafe self.withFastCChar { cchar throws(E) in
+      return try unsafe body(cchar.baseAddress._unsafelyUnwrappedUnchecked)
     }
   }
 
-  @inline(never) // slow-path
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withCString<Result>(
+      _ body: (UnsafePointer<Int8>) throws -> Result
+    ) throws -> Result
+  )
   @usableFromInline
-  internal func _slowWithCString<Result>(
+  internal func __rethrows_withCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
-  ) rethrows -> Result {
+  ) throws -> Result {
+    return try unsafe self.withCString(body)
+  }
+#endif // !hasFeature(Embedded)
+
+  @inline(never) // slow-path
+  @_alwaysEmitIntoClient
+  internal func _slowWithCString<Result, E: Error>(
+    _ body: (UnsafePointer<Int8>) throws(E) -> Result
+  ) throws(E) -> Result {
     _internalInvariant(!_object.isFastZeroTerminated)
-    return try unsafe String(self).utf8CString.withUnsafeBufferPointer {
-      let ptr = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
+    return try unsafe String(self).utf8CString.withUnsafeBufferPointer { buffer throws(E) in
+      let ptr = unsafe buffer.baseAddress._unsafelyUnwrappedUnchecked
       return try unsafe body(ptr)
     }
   }
+  
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func _slowWithCString<Result>(
+      _ body: (UnsafePointer<Int8>) throws -> Result
+    ) throws -> Result
+  )
+  @usableFromInline
+  internal func __rethrows_underscore_slowWithCString<Result>(
+    _ body: (UnsafePointer<Int8>) throws -> Result
+  ) throws -> Result {
+    return try unsafe self._slowWithCString(body)
+  }
+#endif // !hasFeature(Embedded)
 }
 
 extension _StringGuts {

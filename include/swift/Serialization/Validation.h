@@ -128,6 +128,7 @@ class ExtendedValidationInfo {
   StringRef ModulePackageName;
   StringRef ExportAsName;
   StringRef PublicModuleName;
+  StringRef OSLogStringSectionName;
   CXXStdlibKind CXXStdlib;
   version::Version SwiftInterfaceCompilerVersion;
   struct {
@@ -235,6 +236,11 @@ public:
 
   StringRef getPublicModuleName() const { return PublicModuleName; }
   void setPublicModuleName(StringRef name) { PublicModuleName = name; }
+
+  StringRef getOSLogStringSectionName() const { return OSLogStringSectionName; }
+  void setOSLogStringSectionName(StringRef name) {
+    OSLogStringSectionName = name;
+  }
 
   StringRef getExportAsName() const { return ExportAsName; }
   void setExportAsName(StringRef name) { ExportAsName = name; }

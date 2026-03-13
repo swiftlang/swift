@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-run-simple-swift(-enable-builtin-module -enable-experimental-feature Lifetimes -enable-experimental-feature BorrowInout) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-builtin-module -enable-experimental-feature Lifetimes -enable-experimental-feature BorrowInout)
+
 // REQUIRES: executable_test
 // REQUIRES: synchronization
 // REQUIRES: swift_feature_Lifetimes
@@ -7,6 +8,8 @@
 
 import Builtin
 import Synchronization
+
+import StdlibUnittest
 
 struct Foo: ~Copyable {
   var x = 128
@@ -53,15 +56,16 @@ extension Optional where Wrapped: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
-func testBorrow() {
+let suite = TestSuite("BorrowInout")
+
+if #available(SwiftStdlib 6.4, *) {
+suite.test("Borrow") {
   var foo = Foo()
 
   do {
     let borrowFoo = Borrow(foo)
 
-    // CHECK: 128
-    print(borrowFoo.value.x)
+    expectEqual(borrowFoo.value.x, 128)
   }
 
   foo.bar()
@@ -70,49 +74,40 @@ func testBorrow() {
   let ba = BorrowingAtomic(a)
   var int = ba.load()
 
-  // CHECK: 123
-  print(int)
+  expectEqual(int, 123)
 
   ba.store(321)
   int = ba.load()
 
-  // CHECK: 321
-  print(int)
+  expectEqual(int, 321)
+}
 }
 
-@available(SwiftStdlib 6.4, *)
-func testInout() {
+if #available(SwiftStdlib 6.4, *) {
+suite.test("Inout") {
   var x: _? = 123
 
   var y = x.mutate()!
   y.value &+= 321
 
-  // CHECK: 444
-  print(y.value)
+  expectEqual(y.value, 444)
 
   x? &-= 321
 
-  // CHECK: 123
-  print(x)
+  expectEqual(x, 123)
 
   var a: Int? = nil
 
   var b = a.insert(128)
 
-  // CHECK: 128
-  print(b.value)
+  expectEqual(b.value, 128)
 
   b.value &-= 64
 
-  // CHECK: 64
-  print(b.value)
+  expectEqual(b.value, 64)
 
-  // CHECK: Optional(64)
-  print(a)
+  expectEqual(a, 64)
+}
 }
 
-if #available(SwiftStdlib 6.4, *) {
-  testBorrow()
-  testInout()
-}
-
+runAllTests()

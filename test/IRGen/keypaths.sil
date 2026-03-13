@@ -406,23 +406,30 @@ struct Foo<T> {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @stored_property_generics(ptr %T, ptr %U)
 sil @stored_property_generics : $@convention(thin) <T, U> () -> () {
 entry:
-  // CHECK: [[ARGS:%.*]] = alloca i{{.*}}
-  // CHECK: store ptr %T, ptr [[ARGS]]
-  // CHECK: call ptr @swift_getKeyPath(ptr [[KP_I]], ptr [[ARGS]])
+  // CHECK: [[ARGS1:%.*]] = alloca i{{.*}}
+  // CHECK: [[ARGS2:%.*]] = alloca i{{.*}}
+  // CHECK: [[ARGS3:%.*]] = alloca i{{.*}}
+
+  // CHECK: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[ARGS1]])
+  // CHECK: store ptr %T, ptr [[ARGS1]]
+  // CHECK: call ptr @swift_getKeyPath(ptr [[KP_I]], ptr [[ARGS1]])
+  // CHECK: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[ARGS1]])
   %i = keypath $KeyPath<Gen<T,T>, T>, <A> (root $Gen<A, A>; stored_property #Gen.x : $A) <T>
   strong_retain %i : $KeyPath<Gen<T,T>, T>
 
-  // CHECK: [[ARGS:%.*]] = alloca i{{.*}}
-  // CHECK: store ptr %U, ptr [[ARGS]]
-  // CHECK: call ptr @swift_getKeyPath(ptr [[KP_J]], ptr [[ARGS]])
+  // CHECK: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[ARGS2]])
+  // CHECK: store ptr %U, ptr [[ARGS2]]
+  // CHECK: call ptr @swift_getKeyPath(ptr [[KP_J]], ptr [[ARGS2]])
+  // CHECK: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[ARGS2]])
   %j = keypath $KeyPath<Gen<U,U>, U>, <A> (root $Gen<A, A>; stored_property #Gen.y : $A) <U>
   strong_retain %j : $KeyPath<Gen<U,U>, U>
 
-  // CHECK: [[ARGS:%.*]] = alloca i{{.*}}
+  // CHECK: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[ARGS3]])
   // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s8keypaths3FooVMa"([[WORD]] 0, ptr %T)
   // CHECK: [[FOO_T:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-  // CHECK: store ptr [[FOO_T]], ptr [[ARGS]]
-  // CHECK: call ptr @swift_getKeyPath(ptr [[KP_I]], ptr [[ARGS]])
+  // CHECK: store ptr [[FOO_T]], ptr [[ARGS3]]
+  // CHECK: call ptr @swift_getKeyPath(ptr [[KP_I]], ptr [[ARGS3]])
+  // CHECK: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[ARGS3]])
   %i2 = keypath $KeyPath<Gen<Foo<T>,Foo<T>>, Foo<T>>, <A> (root $Gen<A, A>; stored_property #Gen.x : $A) <Foo<T>>
   strong_retain %i2 : $KeyPath<Gen<Foo<T>,Foo<T>>, Foo<T>>
 
@@ -432,21 +439,28 @@ entry:
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @tuple_generics(ptr %T, ptr %U, ptr %V)
 sil @tuple_generics : $@convention(thin) <T, U, V> () -> () {
 entry:
-  // CHECK: [[ARGS:%.*]] = alloca i{{.*}}
-  // CHECK: store ptr %T, ptr [[ARGS]]
-  // CHECK: call ptr @swift_getKeyPath(ptr [[KP_TG0]], ptr [[ARGS]])
+  // CHECK: [[ARGS1:%.*]] = alloca i{{.*}}
+  // CHECK: [[ARGS2:%.*]] = alloca i{{.*}}
+  // CHECK: [[ARGS3:%.*]] = alloca i{{.*}}
+
+  // CHECK: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[ARGS1]])
+  // CHECK: store ptr %T, ptr [[ARGS1]]
+  // CHECK: call ptr @swift_getKeyPath(ptr [[KP_TG0]], ptr [[ARGS1]])
+  // CHECK: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[ARGS1]])
   %tg0 = keypath $KeyPath<TG<T,U,V>, T>, <A,B,C> (root $TG<A,B,C>; stored_property #TG.a : $(A,B,C); tuple_element #0 : $A) <T,U,V>
   strong_retain %tg0 : $KeyPath<TG<T,U,V>, T>
 
-  // CHECK: [[ARGS:%.*]] = alloca i{{.*}}
-  // CHECK: store ptr %T, ptr [[ARGS]]
-  // CHECK: call ptr @swift_getKeyPath(ptr [[KP_TG1]], ptr [[ARGS]])
+  // CHECK: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[ARGS2]])
+  // CHECK: store ptr %T, ptr [[ARGS2]]
+  // CHECK: call ptr @swift_getKeyPath(ptr [[KP_TG1]], ptr [[ARGS2]])
+  // CHECK: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[ARGS2]])
   %tg1 = keypath $KeyPath<TG<T,U,V>, V>, <A,B,C> (root $TG<A,B,C>; stored_property #TG.a : $(A,B,C); tuple_element #2 : $C) <T,U,V>
   strong_retain %tg1 : $KeyPath<TG<T,U,V>, V>
 
-  // CHECK: [[ARGS:%.*]] = alloca i{{.*}}
-  // CHECK: store ptr %T, ptr [[ARGS]]
-  // CHECK: call ptr @swift_getKeyPath(ptr [[KP_TG2]], ptr [[ARGS]])
+  // CHECK: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[ARGS3]])
+  // CHECK: store ptr %T, ptr [[ARGS3]]
+  // CHECK: call ptr @swift_getKeyPath(ptr [[KP_TG2]], ptr [[ARGS3]])
+  // CHECK: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[ARGS3]])
   %tg2 = keypath $KeyPath<TGA<T,U>, U>, <A,B> (root $TGA<A,B>; tuple_element #1 : $B) <T,U>
   strong_retain %tg2 : $KeyPath<TGA<T,U>, U>
 

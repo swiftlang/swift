@@ -106,11 +106,18 @@ extension LoadBorrowInst : Simplifiable, SILCombineSimplifiable {
   ///   end_borrow %3
   /// ```
   private func tryForwardStoreBorrow(_ context: SimplifyContext) {
-    guard let storeBorrow = address as? StoreBorrowInst else {
+    let accessPath = address.accessPath
+    guard case .storeBorrow(let storeBorrow) = accessPath.base,
+          accessPath.projectionPath.isMaterializable,
+          uses.endingLifetime.ignore(usersOfType: EndBorrowInst.self).isEmpty
+    else {
       return
     }
+
     let builder = Builder(before: self, context)
     let beginBorrow = builder.createBeginBorrow(of: storeBorrow.source)
-    replace(with: beginBorrow, context)
+    uses.endingLifetime.replaceAll(with: beginBorrow, context)
+    let v = beginBorrow.createProjection(path: accessPath.projectionPath, builder: builder)
+    replace(with: v, context)
   }
 }

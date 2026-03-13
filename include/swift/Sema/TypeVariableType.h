@@ -201,9 +201,6 @@ public:
   /// a special `subscript(keyPath:)` subscript.
   bool isKeyPathSubscriptIndex() const;
 
-  /// Determine whether this type variable represents a subscript result type.
-  bool isSubscriptResultType() const;
-
   /// Determine whether this type variable represents an opened
   /// type parameter pack.
   bool isParameterPack() const;
@@ -421,7 +418,7 @@ private:
     ENTRY(TVO_CanBindToInOut, "inout");
     ENTRY(TVO_CanBindToNoEscape, "noescape");
     ENTRY(TVO_CanBindToHole, "hole");
-    ENTRY(TVO_PrefersSubtypeBinding, "");
+    ENTRY(TVO_PrefersSubtypeBinding, "prefer subtype");
     ENTRY(TVO_CanBindToPack, "pack");
     ENTRY(TVO_PackExpansion, "pack expansion");
     }

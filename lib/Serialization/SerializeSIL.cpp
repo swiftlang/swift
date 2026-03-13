@@ -1503,6 +1503,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     for (auto Arg: PAI->getArguments()) {
       Args.push_back(addValueRef(Arg));
     }
+    unsigned flags = 0;
+    flags |= unsigned(PAI->isStackAllocationNested()
+                        ? IsNestedEncoding::IsNested
+                        : IsNestedEncoding::IsNotNested) << 0;
     SILInstApplyLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
         SIL_PARTIAL_APPLY, 0,
@@ -1510,7 +1514,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addTypeRef(PAI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(PAI->getType().getRawASTType()),
         addValueRef(PAI->getCallee()),
-        unsigned(swift::ActorIsolation::Unspecified),
+        flags,
         unsigned(swift::ActorIsolation::Unspecified), Args);
     break;
   }

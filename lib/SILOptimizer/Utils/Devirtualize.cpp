@@ -662,6 +662,7 @@ replacePartialApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc
   auto *newPAI =
       builder.createPartialApply(loc, newFn, newSubs, newArgs, convention,
                                  isolation);
+  newPAI->setStackAllocationIsNested(oldPAI->isStackAllocationNested());
 
   // Check if any casting is required for the partially-applied function.
   // A non-guaranteed cast needs no usePoints.

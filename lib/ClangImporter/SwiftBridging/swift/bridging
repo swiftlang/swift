@@ -360,6 +360,10 @@
 /// unsafe constituents.
 #define SWIFT_SAFE __attribute__((swift_attr("safe")))
 
+/// Do not generate a safe wrapper overload function even if this function
+/// contains annotations that would trigger it otherwise.
+#define SWIFT_NO_SAFE_WRAPPER __attribute__((swift_attr("no_safe_wrapper")))
+
 #else  // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 
 // Empty defines for compilers that don't support `attribute(swift_attr)`.
@@ -386,6 +390,7 @@
 #define SWIFT_PRIVATE_FILEID(_fileID)
 #define SWIFT_UNSAFE
 #define SWIFT_SAFE
+#define SWIFT_NO_SAFE_WRAPPER
 
 #endif // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 

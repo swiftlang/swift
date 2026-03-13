@@ -4898,7 +4898,8 @@ void IRGenModule::emitAccessibleFunctions() {
     llvm_unreachable("Don't know how to emit accessible functions for "
                      "the selected object format.");
   case llvm::Triple::MachO:
-    fnsSectionName = "__TEXT, __swift5_acfuncs, regular";
+    // no_dead_strip - accessible functions must never be stripped
+    fnsSectionName = "__TEXT, __swift5_acfuncs, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
@@ -6153,7 +6154,7 @@ IRGenModule::getAddrOfGlobalString(StringRef data, CStringSectionType type,
     sectionName = ObjCMethodTypeSectionName;
     break;
   case CStringSectionType::OSLogString:
-    sectionName = OSLogStringSectionName;
+    sectionName = Context.LangOpts.OSLogStringSectionName;
     break;
   case CStringSectionType::NumTypes:
     llvm_unreachable("invalid type");

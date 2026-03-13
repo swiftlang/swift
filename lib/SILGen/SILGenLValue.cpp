@@ -5828,6 +5828,13 @@ ManagedValue SILGenFunction::emitBorrowedLValue(SILLocation loc,
   return value;
 }
 
+static bool isLetRefElementComponent(PathComponent *component) {
+  if (component->getKind() != PathComponent::RefElementKind)
+    return false;
+
+  return static_cast<RefElementComponent *>(component)->getField()->isLet();
+}
+
 std::optional<ManagedValue>
 SILGenFunction::tryEmitProjectedLValue(SILLocation loc, LValue &&src,
                                        TSanKind tsanKind) {
@@ -5838,7 +5845,7 @@ SILGenFunction::tryEmitProjectedLValue(SILLocation loc, LValue &&src,
   for (auto component = src.begin(); component != src.end(); component++) {
     if (component->get()->getKind() != PathComponent::BorrowMutateKind &&
         component->get()->getKind() != PathComponent::StructElementKind &&
-        component->get()->getKind() != PathComponent::RefElementKind &&
+        !isLetRefElementComponent(component->get()) &&
         component->get()->getKind() != PathComponent::TupleElementKind &&
         component->get()->getKind() != PathComponent::ValueKind) {
       return std::nullopt;

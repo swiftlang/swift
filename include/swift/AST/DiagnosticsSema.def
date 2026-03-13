@@ -1984,6 +1984,11 @@ ERROR(objc_implementation_sendability_mismatch,none,
       "type %2 declared by the header",
       (ValueDecl *, Type, Type))
 
+ERROR(objc_implementation_ownership_mismatch,none,
+      "%kind0 has a parameter ownership modifier that does not match "
+      "the declaration in the header",
+      (ValueDecl *))
+
 ERROR(objc_implementation_required_attr_mismatch,none,
       "%kind0 should%select{ not|}2 be 'required' to match %kindonly1 declared "
       "by the header",
@@ -5814,6 +5819,21 @@ NOTE(property_requires_actor,none,
 ERROR(isolated_default_argument_context,none,
       "%0 default value in a %1 context", 
       (ActorIsolation, ActorIsolation))
+ERROR(different_actor_isolated_default_argument_context,none,
+      "default value for %kind0 must be %1-isolated",
+      (const ValueDecl *, Identifier))
+NOTE(note_expected_same_actor_default_argument,none,
+      "expected default value to have same isolation as %kind0 (got %1 and %2)",
+      (const ValueDecl *, Identifier, Identifier))
+ERROR(same_actor_isolated_default_argument_context,none,
+      "cannot use default value from different instance of %0",
+      (Identifier))
+NOTE(same_actor_isolated_default_argument_context_note,none,
+      "default value must be isolated to %0",
+      (Identifier))
+NOTE(same_actor_isolated_default_argument_context_specified_here,none,
+      "%0 specified here",
+      (Identifier))
 ERROR(conflicting_default_argument_isolation,none,
       "default argument cannot be both %0 and %1",
       (ActorIsolation, ActorIsolation))
@@ -5835,6 +5855,12 @@ GROUPED_ERROR(actor_isolated_call,ActorIsolatedCall,none,
 GROUPED_ERROR(actor_isolated_call_decl,ActorIsolatedCall,none,
       "call to %0 %kind1 in a synchronous %2 context",
       (ActorIsolation, const ValueDecl *, ActorIsolation))
+NOTE(mark_deinit_isolated_to_access,none,
+      "add 'isolated' to run isolated to %0, which may be later than 'nonisolated deinit'",
+      (Identifier))
+NOTE(marked_nonisolated_here,none,
+      "marked as 'nonisolated' here",
+      ())
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %kind0 can not be partially applied",
         (const ValueDecl *))
@@ -6080,7 +6106,7 @@ ERROR(non_concurrent_type_member,none,
       (Type, bool, DeclName, const ValueDecl *, bool))
 ERROR(concurrent_value_class_mutable_property,none,
       "stored property %0 of 'Sendable'-conforming %kind1 is mutable",
-      (DeclName, const ValueDecl *))
+      (const ValueDecl *, const ValueDecl *))
 ERROR(concurrent_value_outside_source_file,none,
       "conformance to 'Sendable' must occur in the same source file as "
       "%kind0; use '@unchecked Sendable' for retroactive conformance",
@@ -7315,11 +7341,7 @@ ERROR(public_decl_needs_availability, none,
 
 ERROR(attr_requires_decl_availability_for_platform,none,
       "'%0' requires that %1 have explicit availability for %2",
-      (DeclAttribute, DeclName, StringRef))
-
-ERROR(attr_requires_availability_for_platform,none,
-      "'%0' requires explicit availability for %1",
-      (DeclAttribute, StringRef))
+      (DeclAttribute, const Decl *, StringRef))
 
 // This doesn't display as an availability diagnostic, but it's
 // implemented there and fires when these subscripts are marked
@@ -7696,6 +7718,10 @@ GROUPED_ERROR(property_wrapper_type_requirement_not_accessible,PropertyWrappers,
 GROUPED_ERROR(property_wrapper_ambiguous_enclosing_self_subscript,PropertyWrappers,none,
       "property wrapper type %0 has multiple enclosing-self subscripts %1",
       (Type, DeclName))
+GROUPED_ERROR(property_wrapper_enclosing_self_subscript_keypath_type,PropertyWrappers,none,
+      "parameter %0 of enclosing-self subscript should have read-only or "
+      "writable key path type (got %1)",
+      (Identifier, Type))
 GROUPED_ERROR(property_wrapper_dynamic_self_type,PropertyWrappers,none,
       "property wrapper %select{wrapped value|projected value}0 cannot have "
       "dynamic Self type", (bool))
@@ -8263,6 +8289,8 @@ ERROR(inverse_generic_but_also_conforms, none,
 ERROR(inverse_associatedtype_restriction, none,
       "cannot suppress '%0' requirement of an associated type",
       (StringRef))
+WARNING(legacy_suppressed_assoc_types, none,
+      "experimental feature 'SuppressedAssociatedTypes' is deprecated; see SE-0503 for the official version", ())
 ERROR(inverse_on_class, none,
       "%select{classes|actors}1 cannot be '~%0'",
       (StringRef, bool))
@@ -8767,9 +8795,6 @@ GROUPED_ERROR(weak_unowned_in_embedded_swift, EmbeddedRestrictions, none,
               "attribute %0 cannot be used in Embedded Swift",
               (ReferenceOwnership))
 
-GROUPED_WARNING(untyped_throws_in_embedded_swift, EmbeddedRestrictions,
-                none,
-                "untyped throws is not available in Embedded Swift; add a thrown error type with '(type)'", ())
 GROUPED_WARNING(generic_nonfinal_in_embedded_swift, EmbeddedRestrictions,
                 none,
                 "generic %kind0 in a class %select{must be 'final'|cannot be 'required'}1 in Embedded Swift",
@@ -9136,6 +9161,11 @@ ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
       "invalid use of @_unsafeSelfDependentResult", ())
 
 REMARK(macro_expansion_line, none, "macro content: |%0|", (StringRef))
+
+GROUPED_WARNING(oslog_missing_string_section,OSLog,none,
+                "global variable 'osLogStringSectionName' is missing from the OSLog module; defaulting to '__TEXT,__oslogstring,cstring_literals'", ())
+GROUPED_ERROR(oslog_string_section_not_literal,OSLog,none,
+              "global variable 'osLogStringSectionName' requires a string literal initializer", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

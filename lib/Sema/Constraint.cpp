@@ -222,7 +222,7 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
   *getTrailingObjects<DeclContext *>() = useDC;
 }
 
-Constraint::Constraint(Type type, OverloadChoice choice,
+Constraint::Constraint(Type type, OverloadChoice choice, Type effectiveOverloadType,
                        DeclContext *useDC,
                        ConstraintFix *fix, ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
@@ -230,7 +230,8 @@ Constraint::Constraint(Type type, OverloadChoice choice,
       HasFix(fix != nullptr), HasDeclContext(true), HasRestriction(false),
       IsActive(false), IsDisabled(bool(fix)), IsDisabledForPerformance(false),
       RememberChoice(false), IsFavored(false), IsIsolated(false),
-      Overload{type, /*preparedOverload=*/nullptr}, Locator(locator) {
+      Overload{type, effectiveOverloadType, /*preparedOverload=*/nullptr},
+      Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
   if (fix)
     *getTrailingObjects<ConstraintFix *>() = fix;
@@ -447,46 +448,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::BindOverload: {
     Out << " bound to ";
     auto overload = getOverloadChoice();
-    auto printDecl = [&] {
-      auto decl = overload.getDecl();
-      decl->dumpRef(Out);
-      Out << " : " << decl->getInterfaceType();
-    };
-
-    switch (overload.getKind()) {
-    case OverloadChoiceKind::Decl:
-      Out << "decl ";
-      printDecl();
-      break;
-    case OverloadChoiceKind::DeclViaDynamic:
-      Out << "decl-via-dynamic ";
-      printDecl();
-      break;
-    case OverloadChoiceKind::DeclViaBridge:
-      Out << "decl-via-bridge ";
-      printDecl();
-      break;
-    case OverloadChoiceKind::DeclViaUnwrappedOptional:
-      Out << "decl-via-unwrapped-optional ";
-      printDecl();
-      break;
-    case OverloadChoiceKind::DynamicMemberLookup:
-    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
-      Out << "dynamic member lookup '" << overload.getName() << "'";
-      break;
-    case OverloadChoiceKind::TupleIndex:
-      Out << "tuple index " << overload.getTupleIndex();
-      break;
-    case OverloadChoiceKind::MaterializePack:
-      Out << "materialize pack";
-      break;
-    case OverloadChoiceKind::ExtractFunctionIsolation:
-      Out << "extract function islation";
-      break;
-    case OverloadChoiceKind::KeyPathApplication:
-      Out << "key path application";
-      break;
-    }
+    overload.dump(Type(), sm, Out);
 
     skipSecond = true;
     break;
@@ -842,6 +804,9 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
     baseType->getTypeVariables(typeVars);
   }
 
+  // Compute effective overload type, for disjunction selection and pruning.
+  auto effectiveOverloadType = cs.getEffectiveOverloadType(locator, choice, useDC);
+
   // Create the constraint.
   auto size =
     totalSizeToAlloc<TypeVariableType *, ConstraintFix *, DeclContext *,
@@ -849,7 +814,7 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
       typeVars.size(), fix ? 1 : 0, /*hasDeclContext=*/1,
       /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/1);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(type, choice, useDC,
+  return new (mem) Constraint(type, choice, effectiveOverloadType, useDC,
                               fix, locator, typeVars);
 }
 

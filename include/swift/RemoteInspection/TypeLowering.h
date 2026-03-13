@@ -190,6 +190,14 @@ struct FieldInfo {
   int Value;
   const TypeRef *TR;
   const TypeInfo &TI;
+  /// For indirect enum cases, this stores the declared payload type.
+  const TypeRef *IndirectPayloadTR;
+
+  FieldInfo(const std::string &Name, unsigned Offset, int Value,
+            const TypeRef *TR, const TypeInfo &TI,
+            const TypeRef *IndirectPayloadTR = nullptr)
+      : Name(Name), Offset(Offset), Value(Value), TR(TR), TI(TI),
+        IndirectPayloadTR(IndirectPayloadTR) {}
 };
 
 /// Builtins and (opaque) imported value types
@@ -420,6 +428,13 @@ public:
   const TypeInfo *getReferentTypeInfo() const { return ReferentTI; }
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Borrow;
+  }
+
+  // True if values of this borrow type contain a bitwise copy of their target
+  // values.
+  // False if values of this borrow type are pointers to their target values.
+  bool usesValueRepresentation() const {
+    return ReferentTI == RepresentationTI;
   }
 };
 

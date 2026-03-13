@@ -452,7 +452,7 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
         return false;
       }
 
-      SILValue InitArray = StInst->getSrc();
+      SILValue InitArray = lookThroughOwnershipInsts(StInst->getSrc());
       if (isa<SILArgument>(InitArray) || isa<ApplyInst>(InitArray))
         continue;
 

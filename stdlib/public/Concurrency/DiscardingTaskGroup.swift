@@ -70,9 +70,7 @@ import Swift
 /// - SeeAlso: ``TaskGroup``
 /// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:body:)``
 @available(SwiftStdlib 5.9, *)
-#if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
-#endif
 @inlinable
 public func withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
@@ -345,9 +343,7 @@ extension DiscardingTaskGroup: Sendable { }
 /// }
 /// ```
 @available(SwiftStdlib 5.9, *)
-#if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
-#endif
 @inlinable
 public func withThrowingDiscardingTaskGroup<GroupResult>(
     returning returnType: GroupResult.Type = GroupResult.self,

@@ -116,6 +116,11 @@ sil @useUnmanagedNonSendableKlass : $@convention(thin) (@guaranteed @sil_unmanag
 sil @useActor : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
 sil @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
 
+sil @useOptionalAnyActor : $@convention(thin) (@sil_isolated @guaranteed Optional<any Actor>) -> @owned NonSendableKlass
+sil @useOptionalAnyActorWithParam : $@convention(thin) (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+
+sil [isolation "actor_instance"] @unappliedIsolatedAnyParameter : $@convention(method) @async (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+
 ///////////////////////
 // MARK: Basic Tests //
 ///////////////////////
@@ -125,7 +130,7 @@ sil @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<M
 //
 // CHECK: begin running test 1 of 1 on actor_self_isolation_unknown: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = argument of bb0 : $MyActor
-// CHECK-NEXT: Isolation: unknown
+// CHECK-NEXT: Isolation: invalid
 // CHECK-NEXT: end running test 1 of 1 on actor_self_isolation_unknown: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @actor_self_isolation_unknown : $@convention(thin) (@guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor):
@@ -1915,7 +1920,7 @@ bb0:
 
 // CHECK-LABEL: begin running test 1 of 1 on var_box_with_sendable_type_is_nonsendable_isolationinfo: sil_isolation_info_inference with: @trace[0]
 // CHECK: Input Value:   %0 = alloc_box ${ var MyActor }                 // user: %1
-// CHECK: Isolation: unknown
+// CHECK: Isolation: invalid
 // CHECK: end running test 1 of 1 on var_box_with_sendable_type_is_nonsendable_isolationinfo: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @var_box_with_sendable_type_is_nonsendable_isolationinfo : $@convention(thin) () -> () {
 bb0:
@@ -1943,7 +1948,7 @@ bb0:
 
 // CHECK-LABEL: begin running test 1 of 1 on let_box_with_sendable_type_is_sendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
 // CHECK: Input Value:   %0 = alloc_box ${ let MyActor }                 // user: %1
-// CHECK: Isolation: unknown
+// CHECK: Isolation: invalid
 // CHECK: end running test 1 of 1 on let_box_with_sendable_type_is_sendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @let_box_with_sendable_type_is_sendable_isolationinfo_inference : $@convention(thin) () -> () {
 bb0:
@@ -1971,7 +1976,7 @@ bb0:
 
 // CHECK-LABEL: begin running test 1 of 1 on var_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
 // CHECK: Input Value:   %0 = alloc_box ${ var NonSendableKlass }        // user: %1
-// CHECK: Isolation: unknown
+// CHECK: Isolation: invalid
 // CHECK: end running test 1 of 1 on var_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @var_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference : $@convention(thin) () -> () {
 bb0:
@@ -1999,7 +2004,7 @@ bb0:
 
 // CHECK-LABEL: begin running test 1 of 1 on let_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
 // CHECK: Input Value:   %0 = alloc_box ${ let NonSendableKlass }        // user: %1
-// CHECK: Isolation: unknown
+// CHECK: Isolation: invalid
 // CHECK: end running test 1 of 1 on let_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @let_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference : $@convention(thin) () -> () {
 bb0:
@@ -2007,6 +2012,115 @@ bb0:
   %0 = alloc_box ${ let NonSendableKlass }
   debug_value [trace] %0
   destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on taskisolated_nonisolated_nonsending_test: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value: %1 = argument of bb0 : $NonSendableKlass
+// CHECK-NEXT: Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter
+// CHECK-NEXT: end running test 1 of 1 on taskisolated_nonisolated_nonsending_test: sil_isolation_info_inference with: @trace[0]
+sil [ossa] [isolation "caller_isolation_inheriting"] @taskisolated_nonisolated_nonsending_test : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on builtin_implicit_actor_means_functionapplication_is_taskisolated: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %3 = apply %2(%1) : $@convention(thin) (@sil_isolated @guaranteed Optional<any Actor>) -> @owned NonSendableKlass // user: %4
+// CHECK-NEXT: Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter
+// CHECK-NEXT: end running test 1 of 1 on builtin_implicit_actor_means_functionapplication_is_taskisolated: sil_isolation_info_inference with: @trace[0]
+sil [ossa] [isolation "caller_isolation_inheriting"] @builtin_implicit_actor_means_functionapplication_is_taskisolated : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %1 = implicitactor_to_opaqueisolation_cast %0
+  %f = function_ref @useOptionalAnyActor : $@convention(thin) (@sil_isolated @guaranteed Optional<any Actor>) -> @owned NonSendableKlass
+  %2 = apply %f(%1) : $@convention(thin) (@sil_isolated @guaranteed Optional<any Actor>) -> @owned NonSendableKlass
+  debug_value [trace] %2
+  destroy_value %2
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on builtin_implicit_actor_means_functionapplication_with_taskisolated_arg: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %4 = apply %3(%2, %1) : $@convention(thin) (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass // user: %5
+// CHECK-NEXT: Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter
+// CHECK-NEXT: end running test 1 of 1 on builtin_implicit_actor_means_functionapplication_with_taskisolated_arg: sil_isolation_info_inference with: @trace[0]
+sil [ossa] [isolation "caller_isolation_inheriting"] @builtin_implicit_actor_means_functionapplication_with_taskisolated_arg : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %2 = implicitactor_to_opaqueisolation_cast %0
+  %f = function_ref @useOptionalAnyActorWithParam : $@convention(thin) (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  %3 = apply %f(%2, %1) : $@convention(thin) (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  debug_value [trace] %3
+  destroy_value %3
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] [isolation "caller_isolation_inheriting"] @merge_isolated_any_with_taskisolated_from_nonisolated_nonsending_parameter : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %2 = implicitactor_to_opaqueisolation_cast %0
+  %f = function_ref @useOptionalAnyActorWithParam : $@convention(thin) (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  %3 = apply %f(%2, %1) : $@convention(thin) (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  debug_value [trace] %3
+  destroy_value %3
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on unapplied_isolated_any_test: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   // function_ref unappliedIsolatedAnyParameter
+// CHECK-NEXT:   %0 = function_ref @unappliedIsolatedAnyParameter : $@convention(method) @async (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+// CHECK-NEXT: Isolation: actor-isolated: unapplied_isolated_any_parameter
+// CHECK-NEXT: end running test 1 of 1 on unapplied_isolated_any_test: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @unapplied_isolated_any_test : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %f = function_ref @unappliedIsolatedAnyParameter : $@convention(method) @async (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  debug_value [trace] %f
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on unapplied_isolated_any_merge_test: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
+// CHECK-NEXT: First Value:   // function_ref unappliedIsolatedAnyParameter
+// CHECK-NEXT:   %2 = function_ref @unappliedIsolatedAnyParameter : $@convention(method) @async (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+// CHECK-NEXT: First Isolation: actor-isolated: unapplied_isolated_any_parameter
+// CHECK-NEXT: Second Value: %1 = argument of bb0 : $NonSendableKlass
+// CHECK-NEXT: Second Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter
+// CHECK-NEXT: Merged Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter
+// CHECK-NEXT: end running test 1 of 1 on unapplied_isolated_any_merge_test: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
+sil [ossa] [isolation "caller_isolation_inheriting"] @unapplied_isolated_any_merge_test : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass):
+  specify_test "sil-isolation-info-merged-inference @trace[0] @trace[1]"
+  %f = function_ref @unappliedIsolatedAnyParameter : $@convention(method) @async (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  debug_value [trace] %f
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on unapplied_isolated_any_merge_failure_test: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
+// CHECK-NEXT: First Value:   %2 = alloc_stack $NonSendableKlass              // users: %6, %5, %4
+// CHECK-NEXT: First Isolation: global actor '<null>'-isolated
+// CHECK-NEXT: Second Value: %1 = argument of bb0 : $NonSendableKlass
+// CHECK-NEXT: Second Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter
+// CHECK-NEXT: Merged Isolation: Merge failure!
+// CHECK-NEXT: end running test 1 of 1 on unapplied_isolated_any_merge_failure_test: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
+sil [ossa] [isolation "caller_isolation_inheriting"] @unapplied_isolated_any_merge_failure_test : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass):
+  specify_test "sil-isolation-info-merged-inference @trace[0] @trace[1]"
+  %stack = alloc_stack $NonSendableKlass
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%stack) : $@convention(thin) @async () -> @out NonSendableKlass
+  debug_value [trace] %stack
+  debug_value [trace] %1
+  destroy_addr %stack : $*NonSendableKlass
+  dealloc_stack %stack : $*NonSendableKlass
   %9999 = tuple ()
   return %9999 : $()
 }

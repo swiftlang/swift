@@ -16,19 +16,28 @@ import SwiftShims
 // embedded Swift, in an embedded-programming friendly way (we mainly need
 // printing to not need to heap allocate).
 
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+private func writeSingleChar(_ c: CInt) {
+  _ = _swift_writeCharToStandardOutput(c)
+}
+#else
 @_extern(c, "putchar")
-@discardableResult
 func putchar(_: CInt) -> CInt
+
+private func writeSingleChar(_ c: CInt) {
+  _ = putchar(c)
+}
+#endif
 
 public func print(_ string: StaticString, terminator: StaticString = "\n") {
   var p = unsafe string.utf8Start
   while unsafe p.pointee != 0 {
-    putchar(CInt(unsafe p.pointee))
+    writeSingleChar(CInt(unsafe p.pointee))
     unsafe p += 1
   }
   unsafe p = terminator.utf8Start
   while unsafe p.pointee != 0 {
-    putchar(CInt(unsafe p.pointee))
+    writeSingleChar(CInt(unsafe p.pointee))
     unsafe p += 1
   }
 }
@@ -38,12 +47,12 @@ public func print(_ string: String, terminator: StaticString = "\n") {
   var string = string
   string.withUTF8 { buf in
     for unsafe c in unsafe buf {
-      putchar(CInt(c))
+      writeSingleChar(CInt(c))
     }
   }
   var p = unsafe terminator.utf8Start
   while unsafe p.pointee != 0 {
-    putchar(CInt(unsafe p.pointee))
+    writeSingleChar(CInt(unsafe p.pointee))
     unsafe p += 1
   }
 }
@@ -53,30 +62,30 @@ public func print(_ object: some CustomStringConvertible, terminator: StaticStri
   var string = object.description
   string.withUTF8 { buf in
     for unsafe c in unsafe buf {
-      putchar(CInt(c))
+      writeSingleChar(CInt(c))
     }
   }
   var p = unsafe terminator.utf8Start
   while unsafe p.pointee != 0 {
-    putchar(CInt(unsafe p.pointee))
+    writeSingleChar(CInt(unsafe p.pointee))
     unsafe p += 1
   }
 }
 
 func print(_ buf: UnsafeBufferPointer<UInt8>, terminator: StaticString = "\n") {
   for unsafe c in unsafe buf {
-    putchar(CInt(c))
+    writeSingleChar(CInt(c))
   }
   var p = unsafe terminator.utf8Start
   while unsafe p.pointee != 0 {
-    unsafe putchar(CInt(p.pointee))
+    unsafe writeSingleChar(CInt(p.pointee))
     unsafe p += 1
   }
 }
 
 func printCharacters(_ buf: UnsafeRawBufferPointer) {
   for unsafe c in unsafe buf {
-    putchar(CInt(c))
+    writeSingleChar(CInt(c))
   }
 }
 

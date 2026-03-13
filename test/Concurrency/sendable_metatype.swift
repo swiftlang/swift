@@ -84,6 +84,12 @@ nonisolated func passMetaSmuggledAnyFromExistential(_ pqT: (P & Q).Type) {
   }
 }
 
+@MainActor func passMetaSmuggledAnyFromExistential2(_ pqT: (P & Q).Type) {
+  let x: P.Type = pqT
+  Task.detached { // expected-warning{{passing closure as a 'sending' parameter risks causing data races between main actor-isolated code and concurrent execution of the closure}}
+    acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to main actor-isolated code}}
+  }
+}
 
 func testSendableMetatypeDowngrades() {
   @preconcurrency

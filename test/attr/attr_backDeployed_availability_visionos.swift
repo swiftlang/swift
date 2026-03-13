@@ -49,7 +49,7 @@ public func availableSameVersionAsBackDeploymentAndAlsoAvailableEarlierOniOS() {
 @backDeployed(before: visionOS 2) // expected-error {{'@backDeployed' has no effect because 'availableAfterBackDeployment()' is not available before visionOS 2}}
 public func availableAfterBackDeployment() {}
 
-@available(iOS 99, *) // expected-note {{'availableOniOSAfterBackDeploymentOniOS()' was introduced in iOS 99}}
+@available(iOS 99, *) // expected-note {{'availableOniOSAfterBackDeploymentOniOS()' was introduced in visionOS 99}}
 @backDeployed(before: iOS 17.4) // expected-error {{'@backDeployed' has no effect because 'availableOniOSAfterBackDeploymentOniOS()' is not available before visionOS 1.1}}
 public func availableOniOSAfterBackDeploymentOniOS() {}
 

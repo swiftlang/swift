@@ -4446,7 +4446,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   if (borrow || mutate) {
     if (auto *extDecl = dyn_cast<ExtensionDecl>(DC)) {
       auto extNominal = extDecl->getExtendedNominal();
-      if (!isa<StructDecl>(extNominal)) {
+      if (!isa<StructDecl>(extNominal) && !isa<EnumDecl>(extNominal) &&
+          !isa<ClassDecl>(extNominal)) {
         if (borrow) {
           storage->getASTContext().Diags.diagnose(
               borrow->getLoc(),

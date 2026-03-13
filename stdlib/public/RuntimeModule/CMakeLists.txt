@@ -37,6 +37,7 @@ set(backtracing_sources
   Backtrace+Codable.swift
   BacktraceFormatter.swift
   BacktraceJSONFormatter.swift
+  BacktracerThreadLocals.swift
   Base64.swift
   ByteSwapping.swift
   CachingMemoryReader.swift
@@ -102,7 +103,8 @@ set(runtime_compile_flags
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
   "-Xcc;-I${CMAKE_BINARY_DIR}/include"
   "-Xcc;-I${SWIFT_STDLIB_SOURCE_DIR}/public/RuntimeModule/modules"
-  "-disable-upcoming-feature;MemberImportVisibility")
+  "-disable-upcoming-feature;MemberImportVisibility"
+  "-enable-experimental-feature;Reparenting")
 
 ###TODO: Add these when we add static linking support
 #

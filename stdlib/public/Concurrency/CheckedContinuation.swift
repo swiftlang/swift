@@ -314,9 +314,7 @@ public nonisolated(nonsending) func withCheckedContinuation<T>(
 
 @inlinable
 @available(SwiftStdlib 5.1, *)
-#if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
-#endif
 @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
 public func withCheckedContinuation<T>( // source-compatibility overload
   isolation: isolated (any Actor)?,
@@ -427,9 +425,7 @@ public nonisolated(nonsending) func withCheckedThrowingContinuation<T>( // nonse
 
 @inlinable
 @available(SwiftStdlib 5.1, *)
-#if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
-#endif
 @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
 public func withCheckedThrowingContinuation<T>(
   isolation: isolated (any Actor)?,

@@ -98,6 +98,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DropWhile
     single-source/ErrorHandling
     single-source/Exclusivity
+    single-source/ExecutorEnqueue
     single-source/ExistentialPerformance
     single-source/Fibonacci
     single-source/FindStringNaive

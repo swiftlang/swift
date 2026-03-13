@@ -3689,37 +3689,12 @@ void LocatableType::Profile(llvm::FoldingSetNodeID &id, SourceLoc loc,
 // Simple accessors.
 Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
 
-static Type replacingTypeVariablesAndPlaceholders(Type ty) {
-  if (!ty || !ty->hasTypeVariableOrPlaceholder())
-    return ty;
-
-  struct Transform : public TypeTransform<Transform> {
-    Transform(ASTContext &ctx) : TypeTransform(ctx) {}
-
-    std::optional<Type> transform(TypeBase *ty, TypePosition) {
-      if (!ty->hasTypeVariableOrPlaceholder())
-        return ty;
-
-      if (isa<TypeVariableType>(ty) || isa<PlaceholderType>(ty))
-        return ErrorType::get(ctx);
-
-      return std::nullopt;
-    }
-    std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
-      // Fold away the sendable dependence if present, the function type will
-      // just become non-Sendable.
-      return std::make_pair(Type(), false);
-    }
-  };
-  return Transform(ty->getASTContext()).doIt(ty, TypePosition::Invariant);
-}
-
 Type ErrorType::get(Type originalType) {
   // The original type is only used for printing/debugging, and we don't support
   // solver-allocated ErrorTypes. As such, fold any type variables and
   // placeholders into ErrorTypes. If we have a top-level one, we can return
   // that directly.
-  originalType = replacingTypeVariablesAndPlaceholders(originalType);
+  originalType = originalType->replaceTypeVariablesAndPlaceholdersWithErrors();
   if (isa<ErrorType>(originalType.getPointer()))
     return originalType;
 

@@ -847,3 +847,10 @@ func testCompoundLeadingDot() {
   let _: S = .foo(x:)(0)
   let _: S = .foo(x:)(x: 0) // expected-error {{extraneous argument label 'x:' in call}}
 }
+
+/// Make sure that anyObject is handled correctly on .init member lookup
+class E {}
+
+func foofoo() -> some E {
+  return .init() //ok
+}

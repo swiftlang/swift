@@ -393,29 +393,28 @@ static bool isMemberChainTail(Expr *expr, Expr *parent, MemberChainKind kind) {
 }
 
 static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
-                                    ValueDecl **localDeclAfterUse) {
-  *localDeclAfterUse = nullptr;
-
-  // References to variables injected by lldb are always valid.
-  if (isa<VarDecl>(D) && cast<VarDecl>(D)->isDebuggerVar())
+                                    ValueDecl *&localDeclAfterUse) {
+  // Only VarDecls require declaration before use.
+  auto *VD = dyn_cast<VarDecl>(D);
+  if (!VD)
     return true;
 
-  // If we find something in the current context, it must be a forward
-  // reference, because otherwise if it was in scope, it would have
-  // been returned by the call to ASTScope::lookupLocalDecls() above.
-  if (D->getDeclContext()->isLocalContext()) {
-    do {
-      if (D->getDeclContext() == DC) {
-        *localDeclAfterUse = D;
-        return false;
-      }
+  // Non-local and variables injected by lldb are always valid.
+  auto *varDC = VD->getDeclContext();
+  if (!varDC->isLocalContext() || VD->isDebuggerVar())
+    return true;
 
-      // If we're inside of a 'defer' context, walk up to the parent
-      // and check again. We don't want 'defer' bodies to forward
-      // reference bindings in the immediate outer scope.
-    } while (isa<FuncDecl>(DC) &&
-             cast<FuncDecl>(DC)->isDeferBody() &&
-             (DC = DC->getParent()));
+  while (true) {
+    if (varDC == DC) {
+      localDeclAfterUse = VD;
+      return false;
+    }
+    if (isa<AbstractClosureExpr>(DC) ||
+        (isa<FuncDecl>(DC) && cast<FuncDecl>(DC)->isDeferBody())) {
+      DC = DC->getParent();
+      continue;
+    }
+    break;
   }
   return true;
 }
@@ -587,12 +586,11 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
     Lookup = TypeChecker::lookupUnqualified(DC, LookupName, Loc, lookupOptions);
 
     ValueDecl *localDeclAfterUse = nullptr;
-    AllDeclRefs =
-        findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
-                       /*breakOnMember=*/true, ResultValues,
-                       [&](ValueDecl *D) {
-                         return isValidForwardReference(D, DC, &localDeclAfterUse);
-                       });
+    AllDeclRefs = findNonMembers(
+        Lookup.innerResults(), UDRE->getRefKind(),
+        /*breakOnMember=*/true, ResultValues, [&](ValueDecl *D) {
+          return isValidForwardReference(D, DC, localDeclAfterUse);
+        });
 
     // If local declaration after use is found, check outer results for
     // better matching candidates.
@@ -609,12 +607,11 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
         Lookup.shiftDownResults();
         ResultValues.clear();
         localDeclAfterUse = nullptr;
-        AllDeclRefs =
-            findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
-                           /*breakOnMember=*/true, ResultValues,
-                           [&](ValueDecl *D) {
-                             return isValidForwardReference(D, DC, &localDeclAfterUse);
-                           });
+        AllDeclRefs = findNonMembers(
+            Lookup.innerResults(), UDRE->getRefKind(),
+            /*breakOnMember=*/true, ResultValues, [&](ValueDecl *D) {
+              return isValidForwardReference(D, DC, localDeclAfterUse);
+            });
       }
     }
   }

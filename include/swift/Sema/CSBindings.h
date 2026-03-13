@@ -57,7 +57,10 @@ enum class AllowedBindingKind : uint8_t {
   /// Supertypes of the specified type.
   Supertypes,
   /// Subtypes of the specified type.
-  Subtypes
+  Subtypes,
+  /// Special hack for `extension P where Self == S { ... }` members
+  /// and keypaths.
+  Fallback,
 };
 
 /// The kind of literal binding found.
@@ -93,7 +96,8 @@ struct PotentialBinding {
                    PointerUnion<Constraint *, ConstraintLocator *> source,
                    TypeVariableType *originator)
       : BindingType(type), Kind(kind), BindingSource(source),
-        Originator(originator) {}
+        Originator(originator) {
+  }
 
   PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
       : PotentialBinding(
@@ -135,10 +139,12 @@ struct PotentialBinding {
   }
 
   PotentialBinding withSameSource(Type type, AllowedBindingKind kind) const {
+    ASSERT(kind != AllowedBindingKind::Fallback);
     return {type, kind, BindingSource, Originator};
   }
 
   PotentialBinding asTransitiveFrom(TypeVariableType *originator) const {
+    ASSERT(Kind != AllowedBindingKind::Fallback);
     ASSERT(originator);
     return {BindingType, Kind, BindingSource, originator};
   }
@@ -164,6 +170,11 @@ struct PotentialBinding {
   }
 
   void print(llvm::raw_ostream &out, const PrintOptions &PO) const;
+
+  bool operator==(const PotentialBinding &other) const {
+    return (Kind == other.Kind &&
+            BindingType->isEqual(other.BindingType));
+  }
 };
 
 struct LiteralRequirement {
@@ -258,6 +269,11 @@ struct PotentialBindings {
 
   /// The set of constraints which delay attempting this type variable.
   llvm::TinyPtrVector<Constraint *> DelayedBy;
+
+  /// The set of LValueObject constraints having this type variable on the
+  /// left-hand side. If this is non-empty, we know that the type variable
+  /// must be bound to an lvalue.
+  llvm::TinyPtrVector<Constraint *> LValueOf;
 
   /// The set of type variables adjacent to the current one.
   ///
@@ -362,15 +378,11 @@ struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
   }
 
   static bool isEqual(const Binding &LHS, const Binding &RHS) {
-    auto lhsTy = LHS.BindingType.getPointer();
-    auto rhsTy = RHS.BindingType.getPointer();
-
-    // Fast path: pointer equality.
-    if (DenseMapInfo<swift::TypeBase *>::isEqual(lhsTy, rhsTy))
-      return true;
-
     // If either side is empty or tombstone, let's use pointer equality.
     {
+      auto lhsTy = LHS.BindingType.getPointer();
+      auto rhsTy = RHS.BindingType.getPointer();
+
       auto emptyTy = llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey();
       auto tombstoneTy =
           llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey();
@@ -382,8 +394,7 @@ struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
         return lhsTy == rhsTy;
     }
 
-    // Otherwise let's drop the sugar and check.
-    return LHS.BindingType->isEqual(RHS.BindingType);
+    return LHS == RHS;
   }
 
 private:
@@ -397,6 +408,16 @@ private:
 namespace swift {
 namespace constraints {
 namespace inference {
+
+enum class KnownLValueKind: uint8_t {
+  /// Insufficient information to determine yet.
+  Unknown,
+  /// Definitely not an lvalue.
+  RValue,
+  /// Definitely an lvalue.
+  LValue
+};
+
 class BindingSet {
   using BindingScore =
       std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
@@ -409,14 +430,32 @@ class BindingSet {
 
   llvm::SmallPtrSet<TypeVariableType *, 4> AdjacentVars;
 
-  /// Set whenever transitive inference changes the binding set
-  /// after the constructor.
-  bool IsDirty = false;
-  /// Generation number of PotentialBindings.
+  /// Generation number of PotentialBindings at the time this BindingSet
+  /// was constructed.
   unsigned GenerationNumber = 0;
 
+  /// Flag indicating if we were in salvage when we constructed this
+  /// BindingSet.
+  bool Salvage : 1;
+
+  /// Set to true if the transitive inference process modified the binding set
+  /// after it was constructed.
+  bool IsDirty : 1;
+
+  /// Computed early by computeLValueState().
+  unsigned LValueState : 2;
+
+  /// Set when adding a binding that contradicts an existing binding
+  /// or a conformance constraint on the type variable. See addBinding()
+  /// and reduceBinding().
+  bool IsConflicting : 1;
+
+  void setLValueState(KnownLValueKind kind) {
+    LValueState = unsigned(kind);
+  }
+
 public:
-  swift::SmallSetVector<PotentialBinding, 4> Bindings;
+  swift::SmallVector<PotentialBinding, 4> Bindings;
 
   /// The set of unique literal protocol requirements placed on this
   /// type variable or inferred transitively through subtype chains.
@@ -427,6 +466,8 @@ public:
   llvm::SmallVector<LiteralRequirement, 2> Literals;
 
   llvm::SmallVector<Constraint *, 2> Defaults;
+
+  llvm::SmallDenseSet<ProtocolDecl *, 4> Protocols;
 
   /// The set of transitive protocol requirements inferred through
   /// subtype/conversion/equivalence relations with other type variables.
@@ -462,8 +503,16 @@ public:
   }
 
   /// Check if this binding set is known to be up to date.
-  bool isUpToDate() const {
-    return (GenerationNumber == Info.GenerationNumber && !IsDirty);
+  bool isUpToDate() const;
+
+  KnownLValueKind getLValueState() const {
+    return KnownLValueKind(LValueState);
+  }
+
+  /// Whether we deduced that the adjacent constraints on this type
+  /// variable are contradictory.
+  bool isConflicting() const {
+    return IsConflicting;
   }
 
   /// Whether this type variable is subject to a ExpressibleByNilLiteral
@@ -534,14 +583,6 @@ public:
     });
   }
 
-  /// Check if this binding is viable for inclusion in the set.
-  ///
-  /// \param binding The binding to validate.
-  /// \param isTransitive Indicates whether this binding has been
-  /// acquired through transitive inference and requires extra
-  /// checking.
-  bool isViable(PotentialBinding &binding);
-
   /// Determine whether this set has any "viable" (or non-hole) bindings.
   ///
   /// A viable binding could be - a direct or transitive binding
@@ -591,6 +632,12 @@ public:
 
     assert(numDefaultable >= unviable);
     return numDefaultable - unviable;
+  }
+
+  unsigned getNumExactBindings() const {
+    return llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
+      return binding.Kind == AllowedBindingKind::Exact;
+    });
   }
 
   ASTNode getAssociatedCodeCompletionToken() const {
@@ -677,14 +724,27 @@ public:
   }
 
 private:
+  void computeLValueState();
+
   void markDirty() {
     IsDirty = true;
+  }
+
+  void markConflicting() {
+    IsConflicting = true;
   }
 
   /// Add a new binding to the set.
   ///
   /// \param binding The binding to add.
   void addBinding(PotentialBinding binding);
+
+  /// Rewrite certain bindings into a simpler form based on this type variable's
+  /// adjacent conformance constraints.
+  void reduceBinding(PotentialBinding &binding);
+
+  std::optional<bool> subsumeBinding(PotentialBinding &binding,
+                                     const PotentialBinding &existing);
 
   void addDefault(Constraint *constraint);
 

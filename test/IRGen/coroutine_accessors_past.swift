@@ -6,6 +6,7 @@
 // REQUIRES: swift_feature_CoroutineAccessors
 
 // REQUIRES: OS_FAMILY=darwin || OS=linux-gnu
+// REQUIRES: PTRSIZE=64
 
 // Simple struct available before CoroutineAccessors feature is present:
 

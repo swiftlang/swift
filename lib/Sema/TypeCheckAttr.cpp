@@ -107,13 +107,8 @@ public:
     if (IntroVer.has_value())
       return false;
 
-    if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      diagnose(attr->AtLoc, diag::attr_requires_decl_availability_for_platform,
-               attr, VD->getName(), prettyPlatformString(platform));
-    } else {
-      diagnose(attr->AtLoc, diag::attr_requires_availability_for_platform, attr,
-               prettyPlatformString(platform));
-    }
+    diagnose(attr->AtLoc, diag::attr_requires_decl_availability_for_platform,
+             attr, D, prettyPlatformString(platform));
     return true;
   }
 
@@ -2463,6 +2458,10 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // experimental feature is enabled.
   auto &ctx = fromModule->getASTContext();
   if (ctx.LangOpts.hasFeature(Feature::AllowRuntimeSymbolDeclarations))
+    return true;
+
+  // Only consider "swift_"-containing symbols.
+  if (!symbol.contains("swift_"))
     return true;
 
   // Swift runtime functions are a private contract between the compiler and

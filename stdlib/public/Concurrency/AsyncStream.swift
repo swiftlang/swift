@@ -166,14 +166,18 @@ public struct AsyncStream<Element> {
       
       /// When the buffer is full, discard the newly received element.
       ///
-      /// This strategy enforces keeping at most the specified number of oldest
-      /// values.
+      /// This strategy enforces keeping at most the specified number of oldest values.
+      ///
+      /// - Note: If the specified number is zero or negative, no elements are buffered.
+      /// In that case, an iterator receives an element only if it is already awaiting a value when the continuation yields.
       case bufferingOldest(Int)
       
       /// When the buffer is full, discard the oldest element in the buffer.
       ///
-      /// This strategy enforces keeping at most the specified number of newest
-      /// values.
+      /// This strategy enforces keeping at most the specified number of newest values.
+      ///
+      /// - Note: If the specified number is zero or negative, no elements are buffered.
+      /// In that case, an iterator receives an element only if it is already awaiting a value when the continuation yields.
       case bufferingNewest(Int)
     }
 
@@ -466,9 +470,7 @@ extension AsyncStream {
   /// - Returns: A tuple containing the stream and its continuation. The continuation should be passed to the
   /// producer while the stream should be passed to the consumer.
   @available(SwiftStdlib 5.1, *)
-  #if !hasFeature(Embedded)
   @backDeployed(before: SwiftStdlib 5.9)
-  #endif
   public static func makeStream(
       of elementType: Element.Type = Element.self,
       bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded

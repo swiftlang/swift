@@ -231,6 +231,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::DEFERRED_CODE_GEN:
       extendedInfo.setDeferredCodeGen(true);
       break;
+    case options_block::OSLOG_STRING_SECTION_NAME:
+      extendedInfo.setOSLogStringSectionName(blobData);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1591,6 +1594,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       ModulePackageName = extInfo.getModulePackageName();
       ModuleExportAsName = extInfo.getExportAsName();
       PublicModuleName = extInfo.getPublicModuleName();
+      OSLogStringSectionName = extInfo.getOSLogStringSectionName();
+      
       SwiftInterfaceCompilerVersion =
           extInfo.getSwiftInterfaceCompilerVersion();
 
