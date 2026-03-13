@@ -155,8 +155,8 @@ private:
   // This is unique_ptr because NamedRegionTimer is non-copy-constructable.
   std::unique_ptr<llvm::NamedRegionTimer> Timer;
 
-  SourceManager *SourceMgr;
-  clang::SourceManager *ClangSourceMgr;
+  SourceManager *SourceMgr = nullptr;
+  clang::SourceManager *ClangSourceMgr = nullptr;
   std::optional<AlwaysOnDriverCounters> DriverCounters;
   std::optional<AlwaysOnFrontendCounters> FrontendCounters;
   std::optional<AlwaysOnFrontendCounters> LastTracedFrontendCounters;
@@ -184,8 +184,6 @@ private:
   UnifiedStatsReporter(StringRef ProgramName,
                        StringRef AuxName,
                        StringRef Directory,
-                       SourceManager *SM,
-                       clang::SourceManager *CSM,
                        bool FineGrainedTimers,
                        bool TraceEvents,
                        bool ProfileEvents,
@@ -199,8 +197,6 @@ public:
                        StringRef OutputType,
                        StringRef OptType,
                        StringRef Directory,
-                       SourceManager *SM,
-                       clang::SourceManager *CSM,
                        bool FineGrainedTimers,
                        bool TraceEvents,
                        bool ProfileEvents,
@@ -208,6 +204,7 @@ public:
                        bool PrintZeroStats);
   ~UnifiedStatsReporter();
 
+  void setSourceManager(SourceManager *SM, clang::SourceManager *CSM);
   bool fineGrainedTimers() const { return FineGrainedTimers; }
 
   AlwaysOnDriverCounters &getDriverCounters();
