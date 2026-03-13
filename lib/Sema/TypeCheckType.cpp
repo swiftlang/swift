@@ -58,6 +58,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/SILTypeResolutionContext.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
