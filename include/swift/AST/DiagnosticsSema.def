@@ -7209,7 +7209,7 @@ ERROR(availability_decl_more_than_enclosing, none,
       (const Decl *))
 
 NOTE(availability_implicit_decl_here, none,
-     "%kindonly0 implicitly declared here with availability of %1 %2 or newer",
+     "%0 implicitly declared here with availability of %1 %2 or newer",
      (const Decl *, AvailabilityDomain, AvailabilityRange))
 
 NOTE(availability_decl_more_than_enclosing_here, none,

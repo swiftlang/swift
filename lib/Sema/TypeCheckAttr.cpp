@@ -2415,7 +2415,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
     if (auto enclosingAvailable =
             getSemanticAvailableRangeDeclAndAttr(parent, attr->getDomain())) {
       SemanticAvailableAttr enclosingAttr = enclosingAvailable->first;
-      const Decl *enclosingDecl = enclosingAvailable->second;
+      const Decl *enclosingAvailabilityDecl = enclosingAvailable->second;
       enclosingIntroducedRange = enclosingAttr.getIntroducedRange(Ctx);
       if (enclosingIntroducedRange &&
           !introducedRange->isContainedIn(*enclosingIntroducedRange)) {
@@ -2424,21 +2424,29 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           // Incorrect availability for an implicit declaration is likely a
           // compiler bug so make the diagnostic a warning.
           limit = DiagnosticBehavior::Warning;
-        } else if (enclosingDecl != parent) {
+        } else if (enclosingAvailabilityDecl != parent) {
           // Members of extensions of nominal types with available ranges were
           // not diagnosed previously, so only emit a warning in that case.
           if (isa<ExtensionDecl>(DC->getTopmostDeclarationDeclContext()))
             limit = DiagnosticBehavior::Warning;
         }
-        diagnose(D->isImplicit() ? enclosingDecl->getLoc()
-                                 : parsedAttr->getLocation(),
-                 diag::availability_decl_more_than_enclosing, D)
+        auto diagLoc = parsedAttr->getLocation();
+        if (D->isImplicit()) {
+          // Walk up until we find a non-implicit decl to diagnose.
+          const auto *diagDecl = D;
+          while (diagDecl && diagDecl->isImplicit())
+            diagDecl = diagDecl->parentDeclForAvailability();
+
+          diagLoc = diagDecl ? diagDecl->getLoc()
+                             : enclosingAvailabilityDecl->getLoc();
+        }
+        diagnose(diagLoc, diag::availability_decl_more_than_enclosing, D)
             .limitBehavior(limit);
-        if (D->isImplicit())
-          diagnose(enclosingDecl->getLoc(),
-                   diag::availability_implicit_decl_here, D,
+        if (D->isImplicit()) {
+          diagnose(diagLoc, diag::availability_implicit_decl_here, D,
                    Ctx.getTargetAvailabilityDomain(), *introducedRange);
-        diagnose(enclosingDecl->getLoc(),
+        }
+        diagnose(enclosingAvailabilityDecl->getLoc(),
                  diag::availability_decl_more_than_enclosing_here,
                  Ctx.getTargetAvailabilityDomain(), *enclosingIntroducedRange);
       }
