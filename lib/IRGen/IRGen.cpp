@@ -253,13 +253,13 @@ getProfileReader(const Twine &ProfileName, llvm::vfs::FileSystem &FS,
 }
 
 static std::optional<PGOOptions> buildIRUseOptions(const IRGenOptions &Opts,
+                                                   llvm::vfs::FileSystem &FS,
                                                    DiagnosticEngine &Diags) {
   if (Opts.UseIRProfile.empty())
     return std::nullopt;
 
-  auto FS = llvm::vfs::createPhysicalFileSystem();
   std::unique_ptr<llvm::IndexedInstrProfReader> Reader =
-      getProfileReader(Opts.UseIRProfile.c_str(), *FS, Diags);
+      getProfileReader(Opts.UseIRProfile.c_str(), FS, Diags);
   if (!Reader)
     return std::nullopt;
 
@@ -287,6 +287,7 @@ static std::optional<PGOOptions> buildIRUseOptions(const IRGenOptions &Opts,
 
 static void populatePGOOptions(std::optional<PGOOptions> &Out,
                                const IRGenOptions &Opts,
+                               llvm::vfs::FileSystem &FS,
                                DiagnosticEngine &Diags) {
   if (!Opts.UseSampleProfile.empty()) {
     Out = PGOOptions(
@@ -329,7 +330,7 @@ static void populatePGOOptions(std::optional<PGOOptions> &Out,
     return;
   }
 
-  if (auto IRUseOptions = buildIRUseOptions(Opts, Diags)) {
+  if (auto IRUseOptions = buildIRUseOptions(Opts, FS, Diags)) {
     Out = *IRUseOptions;
     return;
   }
@@ -361,14 +362,14 @@ void diagnoseSync(
   Diags.diagnose(Loc, ID, std::move(Args)...);
 }
 
-void swift::performLLVMOptimizations(const IRGenOptions &Opts,
-                                     DiagnosticEngine &Diags,
-                                     llvm::sys::Mutex *DiagMutex,
-                                     llvm::Module *Module,
-                                     llvm::TargetMachine *TargetMachine,
-                                     llvm::raw_pwrite_stream *out) {
+void swift::performLLVMOptimizations(
+    const IRGenOptions &Opts, DiagnosticEngine &Diags,
+    llvm::sys::Mutex *DiagMutex, llvm::Module *Module,
+    llvm::TargetMachine *TargetMachine,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
+    llvm::raw_pwrite_stream *out) {
   std::optional<PGOOptions> PGOOpt;
-  populatePGOOptions(PGOOpt, Opts, Diags);
+  populatePGOOptions(PGOOpt, Opts, *FS, Diags);
 
   PipelineTuningOptions PTO;
 
@@ -407,7 +408,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                               Opts.VerifyEach, PrintPassOpts);
   SI.registerCallbacks(PIC, &MAM);
 
-  PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC);
+  PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC, FS);
 
   // Attempt to load pass plugins and register their callbacks with PB.
   for (const auto &PluginFile : Opts.LLVMPassPlugins) {
@@ -762,12 +763,11 @@ namespace {
 
 /// Run the LLVM passes. In multi-threaded compilation this will be done for
 /// multiple LLVM modules in parallel.
-bool swift::performLLVM(const IRGenOptions &Opts,
-                        DiagnosticEngine &Diags,
+bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
                         llvm::sys::Mutex *DiagMutex,
-                        llvm::GlobalVariable *HashGlobal,
-                        llvm::Module *Module,
+                        llvm::GlobalVariable *HashGlobal, llvm::Module *Module,
                         llvm::TargetMachine *TargetMachine,
+                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
                         StringRef OutputFilename,
                         llvm::vfs::OutputBackend &Backend,
                         UnifiedStatsReporter *Stats) {
@@ -842,7 +842,7 @@ bool swift::performLLVM(const IRGenOptions &Opts,
           Ctxt.getDiagnosticHandler();
   Ctxt.setDiagnosticHandler(std::make_unique<SwiftDiagnosticHandler>(Opts));
 
-  performLLVMOptimizations(Opts, Diags, DiagMutex, Module, TargetMachine,
+  performLLVMOptimizations(Opts, Diags, DiagMutex, Module, TargetMachine, FS,
                            OutputFile ? &OutputFile->getOS() : nullptr);
 
   if (Stats) {
@@ -1654,6 +1654,7 @@ struct LLVMCodeGenThreads {
         embedBitcode(IGM->getModule(), parent.irgen->Opts);
         performLLVM(parent.irgen->Opts, IGM->Context.Diags, diagMutex,
                     IGM->ModuleHash, IGM->getModule(), IGM->TargetMachine.get(),
+                    IGM->Context.SourceMgr.getFileSystem(),
                     IGM->OutputFilename, IGM->Context.getOutputBackend(),
                     IGM->Context.Stats);
         if (IGM->Context.Diags.hadAnyError())
@@ -2109,7 +2110,7 @@ void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   ASTSym->setAlignment(llvm::MaybeAlign(serialization::SWIFTMODULE_ALIGNMENT));
   IGM.finalize();
   ::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, IGM.getModule(),
-                IGM.TargetMachine.get(),
+                IGM.TargetMachine.get(), Ctx.SourceMgr.getFileSystem(),
                 OutputPath, Ctx.getOutputBackend(), Ctx.Stats);
 }
 
@@ -2126,8 +2127,8 @@ bool swift::performLLVM(const IRGenOptions &Opts, ASTContext &Ctx,
 
   embedBitcode(Module, Opts);
   if (::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, Module,
-                    TargetMachine.get(), OutputFilename, Ctx.getOutputBackend(),
-                    Ctx.Stats))
+                    TargetMachine.get(), Ctx.SourceMgr.getFileSystem(),
+                    OutputFilename, Ctx.getOutputBackend(), Ctx.Stats))
     return true;
   return false;
 }
@@ -2153,7 +2154,8 @@ GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
     return irMod;
 
   performLLVMOptimizations(desc.Opts, ctx.Diags, nullptr, irMod.getModule(),
-                           irMod.getTargetMachine(), desc.out);
+                           irMod.getTargetMachine(),
+                           ctx.SourceMgr.getFileSystem(), desc.out);
   return irMod;
 }
 

@@ -505,6 +505,12 @@ private:
       if (!ConstProtocolFile.empty())
         tracker->trackFile(ConstProtocolFile);
 
+      // Profile Data.
+      tracker->trackFile(instance.getInvocation().getIRGenOptions().UseProfile);
+      tracker->trackFile(instance.getInvocation().getIRGenOptions().UseIRProfile);
+      tracker->trackFile(
+          instance.getInvocation().getIRGenOptions().UseSampleProfile);
+
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return diagnoseCASFSCreationError(root.takeError());

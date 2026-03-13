@@ -2032,9 +2032,9 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
-                     TargetMachine.get(), OutputFilename,
-                     Instance.getOutputBackend(),
-                     Instance.getStatsReporter());
+                     TargetMachine.get(),
+                     Instance.getSourceMgr().getFileSystem(), OutputFilename,
+                     Instance.getOutputBackend(), Instance.getStatsReporter());
 }
 
 static bool performCompileStepsPostSILGen(
