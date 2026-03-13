@@ -2947,6 +2947,12 @@ static void configureDiagnosticEngine(
   }
   Diagnostics.setDiagnosticDocumentationPath(docsPath);
 
+  llvm::SmallString<128> localDocsPath(mainExecutablePath);
+  llvm::sys::path::remove_filename(localDocsPath); // Remove /swift-frontend
+  llvm::sys::path::remove_filename(localDocsPath); // Remove /bin
+  llvm::sys::path::append(localDocsPath, "share", "doc", "swift", "diagnostics");
+  Diagnostics.setLocalDiagnosticDocumentationPath(std::string(localDocsPath));
+
   if (!Options.LocalizationCode.empty()) {
     std::string locPath = Options.LocalizationPath;
     if (locPath.empty()) {

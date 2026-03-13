@@ -891,6 +891,10 @@ namespace swift {
     /// Path to diagnostic documentation directory.
     std::string diagnosticDocumentationPath = "";
 
+    /// Path to toolchain-local diagnostic documentation directory
+    /// relative to the compiler executable.
+    std::string localDiagnosticDocumentationPath = "";
+
     /// The Swift language version. This is used to limit diagnostic behavior
     /// until a specific language version, e.g. Swift 6.
     version::Version languageVersion;
@@ -996,6 +1000,13 @@ namespace swift {
     }
     StringRef getDiagnosticDocumentationPath() {
       return diagnosticDocumentationPath;
+    }
+
+    void setLocalDiagnosticDocumentationPath(std::string path) {
+      localDiagnosticDocumentationPath = path;
+    }
+    StringRef getLocalDiagnosticDocumentationPath() {
+      return localDiagnosticDocumentationPath;
     }
 
     bool isPrettyPrintingDecl() const { return IsPrettyPrintingDecl; }

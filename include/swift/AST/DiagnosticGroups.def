@@ -35,7 +35,7 @@
 #define DEFINE_DIAGNOSTIC_GROUPS_MACROS
 #include "swift/AST/DefineDiagnosticGroupsMacros.h"
 
-// GROUP(Name,Option,DocsFile)
+// GROUP(Name,Options,DocsFile)
 // GROUP_LINK(Parent,Child)
 
 GROUP(no_group,none,"")
@@ -76,7 +76,7 @@ GROUP(PropertyWrappers,none,"property-wrapper-requirements")
 GROUP(ProtocolTypeNonConformance,none,"protocol-type-non-conformance")
 GROUP(RegionIsolation,none,"region-isolation")
 GROUP(ResultBuilderMethods,none,"result-builder-methods")
-GROUP(ReturnTypeImplicitCopy,none,"return-type-implicit-copy")
+GROUP(ReturnTypeImplicitCopy,ToolchainLocalDocumentation,"return-type-implicit-copy")
 GROUP(SendableClosureCaptures,none,"sendable-closure-captures")
 GROUP(SendableMetatypes,none,"sendable-metatypes")
 GROUP(SemanticCopies,DefaultIgnoreWarnings,"semantic-copies")

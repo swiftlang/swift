@@ -1744,12 +1744,23 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     auto groupID = diagnostic.getGroupID();
     if (groupID != DiagGroupID::no_group) {
       const auto &diagGroup = getDiagGroupInfoByID(groupID);
-      
-      std::string docURL(getDiagnosticDocumentationPath());
-      if (!docURL.empty() && docURL.back() != '/')
-        docURL += "/";
-      docURL += diagGroup.documentationFile;
-      info->CategoryDocumentationURL = std::move(docURL);
+
+      if (diagGroup.toolchainLocalDocumentation) {
+        std::string localPath(getLocalDiagnosticDocumentationPath());
+        if (!localPath.empty()) {
+          if (localPath.back() != '/')
+            localPath += "/";
+          localPath += diagGroup.documentationFile;
+          localPath += ".md";
+          info->CategoryDocumentationURL = std::move(localPath);
+        }
+      } else {
+        std::string docURL(getDiagnosticDocumentationPath());
+        if (!docURL.empty() && docURL.back() != '/')
+          docURL += "/";
+        docURL += diagGroup.documentationFile;
+        info->CategoryDocumentationURL = std::move(docURL);
+      }
     }
 
     for (auto &consumer : Consumers) {
