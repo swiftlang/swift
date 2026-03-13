@@ -1936,7 +1936,7 @@ TypeExpr *TypeExprSimplifier::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     return nullptr;
   }
 
-  auto *TyExpr = simplifyTypeExpr(UDE->getBase());
+  auto *TyExpr = dyn_cast<TypeExpr>(UDE->getBase());
   if (!TyExpr)
     return nullptr;
 
@@ -2270,14 +2270,6 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
     return simplifyNestedTypeExpr(UDE);
   }
 
-  // Fold unresolved named referencs
-  if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
-    if (auto resolvedExpr = TypeChecker::resolveDeclRefExpr(UDRE, DC))
-      return simplifyTypeExpr(resolvedExpr);
-    else
-      return nullptr;
-  }
-
   // In a generic argument context, a value generic parameter reference
   // (TypeValueExpr) can be treated as a type — its inner TypeRepr
   // resolves to a GenericTypeParamType through normal type resolution.
@@ -2285,25 +2277,19 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
     return new (Ctx) TypeExpr(TVE->getRepr());
   }
 
-  // Fold unresolved specializations
+  // Fold unresolved specializations.
+  // The base is expected to already be a TypeExpr.
   if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(E)) {
-    if (auto simplifiedSubExpr = simplifyTypeExpr(USE->getSubExpr())) {
-      // If this is a reference type a specialized type, form a TypeExpr.
-      // The base should be a TypeExpr that we already resolved.
-      if (auto *te = dyn_cast_or_null<TypeExpr>(simplifiedSubExpr)) {
-        if (auto *declRefTR =
-                dyn_cast_or_null<DeclRefTypeRepr>(te->getTypeRepr())) {
-          return TypeExpr::createForSpecializedDecl(
-              declRefTR, USE->getUnresolvedParams(),
-              SourceRange(USE->getLAngleLoc(), USE->getRAngleLoc()),
-              getASTContext());
-        }
-      } else {
-        return nullptr;
+    if (auto *te = dyn_cast<TypeExpr>(USE->getSubExpr())) {
+      if (auto *declRefTR =
+              dyn_cast_or_null<DeclRefTypeRepr>(te->getTypeRepr())) {
+        return TypeExpr::createForSpecializedDecl(
+            declRefTR, USE->getUnresolvedParams(),
+            SourceRange(USE->getLAngleLoc(), USE->getRAngleLoc()),
+            getASTContext());
       }
-    } else {
-      return nullptr;
     }
+    return nullptr;
   }
 
   // Fold '_' into a placeholder type, if we're allowed.
@@ -2323,7 +2309,7 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
       TyExpr = dyn_cast<TypeExpr>(OOE->getSubExpr());
       QuestionLoc = OOE->getLoc();
     } else {
-      TyExpr = simplifyTypeExpr(cast<BindOptionalExpr>(E)->getSubExpr());
+      TyExpr = dyn_cast<TypeExpr>(cast<BindOptionalExpr>(E)->getSubExpr());
       QuestionLoc = cast<BindOptionalExpr>(E)->getQuestionLoc();
     }
     if (!TyExpr) return nullptr;
@@ -2360,7 +2346,7 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
 
   // Fold (T) into a type T with parens around it.
   if (auto *PE = dyn_cast<ParenExpr>(E)) {
-    auto *TyExpr = simplifyTypeExpr(PE->getSubExpr());
+    auto *TyExpr = dyn_cast<TypeExpr>(PE->getSubExpr());
     if (!TyExpr) return nullptr;
 
     TupleTypeReprElement InnerTypeRepr[] = { TyExpr->getTypeRepr() };
@@ -2905,11 +2891,45 @@ Expr *PreCheckTarget::wrapMemberChainIfNeeded(Expr *E) {
 
 TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
                                                        Expr *E) {
-  auto canSimplifyDiscardAssignmentExpr = [&](DiscardAssignmentExpr *DAE) {
-    return true;
+  /// An ASTWalker for simplifying type expressions inside generic argument
+  /// positions.
+  /// The inner expression of a GenericArgumentExprTypeRepr is not walked by
+  /// the outer PreCheckTarget (to avoid exposing it to CSGen/CSApply walkers),
+  /// so we use this walker to resolve names and fold type sugar.
+  class GenericArgumentSimplifierWalker : public ASTWalker {
+    DeclContext *DC;
+  public:
+    GenericArgumentSimplifierWalker(DeclContext *dc) : DC(dc) {}
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      // Resolve unqualified name references
+      if (auto *unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+        auto *resolved = TypeChecker::resolveDeclRefExpr(unresolved, DC);
+        if (!resolved)
+          return Action::Stop();
+        return Action::Continue(resolved);
+      }
+      return Action::Continue(expr);
+    }
+
+    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
+      auto canSimplifyDiscardAssignmentExpr =
+          [](DiscardAssignmentExpr *DAE) { return true; };
+      if (auto *simplified = TypeExprSimplifier::simplify(
+              expr, DC, canSimplifyDiscardAssignmentExpr,
+              /*inGenericArgumentContext=*/true))
+        return Action::Continue(simplified);
+      return Action::Continue(expr);
+    }
   };
-  return TypeExprSimplifier::simplify(E, DC, canSimplifyDiscardAssignmentExpr,
-                                      true);
+
+  GenericArgumentSimplifierWalker walker(DC);
+  auto *walked = E->walk(walker);
+  if (!walked)
+    return nullptr;
+  return dyn_cast<TypeExpr>(walked);
 }
 
 bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target) {
