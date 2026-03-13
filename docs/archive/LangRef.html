@@ -490,7 +490,7 @@
     Structs do not support inheritance due to undesirable ripple effects across
     the design of the language. For example, method dispatch would arguably need
     to become virtual, not static. The storage of the type would arguably need
-    to become indirected so that an array of T could be implemented sanely
+    to become indirected so that an array of T could be implemented soundly
     (because we don't know if T is actually a T, or a subclass of T). We'd need
     to store the "isa"/vtable in the struct so that virtual method dispatch
     could be implemented, and this has additional storage costs. None of these

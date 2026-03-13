@@ -18,13 +18,13 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
-#include "swift/Strings.h"
 #include "swift/Demangling/Punycode.h"
-#include "llvm/ADT/Optional.h"
-#include <functional>
-#include <vector>
+#include "swift/Strings.h"
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
+#include <optional>
+#include <vector>
 
 using namespace swift;
 using namespace Demangle;
@@ -125,7 +125,7 @@ public:
 
   /// Claim the next few characters if they exactly match the given string.
   bool nextIf(StringRef str) {
-    if (!Text.startswith(str)) return false;
+    if (!Text.starts_with(str)) return false;
     advanceOffset(str.size());
     return true;
   }
@@ -150,7 +150,7 @@ public:
   }
 
   bool readUntil(char c, std::string &result) {
-    llvm::Optional<char> c2;
+    std::optional<char> c2;
     while (!isEmpty() && (c2 = peek()).value() != c) {
       result.push_back(c2.value());
       advanceOffset(1);
@@ -253,12 +253,12 @@ private:
     Parent->addChild(Child, Factory);
   }
 
-  llvm::Optional<Directness> demangleDirectness(unsigned depth) {
+  std::optional<Directness> demangleDirectness(unsigned depth) {
     if (Mangled.nextIf('d'))
       return Directness::Direct;
     if (Mangled.nextIf('i'))
       return Directness::Indirect;
-    return llvm::None;
+    return std::nullopt;
   }
 
   bool demangleNatural(Node::IndexType &num, unsigned depth) {
@@ -290,13 +290,13 @@ private:
     return false;
   }
 
-  llvm::Optional<ValueWitnessKind> demangleValueWitnessKind(unsigned depth) {
+  std::optional<ValueWitnessKind> demangleValueWitnessKind(unsigned depth) {
     char Code[2];
     if (!Mangled)
-      return llvm::None;
+      return std::nullopt;
     Code[0] = Mangled.next();
     if (!Mangled)
-      return llvm::None;
+      return std::nullopt;
     Code[1] = Mangled.next();
 
     StringRef CodeStr(Code, 2);
@@ -304,7 +304,7 @@ private:
   if (CodeStr == #MANGLING) return ValueWitnessKind::NAME;
 #include "swift/Demangling/ValueWitnessMangling.def"
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   NodePointer demangleGlobal(unsigned depth) {
@@ -376,7 +376,7 @@ private:
 
     // Value witnesses.
     if (Mangled.nextIf('w')) {
-      llvm::Optional<ValueWitnessKind> w = demangleValueWitnessKind(depth + 1);
+      std::optional<ValueWitnessKind> w = demangleValueWitnessKind(depth + 1);
       if (!w.has_value())
         return nullptr;
       auto witness =
@@ -528,7 +528,8 @@ private:
       if (!name || !Mangled.nextIf('_'))
         return false;
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropFunction), Factory);
-      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(name->getText()), Factory);
+      NodePointer pl = Factory.createNode(Node::Kind::Identifier, name->getText());
+      parent->addChild(pl, Factory);
       return true;
     }
 
@@ -537,7 +538,8 @@ private:
       if (!name || !Mangled.nextIf('_'))
         return false;
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropGlobal), Factory);
-      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(name->getText()), Factory);
+      NodePointer pl = Factory.createNode(Node::Kind::Identifier, name->getText());
+      parent->addChild(pl, Factory);
       return true;
     }
 
@@ -583,7 +585,8 @@ private:
 
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropString), Factory);
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(encodingStr), Factory);
-      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(str->getText()), Factory);
+      NodePointer pl = Factory.createNode(Node::Kind::Identifier, str->getText());
+      parent->addChild(pl, Factory);
       return true;
     }
 
@@ -768,8 +771,9 @@ private:
     return demangleIdentifier(depth + 1);
   }
 
-  NodePointer demangleIdentifier(unsigned depth,
-                                 llvm::Optional<Node::Kind> kind = llvm::None) {
+  NodePointer
+  demangleIdentifier(unsigned depth,
+                     std::optional<Node::Kind> kind = std::nullopt) {
     if (!Mangled)
       return nullptr;
     
@@ -1212,6 +1216,9 @@ private:
     if (Mangled.nextIf('D')) {
       entityKind = Node::Kind::Deallocator;
       hasType = false;
+    } else if (Mangled.nextIf('Z')) {
+      entityKind = Node::Kind::IsolatedDeallocator;
+      hasType = false;
     } else if (Mangled.nextIf('d')) {
       entityKind = Node::Kind::Destructor;
       hasType = false;
@@ -1632,6 +1639,9 @@ private:
       } else if (Mangled.nextIf('T')) {
         kind = Node::Kind::Identifier;
         name = "T";
+      } else if (Mangled.nextIf('B')) {
+        kind = Node::Kind::Identifier;
+        name = "B";
       } else if (Mangled.nextIf('E')) {
         kind = Node::Kind::Identifier;
         if (!demangleNatural(size, depth + 1))
@@ -1660,6 +1670,11 @@ private:
         if (!demangleNatural(size, depth + 1))
           return nullptr;
         name = "m";
+      } else if (Mangled.nextIf('S')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size, depth + 1))
+          return nullptr;
+        name = "S";
       } else {
         return nullptr;
       }
@@ -1851,6 +1866,7 @@ private:
       globalActorNode->addChild(globalActorType, Factory);
       block->addChild(globalActorNode, Factory);
     }
+    // Is there any need to handle isolated(any) function types here?
 
     NodePointer in_node = Factory.createNode(Node::Kind::ArgumentTuple);
     block->addChild(in_node, Factory);

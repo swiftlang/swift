@@ -23,8 +23,8 @@
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Host.h"
 #include "llvm/Support/Path.h"
+#include "llvm/TargetParser/Host.h"
 #include "gtest/gtest.h"
 #include <string>
 
@@ -42,6 +42,8 @@ public:
   SearchPathOptions SearchPathOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
+  CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
 
@@ -78,8 +80,8 @@ protected:
   ProtocolType *createProtocol(llvm::StringRef protocolName,
                                Type parent = Type());
 
-  static BindingSet inferBindings(ConstraintSystem &cs,
-                                  TypeVariableType *typeVar);
+  static const BindingSet &inferBindings(ConstraintSystem &cs,
+                                         TypeVariableType *typeVar);
 };
 
 } // end namespace unittest

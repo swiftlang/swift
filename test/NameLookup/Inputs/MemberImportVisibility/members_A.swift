@@ -1,0 +1,87 @@
+public struct X {
+  public init() {}
+}
+
+public protocol P { }
+
+public struct Y<T> { }
+
+extension Y: P where T: P { }
+
+public struct Z: P {
+  public init() {}
+}
+
+infix operator <<<
+infix operator >>>
+infix operator <>
+
+@available(*, deprecated)
+public func shadowedByMemberOnXinA() { }
+
+@available(*, deprecated)
+public func shadowedByMemberOnXinB() { }
+
+@available(*, deprecated)
+public func shadowedByMemberOnXinC() { }
+
+@available(*, deprecated)
+public func shadowedByStaticMemberOnXinA() { }
+
+@available(*, deprecated)
+public func shadowedByStaticMemberOnXinB() { }
+
+@available(*, deprecated)
+public func shadowedByStaticMemberOnXinC() { }
+
+extension X {
+  public func XinA() { }
+
+  @_spi(A)
+  public func XinA_spi() { }
+
+  public var propXinA: Bool { return true }
+
+  public static func <<<(a: Self, b: Self) -> Self { a }
+
+  public struct NestedInA {}
+  public protocol ProtoNestedInA {}
+
+  public func shadowedByMemberOnXinA() { }
+  public static func shadowedByStaticMemberOnXinA() { }
+}
+
+extension Y {
+  public func YinA() { }
+
+  public static func <<<(a: Self, b: Self) -> Self { a }
+}
+
+extension P where Self == Z {
+  public static var zInA: Z { Z() }
+}
+
+public enum EnumInA {
+  case caseInA
+}
+
+open class BaseClassInA {
+  open func methodInA() {}
+  open func overriddenMethod() {}
+}
+
+public protocol ProtocolInA {
+  func defaultedRequirementInA()
+  func defaultedRequirementInB()
+  func defaultedRequirementInC()
+}
+
+extension ProtocolInA {
+  public func defaultedRequirementInA() { }
+}
+
+public struct EquatableInA: Equatable {
+  public static func ==(_: Self, _: Self) -> Bool {
+    false
+  }
+}

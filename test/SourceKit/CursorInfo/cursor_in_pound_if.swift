@@ -8,6 +8,5 @@ func foo() {
   let xxx = "hello"
 #endif
 }
-// TODO: Once we switch to use the solver-based cursor info implementation, we also receive results for the int case
-// CHECK-INT: Unable to resolve cursor info
+// CHECK-INT: <Declaration>let xxx: <Type usr="s:Si">Int</Type></Declaration>
 // CHECK-STR: <Declaration>let xxx: <Type usr="s:SS">String</Type></Declaration>

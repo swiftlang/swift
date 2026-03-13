@@ -12,6 +12,7 @@ struct DoesNotConformToProtocol {
 struct DummyStruct {};
 
 struct __attribute__((swift_attr("import_unsafe"))) NonTrivial {
+  NonTrivial(const NonTrivial &other) {}
   ~NonTrivial() {}
   NonTrivial(DummyStruct) {}
   NonTrivial() {}
@@ -66,5 +67,30 @@ struct HasOperatorPlusEqual {
 };
 
 using HasOperatorPlusEqualInt = HasOperatorPlusEqual<int>;
+
+struct HasVirtualMethod {
+  virtual int return42() { return 42; } 
+};
+
+struct HasStaticOperatorCall {
+  static int operator()(int x) { return x * 2; }
+};
+
+typedef struct {
+  int a;
+} Anon0;
+
+typedef struct {
+  int a;
+} Anon1;
+
+template <class T>
+struct S {
+  ~S() {}
+  int method0();
+};
+
+using AnonType0 = S<Anon0>;
+using AnonType1 = S<Anon1>;
 
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_PROTOCOL_CONFORMANCE_H

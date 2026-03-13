@@ -48,17 +48,17 @@ import A.B.C
 #endif
 
 
-#if canImport(A(_:).B) // expected-error {{unexpected platform condition argument: expected module name}}
+#if canImport(A(_:).B) // expected-error@:15 {{expected module name}}
 #endif
 
-#if canImport(A.B(c: "arg")) // expected-error {{unexpected platform condition argument: expected module name}}
+#if canImport(A.B(c: "arg")) // expected-error@:15 {{expected module name}}
 #endif
 
-#if canImport(A(b: 1, c: 2).B.C) // expected-error {{unexpected platform condition argument: expected module name}}
+#if canImport(A(b: 1, c: 2).B.C) // expected-error@:15 {{expected module name}}
 #endif
 
-#if canImport(A.B("arg")(3).C) // expected-error {{unexpected platform condition argument: expected module name}}
+#if canImport(A.B("arg")(3).C) // expected-error@:15 {{expected module name}}
 #endif
 
-#if canImport(A.B.C()) // expected-error {{unexpected platform condition argument: expected module name}}
+#if canImport(A.B.C()) // expected-error@:15 {{expected module name}}
 #endif

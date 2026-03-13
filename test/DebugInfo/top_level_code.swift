@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -S -g -o - | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
-// CHECK: {{_?}}main:
+// CHECK: {{_?_?}}main{{(_argc_argv)?}}:
 // CHECK: Lfunc_begin0:
 // Verify that the top-level function (main) begins at line 0 and then
 // proceeds to the first line.

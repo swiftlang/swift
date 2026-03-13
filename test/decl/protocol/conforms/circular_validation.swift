@@ -4,10 +4,10 @@
 // not crash.
 
 protocol P {
-  var x: Int { get set } // expected-note {{protocol requires property 'x' with type 'Int'; do you want to add a stub?}}
+  var x: Int { get set } // expected-note {{protocol requires property 'x' with type 'Int'}}
 }
 
-struct S : P { // expected-error {{type 'S' does not conform to protocol 'P'}}
+struct S : P { // expected-error {{type 'S' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}} 
   static var x = 0 // expected-note {{candidate operates on a type, not an instance as required}}
   var x = S.x // expected-note {{candidate references itself}}
 }

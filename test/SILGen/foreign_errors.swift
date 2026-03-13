@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name foreign_errors -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -Xllvm -sil-print-types -module-name foreign_errors -parse-as-library %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -188,12 +188,12 @@ class VeryErrorProne : ErrorProne {
 // CHECK:    bb0([[ARG1:%.*]] : @owned $Optional<AnyObject>, [[ARG2:%.*]] : @owned $VeryErrorProne):
 // CHECK:      [[BOX:%.*]] = alloc_box ${ var VeryErrorProne }
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[BOX]]
-// CHECK:      [[LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_BOX]]
+// CHECK:      [[LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_BOX]]
 // CHECK:      [[PB:%.*]] = project_box [[LIFETIME]]
-// CHECK:      [[BORROWED_ARG1:%.*]] = begin_borrow [lexical] [[ARG1]]
 // CHECK:      store [[ARG2]] to [init] [[PB]]
 // CHECK:      [[T0:%.*]] = load [take] [[PB]]
 // CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $VeryErrorProne to $ErrorProne
+// CHECK:      [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
 // CHECK:      [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
 // CHECK-NOT:  [[BOX]]{{^[0-9]}}
 // CHECK-NOT:  [[PB]]{{^[0-9]}}

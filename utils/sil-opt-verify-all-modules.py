@@ -13,7 +13,7 @@ import argparse
 import glob
 import multiprocessing
 import os
-import pipes
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -63,7 +63,6 @@ def get_verify_resource_dir_modules_commands(
         ('iphonesimulator', 'x86_64', 'x86_64-apple-ios7.0'),
         ('macosx', 'x86_64', 'x86_64-apple-macosx10.9'),
         ('watchos', 'armv7k', 'armv7k-apple-watchos2.0'),
-        ('watchsimulator', 'i386', 'i386-apple-watchos2.0'),
     ]
 
     commands = []
@@ -91,7 +90,7 @@ def get_verify_resource_dir_modules_commands(
 
 
 def quote_shell_command(args):
-    return " ".join([pipes.quote(a) for a in args])
+    return " ".join([shlex.quote(a) for a in args])
 
 
 def run_commands_in_parallel(commands):

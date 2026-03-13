@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -parse-as-library %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -parse-as-library %import-libdispatch -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,9 +10,12 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-final class StringLike: Sendable, CustomStringConvertible {
+final class StringLike: Sendable, ExpressibleByStringLiteral, CustomStringConvertible {
   let value: String
   init(_ value: String) {
+    self.value = value
+  }
+  init(stringLiteral value: StringLiteralType) {
     self.value = value
   }
 
@@ -31,7 +36,23 @@ enum TL {
 
   @TaskLocal
   static var clazz: ClassTaskLocal?
+
+  @TaskLocal
+  static var force: ForceUnwrapMe!
 }
+
+@TaskLocal
+@available(SwiftStdlib 5.1, *)
+var globalTaskLocal: StringLike = StringLike("<not-set>")
+
+@available(SwiftStdlib 5.10, *)
+struct LessAvailable {}
+
+struct ForceUnwrapMe {}
+
+@TaskLocal
+@available(SwiftStdlib 5.10, *)
+var globalLessAvailable: LessAvailable?
 
 @available(SwiftStdlib 5.1, *)
 final class ClassTaskLocal: Sendable {
@@ -77,6 +98,17 @@ func simple() async {
   printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
   TL.$number.withValue(1) {
     printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (1)
+  }
+
+  // async body
+  await TL.$number.withValue(1) {
+    await Task.yield()
+    print("OK: \(TL.number)")
+  }
+
+  // sync body
+  TL.$number.withValue(1) {
+    print("OK: \(TL.number)")
   }
 }
 
@@ -218,6 +250,13 @@ func inside_actor() async {
 }
 
 @available(SwiftStdlib 5.1, *)
+func global_task_local() async {
+  await $globalTaskLocal.withValue("value-1") {
+    await printTaskLocalAsync($globalTaskLocal) // CHECK-NEXT: TaskLocal<StringLike>(defaultValue: <not-set>) (value-1)
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await simple()
@@ -229,5 +268,6 @@ func inside_actor() async {
     await nested_3_onlyTopContributesAsync()
     await nested_3_onlyTopContributesMixed()
     await inside_actor()
+    await global_task_local()
   }
 }

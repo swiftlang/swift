@@ -11,10 +11,34 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftRemoteMirror
+import Foundation
 
 extension DefaultStringInterpolation {
   mutating func appendInterpolation<T>(hex: T) where T: BinaryInteger {
     appendInterpolation("0x")
     appendInterpolation(String(hex, radix: 16))
   }
+}
+
+enum Std {
+  struct File: TextOutputStream {
+
+#if os(Android)
+    typealias File = OpaquePointer
+#else
+    typealias File = UnsafeMutablePointer<FILE>
+#endif
+
+    var underlying: File
+
+    mutating func write(_ string: String) {
+      fputs(string, underlying)
+    }
+  }
+
+  static var err = File(underlying: stderr)
+}
+
+internal func disableStdErrBuffer() {
+  setvbuf(stderr, nil, Int32(_IONBF), 0)
 }

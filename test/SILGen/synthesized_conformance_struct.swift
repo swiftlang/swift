@@ -9,11 +9,11 @@ struct Struct<T> {
 // CHECK:   @_hasStorage var x: T { get set }
 // CHECK:   enum CodingKeys : CodingKey {
 // CHECK:     case x
+// CHECK:     init?(stringValue: String)
+// CHECK:     init?(intValue: Int)
 // CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Struct<T>.CodingKeys, _ b: Struct<T>.CodingKeys) -> Bool
 // CHECK-RESILIENT: static func == (a: Struct<T>.CodingKeys, b: Struct<T>.CodingKeys) -> Bool
 // CHECK:     func hash(into hasher: inout Hasher)
-// CHECK:     init?(stringValue: String)
-// CHECK:     init?(intValue: Int)
 // CHECK:     var hashValue: Int { get }
 // CHECK:     var intValue: Int? { get }
 // CHECK:     var stringValue: String { get }
@@ -35,37 +35,43 @@ struct Struct<T> {
 
 extension Struct: Equatable where T: Equatable {}
 // CHECK-FRAGILE-LABEL: // static Struct<A>.__derived_struct_equals(_:_:)
+// CHECK-FRAGILE-NEXT: // Isolation: unspecified
 // CHECK-FRAGILE-NEXT: sil hidden [ossa] @$s30synthesized_conformance_struct6StructVAASQRzlE010__derived_C7_equalsySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Struct<T>, @in_guaranteed Struct<T>, @thin Struct<T>.Type) -> Bool {
 // CHECK-RESILIENT-LABEL: // static Struct<A>.== infix(_:_:)
+// CHECK-RESILIENT-NEXT: // Isolation: unspecified
 // CHECK-RESILIENT-NEXT: sil hidden [ossa] @$s30synthesized_conformance_struct6StructVAASQRzlE2eeoiySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Struct<T>, @in_guaranteed Struct<T>, @thin Struct<T>.Type) -> Bool {
 
 extension Struct: Hashable where T: Hashable {}
 // CHECK-LABEL: // Struct<A>.hash(into:)
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil hidden [ossa] @$s30synthesized_conformance_struct6StructVAASHRzlE4hash4intoys6HasherVz_tF : $@convention(method) <T where T : Hashable> (@inout Hasher, @in_guaranteed Struct<T>) -> () {
 
 // CHECK-LABEL: // Struct<A>.hashValue.getter
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil hidden [ossa] @$s30synthesized_conformance_struct6StructVAASHRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Struct<T>) -> Int {
 
 extension Struct: Codable where T: Codable {}
 // CHECK-LABEL: // Struct<A>.encode(to:)
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil hidden [ossa] @$s30synthesized_conformance_struct6StructVAASeRzSERzlE6encode2toys7Encoder_p_tKF : $@convention(method) <T where T : Decodable, T : Encodable> (@in_guaranteed any Encoder, @in_guaranteed Struct<T>) -> @error any Error {
 
 // CHECK-LABEL: // Struct<A>.init(from:)
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil hidden [ossa] @$s30synthesized_conformance_struct6StructVAASeRzSERzlE4fromACyxGs7Decoder_p_tKcfC : $@convention(method) <T where T : Decodable, T : Encodable> (@in any Decoder, @thin Struct<T>.Type) -> (@out Struct<T>, @error any Error)
 
 
 // Witness tables
 
 // CHECK-LABEL: sil_witness_table hidden <T where T : Equatable> Struct<T>: Equatable module synthesized_conformance_struct {
-// CHECK-NEXT:   method #Equatable."==": <Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool : @$s30synthesized_conformance_struct6StructVyxGSQAASQRzlSQ2eeoiySbx_xtFZTW	// protocol witness for static Equatable.== infix(_:_:) in conformance <A> Struct<A>
+// CHECK-NEXT:   method #Equatable."==": <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool : @$s30synthesized_conformance_struct6StructVyxGSQAASQRzlSQ2eeoiySbx_xtFZTW // protocol witness for static Equatable.== infix(_:_:) in conformance <A> Struct<A>
 // CHECK-NEXT:   conditional_conformance (T: Equatable): dependent
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_witness_table hidden <T where T : Hashable> Struct<T>: Hashable module synthesized_conformance_struct {
 // CHECK-DAG:   base_protocol Equatable: <T where T : Equatable> Struct<T>: Equatable module synthesized_conformance_struct
-// CHECK-DAG:   method #Hashable.hashValue!getter: <Self where Self : Hashable> (Self) -> () -> Int : @$s30synthesized_conformance_struct6StructVyxGSHAASHRzlSH9hashValueSivgTW	// protocol witness for Hashable.hashValue.getter in conformance <A> Struct<A>
-// CHECK-DAG:   method #Hashable.hash: <Self where Self : Hashable> (Self) -> (inout Hasher) -> () : @$s30synthesized_conformance_struct6StructVyxGSHAASHRzlSH4hash4intoys6HasherVz_tFTW	// protocol witness for Hashable.hash(into:) in conformance <A> Struct<A>
-// CHECK-DAG:   method #Hashable._rawHashValue: <Self where Self : Hashable> (Self) -> (Int) -> Int : @$s30synthesized_conformance_struct6StructVyxGSHAASHRzlSH13_rawHashValue4seedS2i_tFTW // protocol witness for Hashable._rawHashValue(seed:) in conformance <A> Struct<A>
+// CHECK-DAG:   method #Hashable.hashValue!getter: <Self where Self : Hashable, Self : ~Copyable> (Self) -> () -> Int : @$s30synthesized_conformance_struct6StructVyxGSHAASHRzlSH9hashValueSivgTW	// protocol witness for Hashable.hashValue.getter in conformance <A> Struct<A>
+// CHECK-DAG:   method #Hashable.hash: <Self where Self : Hashable, Self : ~Copyable> (Self) -> (inout Hasher) -> () : @$s30synthesized_conformance_struct6StructVyxGSHAASHRzlSH4hash4intoys6HasherVz_tFTW	// protocol witness for Hashable.hash(into:) in conformance <A> Struct<A>
+// CHECK-DAG:   method #Hashable._rawHashValue: <Self where Self : Hashable, Self : ~Copyable> (Self) -> (Int) -> Int : @$s30synthesized_conformance_struct6StructVyxGSHAASHRzlSH13_rawHashValue4seedS2i_tFTW // protocol witness for Hashable._rawHashValue(seed:) in conformance <A> Struct<A>
 // CHECK-DAG:   conditional_conformance (T: Hashable): dependent
 // CHECK: }
 

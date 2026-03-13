@@ -485,8 +485,8 @@ func foo() -> some P {}
 // CHECK: <kw>func</kw> foo() -> <kw>some</kw> <type>P</type> & <type>Q</type> {}
 func foo() -> some P & Q {}
 
-// CHECK: <kw>class</kw> PropertyDelgate {
-class PropertyDelgate {
+// CHECK: <kw>class</kw> PropertyDelegate {
+class PropertyDelegate {
   // CHECK: @<type>MyDelegate</type>(<int>1</int>, receiveClosure {
   @MyDelegate(1, receiveClosure {
     // CHECK: <kw>var</kw> x = <int>1</int>; x
@@ -510,13 +510,13 @@ func typeAttr3(a: @ escaping () -> Int) {}
 // CHECK: <kw>func</kw> typeAttr2(a: @ <comment-block>/*this is fine...*/</comment-block> escaping () -> <type>Int</type>, b: <attr-builtin>@ escaping</attr-builtin> () -> <type>Int</type>) {}
 func typeAttr2(a: @ /*this is fine...*/ escaping () -> Int, b: @ escaping () -> Int) {}
 
-// CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <int>99</int>, *)
+// CHECK: <attr-builtin>@available</attr-builtin>(iOS <int>99</int>, *)
 // CHECK: <kw>var</kw> iHave = <int>10</int>, multipleVars = <int>20</int>
 @available(iOS 99, *)
 var iHave = 10, multipleVars = 20
 
 enum MultipleCaseElements {
-  // CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <int>99</int>, *)
+  // CHECK: <attr-builtin>@available</attr-builtin>(iOS <int>99</int>, *)
   // CHECK: <kw>case</kw> foo, bar
   @available(iOS 99, *)
   case foo, bar
@@ -524,7 +524,7 @@ enum MultipleCaseElements {
 
 protocol P {}
 enum E {
-  // CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <int>99</int>, *)
+  // CHECK: <attr-builtin>@available</attr-builtin>(iOS <int>99</int>, *)
   // CHECK: <kw>case</kw> a(<type>P</type>)
   @available(iOS 99, *)
   case a(P)
@@ -533,7 +533,7 @@ enum E {
 // Ideally this would be attr-builtin, but we don't actually have the attribute
 // in the AST at all.
 //
-// CHECK: <attr-id>@available</attr-id>(<kw>iOS</kw> <int>99</int>, *)
+// CHECK: <attr-id>@available</attr-id>(iOS <int>99</int>, *)
 // CHECK: <kw>var</kw> <kw>_</kw> = <int>10</int>
 @available(iOS 99, *)
 var _ = 10
@@ -558,6 +558,6 @@ struct FreeWhere<T> {
 }
 
 // Renamed attribute ('fixed' to @available by the parser after emitting an error, so not treated as a custom attribute)
-// CHECK: @availability(<kw>macOS</kw> <float>10.11</float>, *)
+// CHECK: @availability(macOS <float>10.11</float>, *)
 @availability(macOS 10.11, *)
 class HasMisspelledAttr {}

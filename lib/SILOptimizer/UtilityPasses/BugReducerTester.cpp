@@ -17,6 +17,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -85,8 +86,9 @@ class BugReducerTester : public SILFunctionTransform {
     auto FuncType = SILFunctionType::get(
         nullptr, SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
         ParameterConvention::Direct_Unowned, ArrayRef<SILParameterInfo>(),
-        ArrayRef<SILYieldInfo>(), ResultInfoArray, None, SubstitutionMap(),
-        SubstitutionMap(), getFunction()->getModule().getASTContext());
+        ArrayRef<SILYieldInfo>(), ResultInfoArray, std::nullopt,
+        SubstitutionMap(), SubstitutionMap(),
+        getFunction()->getModule().getASTContext());
 
     SILOptFunctionBuilder FunctionBuilder(*this);
     SILFunction *F = FunctionBuilder.getOrCreateSharedFunction(
@@ -128,8 +130,7 @@ class BugReducerTester : public SILFunctionTransform {
         }
 
         auto *FRI = dyn_cast<FunctionRefInst>(FAS.getCallee());
-        if (!FRI || !FRI->getReferencedFunction()->getName().equals(
-                        FunctionTarget)) {
+        if (!FRI || FRI->getReferencedFunction()->getName() != FunctionTarget) {
           ++II;
           continue;
         }
@@ -146,7 +147,7 @@ class BugReducerTester : public SILFunctionTransform {
           // the next instruction and then replace its current value
           // with undef.
           auto *Inst = cast<SingleValueInstruction>(&*II);
-          Inst->replaceAllUsesWith(SILUndef::get(Inst->getType(), *getFunction()));
+          Inst->replaceAllUsesWith(SILUndef::get(Inst));
           Inst->eraseFromParent();
 
           // Mark that we found the miscompile and return so we do not try to
@@ -169,7 +170,7 @@ class BugReducerTester : public SILFunctionTransform {
 
         auto *Inst = cast<SingleValueInstruction>(&*II);
         ++II;
-        Inst->replaceAllUsesWith(SILUndef::get(Inst->getType(), *getFunction()));
+        Inst->replaceAllUsesWith(SILUndef::get(Inst));
         Inst->eraseFromParent();
 
         CausedError = true;

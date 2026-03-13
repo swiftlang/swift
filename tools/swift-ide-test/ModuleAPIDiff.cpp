@@ -11,18 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "ModuleAPIDiff.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <memory>
+#include <optional>
 
 using namespace swift;
 
@@ -251,7 +251,7 @@ DEFINE_SMA_STRING_STRONG_TYPEDEF(SubmoduleName, Name)
 namespace swift {
 namespace sma {
 
-using llvm::Optional;
+using std::optional;
 
 #define SMA_FOR_EVERY_DECL_ATTRIBUTE(MACRO) \
   MACRO(IsDynamic) \
@@ -347,7 +347,7 @@ struct Module {
 
 struct StructDecl {
   Identifier Name;
-  Optional<GenericSignature> TheGenericSignature;
+  std::optional<GenericSignature> TheGenericSignature;
   std::vector<TypeName> ConformsToProtocols;
   DeclAttributes Attributes;
   NestedDecls Decls;
@@ -362,8 +362,8 @@ struct EnumCaseDecl {
 
 struct EnumDecl {
   Identifier Name;
-  Optional<GenericSignature> TheGenericSignature;
-  Optional<TypeName> RawType;
+  std::optional<GenericSignature> TheGenericSignature;
+  std::optional<TypeName> RawType;
   std::vector<TypeName> ConformsToProtocols;
   DeclAttributes Attributes;
   std::vector<std::shared_ptr<EnumCaseDecl>> Cases;
@@ -372,8 +372,8 @@ struct EnumDecl {
 
 struct ClassDecl {
   Identifier Name;
-  Optional<GenericSignature> TheGenericSignature;
-  Optional<TypeName> Superclass;
+  std::optional<GenericSignature> TheGenericSignature;
+  std::optional<TypeName> Superclass;
   std::vector<TypeName> ConformsToProtocols;
   DeclAttributes Attributes;
   NestedDecls Decls;
@@ -394,7 +394,7 @@ struct TypealiasDecl {
 
 struct AssociatedTypeDecl {
   Identifier Name;
-  Optional<TypeName> DefaultDefinition;
+  std::optional<TypeName> DefaultDefinition;
   DeclAttributes Attributes;
 };
 
@@ -422,7 +422,7 @@ struct FuncParam {
 struct FuncDecl {
   FunctionName Name;
   bool IsStatic = false;
-  Optional<GenericSignature> TheGenericSignature;
+  std::optional<GenericSignature> TheGenericSignature;
   std::vector<std::vector<FuncParam>> Params;
   TypeName ResultType;
   DeclAttributes Attributes;
@@ -442,7 +442,7 @@ enum class InitializerFailability {
 struct InitDecl {
   InitializerKind TheInitializerKind;
   InitializerFailability TheInitializerFailability;
-  Optional<GenericSignature> TheGenericSignature;
+  std::optional<GenericSignature> TheGenericSignature;
   std::vector<FuncParam> Params;
   bool IsTrappingStub = false;
   DeclAttributes Attributes;
@@ -728,16 +728,16 @@ public:
     return ResultTN;
   }
 
-  llvm::Optional<sma::TypeName> convertToOptionalTypeName(Type T) const {
+  std::optional<sma::TypeName> convertToOptionalTypeName(Type T) const {
     if (!T)
-      return None;
+      return std::nullopt;
     return convertToTypeName(T);
   }
 
-  llvm::Optional<sma::GenericSignature>
+  std::optional<sma::GenericSignature>
   convertToGenericSignature(GenericSignature GS) {
     if (!GS)
-      return None;
+      return std::nullopt;
     sma::GenericSignature ResultGS;
     for (auto *GTPT : GS.getGenericParams()) {
       sma::GenericParam ResultGP;
@@ -896,7 +896,8 @@ std::shared_ptr<sma::Module> createSMAModel(ModuleDecl *M) {
 
 } // unnamed namespace
 
-int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
+int swift::doGenerateModuleAPIDescription(StringRef DriverPath,
+                                          StringRef MainExecutablePath,
                                           ArrayRef<std::string> Args) {
   std::vector<const char *> CStringArgs;
   for (auto &S : Args) {
@@ -910,9 +911,10 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
 
   CompilerInvocation Invocation;
   bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
-      CStringArgs, Diags, [&](ArrayRef<const char *> FrontendArgs) {
-    return Invocation.parseArgs(FrontendArgs, Diags);
-  });
+      MainExecutablePath, CStringArgs, Diags,
+      [&](ArrayRef<const char *> FrontendArgs) {
+        return Invocation.parseArgs(FrontendArgs, Diags);
+      });
 
   if (HadError) {
     llvm::errs() << "error: unable to create a CompilerInvocation\n";
@@ -941,4 +943,3 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
 
   return 0;
 }
-

@@ -14,14 +14,22 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-  import Darwin.C.tgmath
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+  #if canImport(tgmath_h)
+    import tgmath_h
+  #else
+    import Darwin.C.tgmath
+  #endif
+#elseif canImport(Musl)
+  import Musl
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Cygwin) || os(Haiku)
   import Glibc
 #elseif os(WASI)
   import WASILibc
 #elseif os(Windows)
   import CRT
+#elseif canImport(Android)
+  import Android
 #else
 #error("Unsupported platform")
 #endif
@@ -141,7 +149,7 @@ func _${derivative_kind}Trunc${generic_signature} (
 %  linear_map_kind = 'differential' if derivative_kind == 'jvp' else 'pullback'
 %  for T in ['Float', 'Double', 'Float80']:
 %    if T == 'Float80':
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 %    end
 @inlinable
 @derivative(of: exp)
@@ -282,7 +290,7 @@ func _${derivative_kind}Erfc(_ x: ${T}) -> (value: ${T}, ${linear_map_kind}: (${
 // Binary functions
 %for T in ['Float', 'Double', 'Float80']:
 %  if T == 'Float80':
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 %  end
 @inlinable
 @derivative(of: pow)

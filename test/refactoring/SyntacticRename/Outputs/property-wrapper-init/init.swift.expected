@@ -2,7 +2,7 @@ public struct Outer {
     @propertyWrapper
     public struct InnerWrapper<T> {
         public var wrappedValue: T
-        public /*init:def*/init(somethingElse: T) {
+        public /*init:def*/<keywordBase>init</keywordBase>(<arglabel index=0>initialValue</arglabel><param index=0></param>: T) {
             self.wrappedValue = initialValue
         }
         public /*body:def*/init(first: Int, body: () -> T) {
@@ -21,7 +21,7 @@ public struct HasWrappers {
     
     @Outer . /*body:call*/InnerWrapper(first: 10, body: {
         struct Inner {
-            @Outer . /*init:call*/InnerWrapper(somethingElse: globalInt)
+            @Outer . /*init:call*/InnerWrapper(<callarg index=0>initialValue</callarg><callcolon index=0>: </callcolon>globalInt)
             var x: Int
         }
         return Inner().x + globalInt
@@ -31,7 +31,7 @@ public struct HasWrappers {
 
 func uses() {
     _ = Outer . /*body:call*/InnerWrapper(first: 42, body: { 45 })
-    _ = Outer . /*init:call*/InnerWrapper(somethingElse: 0)
+    _ = Outer . /*init:call*/InnerWrapper(<callarg index=0>initialValue</callarg><callcolon index=0>: </callcolon>0)
 }
 
 

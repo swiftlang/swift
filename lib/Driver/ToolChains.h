@@ -25,14 +25,16 @@ class DiagnosticEngine;
 namespace driver {
 namespace toolchains {
 
+/// True if any *generation* mode of instrumentation-based profile is enabled.
+///
+/// This is used to determine if the profiler runtime should be linked.
+bool needsInstrProfileRuntime(const llvm::opt::ArgList &Args);
+
 class LLVM_LIBRARY_VISIBILITY Darwin : public ToolChain {
 protected:
 
   void addLinkerInputArgs(InvocationInfo &II,
                           const JobContext &context) const;
-
-  void addArgsToLinkARCLite(llvm::opt::ArgStringList &Arguments,
-                            const JobContext &context) const;
 
   void addSanitizerArgs(llvm::opt::ArgStringList &Arguments,
                         const DynamicLinkJobAction &job,
@@ -56,13 +58,19 @@ protected:
       const llvm::opt::ArgList &inputArgs,
       llvm::opt::ArgStringList &arguments) const override;
 
+  void addPlatformSpecificPluginFrontendArgs(
+      const OutputInfo &OI,
+      const CommandOutput &output,
+      const llvm::opt::ArgList &inputArgs,
+      llvm::opt::ArgStringList &arguments) const override;
+
   InvocationInfo constructInvocation(const InterpretJobAction &job,
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                      const JobContext &context) const override;
-    
+
   void validateArguments(DiagnosticEngine &diags,
                          const llvm::opt::ArgList &args,
                          StringRef defaultTarget) const override;
@@ -76,28 +84,26 @@ protected:
   std::string getGlobalDebugPathRemapping() const override;
   
   /// Retrieve the target SDK version for the given target triple.
-  Optional<llvm::VersionTuple>
-  getTargetSDKVersion(const llvm::Triple &triple) const ;
+  std::optional<llvm::VersionTuple>
+  getTargetSDKVersion(const llvm::Triple &triple) const;
 
   /// Information about the SDK that the application is being built against.
   /// This information is only used by the linker, so it is only populated
   /// when there will be a linker job.
-  mutable Optional<clang::DarwinSDKInfo> SDKInfo;
+  mutable std::optional<clang::DarwinSDKInfo> SDKInfo;
 
-  const Optional<llvm::Triple> TargetVariant;
+  const std::optional<llvm::Triple> TargetVariant;
 
 public:
   Darwin(const Driver &D, const llvm::Triple &Triple,
-         const Optional<llvm::Triple> &TargetVariant) :
-      ToolChain(D, Triple), TargetVariant(TargetVariant) {}
+         const std::optional<llvm::Triple> &TargetVariant)
+      : ToolChain(D, Triple), TargetVariant(TargetVariant) {}
 
   ~Darwin() = default;
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,
                                       bool shared = true) const override;
-  
-  Optional<llvm::Triple> getTargetVariant() const {
-    return TargetVariant;
-  }
+
+  std::optional<llvm::Triple> getTargetVariant() const { return TargetVariant; }
 };
 
 class LLVM_LIBRARY_VISIBILITY Windows : public ToolChain {
@@ -110,6 +116,7 @@ protected:
 public:
   Windows(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~Windows() = default;
+
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,
                                       bool shared = true) const override;
 };

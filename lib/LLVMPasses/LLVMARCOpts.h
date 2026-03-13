@@ -26,6 +26,62 @@ enum RT_Kind {
 #include "LLVMSwift.def"
 };
 
+inline RT_Kind classifyFunctionName(StringRef name) {
+  return llvm::StringSwitch<RT_Kind>(name)
+#define SWIFT_FUNC(Name, MemBehavior, TextualName) \
+    .Case("swift_" #TextualName, RT_ ## Name)
+#define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName) \
+    .Case("__swift_" #TextualName, RT_ ## Name)
+#include "LLVMSwift.def"
+
+    // Identify "Client" versions of reference counting entry points.
+#define SWIFT_FUNC(Name, MemBehavior, TextualName) \
+    .Case("swift_" #TextualName "Client", RT_ ## Name)
+#define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName) \
+    .Case("__swift_" #TextualName "Client", RT_ ## Name)
+#include "LLVMSwift.def"
+
+    // Support non-atomic versions of reference counting entry points.
+#define SWIFT_FUNC(Name, MemBehavior, TextualName) \
+    .Case("swift_nonatomic_" #TextualName, RT_ ## Name)
+#define OBJC_FUNC(Name, MemBehavior, TextualName) \
+    .Case("objc_nonatomic_" #TextualName, RT_ ## Name)
+#define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName)
+#include "LLVMSwift.def"
+
+    .Default(RT_Unknown);
+}
+
+/// Whether to allow ARC optimizations for a function with the given name.
+inline bool allowArcOptimizations(StringRef name) {
+  switch (classifyFunctionName(name)) {
+  case RT_UnknownObjectRetainN:
+  case RT_BridgeRetainN:
+  case RT_RetainN:
+  case RT_UnknownObjectReleaseN:
+  case RT_BridgeReleaseN:
+  case RT_ReleaseN:
+  case RT_UnknownObjectRetain:
+  case RT_UnknownObjectRelease:
+  case RT_Retain:
+  case RT_ObjCRetain:
+  case RT_ObjCRelease:
+  case RT_RetainUnowned:
+  case RT_Release:
+  case RT_BridgeRetain:
+  case RT_BridgeRelease:
+    return false;
+
+  case RT_Unknown:
+  case RT_NoMemoryAccessed:
+  case RT_CheckUnowned:
+  case RT_AllocObject:
+  case RT_FixLifetime:
+  case RT_EndBorrow:
+    return true;
+  }
+}
+
 /// Take a look at the specified instruction and classify it into what kind of
 /// runtime entrypoint it is, if any.
 inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
@@ -57,22 +113,7 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
   if (F == nullptr)
     return RT_Unknown;
 
-  return llvm::StringSwitch<RT_Kind>(F->getName())
-#define SWIFT_FUNC(Name, MemBehavior, TextualName) \
-    .Case("swift_" #TextualName, RT_ ## Name)
-#define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName) \
-    .Case("__swift_" #TextualName, RT_ ## Name)
-#include "LLVMSwift.def"
-
-    // Support non-atomic versions of reference counting entry points.
-#define SWIFT_FUNC(Name, MemBehavior, TextualName) \
-    .Case("swift_nonatomic_" #TextualName, RT_ ## Name)
-#define OBJC_FUNC(Name, MemBehavior, TextualName) \
-    .Case("objc_nonatomic_" #TextualName, RT_ ## Name)
-#define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName)
-#include "LLVMSwift.def"
-
-    .Default(RT_Unknown);
+  return classifyFunctionName(F->getName());
 }
 
 } // end namespace swift

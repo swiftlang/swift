@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -typo-correction-limit 23
-// RUN: not %target-swift-frontend -typecheck -disable-typo-correction %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
-// RUN: not %target-swift-frontend -typecheck -typo-correction-limit 0 %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
-// RUN: not %target-swift-frontend -typecheck -DIMPORT_FAIL %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
+// RUN: not %target-swift-frontend -typecheck -disable-typo-correction -diagnostic-style llvm %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
+// RUN: not %target-swift-frontend -typecheck -typo-correction-limit 0 -diagnostic-style llvm%s 2>&1 | %FileCheck %s -check-prefix=DISABLED
+// RUN: not %target-swift-frontend -typecheck -DIMPORT_FAIL %s -diagnostic-style llvm 2>&1 | %FileCheck %s -check-prefix=DISABLED
 // DISABLED-NOT: did you mean
 
 #if IMPORT_FAIL
@@ -10,9 +10,9 @@ import NoSuchModule
 
 // This is close enough to get typo-correction.
 func test_short_and_close() {
-  let foo = 4 // expected-note {{'foo' declared here}}
-  let bab = fob + 1
-  // expected-error@-1 {{cannot find 'fob' in scope; did you mean 'foo'?}}
+  let plop = 4 // expected-note {{'plop' declared here}}
+  let bab = plob + 1
+  // expected-error@-1 {{cannot find 'plob' in scope}}
 }
 
 // This is not.

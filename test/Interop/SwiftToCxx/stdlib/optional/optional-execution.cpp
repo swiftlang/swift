@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/use-optional.swift -typecheck -module-name UseOptional -enable-experimental-cxx-interop -emit-clang-header-path %t/UseOptional.h
+// RUN: %target-swift-frontend %t/use-optional.swift -module-name UseOptional -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/UseOptional.h
 
 // RUN: %target-interop-build-clangxx -fno-exceptions -std=gnu++20 -c %t/optional-execution.cpp -I %t -o %t/swift-stdlib-execution.o
 // RUN: %target-build-swift %t/use-optional.swift -o %t/swift-stdlib-execution -Xlinker %t/swift-stdlib-execution.o -module-name UseOptional -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -78,7 +78,7 @@ public func resetOpt<T>(_ val: inout Optional<T>) {
 #include "UseOptional.h"
 
 int main() {
-  using namespace Swift;
+  using namespace swift;
   using namespace UseOptional;
 
   {

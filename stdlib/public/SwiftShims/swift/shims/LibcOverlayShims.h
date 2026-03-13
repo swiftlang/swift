@@ -59,7 +59,7 @@ static inline char * _Nullable * _Null_unspecified _swift_stdlib_getEnviron() {
   return environ;
 }
 #elif defined(__APPLE__)
-static inline char * _Nullable *_swift_stdlib_getEnviron() {
+static inline char * _Nullable * _Null_unspecified _swift_stdlib_getEnviron() {
   extern char * _Nullable **_NSGetEnviron(void);
   return *_NSGetEnviron();
 }
@@ -76,7 +76,7 @@ static inline void _swift_stdlib_setErrno(int value) {
 }
 
 // Semaphores <semaphore.h>
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if (!defined(_WIN32) && !defined(__wasi__)) || defined(__CYGWIN__)
 static inline sem_t *_stdlib_sem_open2(const char *name, int oflag) {
   return sem_open(name, oflag);
 }
@@ -102,7 +102,10 @@ static inline int _swift_stdlib_ioctlPtr(int fd, unsigned long int request, void
 #if defined(_WIN32) && !defined(__CYGWIN__)
 // Windows
 static inline int _swift_stdlib_open(const char *path, int oflag, mode_t mode) {
-  return _open(path, oflag, (int)mode);
+  int fh;
+  errno_t err = _sopen_s(&fh, path, oflag, _SH_DENYNO, mode);
+  __assume(err == 0 || fh == -1);
+  return fh;
 }
 
 #else
@@ -118,15 +121,15 @@ int static inline _swift_stdlib_openat(int fd, const char *path, int oflag,
 #endif
 
 #if defined(__OpenBSD__)
-static inline FILE *_swift_stdlib_stdin(void) {
+static inline void *_swift_stdlib_stdin(void) {
   return stdin;
 }
 
-static inline FILE *_swift_stdlib_stdout(void) {
+static inline void *_swift_stdlib_stdout(void) {
   return stdout;
 }
 
-static inline FILE *_swift_stdlib_stderr(void) {
+static inline void *_swift_stdlib_stderr(void) {
   return stderr;
 }
 #endif

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -g %s -parse-as-library -emit-ir -module-name main | %FileCheck %s --check-prefix=CHECK-LL
-// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -g %s -parse-as-library -module-name main -o %t/main
+// RUN: %target-build-swift  -target %target-swift-5.1-abi-triple -g %s -parse-as-library -emit-ir -module-name main | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift  -target %target-swift-5.1-abi-triple -g %s -parse-as-library -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
@@ -28,8 +28,8 @@ protocol P {
 // CHECK: exiting call_f
 
 // CHECK-LL: @"$s4main1PPAAE1fyyYaFTu" = hidden global %swift.async_func_pointer
-// CHECK-LL: @"$s4main6call_fyyxYaAA1PRzlFTu" = hidden global %swift.async_func_pointer
 // CHECK-LL: @"$s4main1XCAA1PA2aDP1fyyYaFTWTu" = internal global %swift.async_func_pointer
+// CHECK-LL: @"$s4main6call_fyyxYaAA1PRzlFTu" = hidden global %swift.async_func_pointer
 
 extension P {
   // CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main1PPAAE1fyyYaF"(

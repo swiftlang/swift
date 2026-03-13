@@ -1,4 +1,7 @@
-# Temporary Pointers
+# Temporary pointers (TemporaryPointers)
+
+## Overview
+
 A temporary, or ephemeral, pointer in Swift is a pointer which is introduced by an implicit function argument conversion and is only valid for the lifetime of the function call it appears in. There are a few ways to create a temporary pointer:
 
 - Using an inout-to-pointer conversion by passing an argument with `&`:
@@ -61,4 +64,3 @@ let ptr = withUnsafePointer(to: &x) { $0 }
 This code is invalid because the pointer to `x` is only valid until `withUnsafePointer` returns, but it escapes the closure when it is returned and assigned to `ptr`.
 
 To learn more about correctly using unsafe pointer APIs, see the Swift standard library documentation of `UnsafePointer` and related types.
-

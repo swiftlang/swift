@@ -1,0 +1,1681 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2023-2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#if (os(macOS) || os(Linux) || os(Windows)) && (arch(x86_64) || arch(arm64))
+
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif os(Windows)
+import CRT
+import WinSDK
+#endif
+
+@_spi(Formatting) import Runtime
+@_spi(Contexts) import Runtime
+@_spi(Registers) import Runtime
+@_spi(MemoryReaders) import Runtime
+@_spi(CrashLog) import Runtime
+
+@main
+internal struct SwiftBacktrace {
+  enum UnwindAlgorithm {
+    case fast
+    case precise
+  }
+
+  enum Preset {
+    case none
+    case friendly
+    case medium
+    case full
+  }
+
+  enum ImagesToShow {
+    case none
+    case all
+    case mentioned
+  }
+
+  enum RegistersToShow {
+    case none
+    case all
+    case crashedOnly
+  }
+
+  enum OutputTo {
+    case stdout
+    case stderr
+    case file
+  }
+
+  enum Symbolication {
+    case off
+    case fast
+    case full
+  }
+
+  enum OutputFormat {
+    case text
+    case json
+  }
+
+  struct Arguments {
+    var unwindAlgorithm: UnwindAlgorithm = .precise
+    var demangle = false
+    var interactive = false
+    var color = false
+    var timeout = 30
+    var preset: Preset = .none
+    var threads: Bool? = nil
+    var registers: RegistersToShow? = nil
+    var crashInfo: UInt64? = nil
+    var showImages: ImagesToShow? = nil
+    var limit: Int? = 64
+    var top = 16
+    var sanitize: Bool? = nil
+    var cache = true
+    var outputTo: OutputTo = .stdout
+    var symbolicate: Symbolication = .full
+    var format: OutputFormat = .text
+    var outputPath: String = "/tmp"
+    #if os(Windows)
+    var parentPid: DWORD = 0
+    #endif
+  }
+
+  static var args = Arguments()
+  static var formattingOptions = BacktraceFormattingOptions()
+
+  static var target: Target? = nil
+  static var currentThread: Int = 0
+
+  static var now = Timestamp()
+  static var backtraceDuration = Duration()
+
+  static var theme: any Theme {
+    if args.color {
+      return Themes.color
+    } else {
+      return Themes.plain
+    }
+  }
+
+  static var outputStream: CFileStream? = nil
+
+  static func write(_ string: String, flush: Bool = false) {
+    var stream = outputStream!
+
+    print(string, terminator: "", to: &stream)
+    if flush {
+      stream.flush()
+    }
+  }
+
+  static func writeln(_ string: String, flush: Bool = false) {
+    var stream = outputStream!
+
+    print(string, to: &stream)
+    if flush {
+      stream.flush()
+    }
+  }
+
+  static func usage() {
+    print("""
+usage: swift-backtrace [--unwind <algorithm>] [--demangle [<bool>]] [--interactive [<bool>]] [--color [<bool>]] [--timeout <seconds>] [--preset <preset>] [--threads [<bool>]] [--registers <registers>] [--images <images>] [--cache [<bool>]] [--output-to <stream>] --crashinfo <addr>
+
+Generate a backtrace for the parent process.
+
+--unwind <algorithm>
+-u <algorithm>          Set the unwind algorithm to use.  Supported algorithms
+                        are "fast" and "precise".
+
+--demangle [<bool>]
+-d [<bool>]             Set whether or not to demangle identifiers.
+
+--interactive [<bool>]
+-i [<bool>]             Set whether to be interactive.
+
+--color [<bool>]
+-c [<bool>]             Set whether to use ANSI color in the output.
+
+--timeout <seconds>
+-t <seconds>            Set how long to wait for interaction.
+
+--preset <preset>
+-p <preset>             Set the backtrace format (by preset).  Options are
+                        "friendly", "medium" and "full".
+
+--threads [<bool>]
+-h [<bool>]             Set whether or not to show all threads.
+
+--registers <registers>
+-r <registers>          Set which registers dumps to show.  Options are "none",
+                        "all" and "crashed".
+
+--images <images>
+-m <images>             Set which images to list.  Options are "none", "all"
+                        and "mentioned".
+
+--limit <count>
+-l <count>              Set the limit on the number of frames to capture.
+                        Can be set to "none" to disable the limit.
+
+--top <count>
+-T <count>              Set the minimum number of frames to capture at the top
+                        of the stack.  This is used with limit to ensure that
+                        you capture sufficient frames to understand deep traces.
+
+--sanitize [<bool>]
+-s [<bool>]             Set whether or not to sanitize paths.
+
+--cache [<bool>]        Set whether or not to use the symbol cache, if any.
+
+--output-to <stream>    Set which output stream to use.  Options are "stdout"
+-o <stream>             and "stderr".  The default is "stdout".
+
+                        Alternatively, you may specify a file path here.  If
+                        the path points to a directory, a unique filename will
+                        be generated automatically.
+
+--format <format>       Set the output format.  Options are "text" and "json";
+                        the default is "text".
+
+--crashinfo <addr>
+-a <addr>               Provide a pointer to a platform specific CrashInfo
+                        structure.  <addr> should be in hexadecimal.
+
+--symbolicate [<mode>]  Set to "full" to fully symbolicate, including inline
+                        frames and source locations; "fast" to just do symbol
+                        lookup, of "off" to disable.  The default is "full".
+""", to: &standardError)
+  }
+
+  static func parseBool(_ s: some StringProtocol) -> Bool {
+    let lowered = s.lowercased()
+    return lowered == "yes" || lowered == "y" ||
+      lowered == "true" || lowered == "t" || lowered == "on"
+  }
+
+  static func handleArgument(_ arg: String, value: String?) {
+    switch arg {
+      case "-?", "--help":
+        usage()
+        exit(0)
+      case "-u", "--unwind":
+        if let v = value {
+          switch v.lowercased() {
+            case "fast":
+              args.unwindAlgorithm = .fast
+            case "precise":
+              args.unwindAlgorithm = .precise
+            default:
+              print("swift-backtrace: unknown unwind algorithm '\(v)'",
+                    to: &standardError)
+              usage()
+              exit(1)
+          }
+        } else {
+          print("swift-backtrace: missing unwind algorithm",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
+      case "-d", "--demangle":
+        if let v = value {
+          args.demangle = parseBool(v)
+        } else {
+          args.demangle = true
+        }
+      case "-i", "--interactive":
+        if let v = value {
+          args.interactive = parseBool(v)
+        } else {
+          args.interactive = true
+        }
+      case "-c", "--color":
+        if let v = value {
+          args.color = parseBool(v)
+        } else {
+          args.color = true
+        }
+      case "-t", "--timeout":
+        if let v = value {
+          if let secs = Int(v), secs >= 0 {
+            args.timeout = secs
+          } else {
+            print("swift-backtrace: bad timeout '\(v)'",
+                  to: &standardError)
+          }
+        } else {
+          print("swift-backtrace: missing timeout value",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
+      case "-p", "--preset":
+        if let v = value {
+          switch v.lowercased() {
+            case "friendly":
+              args.preset = .friendly
+            case "medium":
+              args.preset = .medium
+            case "full":
+              args.preset = .full
+            default:
+              print("swift-backtrace: unknown preset '\(v)'",
+                    to: &standardError)
+              usage()
+              exit(1)
+          }
+        } else {
+          print("swift-backtrace: missing preset name",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
+      case "-h", "--threads":
+        if let v = value {
+          if v.lowercased() != "preset" {
+            args.threads = parseBool(v)
+          }
+        } else {
+          args.threads = true
+        }
+      case "-r", "--registers":
+        if let v = value {
+          switch v.lowercased() {
+            case "preset":
+              break
+            case "none":
+              args.registers = RegistersToShow.none
+            case "all":
+              args.registers = .all
+            case "crashed":
+              args.registers = .crashedOnly
+            default:
+              print("swift-backtrace: unknown registers setting '\(v)'",
+                    to: &standardError)
+              usage()
+              exit(1)
+          }
+        } else {
+          print("swift-backtrace: missing registers setting",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
+      case "-m", "--images":
+        if let v = value {
+          switch v.lowercased() {
+            case "preset":
+              break
+            case "none":
+              args.showImages = ImagesToShow.none
+            case "all":
+              args.showImages = .all
+            case "mentioned":
+              args.showImages = .mentioned
+            default:
+              print("swift-backtrace: unknown images setting '\(v)'",
+                    to: &standardError)
+              usage()
+              exit(1)
+          }
+        } else {
+          print("swift-backtrace: missing images setting",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
+      case "-l", "--limit":
+        if let v = value {
+          if v.lowercased() == "none" {
+            args.limit = nil
+          } else if let limit = Int(v), limit > 0 {
+            args.limit = limit
+          } else {
+            print("swift-backtrace: bad limit value \(v)",
+                  to: &standardError)
+          }
+        } else {
+          print("swift-backtrace: missing limit value",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
+      case "-T", "--top":
+        if let v = value {
+          if let top = Int(v), top >= 0 {
+            args.top = top
+          } else {
+            print("swift-backtrace: bad top value \(v)",
+                  to: &standardError)
+          }
+        } else {
+          print("swift-backtrace: missing top value",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
+      case "-s", "--sanitize":
+        if let v = value {
+          args.sanitize = parseBool(v)
+        } else {
+          args.sanitize = true
+        }
+      case "--cache":
+        if let v = value {
+          args.cache = parseBool(v)
+        } else {
+          args.cache = true
+        }
+      case "-o", "--output-to":
+        if let v = value {
+          switch v.lowercased() {
+            case "stdout":
+              args.outputTo = .stdout
+            case "stderr":
+              args.outputTo = .stderr
+            default:
+              args.outputTo = .file
+              args.outputPath = v
+          }
+        } else {
+          print("swift-backtrace: missing output-to value",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
+      case "-a", "--crashinfo":
+        if let v = value {
+          if let a = UInt64(v, radix: 16) {
+            args.crashInfo = a
+          } else {
+            print("swift-backtrace: bad pointer '\(v)'",
+                  to: &standardError)
+            usage()
+            exit(1)
+          }
+        } else {
+          print("swift-backtrace: missing pointer value",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
+      case "--symbolicate":
+        if let v = value {
+          switch v.lowercased() {
+            case "off":
+              args.symbolicate = .off
+            case "fast":
+              args.symbolicate = .fast
+            case "full":
+              args.symbolicate = .full
+            default:
+              print("swift-backtrace: unknown symbolicate setting '\(v)'",
+                    to: &standardError)
+          }
+        } else {
+          args.symbolicate = .full
+        }
+      case "--format":
+        if let v = value {
+          switch v.lowercased() {
+            case "text":
+              args.format = .text
+            case "json":
+              args.format = .json
+            default:
+              print("swift-backtrace: unknown output format '\(v)'",
+                    to: &standardError)
+          }
+        } else {
+          print("swift-backtrace: missing format value",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
+      #if os(Windows)
+      case "--pid":
+        if let v = value {
+          if let pid = DWORD(v) {
+            args.parentPid = pid
+          } else {
+            print("swift-backtrace: bad pid value \(v)",
+                  to: &standardError)
+            exit(1)
+          }
+        } else {
+          print("swift-backtrace: missing pid value",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
+      #endif
+      default:
+        print("swift-backtrace: unknown argument '\(arg)'",
+              to: &standardError)
+        usage()
+        exit(1)
+    }
+  }
+
+  static func unblockSignals() {
+    #if !os(Windows)
+    var mask = sigset_t()
+
+    sigfillset(&mask)
+    sigprocmask(SIG_UNBLOCK, &mask, nil)
+    #endif
+  }
+
+  static func getJsonBacktraceFormatterOptions() -> BacktraceJSONFormatterOptions {
+    var options = BacktraceJSONFormatterOptions(rawValue: 0)
+    if (args.registers == .all) { options.formUnion(.allRegisters) }
+    if (args.demangle) { options.formUnion(.demangle) }
+    if (args.sanitize == true) { options.formUnion(.sanitize) }
+    if (args.showImages == .mentioned) { options.formUnion(.mentionedImages) }
+    if (args.showImages != ImagesToShow.none) { options.formUnion(.images) }
+    if (args.threads == true) { options.formUnion(.allThreads) }
+    return options
+  }
+
+  static func main() {
+    unblockSignals()
+    parseArguments()
+
+    guard let crashInfoAddr = args.crashInfo else {
+      print("swift-backtrace: --crashinfo is not optional",
+            to: &standardError)
+      usage()
+      exit(1)
+    }
+
+    // Set-up the backtrace formatting options
+    switch args.preset {
+      case .friendly, .none:
+        formattingOptions =
+          .skipRuntimeFailures(true)
+          .showAddresses(false)
+          .showSourceCode(true)
+          .showFrameAttributes(false)
+          .sanitizePaths(args.sanitize ?? false)
+        if args.threads == nil {
+          args.threads = false
+        }
+        if args.registers == nil {
+          args.registers = RegistersToShow.none
+        }
+        if args.showImages == nil {
+          args.showImages = ImagesToShow.none
+        }
+      case .medium:
+        formattingOptions =
+          .skipRuntimeFailures(true)
+          .showSourceCode(true)
+          .showFrameAttributes(true)
+          .sanitizePaths(args.sanitize ?? true)
+        if args.threads == nil {
+          args.threads = false
+        }
+        if args.registers == nil {
+          args.registers = .crashedOnly
+        }
+        if args.showImages == nil {
+          args.showImages = .mentioned
+        }
+      case .full:
+        formattingOptions =
+          .skipRuntimeFailures(false)
+          .skipThunkFunctions(false)
+          .skipSystemFrames(false)
+          .sanitizePaths(args.sanitize ?? true)
+        if args.threads == nil {
+          args.threads = true
+        }
+        if args.registers == nil {
+          args.registers = .crashedOnly
+        }
+        if args.showImages == nil {
+          args.showImages = .mentioned
+        }
+    }
+    formattingOptions = formattingOptions.demangle(args.demangle)
+
+    // We never use the showImages option; if we're going to show images, we
+    // want to do it *once* for all the backtraces we showed.
+    formattingOptions = formattingOptions.showImages(.none)
+
+    // Target's initializer fetches and symbolicates backtraces, so
+    // we want to time that part here.
+    backtraceDuration = Duration.measure {
+      #if os(Windows)
+      target = Target(pid: args.parentPid,
+                      crashInfoAddr: crashInfoAddr,
+                      limit: args.limit, top: args.top,
+                      cache: args.cache,
+                      symbolicate: args.symbolicate)
+      #else
+      target = Target(crashInfoAddr: crashInfoAddr,
+                      limit: args.limit, top: args.top,
+                      cache: args.cache,
+                      symbolicate: args.symbolicate)
+      #endif
+
+      currentThread = target!.crashingThreadNdx
+    }
+
+    // Grab the current wall clock time
+    now = Timestamp.wallTime
+
+    // Set up the output stream
+    var didOpenOutput = false
+    switch args.outputTo {
+      case .stdout:
+        outputStream = standardOutput
+      case .stderr:
+        outputStream = standardError
+      case .file:
+        if isDir(args.outputPath) {
+          // If the output path is a directory, generate a filename
+          let name = target!.name
+          let pid = target!.pid
+
+          let ext: String
+          switch args.format {
+            case .text:
+              ext = "log"
+            case .json:
+              ext = "json"
+          }
+
+          var filename =
+            "\(args.outputPath)/\(name)-\(pid)-\(now).\(ext)"
+
+          #if os(Windows)
+          var handle = CreateFile(filename,
+                                  DWORD(GENERIC_READ)|DWORD(GENERIC_WRITE),
+                                  DWORD(FILE_SHARE_READ),
+                                  nil,
+                                  DWORD(CREATE_NEW),
+                                  DWORD(FILE_ATTRIBUTE_NORMAL),
+                                  nil)
+          var failed = handle == INVALID_HANDLE_VALUE
+          #else
+          var fd = open(filename, O_RDWR|O_CREAT|O_EXCL, 0o644)
+          var failed = fd < 0
+          #endif
+          var ndx = 1
+
+          while failed {
+            #if os(Windows)
+            let interrupted = false
+            let exists = GetLastError() == ERROR_ALREADY_EXISTS
+            #else
+            let interrupted = errno == EINTR
+            let exists = errno == EEXIST
+            #endif
+
+            if !interrupted && !exists {
+              break
+            }
+
+            if !interrupted {
+              ndx += 1
+              filename = "\(args.outputPath)/\(name)-\(pid)-\(now)-\(ndx).\(ext)"
+            }
+
+            #if os(Windows)
+            handle = CreateFile(filename,
+                                DWORD(GENERIC_READ)|DWORD(GENERIC_WRITE),
+                                DWORD(FILE_SHARE_READ),
+                                nil,
+                                DWORD(CREATE_NEW),
+                                DWORD(FILE_ATTRIBUTE_NORMAL),
+                                nil)
+            failed = handle == INVALID_HANDLE_VALUE
+            #else
+            fd = open(filename, O_RDWR|O_CREAT|O_EXCL, 0o644)
+            failed = fd < 0
+            #endif
+          }
+
+          if failed {
+            print("swift-backtrace: unable to create \(filename) for writing",
+                  to: &standardError)
+            outputStream = standardError
+          }
+
+          #if os(Windows)
+          let fd = _open_osfhandle(Int(bitPattern: handle), 0)
+          let fdopen = _fdopen
+          let close = _close
+          let unlink = _unlink
+          #endif
+
+          if let cFile = fdopen(fd, "wt") {
+            didOpenOutput = true
+            outputStream = CFileStream(fp: cFile)
+          } else {
+            _ = close(fd)
+            _ = unlink(filename)
+
+            print("swift-backtrace: unable to fdopen \(filename) for writing",
+                  to: &standardError)
+            outputStream = standardError
+          }
+        } else if let cFile = fopen(args.outputPath, "wt") {
+          didOpenOutput = true
+          outputStream = CFileStream(fp: cFile)
+        } else {
+          print("swift-backtrace: unable to open \(args.outputPath) for writing",
+                to: &standardError)
+
+          outputStream = standardError
+        }
+    }
+    defer {
+      if didOpenOutput {
+        outputStream!.close()
+      }
+    }
+
+    // Clear (or complete) the message written by the crash handler; this
+    // is always on stdout or stderr, even if you specify a file for output.
+    var handlerOut: CFileStream
+    if args.outputTo == .stdout {
+      handlerOut = standardOutput
+    } else {
+      handlerOut = standardError
+    }
+    if args.color {
+      print("\r\u{1b}[0K", terminator: "", to: &handlerOut)
+    } else {
+      print(" done ***\n\n", terminator: "", to: &handlerOut)
+    }
+
+    switch args.format {
+      case .text:
+        printCrashLog()
+
+        writeln("")
+
+        writeln("Backtrace took \(backtraceDuration)s")
+        writeln("")
+      case .json:
+        guard let target = target else {
+          print("swift-backtrace: unable to get target",
+                to: &standardError)
+          return
+        }
+
+        let crashLog = captureCrashLog(
+          imageMap: target.images,
+          backtraceDuration: backtraceDuration)
+
+        guard let crashLog else {
+          print("swift-backtrace: unable to build crash log",
+                to: &standardError)
+          return
+        }
+
+        let writer = SwiftBacktraceWriter()
+        let options = getJsonBacktraceFormatterOptions()
+
+        var backtraceFormatter = BacktraceJSONFormatter(
+          crashLog: crashLog,
+          writer: writer,
+          options: options)
+
+        backtraceFormatter.writeCrashLog(now: now.iso8601)
+    }
+
+    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    // On Darwin, if Developer Mode is turned off, or we can't tell if it's
+    // on or not, disable interactivity
+    var developerMode: Int32 = 0
+    var developerModeSize: Int = MemoryLayout<Int32>.size
+    if args.interactive
+         && (sysctlbyname("security.mac.amfi.developer_mode_status",
+                         &developerMode,
+                         &developerModeSize,
+                         nil,
+                         0) == -1
+               || developerMode == 0) {
+      args.interactive = false
+    }
+    #endif
+
+    if args.interactive {
+      #if !os(Windows)
+      // Make sure we're line buffered
+      setvbuf(stdout, nil, _IOLBF, 0)
+      #endif
+
+      while let ch = waitForKey("Press space to interact, D to debug, or any other key to quit",
+                                timeout: args.timeout) {
+        switch UInt8(ch) {
+          case UInt8(ascii: " "):
+            interactWithUser()
+            exit(0)
+          case UInt8(ascii: "D"), UInt8(ascii: "d"):
+            startDebugger()
+          default:
+            exit(0)
+        }
+      }
+    }
+
+  }
+
+  // Parse the command line arguments; we can't use swift-argument-parser
+  // from here because that would create a dependency problem, so we do
+  // it manually.
+  static func parseArguments() {
+    var currentArg: String? = nil
+    for arg in CommandLine.arguments[1...] {
+      if arg.hasPrefix("-") {
+        if let key = currentArg {
+          handleArgument(key, value: nil)
+        }
+        currentArg = arg
+      } else {
+        if let key = currentArg {
+          handleArgument(key, value: arg)
+          currentArg = nil
+        } else if arg != "" {
+          print("swift-backtrace: unexpected argument '\(arg)'",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
+      }
+    }
+    if let key = currentArg {
+      handleArgument(key, value: nil)
+    }
+  }
+
+  #if os(Linux) || os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  static func setRawMode() -> termios {
+    var oldAttrs = termios()
+    tcgetattr(0, &oldAttrs)
+
+    var newAttrs = oldAttrs
+
+    #if os(Linux)
+    newAttrs.c_lflag &= ~UInt32(ICANON | ECHO)
+    #else
+    newAttrs.c_lflag &= ~UInt(ICANON | ECHO)
+    #endif
+
+    tcsetattr(0, TCSANOW, &newAttrs)
+
+    return oldAttrs
+  }
+
+  static func resetInputMode(mode: termios) {
+    var theMode = mode
+    tcsetattr(0, TCSANOW, &theMode)
+  }
+
+  static func waitForKey(_ message: String, timeout: Int?) -> Int32? {
+    let oldMode = setRawMode()
+
+    defer {
+      write("\r\u{1b}[0K", flush: true)
+      resetInputMode(mode: oldMode)
+    }
+
+    if let timeout = timeout {
+      var remaining = timeout
+
+      while true {
+        write("\r\(message) (\(remaining)s) ", flush: true)
+
+        var pfd = pollfd(fd: 0, events: Int16(POLLIN), revents: 0)
+
+        let ret = poll(&pfd, 1, 1000)
+        if ret == 0 {
+          remaining -= 1
+          if remaining == 0 {
+            break
+          }
+          continue
+        } else if ret < 0 {
+          break
+        }
+
+        return getchar()
+      }
+    } else {
+      write("\r\(message)", flush: true)
+      return getchar()
+    }
+
+    return nil
+  }
+  #elseif os(Windows)
+  static func waitForKey(_ message: String, timeout: Int?) -> Int32? {
+    let inputHandle = HANDLE(bitPattern: _get_osfhandle(0))
+    //let inputHandle = GetStdHandle(STD_INPUT_HANDLE)
+
+    defer {
+      write("\r\u{1b}[0K", flush: true)
+    }
+
+    _ = FlushConsoleInputBuffer(inputHandle)
+
+    if let timeout = timeout {
+      let target = GetTickCount() &+ DWORD(1000 * timeout)
+
+      while true {
+        let ticks = GetTickCount()
+
+        // ticks will wrap every 49 days, so take care!
+        var remainingMs = target &- ticks
+        if remainingMs >= 0x80000000 {
+          remainingMs = 0
+        }
+        let remaining = remainingMs / 1000
+
+        write("\r\(message) (\(remaining)s) ", flush: true)
+
+        let ret = WaitForSingleObject(inputHandle, min(remainingMs, 100))
+
+        if ret == WAIT_TIMEOUT {
+          if remaining == 0 {
+            break
+          }
+          continue
+        } else if ret == WAIT_FAILED {
+          break
+        } else if ret == WAIT_OBJECT_0 {
+          let result =
+            withUnsafeTemporaryAllocation(of: INPUT_RECORD.self,
+                                          capacity: 16) {
+              (buffer: UnsafeMutableBufferPointer<INPUT_RECORD>) -> Int32? in
+
+              // If inputHandle isn't a console, this might fail, which is
+              // fine; in that case, call _getch().  This might happen if
+              // the program is really running inside an older Windows
+              // terminal emulator that's using a pipe instead of the new
+              // pseudoconsole support.
+              var dwRead: DWORD = 0
+
+              if ReadConsoleInputA(inputHandle,
+                                   buffer.baseAddress,
+                                   DWORD(buffer.count),
+                                   &dwRead) {
+                for ndx in 0..<Int(dwRead) {
+                  let event = buffer[ndx]
+                  // Eat non-key-events
+                  if event.EventType != KEY_EVENT {
+                    continue
+                  }
+                  if event.Event.KeyEvent.bKeyDown.boolValue {
+                    return Int32(event.Event.KeyEvent.uChar.AsciiChar)
+                  }
+                }
+                return nil
+              } else {
+                return _getch()
+              }
+            }
+
+          if let result {
+            return result
+          }
+        }
+      }
+    } else {
+      write("\r\(message)", flush: true)
+      return _getch()
+    }
+
+    return nil
+  }
+  #endif
+
+  static func backtraceFormatter() -> BacktraceFormatter {
+    var width = 80
+
+    #if !os(Windows)
+    var terminalSize = winsize(ws_row: 24, ws_col: 80,
+                               ws_xpixel: 1024, ws_ypixel: 768)
+
+    _ = ioctl(0, CUnsignedLong(TIOCGWINSZ), &terminalSize)
+
+    width = Int(terminalSize.ws_col)
+    #else
+    var consoleInfo = CONSOLE_SCREEN_BUFFER_INFO()
+    if GetConsoleScreenBufferInfo(outputStream!.handle,
+                                  &consoleInfo) {
+      width = Int(consoleInfo.dwSize.X)
+    }
+    #endif
+
+    return BacktraceFormatter(formattingOptions
+                              .theme(theme)
+                              .width(width))
+  }
+
+  static func printCrashLog() {
+    guard let target = target else {
+      print("swift-backtrace: unable to get target",
+            to: &standardError)
+      return
+    }
+
+    let crashingThread = target.threads[target.crashingThreadNdx]
+
+    let description: String
+
+    if case let .symbolicated(symbolicated) = crashingThread.backtrace,
+       let failure = symbolicated.swiftRuntimeFailure {
+      description = failure
+    } else {
+      description = "Program crashed: \(target.signalDescription) at \(hex(target.faultAddress))"
+    }
+
+    writeln(theme.crashReason(description))
+
+    var mentionedImages = Set<Int>()
+    let formatter = backtraceFormatter()
+
+    let architecture: String
+    switch crashingThread.backtrace {
+      case let .raw(backtrace):
+        architecture = backtrace.architecture
+      case let .symbolicated(backtrace):
+        architecture = backtrace.architecture
+    }
+
+    writeln("\nPlatform: \(theme.architecture(architecture)) \(theme.platform(target.images.platform))")
+
+    func dump(ndx: Int, thread: TargetThread) {
+      let crashed = thread.id == target.crashingThread ? " crashed" : ""
+      let name = !thread.name.isEmpty ? " \"\(thread.name)\"" : ""
+      writeln("\nThread \(ndx)\(name)\(crashed):\n")
+
+      if args.registers! == .all {
+        if let context = thread.context {
+          showRegisters(context)
+        } else {
+          writeln("  " + theme.info("no context for thread \(ndx)"))
+        }
+        writeln("")
+      }
+
+      let formatted: String
+      switch thread.backtrace {
+        case let .raw(backtrace):
+          formatted = formatter.format(backtrace: backtrace)
+        case let .symbolicated(backtrace):
+          formatted = formatter.format(backtrace: backtrace)
+      }
+
+      writeln(formatted)
+
+      if args.showImages! == .mentioned {
+        switch thread.backtrace {
+          case let .raw(backtrace):
+            for frame in backtrace.frames {
+              let address = frame.adjustedProgramCounter
+              if let imageNdx = target.images.firstIndex(
+                   where: { address >= $0.baseAddress
+                              && address < $0.endOfText }
+                 ) {
+                mentionedImages.insert(imageNdx)
+              }
+            }
+          case let .symbolicated(backtrace):
+            for frame in backtrace.frames {
+              if formatter.shouldSkip(frame) {
+                continue
+              }
+              if let symbol = frame.symbol, symbol.imageIndex >= 0 {
+                mentionedImages.insert(symbol.imageIndex)
+              }
+            }
+        }
+      }
+    }
+
+    dump(ndx: target.crashingThreadNdx, thread: crashingThread)
+    if args.threads! {
+      for (ndx, thread) in target.threads.enumerated() where ndx != target.crashingThreadNdx {
+        dump(ndx: ndx, thread: thread)
+      }
+    }
+
+    if args.registers! == .crashedOnly {
+      writeln("\n\nRegisters:\n")
+
+      if let context = target.threads[target.crashingThreadNdx].context {
+        showRegisters(context)
+      } else {
+        writeln(theme.info("no context for thread \(target.crashingThreadNdx)"))
+      }
+    }
+
+    switch args.showImages! {
+      case .none:
+        break
+      case .mentioned:
+        let images = mentionedImages.sorted().map{ target.images[$0] }
+        let omitted = target.images.count - images.count
+        if omitted > 0 {
+          writeln("\n\nImages (\(omitted) omitted):\n")
+        } else {
+          writeln("\n\nImages:\n")
+        }
+        writeln(formatter.format(images: images))
+      case .all:
+        writeln("\n\nImages:\n")
+        writeln(formatter.format(images: target.images))
+    }
+  }
+
+  static func startDebugger() {
+    guard let target = target else {
+      return
+    }
+
+    do {
+      try target.withDebugger {
+        if let ch = waitForKey("Press any key once LLDB is attached, or A to abort", timeout: nil),
+           ch != UInt8(ascii: "A") && ch != UInt8(ascii: "a") {
+          return .handOffToDebugger
+        }
+
+        return .abort
+      }
+    } catch {
+      writeln(theme.error("unable to spawn debugger"))
+    }
+  }
+
+  static func interactWithUser() {
+    guard let target = target else {
+      return
+    }
+
+    while true {
+      outputStream!.flush()
+      write(theme.prompt(">>> "), flush: true)
+      guard let input = readLine() else {
+        print("")
+        break
+      }
+
+      let cmd = input.split(whereSeparator: { $0.isWhitespace })
+
+      if cmd.count < 1 {
+        continue
+      }
+
+      // ###TODO: We should really replace this with something a little neater
+      switch cmd[0].lowercased() {
+        case "exit", "quit":
+          return
+        case "debug":
+          startDebugger()
+        case "bt", "backtrace":
+          let formatter = backtraceFormatter()
+          let formatted: String
+          switch target.threads[currentThread].backtrace {
+            case let .raw(backtrace):
+              formatted = formatter.format(backtrace: backtrace)
+            case let .symbolicated(backtrace):
+              formatted = formatter.format(backtrace: backtrace)
+          }
+          writeln(formatted)
+        case "thread":
+          if cmd.count >= 2 {
+            if let newThreadNdx = Int(cmd[1]),
+               newThreadNdx >= 0 && newThreadNdx < target.threads.count {
+              currentThread = newThreadNdx
+            } else {
+              writeln(theme.error("Bad thread index '\(cmd[1])'"))
+              break
+            }
+          }
+
+          let crashed: String
+          if currentThread == target.crashingThreadNdx {
+            crashed = " (crashed)"
+          } else {
+            crashed = ""
+          }
+
+          let thread = target.threads[currentThread]
+          let name = thread.name.isEmpty ? "" : " \(thread.name)"
+          writeln("Thread \(currentThread) id=\(thread.id)\(name)\(crashed)\n")
+
+          let formatter = backtraceFormatter()
+          switch thread.backtrace {
+            case let .raw(backtrace):
+              if let frame = backtrace.frames.consumingFirst {
+                let formatted = formatter.format(frame: frame)
+                writeln("\(formatted)")
+              }
+            case let .symbolicated(backtrace):
+              if let frame = backtrace.frames.drop(while: {
+                $0.isSwiftRuntimeFailure
+              }).consumingFirst {
+                let formatted = formatter.format(frame: frame)
+                writeln("\(formatted)")
+              }
+          }
+          break
+        case "reg", "registers":
+          if let context = target.threads[currentThread].context {
+            showRegisters(context)
+          } else {
+            writeln(theme.info("no context for thread \(currentThread)"))
+          }
+          break
+        case "mem", "memory":
+          if cmd.count != 2 && cmd.count != 3 {
+            writeln("memory <start-address> [<end-address>|+<byte-count>]")
+            break
+          }
+
+          guard let startAddress = parseUInt64(cmd[1]) else {
+            writeln(theme.error("bad start address \(cmd[1])"))
+            break
+          }
+
+          let count: UInt64
+          if cmd.count == 3 {
+            if cmd[2].hasPrefix("+") {
+              guard let theCount = parseUInt64(cmd[2].dropFirst()) else {
+                writeln(theme.error("bad byte count \(cmd[2])"))
+                break
+              }
+              count = theCount
+            } else {
+              guard let addr = parseUInt64(cmd[2]) else {
+                writeln(theme.error("bad end address \(cmd[2])"))
+                break
+              }
+              if addr < startAddress {
+                writeln("End address must be after start address")
+                break
+              }
+              count = addr - startAddress
+            }
+          } else {
+            count = 256
+          }
+
+          dumpMemory(at: startAddress, count: count)
+          break
+        case "process", "threads":
+          writeln("Process \(target.pid) \"\(target.name)\" has \(target.threads.count) thread(s):\n")
+
+          let formatter = backtraceFormatter()
+
+          var rows: [BacktraceFormatter.TableRow] = []
+          for (n, thread) in target.threads.enumerated() {
+            let crashed: String
+            if n == target.crashingThreadNdx {
+              crashed = " (crashed)"
+            } else {
+              crashed = ""
+            }
+
+            let selected = currentThread == n ? "▶︎" : " "
+            let name = thread.name.isEmpty ? "" : " \(thread.name)"
+
+            rows.append(.columns([ selected,
+                                   "\(n)",
+                                   "id=\(thread.id)\(name)\(crashed)" ]))
+
+            switch thread.backtrace {
+              case let .raw(backtrace):
+                if let frame = backtrace.frames.consumingFirst {
+                  rows += formatter.formatRows(
+                    frame: frame
+                  ).map{ row in
+
+                    switch row {
+                      case let .columns(columns):
+                        return .columns([ "", "" ] + columns)
+                      default:
+                        return row
+                    }
+                  }
+                }
+              case let .symbolicated(backtrace):
+                if let frame = backtrace.frames.drop(while: {
+                  $0.isSwiftRuntimeFailure
+                }).consumingFirst {
+                  rows += formatter.formatRows(
+                    frame: frame
+                  ).map{ row in
+
+                    switch row {
+                      case let .columns(columns):
+                        return .columns([ "", "" ] + columns)
+                      default:
+                        return row
+                    }
+                  }
+                }
+            }
+          }
+
+          let output = BacktraceFormatter.formatTable(rows,
+                                                      alignments: [
+                                                        .left,
+                                                        .right
+                                                      ])
+          writeln(output)
+        case "images":
+          let formatter = backtraceFormatter()
+          let images = target.images
+          let output = formatter.format(images: images)
+
+          writeln(output)
+        case "set":
+          if cmd.count == 1 {
+            let limit: String
+            if let lim = args.limit {
+              limit = "\(lim)"
+            } else {
+              limit = "none"
+            }
+            let top = "\(args.top)"
+
+            writeln("""
+                    addresses      = \(formattingOptions.shouldShowAddresses)
+                    demangle       = \(formattingOptions.shouldDemangle)
+                    frame-attrs    = \(formattingOptions.shouldShowFrameAttributes)
+                    image-names    = \(formattingOptions.shouldShowImageNames)
+                    limit          = \(limit)
+                    sanitize       = \(formattingOptions.shouldSanitizePaths)
+                    source         = \(formattingOptions.shouldShowSourceCode)
+                    source-context = \(formattingOptions.sourceContextLines)
+                    system-frames  = \(!formattingOptions.shouldSkipSystemFrames)
+                    thunks         = \(!formattingOptions.shouldSkipThunkFunctions)
+                    top            = \(top)
+                    symbolicate    = \(args.symbolicate)
+                    """)
+          } else {
+            for optval in cmd[1...] {
+              let parts = optval.split(separator: "=", maxSplits: 1,
+                                       omittingEmptySubsequences: false)
+              if parts.count == 1 {
+                let option = parts[0]
+
+                switch option {
+                  case "addresses":
+                    writeln("addresses = \(formattingOptions.shouldShowAddresses)")
+                  case "demangle":
+                    writeln("demangle = \(formattingOptions.shouldDemangle)")
+                  case "frame-attrs":
+                    writeln("frame-attrs = \(formattingOptions.shouldShowFrameAttributes)")
+                  case "image-names":
+                    writeln("image-names = \(formattingOptions.shouldShowImageNames)")
+                  case "limit":
+                    if let limit = args.limit {
+                      writeln("limit = \(limit)")
+                    } else {
+                      writeln("limit = none")
+                    }
+                  case "sanitize":
+                    writeln("sanitize = \(formattingOptions.shouldSanitizePaths)")
+                  case "source":
+                    writeln("source = \(formattingOptions.shouldShowSourceCode)")
+                  case "source-context":
+                    writeln("source-context = \(formattingOptions.sourceContextLines)")
+                  case "system-frames":
+                    writeln("system-frames = \(!formattingOptions.shouldSkipSystemFrames)")
+                  case "thunks":
+                    writeln("thunks = \(!formattingOptions.shouldSkipThunkFunctions)")
+                  case "top":
+                    writeln("top = \(args.top)")
+                  case "symbolicate":
+                    writeln("symbolicate = \(args.symbolicate)")
+                  default:
+                    writeln(theme.error("unknown option '\(option)'"))
+                }
+              } else {
+                let option = parts[0]
+                let value = parts[1]
+                var changedBacktrace = false
+
+                switch option {
+                  case "limit":
+                    if value == "none" {
+                      args.limit = nil
+                      changedBacktrace = true
+                    } else if let limit = Int(value), limit > 0 {
+                      args.limit = limit
+                      changedBacktrace = true
+                    } else {
+                      writeln(theme.error("bad limit value '\(value)'"))
+                    }
+
+                  case "top":
+                    if let top = Int(value), top >= 0 {
+                      args.top = top
+                      changedBacktrace = true
+                    } else {
+                      writeln(theme.error("bad top value '\(value)'"))
+                    }
+
+                  case "source":
+                    formattingOptions =
+                      formattingOptions.showSourceCode(parseBool(value),
+                                                       contextLines: formattingOptions.sourceContextLines)
+
+                  case "source-context":
+                    if let lines = Int(value), lines >= 0 {
+                      formattingOptions =
+                        formattingOptions.showSourceCode(formattingOptions.shouldShowSourceCode,
+                                                         contextLines: lines)
+                    } else {
+                      writeln(theme.error("bad source-context value '\(value)'"))
+                    }
+
+                  case "thunks":
+                    formattingOptions =
+                      formattingOptions.skipThunkFunctions(!parseBool(value))
+
+                  case "system-frames":
+                    formattingOptions =
+                      formattingOptions.skipSystemFrames(!parseBool(value))
+
+                  case "frame-attrs":
+                    formattingOptions =
+                      formattingOptions.showFrameAttributes(parseBool(value))
+
+                  case "addresses":
+                    formattingOptions =
+                      formattingOptions.showAddresses(parseBool(value))
+
+                  case "sanitize":
+                    formattingOptions =
+                      formattingOptions.sanitizePaths(parseBool(value))
+
+                  case "demangle":
+                    formattingOptions =
+                      formattingOptions.demangle(parseBool(value))
+
+                  case "image-names":
+                    formattingOptions =
+                      formattingOptions.showImageNames(parseBool(value))
+
+                  case "symbolicate":
+                    let oldSymbolicate = args.symbolicate
+
+                    switch value.lowercased() {
+                      case "off":
+                        args.symbolicate = .off
+                      case "fast":
+                        args.symbolicate = .fast
+                      case "full":
+                        args.symbolicate = .full
+                      default:
+                        writeln(theme.error("bad symbolicate value '\(value)'"))
+                    }
+
+                    if args.symbolicate != oldSymbolicate {
+                      changedBacktrace = true
+                    }
+                  default:
+                    writeln(theme.error("unknown option '\(option)'"))
+                }
+
+                if changedBacktrace {
+                  target.redoBacktraces(limit: args.limit,
+                                        top: args.top,
+                                        cache: args.cache,
+                                        symbolicate: args.symbolicate)
+                }
+              }
+            }
+          }
+        case "help":
+          writeln("""
+                  Available commands:
+
+                  backtrace  Display a backtrace.
+                  bt         Synonym for backtrace.
+                  debug      Attach the debugger.
+                  exit       Exit interaction, allowing program to crash normally.
+                  help       Display help.
+                  images     List images loaded by the program.
+                  mem        Synonym for memory.
+                  memory     Inspect memory.
+                  process    Show information about the process.
+                  quit       Synonym for exit.
+                  reg        Synonym for registers.
+                  registers  Display the registers.
+                  set        Set or show options.
+                  thread     Show or set the current thread.
+                  threads    Synonym for process.
+                  """)
+        default:
+          writeln(theme.error("unknown command '\(cmd[0])'"))
+      }
+
+      writeln("")
+    }
+  }
+
+  static func printableBytes(from bytes: some Sequence<UInt8>) -> String {
+    // It would be nice to join these with ZWNJs to prevent ligature processing,
+    // but sadly Terminal displays ZWNJ as a space character.
+    return bytes.map{ byte in
+      switch byte {
+        case 0..<32, 127, 0x80..<0xa0:
+          return theme.nonPrintable("·")
+        default:
+          return theme.printable(String(Unicode.Scalar(byte)))
+      }
+    }.joined(separator:"")
+  }
+
+  static func dumpMemory(at address: UInt64, count: UInt64) {
+    guard let bytes = try? target!.reader.fetch(
+            from: RemoteMemoryReader.Address(address),
+            count: Int(count),
+            as: UInt8.self) else {
+      writeln("Unable to read memory")
+      return
+    }
+
+    let startAddress = HostContext.stripPtrAuth(address: address)
+    var ndx = 0
+    while ndx < bytes.count {
+      let addr = startAddress + UInt64(ndx)
+      let remaining = bytes.count - ndx
+      let lineChunk = 16
+      let todo = min(remaining, lineChunk)
+      let formattedBytes = theme.data(bytes[ndx..<ndx+todo].map{
+        hex($0, withPrefix: false)
+      }.joined(separator: " "))
+      let printedBytes = printableBytes(from: bytes[ndx..<ndx+todo])
+      let padding = String(repeating: " ",
+                           count: (lineChunk - todo) * 3)
+
+      let hexAddr = theme.address(hex(addr, withPrefix: false))
+      writeln("\(hexAddr)  \(formattedBytes)\(padding)  \(printedBytes)")
+
+      ndx += todo
+    }
+  }
+
+  static func showRegister<T: FixedWidthInteger>(name: String, value: T) {
+    let hexValue = theme.hexValue(hex(value))
+
+    // Pad the register name
+    let regPad = String(repeating: " ", count: max(3 - name.count, 0))
+    let reg = theme.register(regPad + name)
+
+    // Grab 16 bytes at each address if possible
+    if let bytes = try? target!.reader.fetch(
+         from: RemoteMemoryReader.Address(value),
+         count: 16,
+         as: UInt8.self) {
+      if args.sanitize ?? false {
+        writeln("\(reg) \(hexValue)  <memory>")
+      } else {
+        let formattedBytes = theme.data(bytes.map{
+                                          hex($0, withPrefix: false)
+                                        }.joined(separator: " "))
+        let printedBytes = printableBytes(from: bytes)
+        writeln("\(reg) \(hexValue)  \(formattedBytes)  \(printedBytes)")
+      }
+    } else {
+      let decValue = theme.decimalValue("\(value)")
+      writeln("\(reg) \(hexValue)  \(decValue)")
+    }
+  }
+
+  static func showGPR<C: Context>(name: String, context: C, register: C.Register) {
+    // Get the register contents
+    let value = context.getRegister(register)!
+
+    showRegister(name: name, value: value)
+  }
+
+  static func showGPRs<C: Context, Rs: Sequence>(_ context: C, range: Rs) where Rs.Element == C.Register {
+    for reg in range {
+      showGPR(name: "\(reg)", context: context, register: reg)
+    }
+  }
+
+  static func x86StatusFlags<T: FixedWidthInteger>(_ flags: T) -> String {
+    var status: [String] = []
+
+    if (flags & 0x400) != 0 {
+      status.append("OF")
+    }
+    if (flags & 0x80) != 0 {
+      status.append("SF")
+    }
+    if (flags & 0x40) != 0 {
+      status.append("ZF")
+    }
+    if (flags & 0x10) != 0 {
+      status.append("AF")
+    }
+    if (flags & 0x4) != 0 {
+      status.append("PF")
+    }
+    if (flags & 0x1) != 0 {
+      status.append("CF")
+    }
+
+    return status.joined(separator: " ")
+  }
+
+  static func showRegisters(_ context: X86_64Context) {
+    showGPRs(context, range: .rax ... .r15)
+    showRegister(name: "rip", value: context.programCounter)
+
+    let rflags = context.getRegister(.rflags)!
+    let cs = theme.hexValue(hex(UInt16(context.getRegister(.cs)!)))
+    let fs = theme.hexValue(hex(UInt16(context.getRegister(.fs)!)))
+    let gs = theme.hexValue(hex(UInt16(context.getRegister(.gs)!)))
+
+    let hexFlags = theme.hexValue(hex(rflags))
+    let status = theme.flags(x86StatusFlags(rflags))
+
+    writeln("")
+    writeln("\(theme.register("rflags")) \(hexFlags)  \(status)")
+    writeln("")
+    writeln("\(theme.register("cs")) \(cs)  \(theme.register("fs")) \(fs)  \(theme.register("gs")) \(gs)")
+  }
+
+  static func showRegisters(_ context: I386Context) {
+    showGPRs(context, range: .eax ... .edi)
+    showRegister(name: "eip", value: context.programCounter)
+
+    let eflags = UInt32(context.getRegister(.eflags)!)
+    let es = theme.hexValue(hex(UInt16(context.getRegister(.es)!)))
+    let cs = theme.hexValue(hex(UInt16(context.getRegister(.cs)!)))
+    let ss = theme.hexValue(hex(UInt16(context.getRegister(.ss)!)))
+    let ds = theme.hexValue(hex(UInt16(context.getRegister(.ds)!)))
+    let fs = theme.hexValue(hex(UInt16(context.getRegister(.fs)!)))
+    let gs = theme.hexValue(hex(UInt16(context.getRegister(.gs)!)))
+
+    let hexFlags = theme.hexValue(hex(eflags))
+    let status = theme.flags(x86StatusFlags(eflags))
+
+    writeln("")
+    writeln("\(theme.register("eflags")) \(hexFlags)  \(status)")
+    writeln("")
+    writeln("\(theme.register("es")): \(es) \(theme.register("cs")): \(cs) \(theme.register("ss")): \(ss) \(theme.register("ds")): \(ds) \(theme.register("fs")): \(fs) \(theme.register("gs")): \(gs)")
+  }
+
+  static func showRegisters(_ context: ARM64Context) {
+    showGPRs(context, range: .x0 ..< .x29)
+    showGPR(name: "fp", context: context, register: .x29)
+    showGPR(name: "lr", context: context, register: .x30)
+    showGPR(name: "sp", context: context, register: .sp)
+    showGPR(name: "pc", context: context, register: .pc)
+  }
+
+  static func showRegisters(_ context: ARMContext) {
+    showGPRs(context, range: .r0 ... .r10)
+    showGPR(name: "fp", context: context, register: .r11)
+    showGPR(name: "ip", context: context, register: .r12)
+    showGPR(name: "sp", context: context, register: .r13)
+    showGPR(name: "lr", context: context, register: .r14)
+    showGPR(name: "pc", context: context, register: .r15)
+  }
+}
+
+#if os(Windows)
+let INVALID_HANDLE_VALUE = HANDLE(bitPattern: -1)!
+
+// Make CreateFile a bit easier to use
+func CreateFile(_ filename: String,
+                _ dwDesiredAccess: DWORD,
+                _ dwShareMode: DWORD,
+                _ lpSecurityAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?,
+                _ dwCreationDisposition: DWORD,
+                _ dwFlagsAndAttributes: DWORD,
+                _ hTemplateFile: HANDLE?) -> HANDLE {
+  return filename.withCString(encodedAs: UTF16.self) { lpwszFilename in
+    return CreateFileW(lpwszFilename,
+                       dwDesiredAccess,
+                       dwShareMode,
+                       lpSecurityAttributes,
+                       dwCreationDisposition,
+                       dwFlagsAndAttributes,
+                       hTemplateFile)
+  }
+}
+#endif
+
+#else
+
+@main
+internal struct SwiftBacktrace {
+  static public func main() {
+    print("swift-backtrace: not supported on this platform.")
+  }
+}
+
+#endif // os(macOS)

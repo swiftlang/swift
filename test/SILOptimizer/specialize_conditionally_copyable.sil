@@ -1,0 +1,66 @@
+// RUN: %target-sil-opt -generic-specializer %s | %FileCheck %s
+
+import Builtin
+import Swift
+import SwiftShims
+
+public struct Container<Element> : ~Copyable where Element : ~Copyable {
+  @_hasStorage var _storage: UnsafeMutableBufferPointer<Element> { get set }
+  @_hasStorage var count: Int32 { get set }
+}
+
+extension Container : Copyable where Element : Copyable {
+}
+
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s4foo1s5Int32V_Tg5 : $@convention(method) (Container<Int32>) -> Int32 
+// CHECK-NOT: load_borrow
+// CHECK-NOT: end_borrow
+// CHECK-LABEL: } // end sil function '$s4foo1s5Int32V_Tg5'
+sil [ossa] [noinline] @foo1 : $@convention(method) <T where T : ~Copyable> (@in_guaranteed Container<T>) -> Int32 {
+bb0(%0 : $*Container<T>):
+  %ld = load_borrow %0
+  %count = struct_extract %ld, #Container.count
+  end_borrow %ld
+  return %count
+}
+
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s4foo2s5Int32V_Tg5 : $@convention(method) (Container<Int32>) -> Int32 {
+// CHECK-NOT: begin_borrow
+// CHECK-NOT: end_borrow
+// CHECK-LABEL: } // end sil function '$s4foo2s5Int32V_Tg5'
+
+sil [ossa] [noinline] @foo2 : $@convention(method) <T where T : ~Copyable> (@in_guaranteed Container<T>) -> Int32 {
+bb0(%0 : $*Container<T>):
+  %ld = load [copy] %0
+  %b = begin_borrow %ld
+  %count = struct_extract %b, #Container.count
+  end_borrow %b
+  destroy_value %ld
+  return %count
+}
+
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s4foo3s5Int32V_Tg5 : $@convention(method) (@inout Container<Int32>, @owned Container<Int32>) -> () {
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function '$s4foo3s5Int32V_Tg5'
+sil [ossa] [noinline] @foo3 : $@convention(method) <T where T : ~Copyable> (@inout Container<T>, @owned Container<T>) -> () {
+bb0(%0 : $*Container<T>, %1 : @owned $Container<T>):
+  %copy = copy_value %1
+  store %1 to [assign] %0
+  destroy_addr %0
+  store %copy to [init] %0
+  %t = tuple ()
+  return %t
+}
+  
+sil [ossa] [noinline] @bar : $@convention(method) (@in_guaranteed Container<Int32>, @inout Container<Int32>, Container<Int32>) -> () {
+bb0(%0 : $*Container<Int32>, %1 : $*Container<Int32>, %2 : $Container<Int32>):
+  %foo1 = function_ref @foo1 : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed Container<τ_0_0>) -> Int32
+  %count1 = apply %foo1<Int32>(%0) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed Container<τ_0_0>) -> Int32 
+  %foo2 = function_ref @foo2 : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed Container<τ_0_0>) -> Int32
+  %count2 = apply %foo2<Int32>(%0) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed Container<τ_0_0>) -> Int32 
+  %foo3 = function_ref @foo3 : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout Container<τ_0_0>, @owned Container<τ_0_0>) -> ()
+  apply %foo3<Int32>(%1, %2) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout Container<τ_0_0>, @owned Container<τ_0_0>) -> ()
+  %t = tuple ()
+  return %t
+}
+

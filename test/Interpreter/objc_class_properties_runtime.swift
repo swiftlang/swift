@@ -2,7 +2,7 @@
 
 // RUN: %clang -arch %target-cpu -target %target-cpu-apple-macosx10.11 -isysroot %sdk -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
 
-// RUN: %swiftc_driver -target $(echo '%target-triple' | sed -E -e 's/macosx10.(9|10).*/macosx10.11/') -sdk %sdk -I %S/Inputs/ObjCClasses/ %t/ObjCClasses.o %s -o %t/a.out
+// RUN: %target-swiftc_driver -sdk %sdk -I %S/Inputs/ObjCClasses/ %t/ObjCClasses.o %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 

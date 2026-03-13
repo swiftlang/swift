@@ -15,8 +15,8 @@ bb0:
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK-LABEL: [always_inline] @noinline_callee
-sil [always_inline] @noinline_callee : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// CHECK-LABEL: [heuristic_always_inline] @noinline_callee
+sil [heuristic_always_inline] @noinline_callee : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %2 = integer_literal $Builtin.Int1, 0
   %3 = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)

@@ -65,25 +65,25 @@ struct DocStructureArrayBuilder::Implementation {
   typedef CompactArrayBuilder<unsigned> StructureArrayBuilder;
   SmallVector<char, 256> structureArrayBuffer;
 
-  CompactArrayBuilder<unsigned,            // Offset
-                      unsigned,            // Length
-                      UIdent,              // Kind
-                      UIdent,              // AccessLevel
-                      UIdent,              // SetterAccessLevel
-                      unsigned,            // NameOffset
-                      unsigned,            // NameLength
-                      unsigned,            // BodyOffset
-                      unsigned,            // BodyLength
-                      unsigned,            // DocOffset
-                      unsigned,            // DocLength
-                      Optional<StringRef>, // DisplayName
-                      Optional<StringRef>, // TypeName
-                      Optional<StringRef>, // RuntimeName
-                      Optional<StringRef>, // SelectorName
-                      unsigned,            // InheritedTypesOffset
-                      unsigned,            // AttrsOffset
-                      unsigned,            // ElementsOffset
-                      unsigned             // ChildrenOffset
+  CompactArrayBuilder<unsigned,                 // Offset
+                      unsigned,                 // Length
+                      UIdent,                   // Kind
+                      UIdent,                   // AccessLevel
+                      UIdent,                   // SetterAccessLevel
+                      unsigned,                 // NameOffset
+                      unsigned,                 // NameLength
+                      unsigned,                 // BodyOffset
+                      unsigned,                 // BodyLength
+                      unsigned,                 // DocOffset
+                      unsigned,                 // DocLength
+                      std::optional<StringRef>, // DisplayName
+                      std::optional<StringRef>, // TypeName
+                      std::optional<StringRef>, // RuntimeName
+                      std::optional<StringRef>, // SelectorName
+                      unsigned,                 // InheritedTypesOffset
+                      unsigned,                 // AttrsOffset
+                      unsigned,                 // ElementsOffset
+                      unsigned                  // ChildrenOffset
                       >
       structureBuilder;
 
@@ -220,9 +220,9 @@ void DocStructureArrayBuilder::endSubStructure() {
     impl.topIndices.push_back(index);
   }
 
-  // Canonicalize empty strings to None for the CompactArray.
-  auto str = [](StringRef str) -> Optional<StringRef> {
-    return str.empty() ? None : Optional<StringRef>(str);
+  // Canonicalize empty strings to std::nullopt for the CompactArray.
+  auto str = [](StringRef str) -> std::optional<StringRef> {
+    return str.empty() ? std::nullopt : std::optional<StringRef>(str);
   };
 
   impl.structureBuilder.addEntry(
@@ -403,7 +403,7 @@ uint64_t DocStructureArrayReader::getHeaderValue(unsigned index) const {
   do {                                                                         \
     sourcekitd_uid_t key = SKDUIDFromUIdent(K);                                \
     sourcekitd_variant_t var = make##Ty##Variant(Field);                       \
-    if (!applier(key, var))                                                    \
+    if (!applier(key, var, context))                                           \
       return false;                                                            \
   } while (0)
 
@@ -414,8 +414,8 @@ struct ElementReader {
 
   static bool
   dictionary_apply(void *buffer, size_t index,
-                   llvm::function_ref<bool(sourcekitd_uid_t,
-                                           sourcekitd_variant_t)> applier) {
+                   sourcekitd_variant_dictionary_applier_f_t applier,
+                   void *context) {
 
     CompactArrayReaderTy reader(buffer);
     sourcekitd_uid_t kind;
@@ -434,8 +434,8 @@ struct InheritedTypeReader {
 
   static bool
   dictionary_apply(void *buffer, size_t index,
-                   llvm::function_ref<bool(sourcekitd_uid_t,
-                                           sourcekitd_variant_t)> applier) {
+                   sourcekitd_variant_dictionary_applier_f_t applier,
+                   void *context) {
 
     CompactArrayReaderTy reader(buffer);
     const char *value = nullptr;
@@ -451,9 +451,8 @@ struct AttributesReader {
 
   static bool
   dictionary_apply(void *buffer, size_t index,
-                   llvm::function_ref<bool(sourcekitd_uid_t,
-                                           sourcekitd_variant_t)> applier) {
-
+                   sourcekitd_variant_dictionary_applier_f_t applier,
+                   void *context) {
     CompactArrayReaderTy reader(buffer);
     sourcekitd_uid_t value;
     unsigned offset;
@@ -470,8 +469,8 @@ struct AttributesReader {
 struct DocStructureReader {
   static bool
   dictionary_apply(void *buffer, size_t index,
-                   llvm::function_ref<bool(sourcekitd_uid_t,
-                                           sourcekitd_variant_t)> applier) {
+                   sourcekitd_variant_dictionary_applier_f_t applier,
+                   void *context) {
     auto reader = DocStructureArrayReader(buffer);
     auto node = reader.readStructure(index);
 
@@ -509,7 +508,7 @@ struct DocStructureReader {
     sourcekitd_variant_t var = {                                               \
         {(uintptr_t)getVariantFunctionsFor##Kind##Array(), (uintptr_t)Buf,     \
          Off}};                                                                \
-    if (!applier(key, var))                                                    \
+    if (!applier(key, var, context))                                           \
       return false;                                                            \
   } while (0)
 
@@ -571,14 +570,17 @@ VariantFunctions DocStructureArrayFuncs::funcs = {
     get_type,
     nullptr /*AnnotArray_array_apply*/,
     nullptr /*AnnotArray_array_get_bool*/,
+    nullptr /*AnnotArray_array_get_double*/,
     array_get_count,
     nullptr /*AnnotArray_array_get_int64*/,
     nullptr /*AnnotArray_array_get_string*/,
     nullptr /*AnnotArray_array_get_uid*/,
     array_get_value,
     nullptr /*AnnotArray_bool_get_value*/,
+    nullptr /*AnnotArray_double_get_value*/,
     nullptr /*AnnotArray_dictionary_apply*/,
     nullptr /*AnnotArray_dictionary_get_bool*/,
+    nullptr /*AnnotArray_dictionary_get_double*/,
     nullptr /*AnnotArray_dictionary_get_int64*/,
     nullptr /*AnnotArray_dictionary_get_string*/,
     nullptr /*AnnotArray_dictionary_get_value*/,

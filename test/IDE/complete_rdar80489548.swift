@@ -1,7 +1,6 @@
-// RUN: %empty-directory(%t.ccp)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
-// KW_IN: Keyword[in]/None: in{{; name=.+$}}
+// KW_IN: Keyword[in]/None/Flair[CommonKeyword]: in{{; name=.+$}}
 // KW_NO_IN-NOT: Keyword[in]
 
 func test(value: [Int]) {

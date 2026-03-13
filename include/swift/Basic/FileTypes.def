@@ -51,12 +51,15 @@ TYPE("swiftmodule",         SwiftModuleFile,           "swiftmodule",     "")
 TYPE("swiftdoc",            SwiftModuleDocFile,        "swiftdoc",        "")
 TYPE("swiftinterface",      SwiftModuleInterfaceFile,  "swiftinterface",  "")
 TYPE("private-swiftinterface", PrivateSwiftModuleInterfaceFile,  "private.swiftinterface",  "")
+TYPE("package-swiftinterface", PackageSwiftModuleInterfaceFile,  "package.swiftinterface",  "")
 TYPE("swiftmodulesummary",  SwiftModuleSummaryFile,    "swiftmodulesummary", "")
 TYPE("swiftsourceinfo",     SwiftSourceInfoFile,       "swiftsourceinfo", "")
 TYPE("assembly",            Assembly,                  "s",               "")
 TYPE("raw-sil",             RawSIL,                    "sil",             "")
+TYPE("lowered-sil",         LoweredSIL,                "sil",             "")
 TYPE("raw-sib",             RawSIB,                    "sib",             "")
 TYPE("llvm-ir",             LLVM_IR,                   "ll",              "")
+TYPE("raw-llvm-ir",         RawLLVM_IR,                "ll",              "")
 TYPE("llvm-bc",             LLVM_BC,                   "bc",              "")
 TYPE("diagnostics",         SerializedDiagnostics,     "dia",             "")
 TYPE("clang-header",        ClangHeader,               "h",               "")
@@ -70,12 +73,13 @@ TYPE("tbd",                 TBD,                       "tbd",             "")
 // engineers can see more details on the "Swift module traces" page in the
 // Swift section of the internal wiki.
 TYPE("module-trace",        ModuleTrace,               "trace.json",      "")
+TYPE("fine-module-trace",   FineModuleTrace,           "",                "")
 
 // Complete dependency information for the given Swift files as JSON.
 TYPE("json-dependencies",   JSONDependencies,          "dependencies.json",      "")
 
-// Complete feature information for the given Swift compiler.
-TYPE("json-features",       JSONFeatures,              "features.json",   "")
+// Complete supported argument information for the given Swift compiler.
+TYPE("json-arguments",      JSONArguments,            "arguments.json",   "")
 
 // Gathered compile-time-known value information for the given Swift input file as JSON.
 TYPE("const-values",       ConstValues,              "swiftconstvalues",   "")
@@ -94,9 +98,14 @@ TYPE("swiftoverlay",        SwiftOverlayFile,          "swiftoverlay",    "")
 
 // Misc types
 TYPE("pcm",                 ClangModuleFile,           "pcm",             "")
+TYPE("symbol-graph",        SymbolGraphFile,           "symbols.json",    "")
 TYPE("pch",                 PCH,                       "pch",             "")
 TYPE("none",                Nothing,                   "",                "")
 
 TYPE("abi-baseline-json",   SwiftABIDescriptor,        "abi.json",        "")
+TYPE("api-descriptor-json", SwiftAPIDescriptor,        "",                "")
+TYPE("fixit",               SwiftFixIt,                "",                "")
+TYPE("module-semantic-info", ModuleSemanticInfo,       "",                "")
+TYPE("cached-diagnostics",  CachedDiagnostics,         "",                "")
 
 #undef TYPE

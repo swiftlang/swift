@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name objc_error %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -Xllvm -sil-print-types -module-name objc_error %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -90,14 +90,14 @@ func testAcceptError(error: Error) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s10objc_error16testProduceError{{[_0-9a-zA-Z]*}}F
 func testProduceError() -> Error {
-  // CHECK: function_ref @produceError : $@convention(c) () -> @autoreleased NSError
+  // CHECK: function_ref @$sSo12produceErrors0B0_pyFTo : $@convention(c) () -> @autoreleased NSError
   // CHECK: init_existential_ref {{.*}} : $NSError : $NSError, $any Error
   return produceError()
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s10objc_error24testProduceOptionalError{{[_0-9a-zA-Z]*}}F
 func testProduceOptionalError() -> Error? {
-  // CHECK: function_ref @produceOptionalError
+  // CHECK: function_ref @$sSo20produceOptionalErrors0C0_pSgyFTo : $@convention(c) () -> @autoreleased Optional<NSError>
   // CHECK: init_existential_ref {{.*}} : $NSError : $NSError, $any Error
   return produceOptionalError();
 }
@@ -113,10 +113,11 @@ class MyNSError : NSError {
 // CHECK:   [[NSERROR_SUBCLASS:%.*]] = apply {{.*}}({{.*}}) : $@convention(method) (@thick MyNSError.Type) -> @owned MyNSError
 // CHECK:   [[UPCAST:%.*]] = upcast [[NSERROR_SUBCLASS]] : $MyNSError to $NSError
 // CHECK:   [[EXISTENTIAL_REF:%.*]] = init_existential_ref [[UPCAST]]
-// CHECK:   [[BORROWED_EXISTENTIAL_REF:%.*]] = begin_borrow [lexical] [[EXISTENTIAL_REF]]
+// CHECK:   [[MOVED_EXISTENTIAL_REF:%.*]] = move_value [lexical] [var_decl] [[EXISTENTIAL_REF]]
+// CHECK:   [[BORROWED_EXISTENTIAL_REF:%.*]] = begin_borrow [[MOVED_EXISTENTIAL_REF]]
 // CHECK:   [[COPY_BORROWED_EXISTENTIAL_REF:%.*]] = copy_value [[BORROWED_EXISTENTIAL_REF]]
 // CHECK:   end_borrow [[BORROWED_EXISTENTIAL_REF]]
-// CHECK:   destroy_value [[EXISTENTIAL_REF]]
+// CHECK:   destroy_value [[MOVED_EXISTENTIAL_REF]]
 // CHECK:   return [[COPY_BORROWED_EXISTENTIAL_REF]]
 // CHECK: } // end sil function '$s10objc_error14eraseMyNSError{{[_0-9a-zA-Z]*}}F'
 func eraseMyNSError() -> Error {

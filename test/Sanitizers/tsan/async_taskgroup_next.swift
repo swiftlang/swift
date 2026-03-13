@@ -1,13 +1,19 @@
 // RUN: %target-run-simple-swift( %import-libdispatch -parse-as-library -sanitize=thread)
 
-// Segfaulted in CI on TSan bot. rdar://78264164
-// REQUIRES: rdar78264164
-
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: use_os_stdlib
+
+// Bug in TSan on FreeBSD
+// Thread destruction interceptor marks the thread ignored and then checks that
+// the thread isn't being ignored.
+// rdar://158450231
+// TSan is also occasionally detecting race conditions in the concurrency
+// runtime on FreeBSD.
+// rdar://158355890
+// XFAIL: OS=freebsd
 
 var scratchBuffer: UnsafeMutableBufferPointer<Int> = .allocate(capacity: 1000)
 

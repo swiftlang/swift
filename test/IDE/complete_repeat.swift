@@ -52,19 +52,23 @@ func enclosingFunc1() {
 // REPEAT_4: Decl[LocalVar]/Local:               local0[#Int#];
 // REPEAT_4-NOT: LocalVar
 
-repeat {
-  let local1 = 1
-  #^REPEAT_5^#
-} while
+do {
+  repeat {
+    let local1 = 1
+    #^REPEAT_5^#
+  } while
+}
 // REPEAT_5-NOT: LocalVar
 // REPEAT_5: Decl[LocalVar]/Local:               local1[#Int#];
 // REPEAT_5-NOT: LocalVar
 
-repeat {
-  let local1 = 1
+do {
   repeat {
-    let local2 = 1
-  } while #^REPEAT_COND_1^#
+    let local1 = 1
+    repeat {
+      let local2 = 1
+    } while #^REPEAT_COND_1^#
+  }
 }
 // REPEAT_COND_1-NOT: LocalVar
 // REPEAT_COND_1: Decl[LocalVar]/Local:               local1[#Int#];

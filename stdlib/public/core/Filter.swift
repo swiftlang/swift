@@ -36,6 +36,9 @@ public struct LazyFilterSequence<Base: Sequence> {
   }
 }
 
+@available(*, unavailable)
+extension LazyFilterSequence: Sendable {}
+
 extension LazyFilterSequence {
   /// An iterator over the elements traversed by some base iterator that also
   /// satisfy a given predicate.
@@ -61,6 +64,9 @@ extension LazyFilterSequence {
     }
   }
 }
+
+@available(*, unavailable)
+extension LazyFilterSequence.Iterator: Sendable {}
 
 extension LazyFilterSequence.Iterator: IteratorProtocol, Sequence {
   public typealias Element = Base.Element

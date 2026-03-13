@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -parse-serialized-sil -enable-sil-verify-all %s -inline -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -parse-serialized-sil -enable-sil-verify-all %s -inline -sil-combine | %FileCheck %s
 
 sil_stage canonical
 
@@ -962,7 +962,7 @@ bb0(%1 : $@thick Self.Type):
   return %8 : $()
 }
 
-sil [always_inline] @has_self_metadata : $@convention(method) (@thick X.Type) -> @owned X {
+sil [heuristic_always_inline] @has_self_metadata : $@convention(method) (@thick X.Type) -> @owned X {
 bb0(%1 : $@thick X.Type):
   %3 = unchecked_trivial_bit_cast %1 : $@thick X.Type to $@thick @dynamic_self X.Type
   %27 = upcast %3 : $@thick @dynamic_self X.Type to $@thick X.Type
@@ -989,3 +989,29 @@ entry(%executor: $Builtin.Executor):
   %r = tuple ()
   return %r : $()
 }
+
+sil [ossa] @does_not_throw : $@convention(thin) () -> @error any Error {
+bb0:
+  %1 = tuple ()
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @inlining_produces_infinite_loop
+// CHECK:         builtin "infinite_loop_true_condition"()
+// CHECK:         unreachable
+// CHECK:       } // end sil function 'inlining_produces_infinite_loop'
+sil [ossa] @inlining_produces_infinite_loop : $@convention(thin) () -> @error any Error {
+bb0:
+  br bb1
+
+bb1:
+  %4 = function_ref @does_not_throw : $@convention(thin) () -> @error any Error
+  try_apply %4() : $@convention(thin) () -> @error any Error, normal bb2, error bb3
+
+bb2(%6 : $()):
+  br bb1
+
+bb3(%13 : @owned $any Error):
+  throw %13
+}
+

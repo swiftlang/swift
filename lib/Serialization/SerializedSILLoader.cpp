@@ -26,7 +26,7 @@ using namespace swift;
 
 SerializedSILLoader::SerializedSILLoader(
     ASTContext &Ctx, SILModule *SILMod,
-    DeserializationNotificationHandlerSet *callbacks) {
+    DeserializationNotificationHandlerSet *callbacks) : Context(Ctx) {
 
   // Get a list of SerializedModules from ASTContext.
   // FIXME: Iterating over LoadedModules is not a good way to do this.
@@ -34,9 +34,6 @@ SerializedSILLoader::SerializedSILLoader(
     for (auto File : Entry.second->getFiles()) {
       if (auto LoadedAST = dyn_cast<SerializedASTFile>(File)) {
         auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, callbacks);
-#ifndef NDEBUG
-        SILMod->verify();
-#endif
         LoadedSILSections.emplace_back(Des);
       }
     }
@@ -63,10 +60,13 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
   return retVal;
 }
 
-SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
-                                                    Optional<SILLinkage> Linkage) {
+SILFunction *
+SerializedSILLoader::lookupSILFunction(StringRef Name,
+                                       std::optional<SILLinkage> Linkage,
+                                       bool byAsmName) {
   for (auto &Des : LoadedSILSections) {
-    if (auto *Func = Des->lookupSILFunction(Name, /*declarationOnly*/ true)) {
+    if (auto *Func = Des->lookupSILFunction(Name, /*declarationOnly*/ true,
+                                            byAsmName)) {
       LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
                  << Des->getModuleIdentifier().str() << "\n");
       if (Linkage) {
@@ -87,8 +87,18 @@ SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
   return nullptr;
 }
 
+SILGlobalVariable *
+SerializedSILLoader::lookupSILGlobalVariable(StringRef Name, bool byAsmName) {
+  for (auto &Des : LoadedSILSections) {
+    if (auto *G = Des->lookupSILGlobalVariable(Name, byAsmName)) {
+      return G;
+    }
+  }
+  return nullptr;
+}
+
 bool SerializedSILLoader::hasSILFunction(StringRef Name,
-                                         Optional<SILLinkage> Linkage) {
+                                         std::optional<SILLinkage> Linkage) {
   // It is possible that one module has a declaration of a SILFunction, while
   // another has the full definition.
   SILFunction *retVal = nullptr;
@@ -99,9 +109,8 @@ bool SerializedSILLoader::hasSILFunction(StringRef Name,
   return retVal;
 }
 
-
 SILVTable *SerializedSILLoader::lookupVTable(const ClassDecl *C) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(C->getASTContext());
   std::string mangledClassName = mangler.mangleNominalType(C);
 
   for (auto &Des : LoadedSILSections) {
@@ -113,7 +122,7 @@ SILVTable *SerializedSILLoader::lookupVTable(const ClassDecl *C) {
 
 SILMoveOnlyDeinit *
 SerializedSILLoader::lookupMoveOnlyDeinit(const NominalTypeDecl *nomDecl) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(nomDecl->getASTContext());
   std::string mangledClassName = mangler.mangleNominalType(nomDecl);
 
   for (auto &des : LoadedSILSections) {
@@ -138,10 +147,18 @@ lookupDefaultWitnessTable(SILDefaultWitnessTable *WT) {
   return nullptr;
 }
 
+SILDefaultOverrideTable *
+SerializedSILLoader::lookupDefaultOverrideTable(SILDefaultOverrideTable *OT) {
+  for (auto &Des : LoadedSILSections)
+    if (auto oT = Des->lookupDefaultOverrideTable(OT))
+      return oT;
+  return nullptr;
+}
+
 SILDifferentiabilityWitness *
 SerializedSILLoader::lookupDifferentiabilityWitness(
     SILDifferentiabilityWitnessKey key) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(Context);
   auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
      key.originalFunctionName, key.kind, key.config);
   // It is possible that one module has a declaration of a
@@ -244,6 +261,12 @@ void SerializedSILLoader::getAllWitnessTables() {
 void SerializedSILLoader::getAllDefaultWitnessTables() {
   for (auto &Des : LoadedSILSections)
     Des->getAllDefaultWitnessTables();
+}
+
+/// Deserialize all DefaultOverrideTables in all SILModules.
+void SerializedSILLoader::getAllDefaultOverrideTables() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllDefaultOverrideTables();
 }
 
 /// Deserialize all Properties in all SILModules.

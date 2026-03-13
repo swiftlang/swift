@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5 -enable-experimental-feature ResultBuilderASTTransform
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5
 // REQUIRES: OS=macosx
 
 import SwiftUI
@@ -9,8 +9,8 @@ extension TestLayout {
     return f()
   }
 }
-struct EqualWitdthHStack : TestLayout {}
-extension EqualWitdthHStack: View {
+struct EqualWidthHStack : TestLayout {}
+extension EqualWidthHStack: View {
   var body : some View {
     Spacer()
   }
@@ -24,7 +24,7 @@ struct EmptyView: View {
 
 struct MyView: View {
   var body : some View {
-    EqualWitdthHStack {
+    EqualWidthHStack {
       EmptyView()
     }
   }

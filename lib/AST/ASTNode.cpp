@@ -20,6 +20,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/Token.h"
 
@@ -41,6 +42,7 @@ SourceRange ASTNode::getSourceRange() const {
   if (const auto *I = this->dyn_cast<CaseLabelItem *>()) {
     return I->getSourceRange();
   }
+  assert(!isNull() && "Null ASTNode doesn't have a source range");
   llvm_unreachable("unsupported AST node");
 }
 
@@ -58,9 +60,9 @@ DeclContext *ASTNode::getAsDeclContext() const {
   if (auto *E = this->dyn_cast<Expr*>()) {
     if (isa<AbstractClosureExpr>(E))
       return static_cast<AbstractClosureExpr*>(E);
-  } else if (is<Stmt*>()) {
+  } else if (isa<Stmt *>(*this)) {
     return nullptr;
-  } else if (auto *D = this->dyn_cast<Decl*>()) {
+  } else if (auto *D = this->dyn_cast<Decl *>()) {
     if (isa<DeclContext>(D))
       return cast<DeclContext>(D);
   } else if (getOpaqueValue())
@@ -77,11 +79,11 @@ bool ASTNode::isImplicit() const {
     return D->isImplicit();
   if (const auto *P = this->dyn_cast<Pattern*>())
     return P->isImplicit();
-  if (const auto *T = this->dyn_cast<TypeRepr*>())
+  if (isa<TypeRepr *>(*this))
     return false;
-  if (const auto *C = this->dyn_cast<StmtConditionElement *>())
+  if (isa<StmtConditionElement *>(*this))
     return false;
-  if (const auto *I = this->dyn_cast<CaseLabelItem *>())
+  if (isa<CaseLabelItem *>(*this))
     return false;
   llvm_unreachable("unsupported AST node");
 }
@@ -122,9 +124,9 @@ void ASTNode::dump(raw_ostream &OS, unsigned Indent) const {
     P->dump(OS, Indent);
   else if (auto T = dyn_cast<TypeRepr*>())
     T->print(OS);
-  else if (auto *C = dyn_cast<StmtConditionElement *>())
+  else if (isa<StmtConditionElement *>(*this))
     OS.indent(Indent) << "(statement condition)";
-  else if (auto *I = dyn_cast<CaseLabelItem *>()) {
+  else if (isa<CaseLabelItem *>(*this)) {
     OS.indent(Indent) << "(case label item)";
   } else
     llvm_unreachable("unsupported AST node");
@@ -144,14 +146,40 @@ StringRef swift::getTokenText(tok kind) {
   }
 }
 
-#define FUNC(T)                                                               \
-bool ASTNode::is##T(T##Kind Kind) const {                                     \
-  if (!is<T*>())                                                              \
-    return false;                                                             \
-  return get<T*>()->getKind() == Kind;                                        \
-}
+#define FUNC(T)                                                                \
+  bool ASTNode::is##T(T##Kind Kind) const {                                    \
+    if (!isa<T *>(*this))                                                      \
+      return false;                                                            \
+    return cast<T *>(*this)->getKind() == Kind;                                \
+  }
 FUNC(Stmt)
 FUNC(Expr)
 FUNC(Decl)
 FUNC(Pattern)
 #undef FUNC
+
+SourceRange swift::getUnexpandedMacroRange(const SourceManager &SM,
+                                           SourceRange range) {
+  unsigned bufferID = SM.findBufferContainingLoc(range.Start);
+  SourceRange outerRange;
+  while (const auto *info = SM.getGeneratedSourceInfo(bufferID)) {
+    switch (info->kind) {
+#define MACRO_ROLE(Name, Description)                                          \
+  case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
+      if (auto *customAttr = info->attachedMacroCustomAttr)
+        outerRange = customAttr->getRange();
+      else
+        outerRange =
+            ASTNode::getFromOpaqueValue(info->astNode).getSourceRange();
+      bufferID = SM.findBufferContainingLoc(outerRange.Start);
+      continue;
+    case GeneratedSourceInfo::ReplacedFunctionBody:
+    case GeneratedSourceInfo::PrettyPrinted:
+    case GeneratedSourceInfo::DefaultArgument:
+    case GeneratedSourceInfo::AttributeFromClang:
+      return SourceRange();
+    }
+  }
+  return outerRange;
+}

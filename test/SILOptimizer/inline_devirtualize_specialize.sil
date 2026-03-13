@@ -17,7 +17,7 @@ private class C : P {
 }
 
 // CHECK-LABEL: struct_target
-sil [always_inline] @struct_target : $@convention(method) (S) -> Builtin.Int1 {
+sil [heuristic_always_inline] @struct_target : $@convention(method) (S) -> Builtin.Int1 {
 // CHECK: bb0
 bb0(%0 : $S):
   %2 = integer_literal $Builtin.Int1, 0
@@ -25,7 +25,7 @@ bb0(%0 : $S):
 }
 
 // CHECK-LABEL: struct_witness
-sil [always_inline] [thunk] @struct_witness : $@convention(witness_method: P) (@in_guaranteed S) -> Builtin.Int1 {
+sil [heuristic_always_inline] [thunk] @struct_witness : $@convention(witness_method: P) (@in_guaranteed S) -> Builtin.Int1 {
 // CHECK: bb0
 bb0(%0 : $*S):
   // CHECK-NOT: load
@@ -54,14 +54,14 @@ bb0(%0 : $*S):
 }
 
 // CHECK-LABEL: class_target
-sil [always_inline] @class_target : $@convention(method) (@guaranteed C) -> Builtin.Int1 {
+sil [heuristic_always_inline] @class_target : $@convention(method) (@guaranteed C) -> Builtin.Int1 {
 bb0(%0 : $C):
   %1 = integer_literal $Builtin.Int1, -1
   return %1 : $Builtin.Int1
 }
 
 // CHECK-LABEL: class_witness
-sil [always_inline] [thunk] @class_witness : $@convention(witness_method: P) (@in_guaranteed C) -> Builtin.Int1 {
+sil [heuristic_always_inline] [thunk] @class_witness : $@convention(witness_method: P) (@in_guaranteed C) -> Builtin.Int1 {
 // CHECK: bb0
 bb0(%0 : $*C):
   // CHECK-NOT: load

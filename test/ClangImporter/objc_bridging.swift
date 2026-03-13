@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -verify-additional-file %clang-importer-sdk-path/usr/include/objc_structs.h -verify %s
 
 // REQUIRES: objc_interop
 
@@ -62,6 +62,10 @@ func objcStructs(_ s: StructOfNSStrings, sb: StructOfBlocks) {
   // FIXME: Blocks should also be Unmanaged.
   _ = sb.block as Bool // expected-error {{cannot convert value of type '@convention(block) () -> Void' to type 'Bool' in coercion}}
   sb.block() // okay
+
+  // Structs with non-trivial copy/destroy should not be imported
+  _ = WeaksInAStruct() // expected-error {{cannot find 'WeaksInAStruct' in scope}}
+  _ = StrongsInAStruct() // expected-error {{cannot find 'StrongsInAStruct' in scope}}
 }
 
 func test_repair_does_not_interfere_with_conversions() {

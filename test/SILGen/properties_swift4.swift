@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -swift-version 4 -module-name properties -Xllvm -sil-full-demangle -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 4 -module-name properties -Xllvm -sil-full-demangle -parse-as-library %s | %FileCheck %s
 
 var zero: Int = 0
 
@@ -33,7 +33,8 @@ struct DidSetWillSetTests: ForceAccessors {
       var unrelatedValue = DidSetWillSetTests.defaultValue
 
       // CHECK: [[BOX:%.*]] = alloc_box ${ var DidSetWillSetTests }, var, name "unrelatedValue"
-      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOX]] : ${ var DidSetWillSetTests }, 0
+      // CHECK-NEXT: [[BOXLIFETIME:%.*]] = begin_borrow [var_decl] [[BOX]]
+      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOXLIFETIME]] : ${ var DidSetWillSetTests }, 0
       // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin DidSetWillSetTests.Type
       // CHECK-NEXT: // function_ref static properties.DidSetWillSetTests.defaultValue.getter : properties.DidSetWillSetTests
       // CHECK-NEXT: [[DEFAULTVALUE_FN:%.*]] = function_ref @$s10properties{{[_0-9a-zA-Z]*}}vgZ : $@convention(method) (@thin DidSetWillSetTests.Type) -> DidSetWillSetTests
@@ -75,7 +76,8 @@ struct DidSetWillSetTests: ForceAccessors {
       var unrelatedValue = DidSetWillSetTests.defaultValue
 
       // CHECK: [[BOX:%.*]] = alloc_box ${ var DidSetWillSetTests }, var, name "unrelatedValue"
-      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOX]] : ${ var DidSetWillSetTests }, 0
+      // CHECK-NEXT: [[BOXLIFETIME:%.*]] = begin_borrow [var_decl] [[BOX]]
+      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOXLIFETIME]] : ${ var DidSetWillSetTests }, 0
       // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin DidSetWillSetTests.Type
       // CHECK-NEXT: // function_ref static properties.DidSetWillSetTests.defaultValue.getter : properties.DidSetWillSetTests
       // CHECK-NEXT: [[DEFAULTVALUE_FN:%.*]] = function_ref @$s10properties{{[_0-9a-zA-Z]*}}vgZ : $@convention(method) (@thin DidSetWillSetTests.Type) -> DidSetWillSetTests
@@ -102,7 +104,8 @@ struct DidSetWillSetTests: ForceAccessors {
       var other = self
 
       // CHECK: [[BOX:%.*]] = alloc_box ${ var DidSetWillSetTests }, var, name "other"
-      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOX]] : ${ var DidSetWillSetTests }, 0
+      // CHECK-NEXT: [[BOXLIFETIME:%.*]] = begin_borrow [var_decl] [[BOX]]
+      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOXLIFETIME]] : ${ var DidSetWillSetTests }, 0
       // CHECK-NEXT: [[READ_SELF:%.*]] = begin_access [read] [unknown] %0 : $*DidSetWillSetTests
       // CHECK-NEXT: copy_addr [[READ_SELF]] to [init] [[BOXADDR]] : $*DidSetWillSetTests
       // CHECK-NEXT: end_access [[READ_SELF]] : $*DidSetWillSetTests

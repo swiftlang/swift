@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -emit-verbose-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -emit-verbose-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -105,7 +105,7 @@ class B : A {
 class TestNSCopying {
   // CHECK-LABEL: sil hidden [transparent] [ossa] @$s15objc_properties13TestNSCopyingC8propertySo8NSStringCvs : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
   // CHECK: bb0([[ARG0:%.*]] : @owned $NSString, [[ARG1:%.*]] : @guaranteed $TestNSCopying):
-  // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [lexical] [[ARG0]]
+  // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
   // CHECK:   objc_method [[BORROWED_ARG0]] : $NSString, #NSCopying.copy!foreign
   @NSCopying var property : NSString
 
@@ -289,11 +289,11 @@ class SomeWrapperTests {
 
 // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties16SomeWrapperTestsCyACSScfc : $@convention(method) (@owned String, @owned SomeWrapperTests) -> @owned SomeWrapperTests {
 // CHECK:  [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC04someD0SivsTD
-// CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[M]]({{.*}})
-// CHECK: assign_by_wrapper origin property_wrapper, {{%.*}}: $Int to {{%.*}} : $*SomeWrapper, init {{.*}} : $@callee_guaranteed (Int) -> SomeWrapper, set [[C]] : $@callee_guaranteed (Int) -> ()
+// CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[M]]({{.*}})
+// CHECK: assign_or_init #SomeWrapperTests.someWrapper, self {{%.*}} : $SomeWrapperTests, value {{%.*}} : $Int, init {{%.*}} : $@callee_guaranteed (Int) -> @out SomeWrapper, set [[C]] : $@noescape @callee_guaranteed (Int) -> ()
 // CHECK: [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC1sSSSgvsTD
-// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[M]](
-// CHECK:  assign_by_wrapper origin property_wrapper, {{.*}} : $Optional<String> to {{.*}} : $*W<Optional<String>>, init {{.*}} : $@callee_guaranteed (@owned Optional<String>) -> @owned W<Optional<String>>, set [[C]] : $@callee_guaranteed (@owned Optional<String>) -> ()
+// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[M]](
+// CHECK: assign_or_init #SomeWrapperTests.s, self {{.*}} : $SomeWrapperTests, value {{.*}} : $Optional<String>, init {{.*}} : $@callee_guaranteed (@owned Optional<String>) -> @out W<Optional<String>>, set [[C]] : $@noescape @callee_guaranteed (@owned Optional<String>) -> ()
   init(_ s: String) {
     someWrapper = 1000
     self.s = s

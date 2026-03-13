@@ -1,0 +1,119 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=try_apply | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECKONONE
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=try_apply | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECKO
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class Bar {
+  init()
+  func foo() throws -> Int 
+}
+
+protocol P {}
+
+struct S: P {
+  var x: Int
+}
+
+struct GenS<T> {
+  var x: Int
+}
+
+struct GenError<T>: Error {
+  var x: Int
+}
+
+// CHECK-LABEL: sil @devirt_class_method :
+// CHECK:         [[F:%.*]] = function_ref @bar_foo
+// CHECK:         try_apply [[F]]
+// CHECK:       } // end sil function 'devirt_class_method'
+sil @devirt_class_method : $@convention(thin) () -> (Int, @error any Error) {
+bb0:
+  %0 = alloc_ref $Bar
+  %1 = class_method %0 : $Bar, #Bar.foo : (Bar) -> () throws -> Int, $@convention(method) (@guaranteed Bar) -> (Int, @error any Error)
+  try_apply %1(%0) : $@convention(method) (@guaranteed Bar) -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%3 : $Int):
+  strong_release %0 : $Bar
+  return %3 : $Int
+
+bb2(%6 : $Error):
+  strong_release %0 : $Bar
+  throw %6 : $Error
+}
+
+sil @bar_foo : $@convention(method) (@guaranteed Bar) -> (Int, @error any Error)
+
+sil_vtable Bar {
+  #Bar.foo: @bar_foo
+}
+
+sil @createit : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (@out τ_0_0, @error any Error)
+sil @returnGenS : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (GenS<τ_0_0>, @error any Error)
+sil @throwGenError : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ((), @error GenError<τ_0_0>)
+
+// CHECK-LABEL: sil [ossa] @replace_archetype :
+// CHECKO:        [[E:%.*]] = init_existential_addr %0
+// CHECKO-DAG:    [[C:%.*]] = unchecked_addr_cast [[E]] to $*S
+// CHECKO-DAG:    [[M:%.*]] = metatype $@thick S.Type
+// CHECKO:        try_apply %{{[0-9]+}}<S>([[C]], [[M]])
+// CHECKONONE:    apply %{{[0-9]+}}<@opened
+// CHECK:       } // end sil function 'replace_archetype'
+sil [ossa] @replace_archetype : $@convention(thin) () -> (@out any P, @error any Error) {
+bb0(%0 : $*any P):
+  %1 = metatype $@thick S.Type
+  %2 = init_existential_metatype %1, $@thick any P.Type
+  %4 = open_existential_metatype %2 to $@thick (@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self).Type
+  %6 = function_ref @createit : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (@out τ_0_0, @error any Error)
+  %7 = init_existential_addr %0, $@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self
+  try_apply %6<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>(%7, %4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (@out τ_0_0, @error any Error), normal bb1, error bb2
+
+bb1(%8 : $()):
+  return %8 : $()
+
+bb2(%10 : $Error):
+  throw %10 : $Error
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_returned_embedded_archetype :
+// CHECK:         try_apply %{{[0-9]+}}<@opened
+// CHECK:       } // end sil function 'dont_replace_returned_embedded_archetype'
+sil [ossa] @dont_replace_returned_embedded_archetype : $@convention(thin) () -> ((), @error any Error) {
+bb0:
+  %1 = metatype $@thick S.Type
+  %2 = init_existential_metatype %1, $@thick any P.Type
+  %4 = open_existential_metatype %2 to $@thick (@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self).Type
+  %6 = function_ref @returnGenS : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (GenS<τ_0_0>, @error any Error)
+  try_apply %6<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (GenS<τ_0_0>, @error any Error), normal bb1, error bb2
+
+bb1(%8 : $GenS<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>):
+  %9 = tuple ()
+  return %9 : $()
+
+bb2(%10 : $Error):
+  throw %10 : $Error
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_thrown_embedded_archetype :
+// CHECK:         try_apply %{{[0-9]+}}<@opened
+// CHECK:       } // end sil function 'dont_replace_thrown_embedded_archetype'
+sil [ossa] @dont_replace_thrown_embedded_archetype : $@convention(thin) () -> ((), @error any Error) {
+bb0:
+  %1 = metatype $@thick S.Type
+  %2 = init_existential_metatype %1, $@thick any P.Type
+  %4 = open_existential_metatype %2 to $@thick (@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self).Type
+  %6 = function_ref @throwGenError : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ((), @error GenError<τ_0_0>)
+  try_apply %6<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ((), @error GenError<τ_0_0>), normal bb1, error bb2
+
+bb1(%8 : $()):
+  return %8 : $()
+
+bb2(%10 : $GenError<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>):
+  unreachable
+}
+

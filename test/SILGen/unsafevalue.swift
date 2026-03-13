@@ -1,6 +1,6 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -Onone -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
-// RUN: %target-swift-emit-sil -O -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=OPT %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -Onone -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -O -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=OPT %s
 
 import Swift
 
@@ -29,7 +29,8 @@ public struct UnsafeValue<Element: AnyObject> {
   // CHECK: bb0([[INPUT_ELEMENT:%.*]] : @guaranteed $Element,
   // CHECK:   [[BOX:%.*]] = alloc_box
   // CHECK:   [[UNINIT_BOX:%.*]] = mark_uninitialized [rootself] [[BOX]]
-  // CHECK:   [[PROJECT_UNINIT_BOX:%.*]] = project_box [[UNINIT_BOX]]
+  // CHECK:   [[BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[UNINIT_BOX]]
+  // CHECK:   [[PROJECT_UNINIT_BOX:%.*]] = project_box [[BOX_LIFETIME]]
   // CHECK:   [[COPY_INPUT_ELEMENT:%.*]] = copy_value [[INPUT_ELEMENT]]
   // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJECT_UNINIT_BOX]]
   // CHECK:   [[STRUCT_ACCESS:%.*]] = struct_element_addr [[ACCESS]]
@@ -68,10 +69,12 @@ public struct UnsafeValue<Element: AnyObject> {
   // Access the underlying value at +0, guaranteeing its lifetime by base.
   //
   // CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base_qd_0_qd___qd_0_xXEtr0_lF :
-  // CHECK: bb0([[RESULT:%.*]] : $*Result, [[BASE:%.*]] : $*Base, [[CLOSURE:%.*]] : $@noescape @callee_guaranteed {{.*}}, [[UNSAFE_VALUE:%.*]] : $UnsafeValue<Element>):
+  // CHECK: bb0([[RESULT:%.*]] : $*Result, [[BASE:%.*]] : $*Base, [[CLOSURE:%.*]] : @guaranteed $@noescape @callee_guaranteed {{.*}}, [[UNSAFE_VALUE:%.*]] : $UnsafeValue<Element>):
   // CHECK:  [[COPY_BOX:%.*]] = alloc_box
-  // CHECK:  [[COPY_PROJ:%.*]] = project_box [[COPY_BOX]]
+  // CHECK:  [[BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[COPY_BOX]]
+  // CHECK:  [[COPY_PROJ:%.*]] = project_box [[BOX_LIFETIME]]
   // CHECK:  store [[UNSAFE_VALUE]] to [trivial] [[COPY_PROJ]]
+  // CHECK:  [[CLOSUREC:%.*]] = copy_value [[CLOSURE]]
   // CHECK:  [[VALUE_ADDR:%.*]] = begin_access [read] [unknown] [[COPY_PROJ]]
   // CHECK:  [[STR_VALUE_ADDR:%.*]] = struct_element_addr [[VALUE_ADDR]]
   // CHECK:  [[UNMANAGED_VALUE:%.*]] = load [trivial] [[STR_VALUE_ADDR]]
@@ -79,7 +82,8 @@ public struct UnsafeValue<Element: AnyObject> {
   // CHECK:  [[GUARANTEED_REF:%.*]] = unchecked_ownership_conversion [[UNOWNED_REF]]
   // CHECK:  [[GUARANTEED_REF_DEP_ON_BASE:%.*]] = mark_dependence [[GUARANTEED_REF]] : $Element on [[BASE]]
   // CHECK:  end_access [[VALUE_ADDR]]
-  // CHECK:  apply [[CLOSURE]]([[RESULT]], [[GUARANTEED_REF_DEP_ON_BASE]])
+  // CHECK:  [[CLOSUREB:%.*]] = begin_borrow [[CLOSUREC]]
+  // CHECK:  apply [[CLOSUREB]]([[RESULT]], [[GUARANTEED_REF_DEP_ON_BASE]])
   // CHECK:  end_borrow [[GUARANTEED_REF]]
   // CHECK:  destroy_value [[COPY_BOX]]
   // CHECK: } // end sil function '$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base_qd_0_qd___qd_0_xXEtr0_lF'

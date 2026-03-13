@@ -26,18 +26,24 @@ struct Value<T> {
 }
 
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
-// CHECK:   [[TYPE:%[0-9]+]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$s4main5ValueVySo12NSDictionaryCGMD") #{{[0-9]+}}
-// CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(%swift.opaque* noalias nocapture {{%.*}}, %swift.type* [[TYPE]])
+// CHECK:   [[TYPE:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s4main5ValueVySo12NSDictionaryCGMD")
+// CHECK:      call swiftcc void @"$s4main7consumeyyxlF"(
+// CHECK-SAME:   ptr noalias {{%.*}}, 
+// CHECK-SAME:   ptr [[TYPE]])
 // CHECK: }
 func doit() {
   consume(Value(NSDictionary()))
 }
 doit()
 
-// CHECK: ; Function Attrs: noinline nounwind readnone
-// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueVMa"([[INT]] %0, %swift.type* %1) #{{[0-9]+}} {{(section)?.*}}{
+// CHECK: ; Function Attrs: noinline nounwind memory(none)
+// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueVMa"([[INT]] %0, ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK: entry:
-// CHECK:   [[ERASED_TYPE:%[0-9]+]] = bitcast %swift.type* %1 to i8*
-// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[ERASED_TYPE]], i8* undef, i8* undef, %swift.type_descriptor* bitcast ({{.+}}$s4main5ValueVMn{{.+}} to %swift.type_descriptor*)) #{{[0-9]+}}
+// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
+// CHECK-SAME:   [[INT]] %0, 
+// CHECK-SAME:   ptr %1, 
+// CHECK-SAME:   ptr undef, 
+// CHECK-SAME:   ptr undef, 
+// CHECK-SAME:   $s4main5ValueVMn
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

@@ -13,13 +13,42 @@
 #ifndef SWIFT_BASIC_LAZY_H
 #define SWIFT_BASIC_LAZY_H
 
+#include <functional>
 #include <memory>
+#include <optional>
 
 #include "swift/Basic/Malloc.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Threading/Once.h"
 
 namespace swift {
+
+/// A template for lazy-initialized values.
+/// Usage:
+///
+///   LazyValue<std::string> value([]() { return createString(); })
+///   if (condition) {
+///     // 'createString()' is evaluated only when 'value` is dereferenced.
+///     doSomething(*value);
+///   }
+template <typename T, typename Initializer = std::function<T()>>
+class LazyValue {
+  Initializer Init;
+  std::optional<T> Value;
+
+public:
+  LazyValue(Initializer Init) : Init(Init){};
+
+  T &get() {
+    if (!Value.has_value()) {
+      Value = Init();
+    }
+    return Value.value();
+  }
+
+  T *operator->() { return &get(); }
+  T &operator*() { return get(); }
+};
 
 /// A template for lazily-constructed, zero-initialized, leaked-on-exit
 /// global objects.

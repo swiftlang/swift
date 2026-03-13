@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -unit-test-runner %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -test-runner %s 2>&1 | %FileCheck %s
 
 // REQUIRES: objc_interop
 import Swift
@@ -13,7 +13,7 @@ class Test : NSObject {
 // CHECK-LABEL: } // end sil function 'test_switch_enum_objc_call1'
 sil [ossa] @test_switch_enum_objc_call1 : $@convention(thin) (@guaranteed Optional<Test>) -> () {
 bb0(%0 : @guaranteed $Optional<Test>):
-  test_specification "simplify-cfg-simplify-switch-enum-on-objc-class-optional @instruction[1]"
+  specify_test "simplify_cfg_simplify_switch_enum_on_objc_class_optional @instruction[1]"
   %3 = copy_value %0 : $Optional<Test>
   switch_enum %3 : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb6
 
@@ -39,7 +39,7 @@ sil @some_sideeffect : $@convention(thin) () -> ()
 // CHECK-LABEL: } // end sil function 'test_switch_enum_objc_call2'
 sil [ossa] @test_switch_enum_objc_call2 : $@convention(thin) (@guaranteed Optional<Test>) -> () {
 bb0(%0 : @guaranteed $Optional<Test>):
-  test_specification "simplify-cfg-simplify-switch-enum-on-objc-class-optional @instruction[1]"
+  specify_test "simplify_cfg_simplify_switch_enum_on_objc_class_optional @instruction[1]"
   %3 = copy_value %0 : $Optional<Test>
   switch_enum %3 : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb6
 
@@ -65,7 +65,7 @@ bb6:
 // CHECK-LABEL: } // end sil function 'test_switch_enum_objc_call3'
 sil [ossa] @test_switch_enum_objc_call3 : $@convention(thin) (@guaranteed Optional<Test>) -> () {
 bb0(%0 : @guaranteed $Optional<Test>):
-  test_specification "simplify-cfg-simplify-switch-enum-on-objc-class-optional @instruction[1]"
+  specify_test "simplify_cfg_simplify_switch_enum_on_objc_class_optional @instruction[1]"
   %3 = copy_value %0 : $Optional<Test>
   switch_enum %3 : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb6
 
@@ -91,7 +91,7 @@ bb6:
 // CHECK-LABEL: } // end sil function 'test_switch_enum_objc_call4'
 sil [ossa] @test_switch_enum_objc_call4 : $@convention(thin) (@guaranteed Optional<Test>) -> () {
 bb0(%0 : @guaranteed $Optional<Test>):
-  test_specification "simplify-cfg-simplify-switch-enum-on-objc-class-optional @instruction[1]"
+  specify_test "simplify_cfg_simplify_switch_enum_on_objc_class_optional @instruction[1]"
   %3 = copy_value %0 : $Optional<Test>
   switch_enum %3 : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb6
 
@@ -117,7 +117,7 @@ bb6:
 // CHECK-LABEL: } // end sil function 'test_switch_enum_objc_call5'
 sil [ossa] @test_switch_enum_objc_call5 : $@convention(thin) (@guaranteed Optional<Test>) -> () {
 bb0(%0 : @guaranteed $Optional<Test>):
-  test_specification "simplify-cfg-simplify-switch-enum-on-objc-class-optional @instruction[0]"
+  specify_test "simplify_cfg_simplify_switch_enum_on_objc_class_optional @instruction[0]"
   switch_enum %0 : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb6
 
 bb1(%8 : @guaranteed $Test):

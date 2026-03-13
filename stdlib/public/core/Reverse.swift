@@ -63,6 +63,8 @@ public struct ReversedCollection<Base: BidirectionalCollection> {
   }
 }
 
+extension ReversedCollection: Sendable where Base: Sendable {}
+
 extension ReversedCollection {
   // An iterator that can be much faster than the iterator of a reversed slice.
   @frozen
@@ -82,6 +84,9 @@ extension ReversedCollection {
     }
   }
 }
+
+extension ReversedCollection.Iterator: Sendable
+  where Base: Sendable, Base.Index: Sendable {}
 
 extension ReversedCollection.Iterator: IteratorProtocol, Sequence {
   public typealias Element = Base.Element
@@ -169,6 +174,8 @@ extension ReversedCollection {
     }
   }
 }
+
+extension ReversedCollection.Index: Sendable where Base.Index: Sendable {}
 
 extension ReversedCollection.Index: Comparable {
   @inlinable

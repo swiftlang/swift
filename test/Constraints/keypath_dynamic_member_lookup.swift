@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -verify -Xllvm -sil-disable-pass=simplification %s | %FileCheck %s
 
 struct Point {
   let x: Int
@@ -40,15 +40,15 @@ var lens = Lens(Rectangle(topLeft: topLeft,
                           bottomRight: bottomRight))
 
 // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
-// CHECK-NEXT: apply %45<Rectangle, Point>({{.*}})
+// CHECK-NEXT: apply %{{[0-9]+}}<Rectangle, Point>({{.*}})
 // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
-// CHECK-NEXT: apply %{{.*}}<Point, Int>({{.*}})
+// CHECK-NEXT: apply %{{[0-9]+}}<Point, Int>({{.*}})
 _ = lens.topLeft.x
 
 // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
-// CHECK-NEXT: apply %68<Rectangle, Point>({{.*}})
+// CHECK-NEXT: apply %{{[0-9]+}}<Rectangle, Point>({{.*}})
 // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
-// CHECK-NEXT: apply %75<Point, Int>({{.*}})
+// CHECK-NEXT: apply %{{[0-9]+}}<Point, Int>({{.*}})
 _ = lens.topLeft.y
 
 lens.topLeft = Lens(Point(x: 1, y: 2)) // Ok
@@ -227,18 +227,18 @@ func test_keypath_dynamic_lookup_inside_keypath() {
   _ = \Lens<[[Int]]>.[0].count
 }
 
-func test_recursive_dynamic_lookup(_ lens: Lens<Lens<Point>>) {
+func test_recursive_dynamic_lookup(_ pointLens: Lens<Lens<Point>>, _ arrLens: Lens<Lens<[Point]>>) {
   // CHECK: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
   // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
   // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
-  _ = lens.x
+  _ = pointLens.x
   // CHECK: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
   // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
-  _ = lens.obj.x
+  _ = pointLens.obj.x
   // CHECK: [[FIRST_OBJ:%.*]] = struct_extract {{.*}} : $Lens<Lens<Point>>, #Lens.obj
   // CHECK-NEXT: [[SECOND_OBJ:%.*]] = struct_extract [[FIRST_OBJ]] : $Lens<Point>, #Lens.obj
   // CHECK-NEXT: struct_extract [[SECOND_OBJ]] : $Point, #Point.y
-  _ = lens.obj.obj.y
+  _ = pointLens.obj.obj.y
   // CHECK: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
   // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
   // CHECK-NEXT: keypath $KeyPath<Lens<Lens<Point>>, Lens<Lens<Int>>>, (root $Lens<Lens<Point>>; gettable_property $Lens<Lens<Int>>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
@@ -249,6 +249,21 @@ func test_recursive_dynamic_lookup(_ lens: Lens<Lens<Point>>) {
   // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
   // CHECK-NEXT: keypath $KeyPath<Lens<Lens<Rectangle>>, Lens<Lens<Int>>>, (root $Lens<Lens<Rectangle>>; settable_property $Lens<Lens<Point>>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig : {{.*}})
   _ = \Lens<Lens<Rectangle>>.topLeft.x
+
+  // CHECK: keypath $WritableKeyPath<Array<Point>, Point>, (root $Array<Point>; settable_property $Point, id @$sSayxSicig
+  // CHECK-NEXT: keypath $WritableKeyPath<Lens<Array<Point>>, Lens<Point>>, (root $Lens<Array<Point>>; settable_property $Lens<Point>, id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
+  // CHECK: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
+  // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>, id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
+  _ = arrLens[0].x // arrLens[dynamicMember: \.[dynamicMember: \.[0]]][dynamicMember: \.[dynamicMember: \.x]]
+
+  _ = \Lens<Lens<[Point]>>.[0].x // \Lens<Lens<[Point]>>.[dynamicMember: \.[dynamicMember: \.[0]]].[dynamicMember: \.[dynamicMember: \.x]]
+  // CHECK: keypath $WritableKeyPath<Array<Point>, Point>, (root $Array<Point>; settable_property $Point, id @$sSayxSicig
+  // CHECK-NEXT: keypath $WritableKeyPath<Lens<Array<Point>>, Lens<Point>>, (root $Lens<Array<Point>>; settable_property $Lens<Point>, id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
+  // CHECK-NEXT: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
+  // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>, id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
+  // CHECK-NEXT: keypath $KeyPath<Lens<Lens<Array<Point>>>, Lens<Lens<Int>>>, (root $Lens<Lens<Array<Point>>>; settable_property $Lens<Lens<Point>>, id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
 }
 
 @dynamicMemberLookup
@@ -417,34 +432,34 @@ func testIUOUnwrap(_ x: S_54310, _ y: S_57571) {
   // CHECK: keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; stored_property #S_54310_Base.i : $Optional<Int>; optional_force : $Int)
   x.i
 
-  // CHECK: keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicig : $@convention(method) (Int, S_54310_Base) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicipACTK : $@convention(thin) (@in_guaranteed S_54310_Base, UnsafeRawPointer) -> @out Optional<Int>, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSiTh : $@convention(thin) (UnsafeRawPointer) -> Int; optional_force : $Int)
+  // CHECK: keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicig : $@convention(method) (Int, S_54310_Base) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed S_54310_Base, @in_guaranteed Int) -> @out Optional<Int>, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int; optional_force : $Int)
   x[5]
 
   // CHECK: [[INNER_KP:%[0-9]+]] = keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; stored_property #S_54310_Base.i : $Optional<Int>; optional_force : $Int)
-  // CHECK: keypath $KeyPath<S_54310, ()>, (root $S_54310; gettable_property $(),  id @$s29keypath_dynamic_member_lookup7S_54310V0B6Memberys7KeyPathCyAA12S_54310_BaseVSiG_tcig : $@convention(method) (@guaranteed KeyPath<S_54310_Base, Int>, S_54310) -> (), getter @$s29keypath_dynamic_member_lookup7S_54310V0B6Memberys7KeyPathCyAA12S_54310_BaseVSiG_tcipACTK : $@convention(thin) (@in_guaranteed S_54310, UnsafeRawPointer) -> @out (), indices [%$0 : $KeyPath<S_54310_Base, Int> : $KeyPath<S_54310_Base, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[INNER_KP]])
+  // CHECK: $KeyPath<S_54310, ()>, (root $S_54310; gettable_property $(),  id @$s29keypath_dynamic_member_lookup7S_54310V0B6Memberys7KeyPathCyAA12S_54310_BaseVSiG_tcig : $@convention(method) (@guaranteed KeyPath<S_54310_Base, Int>, S_54310) -> (), getter @$s29keypath_dynamic_member_lookup7S_54310V0B6Memberys7KeyPathCyAA12S_54310_BaseVSiG_tcipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed S_54310, @in_guaranteed KeyPath<S_54310_Base, Int>) -> @out (), indices [%$0 : $KeyPath<S_54310_Base, Int> : $KeyPath<S_54310_Base, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTH : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<S_54310_Base, Int>, @in_guaranteed KeyPath<S_54310_Base, Int>) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<S_54310_Base, Int>) -> Int) ([[INNER_KP]])
   _ = \S_54310.i
 
-  // CHECK: [[INNER_SUB_KP:%[0-9]+]] = keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicig : $@convention(method) (Int, S_54310_Base) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicipACTK : $@convention(thin) (@in_guaranteed S_54310_Base, UnsafeRawPointer) -> @out Optional<Int>, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSiTh : $@convention(thin) (UnsafeRawPointer) -> Int; optional_force : $Int)
-  // CHECK: keypath $KeyPath<S_54310, ()>, (root $S_54310; gettable_property $(),  id @$s29keypath_dynamic_member_lookup7S_54310V0B6Memberys7KeyPathCyAA12S_54310_BaseVSiG_tcig : $@convention(method) (@guaranteed KeyPath<S_54310_Base, Int>, S_54310) -> (), getter @$s29keypath_dynamic_member_lookup7S_54310V0B6Memberys7KeyPathCyAA12S_54310_BaseVSiG_tcipACTK : $@convention(thin) (@in_guaranteed S_54310, UnsafeRawPointer) -> @out (), indices [%$0 : $KeyPath<S_54310_Base, Int> : $KeyPath<S_54310_Base, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[INNER_SUB_KP]])
+  // CHECK: [[INNER_SUB_KP:%[0-9]+]] = keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; gettable_property $Optional<Int>, id @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicig : $@convention(method) (Int, S_54310_Base) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed S_54310_Base, @in_guaranteed Int) -> @out Optional<Int>, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int; optional_force : $Int)
+  // CHECK: keypath $KeyPath<S_54310, ()>, (root $S_54310; gettable_property $(),  id @$s29keypath_dynamic_member_lookup7S_54310V0B6Memberys7KeyPathCyAA12S_54310_BaseVSiG_tcig : $@convention(method) (@guaranteed KeyPath<S_54310_Base, Int>, S_54310) -> (), getter @$s29keypath_dynamic_member_lookup7S_54310V0B6Memberys7KeyPathCyAA12S_54310_BaseVSiG_tcipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed S_54310, @in_guaranteed KeyPath<S_54310_Base, Int>) -> @out (), indices [%$0 : $KeyPath<S_54310_Base, Int> : $KeyPath<S_54310_Base, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTH : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<S_54310_Base, Int>, @in_guaranteed KeyPath<S_54310_Base, Int>) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<S_54310_Base, Int>) -> Int) ([[INNER_SUB_KP]])
   _ = \S_54310.[5]
 
   // https://github.com/apple/swift/issues/57571: Make sure we can handle IUO
   // unwraps in both the inner and outer key paths.
 
   // CHECK: [[INNER_KP2:%[0-9]+]] = keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; stored_property #S_54310_Base.i : $Optional<Int>; optional_force : $Int)
-  // CHECK: keypath $KeyPath<S_57571, Optional<Int>>, (root $S_57571; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcig : $@convention(method) (@guaranteed KeyPath<S_54310_Base, Int>, S_57571) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcipACTK : $@convention(thin) (@in_guaranteed S_57571, UnsafeRawPointer) -> @out Optional<Int>, indices [%$0 : $KeyPath<S_54310_Base, Int> : $KeyPath<S_54310_Base, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[INNER_KP2]])
+  // CHECK: keypath $KeyPath<S_57571, Optional<Int>>, (root $S_57571; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcig : $@convention(method) (@guaranteed KeyPath<S_54310_Base, Int>, S_57571) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed S_57571, @in_guaranteed KeyPath<S_54310_Base, Int>) -> @out Optional<Int>, indices [%$0 : $KeyPath<S_54310_Base, Int> : $KeyPath<S_54310_Base, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTH : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<S_54310_Base, Int>, @in_guaranteed KeyPath<S_54310_Base, Int>) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<S_54310_Base, Int>) -> Int) ([[INNER_KP2]])
   _ = \S_57571.i
 
   // CHECK: [[INNER_KP3:%[0-9]+]] = keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; stored_property #S_54310_Base.i : $Optional<Int>; optional_force : $Int)
-  // CHECK: keypath $KeyPath<S_57571, Int>, (root $S_57571; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcig : $@convention(method) (@guaranteed KeyPath<S_54310_Base, Int>, S_57571) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcipACTK : $@convention(thin) (@in_guaranteed S_57571, UnsafeRawPointer) -> @out Optional<Int>, indices [%$0 : $KeyPath<S_54310_Base, Int> : $KeyPath<S_54310_Base, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTh : $@convention(thin) (UnsafeRawPointer) -> Int; optional_force : $Int) ([[INNER_KP3]])
+  // CHECK: keypath $KeyPath<S_57571, Int>, (root $S_57571; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcig : $@convention(method) (@guaranteed KeyPath<S_54310_Base, Int>, S_57571) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed S_57571, @in_guaranteed KeyPath<S_54310_Base, Int>) -> @out Optional<Int>, indices [%$0 : $KeyPath<S_54310_Base, Int> : $KeyPath<S_54310_Base, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTH : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<S_54310_Base, Int>, @in_guaranteed KeyPath<S_54310_Base, Int>) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<S_54310_Base, Int>) -> Int; optional_force : $Int) ([[INNER_KP3]])
   let _: KeyPath<S_57571, Int> = \S_57571.i
 
-  // CHECK: [[INNER_KP4:%[0-9]+]] = keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicig : $@convention(method) (Int, S_54310_Base) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicipACTK : $@convention(thin) (@in_guaranteed S_54310_Base, UnsafeRawPointer) -> @out Optional<Int>, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSiTh : $@convention(thin) (UnsafeRawPointer) -> Int; optional_force : $Int)
-  // CHECK: keypath $KeyPath<S_57571, Optional<Int>>, (root $S_57571; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcig : $@convention(method) (@guaranteed KeyPath<S_54310_Base, Int>, S_57571) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcipACTK : $@convention(thin) (@in_guaranteed S_57571, UnsafeRawPointer) -> @out Optional<Int>, indices [%$0 : $KeyPath<S_54310_Base, Int> : $KeyPath<S_54310_Base, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[INNER_KP4]])
+  // CHECK: [[INNER_KP4:%[0-9]+]] = keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicig : $@convention(method) (Int, S_54310_Base) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed S_54310_Base, @in_guaranteed Int) -> @out Optional<Int>, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int; optional_force : $Int)
+  // CHECK: keypath $KeyPath<S_57571, Optional<Int>>, (root $S_57571; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcig : $@convention(method) (@guaranteed KeyPath<S_54310_Base, Int>, S_57571) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed S_57571, @in_guaranteed KeyPath<S_54310_Base, Int>) -> @out Optional<Int>, indices [%$0 : $KeyPath<S_54310_Base, Int> : $KeyPath<S_54310_Base, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTH : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<S_54310_Base, Int>, @in_guaranteed KeyPath<S_54310_Base, Int>) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<S_54310_Base, Int>) -> Int) ([[INNER_KP4]])
   _ = \S_57571.[0]
 
-  // CHECK: [[INNER_KP5:%[0-9]+]] = keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicig : $@convention(method) (Int, S_54310_Base) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicipACTK : $@convention(thin) (@in_guaranteed S_54310_Base, UnsafeRawPointer) -> @out Optional<Int>, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSiTh : $@convention(thin) (UnsafeRawPointer) -> Int; optional_force : $Int)
-  // CHECK: keypath $KeyPath<S_57571, Int>, (root $S_57571; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcig : $@convention(method) (@guaranteed KeyPath<S_54310_Base, Int>, S_57571) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcipACTK : $@convention(thin) (@in_guaranteed S_57571, UnsafeRawPointer) -> @out Optional<Int>, indices [%$0 : $KeyPath<S_54310_Base, Int> : $KeyPath<S_54310_Base, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTh : $@convention(thin) (UnsafeRawPointer) -> Int; optional_force : $Int) ([[INNER_KP5]])
+  // CHECK: [[INNER_KP5:%[0-9]+]] = keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicig : $@convention(method) (Int, S_54310_Base) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed S_54310_Base, @in_guaranteed Int) -> @out Optional<Int>, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int; optional_force : $Int)
+  // CHECK: keypath $KeyPath<S_57571, Int>, (root $S_57571; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcig : $@convention(method) (@guaranteed KeyPath<S_54310_Base, Int>, S_57571) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup7S_57571V0B6MemberSiSgs7KeyPathCyAA12S_54310_BaseVSiG_tcipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed S_57571, @in_guaranteed KeyPath<S_54310_Base, Int>) -> @out Optional<Int>, indices [%$0 : $KeyPath<S_54310_Base, Int> : $KeyPath<S_54310_Base, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTH : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<S_54310_Base, Int>, @in_guaranteed KeyPath<S_54310_Base, Int>) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup12S_54310_BaseVSiGTh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<S_54310_Base, Int>) -> Int; optional_force : $Int) ([[INNER_KP5]])
   let _: KeyPath<S_57571, Int> = \S_57571.[0]
 
   // CHECK: [[INNER_KP6:%[0-9]+]] = keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; stored_property #S_54310_Base.i : $Optional<Int>; optional_force : $Int)
@@ -454,7 +469,7 @@ func testIUOUnwrap(_ x: S_54310, _ y: S_57571) {
   // CHECK: bb{{[0-9]+}}(%{{[0-9]+}} : $Int)
   let _: Int = y.i
 
-  // CHECK: [[INNER_KP7:%[0-9]+]] = keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicig : $@convention(method) (Int, S_54310_Base) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicipACTK : $@convention(thin) (@in_guaranteed S_54310_Base, UnsafeRawPointer) -> @out Optional<Int>, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSiTh : $@convention(thin) (UnsafeRawPointer) -> Int; optional_force : $Int)
+  // CHECK: [[INNER_KP7:%[0-9]+]] = keypath $KeyPath<S_54310_Base, Int>, (root $S_54310_Base; gettable_property $Optional<Int>,  id @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicig : $@convention(method) (Int, S_54310_Base) -> Optional<Int>, getter @$s29keypath_dynamic_member_lookup12S_54310_BaseVySiSgSicipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed S_54310_Base, @in_guaranteed Int) -> @out Optional<Int>, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int; optional_force : $Int)
   // CHECK: [[Y0_OPT:%[0-9]+]] = apply {{%[0-9]+}}([[INNER_KP7]], {{%[0-9]+}}) : $@convention(method) (@guaranteed KeyPath<S_54310_Base, Int>, S_57571) -> Optional<Int>
   // CHECK: switch_enum [[Y0_OPT]]
   // CHECK: unreachable
@@ -520,15 +535,15 @@ struct S_54352 {
 func testDynamicMemberWithDefault(_ x: S_54352) {
   // CHECK: [[DEF_FN:%[0-9]+]] = function_ref @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icipfA_ : $@convention(thin) () -> Int
   // CHECK: [[DEF_ARG:%[0-9]+]] = apply [[DEF_FN]]()
-  // CHECK: [[KP:%[0-9]+]] = keypath $KeyPath<HasDefaultedSubscript, Int>, (root $HasDefaultedSubscript; gettable_property $Int,  id @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icig : $@convention(method) (Int, HasDefaultedSubscript) -> Int, getter @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icipACTK : $@convention(thin) (@in_guaranteed HasDefaultedSubscript, UnsafeRawPointer) -> @out Int, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSiTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[DEF_ARG]])
+  // CHECK: [[KP:%[0-9]+]] = keypath $KeyPath<HasDefaultedSubscript, Int>, (root $HasDefaultedSubscript; gettable_property $Int,  id @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icig : $@convention(method) (Int, HasDefaultedSubscript) -> Int, getter @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed HasDefaultedSubscript, @in_guaranteed Int) -> @out Int, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int) ([[DEF_ARG]])
   // CHECK: [[SUB_GET:%[0-9]+]] = function_ref @$s29keypath_dynamic_member_lookup7S_54352V0B6MemberSis7KeyPathCyAA21HasDefaultedSubscriptVSiG_tcig : $@convention(method) (@guaranteed KeyPath<HasDefaultedSubscript, Int>, S_54352) -> Int
   // CHECK: apply [[SUB_GET]]([[KP]], {{%[0-9]+}})
   _ = x[]
 
   // CHECK: [[DEF_FN:%[0-9]+]] = function_ref @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icipfA_ : $@convention(thin) () -> Int
   // CHECK: [[DEF_ARG:%[0-9]+]] = apply [[DEF_FN]]()
-  // CHECK: [[INNER_KP:%[0-9]+]] = keypath $KeyPath<HasDefaultedSubscript, Int>, (root $HasDefaultedSubscript; gettable_property $Int,  id @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icig : $@convention(method) (Int, HasDefaultedSubscript) -> Int, getter @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icipACTK : $@convention(thin) (@in_guaranteed HasDefaultedSubscript, UnsafeRawPointer) -> @out Int, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSiTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[DEF_ARG]])
-  // CHECK: [[OUTER_KP:%[0-9]+]] = keypath $KeyPath<S_54352, Int>, (root $S_54352; gettable_property $Int,  id @$s29keypath_dynamic_member_lookup7S_54352V0B6MemberSis7KeyPathCyAA21HasDefaultedSubscriptVSiG_tcig : $@convention(method) (@guaranteed KeyPath<HasDefaultedSubscript, Int>, S_54352) -> Int, getter @$s29keypath_dynamic_member_lookup7S_54352V0B6MemberSis7KeyPathCyAA21HasDefaultedSubscriptVSiG_tcipACTK : $@convention(thin) (@in_guaranteed S_54352, UnsafeRawPointer) -> @out Int, indices [%$0 : $KeyPath<HasDefaultedSubscript, Int> : $KeyPath<HasDefaultedSubscript, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup21HasDefaultedSubscriptVSiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup21HasDefaultedSubscriptVSiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[INNER_KP]])
+  // CHECK: [[INNER_KP:%[0-9]+]] = keypath $KeyPath<HasDefaultedSubscript, Int>, (root $HasDefaultedSubscript; gettable_property $Int,  id @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icig : $@convention(method) (Int, HasDefaultedSubscript) -> Int, getter @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed HasDefaultedSubscript, @in_guaranteed Int) -> @out Int, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int) ([[DEF_ARG]])
+  // CHECK: [[OUTER_KP:%[0-9]+]] = keypath $KeyPath<S_54352, Int>, (root $S_54352; gettable_property $Int,  id @$s29keypath_dynamic_member_lookup7S_54352V0B6MemberSis7KeyPathCyAA21HasDefaultedSubscriptVSiG_tcig : $@convention(method) (@guaranteed KeyPath<HasDefaultedSubscript, Int>, S_54352) -> Int, getter @$s29keypath_dynamic_member_lookup7S_54352V0B6MemberSis7KeyPathCyAA21HasDefaultedSubscriptVSiG_tcipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed S_54352, @in_guaranteed KeyPath<HasDefaultedSubscript, Int>) -> @out Int, indices [%$0 : $KeyPath<HasDefaultedSubscript, Int> : $KeyPath<HasDefaultedSubscript, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup21HasDefaultedSubscriptVSiGTH : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<HasDefaultedSubscript, Int>, @in_guaranteed KeyPath<HasDefaultedSubscript, Int>) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup21HasDefaultedSubscriptVSiGTh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<HasDefaultedSubscript, Int>) -> Int) ([[INNER_KP]])
   _ = \S_54352.[]
 }
 
@@ -557,4 +572,83 @@ struct S_54150 {
     // CHECK: function_ref @swift_getAtKeyPath
     // CHECK-NEXT: apply %{{.*}}<S_54150, T>({{.*}})
   }
+}
+
+// https://github.com/swiftlang/swift/issues/56837
+@dynamicMemberLookup
+struct Issue56837<Value, Integer: FixedWidthInteger> {
+    var value: Value
+    init(_ value: Value) {
+        self.value = value
+    }
+    subscript<T>(dynamicMember keyPath: KeyPath<Value, T>) -> T {
+        get { return self.value[keyPath: keyPath] }
+    }
+    subscript(type value: Integer) -> Bool {
+        get { return true }
+    }
+}
+struct TestIssue56837 {
+    typealias T1 = Issue56837<String, Int8>
+    typealias T2 = Issue56837<T1, Int16>
+    typealias T3 = Issue56837<T2, Int32>
+    typealias T4 = Issue56837<T3, Int64>
+    static func test() {
+        let value: T4 = .init(.init(.init(.init("Swift"))))
+        _ = value[type: Int64.max]
+        _ = value[type: Int32.max]
+        _ = value[type: Int16.max]
+        _ = value[type: Int8.max]
+    }
+}
+
+@dynamicMemberLookup
+class TestDynamicSelf {
+  struct S {
+    subscript() -> Int { 0 }
+  }
+  func foo() -> Self {
+    // Make sure we can do dynamic member lookup on a dynamic self.
+    _ = self[]
+    return self
+  }
+  subscript<T>(dynamicMember dynamicMember: KeyPath<S, T>) -> T {
+    fatalError()
+  }
+}
+
+@dynamicMemberLookup
+protocol P1 {}
+
+extension P1 {
+  subscript<T>(dynamicMember dynamicMemberLookup: KeyPath<TestOverloaded.S2, T>) -> T {
+    fatalError()
+  }
+}
+
+struct TestOverloaded {
+  struct S1: P1 {
+    subscript(x: String) -> Int {
+      fatalError()
+    }
+    func f(_ x: String) -> Int {
+      return self[x]
+    }
+  }
+  struct S2: P1 {}
+}
+
+@dynamicMemberLookup
+struct SingleLens<T> {
+  var value: T
+  init(_ value: T) {
+    self.value = value
+  }
+  subscript<U>(dynamicMember keyPath: KeyPath<T, U>) -> U {
+    value[keyPath: keyPath]
+  }
+}
+
+func testRecursiveSingleSubscript(_ x: SingleLens<SingleLens<SingleLens<SingleLens<[Int]>>>>) {
+  _ = x[0]
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil | %FileCheck %s
 
 // REQUIRES: objc_interop
 

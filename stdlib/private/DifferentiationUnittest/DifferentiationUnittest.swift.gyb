@@ -108,7 +108,8 @@ public struct Tracked<T> {
   @differentiable(reverse where T: Differentiable, T == T.TangentVector)
   public var value: T {
     get { handle.value }
-    set { handle.value = newValue }
+    // FIXME: Disable setter until https://github.com/apple/swift/issues/55542 is fixed
+    // set { handle.value = newValue }
   }
 }
 
@@ -141,7 +142,8 @@ public struct NonresilientTracked<T> {
   @differentiable(reverse where T: Differentiable, T == T.TangentVector)
   public var value: T {
     get { handle.value }
-    set { handle.value = newValue }
+    // FIXME: Disable setter until https://github.com/apple/swift/issues/55542 is fixed
+    // set { handle.value = newValue }
   }
 }
 
@@ -337,6 +339,29 @@ where
     -> (value: Self, differential: (Self, Self) -> (Self))
   {
     return (lhs * rhs, { (dx, dy) in dx * rhs + dy * lhs })
+  }
+
+  @usableFromInline
+  @derivative(of: *=)
+  static func _vjpMultiplyAssign(_ lhs: inout Self, _ rhs: Self) -> (
+    value: Void, pullback: (inout Self) -> Self)
+  {
+    defer { lhs *= rhs }
+    return ((), { [lhs = lhs] v in
+      let drhs = lhs * v
+      v *= rhs
+      return drhs
+    })
+  }
+
+  @usableFromInline
+  @derivative(of: *=)
+  static func _jvpMultiplyAssign(_ lhs: inout Self, _ rhs: Self) -> (
+    value: Void, differential: (inout Self, Self) -> Void)
+  {
+    let oldLhs = lhs
+    lhs *= rhs
+    return ((), { $0 = $0 * rhs + oldLhs * $1 })
   }
 }
 

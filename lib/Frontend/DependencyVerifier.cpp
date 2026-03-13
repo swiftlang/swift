@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,6 +20,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
@@ -148,6 +149,9 @@ struct Obligation {
   public:
     Key() = delete;
 
+  private:
+    Key(StringRef Name, Expectation::Kind Kind) : Name(Name), Kind(Kind) {}
+
   public:
     static Key forNegative(StringRef name) {
       return Key{name, Expectation::Kind::Negative};
@@ -188,7 +192,7 @@ struct Obligation {
       }
       static bool isEqual(const Obligation::Key &LHS,
                           const Obligation::Key &RHS) {
-        return LHS.Name.equals(RHS.Name) && LHS.Kind == RHS.Kind;
+        return LHS.Name == RHS.Name && LHS.Kind == RHS.Kind;
       }
     };
   };
@@ -312,7 +316,7 @@ private:
   InFlightDiagnostic
   diagnose(DiagnosticEngine &Diags, const char *LocPtr, Diag<ArgTypes...> ID,
            typename detail::PassArgument<ArgTypes>::type... Args) const {
-    auto Loc = SourceLoc(llvm::SMLoc::getFromPointer(LocPtr));
+    auto Loc = SourceLoc::getFromPointer(LocPtr);
     return Diags.diagnose(Loc, ID, std::move(Args)...);
   }
 };
@@ -320,13 +324,7 @@ private:
 
 bool DependencyVerifier::parseExpectations(
     const SourceFile *SF, std::vector<Expectation> &Expectations) {
-  const auto MaybeBufferID = SF->getBufferID();
-  if (!MaybeBufferID) {
-    llvm::errs() << "source file has no buffer: " << SF->getFilename();
-    return true;
-  }
-
-  const auto BufferID = MaybeBufferID.value();
+  const auto BufferID = SF->getBufferID();
   const CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
   const StringRef InputFile = SM.extractText(EntireRange);
 
@@ -480,7 +478,7 @@ bool DependencyVerifier::verifyNegativeExpectations(
 
 bool DependencyVerifier::diagnoseUnfulfilledObligations(
     const SourceFile *SF, ObligationMap &Obligations) {
-  CharSourceRange EntireRange = SM.getRangeForBuffer(*SF->getBufferID());
+  CharSourceRange EntireRange = SM.getRangeForBuffer(SF->getBufferID());
   StringRef InputFile = SM.extractText(EntireRange);
   auto &diags = SF->getASTContext().Diags;
   auto &Ctx = SF->getASTContext();
@@ -488,7 +486,7 @@ bool DependencyVerifier::diagnoseUnfulfilledObligations(
     // HACK: Diagnosing the end of the buffer will print a carat pointing
     // at the file path, but not print any of the buffer's contents, which
     // might be misleading.
-    auto Loc = SourceLoc(llvm::SMLoc::getFromPointer(InputFile.end()));
+    auto Loc = SourceLoc::getFromPointer(InputFile.end());
     switch (p.getKind()) {
     case Expectation::Kind::Negative:
       llvm_unreachable("Obligations may not be negative; only Expectations!");

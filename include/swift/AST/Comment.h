@@ -14,7 +14,7 @@
 #define SWIFT_AST_COMMENT_H
 
 #include "swift/Markup/Markup.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 class Decl;
@@ -46,18 +46,18 @@ public:
   }
 
   ArrayRef<StringRef> getTags() const {
-    return llvm::makeArrayRef(Parts.Tags.begin(), Parts.Tags.end());
+    return llvm::ArrayRef(Parts.Tags.begin(), Parts.Tags.end());
   }
 
-  Optional<const swift::markup::Paragraph *> getBrief() const {
+  std::optional<const swift::markup::Paragraph *> getBrief() const {
     return Parts.Brief;
   }
 
-  Optional<const swift::markup::ReturnsField * >getReturnsField() const {
+  std::optional<const swift::markup::ReturnsField *> getReturnsField() const {
     return Parts.ReturnsField;
   }
 
-  Optional<const swift::markup::ThrowsField*> getThrowsField() const {
+  std::optional<const swift::markup::ThrowsField *> getThrowsField() const {
     return Parts.ThrowsField;
   }
 
@@ -69,7 +69,7 @@ public:
     return Parts.BodyNodes;
   }
 
-  Optional<const markup::LocalizationKeyField *>
+  std::optional<const markup::LocalizationKeyField *>
   getLocalizationKeyField() const {
     return Parts.LocalizationKeyField;
   }
@@ -93,27 +93,8 @@ public:
 };
 
 /// Get a parsed documentation comment for the declaration, if there is one.
-///
-/// \param AllowSerialized Allow loading serialized doc comment data, including
-/// comment ranges.
 DocComment *getSingleDocComment(swift::markup::MarkupContext &Context,
-                                const Decl *D, bool AllowSerialized = false);
-
-/// Get the declaration that actually provides a doc comment for another.
-///
-/// \param AllowSerialized Allow loading serialized doc comment data, including
-/// comment ranges.
-const Decl *getDocCommentProvidingDecl(const Decl *D,
-                                       bool AllowSerialized = false);
-
-/// Attempt to get a doc comment from the declaration, or other inherited
-/// sources, like from base classes or protocols.
-///
-/// \param AllowSerialized Allow loading serialized doc comment data, including
-/// comment ranges.
-DocComment *getCascadingDocComment(swift::markup::MarkupContext &MC,
-                                   const Decl *D,
-                                   bool AllowSerialized = false);
+                                const Decl *D);
 
 /// Extract comments parts from the given Markup node.
 swift::markup::CommentParts
@@ -122,6 +103,25 @@ extractCommentParts(swift::markup::MarkupContext &MC,
 
 /// Extract brief comment from \p RC, and print it to \p OS .
 void printBriefComment(RawComment RC, llvm::raw_ostream &OS);
+
+/// Describes the intended serialization target for a doc comment.
+enum class DocCommentSerializationTarget : uint8_t {
+  /// The doc comment should not be serialized.
+  None = 0,
+
+  /// The doc comment should only be serialized in the 'swiftsourceinfo'.
+  SourceInfoOnly,
+
+  /// The doc comment should be serialized in both the 'swiftdoc' and
+  /// 'swiftsourceinfo'.
+  SwiftDocAndSourceInfo,
+};
+
+/// Retrieve the expected serialization target for a documentation comment
+/// attached to the given decl.
+DocCommentSerializationTarget
+getDocCommentSerializationTargetFor(const Decl *D);
+
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_COMMENT_H

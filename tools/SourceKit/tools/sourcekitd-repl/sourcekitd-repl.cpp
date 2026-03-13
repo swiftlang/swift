@@ -268,8 +268,7 @@ public:
         CurrentLines.append(indent, ' ');
       }
 
-      convertToUTF8(llvm::makeArrayRef(WLine, WLine + wcslen(WLine)),
-                    CurrentLines);
+      convertToUTF8(llvm::ArrayRef(WLine, WLine + wcslen(WLine)), CurrentLines);
 
       // Special-case backslash for line continuations in the REPL.
       if (CurrentLines.size() > 2 &&
@@ -411,8 +410,8 @@ private:
   }
 
   bool isAtStartOfLine(const LineInfoW *line) {
-    for (wchar_t c : llvm::makeArrayRef(line->buffer,
-                                        line->cursor - line->buffer)) {
+    for (wchar_t c :
+         llvm::ArrayRef(line->buffer, line->cursor - line->buffer)) {
       if (!iswspace(c))
         return false;
     }
@@ -611,12 +610,12 @@ static bool handleRequest(StringRef ReqStr, std::string &ErrorMessage) {
   bool UseTimer = false;
   while (true) {
     ReqStr = ReqStr.ltrim();
-    if (ReqStr.startswith("async")) {
+    if (ReqStr.starts_with("async")) {
       UseAsync = true;
       ReqStr = ReqStr.substr(strlen("async"));
       continue;
     }
-    if (ReqStr.startswith("time")) {
+    if (ReqStr.starts_with("time")) {
       UseTimer = true;
       ReqStr = ReqStr.substr(strlen("time"));
       continue;

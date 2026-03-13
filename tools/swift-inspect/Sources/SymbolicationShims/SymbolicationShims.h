@@ -12,6 +12,7 @@
 
 #if defined(__APPLE__)
 
+#include <mach/vm_param.h>
 #include <stdint.h>
 #include <ptrauth.h>
 
@@ -26,6 +27,10 @@ struct Range {
 static inline uintptr_t GetPtrauthMask(void) {
 #if __has_feature(ptrauth_calls)
   return (uintptr_t)ptrauth_strip((void*)0x0007ffffffffffff, 0);
+#elif __arm64__ && __LP64__
+  // Mask all bits above the top of MACH_VM_MAX_ADDRESS, which will
+  // match the above ptrauth_strip.
+  return (uintptr_t)~0ull >> __builtin_clzll(MACH_VM_MAX_ADDRESS);
 #else
   return (uintptr_t)~0ull;
 #endif

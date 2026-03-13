@@ -4,9 +4,9 @@
 // Mutating functions with control flow can cause assertion failure for
 // conflicting debug variable type
 
-// CHECK-LABEL: define internal swiftcc float @"$s4main8TestTypeV24doDifferentiableTimeStep04timeG0ySf_tFTJpSSpSrTA"
-// CHECK: [[SELF:%.*]] = alloca %T4main8TestTypeV06ManualB7TangentV, align 4
-// CHECK: call void @llvm.dbg.declare(metadata %T4main8TestTypeV06ManualB7TangentV* [[SELF]]
+// CHECK-LABEL: define internal swiftcc{{.*}} float @"$s4main8TestTypeV24doDifferentiableTimeStep04timeG0ySf_tFTJpSSpSrTA"
+// CHECK: [[SELF:%.*]] = alloca %T4main8TestTypeV06ManualB7TangentV
+// CHECK: #dbg_value(ptr [[SELF]]
 
 import _Differentiation
 

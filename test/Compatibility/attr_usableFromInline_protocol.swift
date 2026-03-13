@@ -7,8 +7,8 @@ public protocol PublicProtoWithReqs {
 }
 
 @usableFromInline struct UFIAdopter<T> : PublicProtoWithReqs {}
-// expected-warning@-1 {{type alias 'Assoc' should be declared '@usableFromInline' because it matches a requirement in protocol 'PublicProtoWithReqs'}} {{none}}
-// expected-warning@-2 {{instance method 'foo()' should be declared '@usableFromInline' because it matches a requirement in protocol 'PublicProtoWithReqs'}} {{none}}
+// expected-warning@-1 {{type alias 'Assoc' must be declared '@usableFromInline' because it matches a requirement in protocol 'PublicProtoWithReqs'; this is an error in the Swift 5 language mode}} {{none}}
+// expected-warning@-2 {{instance method 'foo()' must be declared '@usableFromInline' because it matches a requirement in protocol 'PublicProtoWithReqs'; this is an error in the Swift 5 language mode}} {{none}}
 extension UFIAdopter {
   typealias Assoc = Int
   // expected-note@-1 {{'Assoc' declared here}}
@@ -18,9 +18,9 @@ extension UFIAdopter {
 
 @usableFromInline struct UFIAdopterAllInOne<T> : PublicProtoWithReqs {
   typealias Assoc = Int
-  // expected-warning@-1 {{type alias 'Assoc' should be declared '@usableFromInline' because it matches a requirement in protocol 'PublicProtoWithReqs'}} {{none}}
+  // expected-warning@-1 {{type alias 'Assoc' must be declared '@usableFromInline' because it matches a requirement in protocol 'PublicProtoWithReqs'; this is an error in the Swift 5 language mode}} {{none}}
   func foo() {}
-  // expected-warning@-1 {{instance method 'foo()' should be declared '@usableFromInline' because it matches a requirement in protocol 'PublicProtoWithReqs'}} {{none}}
+  // expected-warning@-1 {{instance method 'foo()' must be declared '@usableFromInline' because it matches a requirement in protocol 'PublicProtoWithReqs'; this is an error in the Swift 5 language mode}} {{none}}
 }
 
 internal struct InternalAdopter<T> : PublicProtoWithReqs {}
@@ -36,8 +36,8 @@ extension InternalAdopter {
 }
 
 public struct PublicAdopter<T> : UFIProtoWithReqs {}
-// expected-warning@-1 {{type alias 'Assoc' should be declared '@usableFromInline' because it matches a requirement in protocol 'UFIProtoWithReqs'}} {{none}}
-// expected-warning@-2 {{instance method 'foo()' should be declared '@usableFromInline' because it matches a requirement in protocol 'UFIProtoWithReqs'}} {{none}}
+// expected-warning@-1 {{type alias 'Assoc' must be declared '@usableFromInline' because it matches a requirement in protocol 'UFIProtoWithReqs'; this is an error in the Swift 5 language mode}} {{none}}
+// expected-warning@-2 {{instance method 'foo()' must be declared '@usableFromInline' because it matches a requirement in protocol 'UFIProtoWithReqs'; this is an error in the Swift 5 language mode}} {{none}}
 extension PublicAdopter {
   typealias Assoc = Int
   // expected-note@-1 {{'Assoc' declared here}}

@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "EnumPayload.h"
 #include "IRGenDebugInfo.h"
@@ -88,9 +89,9 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
                                == FixedPacking::OffsetZero),
              "is-inline bit");
       verifyValues(metadata,
-             emitLoadOfIsPOD(*this, layoutType),
-             getBoolConstant(fixedTI->isPOD(ResilienceExpansion::Maximal)),
-             "is-POD bit");
+             emitLoadOfIsTriviallyDestroyable(*this, layoutType),
+             getBoolConstant(fixedTI->isTriviallyDestroyable(ResilienceExpansion::Maximal)),
+             "is-trivially-destructible bit");
       verifyValues(metadata,
              emitLoadOfIsBitwiseTakable(*this, layoutType),
              getBoolConstant(fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal)),

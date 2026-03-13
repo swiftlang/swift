@@ -1,6 +1,7 @@
 
 /* Generic Signature Changes */
 cake: Func P1.P1Constraint() has generic signature change from <Self where Self : cake.P1, Self : cake.P2> to <Self where Self : cake.P1>
+cake: Func addingAnInverse(_:) has generic signature change from <T> to <T where T : ~Copyable>
 cake: Protocol P3 has generic signature change from <Self : cake.P1, Self : cake.P2> to <Self : cake.P1, Self : cake.P4>
 
 /* RawRepresentable Changes */
@@ -48,7 +49,9 @@ cake: Var C1.CIIns2 changes from strong to weak
 cake: EnumElement FrozenKind.AddedCase has been added as a new enum case
 
 /* Conformance changes */
+cake: Enum IceKind has removed conformance to BitwiseCopyable
 cake: Enum IceKind has removed conformance to Sendable
+cake: Enum IceKind has removed conformance to SendableMetatype
 cake: Func ObjCProtocol.removeOptional() is no longer an optional requirement
 cake: Protocol P3 has added inherited protocol P4
 cake: Protocol P3 has removed inherited protocol P2
@@ -63,7 +66,7 @@ cake: Accessor ClassWithOpenMember.property.Get() is no longer open for subclass
 
 /* Class Inheritance Change */
 cake: Class C4 has changed its super class from APINotesTest.OldType to APINotesTest.NewType
-cake: Class SubGenericClass has changed its super class from cake.GenericClass<cake.P1> to cake.GenericClass<cake.P2>
+cake: Class SubGenericClass has changed its super class from cake.GenericClass<any cake.P1> to cake.GenericClass<any cake.P2>
 cake: Class SuperClassRemoval has removed its super class cake.C3
 cake: Class SuperClassRemoval no longer inherits convenience inits from its superclass
 cake: Constructor AddingNewDesignatedInit.init(_:) has been added as a designated initializer to an open class

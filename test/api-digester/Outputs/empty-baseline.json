@@ -1,8 +1,8 @@
 {
   "ABIRoot": {
     "kind": "Root",
-    "name": "TopLevel",
-    "printedName": "TopLevel",
+    "name": "NO_MODULE",
+    "printedName": "NO_MODULE",
     "json_format_version": 8
   }
 }

@@ -1,10 +1,18 @@
 
-// RUN: %target-swift-emit-silgen -module-name default_arguments -Xllvm -sil-full-demangle -swift-version 4 %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -module-name default_arguments -Xllvm -sil-full-demangle -swift-version 4 %s | %FileCheck %s --check-prefix=NEGATIVE
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name default_arguments -Xllvm -sil-full-demangle -swift-version 4 %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name default_arguments -Xllvm -sil-full-demangle -swift-version 4 %s | %FileCheck %s --check-prefix=NEGATIVE
 
 // __FUNCTION__ used as top-level parameter produces the module name.
 // CHECK-LABEL: sil [ossa] @main
 // CHECK:         string_literal utf8 "default_arguments"
+
+// Test at top level.
+testMagicLiterals()
+closure { testMagicLiterals() }
+autoclosure(testMagicLiterals())
+
+// CHECK: string_literal utf8 "default_arguments"
+let y : String = #function
 
 // Default argument for first parameter.
 // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments7defarg11i1d1sySi_SdSStFfA_ : $@convention(thin) () -> Int
@@ -163,14 +171,6 @@ class Foo {
 
 }
 
-// Test at top level.
-testMagicLiterals()
-closure { testMagicLiterals() }
-autoclosure(testMagicLiterals())
-
-// CHECK: string_literal utf8 "default_arguments"
-let y : String = #function 
-
 // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments16testSelectorCall_17withMagicLiteralsySi_SitF
 // CHECK:         string_literal utf8 "testSelectorCall(_:withMagicLiterals:)"
 func testSelectorCall(_ x: Int, withMagicLiterals y: Int) {
@@ -245,8 +245,8 @@ class ReabstractDefaultArgument<T> {
 // CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[RESULT_CONV]]) : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in_guaranteed Int, @in_guaranteed Int) -> Bool) -> Bool
 // CHECK-NEXT: [[CONV_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[FN]]
 // function_ref reabstraction thunk helper from @callee_guaranteed (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool) to @callee_guaranteed (@in_guaranteed Swift.Int, @in_guaranteed Swift.Int) -> (@unowned Swift.Bool)
-// CHECK: [[THUNK:%.*]] = function_ref @$sS2iSbIgyyd_S2iSbIegnnd_TR : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int, @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
-// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[CONV_FN]]) : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int, @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
+// CHECK: [[THUNK:%.*]] = function_ref @$sS2iSbIgyyd_S2iSbIegnnd_TR :
+// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[CONV_FN]]) :
 // CHECK-NEXT: [[CONV_FN_0:%.*]] = convert_function [[FN]]
 // CHECK-NEXT: [[CONV_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CONV_FN_0]]
 // CHECK: [[INITFN:%[0-9]+]] = function_ref @$s17default_arguments25ReabstractDefaultArgumentC{{[_0-9a-zA-Z]*}}fC
@@ -338,25 +338,25 @@ func autoclosureDefaultEscaping(closure: @escaping @autoclosure () -> Bool  = tr
 // CHECK:  [[F:%.*]] = function_ref @$s17default_arguments15throwingDefault7closureySbyKXE_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 // CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 // CHECK:  [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
-// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments15throwingDefault7closureySbyKXE_tKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Bool, @error any Error)) -> @error any Error
+// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments15throwingDefault7closureySbyKXE_tKF :
 // CHECK:  try_apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$s17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 // CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 // CHECK:  [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
-// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Bool, @error any Error)) -> @error any Error
+// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKF :
 // CHECK:  try_apply [[R]]([[E]])
 
 // CHECK:   [[F:%.*]] = function_ref @$s17default_arguments0A3Arg7closureySbyXE_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:   [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:   [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
-// CHECK:   [[R:%.*]] = function_ref @$s17default_arguments0A3Arg7closureySbyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
+// CHECK:   [[R:%.*]] = function_ref @$s17default_arguments0A3Arg7closureySbyXE_tF :
 // CHECK:   apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$s17default_arguments21autoclosureDefaultArg7closureySbyXK_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Boo
 // CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:  [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
-// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments21autoclosureDefaultArg7closureySbyXK_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
+// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments21autoclosureDefaultArg7closureySbyXK_tF :
 // CHECK:  apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$s17default_arguments23throwingDefaultEscaping7closureySbyKc_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
@@ -446,11 +446,11 @@ enum E {
   // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments1EO4testyyFZ : $@convention(method) (@thin E.Type) -> ()
   static func test() {
     // CHECK: function_ref @$s17default_arguments1EO6ResultV4name9platformsAESS_SaySiGtcfcfA0_ : $@convention(thin) () -> @owned Array<Int>
-    // CHECK: function_ref @$s17default_arguments1EO4testyyFZAC6ResultVSS_SaySiGtcfu_ : $@convention(thin) (@guaranteed String, @guaranteed Array<Int>) -> @owned E.Result
+    // CHECK: function_ref @$s17default_arguments1EO6ResultV4name9platformsAESS_SaySiGtcfC : $@convention(method) (@owned String, @owned Array<Int>, @thin E.Result.Type) -> @owned E.Result
 
-    // CHECK-LABEL: sil private [ossa] @$s17default_arguments1EO4testyyFZAC6ResultVSS_SaySiGtcfu_ : $@convention(thin) (@guaranteed String, @guaranteed Array<Int>) -> @owned E.Result
     var result = Self.Result(name: "")
   }
+  // CHECK: end sil function '$s17default_arguments1EO4testyyFZ'
 }
 
 // FIXME: Arguably we shouldn't allow calling a constructor like this, as

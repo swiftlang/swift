@@ -12,6 +12,7 @@
 
 #include "swift/SIL/SILConstants.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/DenseSet.h"
@@ -66,6 +67,12 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   case RK_IntegerInline:
     os << "int: " << getIntegerValue() << "\n";
     return;
+  case RK_FloatingPoint: {
+    SmallVector<char, 0> stringFloatRepr;
+    getFloatValue().toString(stringFloatRepr);
+    os << "float: " << stringFloatRepr << "\n";
+    return;
+  }
   case RK_String:
     os << "string: \"" << getStringValue() << "\"\n";
     return;
@@ -145,7 +152,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     }
     os.indent(indent) << "] values: [\n";
     for (SymbolicClosureArgument closureArg : args) {
-      Optional<SymbolicValue> value = closureArg.second;
+      std::optional<SymbolicValue> value = closureArg.second;
       if (!value.has_value()) {
         os.indent(indent + 2) << "nil\n";
         continue;
@@ -181,6 +188,8 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_Integer:
   case RK_IntegerInline:
     return Integer;
+  case RK_FloatingPoint:
+    return FloatingPoint;
   case RK_String:
     return String;
   case RK_DirectAddress:
@@ -207,9 +216,11 @@ SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
   case RK_Metatype:
   case RK_Function:
     assert(0 && "cloning this representation kind is not supported");
-  case RK_Enum:
+    case RK_Enum:
     // These have trivial inline storage, just return a copy.
     return *this;
+  case RK_FloatingPoint:
+    return SymbolicValue::getFloat(getFloatValue(), allocator);
   case RK_IntegerInline:
   case RK_Integer:
     return SymbolicValue::getInteger(getIntegerValue(), allocator);
@@ -273,6 +284,7 @@ bool SymbolicValue::containsOnlyConstants() const {
   case RK_Enum:
   case RK_IntegerInline:
   case RK_Integer:
+  case RK_FloatingPoint:
   case RK_String:
   case RK_Closure:
     return true;
@@ -350,6 +362,18 @@ SymbolicValue SymbolicValue::getInteger(const APInt &value,
   return result;
 }
 
+SymbolicValue SymbolicValue::getFloat(const APFloat &value,
+                                      SymbolicValueAllocator &allocator) {
+  auto rawMem = allocator.allocate(APFloat::getSizeInBits(value.getSemantics()),
+                                   alignof(APFloat));
+  auto floatVal = ::new (rawMem) APFloat(value);
+
+  SymbolicValue result;
+  result.representationKind = RK_FloatingPoint;
+  result.value.floatingPoint = floatVal;
+  return result;
+}
+
 APInt SymbolicValue::getIntegerValue() const {
   assert(getKind() == Integer);
   if (representationKind == RK_IntegerInline) {
@@ -369,6 +393,12 @@ unsigned SymbolicValue::getIntegerValueBitWidth() const {
   assert (representationKind == RK_IntegerInline ||
           representationKind == RK_Integer);
   return auxInfo.integerBitwidth;
+}
+
+APFloat SymbolicValue::getFloatValue() const {
+  assert(getKind() == FloatingPoint);
+  assert(representationKind == RK_FloatingPoint);
+  return *(value.floatingPoint);
 }
 
 //===----------------------------------------------------------------------===//
@@ -425,7 +455,7 @@ struct AggregateSymbolicValue final
     auto *aggregate =
         ::new (rawMem) AggregateSymbolicValue(aggregateType, members.size());
     std::uninitialized_copy(members.begin(), members.end(),
-                            aggregate->getTrailingObjects<SymbolicValue>());
+                            aggregate->getTrailingObjects());
     return aggregate;
   }
 
@@ -434,7 +464,7 @@ struct AggregateSymbolicValue final
 
   /// Return the symbolic values of members.
   ArrayRef<SymbolicValue> getMemberValues() const {
-    return {getTrailingObjects<SymbolicValue>(), numElements};
+    return getTrailingObjects(numElements);
   }
 
   // This is used by the llvm::TrailingObjects base class.
@@ -501,12 +531,12 @@ struct alignas(SourceLoc) UnknownSymbolicValue final
     auto value = ::new (rawMem) UnknownSymbolicValue(
         node, reason, static_cast<unsigned>(elements.size()));
     std::uninitialized_copy(elements.begin(), elements.end(),
-                            value->getTrailingObjects<SourceLoc>());
+                            value->getTrailingObjects());
     return value;
   }
 
   ArrayRef<SourceLoc> getCallStack() const {
-    return {getTrailingObjects<SourceLoc>(), callStackSize};
+    return getTrailingObjects(callStackSize);
   }
 
   // This is used by the llvm::TrailingObjects base class.
@@ -627,14 +657,14 @@ struct DerivedAddressValue final
     auto dav =
         ::new (rawMem) DerivedAddressValue(memoryObject, elements.size());
     std::uninitialized_copy(elements.begin(), elements.end(),
-                            dav->getTrailingObjects<unsigned>());
+                            dav->getTrailingObjects());
     return dav;
   }
 
   /// Return the access path for this derived address, which is an array of
   /// indices drilling into the memory object.
   ArrayRef<unsigned> getElements() const {
-    return {getTrailingObjects<unsigned>(), numElements};
+    return getTrailingObjects(numElements);
   }
 
   // This is used by the llvm::TrailingObjects base class.
@@ -719,13 +749,13 @@ struct SymbolicArrayStorage final
     auto *storage =
         ::new (rawMem) SymbolicArrayStorage(elementType, elements.size());
     std::uninitialized_copy(elements.begin(), elements.end(),
-                            storage->getTrailingObjects<SymbolicValue>());
+                            storage->getTrailingObjects());
     return storage;
   }
 
   /// Return the stored elements.
   ArrayRef<SymbolicValue> getElements() const {
-    return {getTrailingObjects<SymbolicValue>(), numElements};
+    return getTrailingObjects(numElements);
   }
 
   // This is used by the llvm::TrailingObjects base class.
@@ -842,9 +872,8 @@ SymbolicClosure *SymbolicClosure::create(SILFunction *target,
   //  Placement initialize the object.
   auto closure = ::new (rawMem) SymbolicClosure(
       target, args.size(), substMap, closureInst, hasNonConstantCapture);
-  std::uninitialized_copy(
-      args.begin(), args.end(),
-      closure->getTrailingObjects<SymbolicClosureArgument>());
+  std::uninitialized_copy(args.begin(), args.end(),
+                          closure->getTrailingObjects());
   return closure;
 }
 
@@ -1137,7 +1166,7 @@ static SymbolicValue getIndexedElement(SymbolicValue aggregate,
   } else {
     elt = aggregate.getAggregateMembers()[elementNo];
     if (auto *decl = type->getStructOrBoundGenericStruct()) {
-      eltType = decl->getStoredProperties()[elementNo]->getType();
+      eltType = decl->getStoredProperties()[elementNo]->getTypeInContext();
     } else if (auto tuple = type->getAs<TupleType>()) {
       assert(elementNo < tuple->getNumElements() && "invalid index");
       eltType = tuple->getElement(elementNo).getType();
@@ -1174,6 +1203,11 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
   if (accessPath.empty())
     return newElement;
 
+  // Callers are required to ensure unknowns are not passed. However,
+  // the recurisve call can pass an unknown as an aggregate.
+  if (aggregate.getKind() == SymbolicValue::Unknown)
+    return aggregate;
+
   // If we have an uninit memory, then scalarize it into an aggregate to
   // continue.  This happens when memory objects are initialized piecewise.
   if (aggregate.getKind() == SymbolicValue::UninitMemory) {
@@ -1208,7 +1242,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
   } else {
     oldElts = aggregate.getAggregateMembers();
     if (auto *decl = type->getStructOrBoundGenericStruct()) {
-      eltType = decl->getStoredProperties()[elementNo]->getType();
+      eltType = decl->getStoredProperties()[elementNo]->getTypeInContext();
     } else if (auto tuple = type->getAs<TupleType>()) {
       assert(elementNo < tuple->getNumElements() && "invalid index");
       eltType = tuple->getElement(elementNo).getType();

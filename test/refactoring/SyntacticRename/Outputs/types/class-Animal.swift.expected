@@ -17,10 +17,10 @@ var example: /*alias-FuncType*/FuncType = {a, b in x}
 
 func bar<X:/*protocol-Proto*/Proto, Y>(a: X, b: Y) {}
 
-class /*class-Animal:def*/Gonzo</*generic-T:def*/T, /*generic-U:def*/U> where /*generic-U*/U:/*protocol-Proto*/Proto, /*generic-U*/U . /*associated-Item*/Item == Int {}
+class /*class-Animal:def*/<base>Animal</base></*generic-T:def*/T, /*generic-U:def*/U> where /*generic-U*/U:/*protocol-Proto*/Proto, /*generic-U*/U . /*associated-Item*/Item == Int {}
 
-var anAnimal: /*class-Animal*/Gonzo<Int, /*class-Bar*/Bar> = /*class-Animal*/Gonzo()
-extension /*class-Animal:def*/Gonzo {
+var anAnimal: /*class-Animal*/<base>Animal</base><Int, /*class-Bar*/Bar> = /*class-Animal*/<base>Animal</base>()
+extension /*class-Animal:def*/<base>Animal</base> {
 	func boo(a: /*generic-T*/T, b: /*generic-U*/U) {}
 }
 

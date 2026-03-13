@@ -26,10 +26,12 @@
 
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
+#include "LiteralExpressionFolding.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 using namespace swift;
 
 /// Check whether a given \p decl has a @_semantics attribute with the given
@@ -71,14 +73,14 @@ static bool isParamRequiredToBeConstant(AbstractFunctionDecl *funcDecl, ParamDec
     // We are looking at a top-level os_log function that accepts level and
     // possibly custom log object. Those need not be constants, but every other
     // parameter must be.
-    paramType = param->getType();
+    paramType = param->getTypeInContext();
     nominal = paramType->getNominalOrBoundGenericNominal();
     return !nominal || !isOSLogDynamicObject(nominal);
   }
   if (!hasSemanticsAttr(funcDecl,
                         semantics::ATOMICS_REQUIRES_CONSTANT_ORDERINGS))
     return false;
-  paramType = param->getType();
+  paramType = param->getTypeInContext();
   structDecl = paramType->getStructOrBoundGenericStruct();
   if (!structDecl)
     return false;
@@ -174,7 +176,8 @@ static Expr *checkConstantness(Expr *expr) {
       return expr;
 
     ApplyExpr *apply = cast<ApplyExpr>(expr);
-    ValueDecl *calledValue = apply->getCalledValue();
+    ValueDecl *calledValue =
+        apply->getCalledValue(/*skipFunctionConversions=*/true);
     if (!calledValue)
       return expr;
 
@@ -203,19 +206,6 @@ static Expr *checkConstantness(Expr *expr) {
       expressionsToCheck.push_back(arg.getExpr());
   }
   return nullptr;
-}
-
-/// Return true iff the given \p type is a Stdlib integer type.
-static bool isIntegerType(Type type) {
-  return type->isInt() || type->isInt8() || type->isInt16() ||
-         type->isInt32() || type->isInt64() || type->isUInt() ||
-         type->isUInt8() || type->isUInt16() || type->isUInt32() ||
-         type->isUInt64();
-}
-
-/// Return true iff the given \p type is a Float type.
-static bool isFloatType(Type type) {
-  return type->isFloat() || type->isDouble() || type->isFloat80();
 }
 
 /// Given an error expression \p errorExpr, diagnose the error based on the type
@@ -254,11 +244,11 @@ static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_string_literal);
     return;
   }
-  if (isIntegerType(exprType)) {
+  if (exprType->isStdlibInteger()) {
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_integer_literal);
     return;
   }
-  if (isFloatType(exprType)) {
+  if (exprType->isStdlibFloat()) {
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_float_literal);
     return;
   }
@@ -299,7 +289,8 @@ static void diagnoseConstantArgumentRequirementOfCall(const CallExpr *callExpr,
                                                       const ASTContext &ctx) {
   assert(callExpr && callExpr->getType() &&
          "callExpr should have a valid type");
-  ValueDecl *calledDecl = callExpr->getCalledValue();
+  ValueDecl *calledDecl =
+      callExpr->getCalledValue(/*skipFunctionConversions=*/true);
   if (!calledDecl || !isa<AbstractFunctionDecl>(calledDecl))
     return;
   AbstractFunctionDecl *callee = cast<AbstractFunctionDecl>(calledDecl);
@@ -339,6 +330,10 @@ void swift::diagnoseConstantArgumentRequirement(
   public:
     ConstantReqCallWalker(DeclContext *DC) : DC(DC), insideClosure(false) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     // Descend until we find a call expressions. Note that the input expression
     // could be an assign expression or another expression that contains the
     // call.
@@ -349,15 +344,8 @@ void swift::diagnoseConstantArgumentRequirement(
         return walkToClosureExprPre(closureExpr);
       }
 
-      // Interpolated expressions' bodies will be type checked
-      // separately so exit early to avoid duplicate diagnostics.
-      // The caveat is that they won't be checked inside closure
-      // bodies because we manually check all closures to avoid
-      // duplicate diagnostics. Therefore we must still descend into
-      // interpolated expressions if we are inside of a closure.
-      if (!expr || isa<ErrorExpr>(expr) || !expr->getType() ||
-          (isa<InterpolatedStringLiteralExpr>(expr) && !insideClosure))
-        return Action::SkipChildren(expr);
+      if (!expr || isa<ErrorExpr>(expr) || !expr->getType())
+        return Action::SkipNode(expr);
       if (auto *callExpr = dyn_cast<CallExpr>(expr)) {
         diagnoseConstantArgumentRequirementOfCall(callExpr, DC->getASTContext());
       }

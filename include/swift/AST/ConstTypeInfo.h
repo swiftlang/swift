@@ -14,7 +14,9 @@
 #define SWIFT_AST_CONST_TYPE_INFO_H
 
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -36,6 +38,13 @@ public:
     Array,
     Tuple,
     Enum,
+    Type,
+    KeyPath,
+    FunctionCall,
+    StaticFunctionCall,
+    MemberReference,
+    InterpolatedString,
+    NilLiteral,
     Runtime
   };
 
@@ -65,6 +74,22 @@ private:
   std::string Value;
 };
 
+/// A representation of an Optional<Wrapped> value declared as nil
+/// or left undeclared.
+///
+/// Nil values were previously represented as RawLiteralValue with
+/// value "nil". This caused ambiguous values when extracting values,
+/// such as an Optional<String> of value "nil".
+
+class NilLiteralValue : public CompileTimeValue {
+public:
+  NilLiteralValue() : CompileTimeValue(ValueKind::NilLiteral) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::NilLiteral;
+  }
+};
+
 struct FunctionParameter {
   std::string Label;
   swift::Type Type;
@@ -91,21 +116,183 @@ private:
   std::vector<FunctionParameter> Parameters;
 };
 
-/// A representation of a Builder pattern initialization expression
+/// A representation of a Builder pattern initialization expression. For
+/// example:
+///
+/// @FooBuilder
+/// public static var foos: [Foo] {
+///    Foo(name: "foos.1")
+///    Foo(name: "foos.2")
+/// }
+///
+/// In this example, the result builder type is FooBuilder
+/// The members are Foo(name: "foos.1") and Foo(name: "foos.2")
+///
 class BuilderValue : public CompileTimeValue {
 public:
-  BuilderValue() : CompileTimeValue(ValueKind::Builder) {}
+  enum MemberKind {
+    Expression,
+    Either,
+    Optional,
+    LimitedAvailability,
+    Array,
+    Unknown
+  };
+
+  /// A base class for individual members being declared inside the result
+  /// builder
+  class BuilderMember {
+  public:
+    MemberKind getKind() const { return Kind; }
+
+  protected:
+    BuilderMember(MemberKind MemberKind) : Kind(MemberKind) {}
+
+  private:
+    MemberKind Kind;
+  };
+
+  /// A basic expression that is defined inside the result builder. For example:
+  ///  {
+  ///     Foo(name: "1")
+  ///  }
+  ///
+  class SingleMember : public BuilderMember {
+  public:
+    SingleMember(std::shared_ptr<CompileTimeValue> Element)
+        : BuilderMember(MemberKind::Expression), Element(Element) {}
+
+    static bool classof(const BuilderMember *T) {
+      return T->getKind() == MemberKind::Expression;
+    }
+
+    std::shared_ptr<CompileTimeValue> getElement() const { return Element; }
+
+  private:
+    std::shared_ptr<CompileTimeValue> Element;
+  };
+
+  /// A member that represents when the individual values are defined by
+  /// iterating over an array. For example:
+  ///     for i in 1...3 {
+  ///         Foo(name: "MyFooProviderInferred.foos.Array.\(i)")
+  ///     }
+  ///
+  class ArrayMember : public BuilderMember {
+  public:
+    ArrayMember(std::vector<std::shared_ptr<BuilderMember>> Elements)
+        : BuilderMember(MemberKind::Array), Elements(Elements) {}
+
+    static bool classof(const BuilderMember *T) {
+      return T->getKind() == MemberKind::Array;
+    }
+
+    std::vector<std::shared_ptr<BuilderMember>> getElements() const {
+      return Elements;
+    }
+
+  private:
+    std::vector<std::shared_ptr<BuilderMember>> Elements;
+  };
+
+  /// A member that is defined conditionally. It can be of the following types:
+  ///
+  /// 1. A regular if-else condition
+  ///      if condition {
+  ///         Foo(name: "1")
+  ///      } else {
+  ///         Foo(name: "2")
+  ///      }
+  ///
+  /// 2. An optional
+  ///     if condition {
+  ///         Foo(name: "1")
+  ///     }
+  ///
+  /// 3. Limited availability
+  ///     if #available(macOS 99, *) {
+  ///         Foo(name: "1")
+  ///         Foo(name: "2")
+  ///     }
+  ///
+  class ConditionalMember : public BuilderMember {
+  public:
+    class AvailabilitySpec {
+    private:
+      AvailabilityDomain Domain;
+      llvm::VersionTuple Version;
+
+    public:
+      AvailabilitySpec(AvailabilityDomain Domain, llvm::VersionTuple Version)
+          : Domain(Domain), Version(Version) {}
+
+      AvailabilityDomain getDomain() const { return Domain; }
+      llvm::VersionTuple getVersion() const { return Version; }
+    };
+
+    ConditionalMember(MemberKind MemberKind,
+                      std::vector<AvailabilitySpec> AvailabilitySpecs,
+                      std::vector<std::shared_ptr<BuilderMember>> IfElements,
+                      std::vector<std::shared_ptr<BuilderMember>> ElseElements)
+        : BuilderMember(MemberKind), AvailabilitySpecs(AvailabilitySpecs),
+          IfElements(IfElements), ElseElements(ElseElements) {}
+
+    ConditionalMember(MemberKind MemberKind,
+                      std::vector<std::shared_ptr<BuilderMember>> IfElements,
+                      std::vector<std::shared_ptr<BuilderMember>> ElseElements)
+        : BuilderMember(MemberKind), IfElements(IfElements),
+          ElseElements(ElseElements) {}
+
+    static bool classof(const BuilderMember *T) {
+      auto Kind = T->getKind();
+      return (Kind == MemberKind::Either) ||
+             (Kind == MemberKind::LimitedAvailability) ||
+             (Kind == MemberKind::Optional);
+    }
+
+    std::optional<std::vector<AvailabilitySpec>> getAvailabilitySpecs() const {
+      return AvailabilitySpecs;
+    }
+    std::vector<std::shared_ptr<BuilderMember>> getIfElements() const {
+      return IfElements;
+    }
+    std::vector<std::shared_ptr<BuilderMember>> getElseElements() const {
+      return ElseElements;
+    }
+
+  private:
+    std::optional<std::vector<AvailabilitySpec>> AvailabilitySpecs;
+    std::vector<std::shared_ptr<BuilderMember>> IfElements;
+    std::vector<std::shared_ptr<BuilderMember>> ElseElements;
+  };
+
+  BuilderValue(std::vector<std::shared_ptr<BuilderMember>> Members)
+      : CompileTimeValue(ValueKind::Builder), ResultBuilderType(std::nullopt),
+        Members(Members) {}
+
+  BuilderValue(CustomAttr *ResultBuilderType,
+               std::vector<std::shared_ptr<BuilderMember>> Members)
+      : CompileTimeValue(ValueKind::Builder),
+        ResultBuilderType(ResultBuilderType), Members(Members) {}
+
+  std::optional<CustomAttr *> getResultBuilderType() const {
+    return ResultBuilderType;
+  }
+  std::vector<std::shared_ptr<BuilderMember>> getMembers() const {
+    return Members;
+  }
 
   static bool classof(const CompileTimeValue *T) {
     return T->getKind() == ValueKind::Builder;
   }
 
 private:
-  std::vector<CompileTimeValue> Members;
+  std::optional<CustomAttr *> ResultBuilderType;
+  std::vector<std::shared_ptr<BuilderMember>> Members;
 };
 
 struct TupleElement {
-  Optional<std::string> Label;
+  std::optional<std::string> Label;
   swift::Type Type;
   std::shared_ptr<CompileTimeValue> Value;
 };
@@ -165,12 +352,12 @@ private:
 class EnumValue : public CompileTimeValue {
 public:
   EnumValue(std::string Identifier,
-            llvm::Optional<std::vector<FunctionParameter>> Parameters)
+            std::optional<std::vector<FunctionParameter>> Parameters)
       : CompileTimeValue(ValueKind::Enum), Identifier(Identifier),
         Parameters(Parameters) {}
 
   std::string getIdentifier() const { return Identifier; }
-  llvm::Optional<std::vector<FunctionParameter>> getParameters() const {
+  std::optional<std::vector<FunctionParameter>> getParameters() const {
     return Parameters;
   }
 
@@ -180,7 +367,136 @@ public:
 
 private:
   std::string Identifier;
-  llvm::Optional<std::vector<FunctionParameter>> Parameters;
+  std::optional<std::vector<FunctionParameter>> Parameters;
+};
+
+/// A type value representation
+class TypeValue : public CompileTimeValue {
+public:
+  TypeValue(swift::Type Type) : CompileTimeValue(ValueKind::Type), Type(Type) {}
+
+  swift::Type getType() const { return Type; }
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::Type;
+  }
+
+private:
+  swift::Type Type;
+};
+
+/// A representation of a Keypath
+class KeyPathValue : public CompileTimeValue {
+public:
+  struct Component {
+    std::string Label;
+    swift::Type Type;
+  };
+  KeyPathValue(std::string Path,
+               swift::Type RootType,
+               std::vector<Component> Components)
+  : CompileTimeValue(ValueKind::KeyPath), Path(Path), RootType(RootType), Components(Components) {}
+
+  std::string getPath() const { return Path; }
+  swift::Type getRootType() const { return RootType; }
+  std::vector<Component> getComponents() const {
+    return Components;
+  }
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::KeyPath;
+  }
+
+private:
+  std::string Path;
+  swift::Type RootType;
+  std::vector<Component> Components;
+};
+
+/// A function call representation. This is for a function declaration such as
+/// let foo = bar(baz: "abc")
+class FunctionCallValue : public CompileTimeValue {
+public:
+  FunctionCallValue(std::string Identifier,
+                    std::optional<std::vector<FunctionParameter>> Parameters)
+      : CompileTimeValue(ValueKind::FunctionCall), Identifier(Identifier),
+        Parameters(Parameters) {}
+
+  std::string getIdentifier() const { return Identifier; }
+  std::optional<std::vector<FunctionParameter>> getParameters() const {
+    return Parameters;
+  }
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::FunctionCall;
+  }
+
+private:
+  std::string Identifier;
+  std::optional<std::vector<FunctionParameter>> Parameters;
+};
+
+/// A static function reference representation such as
+/// let foo = MyStruct.bar(item: "")
+/// let foo = MyStruct.bar()
+class StaticFunctionCallValue : public CompileTimeValue {
+public:
+  StaticFunctionCallValue(std::string Label, swift::Type Type,
+                          std::vector<FunctionParameter> Parameters)
+      : CompileTimeValue(ValueKind::StaticFunctionCall), Label(Label),
+        Type(Type), Parameters(Parameters) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::StaticFunctionCall;
+  }
+
+  std::string getLabel() const { return Label; }
+  swift::Type getType() const { return Type; }
+  std::vector<FunctionParameter> getParameters() const { return Parameters; }
+
+private:
+  std::string Label;
+  swift::Type Type;
+  std::vector<FunctionParameter> Parameters;
+};
+
+/// A member reference representation such as
+/// let foo = MyStruct.bar
+class MemberReferenceValue : public CompileTimeValue {
+public:
+  MemberReferenceValue(swift::Type BaseType, std::string MemberLabel)
+      : CompileTimeValue(ValueKind::MemberReference), BaseType(BaseType),
+        MemberLabel(MemberLabel) {}
+
+  std::string getMemberLabel() const { return MemberLabel; }
+  swift::Type getBaseType() const { return BaseType; }
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::MemberReference;
+  }
+
+private:
+  swift::Type BaseType;
+  std::string MemberLabel;
+};
+
+/// A representation of an Interpolated String Literal
+class InterpolatedStringLiteralValue : public CompileTimeValue {
+public:
+  InterpolatedStringLiteralValue(
+      std::vector<std::shared_ptr<CompileTimeValue>> Segments)
+      : CompileTimeValue(ValueKind::InterpolatedString), Segments(Segments) {}
+
+  std::vector<std::shared_ptr<CompileTimeValue>> getSegments() const {
+    return Segments;
+  }
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::InterpolatedString;
+  }
+
+private:
+  std::vector<std::shared_ptr<CompileTimeValue>> Segments;
 };
 
 /// A representation of an arbitrary value that does not fall under
@@ -195,43 +511,44 @@ public:
 };
 
 struct CustomAttrValue {
-  swift::CustomAttr *Attr;
+  const swift::CustomAttr *Attr;
   std::vector<FunctionParameter> Parameters;
 };
 
 /// A representation of a single associated value for an enumeration case.
 struct EnumElementParameterValue {
-  llvm::Optional<std::string> Label;
+  std::optional<std::string> Label;
   swift::Type Type;
 };
 
 /// A representation of a single enumeration case.
 struct EnumElementDeclValue {
   std::string Name;
-  llvm::Optional<std::string> RawValue;
-  llvm::Optional<std::vector<EnumElementParameterValue>> Parameters;
+  std::optional<std::string> RawValue;
+  std::optional<std::vector<EnumElementParameterValue>> Parameters;
 };
 
+using AttrValueVector = llvm::SmallVector<CustomAttrValue, 2>;
 struct ConstValueTypePropertyInfo {
   swift::VarDecl *VarDecl;
   std::shared_ptr<CompileTimeValue> Value;
-  llvm::Optional<std::vector<CustomAttrValue>> PropertyWrappers;
+  std::optional<AttrValueVector> PropertyWrappers;
 
-  ConstValueTypePropertyInfo(
-      swift::VarDecl *VarDecl, std::shared_ptr<CompileTimeValue> Value,
-      llvm::Optional<std::vector<CustomAttrValue>> PropertyWrappers)
+  ConstValueTypePropertyInfo(swift::VarDecl *VarDecl,
+                             std::shared_ptr<CompileTimeValue> Value,
+                             std::optional<AttrValueVector> PropertyWrappers)
       : VarDecl(VarDecl), Value(Value), PropertyWrappers(PropertyWrappers) {}
 
   ConstValueTypePropertyInfo(swift::VarDecl *VarDecl,
                              std::shared_ptr<CompileTimeValue> Value)
       : VarDecl(VarDecl), Value(Value),
-        PropertyWrappers(llvm::Optional<std::vector<CustomAttrValue>>()) {}
+        PropertyWrappers(std::optional<AttrValueVector>()) {}
 };
 
 struct ConstValueTypeInfo {
   swift::NominalTypeDecl *TypeDecl;
   std::vector<ConstValueTypePropertyInfo> Properties;
-  llvm::Optional<std::vector<EnumElementDeclValue>> EnumElements;
+  std::optional<std::vector<EnumElementDeclValue>> EnumElements;
 };
 } // namespace swift
 #endif

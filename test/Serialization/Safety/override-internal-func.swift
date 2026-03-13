@@ -10,15 +10,19 @@
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface
 
 /// Build against the swiftmodule.
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -enable-deserialization-safety
 
 /// Build against the swiftinterface.
 // RUN: rm %t/Lib.swiftmodule
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -enable-deserialization-safety
 
 //--- Lib.swift
 
 open class Base {
+  internal init() {}
+
   public func publicMethod() -> Int {
     return 1
   }
@@ -33,6 +37,10 @@ open class Base {
 }
 
 open class Derived : Base {
+  public override init() {
+      super.init()
+  }
+
   open override func publicMethod() -> Int {
     return super.publicMethod() + 1
   }
@@ -62,4 +70,8 @@ public class OtherFinalDerived : Derived {
   public override func internalMethod() -> Int {
     return super.internalMethod() + 1
   }
+}
+
+func foo() {
+    let a = Derived()
 }

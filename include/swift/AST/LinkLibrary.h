@@ -32,16 +32,19 @@ class LinkLibrary {
 private:
   std::string Name;
   unsigned Kind : 1;
+  unsigned Static : 1;
   unsigned ForceLoad : 1;
 
 public:
-  LinkLibrary(StringRef N, LibraryKind K, bool forceLoad = false)
-    : Name(N), Kind(static_cast<unsigned>(K)), ForceLoad(forceLoad) {
+  LinkLibrary(StringRef N, LibraryKind K, bool Static, bool forceLoad = false)
+      : Name(N), Kind(static_cast<unsigned>(K)), Static(Static),
+        ForceLoad(forceLoad) {
     assert(getKind() == K && "not enough bits for the kind");
   }
 
   LibraryKind getKind() const { return static_cast<LibraryKind>(Kind); }
   StringRef getName() const { return Name; }
+  bool isStaticLibrary() const { return Static; }
   bool shouldForceLoad() const { return ForceLoad; }
 };
 

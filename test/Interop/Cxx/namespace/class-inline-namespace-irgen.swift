@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-emit-ir -I %t/Inputs -enable-experimental-cxx-interop %t/test.swift | %FileCheck %t/test.swift
+// RUN: %target-swift-emit-ir -I %t/Inputs -enable-experimental-cxx-interop %t/test.swift -Xcc -fignore-exceptions | %FileCheck %t/test.swift
 
 
 //--- Inputs/module.modulemap
@@ -48,7 +48,7 @@ extension Parent.TypedefInInlineChild {
     return ""
   }
 }
-// CHECK: define hidden swiftcc {{.*}} @"$sSo6ParentO11InlineChildO027__CxxTemplateInstN6Parent11b7Child21e2InbC4IcEEV4testE6stringSSvg"()
+// CHECK: define hidden swiftcc {{.*}} @"$sSo6ParentO11InlineChildO0034TemplateInInlineChildCChar_ckBDjAbV4testE6stringSSvg"()
 
 extension Parent.InInlineChild {
   func doSomething() {
@@ -70,22 +70,22 @@ extension Parent.InlineChild.InSecondInlineChild {
 }
 // define hidden swiftcc {{.*}} @"$sSo6ParentO11InlineChildO06SecondbC0O02IndbC0V4testE1ySivg"()
 
-// CHECK: define hidden swiftcc {{.*}} @"$s4test3useySSSo6ParentO11InlineChildO027__CxxTemplateInstN6Parent11d7Child21g2IndE4IcEEVF"()
-// CHECK: call swiftcc {{.*}} @"$sSo6ParentO11InlineChildO027__CxxTemplateInstN6Parent11b7Child21e2InbC4IcEEV4testE6stringSSvg"
+// CHECK: define hidden swiftcc {{.*}} @"$s4test3useySSSo6ParentO11InlineChildO0034TemplateInInlineChildCChar_ckBDjAbVF"()
+// CHECK: call swiftcc {{.*}} @"$sSo6ParentO11InlineChildO0034TemplateInInlineChildCChar_ckBDjAbV4testE6stringSSvg"
 func use(_ x: Parent.TypedefInInlineChild) -> String {
   let s = x.string
   return s
 }
 
-// CHECK: define hidden swiftcc {{.*}} @"$s4test4use2ySSSo6ParentO11InlineChildO027__CxxTemplateInstN6Parent11d7Child21g2IndE4IcEEVF"()
-// CHECK: call swiftcc {{.*}} @"$sSo6ParentO11InlineChildO027__CxxTemplateInstN6Parent11b7Child21e2InbC4IcEEV4testE6stringSSvg"
+// CHECK: define hidden swiftcc {{.*}} @"$s4test4use2ySSSo6ParentO11InlineChildO0034TemplateInInlineChildCChar_ckBDjAbVF"()
+// CHECK: call swiftcc {{.*}} @"$sSo6ParentO11InlineChildO0034TemplateInInlineChildCChar_ckBDjAbV4testE6stringSSvg"
 func use2(_ x: Parent.InlineChild.TypedefInInlineChild) -> String {
   let s = x.string
   return s
 }
 
 // define swiftcc void @"$s4testAAyySo6ParentO11InlineChildO02IncD0VF"()
-// CHECK: alloca %TSo6ParentO11InlineChildO027__CxxTemplateInstN6Parent11b7Child21e2InbC4IcEEV
+// CHECK: alloca %TSo6ParentO11InlineChildO0034TemplateInInlineChildCChar_ckBDjAbV
 // CHECK: call {{.*}} @{{_ZN6Parent11InlineChild21TemplateInInlineChildIcEC|"\?\?0\?\$TemplateInInlineChild@D@InlineChild@Parent@@QEAA@XZ"}}
 // CHECK: call swiftcc void @"$sSo6ParentO11InlineChildO02InbC0V4testE11doSomethingyyF"(
 // CHECK: call swiftcc {{.*}} @"$sSo6ParentO11InlineChildO06SecondbC0O02IndbC0V4testE1xSivg"(

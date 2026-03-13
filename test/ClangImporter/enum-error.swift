@@ -12,9 +12,9 @@
 // RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/enum-error.h -DERRORS -verify
 
 // RUN: echo '#include "enum-error.h"' > %t.m
-// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h -print-regular-comments --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t.txt
+// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t.txt
 // RUN: %FileCheck -check-prefix=HEADER %s < %t.txt
-// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h -print-regular-comments --skip-private-stdlib-decls -skip-underscored-stdlib-protocols --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t2.txt
+// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h --skip-private-system-decls -skip-underscored-system-protocols --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t2.txt
 // RUN: %FileCheck -check-prefix=HEADER-NO-PRIVATE %s < %t2.txt
 
 import Foundation
@@ -90,11 +90,11 @@ func testError() {
   let terr = getErr()
   switch (terr) { case .TENone, .TEOne, .TETwo: break }
   // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: warning: switch covers known cases, but 'TestError.Code' may have additional unknown values
-  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: handle unknown values using "@unknown default"
+  // EXHAUSTIVE: {{.+}}: note: handle unknown values using "@unknown default"
 
   switch (terr) { case .TENone, .TEOne: break }
   // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive
-  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: add missing case: '.TETwo'
+  // EXHAUSTIVE: {{.+}}: note: add missing case: '.TETwo'
 
   let _ = TestError.Code(rawValue: 2)!
 
@@ -110,7 +110,7 @@ func testError() {
 
   switch eerr { case .EENone, .EEOne: break }
   // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive
-  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: add missing case: '.EETwo'
+  // EXHAUSTIVE: {{.+}}: note: add missing case: '.EETwo'
 
 #endif
 
@@ -118,7 +118,7 @@ func testError() {
 
 #if ERRORS
 class ObjCTest {
-  @objc func foo() -> TestError {} // expected-error {{method cannot be marked @objc because its result type cannot be represented in Objective-C}} expected-note {{Swift structs cannot be represented in Objective-C}}
+  @objc func foo() -> TestError {} // expected-error {{method cannot be marked '@objc' because its result type cannot be represented in Objective-C}} expected-note {{Swift structs cannot be represented in Objective-C}}
   @objc func bar() -> TestError.Code {} // okay
 }
 #endif

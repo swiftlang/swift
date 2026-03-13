@@ -20,6 +20,12 @@
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/MetadataValues.h"
 
+// lldb knows about some of these internals. If you change things that lldb
+// knows about (or might know about in the future, as a future lldb might be
+// inspecting a process running an older Swift runtime), increment
+// _swift_concurrency_debug_internal_layout_version and add a comment describing
+// the new version.
+
 namespace swift {
 
 /// The default actor implementation.  This is the layout of both
@@ -37,6 +43,22 @@ public:
     : HeapObject(metadata, immortal), PrivateData{} {}
 
   void *PrivateData[NumWords_DefaultActor];
+};
+
+/// The non-default distributed actor implementation.
+class alignas(Alignment_NonDefaultDistributedActor) NonDefaultDistributedActor : public HeapObject {
+public:
+  // These constructors do not initialize the actor instance, and the
+  // destructor does not destroy the actor instance; you must call
+  // swift_nonDefaultDistributedActor_initialize yourself.
+  constexpr NonDefaultDistributedActor(const HeapMetadata *metadata)
+    : HeapObject(metadata), PrivateData{} {}
+
+  constexpr NonDefaultDistributedActor(const HeapMetadata *metadata,
+                                       InlineRefCounts::Immortal_t immortal)
+    : HeapObject(metadata, immortal), PrivateData{} {}
+
+  void *PrivateData[NumWords_NonDefaultDistributedActor];
 };
 
 } // end namespace swift

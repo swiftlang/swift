@@ -47,8 +47,8 @@ case . /*case-other*/other(let x):
 	print(x)
 }
 
-enum /*enum-WithValue:def*/NewName: Int {
+enum /*enum-WithValue:def*/<base>WithValue</base>: Int {
 	case /*case-one:def*/one = 1
 }
-var _ = /*enum-WithValue*/NewName . /*case-one*/one
+var _ = /*enum-WithValue*/<base>WithValue</base> . /*case-one*/one
 

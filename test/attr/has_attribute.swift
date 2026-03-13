@@ -21,5 +21,25 @@ UserInaccessibleAreNotAttributes
 #endif
 
 #if hasAttribute(17)
-// expected-error@-1{{unexpected platform condition argument: expected attribute name}}
+// expected-error@-1:5 {{single unlabeled argument for the attribute}}
+#endif
+
+#if !hasAttribute(escaping)
+#error("type attributes are valid")
+#endif
+
+#if !hasAttribute(convention)
+#error("type attributes are valid")
+#endif
+
+#if !hasAttribute(retroactive)
+#error("type attributes are valid")
+#endif
+
+#if hasAttribute(in_guaranteed)
+#error("SIL type attributes are invalid")
+#endif
+
+#if hasAttribute(opened)
+#error("SIL type attributes are invalid")
 #endif

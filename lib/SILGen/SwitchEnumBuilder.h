@@ -23,7 +23,7 @@ class SILGenFunction;
 
 /// TODO: std::variant.
 struct SwitchCaseBranchDest {
-  Optional<JumpDest> jumpDest;
+  std::optional<JumpDest> jumpDest;
   NullablePtr<SILBasicBlock> block;
 
   SwitchCaseBranchDest() : jumpDest(), block() {}
@@ -135,7 +135,7 @@ private:
   SILGenBuilder &builder;
   SILLocation loc;
   ManagedValue subjectExprOperand;
-  llvm::Optional<DefaultCaseData> defaultBlockData;
+  std::optional<DefaultCaseData> defaultBlockData;
   llvm::SmallVector<NormalCaseData, 8> caseDataArray;
 
 public:

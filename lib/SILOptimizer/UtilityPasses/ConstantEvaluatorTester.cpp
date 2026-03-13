@@ -35,7 +35,7 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
 
   bool shouldInterpret() {
     auto *fun = getFunction();
-    return fun->getName().startswith("interpret");
+    return fun->getName().starts_with("interpret");
   }
 
   bool shouldSkipInstruction(SILInstruction *inst) {
@@ -47,7 +47,7 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
     if (!callee)
       return false;
 
-    return callee->getName().startswith("skip");
+    return callee->getName().starts_with("skip");
   }
 
   void run() override {
@@ -78,8 +78,8 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
         break;
       }
 
-      Optional<SILBasicBlock::iterator> nextInstOpt;
-      Optional<SymbolicValue> errorVal;
+      std::optional<SILBasicBlock::iterator> nextInstOpt;
+      std::optional<SymbolicValue> errorVal;
 
       // If the instruction is marked as skip, skip it and make its effects
       // non-constant. Otherwise, try evaluating the instruction and if the

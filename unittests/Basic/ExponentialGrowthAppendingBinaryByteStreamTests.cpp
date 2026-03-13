@@ -79,7 +79,7 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteAtInvalidOffset) {
   EXPECT_EQ(0U, Stream.getLength());
 
   std::vector<uint8_t> InputData = {'T', 'e', 's', 't', 'T', 'e', 's', 't'};
-  auto Test = makeArrayRef(InputData).take_front(4);
+  auto Test = llvm::ArrayRef(InputData).take_front(4);
   // Writing past the end of the stream is an error.
   EXPECT_THAT_ERROR(Stream.writeBytes(4, Test), Failed());
 
@@ -99,7 +99,7 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, InitialSizeZero) {
   auto Stream = ExponentialGrowthAppendingBinaryByteStream();
 
   std::vector<uint8_t> InputData = {'T', 'e', 's', 't'};
-  auto Test = makeArrayRef(InputData).take_front(4);
+  auto Test = llvm::ArrayRef(InputData).take_front(4);
   EXPECT_THAT_ERROR(Stream.writeBytes(0, Test), Succeeded());
   EXPECT_EQ(Test, Stream.data());
 }
@@ -109,7 +109,7 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, GrowMultipleSteps) {
 
   // Test that the buffer can grow multiple steps at once, e.g. 1 -> 2 -> 4
   std::vector<uint8_t> InputData = {'T', 'e', 's', 't'};
-  auto Test = makeArrayRef(InputData).take_front(4);
+  auto Test = llvm::ArrayRef(InputData).take_front(4);
   EXPECT_THAT_ERROR(Stream.writeBytes(0, Test), Succeeded());
   EXPECT_EQ(Test, Stream.data());
 }
@@ -119,25 +119,25 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteIntoMiddle) {
 
   // Test that the stream resizes correctly if we write into its middle
   std::vector<uint8_t> InitialData = {'T', 'e', 's', 't'};
-  auto InitialDataRef = makeArrayRef(InitialData);
+  auto InitialDataRef = llvm::ArrayRef(InitialData);
   EXPECT_THAT_ERROR(Stream.writeBytes(0, InitialDataRef), Succeeded());
   EXPECT_EQ(InitialDataRef, Stream.data());
 
   std::vector<uint8_t> UpdateData = {'u'};
-  auto UpdateDataRef = makeArrayRef(UpdateData);
+  auto UpdateDataRef = llvm::ArrayRef(UpdateData);
   EXPECT_THAT_ERROR(Stream.writeBytes(1, UpdateDataRef), Succeeded());
 
   std::vector<uint8_t> DataAfterUpdate = {'T', 'u', 's', 't'};
-  auto DataAfterUpdateRef = makeArrayRef(DataAfterUpdate);
+  auto DataAfterUpdateRef = llvm::ArrayRef(DataAfterUpdate);
   EXPECT_EQ(DataAfterUpdateRef, Stream.data());
   EXPECT_EQ(4u, Stream.getLength());
 
   std::vector<uint8_t> InsertData = {'e', 'r'};
-  auto InsertDataRef = makeArrayRef(InsertData);
+  auto InsertDataRef = llvm::ArrayRef(InsertData);
   EXPECT_THAT_ERROR(Stream.writeBytes(4, InsertDataRef), Succeeded());
 
   std::vector<uint8_t> DataAfterInsert = {'T', 'u', 's', 't', 'e', 'r'};
-  auto DataAfterInsertRef = makeArrayRef(DataAfterInsert);
+  auto DataAfterInsertRef = llvm::ArrayRef(DataAfterInsert);
   EXPECT_EQ(DataAfterInsertRef, Stream.data());
   EXPECT_EQ(6u, Stream.getLength());
 }
@@ -147,13 +147,13 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteInteger) {
 
   // Test the writeInteger method
   std::vector<uint8_t> InitialData = {'H', 'e', 'l', 'l', 'o'};
-  auto InitialDataRef = makeArrayRef(InitialData);
+  auto InitialDataRef = llvm::ArrayRef(InitialData);
   EXPECT_THAT_ERROR(Stream.writeBytes(0, InitialDataRef), Succeeded());
   EXPECT_EQ(InitialDataRef, Stream.data());
 
   EXPECT_THAT_ERROR(Stream.writeInteger(5, (uint8_t)' '), Succeeded());
   std::vector<uint8_t> AfterFirstInsert = {'H', 'e', 'l', 'l', 'o', ' '};
-  auto AfterFirstInsertRef = makeArrayRef(AfterFirstInsert);
+  auto AfterFirstInsertRef = llvm::ArrayRef(AfterFirstInsert);
   EXPECT_EQ(AfterFirstInsertRef, Stream.data());
   EXPECT_EQ(6u, Stream.getLength());
 
@@ -164,7 +164,7 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteInteger) {
   EXPECT_THAT_ERROR(Stream.writeInteger(6, ToInsert), Succeeded());
   std::vector<uint8_t> AfterSecondInsert = {'H', 'e', 'l', 'l', 'o', ' ',
                                             'w', 'o', 'r', 'l'};
-  auto AfterSecondInsertRef = makeArrayRef(AfterSecondInsert);
+  auto AfterSecondInsertRef = llvm::ArrayRef(AfterSecondInsert);
   EXPECT_EQ(AfterSecondInsertRef, Stream.data());
   EXPECT_EQ(10u, Stream.getLength());
 }

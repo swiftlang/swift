@@ -128,7 +128,7 @@ def merge_lipo_files(src_root_dirs, file_list, dest_root_dir, verbose=False,
                     "-- Warning: non-executable source files are different, " +
                     "skipping: %s" % file_paths)
         else:
-            print("-- Warning: Unsupport file type, skipping: %s" % file_paths)
+            print("-- Warning: Unsupported file type, skipping: %s" % file_paths)
 
 
 def main():

@@ -12,6 +12,17 @@ module ClassesSecondHeader {
   requires cplusplus
 }
 
+module ConstexprInNamespace {
+  header "constexpr-in-namespace.h"
+  requires cplusplus
+}
+
+module ExternWithinNamespace {
+  header "extern-within-namespace.h"
+  export *
+  requires cplusplus
+}
+
 module FreeFunctions {
   header "free-functions.h"
   requires cplusplus
@@ -52,5 +63,31 @@ module TemplatesWithForwardDecl {
 
 module Extensions {
   header "extensions.h"
+  requires cplusplus
+}
+
+module Enums {
+  header "enums.h"
+  requires cplusplus
+}
+
+module ImportAsMember {
+  header "import-as-member.h"
+  export *
+  requires cplusplus
+}
+
+module MembersDirect {
+  header "members-direct.h"
+  requires cplusplus
+}
+
+module MembersTransitive {
+  header "members-transitive.h"
+  requires cplusplus
+}
+
+module UsingFromNamespace {
+  header "using-from-namespace.h"
   requires cplusplus
 }

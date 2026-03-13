@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures -warn-redundant-requirements > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 // CHECK-LABEL: .P1@
@@ -18,7 +18,7 @@ protocol P3 {}
 // CHECK-LABEL: .Q1@
 // CHECK-NEXT: Requirement signature: <Self where Self.[Q1]X : P1>
 protocol Q1 {
-    associatedtype X: P1 // expected-note 3{{declared here}}
+    associatedtype X: P1 // expected-note {{declared here}}
 }
 
 // inheritance
@@ -37,7 +37,7 @@ protocol Q3: Q1 {
 // CHECK-LABEL: .Q4@
 // CHECK-NEXT: Requirement signature: <Self where Self : Q1, Self.[Q1]X : P2>
 protocol Q4: Q1 {
-    associatedtype X: P2 // expected-warning{{redeclaration of associated type 'X'}}
+    associatedtype X: P2 // expected-warning{{redeclaration of associated type 'X'}} // expected-note 2{{declared here}}
 }
 
 // multiple inheritance
@@ -50,8 +50,8 @@ protocol Q5: Q2, Q3, Q4 {}
 // CHECK-NEXT: Requirement signature: <Self where Self : Q2, Self : Q3, Self : Q4>
 protocol Q6: Q2,
              Q3, Q4 {
-    associatedtype X: P1 // expected-warning{{redundant conformance constraint 'Self.X' : 'P1'}}
-                   // expected-warning@-1{{redeclaration of associated type 'X' from protocol 'Q1' is}}
+    associatedtype X: P1
+                   // expected-warning@-1{{redeclaration of associated type 'X' from protocol 'Q4' is}}
 }
 
 // multiple inheritance with a new conformance

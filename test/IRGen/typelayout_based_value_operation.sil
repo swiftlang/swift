@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -enable-type-layout %s -emit-ir -sil-verify-all | %FileCheck %s
-// RUN: %target-swift-frontend -disable-type-layout %s -emit-ir -sil-verify-all | %FileCheck %s --check-prefix=NOTYPELAYOUT
+// RUN: %target-swift-frontend -enable-type-layout %s -Xllvm -sil-disable-pass=mandatory-temp-rvalue-elimination -emit-ir -sil-verify-all | %FileCheck %s
+// RUNx: %target-swift-frontend -disable-type-layout %s -Xllvm -sil-disable-pass=mandatory-temp-rvalue-elimination -emit-ir -sil-verify-all | %FileCheck %s --check-prefix=NOTYPELAYOUT
 
 sil_stage canonical
 import Builtin
@@ -16,12 +16,12 @@ public struct A<T> {
 
 public class C {}
 
-// CHECK-LABEL: define{{.*}} void @testDestroyValueTrival(
+// CHECK-LABEL: define{{.*}} void @testDestroyValueTrivial(
 // CHECK-NEXT: entry:
 // CHECK-NEXT:  ret void
 // CHECK-NEXT: }
 
-sil @testDestroyValueTrival : $@convention(thin) (@in A<Builtin.Int32>) -> ()  {
+sil @testDestroyValueTrivial : $@convention(thin) (@in A<Builtin.Int32>) -> ()  {
 entry(%arg : $*A<Builtin.Int32>):
   destroy_addr %arg : $*A<Builtin.Int32>
   %ret = tuple ()
@@ -29,36 +29,36 @@ entry(%arg : $*A<Builtin.Int32>):
 }
 
 // CHECK-LABEL: define{{.*}} void @testValue(
-// CHECK:   call %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOc"(
-// CHECK:   call %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOh"(
-// CHECK:   call %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOh"(
+// CHECK:   call ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOc"(
+// CHECK:   call ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOh"(
+// CHECK:   call ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOh"(
 // CHECK: }
 
-// CHECK-LABEL: define{{.*}} %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOc"(
-// CHECK:  call %swift.type* @__swift_instantiateConcreteTypeFromMangledName
+// CHECK-LABEL: define{{.*}} ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOc"(
+// CHECK:  call ptr @__swift_instantiateConcreteTypeFromMangledName
 // CHECK:  load
-// CHECK:  call %swift.opaque* %{{.*}}(%swift.opaque* noalias {{.*}}, %swift.type* {{.*}})
+// CHECK:  call ptr %{{.*}}(ptr noalias {{.*}}, ptr {{.*}})
 // CHECK: }
 
-// CHECK-LABEL: define{{.*}} %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOh"(
-// CHECK:  call %swift.type* @__swift_instantiateConcreteTypeFromMangledName
+// CHECK-LABEL: define{{.*}} ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOh"(
+// CHECK:  call ptr @__swift_instantiateConcreteTypeFromMangledName
 // CHECK:  load
-// CHECK:  call void %{{.*}}(%swift.opaque* noalias {{.*}}, %swift.type* {{.*}})
+// CHECK:  call void %{{.*}}(ptr noalias {{.*}}, ptr {{.*}})
 // CHECK: }
 
-// NOTYPELAYOUT-LABEL: define{{.*}} %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOc"(
+// NOTYPELAYOUT-LABEL: define{{.*}} ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOc"(
 // NOTYPELAYOUT: swift_retain
 // NOTYPELAYOUT: swift_retain
 // NOTYPELAYOUT: swift_retain
 // NOTYPELAYOUT: swift_retain
-// CHECK: }
+// NOTYPELAYOUT: }
 
-// NOTYPELAYOUT-LABEL: define{{.*}} %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOh"(
+// NOTYPELAYOUT-LABEL: define{{.*}} ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOh"(
 // NOTYPELAYOUT: swift_release
 // NOTYPELAYOUT: swift_release
 // NOTYPELAYOUT: swift_release
 // NOTYPELAYOUT: swift_release
-// CHECK: }
+// NOTYPELAYOUT: }
 
 sil @testValue : $@convention(thin) (@in A<C>) -> ()  {
 entry(%arg : $*A<C>):
@@ -70,5 +70,35 @@ entry(%arg : $*A<C>):
   %ret = tuple ()
   return %ret : $()
 }
+
+// CHECK-LABEL: define{{.*}} void @testValue_no_typelayout(
+// CHECK:   call ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOC"(
+// CHECK:   call ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOH"(
+// CHECK:   call ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOH"(
+// CHECK: }
+sil [perf_constraint] @testValue_no_typelayout : $@convention(thin) (@in A<C>) -> ()  {
+entry(%arg : $*A<C>):
+  %loc = alloc_stack $A<C>
+  copy_addr %arg to [init] %loc : $*A<C>
+  destroy_addr %arg : $*A<C>
+  destroy_addr %loc : $*A<C>
+  dealloc_stack %loc: $*A<C>
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: define{{.*}} ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOC"(
+// CHECK: swift_retain
+// CHECK: swift_retain
+// CHECK: swift_retain
+// CHECK: swift_retain
+// CHECK: }
+
+// CHECK-LABEL: define{{.*}} ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOH"(
+// CHECK: swift_release
+// CHECK: swift_release
+// CHECK: swift_release
+// CHECK: swift_release
+// CHECK: }
 
 sil_vtable C {}

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/print-string.swift -typecheck -module-name Stringer -enable-experimental-cxx-interop -emit-clang-header-path %t/Stringer.h
+// RUN: %target-swift-frontend %t/print-string.swift -module-name Stringer -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/Stringer.h
 
 // RUN: %target-interop-build-clangxx -std=gnu++20 -c %t/string-conversions.cpp -I %t -o %t/swift-stdlib-execution.o
 // RUN: %target-build-swift %t/print-string.swift -o %t/swift-stdlib-execution -Xlinker %t/swift-stdlib-execution.o -module-name Stringer -Xfrontend -entry-point-function-name -Xfrontend swiftMain %target-cxx-lib
@@ -28,14 +28,23 @@ public func makeString(_ s: String, _ y: String) -> String {
 #include "Stringer.h"
 
 int main() {
-  using namespace Swift;
+  using namespace swift;
   using namespace Stringer;
 
   {
     auto s = String("hello world");
     printString(s);
+    swift::String s2 = "Hello literal";
+    printString(s2);
+    const char *literal = "Test literal via ptr";
+    printString(literal);
+    swift::String s3 = nullptr;
+    printString(s3);
   }
 // CHECK: '''hello world'''
+// CHECK-NEXT: '''Hello literal'''
+// CHECK-NEXT: '''Test literal via ptr'''
+// CHECK-NEXT: ''''''
 
   {
     std::string str = "test std::string";

@@ -9,6 +9,6 @@
 // CHECK-SAME:                          language: {{DW_LANG_ObjC|DW_LANG_C}}
 // CHECK: ![[CONCURRENCY_SHIMS_CU]] = distinct !DICompileUnit(
 // CHECK-SAME:                          language: {{DW_LANG_ObjC|DW_LANG_C}}
-// CHECK: DISubprogram(name: "Foo"{{.*}} unit: ![[CLANG_CU]],
+// CHECK: DISubprogram(name: "Foo"{{.*}} unit: ![[CLANG_CU]]
 
 Foo()

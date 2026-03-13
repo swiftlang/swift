@@ -1,12 +1,12 @@
 // RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules/ -enable-objc-interop -show-diagnostics-after-fatal -D MISSING_FROM_MODULE -o /dev/null 2>&1 | %FileCheck -check-prefix CHECK-MODULE-MAP %s
 // RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules/ -enable-objc-interop -show-diagnostics-after-fatal -o /dev/null 2>&1 | %FileCheck -check-prefix CHECK -check-prefix CHECK-DIRECT %s
-// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules/ -enable-objc-interop -show-diagnostics-after-fatal -D INDIRECT -o /dev/null 2>&1 | %FileCheck -check-prefix CHECK -check-prefix CHECK-INDIRECT %s
+// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules/ -I %S/Inputs/custom-modules/more-custom-modules -enable-objc-interop -show-diagnostics-after-fatal -D INDIRECT -o /dev/null 2>&1 | %FileCheck -check-prefix CHECK -check-prefix CHECK-INDIRECT %s
 
 // FIXME: not every test here depends on Objective-C syntax, this test can be split.
 
 #if MISSING_FROM_MODULE
 import MissingHeader
-// CHECK-MODULE-MAP: {{.*}}{{/|\\}}Inputs{{/|\\}}custom-modules{{/|\\}}module.map:{{[0-9]+:[0-9]+}}: error: header 'this-header-does-not-exist.h' not found
+// CHECK-MODULE-MAP: {{.*}}{{/|\\}}Inputs{{/|\\}}custom-modules{{/|\\}}module.modulemap:{{[0-9]+:[0-9]+}}: error: header 'this-header-does-not-exist.h' not found
 // CHECK-MODULE-MAP: broken-modules.swift:[[@LINE-2]]:8: error: could not build Objective-C module 'MissingHeader'
 
 #else

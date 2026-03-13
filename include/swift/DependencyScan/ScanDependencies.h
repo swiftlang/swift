@@ -14,34 +14,41 @@
 #define SWIFT_DEPENDENCY_SCANDEPENDENCIES_H
 
 #include "swift-c/DependencyScan/DependencyScan.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Support/Error.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Chrono.h"
+#include "llvm/Support/ErrorOr.h"
+#include <unordered_set>
 
 namespace llvm {
 class StringSaver;
-}
+namespace cas {
+class ObjectStore;
+} // namespace cas
+namespace vfs {
+class FileSystem;
+} // namespace vfs
+} // namespace llvm
 
 namespace swift {
 
 class CompilerInvocation;
 class CompilerInstance;
+class DiagnosticEngine;
 class ModuleDependenciesCache;
+struct ModuleDependencyID;
+struct ModuleDependencyIDHash;
+using ModuleDependencyIDSet =
+    std::unordered_set<ModuleDependencyID, ModuleDependencyIDHash>;
 class SwiftDependencyScanningService;
 
 namespace dependencies {
+struct ScanQueryContext;
 
 using CompilerArgInstanceCacheMap =
     llvm::StringMap<std::tuple<std::unique_ptr<CompilerInstance>,
                                std::unique_ptr<SwiftDependencyScanningService>,
                                std::unique_ptr<ModuleDependenciesCache>>>;
-
-struct BatchScanInput {
-  llvm::StringRef moduleName;
-  llvm::StringRef arguments;
-  llvm::StringRef outputPath;
-  bool isSwift;
-};
 
 // MARK: FrontendTool dependency scanner entry points
 /// Scans the dependencies of the main module of \c instance and writes out
@@ -51,39 +58,52 @@ bool scanDependencies(CompilerInstance &instance);
 /// Identify all imports in the translation unit's module.
 bool prescanDependencies(CompilerInstance &instance);
 
-/// Batch scan the dependencies for modules specified in \c batchInputFile.
-bool batchScanDependencies(CompilerInstance &instance,
-                           llvm::StringRef batchInputFile);
-
-/// Batch prescan the imports of modules specified in \c batchInputFile.
-bool batchPrescanDependencies(CompilerInstance &instance,
-                              llvm::StringRef batchInputFile);
-
 // MARK: Dependency scanning execution
 /// Scans the dependencies of the main module of \c instance.
 llvm::ErrorOr<swiftscan_dependency_graph_t>
-performModuleScan(CompilerInstance &instance,
-                  ModuleDependenciesCache &cache);
+performModuleScan(SwiftDependencyScanningService &service,
+                  ModuleDependenciesCache &cache,
+                  ScanQueryContext &queryContext);
 
 /// Scans the main module of \c instance for all direct module imports
 llvm::ErrorOr<swiftscan_import_set_t>
-performModulePrescan(CompilerInstance &instance);
+performModulePrescan(SwiftDependencyScanningService &service,
+                     ModuleDependenciesCache &cache,
+                     ScanQueryContext &queryContext);
 
-/// Batch scan the dependencies for modules specified in \c batchInputFile.
-std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
-performBatchModuleScan(CompilerInstance &invocationInstance,
-                       ModuleDependenciesCache &invocationCache,
-                       CompilerArgInstanceCacheMap *versionedPCMInstanceCache,
-                       llvm::StringSaver &saver,
-                       const std::vector<BatchScanInput> &BatchInput);
 
-/// Batch prescan the imports of modules specified in \c batchInputFile.
-std::vector<llvm::ErrorOr<swiftscan_import_set_t>>
-performBatchModulePrescan(CompilerInstance &invocationInstance,
-                          ModuleDependenciesCache &cache,
-                          llvm::StringSaver &saver,
-                          const std::vector<BatchScanInput> &BatchInput);
+namespace incremental {
+/// For the given module dependency graph captured in the 'cache',
+/// validate whether each dependency node is up-to-date w.r.t. serialization
+/// time-stamp. i.e. if any of the input files of a module dependency are newer
+/// than the serialized dependency graph, it is considered invalidated and must
+/// be re-scanned.
+void validateInterModuleDependenciesCache(
+    const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
+    std::shared_ptr<llvm::cas::ObjectStore> cas,
+    const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
+    DiagnosticEngine &diags, bool emitRemarks = false);
 
+/// Perform a postorder DFS to locate modules whose build recipe is out-of-date
+/// with respect to their inputs. Upon encountering such a module, add it to the
+/// set of invalidated modules, along with the path from the root to this
+/// module.
+void outOfDateModuleScan(const ModuleDependencyID &sourceModuleID,
+                         const ModuleDependenciesCache &cache,
+                         std::shared_ptr<llvm::cas::ObjectStore> cas,
+                         const llvm::sys::TimePoint<> &cacheTimeStamp,
+                         llvm::vfs::FileSystem &fs, DiagnosticEngine &diags,
+                         bool emitRemarks, ModuleDependencyIDSet &visited,
+                         ModuleDependencyIDSet &modulesRequiringRescan);
+
+/// Validate whether all inputs of a given module dependency
+/// are older than the cache serialization time.
+bool verifyModuleDependencyUpToDate(
+    const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
+    std::shared_ptr<llvm::cas::ObjectStore> cas,
+    const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
+    DiagnosticEngine &diags, bool emitRemarks);
+} // end namespace incremental
 } // end namespace dependencies
 } // end namespace swift
 

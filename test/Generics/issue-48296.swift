@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // https://github.com/apple/swift/issues/48296
 
@@ -8,8 +8,8 @@ protocol Foo
   var bar: Bar { get }
 }
 
-extension Foo where Self: Collection, Bar: Collection, Self.SubSequence == Bar.SubSequence, /*redundant: */Self.Index == Bar.Index // expected-warning {{redundant same-type constraint 'Self.Index' == 'Self.Bar.Index'}}
-{
+// CHECK: Generic signature: <Self where Self : Collection, Self : Foo, Self.[Foo]Bar : Collection, Self.[Collection]SubSequence == Self.[Foo]Bar.[Collection]SubSequence>
+extension Foo where Self: Collection, Bar: Collection, Self.SubSequence == Bar.SubSequence, /*redundant: */Self.Index == Bar.Index {
   subscript(_ bounds: Range<Index>) -> SubSequence
   {
     return bar[bounds]

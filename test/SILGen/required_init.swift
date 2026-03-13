@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 func subclassFloatLiteral() -> Bar {
   let x: Bar = 1.0

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %S/Inputs/shared_function_serialization_input.swift -o %t/Swift.swiftmodule -emit-module -parse-as-library -parse-stdlib -module-link-name swiftCore -module-name Swift -O -enable-ossa-modules
-// RUN: %target-sil-opt -enable-sil-verify-all -I %t -performance-linker -enable-ossa-modules -inline %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend %S/Inputs/shared_function_serialization_input.swift -o %t/Swift.swiftmodule -emit-module -parse-as-library -parse-stdlib -module-link-name swiftCore -module-name Swift -O
+// RUN: %target-sil-opt -enable-sil-verify-all -I %t -performance-linker -inline %s -o - | %FileCheck %s
 
 // CHECK: sil private @top_level_code
 // CHECK: sil public_external [serialized] [ossa] @$ss1XVABycfC{{.*}}

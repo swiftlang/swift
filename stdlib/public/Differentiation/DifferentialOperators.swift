@@ -42,6 +42,30 @@ public func valueWithDifferential<T, U, V, R>(
   return Builtin.applyDerivative_jvp_arity3(f, x, y, z)
 }
 
+@inlinable
+public func valueWithDifferential<T, R, E: Error>(
+  at x: T, of f: @differentiable(reverse) (T) throws(E) -> R
+) throws(E) -> (value: R, differential: (T.TangentVector) -> R.TangentVector) {
+  return try Builtin.applyDerivative_jvp_throws(f, x)
+}
+
+@inlinable
+public func valueWithDifferential<T, U, R, E: Error>(
+  at x: T, _ y: U, of f: @differentiable(reverse) (T, U) throws(E) -> R
+) throws(E) -> (value: R,
+      differential: (T.TangentVector, U.TangentVector) -> R.TangentVector) {
+  return try Builtin.applyDerivative_jvp_arity2_throws(f, x, y)
+}
+
+@inlinable
+public func valueWithDifferential<T, U, V, R, E: Error>(
+  at x: T, _ y: U, _ z: V, of f: @differentiable(reverse) (T, U, V) throws(E) -> R
+) throws(E) -> (value: R,
+      differential: (T.TangentVector, U.TangentVector, V.TangentVector)
+        -> (R.TangentVector)) {
+  return try Builtin.applyDerivative_jvp_arity3_throws(f, x, y, z)
+}
+
 // Value with pullback
 
 @inlinable
@@ -68,6 +92,30 @@ public func valueWithPullback<T, U, V, R>(
   return Builtin.applyDerivative_vjp_arity3(f, x, y, z)
 }
 
+@inlinable
+public func valueWithPullback<T, R, E: Error>(
+  at x: T, of f: @differentiable(reverse) (T) throws(E) -> R
+) throws(E) -> (value: R, pullback: (R.TangentVector) -> T.TangentVector) {
+  return try Builtin.applyDerivative_vjp_throws(f, x)
+}
+
+@inlinable
+public func valueWithPullback<T, U, R, E: Error>(
+  at x: T, _ y: U, of f: @differentiable(reverse) (T, U) throws(E) -> R
+) throws(E) -> (value: R,
+      pullback: (R.TangentVector) -> (T.TangentVector, U.TangentVector)) {
+  return try Builtin.applyDerivative_vjp_arity2_throws(f, x, y)
+}
+
+@inlinable
+public func valueWithPullback<T, U, V, R, E: Error>(
+  at x: T, _ y: U, _ z: V, of f: @differentiable(reverse) (T, U, V) throws(E) -> R
+) throws(E) -> (value: R,
+      pullback: (R.TangentVector)
+        -> (T.TangentVector, U.TangentVector, V.TangentVector)) {
+  return try Builtin.applyDerivative_vjp_arity3_throws(f, x, y, z)
+}
+
 // Differential
 
 @inlinable
@@ -89,6 +137,27 @@ public func differential<T, U, V, R>(
   at x: T, _ y: U, _ z: V, of f: @differentiable(reverse) (T, U, V) -> R
 ) -> (T.TangentVector, U.TangentVector, V.TangentVector) -> (R.TangentVector) {
   return valueWithDifferential(at: x, y, z, of: f).1
+}
+
+@inlinable
+public func differential<T, R, E: Error>(
+  at x: T, of f: @differentiable(reverse) (T) throws(E) -> R
+) throws(E) -> (T.TangentVector) -> R.TangentVector {
+  return try valueWithDifferential(at: x, of: f).1
+}
+
+@inlinable
+public func differential<T, U, R, E: Error>(
+  at x: T, _ y: U, of f: @differentiable(reverse) (T, U) throws(E) -> R
+) throws(E) -> (T.TangentVector, U.TangentVector) -> R.TangentVector {
+  return try valueWithDifferential(at: x, y, of: f).1
+}
+
+@inlinable
+public func differential<T, U, V, R, E: Error>(
+  at x: T, _ y: U, _ z: V, of f: @differentiable(reverse) (T, U, V) throws(E) -> R
+) throws(E) -> (T.TangentVector, U.TangentVector, V.TangentVector) -> (R.TangentVector) {
+  return try valueWithDifferential(at: x, y, z, of: f).1
 }
 
 
@@ -114,6 +183,28 @@ public func pullback<T, U, V, R>(
 ) -> (R.TangentVector)
     -> (T.TangentVector, U.TangentVector, V.TangentVector) {
   return Builtin.applyDerivative_vjp_arity3(f, x, y, z).1
+}
+
+@inlinable
+public func pullback<T, R, E: Error>(
+  at x: T, of f: @differentiable(reverse) (T) throws(E) -> R
+) throws(E) -> (R.TangentVector) -> T.TangentVector {
+  return try Builtin.applyDerivative_vjp_throws(f, x).1
+}
+
+@inlinable
+public func pullback<T, U, R, E: Error>(
+  at x: T, _ y: U, of f: @differentiable(reverse) (T, U) throws(E) -> R
+) throws(E) -> (R.TangentVector) -> (T.TangentVector, U.TangentVector) {
+  return try Builtin.applyDerivative_vjp_arity2_throws(f, x, y).1
+}
+
+@inlinable
+public func pullback<T, U, V, R, E: Error>(
+  at x: T, _ y: U, _ z: V, of f: @differentiable(reverse) (T, U, V) throws(E) -> R
+) throws(E) -> (R.TangentVector)
+    -> (T.TangentVector, U.TangentVector, V.TangentVector) {
+  return try Builtin.applyDerivative_vjp_arity3_throws(f, x, y, z).1
 }
 
 // Derivative
@@ -145,6 +236,33 @@ public func derivative<T: FloatingPoint, U: FloatingPoint, V: FloatingPoint, R>(
   return differential(at: x, y, z, of: f)(T(1), U(1), V(1))
 }
 
+@inlinable
+public func derivative<T: FloatingPoint, R, E: Error>(
+  at x: T, of f: @differentiable(reverse) (T) throws(E) -> R
+) throws(E) ->  R.TangentVector
+  where T.TangentVector == T {
+  return try differential(at: x, of: f)(T(1))
+}
+
+@inlinable
+public func derivative<T: FloatingPoint, U: FloatingPoint, R, E: Error>(
+  at x: T, _ y: U, of f: @differentiable(reverse) (T, U) throws(E) -> R
+) throws(E) -> R.TangentVector
+  where T.TangentVector == T,
+        U.TangentVector == U {
+  return try differential(at: x, y, of: f)(T(1), U(1))
+}
+
+@inlinable
+public func derivative<T: FloatingPoint, U: FloatingPoint, V: FloatingPoint, R, E: Error>(
+  at x: T, _ y: U, _ z: V, of f: @differentiable(reverse) (T, U, V) throws(E) -> R
+) throws(E) -> R.TangentVector
+  where T.TangentVector == T,
+        U.TangentVector == U,
+        V.TangentVector == V {
+  return try differential(at: x, y, z, of: f)(T(1), U(1), V(1))
+}
+
 // Gradient
 
 @inlinable
@@ -169,6 +287,30 @@ public func gradient<T, U, V, R>(
 ) -> (T.TangentVector, U.TangentVector, V.TangentVector)
   where R : FloatingPoint, R.TangentVector == R {
   return pullback(at: x, y, z, of: f)(R(1))
+}
+
+@inlinable
+public func gradient<T, R, E: Error>(
+  at x: T, of f: @differentiable(reverse) (T) throws(E) -> R
+) throws(E) -> T.TangentVector
+  where R : FloatingPoint, R.TangentVector == R {
+  return try pullback(at: x, of: f)(R(1))
+}
+
+@inlinable
+public func gradient<T, U, R, E: Error>(
+  at x: T, _ y: U, of f: @differentiable(reverse) (T, U) throws(E) -> R
+) throws(E) -> (T.TangentVector, U.TangentVector)
+  where R : FloatingPoint, R.TangentVector == R {
+  return try pullback(at: x, y, of: f)(R(1))
+}
+
+@inlinable
+public func gradient<T, U, V, R, E: Error>(
+  at x: T, _ y: U, _ z: V, of f: @differentiable(reverse) (T, U, V) throws(E) -> R
+) throws(E) -> (T.TangentVector, U.TangentVector, V.TangentVector)
+  where R : FloatingPoint, R.TangentVector == R {
+  return try pullback(at: x, y, z, of: f)(R(1))
 }
 
 // Value with derivative
@@ -204,6 +346,37 @@ public func valueWithDerivative<
   return (y, differential(T(1), U(1), V(1)))
 }
 
+@inlinable
+public func valueWithDerivative<T: FloatingPoint, R, E: Error>(
+  at x: T, of f: @escaping @differentiable(reverse) (T) throws(E) -> R
+) throws(E) -> (value: R, derivative: R.TangentVector)
+  where T.TangentVector == T {
+  let (y, differential) = try valueWithDifferential(at: x, of: f)
+  return (y, differential(T(1)))
+}
+
+@inlinable
+public func valueWithDerivative<T: FloatingPoint, U: FloatingPoint, R, E: Error>(
+  at x: T, _ y: U, of f: @escaping @differentiable(reverse) (T, U) throws(E) -> R
+) throws(E) -> (value: R, derivative: R.TangentVector)
+  where T.TangentVector == T,
+        U.TangentVector == U {
+  let (y, differential) = try valueWithDifferential(at: x, y, of: f)
+  return (y, differential(T(1), U(1)))
+}
+
+@inlinable
+public func valueWithDerivative<
+  T: FloatingPoint, U: FloatingPoint, V: FloatingPoint, R, E: Error>(
+  at x: T, _ y: U, _ z: V, of f: @escaping @differentiable(reverse) (T, U, V) throws(E) -> R
+) throws(E) -> (value: R, derivative: R.TangentVector)
+  where T.TangentVector == T,
+        U.TangentVector == U,
+        V.TangentVector == V {
+  let (y, differential) = try valueWithDifferential(at: x, y, z, of: f)
+  return (y, differential(T(1), U(1), V(1)))
+}
+
 // Value with gradient
 
 @inlinable
@@ -231,6 +404,34 @@ public func valueWithGradient<T, U, V, R>(
       gradient: (T.TangentVector, U.TangentVector, V.TangentVector))
   where R : FloatingPoint, R.TangentVector == R {
   let (y, pullback) = valueWithPullback(at: x, y, z, of: f)
+  return (y, pullback(R(1)))
+}
+
+@inlinable
+public func valueWithGradient<T, R, E: Error>(
+  at x: T, of f: @differentiable(reverse) (T) throws(E) -> R
+) throws(E) -> (value: R, gradient: T.TangentVector)
+  where R : FloatingPoint, R.TangentVector == R {
+  let (y, pullback) = try valueWithPullback(at: x, of: f)
+  return (y, pullback(R(1)))
+}
+
+@inlinable
+public func valueWithGradient<T, U, R, E: Error>(
+  at x: T, _ y: U, of f: @differentiable(reverse) (T, U) throws(E) -> R
+) throws(E) -> (value: R, gradient: (T.TangentVector, U.TangentVector))
+  where R : FloatingPoint, R.TangentVector == R {
+  let (y, pullback) = try valueWithPullback(at: x, y, of: f)
+  return (y, pullback(R(1)))
+}
+
+@inlinable
+public func valueWithGradient<T, U, V, R, E: Error>(
+  at x: T, _ y: U, _ z: V, of f: @differentiable(reverse) (T, U, V) throws(E) -> R
+) throws(E) -> (value: R,
+      gradient: (T.TangentVector, U.TangentVector, V.TangentVector))
+  where R : FloatingPoint, R.TangentVector == R {
+  let (y, pullback) = try valueWithPullback(at: x, y, z, of: f)
   return (y, pullback(R(1)))
 }
 
@@ -263,6 +464,33 @@ public func derivative<T: FloatingPoint, U: FloatingPoint, V: FloatingPoint, R>(
   return { (x, y, z) in derivative(at: x, y, z, of: f) }
 }
 
+@inlinable 
+public func derivative<T: FloatingPoint, R, E: Error>(
+  of f: @escaping @differentiable(reverse) (T) throws(E) -> R
+) -> (T) throws(E) -> R.TangentVector
+  where T.TangentVector == T {
+  return { x in try derivative(at: x, of: f) }
+}
+
+@inlinable 
+public func derivative<T: FloatingPoint, U: FloatingPoint, R, E: Error>(
+  of f: @escaping @differentiable(reverse) (T, U) throws(E) -> R
+) -> (T, U) throws(E) -> R.TangentVector
+  where T.TangentVector == T,
+        U.TangentVector == U {
+  return { (x, y) in try derivative(at: x, y, of: f) }
+}
+
+@inlinable
+public func derivative<T: FloatingPoint, U: FloatingPoint, V: FloatingPoint, R, E: Error>(
+  of f: @escaping @differentiable(reverse) (T, U, V) throws(E) -> R
+) -> (T, U, V) throws(E) -> R.TangentVector
+  where T.TangentVector == T,
+        U.TangentVector == U,
+        V.TangentVector == V {
+  return { (x, y, z) in try derivative(at: x, y, z, of: f) }
+}
+
 // Gradient (curried)
 
 @inlinable
@@ -287,4 +515,28 @@ public func gradient<T, U, V, R>(
 ) -> (T, U, V) -> (T.TangentVector, U.TangentVector, V.TangentVector)
   where R : FloatingPoint, R.TangentVector == R {
   return { x, y, z in gradient(at: x, y, z, of: f) }
+}
+
+@inlinable
+public func gradient<T, R, E: Error>(
+  of f: @escaping @differentiable(reverse) (T) throws(E) -> R
+) -> (T) throws(E) -> T.TangentVector
+  where R : FloatingPoint, R.TangentVector == R {
+  return { x in try gradient(at: x, of: f) }
+}
+
+@inlinable
+public func gradient<T, U, R, E: Error>(
+  of f: @escaping @differentiable(reverse) (T, U) throws(E) -> R
+) -> (T, U) throws(E) -> (T.TangentVector, U.TangentVector)
+  where R : FloatingPoint, R.TangentVector == R {
+  return { x, y in try gradient(at: x, y, of: f) }
+}
+
+@inlinable
+public func gradient<T, U, V, R, E: Error>(
+  of f: @escaping @differentiable(reverse) (T, U, V) throws(E) -> R
+) -> (T, U, V) throws(E) -> (T.TangentVector, U.TangentVector, V.TangentVector)
+  where R : FloatingPoint, R.TangentVector == R {
+  return { x, y, z in try gradient(at: x, y, z, of: f) }
 }

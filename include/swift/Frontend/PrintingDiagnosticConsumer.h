@@ -18,39 +18,31 @@
 #ifndef SWIFT_PRINTINGDIAGNOSTICCONSUMER_H
 #define SWIFT_PRINTINGDIAGNOSTICCONSUMER_H
 
+#include "swift/AST/DiagnosticBridge.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/LLVM.h"
 
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
-class AnnotatedSourceSnippet;
 
 /// Diagnostic consumer that displays diagnostics to standard error.
 class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   llvm::raw_ostream &Stream;
   bool ForceColors = false;
-  bool PrintEducationalNotes = false;
+  bool EmitMacroExpansionFiles = false;
   bool DidErrorOccur = false;
   DiagnosticOptions::FormattingStyle FormattingStyle =
       DiagnosticOptions::FormattingStyle::LLVM;
-  // The current snippet used to display an error/warning/remark and the notes
-  // implicitly associated with it. Uses `std::unique_ptr` so that
-  // `AnnotatedSourceSnippet` can be forward declared.
-  std::unique_ptr<AnnotatedSourceSnippet> currentSnippet;
-  // Educational notes which are buffered until the consumer is finished
-  // constructing a snippet.
-  SmallVector<std::string, 1> BufferedEducationalNotes;
   bool SuppressOutput = false;
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
   /// swift-syntax rendering
-  void *queuedDiagnostics = nullptr;
-  void *queuedSourceFile = nullptr;
-  unsigned queuedDiagnosticsBufferID;
-  StringRef queuedBufferName;
-
+  DiagnosticBridge DiagBridge;
+#endif
+ 
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs());
   ~PrintingDiagnosticConsumer();
@@ -69,12 +61,12 @@ public:
     llvm::sys::Process::UseANSIEscapeCodes(true);
   }
 
-  void setPrintEducationalNotes(bool ShouldPrint) {
-    PrintEducationalNotes = ShouldPrint;
-  }
-
   void setFormattingStyle(DiagnosticOptions::FormattingStyle style) {
     FormattingStyle = style;
+  }
+
+  void setEmitMacroExpansionFiles(bool ShouldEmit) {
+    EmitMacroExpansionFiles = ShouldEmit;
   }
 
   bool didErrorOccur() {
@@ -86,6 +78,11 @@ public:
   }
 
 private:
+  /// Retrieve the SourceFileSyntax for the given buffer.
+  void *getSourceFileSyntax(SourceManager &SM, unsigned bufferID,
+                            StringRef displayName);
+
+  void queueBuffer(SourceManager &sourceMgr, unsigned bufferID);
   void printDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
 };
   

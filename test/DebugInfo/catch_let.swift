@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+
 enum MyError : Error {
   case Yikes
 }
@@ -15,7 +16,7 @@ public func explicitBinding() {
     try throwing()
   }
   catch let error {
-    // CHECK: call void @llvm.dbg.declare(metadata %swift.error** %{{.*}}, metadata ![[EXPLICIT_ERROR:[0-9]+]],
+    // CHECK: #dbg_declare(ptr %{{.*}}, ![[EXPLICIT_ERROR:[0-9]+]],
     use(error)
   }
 }
@@ -27,7 +28,7 @@ public func implicitBinding() {
     try throwing()
   }
   catch {
-    // CHECK: call void @llvm.dbg.declare(metadata %swift.error** %{{.*}}, metadata ![[IMPLICIT_ERROR:[0-9]+]],
+    // CHECK: #dbg_declare(ptr %{{.*}}, ![[IMPLICIT_ERROR:[0-9]+]],
     use(error)
   }
 }
@@ -39,8 +40,9 @@ public func multiBinding() {
     try throwing()
   }
   catch let error as MyError, let error as MyError {
-    // CHECK: call void @llvm.dbg.declare(metadata %swift.error** %{{.*}}, metadata ![[MULTI_BINDING_ERROR:[0-9]+]],
-    // CHECK-NOT: call void @llvm.dbg.declare(metadata %swift.error** %{{.*}}
+    // CHECK: #dbg_declare(ptr %{{.*}}, ![[MULTI_BINDING_ERROR:[0-9]+]],
+    // CHECK-NOT: #dbg_declare(ptr %{{.*}}
+    // CHECK: define {{.*}}MyError{{.*}}
     use(error)
   } catch {
     use(error)

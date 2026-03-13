@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=thread -o %t_tsan-binary
+// RUN: %target-swiftc_driver %s -g -sanitize=thread -o %t_tsan-binary
 // RUN: %target-codesign %t_tsan-binary
 // RUN: %target-run %t_tsan-binary 2>&1 | %FileCheck %s --implicit-check-not='ThreadSanitizer'
 // REQUIRES: executable_test

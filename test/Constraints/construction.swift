@@ -154,7 +154,7 @@ extension S3 {
 let s3b = S3(maybe: s3a)
 
 // https://github.com/apple/swift/issues/47820
-// Erroneous diagnostic: type of expression is ambiguous without more context
+// Erroneous diagnostic: type of expression is ambiguous without a type annotation
 do {
   class C {
       struct S {
@@ -175,7 +175,6 @@ do {
 
 // rdar://problem/34670592 - Compiler crash on heterogeneous collection literal
 _ = Array([1, "hello"]) // Ok
-// expected-warning@-1 {{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
 
 func init_via_non_const_metatype(_ s1: S1.Type) {
   _ = s1(i: 42) // expected-error {{initializing from a metatype value must reference 'init' explicitly}} {{9-9=.init}}

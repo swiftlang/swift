@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/cache)
 // RUN: %empty-directory(%t/Test.app/Contents/MacOS)
 // RUN: cp -r %S/Inputs/object_literals-Resources %t/Test.app/Contents/Resources
-// RUN: %target-build-swift %s -o %t/Test.app/Contents/MacOS/main
+// RUN: %target-build-swift %s -o %t/Test.app/Contents/MacOS/main -module-cache-path %t/cache
 // RUN: %target-codesign %t/Test.app/Contents/MacOS/main
 // RUN: %target-run %t/Test.app/Contents/MacOS/main %t/Test.app/Contents/Resources/*
 

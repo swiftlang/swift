@@ -13,25 +13,23 @@
 #define DEBUG_TYPE "sil-passmanager"
 
 #include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "../../IRGen/IRGenModule.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/SILOptimizerRequests.h"
-#include "swift/Basic/BridgingUtils.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/MD5Stream.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
-#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
-#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
-#include "swift/SILOptimizer/Utils/StackNesting.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -39,6 +37,12 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/Casting.h"
+#include <fstream>
+
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
+#error "Building the compiler without Swift sources is not supported anymore"
+#endif
 
 using namespace swift;
 
@@ -54,6 +58,14 @@ llvm::cl::opt<bool> SILPrintPassTime(
     "sil-print-pass-time", llvm::cl::init(false),
     llvm::cl::desc("Print the execution time of each SIL pass"));
 
+llvm::cl::opt<bool> SILPrintPassMD5(
+    "sil-print-pass-md5", llvm::cl::init(false),
+    llvm::cl::desc("Print the MD5 of the SIL after each pass"));
+
+llvm::cl::opt<unsigned> SILMinPassTime(
+    "sil-min-pass-time", llvm::cl::init(0),
+    llvm::cl::desc("The minimum number of milliseconds for which a pass is printed with -sil-print-pass-time"));
+
 llvm::cl::opt<bool> SILPrintLast(
     "sil-print-last", llvm::cl::init(false),
     llvm::cl::desc("Print the last optimized function before and after the last pass"));
@@ -61,6 +73,20 @@ llvm::cl::opt<bool> SILPrintLast(
 llvm::cl::opt<std::string> SILNumOptPassesToRun(
     "sil-opt-pass-count", llvm::cl::init(""),
     llvm::cl::desc("Stop optimizing after <N> passes or <N>.<M> passes/sub-passes"));
+
+// Read pass counts for each module from a config file.
+// Config file format:
+//   <module-name>:<pass-count>(.<sub-pass-count>)?
+//
+// This is useful for bisecting passes in large projects:
+//   1. create a config file from a full build log. E.g. with
+//        grep -e '-module-name' build.log  | sed -e 's/.*-module-name \([^ ]*\) .*/\1:10000000/' | sort | uniq > config.txt
+//   2. add the `-Xllvm -sil-pass-count-config-file config.txt` option to the project settings
+//   3. bisect by modifying the counts in the config file
+//   4. clean-rebuild after each bisecting step
+llvm::cl::opt<std::string> SILPassCountConfigFile(
+    "sil-pass-count-config-file", llvm::cl::init(""),
+    llvm::cl::desc("Read optimization counts from file"));
 
 llvm::cl::opt<unsigned> SILOptProfileRepeat(
     "sil-opt-profile-repeat", llvm::cl::init(1),
@@ -74,6 +100,10 @@ llvm::cl::opt<std::string> SILBreakOnFun(
 llvm::cl::opt<std::string> SILBreakOnPass(
     "sil-break-on-pass", llvm::cl::init(""),
     llvm::cl::desc("Break before running a particular function pass"));
+
+llvm::cl::opt<std::string>
+    SILBreakBeforePassCount("sil-break-before-pass-count", llvm::cl::init(""),
+                            llvm::cl::desc("Break before running pass number"));
 
 llvm::cl::list<std::string>
     SILPrintFunction("sil-print-function", llvm::cl::CommaSeparated,
@@ -140,9 +170,6 @@ llvm::cl::opt<bool> SILForceVerifyAll(
     llvm::cl::desc("For all passes, precompute analyses before the pass and "
                    "verify analyses after the pass"));
 
-llvm::cl::list<std::string>
-    SimplifyInstructionTest("simplify-instruction", llvm::cl::CommaSeparated,
-                     llvm::cl::desc("Simplify instruction of specified kind(s)"));
 
 static llvm::ManagedStatic<std::vector<unsigned>> DebugPassNumbers;
 
@@ -177,9 +204,26 @@ static llvm::cl::opt<DebugOnlyPassNumberOpt, true,
               llvm::cl::location(DebugOnlyPassNumberOptLoc),
               llvm::cl::ValueRequired);
 
+static llvm::cl::opt<bool> SILPrintEverySubpass(
+    "sil-print-every-subpass", llvm::cl::init(false),
+    llvm::cl::desc("Print the function before every subpass run of passes that "
+                   "have multiple subpasses"));
+
+static bool isInPrintFunctionList(SILFunction *F) {
+  for (const std::string &printFnName : SILPrintFunction) {
+    if (printFnName == F->getName())
+      return true;
+    if (!printFnName.empty() && printFnName[0] != '$' &&
+        !F->getName().empty() && F->getName()[0] == '$' &&
+        printFnName == F->getName().drop_front()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool isFunctionSelectedForPrinting(SILFunction *F) {
-  if (!SILPrintFunction.empty() && SILPrintFunction.end() ==
-      std::find(SILPrintFunction.begin(), SILPrintFunction.end(), F->getName()))
+  if (!SILPrintFunction.empty() && !isInPrintFunctionList(F))
     return false;
 
   if (!F->getName().contains(SILPrintFunctions))
@@ -356,12 +400,12 @@ void swift::executePassPipelinePlan(SILModule *SM,
                                     irgen::IRGenModule *IRMod) {
   auto &evaluator = SM->getASTContext().evaluator;
   SILPipelineExecutionDescriptor desc{SM, plan, isMandatory, IRMod};
-  (void)llvm::cantFail(evaluator(ExecuteSILPipelineRequest{desc}));
+  (void)evaluateOrFatal(evaluator, ExecuteSILPipelineRequest{desc});
 }
 
 SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
                                irgen::IRGenModule *IRMod)
-    : Mod(M), IRMod(IRMod),
+    : Mod(M), IRMod(IRMod), irgen(nullptr),
       swiftPassInvocation(this),
       isMandatory(isMandatory), deserializationNotificationHandler(nullptr) {
 #define SIL_ANALYSIS(NAME) \
@@ -369,19 +413,29 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
 #include "swift/SILOptimizer/Analysis/Analysis.def"
 
   if (!SILNumOptPassesToRun.empty()) {
-    StringRef countsStr = SILNumOptPassesToRun;
-    bool validFormat = true;
-    if (countsStr.consumeInteger(10, maxNumPassesToRun))
-      validFormat = false;
-    if (countsStr.startswith(".")) {
-      countsStr = countsStr.drop_front(1);
-      if (countsStr.consumeInteger(10, maxNumSubpassesToRun))
-        validFormat = false;
-    }
-    if (!validFormat || !countsStr.empty()) {
-      llvm::errs() << "error: wrong format of -sil-opt-pass-count option\n";
+    parsePassesToRunCount(SILNumOptPassesToRun);
+  } else if (!SILPassCountConfigFile.empty()) {
+    StringRef moduleName = M->getSwiftModule()->getName().str();
+    std::fstream fs(SILPassCountConfigFile);
+    if (!fs) {
+      llvm::errs() << "cannot open pass count config file\n";
       exit(1);
     }
+    std::string line;
+    while (std::getline(fs, line)) {
+      auto pair = StringRef(line).split(":");
+      StringRef modName = pair.first;
+      StringRef countsStr = pair.second;
+      if (modName == moduleName) {
+        parsePassesToRunCount(countsStr);
+        break;
+      }
+    }
+    fs.close();
+  }
+
+  if (!SILBreakBeforePassCount.empty()) {
+    parseBreakBeforePassCount(SILBreakBeforePassCount);
   }
 
   for (SILAnalysis *A : Analyses) {
@@ -394,26 +448,89 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
   M->registerDeserializationNotificationHandler(std::move(handler));
 }
 
+void SILPassManager::parsePassesToRunCount(StringRef countsStr) {
+  bool validFormat = true;
+  if (countsStr.consumeInteger(10, maxNumPassesToRun))
+    validFormat = false;
+  if (countsStr.starts_with(".")) {
+    countsStr = countsStr.drop_front(1);
+    if (countsStr.consumeInteger(10, maxNumSubpassesToRun))
+      validFormat = false;
+  }
+  if (!validFormat || !countsStr.empty()) {
+    llvm::errs() << "error: wrong format of -sil-opt-pass-count option\n";
+    exit(1);
+  }
+}
+
+void SILPassManager::parseBreakBeforePassCount(StringRef countsStr) {
+  bool validFormat = true;
+  if (countsStr.consumeInteger(10, breakBeforePassCount))
+    validFormat = false;
+  if (!validFormat || !countsStr.empty()) {
+    llvm::errs()
+        << "error: wrong format of -sil-break-before-pass-count option\n";
+    exit(1);
+  }
+}
+
 bool SILPassManager::continueTransforming() {
   if (isMandatory)
     return true;
   return NumPassesRun < maxNumPassesToRun;
 }
 
-bool SILPassManager::continueWithNextSubpassRun(SILInstruction *forInst,
-                                                SILFunction *function,
-                                                SILTransform *trans) {
+bool SILPassManager::continueWithNextSubpassRun(
+    std::optional<Transformee> origTransformee, SILFunction *function,
+    SILTransform *trans) {
+  // Rewrite .some(nullptr) as .none.
+  std::optional<llvm::PointerUnion<SILValue, SILInstruction *>> forTransformee;
+  if (origTransformee) {
+    auto forValue = dyn_cast<SILValue>(*origTransformee);
+    if (forValue) {
+      forTransformee = forValue;
+    } else if (auto *forInst = cast<SILInstruction *>(*origTransformee)) {
+      forTransformee = forInst;
+    }
+  }
+
+  unsigned subPass = numSubpassesRun++;
+
+  if (SILPrintEverySubpass && isFunctionSelectedForPrinting(function) &&
+      doPrintBefore(trans, function)) {
+    dumpPassInfo("*** SIL function before ", trans, function);
+    llvm::dbgs() << "  *** sub-pass " << subPass << " for ";
+    if (forTransformee) {
+      auto forValue = dyn_cast<SILValue>(*forTransformee);
+      if (forValue) {
+        llvm::dbgs() << forValue;
+      } else {
+        auto *forInst = cast<SILInstruction *>(*forTransformee);
+        llvm::dbgs() << *forInst;
+      }
+    } else {
+      llvm::dbgs() << "???\n";
+    }
+    function->dump(getOptions().EmitVerboseSIL);
+  }
+
   if (isMandatory)
     return true;
   if (NumPassesRun != maxNumPassesToRun - 1)
     return true;
 
-  unsigned subPass = numSubpassesRun++;
-  
   if (subPass == maxNumSubpassesToRun - 1 && SILPrintLast) {
     dumpPassInfo("*** SIL function before ", trans, function);
-    if (forInst) {
-      llvm::dbgs() << "  *** sub-pass " << subPass << " for " << *forInst;
+    if (forTransformee) {
+      auto forValue = dyn_cast<SILValue>(*forTransformee);
+      if (forValue) {
+        llvm::dbgs() << forValue;
+      } else {
+        auto *forInst = cast<SILInstruction *>(*forTransformee);
+        llvm::dbgs() << *forInst;
+      }
+    } else {
+      llvm::dbgs() << "???\n";
     }
     function->dump(getOptions().EmitVerboseSIL);
   }
@@ -431,23 +548,28 @@ bool SILPassManager::analysesUnlocked() {
 // Test the function and pass names we're given against the debug
 // options that force us to break prior to a given pass and/or on a
 // given function.
-static bool breakBeforeRunning(StringRef fnName, SILFunctionTransform *SFT) {
-  if (SILBreakOnFun.empty() && SILBreakOnPass.empty())
+bool SILPassManager::breakBeforeRunning(StringRef fnName,
+                                        SILFunctionTransform *SFT) {
+  if (SILBreakOnFun.empty() && SILBreakOnPass.empty() &&
+      SILBreakBeforePassCount.empty())
     return false;
 
-  if (SILBreakOnFun.empty()
-      && (SFT->getID() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass))
+  if (!SILBreakOnPass.empty() &&
+      (SFT->getID() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass))
     return true;
 
-  if (SILBreakOnPass.empty() && fnName == SILBreakOnFun)
+  if (!SILBreakOnFun.empty() && fnName == SILBreakOnFun)
     return true;
 
-  return fnName == SILBreakOnFun
-    && (SFT->getID() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass);
+  if (!SILBreakBeforePassCount.empty() &&
+      breakBeforePassCount == NumPassesRun) {
+    return true;
+  }
+  return false;
 }
 
 void SILPassManager::dumpPassInfo(const char *Title, SILTransform *Tr,
-                                  SILFunction *F, int passIdx) {
+                                  SILFunction *F, int passIdx, bool skipNewline) {
   llvm::dbgs() << "  " << Title << " #" << NumPassesRun
                << ", stage " << StageName << ", pass";
   if (passIdx >= 0)
@@ -455,18 +577,17 @@ void SILPassManager::dumpPassInfo(const char *Title, SILTransform *Tr,
   llvm::dbgs() << ": " << Tr->getID() << " (" << Tr->getTag() << ")";
   if (F)
     llvm::dbgs() << ", Function: " << F->getName();
-  llvm::dbgs() << '\n';
+  if (!skipNewline)
+    llvm::dbgs() << '\n';
 }
 
 void SILPassManager::dumpPassInfo(const char *Title, unsigned TransIdx,
-                                  SILFunction *F) {
-  dumpPassInfo(Title, Transformations[TransIdx], F, (int)TransIdx);
+                                  SILFunction *F, bool skipNewline) {
+  dumpPassInfo(Title, Transformations[TransIdx], F, (int)TransIdx, skipNewline);
 }
 
 bool SILPassManager::isMandatoryFunctionPass(SILFunctionTransform *sft) {
   return isMandatory ||
-         sft->getPassKind() ==
-             PassKind::NonTransparentFunctionOwnershipModelEliminator ||
          sft->getPassKind() == PassKind::OwnershipModelEliminator;
 }
 
@@ -495,12 +616,16 @@ bool SILPassManager::isInstructionPassDisabled(StringRef instName) {
   StringRef prefix("simplify-");
   for (const std::string &namePattern : SILDisablePass) {
     StringRef pattern(namePattern);
-    if (pattern.startswith(prefix) && pattern.endswith(instName) &&
+    if (pattern.starts_with(prefix) && pattern.ends_with(instName) &&
         pattern.size() == prefix.size() + instName.size()) {
       return true;
     }
   }
   return false;
+}
+
+bool SILPassManager::isAnyPassDisabled() {
+  return !SILDisablePass.empty();
 }
 
 bool SILPassManager::disablePassesForFunction(SILFunction *function) {
@@ -547,6 +672,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   updateSILModuleStatsBeforeTransform(F->getModule(), SFT, *this, NumPassesRun);
 
   CurrentPassHasInvalidated = false;
+  currentPassDependsOnCalleeBodies = false;
   numSubpassesRun = 0;
 
   auto MatchFun = [&](const std::string &Str) -> bool {
@@ -558,8 +684,9 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
       (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
                                                  SILVerifyAroundPass.end(),
                                                  MatchFun))) {
-    F->verify();
+    F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
+    runSwiftFunctionVerification(F);
   }
 
   if (SILPrintPassName)
@@ -612,6 +739,11 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
       
       // Continue time measurement (including flushing deleted instructions).
       startTime = std::chrono::system_clock::now();
+    } else {
+      if (Mod->hasInstructionsScheduledForDeletion()) {
+        // Last chance for invalidating analysis if the pass forgot to call invalidateAnalysis.
+        invalidateAnalysis(F, SILAnalysis::InvalidationKind::FunctionBody);
+      }
     }
     Mod->flushDeletedInsts();
   }
@@ -620,8 +752,19 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   totalPassRuntime += duration;
   if (SILPrintPassTime) {
     double milliSecs = (double)duration.count() / 1000000.;
-    llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: " << SFT->getTag()
-                 << " @" << F->getName() << "\n";
+    if (milliSecs > (double)SILMinPassTime) {
+      llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: " << SFT->getTag()
+                   << " #" << NumPassesRun << " @" << F->getName() << "\n";
+    }
+  }
+  if (SILPrintPassMD5 && CurrentPassHasInvalidated) {
+    MD5Stream md5Stream;
+    F->print(md5Stream);
+    llvm::MD5::MD5Result result;
+    md5Stream.final(result);
+
+    dumpPassInfo("MD5", TransIdx, F, /*skipNewline=*/ true);
+    llvm::dbgs() << " = " << result << "\n";
   }
 
   if (numRepeats > 1)
@@ -646,13 +789,17 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
                                      duration.count());
 
   // Remember if this pass didn't change anything.
-  if (!CurrentPassHasInvalidated)
+  if (!CurrentPassHasInvalidated && !currentPassDependsOnCalleeBodies)
     completedPasses.set((size_t)SFT->getPassKind());
 
   if (getOptions().VerifyAll &&
       (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
-    F->verify();
+    F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses(F);
+    runSwiftFunctionVerification(F);
+  } else if (getOptions().VerifyOwnershipAll &&
+             (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
+    F->verifyOwnership();
   } else {
     if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
                                                   SILVerifyAfterPass.end(),
@@ -660,8 +807,9 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
         (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
                                                    SILVerifyAroundPass.end(),
                                                    MatchFun))) {
-      F->verify();
+      F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
       verifyAnalyses();
+      runSwiftFunctionVerification(F);
     }
   }
 
@@ -766,8 +914,9 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
       (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
                                                  SILVerifyAroundPass.end(),
                                                  MatchFun))) {
-    Mod->verify();
+    Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
+    runSwiftModuleVerification();
   }
 
   swiftPassInvocation.startModulePassRun(SMT);
@@ -776,6 +925,12 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   SMT->run();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
+  
+  if (!CurrentPassHasInvalidated && Mod->hasInstructionsScheduledForDeletion()) {
+    // Last chance for invalidating analysis if the pass forgot to call invalidateAnalysis.
+    invalidateAllAnalysis();
+  }
+  
   Mod->flushDeletedInsts();
   swiftPassInvocation.finishedModulePassRun();
 
@@ -784,7 +939,19 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
 
   if (SILPrintPassTime) {
     double milliSecs = (double)duration.count() / 1000000.;
-    llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: " << SMT->getTag() << "\n";
+    if (milliSecs > (double)SILMinPassTime) {
+      llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: " << SMT->getTag()
+                   << " #" << NumPassesRun << "\n";
+    }
+  }
+  if (SILPrintPassMD5 && CurrentPassHasInvalidated) {
+    MD5Stream md5Stream;
+    Mod->print(md5Stream);
+    llvm::MD5::MD5Result result;
+    md5Stream.final(result);
+
+    dumpPassInfo("MD5", TransIdx, /*function=*/ nullptr, /*skipNewline=*/ true);
+    llvm::dbgs() << " = " << result << "\n";
   }
 
   // If this pass invalidated anything, print and verify.
@@ -797,8 +964,9 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
 
   if (Options.VerifyAll &&
       (CurrentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
-    Mod->verify();
+    Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
+    runSwiftModuleVerification();
   } else {
     if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
                                                   SILVerifyAfterPass.end(),
@@ -806,8 +974,9 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
         (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
                                                    SILVerifyAroundPass.end(),
                                                    MatchFun))) {
-      Mod->verify();
+      Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
       verifyAnalyses();
+      runSwiftModuleVerification();
     }
   }
 }
@@ -853,6 +1022,15 @@ void SILPassManager::execute() {
     printModule(Mod, Options.EmitVerboseSIL);
   }
 
+  if (SILPrintPassMD5) {
+    MD5Stream md5Stream;
+    Mod->print(md5Stream);
+    llvm::MD5::MD5Result result;
+    md5Stream.final(result);
+
+    llvm::dbgs() << "Initial " << StageName << " MD5 = " << result << "\n";
+  }
+
   // Run the transforms by alternating between function transforms and
   // module transforms. We'll queue up all the function transforms
   // that we see in a row and then run the entire group of transforms
@@ -880,6 +1058,27 @@ void SILPassManager::execute() {
       ++NumPassesRun;
     }
   }
+}
+
+irgen::IRGenModule *SILPassManager::getIRGenModule() {
+  // We need an IRGenModule to get the actual sizes from type lowering.
+  // Creating an IRGenModule involves some effort, let's cache it for the
+  // whole pass.
+  if (IRMod == nullptr) {
+    SILModule *module = getModule();
+
+    auto *irgenOpts = module->getIRGenOptionsOrNull();
+    if (!irgenOpts)
+      return nullptr;
+
+    if (irgen == nullptr)
+      irgen = new irgen::IRGenerator(*irgenOpts, *module);
+    auto targetMachine = irgen->createTargetMachine();
+    assert(targetMachine && "failed to create target");
+    IRMod = new irgen::IRGenModule(*irgen, std::move(targetMachine));
+  }
+
+  return IRMod;
 }
 
 /// D'tor.
@@ -921,6 +1120,16 @@ SILPassManager::~SILPassManager() {
            "Deleting a locked analysis. Did we forget to unlock ?");
     delete A;
   }
+
+  if (irgen) {
+    // If irgen is set, we also own the IRGenModule
+    if (IRMod) {
+      delete IRMod;
+      IRMod = nullptr;
+    }
+    delete irgen;
+    irgen = nullptr;
+  }
 }
 
 void SILPassManager::notifyOfNewFunction(SILFunction *F, SILTransform *T) {
@@ -959,7 +1168,7 @@ void SILPassManager::addFunctionToWorklist(SILFunction *F,
     // this function to the pass manager to ensure that we perform this
     // verification.
     if (getOptions().VerifyAll) {
-      F->verify();
+      F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     }
 
     NewLevel = DerivationLevels[DerivedFrom] + 1;
@@ -1016,8 +1225,7 @@ enum class IRGenPasses : uint8_t {
 } // end anonymous namespace
 
 void SILPassManager::addPass(PassKind Kind) {
-  assert(unsigned(PassKind::AllPasses_Last) >= unsigned(Kind) &&
-         "Invalid pass kind");
+  ASSERT(unsigned(PassKind::numPasses) > unsigned(Kind) && "Invalid pass kind");
   switch (Kind) {
 #define PASS(ID, TAG, NAME)                                                    \
   case PassKind::ID: {                                                         \
@@ -1257,493 +1465,166 @@ void SILPassManager::viewCallGraph() {
 //                           SwiftPassInvocation
 //===----------------------------------------------------------------------===//
 
-static_assert(BridgedSlabCapacity == FixedSizeSlab::capacity,
-              "wrong bridged slab capacity");
-
-FixedSizeSlab *SwiftPassInvocation::allocSlab(FixedSizeSlab *afterSlab) {
-  FixedSizeSlab *slab = passManager->getModule()->allocSlab();
-  if (afterSlab) {
-    allocatedSlabs.insert(std::next(afterSlab->getIterator()), *slab);
-  } else {
-    allocatedSlabs.push_back(*slab);
-  }
-  return slab;
-}
-
-FixedSizeSlab *SwiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
-  FixedSizeSlab *prev = nullptr;
-  assert(!allocatedSlabs.empty());
-  if (&allocatedSlabs.front() != slab)
-    prev = &*std::prev(slab->getIterator());
-
-  allocatedSlabs.remove(*slab);
-  passManager->getModule()->freeSlab(slab);
-  return prev;
-}
-
-BasicBlockSet *SwiftPassInvocation::allocBlockSet() {
-  assert(numBlockSetsAllocated < BlockSetCapacity - 1 &&
-         "too many BasicBlockSets allocated");
-
-  auto *storage = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated;
-  BasicBlockSet *set = new (storage) BasicBlockSet(function);
-  aliveBlockSets[numBlockSetsAllocated] = true;
-  ++numBlockSetsAllocated;
-  return set;
-}
-
-void SwiftPassInvocation::freeBlockSet(BasicBlockSet *set) {
-  int idx = set - (BasicBlockSet *)blockSetStorage;
-  assert(idx >= 0 && idx < numBlockSetsAllocated);
-  assert(aliveBlockSets[idx] && "double free of BasicBlockSet");
-  aliveBlockSets[idx] = false;
-
-  while (numBlockSetsAllocated > 0 && !aliveBlockSets[numBlockSetsAllocated - 1]) {
-    auto *set = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated - 1;
-    set->~BasicBlockSet();
-    --numBlockSetsAllocated;
-  }
-}
-
-NodeSet *SwiftPassInvocation::allocNodeSet() {
-  assert(numNodeSetsAllocated < NodeSetCapacity - 1 &&
-         "too many BasicNodeSets allocated");
-
-  auto *storage = (NodeSet *)nodeSetStorage + numNodeSetsAllocated;
-  NodeSet *set = new (storage) NodeSet(function);
-  aliveNodeSets[numNodeSetsAllocated] = true;
-  ++numNodeSetsAllocated;
-  return set;
-}
-
-void SwiftPassInvocation::freeNodeSet(NodeSet *set) {
-  int idx = set - (NodeSet *)nodeSetStorage;
-  assert(idx >= 0 && idx < numNodeSetsAllocated);
-  assert(aliveNodeSets[idx] && "double free of NodeSet");
-  aliveNodeSets[idx] = false;
-
-  while (numNodeSetsAllocated > 0 && !aliveNodeSets[numNodeSetsAllocated - 1]) {
-    auto *set = (NodeSet *)nodeSetStorage + numNodeSetsAllocated - 1;
-    set->~NodeSet();
-    --numNodeSetsAllocated;
-  }
-}
-
 void SwiftPassInvocation::startModulePassRun(SILModuleTransform *transform) {
-  assert(!this->function && !this->transform && "a pass is already running");
-  this->function = nullptr;
+  ASSERT(!this->function && !this->transform && "a pass is already running");
   this->transform = transform;
-}
-
-void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) {
-  assert(!this->transform && "a pass is already running");
-  this->transform = transform;
-  beginTransformFunction(transform->getFunction());
-}
-
-void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {
-  assert(inst->getFunction() == function &&
-         "running instruction pass on wrong function");
 }
 
 void SwiftPassInvocation::finishedModulePassRun() {
-  endPassRunChecks();
-  assert(!function && transform && "not running a pass");
-  assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
-         && "unhandled change notifications at end of module pass");
+  ASSERT(!function && transform && "not running a module pass");
+  if (changeNotifications != 0) {
+    ASSERT((changeNotifications & ~SILContext::NotificationKind::FunctionTables) == 0
+           && "a module pass must not change the SIL of a function");
+    passManager->invalidateFunctionTables();
+    changeNotifications = SILContext::NotificationKind::Nothing;
+  }
   transform = nullptr;
+  verifyEverythingIsCleared();
+}
+
+void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) {
+  ASSERT(!this->function && !this->transform && "a pass is already running");
+  ASSERT(!silCombiner && "didn't clear silCombiner backlink");
+  this->transform = transform;
+  this->function = transform->getFunction();
+  ASSERT(!this->function->needBreakInfiniteLoops() && "didn't break infinite loops in previous module pass");
+  ASSERT(!this->function->needCompleteLifetimes() && "didn't complete lifetimes in previous module pass");
 }
 
 void SwiftPassInvocation::finishedFunctionPassRun() {
-  endPassRunChecks();
-  endTransformFunction();
-  assert(allocatedSlabs.empty() && "StackList is leaking slabs");
+  ASSERT(function && transform && "not running a function pass");
+  ASSERT((changeNotifications & SILContext::NotificationKind::FunctionTables) == 0
+         && "a function pass must not change function tables");
+  ASSERT(!function->needBreakInfiniteLoops() && "didn't break infinite loops");
+  ASSERT(!function->needCompleteLifetimes() && "didn't complete lifetimes");
+
+  updateAnalysis();
+
+  insertedPhisBySSAUpdater.clear();
+  if (ssaUpdater) {
+    delete ssaUpdater;
+    ssaUpdater = nullptr;
+  }
+
+  function = nullptr;
   transform = nullptr;
+  silCombiner = nullptr;
+  verifyEverythingIsCleared();
+}
+
+void SwiftPassInvocation::updateAnalysis() {
+  if (changeNotifications != SILContext::NotificationKind::Nothing) {
+    passManager->invalidateAnalysis(function, (SILAnalysis::InvalidationKind)changeNotifications);
+  }
+  changeNotifications = SILContext::NotificationKind::Nothing;
+}
+
+void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {
+  ASSERT(inst->getFunction() == function && "running instruction pass on wrong function");
 }
 
 void SwiftPassInvocation::finishedInstructionPassRun() {
-  endPassRunChecks();
+  verifyEverythingIsCleared();
 }
 
-void SwiftPassInvocation::endPassRunChecks() {
-  assert(allocatedSlabs.empty() && "StackList is leaking slabs");
-  assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
-  assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
-  assert(!needFixStackNesting && "Stack nesting not fixed");
+void SwiftPassInvocation::verifyEverythingIsCleared() {
+  ASSERT(!needFixStackNesting && "Stack nesting not fixed");
+  SILContext::verifyEverythingIsCleared();
 }
 
-void SwiftPassInvocation::beginTransformFunction(SILFunction *function) {
-  assert(!this->function && transform && "not running a pass");
-  assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
-         && "change notifications not cleared");
-  this->function = function;
-}
-
-void SwiftPassInvocation::endTransformFunction() {
-  assert(function && transform && "not running a pass");
-  if (changeNotifications != SILAnalysis::InvalidationKind::Nothing) {
-    passManager->invalidateAnalysis(function, changeNotifications);
-    changeNotifications = SILAnalysis::InvalidationKind::Nothing;
+SILFunction *SwiftPassInvocation::beginVerifyFunction(SILFunction *function) {
+  SILFunction *prevFunction = this->function;
+  if (transform && this->function) {
+    ASSERT(this->function == function);
+  } else {
+    ASSERT(!this->function);
+    this->function = function;
   }
-  function = nullptr;
-  assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
-  assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+  return prevFunction;
 }
 
-//===----------------------------------------------------------------------===//
-//                            Swift Bridging
-//===----------------------------------------------------------------------===//
-
-inline SwiftPassInvocation *castToPassInvocation(BridgedPassContext ctxt) {
-  return const_cast<SwiftPassInvocation *>(
-    static_cast<const SwiftPassInvocation *>(ctxt.opaqueCtxt));
-}
-
-inline FixedSizeSlab *castToSlab(BridgedSlab slab) {
-  if (slab.data)
-    return static_cast<FixedSizeSlab *>((FixedSizeSlabPayload *)slab.data);
-  return nullptr;
-}
-
-inline BridgedSlab toBridgedSlab(FixedSizeSlab *slab) {
-  if (slab) {
-    FixedSizeSlabPayload *payload = slab;
-    assert((void *)payload == slab->dataFor<void>());
-    return {payload};
+void SwiftPassInvocation::endVerifyFunction(SILFunction *prevFunction) {
+  ASSERT(function);
+  if (!transform) {
+    verifyEverythingIsCleared();
   }
-  return {nullptr};
+  function = prevFunction;
 }
 
-inline BasicBlockSet *castToBlockSet(BridgedBasicBlockSet blockSet) {
-  return static_cast<BasicBlockSet *>(blockSet.bbs);
+irgen::IRGenModule *SwiftPassInvocation::getIRGenModule() {
+  return passManager->getIRGenModule();
 }
 
-inline NodeSet *castToNodeSet(BridgedNodeSet nodeSet) {
-  return static_cast<NodeSet *>(nodeSet.nds);
+SwiftPassInvocation::~SwiftPassInvocation() {}
+
+SILFunction *SwiftPassInvocation::
+createEmptyFunction(StringRef name,
+                    ArrayRef<SILParameterInfo> params,
+                    bool hasSelfParam,
+                    SILFunction *fromFn) {
+  CanSILFunctionType fTy = fromFn->getLoweredFunctionType();
+  assert(fromFn->getGenericSignature().isNull() && "generic functions are not supported");
+
+  auto extInfo = fTy->getExtInfo();
+  if (fTy->hasSelfParam() && !hasSelfParam)
+    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+
+  CanSILFunctionType newTy = SILFunctionType::get(
+      /*GenericSignature=*/nullptr, extInfo, fTy->getCoroutineKind(),
+      fTy->getCalleeConvention(), params, fTy->getYields(),
+      fTy->getResults(), fTy->getOptionalErrorResult(),
+      SubstitutionMap(), SubstitutionMap(),
+      getModule()->getASTContext());
+
+  SILOptFunctionBuilder functionBuilder(*getTransform());
+
+  SILFunction *newF = functionBuilder.createFunction(
+      fromFn->getLinkage(), name, newTy, nullptr,
+      fromFn->getLocation(), fromFn->isBare(), fromFn->isTransparent(),
+      fromFn->getSerializedKind(), IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible, fromFn->getEntryCount(), fromFn->isThunk(),
+      fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(),
+      fromFn->getEffectsKind(), nullptr, fromFn->getDebugScope());
+
+  return newF;
 }
 
-BridgedSlab PassContext_getNextSlab(BridgedSlab slab) {
-  return toBridgedSlab(&*std::next(castToSlab(slab)->getIterator()));
+void SwiftPassInvocation::moveFunctionBody(SILFunction *sourceFn, SILFunction *destFn) {
+  destFn->moveAllBlocksFromOtherFunction(sourceFn);
+  getPassManager()->invalidateAnalysis(sourceFn, SILAnalysis::InvalidationKind::Everything);
+  getPassManager()->invalidateAnalysis(destFn, SILAnalysis::InvalidationKind::Everything);
 }
 
-BridgedSlab PassContext_getPreviousSlab(BridgedSlab slab) {
-  return toBridgedSlab(&*std::prev(castToSlab(slab)->getIterator()));
+SILFunction *SwiftPassInvocation::lookupStdlibFunction(StringRef name) {
+  SmallVector<ValueDecl *, 1> results;
+  getModule()->getASTContext().lookupInSwiftModule(name, results);
+  if (results.size() != 1)
+    return nullptr;
+
+  auto *decl = dyn_cast<FuncDecl>(results.front());
+  if (!decl)
+    return nullptr;
+
+  SILDeclRef declRef(decl, SILDeclRef::Kind::Func);
+  SILOptFunctionBuilder funcBuilder(*getTransform());
+  return funcBuilder.getOrCreateFunction(SILLocation(decl), declRef, NotForDefinition);
 }
 
-BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
-                                  BridgedSlab afterSlab) {
-  auto *inv = castToPassInvocation(passContext);
-  return toBridgedSlab(inv->allocSlab(castToSlab(afterSlab)));
+void SwiftPassInvocation::initializeSSAUpdater(SILFunction *function, SILType type, ValueOwnershipKind ownership) {
+  insertedPhisBySSAUpdater.clear();
+  if (!ssaUpdater)
+    ssaUpdater = new SILSSAUpdater(&insertedPhisBySSAUpdater);
+  ssaUpdater->initialize(function, type, ownership);
 }
 
-BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
-                                 BridgedSlab slab) {
-  auto *inv = castToPassInvocation(passContext);
-  return toBridgedSlab(inv->freeSlab(castToSlab(slab)));
+void SwiftPassInvocation::SSAUpdater_addAvailableValue(SILBasicBlock *block, SILValue value) {
+  ssaUpdater->addAvailableValue(block, value);
 }
 
-SwiftInt PassContext_continueWithNextSubpassRun(BridgedPassContext passContext,
-                                                OptionalBridgedInstruction inst) {
-  SwiftPassInvocation *inv = castToPassInvocation(passContext);
-  SILInstruction *i = castToInst(inst);
-  return inv->getPassManager()->continueWithNextSubpassRun(i,
-                inv->getFunction(), inv->getTransform()) ? 1: 0;
+SILValue SwiftPassInvocation::SSAUpdater_getValueAtEndOfBlock(SILBasicBlock *block) {
+  return ssaUpdater->getValueAtEndOfBlock(block);
 }
 
-void PassContext_notifyChanges(BridgedPassContext passContext,
-                               enum ChangeNotificationKind changeKind) {
-  SwiftPassInvocation *inv = castToPassInvocation(passContext);
-  switch (changeKind) {
-  case instructionsChanged:
-    inv->notifyChanges(SILAnalysis::InvalidationKind::Instructions);
-    break;
-  case callsChanged:
-    inv->notifyChanges(SILAnalysis::InvalidationKind::CallsAndInstructions);
-    break;
-  case branchesChanged:
-    inv->notifyChanges(SILAnalysis::InvalidationKind::BranchesAndInstructions);
-    break;
-  case effectsChanged:
-    inv->notifyChanges(SILAnalysis::InvalidationKind::Effects);
-    break;
-  }
-}
-
-BridgedBasicBlock PassContext_splitBlock(BridgedInstruction bridgedInst) {
-  SILInstruction *inst = castToInst(bridgedInst);
-  SILBasicBlock *block = inst->getParent();
-  return {block->split(inst->getIterator())};
-}
-
-void PassContext_eraseInstruction(BridgedPassContext passContext,
-                                  BridgedInstruction inst) {
-  castToPassInvocation(passContext)->eraseInstruction(castToInst(inst));
-}
-
-void PassContext_eraseBlock(BridgedPassContext passContext,
-                            BridgedBasicBlock block) {
-  castToBasicBlock(block)->eraseFromParent();
-}
-
-bool PassContext_tryDeleteDeadClosure(BridgedPassContext context, BridgedInstruction closure) {
-  return tryDeleteDeadClosure(castToInst<SingleValueInstruction>(closure), InstModCallbacks());
-}
-
-void PassContext_notifyInvalidatedStackNesting(BridgedPassContext context) {
-  castToPassInvocation(context)->setNeedFixStackNesting(true);
-}
-
-bool PassContext_getNeedFixStackNesting(BridgedPassContext context) {
-  return castToPassInvocation(context)->getNeedFixStackNesting();
-}
-
-void PassContext_fixStackNesting(BridgedPassContext passContext,
-                                 BridgedFunction function) {
-  switch (StackNesting::fixNesting(castToFunction(function))) {
-    case StackNesting::Changes::None:
-      break;
-    case StackNesting::Changes::Instructions:
-      PassContext_notifyChanges(passContext, instructionsChanged);
-      break;
-    case StackNesting::Changes::CFG:
-      PassContext_notifyChanges(passContext, branchesChanged);
-      break;
-  }
-  castToPassInvocation(passContext)->setNeedFixStackNesting(false);
-}
-
-BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context) {
-  SwiftPassInvocation *invocation = castToPassInvocation(context);
-  SILPassManager *pm = invocation->getPassManager();
-  return {pm->getAnalysis<AliasAnalysis>(invocation->getFunction())};
-}
-
-BridgedCalleeAnalysis
-PassContext_getCalleeAnalysis(BridgedPassContext context) {
-  SILPassManager *pm = castToPassInvocation(context)->getPassManager();
-  return {pm->getAnalysis<BasicCalleeAnalysis>()};
-}
-
-BridgedDeadEndBlocksAnalysis
-PassContext_getDeadEndBlocksAnalysis(BridgedPassContext context) {
-  SwiftPassInvocation *invocation = castToPassInvocation(context);
-  SILPassManager *pm = invocation->getPassManager();
-  return {pm->getAnalysis<DeadEndBlocksAnalysis>(invocation->getFunction())};
-}
-
-BridgedDomTree PassContext_getDomTree(BridgedPassContext context) {
-  SwiftPassInvocation *invocation = castToPassInvocation(context);
-  SILPassManager *pm = invocation->getPassManager();
-  return {pm->getAnalysis<DominanceAnalysis>(invocation->getFunction())};
-}
-
-SwiftInt DominatorTree_dominates(BridgedDomTree domTree,
-                                 BridgedBasicBlock dominating,
-                                 BridgedBasicBlock dominated) {
-  DominanceInfo *di = static_cast<DominanceInfo *>(domTree.dt);
-  return di->dominates(castToBasicBlock(dominating), castToBasicBlock(dominated)) ? 1 : 0;
-}
-
-BridgedPostDomTree PassContext_getPostDomTree(BridgedPassContext context) {
-  SwiftPassInvocation *invocation = castToPassInvocation(context);
-  SILPassManager *pm = invocation->getPassManager();
-  return {pm->getAnalysis<PostDominanceAnalysis>(invocation->getFunction())};
-}
-
-SwiftInt PostDominatorTree_postDominates(BridgedPostDomTree pdomTree,
-                                         BridgedBasicBlock dominating,
-                                         BridgedBasicBlock dominated) {
-  auto *pdi = static_cast<PostDominanceInfo *>(pdomTree.pdt);
-  return pdi->dominates(castToBasicBlock(dominating), castToBasicBlock(dominated)) ? 1 : 0;
-}
-
-BridgedBasicBlockSet PassContext_allocBasicBlockSet(BridgedPassContext context) {
-  return {castToPassInvocation(context)->allocBlockSet()};
-}
-
-void PassContext_freeBasicBlockSet(BridgedPassContext context,
-                                   BridgedBasicBlockSet set) {
-  castToPassInvocation(context)->freeBlockSet(castToBlockSet(set));
-}
-
-SwiftInt BasicBlockSet_contains(BridgedBasicBlockSet set, BridgedBasicBlock block) {
-  return castToBlockSet(set)->contains(castToBasicBlock(block)) ? 1 : 0;
-}
-
-SwiftInt BasicBlockSet_insert(BridgedBasicBlockSet set, BridgedBasicBlock block) {
-  return castToBlockSet(set)->insert(castToBasicBlock(block)) ? 1 : 0;
-}
-
-void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block) {
-  castToBlockSet(set)->erase(castToBasicBlock(block));
-}
-
-BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set) {
-  return {castToBlockSet(set)->getFunction()};
-}
-
-BridgedNodeSet PassContext_allocNodeSet(BridgedPassContext context) {
-  return {castToPassInvocation(context)->allocNodeSet()};
-}
-
-void PassContext_freeNodeSet(BridgedPassContext context,
-                                   BridgedNodeSet set) {
-  castToPassInvocation(context)->freeNodeSet(castToNodeSet(set));
-}
-
-SwiftInt NodeSet_containsValue(BridgedNodeSet set, BridgedValue value) {
-  return castToNodeSet(set)->contains(castToSILValue(value)) ? 1 : 0;
-}
-
-SwiftInt NodeSet_insertValue(BridgedNodeSet set, BridgedValue value) {
-  return castToNodeSet(set)->insert(castToSILValue(value)) ? 1 : 0;
-}
-
-void NodeSet_eraseValue(BridgedNodeSet set, BridgedValue value) {
-  castToNodeSet(set)->erase(castToSILValue(value));
-}
-
-SwiftInt NodeSet_containsInstruction(BridgedNodeSet set, BridgedInstruction inst) {
-  return castToNodeSet(set)->contains(castToInst(inst)->asSILNode()) ? 1 : 0;
-}
-
-SwiftInt NodeSet_insertInstruction(BridgedNodeSet set, BridgedInstruction inst) {
-  return castToNodeSet(set)->insert(castToInst(inst)->asSILNode()) ? 1 : 0;
-}
-
-void NodeSet_eraseInstruction(BridgedNodeSet set, BridgedInstruction inst) {
-  castToNodeSet(set)->erase(castToInst(inst)->asSILNode());
-}
-
-BridgedFunction NodeSet_getFunction(BridgedNodeSet set) {
-  return {castToNodeSet(set)->getFunction()};
-}
-
-void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
-  castToInst<AllocRefInstBase>(arb)->setStackAllocatable();
-}
-
-void TermInst_replaceBranchTarget(BridgedInstruction term, BridgedBasicBlock from,
-                                  BridgedBasicBlock to) {
-  castToInst<TermInst>(term)->replaceBranchTarget(castToBasicBlock(from),
-                                                  castToBasicBlock(to));
-}
-
-SubstitutionMap
-PassContext_getContextSubstitutionMap(BridgedPassContext context,
-                                      BridgedType bridgedType) {
-  auto type = castToSILType(bridgedType);
-  auto *ntd = type.getASTType()->getAnyNominal();
-  auto *pm = castToPassInvocation(context)->getPassManager();
-  auto *m = pm->getModule()->getSwiftModule();
-
-  return type.getASTType()->getContextSubstitutionMap(m, ntd);
-}
-
-void PassContext_beginTransformFunction(BridgedFunction function, BridgedPassContext ctxt) {
-  castToPassInvocation(ctxt)->beginTransformFunction(castToFunction(function));
-}
-
-void PassContext_endTransformFunction(BridgedPassContext ctxt) {
-  castToPassInvocation(ctxt)->endTransformFunction();
-}
-
-OptionalBridgedFunction
-PassContext_firstFunctionInModule(BridgedPassContext context) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  if (mod->getFunctions().empty())
-    return {nullptr};
-  return {&*mod->getFunctions().begin()};
-}
-
-OptionalBridgedFunction
-PassContext_nextFunctionInModule(BridgedFunction function) {
-  auto *f = castToFunction(function);
-  auto nextIter = std::next(f->getIterator());
-  if (nextIter == f->getModule().getFunctions().end())
-    return {nullptr};
-  return {&*nextIter};
-}
-
-BridgedVTableArray PassContext_getVTables(BridgedPassContext context) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  auto vTables = mod->getVTables();
-  return {(const BridgedVTable *)vTables.data(), vTables.size()};
-}
-
-OptionalBridgedWitnessTable
-PassContext_firstWitnessTableInModule(BridgedPassContext context) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  if (mod->getWitnessTables().empty())
-    return {nullptr};
-  return {&*mod->getWitnessTables().begin()};
-}
-
-OptionalBridgedWitnessTable
-PassContext_nextWitnessTableInModule(BridgedWitnessTable table) {
-  auto *t = castToWitnessTable(table);
-  auto nextIter = std::next(t->getIterator());
-  if (nextIter == t->getModule().getWitnessTables().end())
-    return {nullptr};
-  return {&*nextIter};
-}
-
-OptionalBridgedDefaultWitnessTable
-PassContext_firstDefaultWitnessTableInModule(BridgedPassContext context) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  if (mod->getDefaultWitnessTables().empty())
-    return {nullptr};
-  return {&*mod->getDefaultWitnessTables().begin()};
-}
-
-OptionalBridgedDefaultWitnessTable
-PassContext_nextDefaultWitnessTableInModule(BridgedDefaultWitnessTable table) {
-  auto *t = castToDefaultWitnessTable(table);
-  auto nextIter = std::next(t->getIterator());
-  if (nextIter == t->getModule().getDefaultWitnessTables().end())
-    return {nullptr};
-  return {&*nextIter};
-}
-
-OptionalBridgedFunction
-PassContext_loadFunction(BridgedPassContext context, StringRef name) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  SILFunction *f = mod->loadFunction(name, SILModule::LinkingMode::LinkNormal);
-  return {f};
-}
-
-SwiftInt SILOptions_enableStackProtection(BridgedPassContext context) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  return mod->getOptions().EnableStackProtection;
-}
-
-SwiftInt SILOptions_enableMoveInoutStackProtection(BridgedPassContext context) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  return mod->getOptions().EnableMoveInoutStackProtection;
-}
-
-bool SILOptions_enableSimplificationFor(BridgedInstruction inst) {
-  // Fast-path check.
-  if (SimplifyInstructionTest.empty() && SILDisablePass.empty())
-    return true;
-
-  StringRef instName = getSILInstructionName(castToInst(inst)->getKind());
-
-  if (SILPassManager::isInstructionPassDisabled(instName))
-    return false;
-
-  if (SimplifyInstructionTest.empty())
-    return true;
-
-  for (const std::string &testName : SimplifyInstructionTest) {
-    if (testName == instName)
-      return true;
-  }
-  return false;
-}
-
-BridgedValue SILUndef_get(BridgedType type, BridgedPassContext context) {
-  SILUndef *undef = SILUndef::get(castToSILType(type),
-                                  *castToPassInvocation(context)->getFunction());
-  return {undef};
+SILValue SwiftPassInvocation::SSAUpdater_getValueInMiddleOfBlock(SILBasicBlock *block) {
+  return ssaUpdater->getValueInMiddleOfBlock(block);
 }

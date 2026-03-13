@@ -13,21 +13,27 @@
 #include "OwnershipLiveRange.h"
 #include "OwnershipPhiOperand.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
 
-OwnershipLiveRange::OwnershipLiveRange(SILValue value)
+OwnershipLiveRange::OwnershipLiveRange(
+    SILValue value, ArrayRef<std::pair<Operand *, SILValue>> extraUses)
     : introducer(OwnedValueIntroducer::get(value)), destroyingUses(),
       ownershipForwardingUses(), unknownConsumingUses() {
   assert(introducer);
   assert(introducer.value->getOwnershipKind() == OwnershipKind::Owned);
 
-  SmallVector<Operand *, 32> tmpDestroyingUses;
-  SmallVector<Operand *, 32> tmpForwardingConsumingUses;
-  SmallVector<Operand *, 32> tmpUnknownConsumingUses;
+  SmallVector<UsePoint, 32> tmpDestroyingUses;
+  SmallVector<UsePoint, 32> tmpForwardingConsumingUses;
+  SmallVector<UsePoint, 32> tmpUnknownConsumingUses;
+
+  SmallVector<SILValue, 4> defs;
+  defs.push_back(value);
 
   // We know that our silvalue produces an @owned value. Look through all of our
   // uses and classify them as either consuming or not.
@@ -83,14 +89,14 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
       continue;
     }
 
-    // If we have a subclass of OwnershipForwardingMixin that doesnt directly
+    // If we have a subclass of ForwardingInstruction that doesnt directly
     // forward its operand to the result, treat the use as an unknown consuming
     // use.
     //
     // If we do not directly forward and we have an owned value (which we do
     // here), we could get back a different value. Thus we can not transform
     // such a thing from owned to guaranteed.
-    if (auto *i = OwnershipForwardingMixin::get(op->getUser())) {
+    if (auto *i = ForwardingInstruction::get(op->getUser())) {
       if (!i->preservesOwnership()) {
         tmpUnknownConsumingUses.push_back(op);
         continue;
@@ -105,9 +111,12 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     // the users force the live range to be alive.
     if (!ti) {
       for (SILValue v : user->getResults()) {
-        if (v->getOwnershipKind() != OwnershipKind::Owned)
+        if (v->getOwnershipKind() != OwnershipKind::Owned &&
+            !isa<BorrowedFromInst>(user)) {
           continue;
+        }
         llvm::copy(v->getUses(), std::back_inserter(worklist));
+        defs.push_back(v);
       }
       continue;
     }
@@ -135,8 +144,32 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
         // Otherwise add all users of this BBArg to the worklist to visit
         // recursively.
         llvm::copy(succArg->getUses(), std::back_inserter(worklist));
+        defs.push_back(succArg);
       }
     }
+  }
+
+  for (auto def : defs) {
+    if (def->use_begin() == def->use_end()) {
+      continue;
+    }
+    SmallVector<SILBasicBlock *, 32> blocks;
+    SSAPrunedLiveness liveness(def->getFunction(), &blocks);
+    liveness.initializeDef(def);
+    liveness.computeSimple();
+    for (auto use : extraUses) {
+      if (use.second != def) {
+        continue;
+      }
+      liveness.updateForUse(use.first->getUser(), /*lifetimeEnding=*/true);
+    }
+    OSSACompleteLifetime::visitAvailabilityBoundary(
+        def, liveness, [&tmpDestroyingUses](auto *inst, auto end) {
+          if (end != OSSACompleteLifetime::LifetimeEnd::Boundary) {
+            return;
+          }
+          tmpDestroyingUses.push_back(inst);
+        });
   }
 
   // The order in which we append these to consumingUses matters since we assume
@@ -147,7 +180,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
   llvm::copy(tmpForwardingConsumingUses, std::back_inserter(consumingUses));
   llvm::copy(tmpUnknownConsumingUses, std::back_inserter(consumingUses));
 
-  auto cUseArrayRef = llvm::makeArrayRef(consumingUses);
+  auto cUseArrayRef = llvm::ArrayRef(consumingUses);
   destroyingUses = cUseArrayRef.take_front(tmpDestroyingUses.size());
   ownershipForwardingUses = cUseArrayRef.slice(
       tmpDestroyingUses.size(), tmpForwardingConsumingUses.size());
@@ -166,7 +199,7 @@ void OwnershipLiveRange::insertEndBorrowsAtDestroys(
   //
   // TODO: Hoist this out?
   SILInstruction *inst = introducer.value->getDefiningInstruction();
-  Optional<ValueLifetimeAnalysis> analysis;
+  std::optional<ValueLifetimeAnalysis> analysis;
   if (!inst) {
     analysis.emplace(cast<SILArgument>(introducer.value),
                      getAllConsumingInsts());
@@ -245,7 +278,8 @@ void OwnershipLiveRange::insertEndBorrowsAtDestroys(
 
 void OwnershipLiveRange::convertOwnedGeneralForwardingUsesToGuaranteed() && {
   while (!ownershipForwardingUses.empty()) {
-    auto *use = ownershipForwardingUses.back();
+    auto point = ownershipForwardingUses.back();
+    auto *use = point.getOperand();
     ownershipForwardingUses = ownershipForwardingUses.drop_back();
     ForwardingOperand operand(use);
     operand.replaceOwnershipKind(OwnershipKind::Owned,
@@ -257,9 +291,12 @@ void OwnershipLiveRange::convertToGuaranteedAndRAUW(
     SILValue newGuaranteedValue, InstModCallbacks callbacks) && {
   auto *value = cast<SingleValueInstruction>(introducer.value);
   while (!destroyingUses.empty()) {
-    auto *d = destroyingUses.back();
+    auto point = destroyingUses.back();
+    auto *destroy = point.getInstruction();
     destroyingUses = destroyingUses.drop_back();
-    callbacks.deleteInst(d->getUser());
+    if (isa<TermInst>(destroy))
+      continue;
+    callbacks.deleteInst(destroy);
   }
 
   callbacks.eraseAndRAUWSingleValueInst(value, newGuaranteedValue);
@@ -296,6 +333,7 @@ static SILValue convertIntroducerToGuaranteed(OwnedValueIntroducer introducer) {
   case OwnedValueIntroducerKind::BeginApply:
   case OwnedValueIntroducerKind::TryApply:
   case OwnedValueIntroducerKind::LoadTake:
+  case OwnedValueIntroducerKind::Move:
   case OwnedValueIntroducerKind::FunctionArgument:
   case OwnedValueIntroducerKind::PartialApplyInit:
   case OwnedValueIntroducerKind::AllocBoxInit:
@@ -314,9 +352,12 @@ void OwnershipLiveRange::convertJoinedLiveRangePhiToGuaranteed(
 
   // Then eliminate all of the destroys...
   while (!destroyingUses.empty()) {
-    auto *d = destroyingUses.back();
+    auto point = destroyingUses.back();
+    auto *destroy = point.getInstruction();
     destroyingUses = destroyingUses.drop_back();
-    callbacks.deleteInst(d->getUser());
+    if (isa<TermInst>(destroy))
+      continue;
+    callbacks.deleteInst(destroy);
   }
 
   // and change all of our guaranteed forwarding insts to have guaranteed
@@ -357,14 +398,4 @@ OwnershipLiveRange::hasUnknownConsumingUse(bool assumingAtFixPoint) const {
   // Otherwise, setup the phi to incoming value map mapping the block arguments
   // to our introducer.
   return HasConsumingUse_t::YesButAllPhiArgs;
-}
-
-OwnershipLiveRange::DestroyingInstsRange
-OwnershipLiveRange::getDestroyingInsts() const {
-  return DestroyingInstsRange(getDestroyingUses(), OperandToUser());
-}
-
-OwnershipLiveRange::ConsumingInstsRange
-OwnershipLiveRange::getAllConsumingInsts() const {
-  return ConsumingInstsRange(consumingUses, OperandToUser());
 }

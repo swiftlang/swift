@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -ownership-model-eliminator %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -ownership-model-eliminator %s | %FileCheck %s
 
 sil_stage raw
 
@@ -18,6 +18,10 @@ class C {}
 struct PairOfInt {
   var lhs : Builtin.Int32
   var rhs : Builtin.Int32
+}
+
+struct ContainsTuple {
+  var tuple : (Builtin.Int32, Builtin.Int32)
 }
 
 // CHECK-LABEL: sil @load : $@convention(thin) (@in Builtin.NativeObject, @in Builtin.Int32) -> () {
@@ -162,7 +166,7 @@ bb1:
 
 // CHECK-LABEL: sil @checked_cast_br_lowered : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject):
-// CHECK:   checked_cast_br [[ARG]] : $Builtin.NativeObject to C, [[SUCCBB:bb[0-9]+]], [[FAILBB:bb[0-9]+]]
+// CHECK:   checked_cast_br Builtin.NativeObject in [[ARG]] : $Builtin.NativeObject to C, [[SUCCBB:bb[0-9]+]], [[FAILBB:bb[0-9]+]]
 //
 // CHECK: [[SUCCBB]]([[CASTED_VALUE:%.*]] : $C):
 // CHECK-NEXT:   strong_release [[CASTED_VALUE]]
@@ -173,7 +177,7 @@ bb1:
 // CHECK-NEXT:   br bb3
 sil [ossa] @checked_cast_br_lowered : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
-  checked_cast_br %0 : $Builtin.NativeObject to C, bb1, bb2
+  checked_cast_br Builtin.NativeObject in %0 : $Builtin.NativeObject to C, bb1, bb2
 
 bb1(%1 : @owned $C):
   destroy_value %1 : $C
@@ -380,4 +384,97 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   dealloc_stack %1 : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
+}
+
+// CHECK-LABEL: sil @lower_explicit_copy_addr : $@convention(thin) (@in_guaranteed C) -> () {
+// CHECK: {{[^_]copy_addr}}
+// CHECK: } // end sil function 'lower_explicit_copy_addr'
+sil [ossa] @lower_explicit_copy_addr : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%0 : $*C):
+  %1 = alloc_stack $C
+  explicit_copy_addr %0 to [init] %1 : $*C
+  destroy_addr %1 : $*C
+  dealloc_stack %1 : $*C
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @closure1: $@convention(thin) (@guaranteed C, @inout_aliasable C) -> ()
+sil @closure2 : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+
+// Ensure no assertion about missing dealloc_stack for partial_apply [on_stack] after OME
+sil [ossa] @test_partial_apply_on_stack: $@convention(thin) (@guaranteed C, @inout C) -> () {
+bb0(%0 : @guaranteed $C, %1 : $*C):
+  %f1 = function_ref @closure1: $@convention(thin) (@guaranteed C, @inout_aliasable C) -> ()
+  %pa1 = partial_apply [callee_guaranteed] [on_stack] %f1(%0, %1) : $@convention(thin) (@guaranteed C, @inout_aliasable C) -> ()
+  %md = mark_dependence %pa1 : $@noescape @callee_guaranteed () -> () on %1 : $*C
+  %f2 = function_ref @closure2 : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %pa2 = partial_apply [callee_guaranteed] %f2(%md) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %pa2 : $@callee_guaranteed () -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @test_dead_end_destroy_value : {{.*}} {
+// CHECK:       bb0([[C:%[^,]+]] :
+// CHECK:         cond_br undef, [[DIE:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// Verify that there's no release_value before this trap.
+// CHECK-NEXT:    unreachable
+// CHECK:       [[EXIT]]:
+// CHECK:         strong_release [[C]]
+// CHECK-LABEL: } // end sil function 'test_dead_end_destroy_value'
+sil [ossa] @test_dead_end_destroy_value : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  cond_br undef, die, exit
+
+die:
+  destroy_value [dead_end] %c : $C
+  unreachable
+
+exit:
+  destroy_value %c : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil @test_dead_end_dealloc_box : {{.*}} {
+// CHECK:         [[B:%[^,]+]] = alloc_box
+// CHECK:         cond_br undef, [[DIE:bb[0-9]+]], [[EXIT:bb[0-9]+]]                         
+// CHECK:       [[DIE]]:                                              
+// CHECK-NEXT:    unreachable                                     
+// CHECK:       [[EXIT]]:                                              
+// CHECK:         dealloc_box [[B]]
+// CHECK-LABEL: } // end sil function 'test_dead_end_dealloc_box'
+sil [ossa] @test_dead_end_dealloc_box : $@convention(thin) () -> () {
+entry:
+  %b = alloc_box ${ var C }
+  cond_br undef, die, exit
+
+die:
+  dealloc_box [dead_end] %b : ${ var C }
+  unreachable
+
+exit:
+  dealloc_box %b : ${ var C }
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil @destructure_tuple_peephole : $@convention(thin) (ContainsTuple) -> () {
+// CHECK: bb0([[ARG:%.*]] : $ContainsTuple):
+// CHECK:  [[S:%.*]] = alloc_stack $(Builtin.Int32, Builtin.Int32)
+// CHECK:  [[T:%.*]] = struct_extract [[ARG]] : $ContainsTuple, #ContainsTuple.tuple
+// CHECK:  store [[T]] to [[S]] : $*(Builtin.Int32, Builtin.Int32)
+// CHECK: } // end sil function 'destructure_tuple_peephole'
+sil [ossa] @destructure_tuple_peephole : $@convention(thin) (ContainsTuple) -> () {
+entry(%arg : $ContainsTuple):
+  %stk = alloc_stack $(Builtin.Int32, Builtin.Int32)
+  %tpl = struct_extract %arg : $ContainsTuple, #ContainsTuple.tuple
+  (%1, %2) = destructure_tuple %tpl : $(Builtin.Int32, Builtin.Int32)
+  %3 = tuple (%1 : $Builtin.Int32, %2 : $Builtin.Int32)
+  store %3 to [trivial] %stk : $*(Builtin.Int32, Builtin.Int32)
+  dealloc_stack %stk : $*(Builtin.Int32, Builtin.Int32)
+  %retval = tuple ()
+  return %retval : $()
 }

@@ -15,36 +15,94 @@
 
 #include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Support/StringSaver.h"
 
 namespace swift {
 namespace dependencies {
 class DependencyScanningTool;
+class DepScanInMemoryDiagnosticCollector;
+
+struct ScanQueryContext {
+  /// Primary CompilerInstance configured for this scanning action
+  std::unique_ptr<CompilerInstance> ScanInstance;
+  /// An thread-safe diagnostic consumer which collects all emitted
+  /// diagnostics in the scan to be reporte via libSwiftScan API
+  std::unique_ptr<DepScanInMemoryDiagnosticCollector> InMemoryDiagnosticCollector;
+  /// A thread-safe serialized diagnostics consumer.
+  /// Note, although type-erased, this must be an instance of
+  /// 'ThreadSafeSerializedDiagnosticConsumer'
+  std::unique_ptr<DiagnosticConsumer> SerializedDiagnosticConsumer;
+
+  ScanQueryContext(
+      std::unique_ptr<CompilerInstance> ScanInstance,
+      std::unique_ptr<DepScanInMemoryDiagnosticCollector>
+          InMemoryDiagnosticCollector,
+      std::unique_ptr<DiagnosticConsumer> SerializedDiagnosticConsumer)
+      : ScanInstance(std::move(ScanInstance)),
+        InMemoryDiagnosticCollector(std::move(InMemoryDiagnosticCollector)),
+        SerializedDiagnosticConsumer(std::move(SerializedDiagnosticConsumer)) {}
+
+  ScanQueryContext(ScanQueryContext &&other)
+      : ScanInstance(std::move(other.ScanInstance)),
+        InMemoryDiagnosticCollector(
+            std::move(other.InMemoryDiagnosticCollector)),
+        SerializedDiagnosticConsumer(
+            std::move(other.SerializedDiagnosticConsumer)) {}
+
+  ~ScanQueryContext() {
+    if (SerializedDiagnosticConsumer)
+      SerializedDiagnosticConsumer->finishProcessing();
+  }
+};
+
+/// Pure virtual Diagnostic consumer intended for collecting
+/// emitted diagnostics in a thread-safe fashion
+class ThreadSafeDiagnosticCollector : public DiagnosticConsumer {
+private:
+  llvm::sys::SmartMutex<true> DiagnosticConsumerStateLock;
+  void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) final;
+
+protected:
+  virtual void addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) = 0;
+
+public:
+  ThreadSafeDiagnosticCollector() {}
+  bool finishProcessing() final { return false; }
+};
 
 /// Diagnostic consumer that simply collects the diagnostics emitted so-far
-class DependencyScannerDiagnosticCollectingConsumer : public DiagnosticConsumer {
+/// and uses a representation agnostic from any specific CompilerInstance state
+/// which may have been used to emit the diagnostic
+class DepScanInMemoryDiagnosticCollector
+    : public ThreadSafeDiagnosticCollector {
 public:
-  friend DependencyScanningTool;
-  DependencyScannerDiagnosticCollectingConsumer() {}
-  void reset() { Diagnostics.clear(); }
-private:
   struct ScannerDiagnosticInfo {
     std::string Message;
     llvm::SourceMgr::DiagKind Severity;
+    std::optional<ScannerImportStatementInfo::ImportDiagnosticLocationInfo>
+        ImportLocation;
   };
-  
-  void handleDiagnostic(SourceManager &SM,
-                        const DiagnosticInfo &Info) override;
-  ScannerDiagnosticInfo convertDiagnosticInfo(SourceManager &SM,
-                                              const DiagnosticInfo &Info);
-  void addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
   std::vector<ScannerDiagnosticInfo> Diagnostics;
-};
 
+protected:
+  void addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
+
+public:
+  friend DependencyScanningTool;
+  DepScanInMemoryDiagnosticCollector() {}
+  void reset() { Diagnostics.clear(); }
+  std::vector<ScannerDiagnosticInfo> getDiagnostics() const {
+    return Diagnostics;
+  }
+  const std::vector<ScannerDiagnosticInfo> &getDiagnosticsRef() const {
+    return Diagnostics;
+  }
+};
 
 /// Given a set of arguments to a print-target-info frontend tool query, produce the
 /// JSON target info.
@@ -58,68 +116,40 @@ public:
   /// Construct a dependency scanning tool.
   DependencyScanningTool();
 
-  /// Collect the full module dependency graph for the input, ignoring any
-  /// placeholder modules.
+  /// Collect the full module dependency graph for the input.
   ///
   /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c swiftscan_dependency_result_t otherwise.
   llvm::ErrorOr<swiftscan_dependency_graph_t>
   getDependencies(ArrayRef<const char *> Command,
-                  const llvm::StringSet<> &PlaceholderModules);
+                  StringRef WorkingDirectory);
 
   /// Collect the set of imports for the input module
   ///
   /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c swiftscan_prescan_result_t otherwise.
   llvm::ErrorOr<swiftscan_import_set_t>
-  getImports(ArrayRef<const char *> Command);
-
-  /// Collect the full module dependency graph for the input collection of
-  /// module names (batch inputs) and output them to the
-  /// BatchScanInput-specified output locations.
-  ///
-  /// \returns a \c std::error_code if errors occurred during scan.
-  std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
-  getDependencies(ArrayRef<const char *> Command,
-                  const std::vector<BatchScanInput> &BatchInput,
-                  const llvm::StringSet<> &PlaceholderModules);
-
-  /// Writes the current `SharedCache` instance to a specified FileSystem path.
-  void serializeCache(llvm::StringRef path);
-  /// Loads an instance of a `SwiftDependencyScanningService` to serve as the `SharedCache`
-  /// from a specified FileSystem path.
-  bool loadCache(llvm::StringRef path);
-  /// Discard the tool's current `SharedCache` and start anew.
-  void resetCache();
-  
-  const std::vector<DependencyScannerDiagnosticCollectingConsumer::ScannerDiagnosticInfo>& getDiagnostics() const { return CDC.Diagnostics; }
-  /// Discared the collection of diagnostics encountered so far.
-  void resetDiagnostics();
-
-private:
-  /// Using the specified invocation command, initialize the scanner instance
-  /// for this scan. Returns the `CompilerInstance` that will be used.
-  llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
-  initScannerForAction(ArrayRef<const char *> Command);
+  getImports(ArrayRef<const char *> Command, StringRef WorkingDirectory);
 
   /// Using the specified invocation command, instantiate a CompilerInstance
   /// that will be used for this scan.
-  llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
-  initCompilerInstanceForScan(ArrayRef<const char *> Command);
+  llvm::ErrorOr<ScanQueryContext> createScanQueryContext(
+      ArrayRef<const char *> Command, StringRef WorkingDirectory,
+      std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+          &initializationDiagnostics);
 
+private:
   /// Shared cache of module dependencies, re-used by individual full-scan queries
   /// during the lifetime of this Tool.
   std::unique_ptr<SwiftDependencyScanningService> ScanningService;
 
-  /// Shared cache of compiler instances created during batch scanning, corresponding to
-  /// command-line options specified in the batch scan input entry.
-  std::unique_ptr<CompilerArgInstanceCacheMap> VersionedPCMInstanceCacheCache;
-
-  /// A shared consumer that accumulates encountered diagnostics.
-  DependencyScannerDiagnosticCollectingConsumer CDC;
-  llvm::BumpPtrAllocator Alloc;
-  llvm::StringSaver Saver;
+  /// Shared state mutual-exclusivity lock
+  llvm::sys::SmartMutex<true> DependencyScanningToolStateLock;
 };
+
+swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(
+    ArrayRef<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+        diagnostics);
 
 } // end namespace dependencies
 } // end namespace swift

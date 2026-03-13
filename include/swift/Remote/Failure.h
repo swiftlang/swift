@@ -288,7 +288,7 @@ public:
       case ArgStorageKind::Address: {
         result += '0';
         result += 'x';
-        uint64_t address = Args[argIndex].Address.getAddressData();
+        uint64_t address = Args[argIndex].Address.getRawAddress();
         unsigned max = ((address >> 32) != 0 ? 16 : 8);
         for (unsigned i = 0; i != max; ++i) {
           result += "0123456789abcdef"[(address >> (max - 1 - i) * 4) & 0xF];

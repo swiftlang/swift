@@ -21,7 +21,7 @@
 #include "swift/Migrator/FixitFilter.h"
 #include "swift/Migrator/Migrator.h"
 #include "swift/Migrator/Replacement.h"
-#include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "llvm/ADT/RewriteBuffer.h"
 #include "llvm/ADT/SmallSet.h"
 
 namespace swift {
@@ -37,7 +37,7 @@ struct Replacement;
 
 class FixitApplyDiagnosticConsumer final
   : public DiagnosticConsumer, public FixitFilter {
-  clang::RewriteBuffer RewriteBuf;
+  llvm::RewriteBuffer RewriteBuf;
 
   /// The entire text of the input file.
   const StringRef Text;

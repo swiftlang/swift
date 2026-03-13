@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-library-evolution -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-library-evolution -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -33,7 +33,7 @@ public struct ConformingNonTrivialStruct : ResilientProtocol {
 // CHECK-NEXT:    [[LOAD:%.*]] = load [trivial] [[TMP]] : $*ConformingStruct
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[LOAD]])
 // CHECK-NEXT:    dealloc_stack [[TMP]] : $*ConformingStruct
-// CHECK } // end sil function 's8defaultA4main16ConformingStructV_TB5'
+// CHECK: } // end sil function '$s8defaultA4main16ConformingStructV_TB5'
 
 // CHECK-LABEL: sil shared [ossa] @$s8defaultA4main26ConformingNonTrivialStructV_TB5
 // CHECK:       bb0(%0 : @guaranteed $ConformingNonTrivialStruct):
@@ -43,7 +43,7 @@ public struct ConformingNonTrivialStruct : ResilientProtocol {
 // CHECK-NEXT:    [[LOAD:%.*]] = load_borrow [[SB]] : $*ConformingNonTrivialStruct
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[LOAD]])
 // CHECK:         dealloc_stack [[TMP]] : $*ConformingNonTrivialStruct
-// CHECK } // end sil function 's8defaultA4main16ConformingNonTrivialStructV_TB5'
+// CHECK: } // end sil function '$s8defaultA4main26ConformingNonTrivialStructV_TB5'
 
 sil [ossa] @defaultA : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):

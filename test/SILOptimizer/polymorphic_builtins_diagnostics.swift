@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-sil -verify %s
-// RUN: %target-swift-frontend -parse-stdlib -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -enable-builtin-module -verify %s
 
-import Swift
+import Builtin
 
 struct MyInt {
   var i: Builtin.Int64

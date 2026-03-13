@@ -29,6 +29,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace llvm {
@@ -66,19 +67,6 @@ public:
     /// A compilation using a single frontend invocation without -primary-file.
     SingleCompile,
 
-    /// A single process that batches together multiple StandardCompile Jobs.
-    ///
-    /// Note: this is a transient value to use _only_ for the individual
-    /// BatchJobs that are the temporary containers for multiple StandardCompile
-    /// Jobs built by ToolChain::constructBatchJob.
-    ///
-    /// In particular, the driver treats a batch-mode-enabled Compilation as
-    /// having OutputInfo::CompilerMode == StandardCompile, with the
-    /// Compilation::BatchModeEnabled flag set to true, _not_ as a
-    /// BatchModeCompile Compilation. The top-level OutputInfo::CompilerMode for
-    /// a Compilation should never be BatchModeCompile.
-    BatchModeCompile,
-
     /// Invoke the REPL
     REPL,
 
@@ -96,7 +84,7 @@ public:
   /// The mode in which the driver should invoke the frontend.
   Mode CompilerMode = Mode::StandardCompile;
 
-  Optional<MSVCRuntime> RuntimeVariant = llvm::None;
+  std::optional<MSVCRuntime> RuntimeVariant = std::nullopt;
 
   /// The output type which should be used for compile actions.
   file_types::ID CompilerOutputType = file_types::ID::TY_INVALID;
@@ -125,6 +113,9 @@ public:
   /// What kind of debug info to generate.
   IRGenDebugInfoFormat DebugInfoFormat = IRGenDebugInfoFormat::None;
 
+  /// DWARF output format version number.
+  std::optional<uint8_t> DWARFVersion;
+
   /// Whether or not the driver should generate a module.
   bool ShouldGenerateModule = false;
 
@@ -150,6 +141,8 @@ public:
 
   OptionSet<SanitizerKind> SelectedSanitizers;
 
+  unsigned SanitizerUseStableABI = 0;
+
   /// Might this sort of compile have explicit primary inputs?
   /// When running a single compile for the whole module (in other words
   /// "whole-module-optimization" mode) there must be no -primary-input's and
@@ -165,12 +158,20 @@ public:
   /// allowable OutputInfo::Mode values.
   enum class DriverKind {
     Interactive,     // swift
-    Batch,           // swiftc
+    Standard,        // swiftc
+    SILOpt,          // sil-opt
+    SILFuncExtractor,// sil-func-extractor
+    SILNM,           // sil-nm
+    SILLLVMGen,      // sil-llvm-gen
+    SILPassPipelineDumper, // sil-passpipeline-dumper
+    SwiftDependencyTool,   // swift-dependency-tool
+    SwiftLLVMOpt,    // swift-llvm-opt
     AutolinkExtract, // swift-autolink-extract
-    SwiftIndent,     // swift-indent
     SymbolGraph,     // swift-symbolgraph
-    APIExtract,      // swift-api-extract
-    APIDigester      // swift-api-digester
+    APIDigester,     // swift-api-digester
+    CacheTool,       // swift-cache-tool
+    ParseTest,       // swift-parse-test
+    SynthesizeInterface,  // swift-synthesize-interface
   };
 
   class InputInfoMap;
@@ -299,14 +300,12 @@ public:
   ///
   /// \param TC The current tool chain.
   /// \param Args The input arguments.
-  /// \param BatchMode Whether the driver has been explicitly or implicitly
-  /// instructed to use batch mode.
   /// \param Inputs The inputs to the driver.
   /// \param[out] OI The OutputInfo in which to store the resulting output
   /// information.
   void buildOutputInfo(const ToolChain &TC,
                        const llvm::opt::DerivedArgList &Args,
-                       const bool BatchMode, const InputFileList &Inputs,
+                       const InputFileList &Inputs,
                        OutputInfo &OI) const;
 
   /// Construct the list of Actions to perform for the given arguments,
@@ -315,16 +314,13 @@ public:
   /// \param[out] TopLevelActions The main Actions to build Jobs for.
   /// \param TC the default host tool chain.
   /// \param OI The OutputInfo for which Actions should be generated.
-  /// \param OutOfDateMap If present, information used to decide which files
-  /// need to be rebuilt.
   /// \param C The Compilation to which Actions should be added.
   void buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
                     const ToolChain &TC, const OutputInfo &OI,
-                    const InputInfoMap *OutOfDateMap,
                     Compilation &C) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
-  Optional<OutputFileMap>
+  std::optional<OutputFileMap>
   buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
                      StringRef workingDirectory) const;
 
@@ -461,11 +457,8 @@ private:
   /// there is an actual conflict.
   /// \param Args The input arguments.
   /// \param Inputs The inputs to the driver.
-  /// \param BatchModeOut An out-parameter flag that indicates whether to
-  /// batch the jobs of the resulting \c Mode::StandardCompile compilation.
   OutputInfo::Mode computeCompilerMode(const llvm::opt::DerivedArgList &Args,
-                                       const InputFileList &Inputs,
-                                       bool &BatchModeOut) const;
+                                       const InputFileList &Inputs) const;
 };
 
 } // end namespace driver

@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=targeted
+// RUN: %target-swift-frontend -strict-concurrency=targeted -emit-sil -o /dev/null %s -verify
+// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete- -emit-sil -o /dev/null %s -verify
+
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
 
@@ -33,22 +35,33 @@ func testE(a: Any, aOpt: Any?) async {
 }
 
 func testESilently(a: Any, aOpt: Any?) {
-  send(a)
-  sendOpt(a)
-  sendOpt(aOpt)
+  send(a) // expected-complete-warning {{'Any' does not conform to the 'Sendable' protocol}}
+  sendOpt(a) // expected-complete-warning {{'Any' does not conform to the 'Sendable' protocol}}
+  sendOpt(aOpt) // expected-complete-warning {{'Any' does not conform to the 'Sendable' protocol}}
 
-  let _: E = .something(a)
-  _ = E.something(a)
+  let _: E = .something(a) // expected-complete-warning {{'Any' does not conform to the 'Sendable' protocol}}
+  _ = E.something(a) // expected-complete-warning {{'Any' does not conform to the 'Sendable' protocol}}
 
   var sendable: Sendable
-  sendable = a
+  sendable = a // expected-complete-warning {{'Any' does not conform to the 'Sendable' protocol}}
 
   var arrayOfSendable: [Sendable]
-  arrayOfSendable = [a, a]
+  arrayOfSendable = [a, a] // expected-complete-warning 2{{'Any' does not conform to the 'Sendable' protocol}}
 
   func localFunc() { }
-  sendable = localFunc
-
+  sendable = localFunc // expected-complete-warning {{'() -> ()' does not conform to the 'Sendable' protocol}}
+  // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   _ = sendable
   _ = arrayOfSendable
+}
+
+func testErasure() {
+  class A {}
+  class B : A {}
+
+  func produce() -> any B & Sendable {
+    fatalError()
+  }
+
+  let _: any A & Sendable = produce() // no warning
 }

@@ -14,10 +14,10 @@ from . import cmark
 from . import foundation
 from . import libcxx
 from . import libdispatch
-from . import libicu
 from . import llvm
 from . import product
 from . import swift
+from . import swift_testing
 
 
 class XCTest(product.Product):
@@ -46,10 +46,10 @@ class XCTest(product.Product):
         return [cmark.CMark,
                 llvm.LLVM,
                 libcxx.LibCXX,
-                libicu.LibICU,
                 swift.Swift,
                 libdispatch.LibDispatch,
-                foundation.Foundation]
+                foundation.Foundation,
+                swift_testing.SwiftTesting]
 
     @classmethod
     def is_nondarwin_only_build_product(cls):

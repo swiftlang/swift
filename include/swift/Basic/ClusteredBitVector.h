@@ -29,10 +29,10 @@
 #ifndef SWIFT_BASIC_CLUSTEREDBITVECTOR_H
 #define SWIFT_BASIC_CLUSTEREDBITVECTOR_H
 
-#include "llvm/ADT/APInt.h"
-#include "llvm/ADT/Optional.h"
 #include "swift/Basic/Debug.h"
+#include "llvm/ADT/APInt.h"
 #include <cassert>
+#include <optional>
 
 namespace swift {
 
@@ -44,7 +44,7 @@ class ClusteredBitVector {
   /// The least-significant bit of the integer corresponds to the bit
   /// at index 0. If the optional does not have a value then the bit
   /// vector has a length of 0 bits.
-  llvm::Optional<APInt> Bits;
+  std::optional<APInt> Bits;
 
   /// Copy constructor from APInt.
   ClusteredBitVector(const APInt &bits) : Bits(bits) {}
@@ -64,13 +64,11 @@ public:
 
   /// Create a new ClusteredBitVector from the provided APInt,
   /// with a size of 0 if the optional does not have a value.
-  ClusteredBitVector(const llvm::Optional<APInt> &bits)
-    : Bits(bits) {}
+  ClusteredBitVector(const std::optional<APInt> &bits) : Bits(bits) {}
 
   /// Create a new ClusteredBitVector from the provided APInt,
   /// with a size of 0 if the optional does not have a value.
-  ClusteredBitVector(llvm::Optional<APInt> &&bits)
-    : Bits(std::move(bits)) {}
+  ClusteredBitVector(std::optional<APInt> &&bits) : Bits(std::move(bits)) {}
 
   ClusteredBitVector &operator=(const ClusteredBitVector &other) {
     this->Bits = other.Bits;
@@ -127,7 +125,7 @@ public:
       v = v.zext(v.getBitWidth() + numBits);
       return;
     }
-    Bits = APInt::getNullValue(numBits);
+    Bits = APInt::getZero(numBits);
   }
 
   /// Extend the vector out to the given length with clear bits.
@@ -148,7 +146,7 @@ public:
       v.setBitsFrom(w);
       return;
     }
-    Bits = APInt::getAllOnesValue(numBits);
+    Bits = APInt::getAllOnes(numBits);
     return;
   }
 
@@ -216,7 +214,7 @@ public:
 
   /// Count the number of set bits in this vector.
   size_t count() const {
-    return Bits ? Bits.value().countPopulation() : 0;
+    return Bits ? Bits.value().popcount() : 0;
   }
 
   /// Determine if there are any bits set in this vector.
@@ -268,7 +266,7 @@ public:
     if (numBits == 0) {
       return ClusteredBitVector();
     }
-    auto vec = APInt::getNullValue(numBits);
+    auto vec = APInt::getZero(numBits);
     if (value) {
       vec.flipAllBits();
     }

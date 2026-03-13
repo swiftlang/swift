@@ -11,19 +11,24 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/AttrKind.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DistributedDecl.h"
-#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
+#include "clang/AST/Mangle.h"
 
 using namespace swift;
 
 SILFunction *SILFunctionBuilder::getOrCreateFunction(
-    SILLocation loc, StringRef name, SILLinkage linkage, CanSILFunctionType type, IsBare_t isBareSILFunction,
-    IsTransparent_t isTransparent, IsSerialized_t isSerialized,
+    SILLocation loc, StringRef name, SILLinkage linkage,
+    CanSILFunctionType type, IsBare_t isBareSILFunction,
+    IsTransparent_t isTransparent, SerializedKind_t serializedKind,
     IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
     IsRuntimeAccessible_t isRuntimeAccessible, ProfileCounter entryCount,
     IsThunk_t isThunk, SubclassScope subclassScope) {
@@ -31,12 +36,12 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   if (auto fn = mod.lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
     assert(stripExternalFromLinkage(fn->getLinkage()) ==
-           stripExternalFromLinkage(linkage));
+           stripExternalFromLinkage(linkage) || mod.getOptions().EmbeddedSwift);
     return fn;
   }
 
   auto fn = SILFunction::create(mod, linkage, name, type, nullptr, loc,
-                                isBareSILFunction, isTransparent, isSerialized,
+                                isBareSILFunction, isTransparent, serializedKind,
                                 entryCount, isDynamic, isDistributed,
                                 isRuntimeAccessible, IsNotExactSelfClass,
                                 isThunk, subclassScope);
@@ -57,49 +62,54 @@ void SILFunctionBuilder::addFunctionAttributes(
   // function as force emitting all optremarks including assembly vision
   // remarks. This allows us to emit the assembly vision remarks without needing
   // to change any of the underlying optremark mechanisms.
-  if (auto *A = Attrs.getAttribute(DAK_EmitAssemblyVisionRemarks))
+  if (Attrs.getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks) ||
+      M.getOptions().EnableGlobalAssemblyVision)
     F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
 
-  // Propagate @_specialize.
-  for (auto *A : Attrs.getAttributes<SpecializeAttr>()) {
-    auto *SA = cast<SpecializeAttr>(A);
-    auto kind =
-        SA->getSpecializationKind() == SpecializeAttr::SpecializationKind::Full
-            ? SILSpecializeAttr::SpecializationKind::Full
-            : SILSpecializeAttr::SpecializationKind::Partial;
-    assert(!constant.isNull());
-    SILFunction *targetFunction = nullptr;
-    auto *attributedFuncDecl = constant.getDecl();
-    auto *targetFunctionDecl = SA->getTargetFunctionDecl(attributedFuncDecl);
-    // Filter out _spi.
-    auto spiGroups = SA->getSPIGroups();
-    bool hasSPI = !spiGroups.empty();
-    if (hasSPI) {
-      if (attributedFuncDecl->getModuleContext() != M.getSwiftModule() &&
-          !M.getSwiftModule()->isImportedAsSPI(SA, attributedFuncDecl)) {
-        continue;
+  if (F->getRepresentation() != SILFunctionTypeRepresentation::ObjCMethod) {
+    // Propagate @_specialize.
+    for (auto *A : Attrs.getAttributes<AbstractSpecializeAttr>()) {
+      auto *SA = cast<AbstractSpecializeAttr>(A);
+      auto kind = SA->getSpecializationKind() ==
+                          SpecializeAttr::SpecializationKind::Full
+                      ? SILSpecializeAttr::SpecializationKind::Full
+                      : SILSpecializeAttr::SpecializationKind::Partial;
+      assert(!constant.isNull());
+      SILFunction *targetFunction = nullptr;
+      auto *attributedFuncDecl = constant.getAbstractFunctionDecl();
+      auto *targetFunctionDecl = SA->getTargetFunctionDecl(attributedFuncDecl);
+      // Filter out _spi.
+      auto spiGroups = SA->getSPIGroups();
+      bool hasSPI = !spiGroups.empty();
+      if (hasSPI) {
+        if (attributedFuncDecl->getModuleContext() != M.getSwiftModule() &&
+            !M.getSwiftModule()->isImportedAsSPI(SA, attributedFuncDecl)) {
+          continue;
+        }
       }
-    }
-    assert(spiGroups.size() <= 1 && "SIL does not support multiple SPI groups");
-    Identifier spiGroupIdent;
-    if (hasSPI) {
-      spiGroupIdent = spiGroups[0];
-    }
-    auto availability =
-      AvailabilityInference::annotatedAvailableRangeForAttr(SA,
-         M.getSwiftModule()->getASTContext());
-    if (targetFunctionDecl) {
-      SILDeclRef declRef(targetFunctionDecl, constant.kind, false);
-      targetFunction = getOrCreateDeclaration(targetFunctionDecl, declRef);
-      F->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->getTypeErasedParams(),
-          SA->isExported(), kind, targetFunction, spiGroupIdent,
-          attributedFuncDecl->getModuleContext(), availability));
-    } else {
-      F->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->getTypeErasedParams(),
-          SA->isExported(), kind, nullptr, spiGroupIdent,
-          attributedFuncDecl->getModuleContext(), availability));
+      assert(spiGroups.size() <= 1 &&
+             "SIL does not support multiple SPI groups");
+      Identifier spiGroupIdent;
+      if (hasSPI) {
+        spiGroupIdent = spiGroups[0];
+      }
+      auto availability = AvailabilityInference::annotatedAvailableRangeForAttr(
+          attributedFuncDecl, SA, M.getSwiftModule()->getASTContext());
+      auto specializedSignature =
+          SA->getSpecializedSignature(attributedFuncDecl);
+      if (targetFunctionDecl) {
+        SILDeclRef declRef(targetFunctionDecl, constant.kind, false);
+        targetFunction = getOrCreateDeclaration(targetFunctionDecl, declRef);
+        F->addSpecializeAttr(SILSpecializeAttr::create(
+            M, specializedSignature, SA->getTypeErasedParams(),
+            SA->isExported(), kind, targetFunction, spiGroupIdent,
+            attributedFuncDecl->getModuleContext(), availability));
+      } else {
+        F->addSpecializeAttr(SILSpecializeAttr::create(
+            M, specializedSignature, SA->getTypeErasedParams(),
+            SA->isExported(), kind, nullptr, spiGroupIdent,
+            attributedFuncDecl->getModuleContext(), availability));
+      }
     }
   }
 
@@ -109,15 +119,20 @@ void SILFunctionBuilder::addFunctionAttributes(
       auto *effectsAttr = cast<EffectsAttr>(attr);
       if (effectsAttr->getKind() == EffectsKind::Custom) {
         customEffects.push_back(effectsAttr);
-      } else {
-        if (F->getEffectsKind() != EffectsKind::Unspecified &&
-            F->getEffectsKind() != effectsAttr->getKind()) {
-          mod.getASTContext().Diags.diagnose(effectsAttr->getLocation(),
-              diag::warning_in_effects_attribute, "mismatching function effects");
-        } else {
-          F->setEffectsKind(effectsAttr->getKind());
-        }
+        continue;
       }
+      if (F->getEffectsKind() != EffectsKind::Unspecified) {
+        // If multiple known effects are specified, the most restrictive one
+        // is used.
+        F->setEffectsKind(
+            std::min(effectsAttr->getKind(), F->getEffectsKind()));
+      } else {
+        F->setEffectsKind(effectsAttr->getKind());
+      }
+    }
+
+    if (auto asmName = constant.getAsmName()) {
+      F->setAsmName(M.getASTContext().AllocateCopy(*asmName));
     }
   }
 
@@ -129,7 +144,7 @@ void SILFunctionBuilder::addFunctionAttributes(
         // Give up on tuples. Their elements are added as individual
         // arguments. It destroys the 1-1 relation ship between parameters
         // and arguments.
-        if (isa<TupleType>(CanType(pd->getType())))
+        if (pd->getInterfaceType()->is<TupleType>())
           break;
         // First try the "local" parameter name. If there is none, use the
         // API name. E.g. `foo(apiName localName: Type) {}`
@@ -161,10 +176,56 @@ void SILFunctionBuilder::addFunctionAttributes(
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
 
+  for (auto *EA : Attrs.getAttributes<ExposeAttr>()) {
+    bool shouldExportDecl = true;
+    if (Attrs.hasAttribute<CDeclAttr>()) {
+      // If the function is marked with @c, expose only C compatible
+      // thunk function.
+      shouldExportDecl = constant.isNativeToForeignThunk() || constant.isForeign;
+    }
+    if (EA->getExposureKind() == ExposureKind::Wasm && shouldExportDecl) {
+      // A wasm-level exported function must be retained if it appears in a
+      // compilation unit.
+      F->setMarkedAsUsed(true);
+      if (!EA->Name.empty())
+        F->setWasmExportName(EA->Name);
+      else if (!F->asmName().empty())
+        F->setWasmExportName(F->asmName());
+      else
+        F->setWasmExportName(F->getName());
+    }
+  }
+
+  if (auto *EA = ExternAttr::find(Attrs, ExternKind::Wasm)) {
+    // @_extern(wasm) always has explicit names
+    F->setWasmImportModuleAndField(*EA->ModuleName, *EA->Name);
+  }
+
+  if (Attrs.hasAttribute<UsedAttr>())
+    F->setMarkedAsUsed(true);
+
   if (Attrs.hasAttribute<NoLocksAttr>()) {
     F->setPerfConstraints(PerformanceConstraints::NoLocks);
   } else if (Attrs.hasAttribute<NoAllocationAttr>()) {
     F->setPerfConstraints(PerformanceConstraints::NoAllocation);
+  } else if (Attrs.hasAttribute<NoRuntimeAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoRuntime);
+  } else if (Attrs.hasAttribute<NoExistentialsAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoExistentials);
+  } else if (Attrs.hasAttribute<NoObjCBridgingAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoObjCBridging);
+  } else if (M.getASTContext().LangOpts.hasFeature(Feature::ManualOwnership) &&
+             constant && constant.hasDecl() && !constant.isImplicit() &&
+             !Attrs.hasAttribute<NoManualOwnershipAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::ManualOwnership);
+  }
+
+  if (Attrs.hasAttribute<LexicalLifetimesAttr>()) {
+    F->setForceEnableLexicalLifetimes(DoForceEnableLexicalLifetimes);
+  }
+
+  if (Attrs.hasAttribute<UnsafeNonEscapableResultAttr>()) {
+    F->setHasUnsafeNonEscapableResult(true);
   }
 
   // Validate `@differentiable` attributes by calling `getParameterIndices`.
@@ -190,6 +251,12 @@ void SILFunctionBuilder::addFunctionAttributes(
   if (constant.isNull())
     return;
   auto *decl = constant.getDecl();
+
+  // Don't add section for addressor functions (where decl is a global)
+  if (isa<FuncDecl>(decl)) {
+    if (auto *SA = Attrs.getAttribute<SectionAttr>())
+      F->setSection(SA->Name);
+  }
 
   // Only emit replacements for the objc entry point of objc methods.
   // There is one exception: @_dynamicReplacement(for:) of @objc methods in
@@ -223,14 +290,15 @@ void SILFunctionBuilder::addFunctionAttributes(
       F->setDynamicallyReplacedFunction(replacedFunc);
     }
   } else if (constant.isDistributedThunk()) {
-    auto decodeFuncDecl =
+    // It's okay for `decodeFuncDecl` to be null because system could be
+    // generic.
+    if (auto decodeFuncDecl =
             getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
-                decl);
-    assert(decodeFuncDecl && "decodeNextArgument function not found!");
-
-    auto decodeRef = SILDeclRef(decodeFuncDecl);
-    auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
-    F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
+                decl)) {
+      auto decodeRef = SILDeclRef(decodeFuncDecl);
+      auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
+      F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
+    }
   }
 }
 
@@ -257,8 +325,9 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     assert(mod.getStage() == SILStage::Raw || fn->getLinkage() == linkage ||
            (forDefinition == ForDefinition_t::NotForDefinition &&
             (fnLinkage == linkageForDef ||
-             (linkageForDef == SILLinkage::PublicNonABI &&
-              fnLinkage == SILLinkage::Shared))));
+             (linkageForDef == SILLinkage::PublicNonABI ||
+              linkageForDef == SILLinkage::PackageNonABI) &&
+              fnLinkage == SILLinkage::Shared)));
     if (forDefinition) {
       // In all the cases where getConstantLinkage returns something
       // different for ForDefinition, it returns an available-externally
@@ -273,14 +342,16 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   IsTransparent_t IsTrans =
       constant.isTransparent() ? IsTransparent : IsNotTransparent;
 
-  IsSerialized_t IsSer = constant.isSerialized();
+  SerializedKind_t IsSer = constant.getSerializedKind();
   // Don't create a [serialized] function after serialization has happened.
-  if (IsSer == IsSerialized && mod.isSerialized())
+  if (IsSer != IsNotSerialized && mod.isSerialized())
     IsSer = IsNotSerialized;
 
   Inline_t inlineStrategy = InlineDefault;
   if (constant.isNoinline())
     inlineStrategy = NoInline;
+  else if (constant.isUnderscoredAlwaysInline())
+    inlineStrategy = HeuristicAlwaysInline;
   else if (constant.isAlwaysInline())
     inlineStrategy = AlwaysInline;
 
@@ -298,14 +369,12 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   }
 
   IsRuntimeAccessible_t isRuntimeAccessible = IsNotRuntimeAccessible;
-  if (constant.isRuntimeAccessibleFunction())
-    isRuntimeAccessible = IsRuntimeAccessible;
 
-  auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr, None,
-                                IsNotBare, IsTrans, IsSer, entryCount, IsDyn,
-                                IsDistributed, isRuntimeAccessible,
-                                IsNotExactSelfClass, IsNotThunk,
-                                constant.getSubclassScope(), inlineStrategy);
+  auto *F = SILFunction::create(
+      mod, linkage, name, constantType, nullptr, std::nullopt, IsNotBare,
+      IsTrans, IsSer, entryCount, IsDyn, IsDistributed, isRuntimeAccessible,
+      IsNotExactSelfClass, IsNotThunk, constant.getSubclassScope(),
+      inlineStrategy);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
 
   if (constant.isGlobal())
@@ -326,6 +395,9 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
       // Add attributes for e.g. computed properties.
+      ASSERT(ABIRoleInfo(storage).providesAPI()
+                && "addFunctionAttributes() on ABI-only accessor?");
+
       addFunctionAttributes(F, storage->getAttrs(), mod,
                             getOrCreateDeclaration);
                             
@@ -344,8 +416,25 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
         F->setInlineStrategy(NoInline);
       }
     }
+    ASSERT(ABIRoleInfo(decl).providesAPI()
+              && "addFunctionAttributes() on ABI-only decl?");
     addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
                           constant);
+  } else if (auto *ce = constant.getAbstractClosureExpr()) {
+    if (mod.getOptions().EnableGlobalAssemblyVision) {
+      F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
+    } else {
+      // Add the attribute to a closure if the enclosing method has it.
+      auto decl = ce->getParent()->getInnermostDeclarationDeclContext();
+      if (decl &&
+          decl->getAttrs().getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks)) {
+        F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
+      }
+    }
+  } else {
+    if (mod.getOptions().EnableGlobalAssemblyVision) {
+      F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
+    }
   }
 
   return F;
@@ -354,26 +443,26 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 SILFunction *SILFunctionBuilder::getOrCreateSharedFunction(
     SILLocation loc, StringRef name, CanSILFunctionType type,
     IsBare_t isBareSILFunction, IsTransparent_t isTransparent,
-    IsSerialized_t isSerialized, ProfileCounter entryCount, IsThunk_t isThunk,
+    SerializedKind_t serializedKind, ProfileCounter entryCount, IsThunk_t isThunk,
     IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
     IsRuntimeAccessible_t isRuntimeAccessible) {
   return getOrCreateFunction(loc, name, SILLinkage::Shared, type,
-                             isBareSILFunction, isTransparent, isSerialized,
+                             isBareSILFunction, isTransparent, serializedKind,
                              isDynamic, isDistributed, isRuntimeAccessible,
                              entryCount, isThunk, SubclassScope::NotApplicable);
 }
 
 SILFunction *SILFunctionBuilder::createFunction(
     SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
-    GenericEnvironment *genericEnv, Optional<SILLocation> loc,
+    GenericEnvironment *genericEnv, std::optional<SILLocation> loc,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-    IsSerialized_t isSerialized, IsDynamicallyReplaceable_t isDynamic,
+    SerializedKind_t serializedKind, IsDynamicallyReplaceable_t isDynamic,
     IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,
     ProfileCounter entryCount, IsThunk_t isThunk, SubclassScope subclassScope,
     Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
     const SILDebugScope *DebugScope) {
   return SILFunction::create(mod, linkage, name, loweredType, genericEnv, loc,
-                             isBareSILFunction, isTrans, isSerialized,
+                             isBareSILFunction, isTrans, serializedKind,
                              entryCount, isDynamic, isDistributed,
                              isRuntimeAccessible, IsNotExactSelfClass, isThunk,
                              subclassScope, inlineStrategy, EK, InsertBefore,

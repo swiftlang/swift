@@ -1,0 +1,112 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -allocbox-to-stack | %FileCheck %s
+
+// Verify that AllocBoxToStack can properly rewrite stack closures when
+// promoting captures after ClosureLifetimeFixup has established stack closures.
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+class Fooer { 
+  func foo1()
+  func foo2()
+}
+
+// closure #1 in Fooer.foo()
+sil private [ossa] @$s4main5FooerC3fooyyFyyXEfU_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<Fooer> }) -> () {
+// %0 "weakSelf"                                  // user: %1
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<Fooer> }):
+  %1 = project_box %0 : ${ var @sil_weak Optional<Fooer> }, 0 // users: %28, %3, %2
+  debug_value %1 : $*@sil_weak Optional<Fooer>, var, name "weakSelf", argno 1, expr op_deref // id: %2
+  %3 = begin_access [read] [dynamic] %1 : $*@sil_weak Optional<Fooer> // users: %19, %13, %5
+  %4 = alloc_stack $Optional<Fooer>               // users: %23, %18, %16, %12, %11, %9, %6
+  %5 = load_weak %3 : $*@sil_weak Optional<Fooer> // user: %6
+  store %5 to [init] %4 : $*Optional<Fooer>       // id: %6
+  %7 = integer_literal $Builtin.Int1, -1          // user: %9
+  %8 = integer_literal $Builtin.Int1, 0           // user: %9
+  %9 = select_enum_addr %4 : $*Optional<Fooer>, case #Optional.some!enumelt: %7, default %8 : $Builtin.Int1 // user: %10
+  cond_br %9, bb2, bb1                            // id: %10
+
+bb1:                                              // Preds: bb0
+  destroy_addr %4 : $*Optional<Fooer>             // id: %11
+  dealloc_stack %4 : $*Optional<Fooer>            // id: %12
+  end_access %3 : $*@sil_weak Optional<Fooer>     // id: %13
+  %14 = enum $Optional<()>, #Optional.none!enumelt // user: %15
+  br bb3(%14 : $Optional<()>)                     // id: %15
+
+bb2:                                              // Preds: bb0
+  %16 = unchecked_take_enum_data_addr %4 : $*Optional<Fooer>, #Optional.some!enumelt // user: %17
+  %17 = load [copy] %16 : $*Fooer                 // users: %22, %21, %20
+  destroy_addr %4 : $*Optional<Fooer>             // id: %18
+  end_access %3 : $*@sil_weak Optional<Fooer>     // id: %19
+  %20 = class_method %17 : $Fooer, #Fooer.foo1 : (Fooer) -> () -> (), $@convention(method) (@guaranteed Fooer) -> () // user: %21
+  %21 = apply %20(%17) : $@convention(method) (@guaranteed Fooer) -> ()
+  destroy_value %17 : $Fooer                      // id: %22
+  dealloc_stack %4 : $*Optional<Fooer>            // id: %23
+  %24 = tuple ()                                  // user: %25
+  %25 = enum $Optional<()>, #Optional.some!enumelt, %24 : $() // user: %26
+  br bb3(%25 : $Optional<()>)                     // id: %26
+
+bb3(%27 : $Optional<()>):                         // Preds: bb1 bb2
+  %28 = begin_access [read] [dynamic] %1 : $*@sil_weak Optional<Fooer> // users: %44, %38, %30
+  %29 = alloc_stack $Optional<Fooer>              // users: %48, %43, %41, %37, %36, %34, %31
+  %30 = load_weak %28 : $*@sil_weak Optional<Fooer> // user: %31
+  store %30 to [init] %29 : $*Optional<Fooer>     // id: %31
+  %32 = integer_literal $Builtin.Int1, -1         // user: %34
+  %33 = integer_literal $Builtin.Int1, 0          // user: %34
+  %34 = select_enum_addr %29 : $*Optional<Fooer>, case #Optional.some!enumelt: %32, default %33 : $Builtin.Int1 // user: %35
+  cond_br %34, bb5, bb4                           // id: %35
+
+bb4:                                              // Preds: bb3
+  destroy_addr %29 : $*Optional<Fooer>            // id: %36
+  dealloc_stack %29 : $*Optional<Fooer>           // id: %37
+  end_access %28 : $*@sil_weak Optional<Fooer>    // id: %38
+  %39 = enum $Optional<()>, #Optional.none!enumelt // user: %40
+  br bb6(%39 : $Optional<()>)                     // id: %40
+
+bb5:                                              // Preds: bb3
+  %41 = unchecked_take_enum_data_addr %29 : $*Optional<Fooer>, #Optional.some!enumelt // user: %42
+  %42 = load [copy] %41 : $*Fooer                 // users: %47, %46, %45
+  destroy_addr %29 : $*Optional<Fooer>            // id: %43
+  end_access %28 : $*@sil_weak Optional<Fooer>    // id: %44
+  %45 = class_method %42 : $Fooer, #Fooer.foo2 : (Fooer) -> () -> (), $@convention(method) (@guaranteed Fooer) -> () // user: %46
+  %46 = apply %45(%42) : $@convention(method) (@guaranteed Fooer) -> ()
+  destroy_value %42 : $Fooer                      // id: %47
+  dealloc_stack %29 : $*Optional<Fooer>           // id: %48
+  %49 = tuple ()                                  // user: %50
+  %50 = enum $Optional<()>, #Optional.some!enumelt, %49 : $() // user: %51
+  br bb6(%50 : $Optional<()>)                     // id: %51
+
+bb6(%52 : $Optional<()>):                         // Preds: bb4 bb5
+  %53 = tuple ()                                  // user: %54
+  return %53 : $()                                // id: %54
+} // end sil function '$s4main5FooerC3fooyyFyyXEfU_'
+sil @$s4main6do_fooyyyyXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+
+// CHECK-LABEL: sil hidden [ossa] @$s4main5FooerC3fooyyF 
+// Fooer.foo()
+sil hidden [ossa] @$s4main5FooerC3fooyyF : $@convention(method) (@owned Fooer) -> () {
+// %0 "self"                                      // users: %13, %5, %1
+bb0(%0 : @owned $Fooer):
+  debug_value %0 : $Fooer, let, name "self", argno 1 // id: %1
+  %2 = alloc_box ${ var @sil_weak Optional<Fooer> }, var, name "weakSelf" // users: %16, %3
+  %3 = begin_borrow [lexical] %2 : ${ var @sil_weak Optional<Fooer> } // users: %10, %15, %4
+  %4 = project_box %3 : ${ var @sil_weak Optional<Fooer> }, 0 // user: %7
+  %5 = copy_value %0 : $Fooer                     // user: %6
+  %6 = enum $Optional<Fooer>, #Optional.some!enumelt, %5 : $Fooer // users: %8, %7
+  store_weak %6 to [init] %4 : $*@sil_weak Optional<Fooer> // id: %7
+  destroy_value %6 : $Optional<Fooer>             // id: %8
+  // function_ref closure #1 in Fooer.foo()
+  %9 = function_ref @$s4main5FooerC3fooyyFyyXEfU_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<Fooer> }) -> () // user: %10
+  %10 = partial_apply [callee_guaranteed] [on_stack] %9(%3) : $@convention(thin) (@guaranteed { var @sil_weak Optional<Fooer> }) -> () // users: %12, %14
+  // function_ref do_foo(_:)
+  %11 = function_ref @$s4main6do_fooyyyyXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> () // user: %12
+  %12 = apply %11(%10) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %0 : $Fooer                       // id: %13
+  destroy_value %10 : $@noescape @callee_guaranteed () -> () // id: %14
+  end_borrow %3 : ${ var @sil_weak Optional<Fooer> } // id: %15
+  destroy_value %2 : ${ var @sil_weak Optional<Fooer> } // id: %16
+  %17 = tuple ()                                  // user: %18
+  return %17 : $()                                // id: %18
+} // end sil function '$s4main5FooerC3fooyyF'

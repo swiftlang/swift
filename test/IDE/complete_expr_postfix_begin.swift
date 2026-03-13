@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 //
 // Test code completion at the beginning of expr-postfix.
@@ -26,30 +26,24 @@ protocol FooProtocol {
 
 typealias FooTypealias = Int
 
-// COMMON: Begin completions
 // Function parameter
-// COMMON-DAG: Decl[LocalVar]/Local: fooParam[#FooStruct#]{{; name=.+$}}
+// COMMON-DAG: Decl[LocalVar]/Local{{(/TypeRelation\[Convertible\])?}}: fooParam[#FooStruct#]; name=fooParam
 // Global completions
-// COMMON-DAG: Decl[Struct]/CurrModule:     FooStruct[#FooStruct#]{{; name=.+$}}
-// COMMON-DAG: Decl[Enum]/CurrModule:       FooEnum[#FooEnum#]{{; name=.+$}}
-// COMMON-DAG: Decl[Class]/CurrModule:      FooClass[#FooClass#]{{; name=.+$}}
-// COMMON-DAG: Decl[Protocol]/CurrModule/Flair[RareType]: FooProtocol[#FooProtocol#]{{; name=.+$}}
+// COMMON-DAG: Decl[Struct]/CurrModule{{(/TypeRelation\[Convertible\])?}}:     FooStruct[#FooStruct#]{{; name=.+$}}
+// COMMON-DAG: Decl[Enum]/CurrModule{{(/TypeRelation\[Convertible\])?}}:       FooEnum[#FooEnum#]{{; name=.+$}}
+// COMMON-DAG: Decl[Class]/CurrModule{{(/TypeRelation\[Convertible\])?}}:      FooClass[#FooClass#]{{; name=.+$}}
+// COMMON-DAG: Decl[Protocol]/CurrModule/Flair[RareType]{{(/TypeRelation\[Convertible\])?}}: FooProtocol[#FooProtocol#]{{; name=.+$}}
 // COMMON-DAG: Decl[TypeAlias]/CurrModule{{(/TypeRelation\[Convertible\])?}}:  FooTypealias[#Int#]{{; name=.+$}}
-// COMMON-DAG: Decl[GlobalVar]/CurrModule:  fooObject[#FooStruct#]{{; name=.+$}}
+// COMMON-DAG: Decl[GlobalVar]/CurrModule{{(/TypeRelation\[Convertible\])?}}:  fooObject[#FooStruct#]{{; name=.+$}}
 // COMMON-DAG: Keyword[try]/None: try{{; name=.+$}}
-// COMMON-DAG: Literal[Boolean]/None: true[#Bool#]{{; name=.+$}}
-// COMMON-DAG: Literal[Boolean]/None: false[#Bool#]{{; name=.+$}}
-// COMMON-DAG: Literal[Nil]/None: nil{{; name=.+$}}
-// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Int8[#Int8#]{{; name=.+$}}
-// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Int16[#Int16#]{{; name=.+$}}
-// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Int32[#Int32#]{{; name=.+$}}
-// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Int64[#Int64#]{{; name=.+$}}
-// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Bool[#Bool#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#function]/None{{(/TypeRelation\[Convertible\])?}}: #function[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#file]/None{{(/TypeRelation\[Convertible\])?}}: #file[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#line]/None{{(/TypeRelation\[Convertible\])?}}: #line[#Int#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#column]/None{{(/TypeRelation\[Convertible\])?}}: #column[#Int#]{{; name=.+$}}
-// COMMON: End completions
+// COMMON-DAG: Literal[Boolean]/None{{(/TypeRelation\[Convertible\])?}}: true[#Bool#]{{; name=.+$}}
+// COMMON-DAG: Literal[Boolean]/None{{(/TypeRelation\[Convertible\])?}}: false[#Bool#]{{; name=.+$}}
+// COMMON-DAG: Literal[Nil]/None{{(/TypeRelation\[Convertible\])?}}: nil{{.*; name=.+$}}
+// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem{{(/TypeRelation\[Convertible\])?}}:    Int8[#Int8#]{{; name=.+$}}
+// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem{{(/TypeRelation\[Convertible\])?}}:    Int16[#Int16#]{{; name=.+$}}
+// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem{{(/TypeRelation\[Convertible\])?}}:    Int32[#Int32#]{{; name=.+$}}
+// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem{{(/TypeRelation\[Convertible\])?}}:    Int64[#Int64#]{{; name=.+$}}
+// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem{{(/TypeRelation\[Convertible\])?}}:    Bool[#Bool#]{{; name=.+$}}
 
 // NO_SELF-NOT: {{[[:<:]][Ss]elf[[:>:]]}}
 
@@ -69,7 +63,7 @@ func testExprPostfixBegin3(fooParam: FooStruct) {
 }
 
 func testExprPostfixBegin4(fooParam: FooStruct) {
-  "\(#^EXPR_POSTFIX_BEGIN_4?xfail=FIXME-64812321;check=COMMON^#)"
+  "\(#^EXPR_POSTFIX_BEGIN_4?check=COMMON^#)"
 }
 
 func testExprPostfixBegin5(fooParam: FooStruct) {
@@ -103,87 +97,71 @@ func testExprPostfixBeginIgnored3(fooParam: FooStruct) {
 
 func testFindFuncParam1(fooParam: FooStruct, a: Int, b: Float, c: inout Double, d: inout Double) {
   #^FIND_FUNC_PARAM_1?check=FIND_FUNC_PARAM_1;check=COMMON;check=NO_SELF^#
-// FIND_FUNC_PARAM_1: Begin completions
 // FIND_FUNC_PARAM_1-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
 // FIND_FUNC_PARAM_1-DAG: Decl[LocalVar]/Local: b[#Float#]{{; name=.+$}}
 // FIND_FUNC_PARAM_1-DAG: Decl[LocalVar]/Local: c[#inout Double#]{{; name=.+$}}
 // FIND_FUNC_PARAM_1-DAG: Decl[LocalVar]/Local: d[#inout Double#]{{; name=.+$}}
-// FIND_FUNC_PARAM_1: End completions
 }
 
 func testFindFuncParam2<Foo : FooProtocol>(fooParam: FooStruct, foo: Foo) {
   #^FIND_FUNC_PARAM_2?check=FIND_FUNC_PARAM_2;check=COMMON;check=NO_SELF^#
-// FIND_FUNC_PARAM_2: Begin completions
 // FIND_FUNC_PARAM_2-DAG: Decl[GenericTypeParam]/Local: Foo[#Foo#]{{; name=.+$}}
 // FIND_FUNC_PARAM_2-DAG: Decl[LocalVar]/Local:         foo[#FooProtocol#]{{; name=.+$}}
-// FIND_FUNC_PARAM_2: End completions
 }
 
 struct TestFindFuncParam3_4 {
   func testFindFuncParam3(a: Int, b: Float, c: Double) {
     #^FIND_FUNC_PARAM_3^#
-// FIND_FUNC_PARAM_3: Begin completions
 // FIND_FUNC_PARAM_3-DAG: Decl[LocalVar]/Local: self[#TestFindFuncParam3_4#]{{; name=.+$}}
 // FIND_FUNC_PARAM_3-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
 // FIND_FUNC_PARAM_3-DAG: Decl[LocalVar]/Local: b[#Float#]{{; name=.+$}}
 // FIND_FUNC_PARAM_3-DAG: Decl[LocalVar]/Local: c[#Double#]{{; name=.+$}}
-// FIND_FUNC_PARAM_3: End completions
   }
 
   func testFindFuncParam4<U>(a: Int, b: U) {
     #^FIND_FUNC_PARAM_4^#
-// FIND_FUNC_PARAM_4: Begin completions
 // FIND_FUNC_PARAM_4-DAG: Decl[GenericTypeParam]/Local: U[#U#]{{; name=.+$}}
 // FIND_FUNC_PARAM_4-DAG: Decl[LocalVar]/Local:         self[#TestFindFuncParam3_4#]{{; name=.+$}}
 // FIND_FUNC_PARAM_4-DAG: Decl[LocalVar]/Local:         a[#Int#]{{; name=.+$}}
 // FIND_FUNC_PARAM_4-DAG: Decl[LocalVar]/Local:         b[#U#]{{; name=.+$}}
-// FIND_FUNC_PARAM_4: End completions
   }
 }
 
 struct TestFindFuncParam5_6<T> {
   func testFindFuncParam5(a: Int, b: T) {
     #^FIND_FUNC_PARAM_5^#
-// FIND_FUNC_PARAM_5: Begin completions
 // FIND_FUNC_PARAM_5-DAG: Decl[GenericTypeParam]/Local: T[#T#]{{; name=.+$}}
 // FIND_FUNC_PARAM_5-DAG: Decl[LocalVar]/Local: self[#TestFindFuncParam5_6<T>#]{{; name=.+$}}
 // FIND_FUNC_PARAM_5-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
 // FIND_FUNC_PARAM_5-DAG: Decl[LocalVar]/Local: b[#T#]{{; name=.+$}}
-// FIND_FUNC_PARAM_5: End completions
   }
 
   func testFindFuncParam6<U>(a: Int, b: T, c: U) {
     #^FIND_FUNC_PARAM_6^#
-// FIND_FUNC_PARAM_6: Begin completions
 // FIND_FUNC_PARAM_6-DAG: Decl[GenericTypeParam]/Local:       T[#T#]{{; name=.+$}}
 // FIND_FUNC_PARAM_6-DAG: Decl[GenericTypeParam]/Local:       U[#U#]{{; name=.+$}}
 // FIND_FUNC_PARAM_6-DAG: Decl[LocalVar]/Local:               self[#TestFindFuncParam5_6<T>#]{{; name=.+$}}
 // FIND_FUNC_PARAM_6-DAG: Decl[LocalVar]/Local:               a[#Int#]{{; name=.+$}}
 // FIND_FUNC_PARAM_6-DAG: Decl[LocalVar]/Local:               b[#T#]{{; name=.+$}}
 // FIND_FUNC_PARAM_6-DAG: Decl[LocalVar]/Local:               c[#U#]{{; name=.+$}}
-// FIND_FUNC_PARAM_6: End completions
   }
 }
 
 class TestFindFuncParam7 {
   func testFindFuncParam7(a: Int, b: Float, c: Double) {
     #^FIND_FUNC_PARAM_7^#
-// FIND_FUNC_PARAM_7: Begin completions
 // FIND_FUNC_PARAM_7-DAG: Decl[LocalVar]/Local: self[#TestFindFuncParam7#]{{; name=.+$}}
 // FIND_FUNC_PARAM_7-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
 // FIND_FUNC_PARAM_7-DAG: Decl[LocalVar]/Local: b[#Float#]{{; name=.+$}}
 // FIND_FUNC_PARAM_7-DAG: Decl[LocalVar]/Local: c[#Double#]{{; name=.+$}}
-// FIND_FUNC_PARAM_7: End completions
   }
 }
 
 func testFindFuncParamSelector1(a: Int, b x: Float, foo fooParam: FooStruct, bar barParam: inout FooStruct) {
   #^FIND_FUNC_PARAM_SELECTOR_1?check=FIND_FUNC_PARAM_SELECTOR_1;check=COMMON;check=NO_SELF^#
-// FIND_FUNC_PARAM_SELECTOR_1: Begin completions
 // FIND_FUNC_PARAM_SELECTOR_1-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
 // FIND_FUNC_PARAM_SELECTOR_1-DAG: Decl[LocalVar]/Local: x[#Float#]{{; name=.+$}}
 // FIND_FUNC_PARAM_SELECTOR_1-DAG: Decl[LocalVar]/Local: barParam[#inout FooStruct#]{{; name=.+$}}
-// FIND_FUNC_PARAM_SELECTOR_1: End completions
 }
 
 //===--- Test that we include constructor parameters in completion results.
@@ -191,71 +169,59 @@ func testFindFuncParamSelector1(a: Int, b x: Float, foo fooParam: FooStruct, bar
 class TestFindConstructorParam1 {
   init(a: Int, b: Float) {
     #^FIND_CONSTRUCTOR_PARAM_1^#
-// FIND_CONSTRUCTOR_PARAM_1: Begin completions
 // FIND_CONSTRUCTOR_PARAM_1-DAG: Decl[LocalVar]/Local: self[#TestFindConstructorParam1#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_1-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_1-DAG: Decl[LocalVar]/Local: b[#Float#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_1: End completions
   }
 }
 
 struct TestFindConstructorParam2 {
   init(a: Int, b: Float) {
     #^FIND_CONSTRUCTOR_PARAM_2^#
-// FIND_CONSTRUCTOR_PARAM_2: Begin completions
 // FIND_CONSTRUCTOR_PARAM_2-DAG: Decl[LocalVar]/Local: self[#TestFindConstructorParam2#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_2-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_2-DAG: Decl[LocalVar]/Local: b[#Float#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_2: End completions
   }
 }
 
 class TestFindConstructorParam3 {
   init<U>(a: Int, b: U) {
     #^FIND_CONSTRUCTOR_PARAM_3^#
-// FIND_CONSTRUCTOR_PARAM_3: Begin completions
 // FIND_CONSTRUCTOR_PARAM_3-DAG: Decl[GenericTypeParam]/Local: U[#U#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_3-DAG: Decl[LocalVar]/Local:         self[#TestFindConstructorParam3#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_3-DAG: Decl[LocalVar]/Local:         a[#Int#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_3-DAG: Decl[LocalVar]/Local:         b[#U#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_3: End completions
   }
 }
 
 class TestFindConstructorParam4<T> {
   init(a: Int, b: T) {
     #^FIND_CONSTRUCTOR_PARAM_4^#
-// FIND_CONSTRUCTOR_PARAM_4: Begin completions
 // FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[GenericTypeParam]/Local: T[#T#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:         self[#TestFindConstructorParam4<T>#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:         a[#Int#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:         b[#T#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_4: End completions
   }
 }
 
 class TestFindConstructorParam5<T> {
   init<U>(a: Int, b: T, c: U) {
     #^FIND_CONSTRUCTOR_PARAM_5^#
-// FIND_CONSTRUCTOR_PARAM_5: Begin completions
 // FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[GenericTypeParam]/Local: T[#T#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[GenericTypeParam]/Local: U[#U#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:         self[#TestFindConstructorParam5<T>#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:         a[#Int#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:         b[#T#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:         c[#U#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_5: End completions
   }
 }
 
 class TestFindConstructorParamSelector1 {
   init(a x: Int, b y: Float) {
     #^FIND_CONSTRUCTOR_PARAM_SELECTOR_1^#
-// FIND_CONSTRUCTOR_PARAM_SELECTOR_1: Begin completions
 // FIND_CONSTRUCTOR_PARAM_SELECTOR_1-DAG: Decl[LocalVar]/Local: self[#TestFindConstructorParamSelector1#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_SELECTOR_1-DAG: Decl[LocalVar]/Local: x[#Int#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_SELECTOR_1-DAG: Decl[LocalVar]/Local: y[#Float#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_SELECTOR_1: End completions
   }
 }
 
@@ -264,19 +230,15 @@ class TestFindConstructorParamSelector1 {
 class TestFindDestructorParam1 {
   deinit {
     #^FIND_DESTRUCTOR_PARAM_1^#
-// FIND_DESTRUCTOR_PARAM_1: Begin completions
 // FIND_DESTRUCTOR_PARAM_1-DAG: Decl[LocalVar]/Local: self[#TestFindDestructorParam1#]{{; name=.+$}}
-// FIND_DESTRUCTOR_PARAM_1: End completions
   }
 }
 
 class TestFindDestructorParam2<T> {
   deinit {
     #^FIND_DESTRUCTOR_PARAM_2^#
-// FIND_DESTRUCTOR_PARAM_2: Begin completions
 // FIND_DESTRUCTOR_PARAM_2-DAG: Decl[GenericTypeParam]/Local: T[#T#]{{; name=.+$}}
 // FIND_DESTRUCTOR_PARAM_2-DAG: Decl[LocalVar]/Local: self[#TestFindDestructorParam2<T>#]{{; name=.+$}}
-// FIND_DESTRUCTOR_PARAM_2: End completions
   }
 }
 
@@ -332,11 +294,9 @@ func foo() -> Undeclared {
   var fooParam = FooStruct()
   #^IN_INVALID_8?check=COMMON^#
 }
-// MY_ALIAS_1: Begin completions
 // MY_ALIAS_1-DAG: Decl[TypeAlias]/Local:                        MyAlias[#(T, T)#];
 // MY_ALIAS_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: x[#MyAlias<Int>#]; name=x
 // MY_ALIAS_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: y[#(Int, Int)#]; name=y
-// MY_ALIAS_1: End completions
 
 func testGenericTypealias1() {
   typealias MyAlias<T> = (T, T)
@@ -344,11 +304,9 @@ func testGenericTypealias1() {
   var y: (Int, Int)
   y = #^GENERIC_TYPEALIAS_1?check=MY_ALIAS_1^#
 }
-// MY_ALIAS_2: Begin completions
 // MY_ALIAS_2-DAG: Decl[TypeAlias]/Local:                        MyAlias[#(T, T)#];
 // MY_ALIAS_2-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: x[#(Int, Int)#]; name=x
 // MY_ALIAS_2-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: y[#MyAlias<Int>#]; name=y
-// MY_ALIAS_2: End completions
 func testGenericTypealias2() {
   typealias MyAlias<T> = (T, T)
   let x: (Int, Int) = (1, 2)
@@ -464,100 +422,76 @@ struct Deprecated {
     #^DEPRECATED_1^#
   }
 }
-// DEPRECATED_1: Begin completions
 // DEPRECATED_1-DAG: Decl[LocalVar]/Local/NotRecommended: local[#Int#];
 // DEPRECATED_1-DAG: Decl[FreeFunction]/Local/NotRecommended: f()[#Void#];
 // DEPRECATED_1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: testDeprecated()[#Void#];
 // DEPRECATED_1-DAG: Decl[Struct]/CurrModule/NotRecommended: Deprecated[#Deprecated#];
-// DEPRECATED_1: End completions
 
 func testTuple(localInt: Int) {
   let localStr: String = "foo"
   let _: (Int, String) = (1, #^IN_TUPLE_1^#)
   let _: (Int, String) = (#^IN_TUPLE_2^#, "foo")
 }
-// IN_TUPLE_1: Begin completions
 // IN_TUPLE_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: localStr[#String#]; name=localStr
 // IN_TUPLE_1-DAG: Decl[LocalVar]/Local:               localInt[#Int#]; name=localInt
-// IN_TUPLE_1: End completions
 
-// IN_TUPLE_2: Begin completions
 // IN_TUPLE_2-DAG: Decl[LocalVar]/Local:               localStr[#String#]; name=localStr
 // IN_TUPLE_2-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: localInt[#Int#]; name=localInt
-// IN_TUPLE_2: End completions
 
 var ownInit1: Int = #^OWN_INIT_1^#
-// OWN_INIT_1: Begin completions
 // OWN_INIT_1-NOT: ownInit1
 func sync() {}
 var ownInit2: () -> Void = { #^OWN_INIT_2^# }
-// OWN_INIT_2: Begin completions
 // OWN_INIT_2-NOT: ownInit2
 var ownInit8: Int = "\(#^OWN_INIT_8^#)"
-// OWN_INIT_8: Begin completions
 // OWN_INIT_8-NOT: ownInit8
 struct OwnInitTester {
   var ownInit3: Int = #^OWN_INIT_3^#
-  // OWN_INIT_3: Begin completions
   // OWN_INIT_3-NOT: ownInit3
   var ownInit4: () -> Void = { #^OWN_INIT_4^# }
-  // OWN_INIT_4: Begin completions
   // OWN_INIT_4-NOT: ownInit4
   var ownInit9: String = "\(#^OWN_INIT_9^#)"
-  // OWN_INIT_9: Begin completions
   // OWN_INIT_9-NOT: ownInit9
 }
 func ownInitTesting() {
   var ownInit5: Int = #^OWN_INIT_5^#
-  // OWN_INIT_5: Begin completions
   // OWN_INIT_5-NOT: ownInit5
   var ownInit6: () -> Void = { #^OWN_INIT_6^# }
-  // OWN_INIT_6: Begin completions
   // OWN_INIT_6-NOT: ownInit6
   var ownInit10: String = "\(#^OWN_INIT_10^#)"
-  // OWN_INIT_10: Begin completions
   // OWN_INIT_10-NOT: ownInit10
 }
 func ownInitTestingParam(ownInit11: Int = #^OWN_INIT_11^#) {
-  // OWN_INIT_11: Begin completions
   // OWN_INIT_11-NOT: Decl[LocalVar]{{.*}}ownInit11
 }
 func ownInitTestingParamInterp(ownInit12: String = "\(#^OWN_INIT_12^#)") {
-  // OWN_INIT_12: Begin completions
   // OWN_INIT_12-NOT: Decl[LocalVar]{{.*}}ownInit12
 }
 func ownInitTestingShadow(ownInit7: Int) {
   var ownInit7: Int = #^OWN_INIT_7^#
-  // OWN_INIT_7: Begin completions
   // OWN_INIT_7: Decl[LocalVar]/Local/TypeRelation[Convertible]: ownInit7[#Int#];
 }
 
 var inAccessor1: Int {
   get { #^OWN_ACCESSOR_1^# }
-// OWN_ACCESSOR_1: Begin completions
 // OWN_ACCESSOR_1: Decl[GlobalVar]/CurrModule/NotRecommended/TypeRelation[Convertible]: inAccessor1[#Int#];
   set { #^OWN_ACCESSOR_2^# }
-// OWN_ACCESSOR_2: Begin completions
 // OWN_ACCESSOR_2: Decl[GlobalVar]/CurrModule: inAccessor1[#Int#];
 }
 var inAccessor2: Int = 1 {
   didSet { #^OWN_ACCESSOR_3^# }
-// OWN_ACCESSOR_3: Begin completions
 // OWN_ACCESSOR_3: Decl[GlobalVar]/CurrModule: inAccessor2[#Int#];
   willSet { #^OWN_ACCESSOR_4?check=OWN_ACCESSOR_3^# }
 }
 class InAccessorTest {
   var inAccessor3: Int {
     get { #^OWN_ACCESSOR_5^# }
-// OWN_ACCESSOR_5: Begin completions
 // OWN_ACCESSOR_5: Decl[InstanceVar]/CurrNominal/NotRecommended/TypeRelation[Convertible]: inAccessor3[#Int#];
     set { #^OWN_ACCESSOR_6^# }
-// OWN_ACCESSOR_6: Begin completions
 // OWN_ACCESSOR_6: Decl[InstanceVar]/CurrNominal: inAccessor3[#Int#];
   }
   var inAccessor4: Int = 1 {
     didSet { #^OWN_ACCESSOR_7^# }
-// OWN_ACCESSOR_7: Begin completions
 // OWN_ACCESSOR_7: Decl[InstanceVar]/CurrNominal: inAccessor4[#Int#];
     willSet { #^OWN_ACCESSOR_8?check=OWN_ACCESSOR_7^# }
   }
@@ -565,15 +499,12 @@ class InAccessorTest {
 func inAccessorTest() {
   var inAccessor5: Int {
     get { #^OWN_ACCESSOR_9^# }
-// OWN_ACCESSOR_9: Begin completions
 // OWN_ACCESSOR_9: Decl[LocalVar]/Local/NotRecommended/TypeRelation[Convertible]: inAccessor5[#Int#];
     set { #^OWN_ACCESSOR_10^# }
-// OWN_ACCESSOR_10: Begin completions
 // OWN_ACCESSOR_10: Decl[LocalVar]/Local: inAccessor5[#Int#];
   }
   var inAccessor6: Int = 1 {
     didSet { #^OWN_ACCESSOR_11^# }
-// OWN_ACCESSOR_11: Begin completions
 // OWN_ACCESSOR_11: Decl[LocalVar]/Local: inAccessor6[#Int#];
     willSet { #^OWN_ACCESSOR_12?check=OWN_ACCESSOR_11^# }
   }
@@ -582,7 +513,6 @@ class InAccessorTestQualified {
   var inAccessorProp: Int {
     get {
       let _ = self.#^OWN_ACCESSOR_13^#
-// OWN_ACCESSOR_13: Begin completions
 // OWN_ACCESSOR_13: Decl[InstanceVar]/CurrNominal:      inAccessorProp[#Int#];
       let _ = \InAccessorTestQualified.#^OWN_ACCESSOR_14?check=OWN_ACCESSOR_13^#
     }

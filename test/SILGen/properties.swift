@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 
 var zero: Int = 0
 
@@ -13,7 +13,8 @@ func physical_tuple_lvalue(_ c: Int) {
   var x : (Int, Int)
   // CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var (Int, Int) }
   // CHECK: [[MARKED_BOX:%[0-9]+]] = mark_uninitialized [var] [[BOX]]
-  // CHECK: [[XADDR:%.*]] = project_box [[MARKED_BOX]]
+  // CHECK: [[XLIFETIME:%.*]] = begin_borrow [var_decl] [[MARKED_BOX]]
+  // CHECK: [[XADDR:%.*]] = project_box [[XLIFETIME]]
   x.1 = c
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[XADDR]]
   // CHECK: [[X_1:%[0-9]+]] = tuple_element_addr [[WRITE]] : {{.*}}, 1
@@ -343,7 +344,8 @@ func inout_arg(_ x: inout Int) {}
 func physical_inout(_ x: Int) {
   var x = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PB:%.*]] = project_box [[XADDR]]
+  // CHECK: [[XL:%.*]] = begin_borrow [var_decl] [[XADDR]]
+  // CHECK: [[PB:%.*]] = project_box [[XL]]
   inout_arg(&x)
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: [[INOUT_ARG:%[0-9]+]] = function_ref @$s10properties9inout_arg{{[_0-9a-zA-Z]*}}F
@@ -369,7 +371,7 @@ func val_subscript_set(_ v: Val, i: Int, x: Float) {
   var v = v
   v[i] = x
   // CHECK: [[VADDR:%[0-9]+]] = alloc_box ${ var Val }
-  // CHECK: [[LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[VADDR]]
+  // CHECK: [[LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[VADDR]]
   // CHECK: [[PB:%.*]] = project_box [[LIFETIME]]
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: [[SUBSCRIPT_SET_METHOD:%[0-9]+]] = function_ref @$s10properties3ValV{{[_0-9a-zA-Z]*}}is
@@ -666,7 +668,7 @@ class r19254812Derived: r19254812Base{
 // Accessing the "pi" property should not copy_value/release self.
 // CHECK-LABEL: sil hidden [ossa] @$s10properties16r19254812DerivedC{{[_0-9a-zA-Z]*}}fc
 // CHECK: [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself]
-// CHECK: [[LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+// CHECK: [[LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
 // CHECK: [[PB_BOX:%.*]] = project_box [[LIFETIME]]
 
 // Initialization of the pi field: no copy_values/releases.
@@ -721,8 +723,9 @@ func testRedundantRetains() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s10properties20testRedundantRetainsyyF : $@convention(thin) () -> () {
 // CHECK: [[A:%[0-9]+]] = apply
+// CHECK: [[MOVED_A:%[0-9]+]] = move_value [lexical] [var_decl] [[A]]
 // CHECK-NOT: copy_value
-// CHECK: destroy_value [[A]] : $RedundantRetains
+// CHECK: destroy_value [[MOVED_A]] : $RedundantRetains
 // CHECK-NOT: copy_value
 // CHECK-NOT: destroy_value
 // CHECK: return
@@ -743,13 +746,9 @@ func addressOnlyNonmutatingProperty<T>(_ x: AddressOnlyNonmutatingSet<T>)
 }
 // CHECK-LABEL: sil hidden [ossa] @$s10properties30addressOnlyNonmutatingProperty{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[SET:%.*]] = function_ref @$s10properties25AddressOnlyNonmutatingSetV4propSivs
-// CHECK:         apply [[SET]]<T>({{%.*}}, [[TMP:%[0-9]*]])
-// CHECK:         destroy_addr [[TMP]]
-// CHECK:         dealloc_stack [[TMP]]
+// CHECK:         apply [[SET]]<T>({{%.*}}, %0)
 // CHECK:         [[GET:%.*]] = function_ref @$s10properties25AddressOnlyNonmutatingSetV4propSivg
 // CHECK:         apply [[GET]]<T>([[TMP:%[0-9]*]])
-// CHECK:         destroy_addr [[TMP]]
-// CHECK:         dealloc_stack [[TMP]]
 
 protocol MakeAddressOnly {}
 struct AddressOnlyReadOnlySubscript {
@@ -761,9 +760,8 @@ struct AddressOnlyReadOnlySubscript {
 // CHECK-LABEL: sil hidden [ossa] @$s10properties015addressOnlyReadC24SubscriptFromMutableBase
 // CHECK:         [[BASE:%.*]] = alloc_box ${ var AddressOnlyReadOnlySubscript }
 // CHECK:         copy_addr [[BASE:%.*]] to [init] [[COPY:%.*]] :
-// CHECK:         copy_addr [[COPY:%.*]] to [init] [[COPY2:%.*]] :
 // CHECK:         [[GETTER:%.*]] = function_ref @$s10properties015AddressOnlyReadC9SubscriptV{{[_0-9a-zA-Z]*}}ig
-// CHECK:         apply [[GETTER]]({{%.*}}, [[COPY2]])
+// CHECK:         apply [[GETTER]]({{%.*}}, [[COPY]])
 func addressOnlyReadOnlySubscriptFromMutableBase(_ x: Int) {
   var base = AddressOnlyReadOnlySubscript()
   _ = base[x]
@@ -779,7 +777,8 @@ struct MutatingGetterStruct {
 
   // CHECK-LABEL: sil hidden [ossa] @$s10properties20MutatingGetterStructV4test
   // CHECK: [[X:%.*]] = alloc_box ${ var MutatingGetterStruct }, var, name "x"
-  // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
+  // CHECK-NEXT: [[XL:%.*]] = begin_borrow [var_decl] [[X]]
+  // CHECK-NEXT: [[PB:%.*]] = project_box [[XL]]
   // CHECK: store {{.*}} to [trivial] [[PB]] : $*MutatingGetterStruct
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: apply {{%.*}}([[WRITE]]) : $@convention(method) (@inout MutatingGetterStruct) -> Int
@@ -830,13 +829,10 @@ protocol NonmutatingProtocol {
 // CHECK-NEXT:   [[C_FIELD_COPY:%.*]] = alloc_stack $@opened("{{.*}}", any NonmutatingProtocol) Self
 // CHECK-NEXT:   copy_addr [[C_FIELD_PAYLOAD]] to [init] [[C_FIELD_COPY]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self
 // CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
-// CHECK-NEXT:   [[C_FIELD_BORROW:%.*]] = alloc_stack
-// CHECK-NEXT:   copy_addr [[C_FIELD_COPY]] to [init] [[C_FIELD_BORROW]]
 // CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}", any NonmutatingProtocol) Self, #NonmutatingProtocol.x!getter : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
-// CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}", any NonmutatingProtocol) Self>([[C_FIELD_BORROW]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
-// CHECK-NEXT:   destroy_addr [[C_FIELD_BORROW]]
+// CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}", any NonmutatingProtocol) Self>([[C_FIELD_COPY]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK-NEXT:   ignored_use
 // CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self
-// CHECK-NEXT:   dealloc_stack [[C_FIELD_BORROW]]
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self
 // CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*any NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_BOX]] : $*any NonmutatingProtocol

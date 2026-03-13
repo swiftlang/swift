@@ -1,0 +1,33 @@
+// RUN: %target-sil-opt -test-runner %s \
+// RUN:   -sil-verify-all \
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   2>&1 | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
+
+import Builtin
+
+class C {}
+
+@_nonescapable
+struct NE {}
+
+// Verify that SILFunction_getSelfArgumentIndex respects SILFunctionConventions
+// and returns right value even in the presence of indirect results.
+//
+// CHECK: [0]  indirect result: indirectOut
+// CHECK: [1]        parameter: directGuaranteed
+// CHECK-LABEL: end running test 1 of {{[^,]+}} on indirect_result: argument_conventions
+sil [ossa] @indirect_result : $@convention(method) <T> (@guaranteed C) -> @out T {
+entry(%result : $*T, %instance : @guaranteed $C):
+    specify_test "argument_conventions"
+    unreachable
+}
+
+// TODO: rdar://122687948 ([~Escapable] Enable inference by default (-enable-experimental-lifetime-dependence-inference))
+// sil [ossa] @result_dependson_copy : $@convention(method) (@guaranteed C) -> _inherit(1) @owned NE {
+// entry(%result : $*NE, %instance : @guaranteed $C):
+//    specify_test "argument_conventions"
+//    unreachable
+// }

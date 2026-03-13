@@ -29,9 +29,9 @@ def setup_worktree(workspace_path, local_path, worktree_name):
     for project in os.listdir(local_path):
         local_project_path = os.path.join(local_path, project)
         worktree_project_path = os.path.join(worktree_path, project)
-        call_quietly(['git',
-                      '-C', local_project_path,
-                      'worktree', 'add', worktree_project_path])
+        call_quietly(
+            ["git", "-C", local_project_path, "worktree", "add", worktree_project_path]
+        )
 
 
 def teardown_worktree(workspace_path, local_path, worktree_name):
@@ -39,9 +39,16 @@ def teardown_worktree(workspace_path, local_path, worktree_name):
     for project in os.listdir(local_path):
         local_project_path = os.path.join(local_path, project)
         worktree_project_path = os.path.join(worktree_path, project)
-        call_quietly(['git',
-                      '-C', local_project_path,
-                      'worktree', 'remove', worktree_project_path])
+        call_quietly(
+            [
+                "git",
+                "-C",
+                local_project_path,
+                "worktree",
+                "remove",
+                worktree_project_path,
+            ]
+        )
 
 
 class WorktreeTestCase(scheme_mock.SchemeMockTestCase):
@@ -50,10 +57,17 @@ class WorktreeTestCase(scheme_mock.SchemeMockTestCase):
         super(WorktreeTestCase, self).__init__(*args, **kwargs)
 
     def test_worktree(self):
-        self.call([self.update_checkout_path,
-                   '--config', self.config_path,
-                   '--source-root', self.worktree_path,
-                   '--scheme', 'main'])
+        self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.worktree_path,
+                "--scheme",
+                "main",
+            ]
+        )
 
     def setUp(self):
         super(WorktreeTestCase, self).setUp()

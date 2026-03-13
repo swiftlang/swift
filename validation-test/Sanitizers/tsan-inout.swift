@@ -1,12 +1,18 @@
 // RUN: %empty-directory(%t)
 // RUN: cd %t
-// RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -target %sanitizers-target-triple -module-name TSanUninstrumented -emit-module -emit-module-path %t/TSanUninstrumented.swiftmodule -parse-as-library
-// RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -target %sanitizers-target-triple -c -module-name TSanUninstrumented -parse-as-library -o %t/TSanUninstrumented.o
-// RUN: %target-swiftc_driver %s %t/TSanUninstrumented.o -target %sanitizers-target-triple -I%t -L%t -g -sanitize=thread %import-libdispatch -o %t/tsan-binary
+// RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -module-name TSanUninstrumented -emit-module -emit-module-path %t/TSanUninstrumented.swiftmodule -parse-as-library
+// RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -c -module-name TSanUninstrumented -parse-as-library -o %t/TSanUninstrumented.o
+// RUN: %target-swiftc_driver %s %t/TSanUninstrumented.o -I%t -L%t -g -sanitize=thread %import-libdispatch -o %t/tsan-binary
 // RUN: not env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t/tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: stress_test
 // REQUIRES: tsan_runtime
+
+// Bug in TSan on FreeBSD
+// Thread destruction interceptor marks the thread ignored and then checks that
+// the thread isn't being ignored.
+// rdar://158450231
+// XFAIL: OS=freebsd
 
 // Test ThreadSanitizer execution end-to-end when calling
 // an uninstrumented module with inout parameters
@@ -27,7 +33,7 @@ var gInThread2: () -> () = { }
 // Spawn two threads, run the two passed in closures simultaneously, and
 // join them.
 func testRace(name: String, thread inThread1: @escaping () -> (), thread inThread2: @escaping () -> ()) {
-#if canImport(Darwin)
+#if canImport(Darwin) || os(FreeBSD)
   var thread1: pthread_t?
   var thread2: pthread_t?
 #else

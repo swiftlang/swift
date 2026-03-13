@@ -77,8 +77,10 @@ bool AccessMarkerElimination::shouldPreserveAccess(
   switch (enforcement) {
   case SILAccessEnforcement::Static:
   case SILAccessEnforcement::Unsafe:
-  case SILAccessEnforcement::Signed:
     return false;
+  // Signed access should be preserved until IRGen
+  case SILAccessEnforcement::Signed:
+    return true;
   case SILAccessEnforcement::Unknown:
   case SILAccessEnforcement::Dynamic:
     return Mod->getOptions().EnforceExclusivityDynamic;
@@ -100,7 +102,7 @@ AccessMarkerElimination::checkAndEliminateMarker(SILInstruction *inst) {
     if (beginAccess->isFromBuiltin())
       return inst->getIterator();
 
-    // Leave dynamic accesses in place, but delete all others.
+    // Leave dynamic and signed accesses in place, but delete all others.
     if (shouldPreserveAccess(beginAccess->getEnforcement()))
       return inst->getIterator();
 
@@ -181,16 +183,16 @@ struct AccessMarkerEliminationPass : SILModuleTransform {
         auto InvalidKind = SILAnalysis::InvalidationKind::Instructions;
         invalidateAnalysis(&F, InvalidKind);
       }
-
-      // Markers from all current SIL functions are stripped. Register a
-      // callback to strip an subsequently loaded functions on-the-fly.
-      if (!EnableOptimizedAccessMarkers) {
-        using NotificationHandlerTy =
-            FunctionBodyDeserializationNotificationHandler;
-        auto *n = new NotificationHandlerTy(prepareSILFunctionForOptimization);
-        std::unique_ptr<DeserializationNotificationHandler> ptr(n);
-        M.registerDeserializationNotificationHandler(std::move(ptr));
-      }
+    }
+    // Markers from all current SIL functions are stripped. Register a
+    // callback to strip an subsequently loaded functions on-the-fly.
+    if (!EnableOptimizedAccessMarkers && !M.checkHasAccessMarkerHandler()) {
+      using NotificationHandlerTy =
+        FunctionBodyDeserializationNotificationHandler;
+      auto *n = new NotificationHandlerTy(prepareSILFunctionForOptimization);
+      std::unique_ptr<DeserializationNotificationHandler> ptr(n);
+      M.registerDeserializationNotificationHandler(std::move(ptr));
+      M.setHasAccessMarkerHandler();
     }
   }
 };

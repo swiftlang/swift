@@ -22,7 +22,10 @@
 namespace llvm {
 class StringRef;
 class raw_fd_ostream;
-}
+namespace vfs{
+  class FileSystem;
+} // namespace vfs
+} // namespace llvm
 
 namespace swift {
 class SourceFile;
@@ -36,6 +39,7 @@ namespace swift {
 bool
 parseProtocolListFromFile(llvm::StringRef protocolListFilePath,
                           DiagnosticEngine &diags,
+                          llvm::vfs::FileSystem &fs,
                           std::unordered_set<std::string> &protocols);
 
 /// Gather compile-time-known values of properties in nominal type declarations
@@ -55,7 +59,7 @@ gatherConstValuesForModule(const std::unordered_set<std::string> &Protocols,
 /// Serialize a collection of \c ConstValueInfos to JSON at the
 /// provided output stream.
 bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
-                       llvm::raw_fd_ostream &OS);
+                       llvm::raw_ostream &OS);
 } // namespace swift
 
 #endif

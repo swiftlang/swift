@@ -24,7 +24,7 @@ func acceptsNonConcurrent(_ fn: (Int) -> Int) { }
 
 func passingConcurrentOrNot(
   _ cfn: @Sendable (Int) -> Int,
-  ncfn: (Int) -> Int // expected-note{{parameter 'ncfn' is implicitly non-sendable}}{{9-9=@Sendable }}
+  ncfn: (Int) -> Int // expected-note{{parameter 'ncfn' is implicitly non-Sendable}}{{9-9=@Sendable }}
 ) {
   // Ambiguous because preconcurrency code doesn't consider `@Sendable`.
   f(cfn) // expected-error{{ambiguous use of 'f'}}
@@ -33,7 +33,7 @@ func passingConcurrentOrNot(
   f(ncfn)
 
   acceptsConcurrent(cfn) // okay
-  acceptsConcurrent(ncfn) // expected-warning{{passing non-sendable parameter 'ncfn' to function expecting a @Sendable closure}}
+  acceptsConcurrent(ncfn) // expected-warning{{passing non-Sendable parameter 'ncfn' to function expecting a '@Sendable' closure}}
   acceptsNonConcurrent(cfn) // okay
   acceptsNonConcurrent(ncfn) // okay
 
@@ -53,8 +53,8 @@ func closures() {
       return i
     })
 
-  let closure1 = { $0 + 1 } // inferred to be non-sendable
-  acceptsConcurrent(closure1) // expected-warning{{converting non-sendable function value to '@Sendable (Int) -> Int' may introduce data races}}
+  let closure1 = { $0 + 1 } // inferred to be non-Sendable
+  acceptsConcurrent(closure1) // expected-warning{{converting non-Sendable function value to '@Sendable (Int) -> Int' may introduce data races}}
 }
 
 // Mutation of captured locals from within @Sendable functions.
@@ -84,12 +84,12 @@ func mutationOfLocal() {
     }()
 
     // Mutations of captured variables executing concurrently are bad.
-    localInt = 17 // expected-error{{mutation of captured var 'localInt' in concurrently-executing code}}
-    localInt += 1 // expected-error{{mutation of captured var 'localInt' in concurrently-executing code}}
-    localInt.makeNegative() // expected-error{{mutation of captured var 'localInt' in concurrently-executing code}}
+    localInt = 17 // expected-warning{{mutation of captured var 'localInt' in concurrently-executing code}}
+    localInt += 1 // expected-warning{{mutation of captured var 'localInt' in concurrently-executing code}}
+    localInt.makeNegative() // expected-warning{{mutation of captured var 'localInt' in concurrently-executing code}}
 
     _ = {
-      localInt = localInt + 12 // expected-error{{mutation of captured var 'localInt' in concurrently-executing code}}
+      localInt = localInt + 12 // expected-warning{{mutation of captured var 'localInt' in concurrently-executing code}}
     }()
 
     return i + localInt
@@ -114,8 +114,8 @@ func testCaseNonTrivialValue() {
     print(i.optArray?[j] ?? 0)
     print(i.optArray![j])
 
-    i.int = 5 // expected-error{{mutation of captured var 'i' in concurrently-executing code}}
-    i.array[0] = 5 // expected-error{{mutation of captured var 'i' in concurrently-executing code}}
+    i.int = 5 // expected-warning{{mutation of captured var 'i' in concurrently-executing code}}
+    i.array[0] = 5 // expected-warning{{mutation of captured var 'i' in concurrently-executing code}}
 
     return value
   }

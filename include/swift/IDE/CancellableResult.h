@@ -118,25 +118,25 @@ public:
 
   /// Return the result kind this \c CancellableResult represents: success,
   /// failure or cancelled.
-  CancellableResultKind getKind() { return Kind; }
+  CancellableResultKind getKind() const { return Kind; }
 
   /// Assuming that the result represents success, return the underlying result
   /// value.
-  ResultType &getResult() {
+  const ResultType &getResult() const {
     assert(getKind() == CancellableResultKind::Success);
     return Result;
   }
 
   /// Assuming that the result represents success, retrieve members of the
   /// underlying result value.
-  ResultType *operator->() { return &getResult(); }
+  const ResultType *operator->() { return &getResult(); }
 
   /// Assuming that the result represents success, return the underlying result
   /// value.
-  ResultType &operator*() { return getResult(); }
+  const ResultType &operator*() { return getResult(); }
 
   /// Assuming that the result represents a failure, return the error message.
-  std::string getError() {
+  std::string getError() const {
     assert(getKind() == CancellableResultKind::Failure);
     return Error;
   }
@@ -152,7 +152,7 @@ public:
   template <typename NewResultType>
   void
   mapAsync(llvm::function_ref<
-               void(ResultType &,
+               void(const ResultType &,
                     llvm::function_ref<void(CancellableResult<NewResultType>)>)>
                Transform,
            llvm::function_ref<void(CancellableResult<NewResultType>)> Handle) {
@@ -168,6 +168,24 @@ public:
     case CancellableResultKind::Cancelled:
       Handle(CancellableResult<NewResultType>::cancelled());
       break;
+    }
+  }
+
+  /// If the result represents success, invoke \p Transform to create a success
+  /// result containing new backing data.
+  ///
+  /// If the result represents error or cancelled, propagate that kind without
+  /// modification.
+  template <typename NewResultType>
+  CancellableResult<NewResultType>
+  map(llvm::function_ref<NewResultType(const ResultType &)> Transform) {
+    switch (getKind()) {
+    case CancellableResultKind::Success:
+      return CancellableResult<NewResultType>::success(Transform(getResult()));
+    case CancellableResultKind::Failure:
+      return CancellableResult<NewResultType>::failure(getError());
+    case CancellableResultKind::Cancelled:
+      return CancellableResult<NewResultType>::cancelled();
     }
   }
 };

@@ -144,6 +144,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "RequirementMachine.h"
 #include "RewriteSystem.h"
 #include "RewriteContext.h"
@@ -159,28 +160,32 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
   SmallVector<StringRef, 2> debug;
   debugFlags.split(debug, ',');
   for (auto flagStr : debug) {
-    auto flag = llvm::StringSwitch<Optional<DebugFlags>>(flagStr)
-      .Case("simplify", DebugFlags::Simplify)
-      .Case("add", DebugFlags::Add)
-      .Case("completion", DebugFlags::Completion)
-      .Case("property-map", DebugFlags::PropertyMap)
-      .Case("concrete-unification", DebugFlags::ConcreteUnification)
-      .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
-      .Case("conditional-requirements", DebugFlags::ConditionalRequirements)
-      .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
-      .Case("homotopy-reduction-detail", DebugFlags::HomotopyReductionDetail)
-      .Case("minimal-conformances", DebugFlags::MinimalConformances)
-      .Case("minimal-conformances-detail", DebugFlags::MinimalConformancesDetail)
-      .Case("protocol-dependencies", DebugFlags::ProtocolDependencies)
-      .Case("minimization", DebugFlags::Minimization)
-      .Case("redundant-rules", DebugFlags::RedundantRules)
-      .Case("redundant-rules-detail", DebugFlags::RedundantRulesDetail)
-      .Case("concrete-contraction", DebugFlags::ConcreteContraction)
-      .Case("propagate-requirement-ids", DebugFlags::PropagateRequirementIDs)
-      .Case("timers", DebugFlags::Timers)
-      .Case("conflicting-rules", DebugFlags::ConflictingRules)
-      .Case("split-concrete-equiv-class", DebugFlags::SplitConcreteEquivalenceClass)
-      .Default(None);
+    auto flag =
+        llvm::StringSwitch<std::optional<DebugFlags>>(flagStr)
+            .Case("simplify", DebugFlags::Simplify)
+            .Case("add", DebugFlags::Add)
+            .Case("completion", DebugFlags::Completion)
+            .Case("property-map", DebugFlags::PropertyMap)
+            .Case("concrete-unification", DebugFlags::ConcreteUnification)
+            .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
+            .Case("conditional-requirements",
+                  DebugFlags::ConditionalRequirements)
+            .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
+            .Case("homotopy-reduction-detail",
+                  DebugFlags::HomotopyReductionDetail)
+            .Case("minimal-conformances", DebugFlags::MinimalConformances)
+            .Case("minimal-conformances-detail",
+                  DebugFlags::MinimalConformancesDetail)
+            .Case("protocol-dependencies", DebugFlags::ProtocolDependencies)
+            .Case("minimization", DebugFlags::Minimization)
+            .Case("redundant-rules", DebugFlags::RedundantRules)
+            .Case("redundant-rules-detail", DebugFlags::RedundantRulesDetail)
+            .Case("concrete-contraction", DebugFlags::ConcreteContraction)
+            .Case("timers", DebugFlags::Timers)
+            .Case("conflicting-rules", DebugFlags::ConflictingRules)
+            .Case("split-concrete-equiv-class",
+                  DebugFlags::SplitConcreteEquivalenceClass)
+            .Default(std::nullopt);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "
                    << flagStr << "\n";
@@ -195,6 +200,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
 
 RewriteContext::RewriteContext(ASTContext &ctx)
     : TheShapeSymbol(nullptr),
+      ThePackElementSymbol(nullptr),
       Context(ctx),
       Stats(ctx.Stats),
       SymbolHistogram(Symbol::NumKinds),
@@ -245,41 +251,10 @@ void RewriteContext::endTimer(StringRef name) {
 
 }
 
-const llvm::TinyPtrVector<const ProtocolDecl *> &
-RewriteContext::getInheritedProtocols(const ProtocolDecl *proto) {
-  auto found = AllInherited.find(proto);
-  if (found != AllInherited.end())
-    return found->second;
-
-  AllInherited.insert(std::make_pair(proto, TinyPtrVector<const ProtocolDecl *>()));
-
-  llvm::SmallDenseSet<const ProtocolDecl *, 4> visited;
-  llvm::TinyPtrVector<const ProtocolDecl *> protos;
-
-  for (auto *inheritedProto : proto->getInheritedProtocols()) {
-    if (!visited.insert(inheritedProto).second)
-      continue;
-
-    protos.push_back(inheritedProto);
-    const auto &allInherited = getInheritedProtocols(inheritedProto);
-
-    for (auto *otherProto : allInherited) {
-      if (!visited.insert(otherProto).second)
-        continue;
-
-      protos.push_back(otherProto);
-    }
-  }
-
-  auto &result = AllInherited[proto];
-  std::swap(protos, result);
-  return result;
-}
-
 int RewriteContext::compareProtocols(const ProtocolDecl *lhs,
                                      const ProtocolDecl *rhs) {
-  unsigned lhsSupport = getInheritedProtocols(lhs).size();
-  unsigned rhsSupport = getInheritedProtocols(rhs).size();
+  unsigned lhsSupport = lhs->getAllInheritedProtocols().size();
+  unsigned rhsSupport = rhs->getAllInheritedProtocols().size();
 
   if (lhsSupport != rhsSupport)
     return rhsSupport - lhsSupport;
@@ -292,9 +267,9 @@ RequirementMachine *RewriteContext::getRequirementMachine(
   auto &machine = Machines[sig];
   if (machine) {
     if (!machine->isComplete()) {
-      llvm::errs() << "Re-entrant construction of requirement "
-                   << "machine for " << sig << "\n";
-      abort();
+      ABORT([&](auto &out) {
+        out << "Re-entrant construction of requirement machine for " << sig;
+      });
     }
 
     return machine;
@@ -354,7 +329,7 @@ void RewriteContext::installRequirementMachine(
 void RewriteContext::getProtocolComponentRec(
     const ProtocolDecl *proto,
     SmallVectorImpl<const ProtocolDecl *> &stack) {
-  assert(Protos.count(proto) == 0);
+  ASSERT(Protos.count(proto) == 0);
 
   // Initialize the next component index and push the entry
   // on the stack
@@ -370,7 +345,7 @@ void RewriteContext::getProtocolComponentRec(
 
   // Look at each successor.
   auto found = Dependencies.find(proto);
-  assert(found != Dependencies.end());
+  ASSERT(found != Dependencies.end());
 
   for (auto *depProto : found->second) {
     auto found = Protos.find(depProto);
@@ -379,7 +354,7 @@ void RewriteContext::getProtocolComponentRec(
       getProtocolComponentRec(depProto, stack);
 
       auto &entry = Protos[proto];
-      assert(Protos.count(depProto) != 0);
+      ASSERT(Protos.count(depProto) != 0);
       entry.LowLink = std::min(entry.LowLink, Protos[depProto].LowLink);
     } else if (found->second.OnStack) {
       // Successor is on the stack and hence in the current SCC.
@@ -400,7 +375,7 @@ void RewriteContext::getProtocolComponentRec(
       depProto = stack.back();
       stack.pop_back();
 
-      assert(Protos.count(depProto) != 0);
+      ASSERT(Protos.count(depProto) != 0);
       Protos[depProto].OnStack = false;
       Protos[depProto].ComponentID = id;
 
@@ -458,28 +433,26 @@ RewriteContext::getProtocolComponentImpl(const ProtocolDecl *proto) {
 
   auto found = Protos.find(proto);
   if (found == Protos.end()) {
-    if (ProtectProtocolComponentRec) {
-      llvm::errs() << "Too much recursion is bad\n";
-      abort();
-    }
+    if (ProtectProtocolComponentRec)
+      ABORT("Too much recursion is bad");
 
     ProtectProtocolComponentRec = true;
 
     SmallVector<const ProtocolDecl *, 3> stack;
     getProtocolComponentRec(proto, stack);
-    assert(stack.empty());
+    ASSERT(stack.empty());
 
     found = Protos.find(proto);
-    assert(found != Protos.end());
+    ASSERT(found != Protos.end());
 
     ProtectProtocolComponentRec = false;
   }
 
-  assert(Components.count(found->second.ComponentID) != 0);
+  CONDITIONAL_ASSERT(Components.count(found->second.ComponentID) != 0);
   auto &component = Components[found->second.ComponentID];
 
-  assert(std::find(component.Protos.begin(), component.Protos.end(), proto)
-         != component.Protos.end() && "Protocol is in the wrong SCC");
+  CONDITIONAL_ASSERT(std::find(component.Protos.begin(), component.Protos.end(), proto)
+                     != component.Protos.end() && "Protocol is in the wrong SCC");
   return component;
 }
 
@@ -494,11 +467,11 @@ RewriteContext::startComputingRequirementSignatures(
   auto &component = getProtocolComponentImpl(proto);
 
   if (component.ComputingRequirementSignatures) {
-    llvm::errs() << "Re-entrant minimization of requirement signatures for: ";
-    for (auto *proto : component.Protos)
-      llvm::errs() << " " << proto->getName();
-    llvm::errs() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "Re-entrant minimization of requirement signatures for: ";
+      for (auto *proto : component.Protos)
+        out << " " << proto->getName();
+    });
   }
 
   component.ComputingRequirementSignatures = true;
@@ -512,7 +485,7 @@ void RewriteContext::finishComputingRequirementSignatures(
     const ProtocolDecl *proto) {
   auto &component = getProtocolComponentImpl(proto);
 
-  assert(component.ComputingRequirementSignatures &&
+  ASSERT(component.ComputingRequirementSignatures &&
          "Didn't call startComputingRequirementSignatures()");
   component.ComputedRequirementSignatures = true;
 }
@@ -533,11 +506,11 @@ RequirementMachine *RewriteContext::getRequirementMachine(
 
   if (component.Machine) {
     if (!component.Machine->isComplete()) {
-      llvm::errs() << "Re-entrant construction of requirement machine for: ";
-      for (auto *proto : component.Protos)
-        llvm::errs() << " " << proto->getName();
-      llvm::errs() << "\n";
-      abort();
+      ABORT([&](auto &out) {
+        out << "Re-entrant construction of requirement machine for: ";
+        for (auto *proto : component.Protos)
+          out << " " << proto->getName();
+      });
     }
 
     return component.Machine;

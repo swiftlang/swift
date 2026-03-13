@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -alloc-stack-hoisting -opt-mode=none | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -alloc-stack-hoisting -opt-mode=none | %FileCheck %s
 
 sil_stage canonical
 
@@ -10,9 +10,9 @@ import Builtin
 // CHECK-LABEL: sil @hoist_generic_1 :
 // CHECK: bb0({{.*}}):
 // Make sure the debug info isn't on the alloc_stack any more.
-// CHECK:   [[STACK:%.*]] = alloc_stack [moved] $T{{[ ]*}} // users:
+// CHECK:   [[STACK:%.*]] = alloc_stack [moveable_value_debuginfo] $T{{[ ]*}} // users:
 // CHECK: bb1:
-// CHECK:   debug_value [moved] [[STACK]] : $*T, let, name "x"
+// CHECK:   debug_value [moveable_value_debuginfo] [[STACK]] : $*T, let, name "x"
 // CHECK-NOT: alloc_stack
 // CHECK-NOT: dealloc_stack
 // CHECK: bb2:
@@ -26,7 +26,7 @@ bb0(%0 : $*T, %1: $Builtin.Int1):
   cond_br %1, bb1, bb2
 
 bb1:
-  %2 = alloc_stack [moved] $T, let, name "x"
+  %2 = alloc_stack [moveable_value_debuginfo] $T, let, name "x"
   copy_addr [take] %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
@@ -41,15 +41,15 @@ bb3:
 
 // CHECK-LABEL: sil @hoist_generic_2 :
 // CHECK: bb0([[ARG:%.*]] : $*T,
-// CHECK-NEXT:   [[STACK:%.*]] = alloc_stack [moved] $T{{[ ]*}} // users:
+// CHECK-NEXT:   [[STACK:%.*]] = alloc_stack [moveable_value_debuginfo] $T{{[ ]*}} // users:
 // CHECK-NEXT:   cond_br {{%.*}}, bb1, bb4
 //
 // CHECK: bb1:
-// CHECK-NEXT:   debug_value [moved] [[STACK]] : $*T, let, name "x"
+// CHECK-NEXT:   debug_value [moveable_value_debuginfo] [[STACK]] : $*T, let, name "x"
 // CHECK-NEXT:   br bb2
 //
 // CHECK: bb2:
-// CHECK:        debug_value [moved] [[STACK]] : $*T, let, name "y"
+// CHECK:        debug_value [moveable_value_debuginfo] [[STACK]] : $*T, let, name "y"
 // CHECK-NEXT:   br bb3
 //
 // CHECK: bb3:
@@ -75,11 +75,11 @@ bb0(%0 : $*T, %1: $Builtin.Int1):
   cond_br %1, bb1, bb2
 
 bb1:
-  %2 = alloc_stack [moved] $T, let, name "x"
+  %2 = alloc_stack [moveable_value_debuginfo] $T, let, name "x"
   copy_addr %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
-  %3 = alloc_stack [moved] $T, let, name "y"
+  %3 = alloc_stack [moveable_value_debuginfo] $T, let, name "y"
   copy_addr %0 to [init] %3 : $*T
   destroy_addr %3 : $*T
   dealloc_stack %3 : $*T
@@ -98,13 +98,14 @@ bb4:
   return %9999 : $()
 }
 
-// This case we are not moving anything so we are leaving in the default
-// behavior which is not breaking blocks and not inserting debug_info.
+// This case we are not moving anything, so we don't add the
+// [moveable_value_debuginfo] flag, but we still want debug info for the
+// second alloc_stack!
 //
 // CHECK-LABEL: sil @hoist_generic_3 :
 // CHECK: bb0([[ARG:%.*]] : $*T,
 // CHECK-NEXT:   [[STACK:%.*]] = alloc_stack $T{{[ ]*}}, let, name "x"
-// CHECK-NOT:    debug_value
+// CHECK:        debug_value %{{.+}}, let, name "y"
 // CHECK: } // end sil function 'hoist_generic_3'
 sil @hoist_generic_3 : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
 bb0(%0 : $*T, %1: $Builtin.Int1):
@@ -140,15 +141,15 @@ bb4:
 
 // CHECK-LABEL: sil @mix_and_match_1 :
 // CHECK: bb0([[ARG:%.*]] : $*T,
-// CHECK-NEXT:   [[STACK:%.*]] = alloc_stack [moved] $T{{[ ]*}} // users:
+// CHECK-NEXT:   [[STACK:%.*]] = alloc_stack [moveable_value_debuginfo] $T{{[ ]*}} // users:
 // CHECK-NEXT:   cond_br {{%.*}}, bb1, bb4
 //
 // CHECK: bb1:
-// CHECK-NEXT:   debug_value [moved] [[STACK]] : $*T, let, name "x"
+// CHECK-NEXT:   debug_value [moveable_value_debuginfo] [[STACK]] : $*T, let, name "x"
 // CHECK-NEXT:   br bb2
 //
 // CHECK: bb2:
-// CHECK:        debug_value [moved] [[STACK]] : $*T, let, name "y"
+// CHECK:        debug_value [moveable_value_debuginfo] [[STACK]] : $*T, let, name "y"
 // CHECK-NEXT:   br bb3
 //
 // CHECK: bb3:
@@ -178,7 +179,7 @@ bb1:
   copy_addr %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
-  %3 = alloc_stack [moved] $T, let, name "y"
+  %3 = alloc_stack [moveable_value_debuginfo] $T, let, name "y"
   copy_addr %0 to [init] %3 : $*T
   destroy_addr %3 : $*T
   dealloc_stack %3 : $*T
@@ -199,15 +200,15 @@ bb4:
 
 // CHECK-LABEL: sil @mix_and_match_2 :
 // CHECK: bb0([[ARG:%.*]] : $*T,
-// CHECK-NEXT:   [[STACK:%.*]] = alloc_stack [moved] $T{{[ ]*}} // users:
+// CHECK-NEXT:   [[STACK:%.*]] = alloc_stack [moveable_value_debuginfo] $T{{[ ]*}} // users:
 // CHECK-NEXT:   cond_br {{%.*}}, bb1, bb4
 //
 // CHECK: bb1:
-// CHECK-NEXT:   debug_value [moved] [[STACK]] : $*T, let, name "x"
+// CHECK-NEXT:   debug_value [moveable_value_debuginfo] [[STACK]] : $*T, let, name "x"
 // CHECK-NEXT:   br bb2
 //
 // CHECK: bb2:
-// CHECK:        debug_value [moved] [[STACK]] : $*T, let, name "y"
+// CHECK:        debug_value [moveable_value_debuginfo] [[STACK]] : $*T, let, name "y"
 // CHECK-NEXT:   br bb3
 //
 // CHECK: bb3:
@@ -233,7 +234,7 @@ bb0(%0 : $*T, %1: $Builtin.Int1):
   cond_br %1, bb1, bb2
 
 bb1:
-  %2 = alloc_stack [moved] $T, let, name "x"
+  %2 = alloc_stack [moveable_value_debuginfo] $T, let, name "x"
   copy_addr %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T

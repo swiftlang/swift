@@ -32,11 +32,11 @@ public enum PublicEnum {
 }
 
 public struct PublicStruct {}
-@_spi(S) public struct SPIStruct {} // expected-note {{type declared here}}
+@_spi(S) public struct SPIStruct {} // expected-note {{struct declared here}}
 
 public enum PublicEnumWithPayloads {
   case publicCasePublicPayload(_ s: PublicStruct)
-  case publicCaseSPIPayload(_ s: SPIStruct) // expected-error {{cannot use struct 'SPIStruct' here; it is SPI}}
+  case publicCaseSPIPayload(_ s: SPIStruct) // expected-error {{cannot use struct 'SPIStruct' in an associated value of a public or '@usableFromInline' enum; it is SPI}}
   @_spi(S) case spiCasePublicPayload(_ s: PublicStruct)
   @_spi(S) case spiCaseSPIPayload(_ s: SPIStruct)
 }

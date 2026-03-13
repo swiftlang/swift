@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name property_abstraction %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name property_abstraction %s | %FileCheck %s
 
 struct Int {
   mutating func foo() {}
@@ -38,7 +38,7 @@ func inOutFunc(_ f: inout ((Int) -> Int)) { }
 // CHECK-LABEL: sil hidden [ossa] @$s20property_abstraction6inOutF{{[_0-9a-zA-Z]*}}F : 
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Foo<Int, Int>):
 // CHECK:   [[XBOX:%.*]] = alloc_box ${ var Foo<Int, Int> }, var, name "x"
-// CHECK:   [[XBOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[XBOX]]
+// CHECK:   [[XBOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[XBOX]]
 // CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX_LIFETIME]] : ${ var Foo<Int, Int> }, 0
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   store [[ARG_COPY]] to [init] [[XBOX_PB]]

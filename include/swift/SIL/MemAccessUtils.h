@@ -164,6 +164,14 @@ inline SILValue stripAccessMarkers(SILValue v) {
   return v;
 }
 
+inline bool isGuaranteedAddressReturn(SILValue value) {
+  auto *defInst = dyn_cast_or_null<ApplyInst>(value->getDefiningInstruction());
+  if (!defInst) {
+    return false;
+  }
+  return defInst->hasAddressResult();
+}
+
 /// Return the source address after stripping as many access projections as
 /// possible without losing the address type.
 ///
@@ -237,8 +245,8 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
   return !(a == SILAccessKind::Read && b == SILAccessKind::Read);
 }
 
-/// Whether \p instruction accesses storage whose representation is unidentified
-/// such as by reading a pointer.
+/// Whether \p instruction accesses storage whose representation is either (1)
+/// unidentified such as by reading a pointer or (2) global.
 bool mayAccessPointer(SILInstruction *instruction);
 
 /// Whether this instruction loads or copies a value whose storage does not
@@ -247,7 +255,7 @@ bool mayLoadWeakOrUnowned(SILInstruction* instruction);
 
 /// Conservatively, whether this instruction could involve a synchronization
 /// point like a memory barrier, lock or syscall.
-bool maySynchronizeNotConsideringSideEffects(SILInstruction* instruction);
+bool maySynchronize(SILInstruction* instruction);
 
 /// Conservatively, whether this instruction could be a barrier to hoisting
 /// destroys.
@@ -375,12 +383,12 @@ protected:
     // Define bits for use in AccessStorageAnalysis. Each identified storage
     // object is mapped to one instance of this subclass.
     SWIFT_INLINE_BITFIELD_FULL(StorageAccessInfo, AccessRepresentation,
-                               64 - NumAccessRepresentationBits,
+                               64 - NumberOfAccessRepresentationBits,
                                accessKind : NumSILAccessKindBits,
                                noNestedConflict : 1,
-                               storageIndex : 64 - (NumAccessRepresentationBits
-                                                    + NumSILAccessKindBits
-                                                    + 1));
+                               storageIndex : 64 -
+                                   (NumberOfAccessRepresentationBits +
+                                    NumSILAccessKindBits + 1));
 
     // Define bits for use in the AccessEnforcementOpts pass. Each begin_access
     // in the function is mapped to one instance of this subclass.  Reserve a
@@ -390,13 +398,11 @@ protected:
     //
     // `AccessRepresentation` refers to the AccessRepresentationBitfield defined
     // above, setting aside enough bits for common data.
-    SWIFT_INLINE_BITFIELD_FULL(AccessEnforcementOptsInfo,
-                               AccessRepresentation,
-                               64 - NumAccessRepresentationBits,
-                               seenNestedConflict : 1,
-                               seenIdenticalStorage : 1,
-                               beginAccessIndex :
-                                 62 - NumAccessRepresentationBits);
+    SWIFT_INLINE_BITFIELD_FULL(AccessEnforcementOptsInfo, AccessRepresentation,
+                               64 - NumberOfAccessRepresentationBits,
+                               seenNestedConflict : 1, seenIdenticalStorage : 1,
+                               beginAccessIndex : 62 -
+                                   NumberOfAccessRepresentationBits);
 
     // Define data flow bits for use in the AccessEnforcementDom pass. Each
     // begin_access in the function is mapped to one instance of this subclass.
@@ -638,6 +644,13 @@ public:
     return findOwnershipReferenceRoot(getReference());
   }
 
+  /// Return the OSSA root of the reference being accessed
+  /// looking through struct_extract, tuple_extract, etc.
+  /// Precondition: isReference() is true.
+  SILValue getOwnershipReferenceAggregate() const {
+    return findOwnershipReferenceAggregate(getReference());
+  }
+  
   /// Return the storage root of the reference being accessed.
   ///
   /// Precondition: isReference() is true.
@@ -887,10 +900,10 @@ namespace swift {
 /// For convenience, encapsulate and AccessStorage value along with its
 /// accessed base address.
 struct AccessStorageWithBase {
-  /// Identical to AccessStorage::compute but preserves the access base.
+  /// Identical to AccessStorage::computeInScope but walks through begin_access.
   static AccessStorageWithBase compute(SILValue sourceAddress);
 
-  /// Identical to AccessStorage::computeInScope but preserves the base.
+  /// Identical to AccessStorage::compute but stops at begin_access
   static AccessStorageWithBase computeInScope(SILValue sourceAddress);
 
   AccessStorage storage;
@@ -945,7 +958,7 @@ struct RelativeAccessStorageWithBase {
   AccessStorageWithBase storageWithBase;
   /// The most transformative cast that was seen between when walking from
   /// address to storage.base;
-  Optional<AccessStorageCast> cast;
+  std::optional<AccessStorageCast> cast;
 
   AccessStorage getStorage() const { return storageWithBase.storage; }
 };
@@ -1254,6 +1267,8 @@ struct AccessPathWithBase {
     return AccessBase(base, accessPath.getStorage().getKind());
   }
 
+  bool isValid() const { return base && accessPath.isValid(); }
+
   bool operator==(AccessPathWithBase other) const {
     return accessPath == other.accessPath && base == other.base;
   }
@@ -1269,8 +1284,10 @@ struct AccessPathWithBase {
 //
 // The "product leaves" are the leaves obtained by only looking through type
 // products (structs and tuples) and NOT type sums (enums).
-void visitProductLeafAccessPathNodes(
-    SILValue address, TypeExpansionContext tec, SILModule &module,
+//
+// Returns false if the access path couldn't be computed.
+bool visitProductLeafAccessPathNodes(
+    SILValue address, TypeExpansionContext tec, SILFunction &function,
     std::function<void(AccessPath::PathNode, SILType)> visitor);
 
 inline AccessPath AccessPath::compute(SILValue address) {
@@ -1396,6 +1413,12 @@ bool visitAccessStorageUses(AccessUseVisitor &visitor, AccessStorage storage,
 /// visitor's visitUse method returns true.
 bool visitAccessPathUses(AccessUseVisitor &visitor, AccessPath accessPath,
                          SILFunction *function);
+
+/// Similar to visitAccessPathUses, but the visitor is restricted to a specific
+/// access base, such as a particular ref_element_addr.
+bool visitAccessPathBaseUses(AccessUseVisitor &visitor,
+                             AccessPathWithBase accessPathWithBase,
+                             SILFunction *function);
 
 } // end namespace swift
 
@@ -1583,6 +1606,13 @@ inline bool isAccessStorageTypeCast(SingleValueInstruction *svi) {
   switch (svi->getKind()) {
   default:
     return false;
+  // This extracts out the block storage from an alloc_stack. We do not want
+  // to treat it as any more than a cast of the underlying value.
+  case SILInstructionKind::ProjectBlockStorageInst:
+  // Simply pass-thru the incoming address.  But change its type!
+  case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   // Simply pass-thru the incoming address.  But change its type!
   case SILInstructionKind::UncheckedAddrCastInst:
   // Casting to RawPointer does not affect the AccessPath. When converting
@@ -1623,11 +1653,29 @@ inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
 
   // Simply pass-thru the incoming address.
   case SILInstructionKind::MarkUninitializedInst:
-  case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+  case SILInstructionKind::DropDeinitInst:
+  case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::BeginBorrowInst:
     return true;
   }
+}
+
+// Strip access markers and casts that preserve the address type.
+//
+// Consider using RelativeAccessStorageWithBase::compute().
+inline SILValue stripAccessAndIdentityCasts(SILValue v) {
+  if (auto *bai = dyn_cast<BeginAccessInst>(v)) {
+    return stripAccessAndIdentityCasts(bai->getOperand());
+  }
+  if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
+    if (isAccessStorageIdentityCast(svi)) {
+      return stripAccessAndIdentityCasts(svi->getAllOperands()[0].get());
+    }
+  }
+  return v;
 }
 
 /// An address, pointer, or box cast that occurs outside of the formal
@@ -1644,6 +1692,22 @@ inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
 /// which we can't do if those operations are behind access projections.
 inline bool isAccessStorageCast(SingleValueInstruction *svi) {
   return isAccessStorageTypeCast(svi) || isAccessStorageIdentityCast(svi);
+}
+
+// Strip access markers and casts that preserve the access storage.
+//
+// Compare to stripAccessAndIdentityCasts.  This function strips cast that
+// change the type.
+inline SILValue stripAccessAndAccessStorageCasts(SILValue v) {
+  if (auto *bai = dyn_cast<BeginAccessInst>(v)) {
+    return stripAccessAndAccessStorageCasts(bai->getOperand());
+  }
+  if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
+    if (isAccessStorageCast(svi)) {
+      return stripAccessAndAccessStorageCasts(svi->getAllOperands()[0].get());
+    }
+  }
+  return v;
 }
 
 /// Abstract CRTP class for a visiting instructions that are part of the use-def
@@ -1743,6 +1807,14 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
     }
     if (isExternalGlobalAddressor(cast<ApplyInst>(sourceAddr)))
       return asImpl().visitUnidentified(sourceAddr);
+
+    if (isGuaranteedAddressReturn(sourceAddr)) {
+      auto *selfOp = &cast<ApplyInst>(sourceAddr)->getSelfArgumentOperand();
+      if (selfOp->get()->getType().isObject()) {
+        return asImpl().visitUnidentified(sourceAddr);
+      }
+      return asImpl().visitAccessProjection(cast<ApplyInst>(sourceAddr), selfOp);
+    }
 
     // Don't currently allow any other calls to return an accessed address.
     return asImpl().visitNonAccess(sourceAddr);
@@ -1886,7 +1958,8 @@ public:
   }
 
   SILValue visitPhi(SILPhiArgument *phi) {
-    assert(false && "unexpected phi on access path");
+    // "Address" phis can happen because we look through `pointer_to_address`
+    // instructions and a phi can be a `Builtin.RawPointer`.
     return SILValue();
   }
 
@@ -1914,8 +1987,6 @@ public:
 /// Clone all projections and casts on the access use-def chain until the
 /// checkBase predicate returns a valid base.
 ///
-/// Returns the cloned value equivalent to \p addr.
-///
 /// This will not clone ref_element_addr or ref_tail_addr because those aren't
 /// part of the access chain.
 ///
@@ -1923,7 +1994,7 @@ public:
 /// returns a valid SILValue to use as the base of the cloned access path, or an
 /// invalid SILValue to continue cloning.
 ///
-/// CheckBase must return a valid SILValue before attempting to clone the
+/// CheckBase must return a valid SILValue either before attempting to clone the
 /// access base. The most basic valid predicate is:
 ///
 ///    auto checkBase = [&](SILValue srcAddr) {
@@ -1938,8 +2009,6 @@ SILValue cloneUseDefChain(SILValue addr, SILInstruction *insertionPoint,
 
 /// Analog to cloneUseDefChain to check validity. begin_borrow and
 /// mark_dependence currently cannot be cloned.
-///
-/// Returns the cloned value equivalent to \p addr.
 template <typename CheckBase>
 bool canCloneUseDefChain(SILValue addr, CheckBase checkBase) {
   return AccessUseDefChainCloner<CheckBase>(checkBase, nullptr)

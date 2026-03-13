@@ -19,13 +19,12 @@
 #ifndef SWIFT_BASIC_VERSION_H
 #define SWIFT_BASIC_VERSION_H
 
-
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/VersionTuple.h"
 #include <array>
+#include <optional>
 #include <string>
 
 namespace swift {
@@ -64,6 +63,9 @@ public:
   /// Create a literal version from a list of components.
   Version(std::initializer_list<unsigned> Values) : Components(Values) {}
 
+  /// Create a version from an llvm::VersionTuple.
+  Version(const llvm::VersionTuple &version);
+
   /// Return a string to be used as an internal preprocessor define.
   ///
   /// The components of the version are multiplied element-wise by
@@ -90,8 +92,7 @@ public:
     return Components.empty();
   }
 
-  /// Convert to a (maximum-4-element) llvm::VersionTuple, truncating
-  /// away any 5th component that might be in this version.
+  /// Convert to an llvm::VersionTuple.
   operator llvm::VersionTuple() const;
 
   /// Returns the concrete version to use when \e this version is provided as
@@ -102,7 +103,7 @@ public:
   /// support for. It's also common for valid versions to produce a different
   /// result; for example "-swift-version 3" at one point instructed the
   /// compiler to act as if it is version 3.1.
-  Optional<Version> getEffectiveLanguageVersion() const;
+  std::optional<Version> getEffectiveLanguageVersion() const;
 
   /// Whether this version is greater than or equal to the given major version
   /// number.
@@ -129,11 +130,12 @@ public:
   /// SWIFT_VERSION_MINOR.
   static Version getCurrentLanguageVersion();
 
-  // List of backward-compatibility versions that we permit passing as
-  // -swift-version <vers>
-  static std::array<StringRef, 3> getValidEffectiveVersions() {
-    return {{"4", "4.2", "5"}};
-  };
+  /// Returns a major version to represent the next future language mode. This
+  /// exists to make it easier to find and update clients when a new language
+  /// mode is added.
+  static constexpr unsigned getFutureMajorLanguageVersion() {
+    return 7;
+  }
 };
 
 bool operator>=(const Version &lhs, const Version &rhs);
@@ -162,13 +164,22 @@ std::string getSwiftFullVersion(Version effectiveLanguageVersion =
 /// this Swift was built.
 StringRef getSwiftRevision();
 
-/// Is the running compiler built with a version tag for distribution?
-/// When true, \c version::getCurrentCompilerVersion returns a valid version
-/// and \c getCurrentCompilerTag returns the version tuple in string format.
-bool isCurrentCompilerTagged();
-
-/// Retrieves the distribtion tag of the running compiler, if any.
+/// Retrieves the distribution tag of the running compiler, if any.
 StringRef getCurrentCompilerTag();
+
+/// Retrieves the distribution tag of the running compiler for serialization,
+/// if any. This can hold more information than \c getCurrentCompilerTag
+/// depending on the vendor.
+StringRef getCurrentCompilerSerializationTag();
+
+/// Distribution channel of the running compiler for distributed swiftmodules.
+/// Helps to distinguish swiftmodules between different compilers using the
+/// same serialization tag.
+StringRef getCurrentCompilerChannel();
+
+/// Retrieves the version of the running compiler. It could be a tag or
+/// a "development" version that only has major/minor.
+std::string getCompilerVersion();
 
 } // end namespace version
 } // end namespace swift

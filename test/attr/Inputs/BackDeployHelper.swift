@@ -94,20 +94,20 @@ extension ReferenceIntArray: Countable {
 #if !STRIP_V2_APIS
 
 @available(BackDeploy 1.0, *)
-@_backDeploy(before: BackDeploy 2.0)
+@backDeployed(before: BackDeploy 2.0)
 public func trivial() {
   testPrint(handle: #dsohandle, "trivial")
 }
 
 @available(BackDeploy 1.0, *)
-@_backDeploy(before: BackDeploy 2.0)
+@backDeployed(before: BackDeploy 2.0)
 public func pleaseThrow(_ shouldThrow: Bool) throws -> Bool {
   if shouldThrow { throw BadError.bad }
   return !shouldThrow
 }
 
 @available(BackDeploy 1.0, *)
-@_backDeploy(before: BackDeploy 2.0)
+@backDeployed(before: BackDeploy 2.0)
 public func genericAppend<T: Appendable>(
   _ a: inout T,
   _ x: __owned T.Element
@@ -116,37 +116,37 @@ public func genericAppend<T: Appendable>(
 }
 
 @available(BackDeploy 1.0, *)
-@_backDeploy(before: BackDeploy 2.0)
+@backDeployed(before: BackDeploy 2.0)
 public func existentialCount(_ c: any Countable) -> Int {
   c.count
 }
 
 extension IntArray {
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public var values: [Int] { _values }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public init() { self.init([]) }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public func print() {
-    // Tests recursive @_backDeploy since `Array.print()` is also @_backDeploy
+    // Tests recursive @backDeployed since `Array.print()` is also @backDeployed
     _values.print()
   }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public static var empty: Self { IntArray([]) }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public func toCountable() -> any Countable { self }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   @inlinable
   public subscript(_ i: Int) -> Int {
     get { _values[i] }
@@ -154,13 +154,13 @@ extension IntArray {
   }
   
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public var rawValues: [Int] {
     _read { yield _values }
   }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public mutating func removeLast() -> Int? {
     defer { _values.removeLast() }
     return _values.last
@@ -169,36 +169,36 @@ extension IntArray {
 
 extension ReferenceIntArray {
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public convenience init() { self.init([]) }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public final var values: [Int] { _values }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public final func print() {
-    // Tests recursive @_backDeploy since `Array.print()` is also @_backDeploy
+    // Tests recursive @backDeployed since `Array.print()` is also @backDeployed
     _values.print()
   }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public final func copy() -> ReferenceIntArray {
     return ReferenceIntArray(values)
   }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public final class var empty: ReferenceIntArray { ReferenceIntArray([]) }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public final func toCountable() -> any Countable { self }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   @inlinable
   public final subscript(_ i: Int) -> Int {
     get { _values[i] }
@@ -206,13 +206,13 @@ extension ReferenceIntArray {
   }
   
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public final var rawValues: [Int] {
     _read { yield _values }
   }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public final func removeLast() -> Int? {
     defer { _values.removeLast() }
     return _values.last
@@ -221,7 +221,7 @@ extension ReferenceIntArray {
 
 extension Array {
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public func print() {
     testPrint(handle: #dsohandle, description)
   }
@@ -229,7 +229,7 @@ extension Array {
 
 extension BadError {
   @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
+  @backDeployed(before: BackDeploy 2.0)
   public init?(fromEmoji emoji: Character) {
     switch emoji {
     case "❗️": self = .bad

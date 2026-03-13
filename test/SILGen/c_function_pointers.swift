@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -verify %s | %FileCheck %s
 
 if true {
   var x = 0 // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
@@ -107,4 +107,12 @@ class Selfless {
     calls_no_args { _ = Self.self; return 0 }
     // expected-error@-1 {{a C function pointer cannot be formed from a closure that captures dynamic Self type}}
   }
+}
+
+enum E {
+    case x(@convention(c) (Float, Bool) -> UnsafeRawPointer?)
+}
+
+func non_trivial_conversion() -> E {
+  return E.x { x, y in nil }
 }

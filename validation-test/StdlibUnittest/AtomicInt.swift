@@ -5,7 +5,7 @@
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 // REQUIRES: stress_test
-// UNSUPPORTED: single_threaded_runtime
+// UNSUPPORTED: threading_none
 
 import SwiftPrivate
 import StdlibUnittest
@@ -795,6 +795,103 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialData {
   }
 }
 
+struct AtomicAcquiringARCRefRaceTest: RaceTestWithPerTrialData {
+  typealias DummyObject = AtomicInitializeARCRefRaceTest.DummyObject
+
+  class RaceData {
+    var _atomicReference: DummyObject? = nil
+
+    var atomicReferencePtr: UnsafeMutablePointer<DummyObject?> {
+      _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+        to: Optional<DummyObject>.self)
+    }
+
+    init() {}
+  }
+
+  typealias ThreadLocalData = _stdlib_ShardedAtomicCounter.PRNG
+  typealias Observation = Observation4UInt
+
+  func makeRaceData() -> RaceData {
+    RaceData()
+  }
+
+  func makeThreadLocalData() -> ThreadLocalData {
+    ThreadLocalData()
+  }
+
+  func thread1(
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
+  ) -> Observation {
+    var observation = Observation4UInt(0, 0, 0, 0)
+    let initializerDestroyed = HeapBool(false)
+    do {
+      let object = DummyObject(
+        destroyedFlag: initializerDestroyed,
+        randomInt: threadLocalData.randomInt())
+      let value = Unmanaged.passUnretained(object)
+      let result = _stdlib_atomicAcquiringInitializeARCRef(
+        object: raceData.atomicReferencePtr, desired: object)
+      observation.data1 = (result.toOpaque() == value.toOpaque()  ? 1 : 0)
+      if let loaded =
+        _stdlib_atomicAcquiringLoadARCRef(object: raceData.atomicReferencePtr) {
+        observation.data2 = UInt(bitPattern: loaded.toOpaque())
+        observation.data3 = loaded._withUnsafeGuaranteedRef { $0.payload }
+      }
+    }
+    observation.data4 = initializerDestroyed.value ? 1 : 0
+    return observation
+  }
+
+  func evaluateObservations(
+    _ observations: [Observation],
+    _ sink: (RaceTestObservationEvaluation) -> Void
+  ) {
+    let ref = observations[0].data2
+    if observations.contains(where: { $0.data2 != ref }) {
+      for observation in observations {
+        sink(.failureInteresting("mismatched reference, expected \(ref): \(observation)"))
+      }
+      return
+    }
+    if observations.contains(where: { $0.data3 != 0x12345678 }) {
+      for observation in observations {
+        sink(.failureInteresting("wrong data: \(observation)"))
+      }
+      return
+    }
+
+    var wonRace = 0
+    var lostRace = 0
+    for observation in observations {
+      switch (observation.data1, observation.data4) {
+      case (1, 0):
+        // Won race, value not destroyed.
+        wonRace += 1
+      case (0, 1):
+        // Lost race, value destroyed.
+        lostRace += 1
+      default:
+        sink(.failureInteresting(String(describing: observation)))
+      }
+    }
+    if wonRace != 1 {
+      for observation in observations {
+        sink(.failureInteresting("zero or more than one thread won race: \(observation)"))
+      }
+      return
+    }
+    if lostRace < 1 {
+      for observation in observations {
+        sink(.failureInteresting("no thread lost race: \(observation)"))
+      }
+      return
+    }
+
+    sink(.pass)
+  }
+}
+
 var AtomicIntTestSuite = TestSuite("AtomicInt")
 
 AtomicIntTestSuite.test("fetchAndAdd/1") {
@@ -841,11 +938,16 @@ AtomicIntTestSuite.test("fetchAndXor/1") {
 
 var AtomicARCRefTestSuite = TestSuite("AtomicARCRef")
 
-AtomicARCRefTestSuite.test("initialize,load") {
+AtomicARCRefTestSuite.test("seqcst_initialize,load") {
   runRaceTest(AtomicInitializeARCRefRaceTest.self,
     operations: 25600, timeoutInSeconds: 60)
   expectEqual(0, dummyObjectCount.getSum())
 }
 
-runAllTests()
+AtomicARCRefTestSuite.test("acquire_initialize,load") {
+  runRaceTest(AtomicAcquiringARCRefRaceTest.self,
+    operations: 25600, timeoutInSeconds: 60)
+  expectEqual(0, dummyObjectCount.getSum())
+}
 
+runAllTests()

@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend -typecheck -verify -disable-objc-attr-requires-foundation-module -enable-objc-interop %t_no_errors.swift
 
 // NORESULT: Token
-// NORESULT-NOT: Begin completions
 
 @objc
 class TagPA {}
@@ -20,21 +19,17 @@ protocol ProtocolA {
   var protoAVarRW: Int { get set }
   var protoAVarRO: Int { get }
 }
-// WITH_PA: Begin completions
 // WITH_PA-DAG: Decl[Constructor]/Super:    required init(fromProtocolA: Int) {|}{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional() {|}{{; name=.+$}}
 // WITH_PA-DAG: Decl[Subscript]/Super:      subscript(a: TagPA) -> Int {|}{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: Int{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceVar]/Super:    var protoAVarRO: Int{{; name=.+$}}
-// WITH_PA: End completions
 
-// WITH_PA_NO_PROTOFUNCA: Begin completions
 // WITH_PA_NO_PROTOFUNCA-DAG: Decl[Constructor]/Super:    required init(fromProtocolA: Int) {|}{{; name=.+$}}
 // WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional() {|}{{; name=.+$}}
 // WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: Int{{; name=.+$}}
 // WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceVar]/Super:    var protoAVarRO: Int{{; name=.+$}}
-// WITH_PA_NO_PROTOFUNCA: End completions
 
 struct TagPB {}
 protocol ProtocolB : ProtocolA {
@@ -47,14 +42,12 @@ protocol ProtocolB : ProtocolA {
   var protoBVarRW: Int { get set }
   var protoBVarRO: Int { get }
 }
-// WITH_PB: Begin completions
 // WITH_PB-DAG: Decl[Constructor]/Super:    required init(fromProtocolA: Int) {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoBFunc() {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[Subscript]/Super:      subscript(a: TagPB) -> Int {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceVar]/Super:    var protoBVarRW: Int{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceVar]/Super:    var protoBVarRO: Int{{; name=.+$}}
-// WITH_PB: End completions
 
 struct TagPE {}
 protocol ProtocolE {
@@ -67,13 +60,11 @@ protocol ProtocolE {
   var protoEVarRW: Int { get set }
   var protoEVarRO: Int { get }
 }
-// WITH_PE: Begin completions
 // WITH_PE-DAG: Decl[Constructor]/Super:    required init(fromProtocolE: Int) {|}{{; name=.+$}}
 // WITH_PE-DAG: Decl[InstanceMethod]/Super: func protoEFunc() {|}{{; name=.+$}}
 // WITH_PE-DAG: Decl[Subscript]/Super:      subscript(a: TagPE) -> Int {|}{{; name=.+$}}
 // WITH_PE-DAG: Decl[InstanceVar]/Super:    var protoEVarRW: Int{{; name=.+$}}
 // WITH_PE-DAG: Decl[InstanceVar]/Super:    var protoEVarRO: Int{{; name=.+$}}
-// WITH_PE: End completions
 
 class BaseA {
   init(fromBaseA: Int) {}
@@ -88,14 +79,12 @@ class BaseA {
   var baseAVarRW: Int { get { return 0 } set {} }
   var baseAVarRO: Int { return 0 }
 }
-// WITH_BA: Begin completions
 // WITH_BA-DAG: Decl[Constructor]/Super:    override init(fromBaseA: Int) {|}{{; name=.+$}}
 // WITH_BA-DAG: Decl[Constructor]/Super:    override init(fromBaseAWithParamName foo: Int, withOther bar: Double) {|}{{; name=.+$}}
 // WITH_BA-DAG: Decl[InstanceMethod]/Super: override func baseAFunc(foo x: Int) {|}{{; name=.+$}}
 // WITH_BA-DAG: Decl[InstanceMethod]/Super: override func baseAFunc2(foo x: Int) {|}{{; name=.+$}}
 // WITH_BA-DAG: Decl[InstanceVar]/Super:    override var baseAVarRW: Int{{; name=.+$}}
 // WITH_BA-DAG: Decl[InstanceVar]/Super:    override var baseAVarRO: Int{{; name=.+$}}
-// WITH_BA: End completions
 
 class BaseB : BaseA {
   override func baseAFunc2(foo x: Int) {}
@@ -110,7 +99,6 @@ class BaseB : BaseA {
   var baseBVarRW: Int { get { return 0 } set {} }
   var baseBVarRO: Int { return 0 }
 }
-// WITH_BB: Begin completions
 // WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseAFunc(foo x: Int) {|}{{; name=.+$}}
 // WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseAFunc2(foo x: Int) {|}{{; name=.+$}}
 // WITH_BB-DAG: Decl[Constructor]/Super:    override init(fromBaseB: Int) {|}{{; name=.+$}}
@@ -119,7 +107,6 @@ class BaseB : BaseA {
 // WITH_BB-DAG: Decl[InstanceVar]/Super:    override var baseAVarRO: Int{{; name=.+$}}
 // WITH_BB-DAG: Decl[InstanceVar]/Super:    override var baseBVarRW: Int{{; name=.+$}}
 // WITH_BB-DAG: Decl[InstanceVar]/Super:    override var baseBVarRO: Int{{; name=.+$}}
-// WITH_BB: End completions
 
 class BaseE : ProtocolE {
   required init(fromProtocolE: Int) {}
@@ -138,7 +125,6 @@ class BaseE : ProtocolE {
   var baseEVarRW: Int { get { return 0 } set {} }
   var baseEVarRO: Int { return 0 }
 }
-// WITH_BE: Begin completions
 // WITH_BE-DAG: Decl[Constructor]/Super:    required init(fromProtocolE: Int) {|}{{; name=.+$}}
 // WITH_BE-DAG: Decl[InstanceMethod]/Super: override func protoEFunc() {|}{{; name=.+$}}
 // WITH_BE-DAG: Decl[Subscript]/Super:      override subscript(a: TagPE) -> Int {|}{{; name=.+$}}
@@ -148,7 +134,6 @@ class BaseE : ProtocolE {
 // WITH_BE-DAG: Decl[InstanceVar]/Super:    override var protoEVarRO: Int{{; name=.+$}}
 // WITH_BE-DAG: Decl[InstanceVar]/Super:    override var baseEVarRW: Int{{; name=.+$}}
 // WITH_BE-DAG: Decl[InstanceVar]/Super:    override var baseEVarRO: Int{{; name=.+$}}
-// WITH_BE: End completions
 
 class ProtocolEImpl /* : ProtocolE but does not implement the protocol */ {
   init(fromProtocolE: Int) {}
@@ -160,13 +145,11 @@ class ProtocolEImpl /* : ProtocolE but does not implement the protocol */ {
   var protoEVarRW: Int { get { return 0 } set {} }
   var protoEVarRO: Int { return 0 }
 }
-// WITH_PEI: Begin completions
 // WITH_PEI-DAG: Decl[Constructor]/Super:    override init(fromProtocolE: Int) {|}{{; name=.+$}}
 // WITH_PEI-DAG: Decl[InstanceMethod]/Super: override func protoEFunc() {|}{{; name=.+$}}
 // WITH_PEI-DAG: Decl[Subscript]/Super:      override subscript(a: TagPE) -> Int {|}{{; name=.+$}}
 // WITH_PEI-DAG: Decl[InstanceVar]/Super:    override var protoEVarRW: Int{{; name=.+$}}
 // WITH_PEI-DAG: Decl[InstanceVar]/Super:    override var protoEVarRO: Int{{; name=.+$}}
-// WITH_PEI: End completions
 
 // NO_ERRORS_UP_TO_HERE
 
@@ -259,14 +242,12 @@ extension TestProtocol_PA {
   #^PROTOCOL_PA_EXT?keywords=false^#
 }
 
-// PROTOCOL_PA_EXT: Begin completions
 // PROTOCOL_PA_EXT-DAG: Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA:)
 // PROTOCOL_PA_EXT-DAG: Decl[InstanceMethod]/Super:         func protoAFunc() {|}; name=protoAFunc()
 // PROTOCOL_PA_EXT-DAG: Decl[InstanceMethod]/Super:         func protoAFuncOptional() {|}; name=protoAFuncOptional()
 // PROTOCOL_PA_EXT-DAG: Decl[Subscript]/Super:              subscript(a: TagPA) -> Int {|}; name=subscript(:)
 // PROTOCOL_PA_EXT-DAG: Decl[InstanceVar]/Super:            var protoAVarRW: Int; name=protoAVarRW
 // PROTOCOL_PA_EXT-DAG: Decl[InstanceVar]/Super:            var protoAVarRO: Int; name=protoAVarRO
-// PROTOCOL_PA_EXT: End completions
 
 class OuterNominal : ProtocolA {
   class Inner {
@@ -290,20 +271,17 @@ class OmitKW1 : ProtocolA {
   override#^OMIT_KEYWORD1?keywords=false^#
 }
 
-// OMIT_KEYWORD1:        Begin completions
 // OMIT_KEYWORD1-NOT:    Decl[Constructor]
 // OMIT_KEYWORD1-DAG:    Decl[InstanceMethod]/Super:         func protoAFunc() {|}; name=protoAFunc(){{$}}
 // OMIT_KEYWORD1-DAG:    Decl[InstanceMethod]/Super:         func protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
 // OMIT_KEYWORD1-DAG:    Decl[Subscript]/Super:              subscript(a: TagPA) -> Int {|}; name=subscript(:)
 // OMIT_KEYWORD1-DAG:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD1-NOT:    Decl[Constructor]
-// OMIT_KEYWORD1: End completions
 
 class OmitKW2 : ProtocolA {
   override func#^OMIT_KEYWORD2?keywords=false^#
 }
 
-// OMIT_KEYWORD2:        Begin completions
 // OMIT_KEYWORD2-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD2-NOT:    Decl[Constructor]
 // OMIT_KEYWORD2-NOT:    Decl[Subscript]
@@ -312,13 +290,11 @@ class OmitKW2 : ProtocolA {
 // OMIT_KEYWORD2-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD2-NOT:    Decl[Constructor]
 // OMIT_KEYWORD2-NOT:    Decl[Subscript]
-// OMIT_KEYWORD2: End completions
 
 class OmitKW3 : ProtocolA {
   func#^OMIT_KEYWORD3?keywords=false^#
 }
 
-// OMIT_KEYWORD3:        Begin completions
 // FIXME: missing 'override'
 // OMIT_KEYWORD3-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD3-NOT:    Decl[Constructor]
@@ -328,7 +304,6 @@ class OmitKW3 : ProtocolA {
 // OMIT_KEYWORD3-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD3-NOT:    Decl[Constructor]
 // OMIT_KEYWORD2-NOT:    Decl[Subscript]
-// OMIT_KEYWORD3: End completions
 
 class OmitKW4: ProtocolA {
   var #^OMIT_KEYWORD4?keywords=false^#
@@ -396,9 +371,7 @@ class C_45165: P_45165 {
   #^ISSUE_45165_WHERE_CLAUSE?keywords=false^#
 }
 
-// ISSUE_45165_WHERE_CLAUSE: Begin completions
 // ISSUE_45165_WHERE_CLAUSE: Decl[InstanceMethod]/Super: func foo<S>(x: S) where S : Sequence, S.Element == Int {|};
-// ISSUE_45165_WHERE_CLAUSE: End completions
 
 protocol HasThrowingProtocol {
   func foo() throws
@@ -412,12 +385,10 @@ class HasThrowing {
 class TestClassWithThrows : HasThrowing, HasThrowingProtocol {
   #^HAS_THROWING?keywords=false^#
 }
-// HAS_THROWING: Begin completions
 // HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         func foo() throws {|}; name=foo()
 // HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func bar() throws {|}; name=bar()
 // HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func baz(x: @escaping () throws -> ()) rethrows {|}; name=baz(x:)
 // HAS_THROWING-DAG: Decl[Constructor]/Super:            override init() throws {|}; name=init()
-// HAS_THROWING: End completions
 
 protocol P0
 protocol P1 {
@@ -450,7 +421,7 @@ class EscapingBase {
 class Escaping : EscapingBase {
   override func #^ESCAPING_1?keywords=false^#
 }
-// ESCAPING_1: Decl[InstanceMethod]/Super:         method(_ x: @escaping (@escaping () -> ()) -> (() -> ())) -> ((@escaping () -> ()) -> ()) {|};
+// ESCAPING_1: Decl[InstanceMethod]/Super:         method(_ x: @escaping (@escaping () -> ()) -> () -> ()) -> (@escaping () -> ()) -> () {|};
 // ESCAPING_1: Decl[InstanceMethod]/Super:         autoclosure(arg: @autoclosure () -> Bool) {|};
 class OverrideBase {
   static let staticLet = 0
@@ -588,7 +559,6 @@ class Override26 : OverrideBase, OverrideP {
 // MODIFIER1-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x:)
 // MODIFIER1-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=init(a:)
 // MODIFIER1-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#}; name=Assoc =
-// MODIFIER1: End completions
 
 // MODIFIER2: Begin completions, 6 items
 // MODIFIER2-DAG: Decl[StaticVar]/Super:              override class var classVar: Int; name=classVar
@@ -597,23 +567,19 @@ class Override26 : OverrideBase, OverrideP {
 // MODIFIER2-DAG: Decl[InstanceMethod]/Super:         override func defaultMethod() {|}; name=defaultMethod()
 // MODIFIER2-DAG: Decl[InstanceMethod]/Super:         override func openMethod() {|}; name=openMethod()
 // MODIFIER2-DAG: Decl[InstanceVar]/Super:            override var varDecl: Int; name=varDecl
-// MODIFIER2: End completions
 
 // MODIFIER4: Begin completions, 3 items
 // MODIFIER4-DAG: Decl[Constructor]/Super:            init(p: Int) {|}; name=init(p:)
 // MODIFIER4-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x:)
 // MODIFIER4-DAG: Decl[Constructor]/Super:            init(a: Int) {|}; name=init(a:)
-// MODIFIER4: End completions
 
 // MODIFIER5: Begin completions, 3 items
 // MODIFIER5-DAG: Decl[Constructor]/Super:            required init(p: Int) {|}; name=init(p:)
 // MODIFIER5-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x:)
 // MODIFIER5-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=init(a:)
-// MODIFIER5: End completions
 
 // MODIFIER6: Begin completions, 1 items
 // MODIFIER6-DAG: Decl[AssociatedType]/Super:         Assoc = {#(Type)#}; name=Assoc =
-// MODIFIER6: End completions
 
 // MODIFIER7: Begin completions, 8 items
 // MODIFIER7-DAG: Decl[StaticVar]/Super:              class var classVar: Int; name=classVar
@@ -624,52 +590,42 @@ class Override26 : OverrideBase, OverrideP {
 // MODIFIER7-DAG: Decl[InstanceMethod]/Super:         func openMethod() {|}; name=openMethod()
 // MODIFIER7-DAG: Decl[Constructor]/Super:            init(x: Int) {|}; name=init(x:)
 // MODIFIER7-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=init(a:)
-// MODIFIER7: End completions
 
 // MODIFIER8: Begin completions, 2 items
 // MODIFIER8-DAG: Decl[InstanceMethod]/Super/Erase[5]: override func defaultMethod() {|}; name=defaultMethod()
 // MODIFIER8-DAG: Decl[InstanceMethod]/Super/Erase[5]: override func openMethod() {|}; name=openMethod()
-// MODIFIER8: End completions
 
 // MODIFIER9: Begin completions, 1 items
 // MODIFIER9-DAG: Decl[InstanceVar]/Super/Erase[4]:   override var varDecl: Int; name=varDecl
-// MODIFIER9: End completions
 
 // MODIFIER12: Begin completions, 1 items
 // MODIFIER12-DAG: Decl[InstanceVar]/Super:           varDecl: Int; name=varDecl
-// MODIFIER12: End completions
 
 // MODIFIER13-NOT: Begin completions
 
 // MODIFIER15: Begin completions, 2 items
 // MODIFIER15-DAG: Decl[StaticVar]/Super/Erase[4]:    override var classVar: Int; name=classVar
 // MODIFIER15-DAG: Decl[StaticVar]/Super/Erase[4]:    override var classGetOnlyVar: Int; name=classGetOnlyVar
-// MODIFIER15: End completions
 
 // MODIFIER17: Begin completions, 2 items
 // MODIFIER17-DAG: Decl[StaticVar]/Super:             classVar: Int; name=classVar
 // MODIFIER17-DAG: Decl[StaticVar]/Super:             classGetOnlyVar: Int; name=classGetOnlyVar
-// MODIFIER17: End completions
 
 // MODIFIER21: Begin completions, 1 items
 // MODIFIER21: Decl[StaticMethod]/Super:              classMethod() {|}; name=classMethod()
-// MODIFIER21: End completions
 
 // MODIFIER22: Begin completions, 1 items
 // MODIFIER22: Decl[StaticMethod]/Super/Erase[5]:     override func classMethod() {|}; name=classMethod()
-// MODIFIER22: End completions
 
 // MODIFIER23: Begin completions, 3 items
 // MODIFIER23-DAG: Decl[StaticMethod]/Super:          override func classMethod() {|}; name=classMethod()
 // MODIFIER23-DAG: Decl[StaticVar]/Super:             override var classVar: Int; name=classVar
 // MODIFIER23-DAG: Decl[StaticVar]/Super:             override var classGetOnlyVar: Int; name=classGetOnlyVar
-// MODIFIER23: End completions
 
 // MODIFIER24: Begin completions, 3 items
 // MODIFIER24-DAG: Decl[StaticMethod]/Super:          func classMethod() {|}; name=classMethod()
 // MODIFIER24-DAG: Decl[StaticVar]/Super:             var classVar: Int; name=classVar
 // MODIFIER24-DAG: Decl[StaticVar]/Super:             var classGetOnlyVar: Int; name=classGetOnlyVar
-// MODIFIER24: End completions
 
 protocol RequiredP {
   init(p: Int)
@@ -686,15 +642,12 @@ struct RequiredS : RequiredP {
 
 // PROTOINIT_NORM: Begin completions, 1 items
 // PROTOINIT_NORM-DAG: required init(p: Int) {|}; name=init(p:)
-// PROTOINIT_NORM: End completions
 
 // PROTOINIT_FINAL: Begin completions, 1 items
 // PROTOINIT_FINAL-DAG: init(p: Int) {|}; name=init(p:)
-// PROTOINIT_FINAL: End completions
 
 // PROTOINIT_STRUCT: Begin completions, 1 items
 // PROTOINIT_STRUCT-DAG: init(p: Int) {|}; name=init(p:)
-// PROTOINIT_STRUCT: End completions
 
 protocol AssocAndMethod {
   associatedtype T = Int
@@ -709,11 +662,9 @@ protocol AssocAndMethod {
 struct MissingAssoc: AssocAndMethod {
   func #^MISSING_ASSOC_1?keywords=false^#
 }
-// MISSING_ASSOC_1: Begin completions
 // MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f1(_: T) {|};
 // MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f2(_: U) {|};
 // MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f3(_: V) {|};
-// MISSING_ASSOC_1: End completions
 
 // Test that we don't skip out on synthesized conformance members.
 
@@ -721,8 +672,8 @@ struct SynthesizedConformance1: Codable {
   let foo: Int
   #^OVERRIDE_SYNTHESIZED_1?keywords=false^#
 // OVERRIDE_SYNTHESIZED_1: Begin completions,  2 items
-// OVERRIDE_SYNTHESIZED_1-DAG: Decl[Constructor]/Super/IsSystem:       init(from decoder: Decoder) throws {|};
-// OVERRIDE_SYNTHESIZED_1-DAG: Decl[InstanceMethod]/Super/IsSystem:    func encode(to encoder: Encoder) throws {|};
+// OVERRIDE_SYNTHESIZED_1-DAG: Decl[Constructor]/Super/IsSystem:       init(from decoder: any Decoder) throws {|};
+// OVERRIDE_SYNTHESIZED_1-DAG: Decl[InstanceMethod]/Super/IsSystem:    func encode(to encoder: any Encoder) throws {|};
 }
 
 open class SynthesizedConformance2: Codable {
@@ -730,7 +681,7 @@ open class SynthesizedConformance2: Codable {
   func encode(to encoder: Encoder) throws {}
   #^OVERRIDE_SYNTHESIZED_2?keywords=false^#
 // OVERRIDE_SYNTHESIZED_2: Begin completions, 1 items
-// OVERRIDE_SYNTHESIZED_2: Decl[Constructor]/Super/IsSystem:           public required init(from decoder: Decoder) throws {|};
+// OVERRIDE_SYNTHESIZED_2: Decl[Constructor]/Super/IsSystem:           public required init(from decoder: any Decoder) throws {|};
 }
 
 struct SynthesizedConformance3: Hashable {
@@ -754,9 +705,9 @@ enum SynthesizedConformance4: CaseIterable {
 class SynthesizedConformance5: SynthesizedConformance2 {
   #^OVERRIDE_SYNTHESIZED_5?keywords=false^#
 // OVERRIDE_SYNTHESIZED_5: Begin completions, 3 items
-// OVERRIDE_SYNTHESIZED_5-DAG: Decl[InstanceMethod]/Super:             override func encode(to encoder: Encoder) throws {|};
-// OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super/IsSystem:       required init(from decoder: Decoder) throws {|};
-// OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super:                required init(from decoder: Decoder) throws {|};
+// OVERRIDE_SYNTHESIZED_5-DAG: Decl[InstanceMethod]/Super:             override func encode(to encoder: any Encoder) throws {|};
+// OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super/IsSystem:       required init(from decoder: any Decoder) throws {|};
+// OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super:                required init(from decoder: any Decoder) throws {|};
 // FIXME: 'required init(from decoder: Decoder)' is suggested twice
 }
 
@@ -768,5 +719,4 @@ struct S_57037: P_57037 {
   let foo = val, #^MULTI_VAR_DECL_OVERRIDE^#
 // MULTI_VAR_DECL_OVERRIDE:     Begin completions, 1 items
 // MULTI_VAR_DECL_OVERRIDE-DAG: Decl[InstanceVar]/Super:            value: Int;
-// MULTI_VAR_DECL_OVERRIDE:     End completions
 }

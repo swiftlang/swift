@@ -17,21 +17,28 @@
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 #include <io.h>
+#include <stdlib.h>
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #endif
 
 #include <stdio.h>
+#include <stdlib.h>
 
+#if defined(_WIN32)
+#include "swift/Runtime/Config.h"
+#endif
 #include "swift/shims/LibcShims.h"
 
 #if defined(_WIN32)
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 static void __attribute__((__constructor__))
 _swift_stdlib_configure_console_mode(void) {
   static UINT uiPrevConsoleCP = GetConsoleOutputCP();
   atexit([]() { SetConsoleOutputCP(uiPrevConsoleCP); });
   SetConsoleOutputCP(CP_UTF8);
 }
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 #endif
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
@@ -39,4 +46,9 @@ __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr,
                                            __swift_size_t size,
                                            __swift_size_t nitems) {
   return fwrite(ptr, size, nitems, stdout);
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_stdlib_fputs_stderr(const char *str) {
+  fputs(str, stderr);
 }

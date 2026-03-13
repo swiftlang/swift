@@ -34,6 +34,20 @@
 // RUN:   -Rmodule-interface-rebuild 2>&1 | %FileCheck %s -check-prefix=CHECK-AvsB-REBUILD
 // CHECK-AvsB-REBUILD: remark: rebuilding module 'Lib' from interface
 
+/// Modules loaded from the resource dir are not usually rebuilt from
+/// the swiftinterface as it would indicate a configuration problem.
+/// Lift that behavior for SDK mismatch and still rebuild them.
+// RUN: %empty-directory(%t/cache)
+// RUN: %target-swift-frontend -emit-module %t/Lib.swift \
+// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -target-sdk-name A -parse-stdlib -module-cache-path %t/cache \
+// RUN:   -o %t/build -emit-module-interface-path %t/build/Lib.swiftinterface
+// RUN: env SWIFT_DEBUG_FORCE_SWIFTMODULE_PER_SDK=true \
+// RUN:   %target-swift-frontend -typecheck %t/Client.swift \
+// RUN:   -target-sdk-name B -resource-dir %t/build -I %t/build \
+// RUN:   -parse-stdlib -module-cache-path %t/cache \
+// RUN:   -Rmodule-interface-rebuild 2>&1 | %FileCheck %s -check-prefix=CHECK-AvsB-REBUILD
+
 // BEGIN Lib.swift
 public func foo() {}
 

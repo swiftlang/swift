@@ -46,7 +46,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  Optional<AccessLevel> getCachedResult() const;
+  std::optional<AccessLevel> getCachedResult() const;
   void cacheResult(AccessLevel value) const;
 };
 
@@ -69,7 +69,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  Optional<AccessLevel> getCachedResult() const;
+  std::optional<AccessLevel> getCachedResult() const;
   void cacheResult(AccessLevel value) const;
 };
 
@@ -91,7 +91,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  Optional<DefaultAndMax> getCachedResult() const;
+  std::optional<DefaultAndMax> getCachedResult() const;
   void cacheResult(DefaultAndMax value) const;
 };
 

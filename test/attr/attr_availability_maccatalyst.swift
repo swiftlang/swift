@@ -1,6 +1,6 @@
-// RUN: %swift -typecheck -verify -parse-stdlib -target x86_64-apple-ios51.0-macabi %s
+// RUN: %swift -typecheck -verify -parse-stdlib -target %target-cpu-apple-ios51.0-macabi %s
 
-// REQUIRES: maccatalyst_support
+// REQUIRES: OS=macosx || OS=maccatalyst
 
 @available(macCatalyst, introduced: 1.0, deprecated: 2.0, obsoleted: 9.0,
            message: "you don't want to do that anyway")
@@ -52,7 +52,7 @@ func introducedLaterOnMacCatalyst() {
 func introducedLaterOnIOS() {
 }
 
-// expected-note@+1 *{{add @available attribute to enclosing global function}}
+// expected-note@+1 *{{add '@available' attribute to enclosing global function}}
 func testPoundAvailable() {
 
   if #available(macCatalyst 55.0, *) {
@@ -144,23 +144,135 @@ extension X: P {}
 // Test platform inheritance for iOS unavailability.
 // rdar://68597591
 
-@available(iOS, unavailable)
-public struct UnavailableOniOS { } // expected-note 2 {{'UnavailableOniOS' has been explicitly marked unavailable here}}
+func takesAnything<T>(_ t: T) { }
+
+@available(macCatalyst, unavailable)
+struct UnavailableOnMacCatalyst { } // expected-note * {{'UnavailableOnMacCatalyst' has been explicitly marked unavailable here}}
 
 @available(iOS, unavailable)
-func unavailableOniOS(_ p: UnavailableOniOS) { } // ok
-
-func functionUsingAnUnavailableType(_ p: UnavailableOniOS) { } // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
-
-public extension UnavailableOniOS { } // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+struct UnavailableOniOS { } // expected-note * {{'UnavailableOniOS' has been explicitly marked unavailable here}}
 
 @available(iOS, unavailable)
-public extension UnavailableOniOS { // ok
-  func someMethod(_ p: UnavailableOniOS) { }
+@available(macCatalyst, introduced: 13.0)
+struct AvailableOnMacCatalystButUnavailableOniOS { }
+
+extension UnavailableOnMacCatalyst { } // expected-error {{'UnavailableOnMacCatalyst' is unavailable in Mac Catalyst}}
+extension UnavailableOniOS { } // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+extension AvailableOnMacCatalystButUnavailableOniOS { } // ok
+
+@available(macCatalyst, unavailable)
+extension UnavailableOnMacCatalyst {
+  func extensionMethod() {
+    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
+
+  @available(iOS, unavailable)
+  func extensionMethodUnavailableOniOS() {
+    takesAnything(UnavailableOniOS())
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
+
+  @available(iOS, introduced: 15)
+  func extensionMethodIntroducedOniOS() {
+    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
+
+}
+
+@available(iOS, unavailable)
+extension UnavailableOniOS {
+  func extensionMethod() {
+    takesAnything(UnavailableOniOS())
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
+
+  @available(macCatalyst, unavailable)
+  func extensionMethodUnavailableOnMacCatalyst() {
+    takesAnything(UnavailableOniOS())
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
+
+  @available(macCatalyst, introduced: 13.0)
+  func extensionMethodMacCatalystIntroduced() {
+    takesAnything(UnavailableOniOS())
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
 }
 
 @available(iOS, unavailable)
 @available(macCatalyst, introduced: 13.0)
-public struct AvailableOnMacCatalyst { }
+extension AvailableOnMacCatalystButUnavailableOniOS {
+  func extensionMethod() {
+    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+    takesAnything(UnavailableOnMacCatalyst()) // expected-error {{'UnavailableOnMacCatalyst' is unavailable in Mac Catalyst}}
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
 
-public extension AvailableOnMacCatalyst { } // ok
+  @available(macCatalyst, unavailable)
+  func extensionMethodUnavailableOnMacCatalyst() {
+    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
+}
+
+@available(iOS, introduced: 14.0)
+@available(macCatalyst, introduced: 14.5)
+public struct AvailableLaterOnMacCatalyst { // expected-note 2 {{enclosing scope requires availability of Mac Catalyst 14.5 or newer}}
+  @available(iOS, introduced: 14.0) // expected-error {{instance method cannot be more available than enclosing scope}}
+  func iOSOnly() { }
+
+  @available(macCatalyst, introduced: 14.5)
+  func macCatalystOnly() { }
+
+  @available(iOS, introduced: 14.0)
+  @available(macCatalyst, introduced: 14.5)
+  func iOSAndMacCatalyst() { }
+
+  struct Nested {
+    @available(iOS, introduced: 14.0) // expected-error {{instance method cannot be more available than enclosing scope}}
+    func iOSOnlyNested() { }
+
+    @available(macCatalyst, introduced: 14.5)
+    func macCatalystOnlyNested() { }
+
+    @available(iOS, introduced: 14.0)
+    @available(macCatalyst, introduced: 14.5)
+    func iOSAndMacCatalystNested() { }
+  }
+}
+
+@available(iOS, introduced: 14.0)
+@available(macCatalyst, introduced: 14.5)
+extension AvailableLaterOnMacCatalyst { // expected-note 2 {{enclosing scope requires availability of Mac Catalyst 14.5 or newer}}
+  @available(iOS, introduced: 14.0) // expected-error {{instance method cannot be more available than enclosing scope}}
+  func iOSOnlyInExtension() { }
+
+  @available(macCatalyst, introduced: 14.5)
+  func macCatalystOnlyInExtension() { }
+
+  @available(iOS, introduced: 14.0)
+  @available(macCatalyst, introduced: 14.5)
+  func iOSAndMacCatalystInExtension() { }
+
+  struct NestedInExtension {
+    @available(iOS, introduced: 14.0) // expected-warning {{instance method cannot be more available than enclosing scope}}
+    func iOSOnlyNestedInExtension() { }
+
+    @available(macCatalyst, introduced: 14.5)
+    func macCatalystOnlyNestedInExtension() { }
+
+    @available(iOS, introduced: 14.0)
+    @available(macCatalyst, introduced: 14.5)
+    func iOSAndMacCatalystNestedInExtension() { }
+  }
+
+}

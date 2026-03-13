@@ -6,7 +6,8 @@ struct Article {
 
 let keypath = \Article.id
 func keypath_generator() -> KeyPath<Article, String> { return \.id }
-func const_map(_const _ map: KeyPath<Article, String>) {}
+func const_map(_ map: _const KeyPath<Article, String>) {}
+func const_map_in_wrong_position(_const _ map: KeyPath<Article, String>) {} // expected-warning {{'_const' before a parameter name is not allowed, place it before the parameter type instead; this is an error in the Swift 6 language mode}}
 
 const_map(\.id)
 const_map(\Article.id)

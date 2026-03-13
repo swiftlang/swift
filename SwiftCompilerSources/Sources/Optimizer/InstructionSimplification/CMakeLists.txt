@@ -7,6 +7,46 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
+  SimplifyAllocRefDynamic.swift
+  SimplifyAllocStack.swift
+  SimplifyApply.swift
+  SimplifyBeginBorrow.swift
   SimplifyBeginCOWMutation.swift
+  SimplifyBorrow.swift
+  SimplifyBranch.swift
+  SimplifyBuiltin.swift
+  SimplifyCheckedCast.swift
+  SimplifyClassifyBridgeObject.swift
+  SimplifyCondBranch.swift
+  SimplifyCondFail.swift
+  SimplifyConvertEscapeToNoEscape.swift
+  SimplifyCopyBlock.swift
+  SimplifyCopyValue.swift
+  SimplifyDebugStep.swift
+  SimplifyDestroyValue.swift
+  SimplifyDestructure.swift
+  SimplifyEndCOWMutationAddr.swift
+  SimplifyExplicitCopy.swift
+  SimplifyFixLifetime.swift
   SimplifyGlobalValue.swift
-  SimplifyStrongRetainRelease.swift)
+  SimplifyInitEnumDataAddr.swift
+  SimplifyKeyPath.swift
+  SimplifyLoad.swift
+  SimplifyLoadBorrow.swift
+  SimplifyMarkDependence.swift
+  SimplifyMoveValue.swift
+  SimplifyPartialApply.swift
+  SimplifyPointerToAddress.swift
+  SimplifyRefCasts.swift
+  SimplifyRetainReleaseValue.swift
+  SimplifyStrongRetainRelease.swift
+  SimplifyStruct.swift
+  SimplifyStructExtract.swift
+  SimplifySwitchEnum.swift
+  SimplifyTuple.swift
+  SimplifyTupleExtract.swift
+  SimplifyTypeValue.swift
+  SimplifyUncheckedAddrCast.swift
+  SimplifyUncheckedEnumData.swift
+  SimplifyValueToBridgeObject.swift
+  SimplifyWitnessMethod.swift)

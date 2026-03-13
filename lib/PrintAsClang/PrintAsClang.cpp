@@ -17,8 +17,10 @@
 #include "SwiftToClangInteropContext.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/FrontendOptions.h"
@@ -54,18 +56,40 @@ static void emitObjCConditional(raw_ostream &out,
     out << "#else\n";
     nonObjCCase();
   }
-  out << "#endif\n";
+  out << "#endif // defined(__OBJC__)\n";
 }
 
-static void writePtrauthPrologue(raw_ostream &os) {
+static void emitExternC(raw_ostream &out,
+                        llvm::function_ref<void()> cCase) {
+  emitCxxConditional(out, [&] {
+    out << "extern \"C\" {\n";
+  });
+  cCase();
+  emitCxxConditional(out, [&] {
+    out << "} // extern \"C\"\n";
+  });
+}
+
+static void writePtrauthPrologue(raw_ostream &os, ASTContext &ctx) {
   emitCxxConditional(os, [&]() {
-    os << "#if __has_include(<ptrauth.h>)\n";
-    os << "# include <ptrauth.h>\n";
-    os << "#else\n";
-    os << "# ifndef __ptrauth_swift_value_witness_function_pointer\n";
-    os << "#  define __ptrauth_swift_value_witness_function_pointer(x)\n";
-    os << "# endif\n";
-    os << "#endif\n";
+    ClangSyntaxPrinter(ctx, os).printIgnoredDiagnosticBlock(
+        "non-modular-include-in-framework-module", [&] {
+          os << "#if defined(__arm64e__) && __has_include(<ptrauth.h>)\n";
+          os << "# include <ptrauth.h>\n";
+          os << "#else\n";
+          ClangSyntaxPrinter(ctx, os).printIgnoredDiagnosticBlock(
+              "reserved-macro-identifier", [&]() {
+                os << "# ifndef "
+                      "__ptrauth_swift_value_witness_function_pointer\n";
+                os << "#  define "
+                      "__ptrauth_swift_value_witness_function_pointer(x)\n";
+                os << "# endif\n";
+                os << "# ifndef __ptrauth_swift_class_method_pointer\n";
+                os << "#  define __ptrauth_swift_class_method_pointer(x)\n";
+                os << "# endif\n";
+              });
+          os << "#endif\n";
+        });
   });
 }
 
@@ -107,7 +131,6 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
       [&] {
         out << "#include <cstdint>\n"
                "#include <cstddef>\n"
-               "#include <cstdbool>\n"
                "#include <cstring>\n";
         out << "#include <stdlib.h>\n";
         out << "#include <new>\n";
@@ -119,13 +142,14 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
                "#include <stdbool.h>\n"
                "#include <string.h>\n";
       });
-  writePtrauthPrologue(out);
+  writePtrauthPrologue(out, ctx);
   out << "\n"
          "#if !defined(SWIFT_TYPEDEFS)\n"
          "# define SWIFT_TYPEDEFS 1\n"
          "# if __has_include(<uchar.h>)\n"
          "#  include <uchar.h>\n"
          "# elif !defined(__cplusplus)\n"
+         "typedef unsigned char char8_t;\n"
          "typedef uint_least16_t char16_t;\n"
          "typedef uint_least32_t char32_t;\n"
          "# endif\n"
@@ -194,21 +218,34 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
 
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
+
+  // For C compilers which don’t support nullability attributes, ignore them;
+  // for ones which do, suppress warnings about them being an extension.
+  out << "#if !__has_feature(nullability)\n"
+         "# define _Nonnull\n"
+         "# define _Nullable\n"
+         "# define _Null_unspecified\n"
+         "#elif !defined(__OBJC__)\n"
+         "# pragma clang diagnostic ignored \"-Wnullability-extension\"\n"
+         "#endif\n"
+         "#if !__has_feature(nullability_nullable_result)\n"
+         "# define _Nullable_result _Nullable\n"
+         "#endif\n";
 }
 
 static int compareImportModulesByName(const ImportModuleTy *left,
-                                      const ImportModuleTy *right) {
+                                      const ImportModuleTy *right, bool isCxx) {
   auto *leftSwiftModule = left->dyn_cast<ModuleDecl *>();
   auto *rightSwiftModule = right->dyn_cast<ModuleDecl *>();
 
   if (leftSwiftModule && !rightSwiftModule)
-    return -compareImportModulesByName(right, left);
+    return -compareImportModulesByName(right, left, isCxx);
 
   if (leftSwiftModule && rightSwiftModule)
     return leftSwiftModule->getName().compare(rightSwiftModule->getName());
 
-  auto *leftClangModule = left->get<const clang::Module *>();
-  assert(leftClangModule->isSubModule() &&
+  auto *leftClangModule = cast<const clang::Module *>(*left);
+  assert((isCxx || leftClangModule->isSubModule()) &&
          "top-level modules should use a normal swift::ModuleDecl");
   if (rightSwiftModule) {
     // Because the Clang module is a submodule, its full name will never be
@@ -221,8 +258,8 @@ static int compareImportModulesByName(const ImportModuleTy *left,
     return 1;
   }
 
-  auto *rightClangModule = right->get<const clang::Module *>();
-  assert(rightClangModule->isSubModule() &&
+  auto *rightClangModule = cast<const clang::Module *>(*right);
+  assert((isCxx || rightClangModule->isSubModule()) &&
          "top-level modules should use a normal swift::ModuleDecl");
 
   SmallVector<StringRef, 8> leftReversePath(
@@ -273,7 +310,7 @@ static void collectClangModuleHeaderIncludes(
     llvm::SmallString<128> containingSearchDirPath;
 
     for (auto &includeDir : includeDirs) {
-      if (textualInclude.startswith(includeDir)) {
+      if (textualInclude.str().starts_with(includeDir)) {
         if (includeDir.size() > containingSearchDirPath.size()) {
           containingSearchDirPath = includeDir;
         }
@@ -281,9 +318,7 @@ static void collectClangModuleHeaderIncludes(
     }
 
     if (!containingSearchDirPath.empty()) {
-      llvm::SmallString<128> prefixToRemove =
-          llvm::formatv("{0}/", containingSearchDirPath);
-      llvm::sys::path::replace_path_prefix(textualInclude, prefixToRemove, "");
+      llvm::sys::path::replace_path_prefix(textualInclude, containingSearchDirPath, "");
     } else {
       // If we cannot find find the module map on the search path,
       // fallback to including the header using the provided path relative
@@ -303,14 +338,15 @@ static void collectClangModuleHeaderIncludes(
     requiredTextualIncludes.insert(textualInclude);
   };
 
-  if (clang::Module::Header umbrellaHeader = clangModule->getUmbrellaHeader()) {
-    addHeader(umbrellaHeader.Entry->tryGetRealPathName(),
-              umbrellaHeader.PathRelativeToRootModuleDirectory);
-  } else if (clang::Module::DirectoryName umbrellaDir =
-                 clangModule->getUmbrellaDir()) {
+  if (std::optional<clang::Module::Header> umbrellaHeader =
+          clangModule->getUmbrellaHeaderAsWritten()) {
+    addHeader(umbrellaHeader->Entry.getFileEntry().tryGetRealPathName(),
+        umbrellaHeader->PathRelativeToRootModuleDirectory);
+  } else if (std::optional<clang::Module::DirectoryName> umbrellaDir =
+                 clangModule->getUmbrellaDirAsWritten()) {
     SmallString<128> nativeUmbrellaDirPath;
     std::error_code errorCode;
-    llvm::sys::path::native(umbrellaDir.Entry->getName(),
+    llvm::sys::path::native(umbrellaDir->Entry.getName(),
                             nativeUmbrellaDirPath);
     llvm::vfs::FileSystem &fileSystem = fileManager.getVirtualFileSystem();
     for (llvm::vfs::recursive_directory_iterator
@@ -319,7 +355,7 @@ static void collectClangModuleHeaderIncludes(
          dir != end && !errorCode; dir.increment(errorCode)) {
 
       if (llvm::StringSwitch<bool>(llvm::sys::path::extension(dir->path()))
-              .Cases(".h", ".H", ".hh", ".hpp", true)
+              .Cases({".h", ".H", ".hh", ".hpp"}, true)
               .Default(false)) {
 
         // Compute path to the header relative to the root of the module
@@ -332,8 +368,8 @@ static void collectClangModuleHeaderIncludes(
           pathComponents.push_back(*pathIt);
         // Then append this to the path from module root to umbrella dir
         SmallString<128> relativeHeaderPath;
-        if (umbrellaDir.PathRelativeToRootModuleDirectory != ".")
-          relativeHeaderPath += umbrellaDir.PathRelativeToRootModuleDirectory;
+        if (umbrellaDir->PathRelativeToRootModuleDirectory != ".")
+          relativeHeaderPath += umbrellaDir->PathRelativeToRootModuleDirectory;
 
         for (auto it = pathComponents.rbegin(), end = pathComponents.rend();
              it != end; ++it) {
@@ -347,8 +383,8 @@ static void collectClangModuleHeaderIncludes(
     for (clang::Module::HeaderKind headerKind :
          {clang::Module::HK_Normal, clang::Module::HK_Textual}) {
       for (const clang::Module::Header &header :
-           clangModule->Headers[headerKind]) {
-        addHeader(header.Entry->tryGetRealPathName(),
+           clangModule->getHeaders(headerKind)) {
+        addHeader(header.Entry.getFileEntry().tryGetRealPathName(),
                   header.PathRelativeToRootModuleDirectory);
       }
     }
@@ -363,12 +399,16 @@ static void collectClangModuleHeaderIncludes(
   }
 }
 
-static void writeImports(raw_ostream &out,
-                         llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-                         ModuleDecl &M, StringRef bridgingHeader,
-                         const FrontendOptions &frontendOpts,
-                         clang::HeaderSearch &clangHeaderSearchInfo,
-                         bool useCxxImport = false) {
+static void
+writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+             ModuleDecl &M, StringRef bridgingHeader,
+             const FrontendOptions &frontendOpts,
+             clang::HeaderSearch &clangHeaderSearchInfo,
+             const llvm::StringMap<StringRef> &exposedModuleHeaderNames,
+             bool useCxxImport = false,
+             bool useNonModularIncludes = false) {
+  useNonModularIncludes |= frontendOpts.EmitClangHeaderWithNonModularIncludes;
+
   // Note: we can't use has_feature(modules) as it's always enabled in C++20
   // mode.
   out << "#if __has_feature(objc_modules)\n";
@@ -380,34 +420,43 @@ static void writeImports(raw_ostream &out,
   // Sort alphabetically for determinism and consistency.
   SmallVector<ImportModuleTy, 8> sortedImports{imports.begin(),
                                                imports.end()};
-  llvm::array_pod_sort(sortedImports.begin(), sortedImports.end(),
-                       &compareImportModulesByName);
+  std::stable_sort(
+      sortedImports.begin(), sortedImports.end(),
+      [&](const ImportModuleTy &left, const ImportModuleTy &right) -> bool {
+        return compareImportModulesByName(&left, &right, useCxxImport) < 0;
+      });
 
   auto isUnderlyingModule = [&M, bridgingHeader](ModuleDecl *import) -> bool {
     if (bridgingHeader.empty())
       return import != &M && import->getName() == M.getName();
 
-    auto importer = static_cast<ClangImporter *>(
-        import->getASTContext().getClangModuleLoader());
-    return import == importer->getImportedHeaderModule();
+    return import->isClangHeaderImportModule();
   };
 
   clang::FileSystemOptions fileSystemOptions;
   clang::FileManager fileManager{fileSystemOptions};
 
-  llvm::SmallSet<llvm::SmallString<128>, 10> requiredTextualIncludes;
+  llvm::SmallSet<llvm::SmallString<128>, 10>
+      requiredTextualIncludes; // Only included without modules.
+  llvm::SmallVector<StringRef, 1> textualIncludes; // always included.
   llvm::SmallSet<const clang::Module *, 10> visitedModules;
   llvm::SmallSet<llvm::SmallString<128>, 10> includeDirs;
 
   llvm::vfs::FileSystem &fileSystem = fileManager.getVirtualFileSystem();
   llvm::ErrorOr<std::string> cwd = fileSystem.getCurrentWorkingDirectory();
 
-  if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
+  if (useNonModularIncludes) {
     assert(cwd && "Access to current working directory required");
 
     for (auto searchDir = clangHeaderSearchInfo.search_dir_begin();
          searchDir != clangHeaderSearchInfo.search_dir_end(); ++searchDir) {
-      includeDirs.insert(normalizePath(searchDir->getName()));
+      // Ensure search directories end in / so that we don't prefix match
+      // against a folder that starts with the same substring.
+      auto path = normalizePath(searchDir->getName());
+      if (!path.ends_with("/"))
+          path.append("/");
+
+      includeDirs.insert(path);
     }
 
     const clang::Module *foundationModule = clangHeaderSearchInfo.lookupModule(
@@ -436,16 +485,25 @@ static void writeImports(raw_ostream &out,
   bool includeUnderlying = false;
   StringRef importDirective =
       useCxxImport ? "#pragma clang module import" : "@import";
+  StringRef importDirectiveLineEnd = useCxxImport ? "\n" : ";\n";
   for (auto import : sortedImports) {
     if (auto *swiftModule = import.dyn_cast<ModuleDecl *>()) {
+      if (useCxxImport) {
+        // Do not import Swift modules into the C++ section of the generated
+        // header unless explicitly exposed.
+        auto it = exposedModuleHeaderNames.find(swiftModule->getName().str());
+        if (it != exposedModuleHeaderNames.end())
+          textualIncludes.push_back(it->getValue());
+        continue;
+      }
       auto Name = swiftModule->getName();
       if (isUnderlyingModule(swiftModule)) {
         includeUnderlying = true;
         continue;
       }
       if (seenImports.insert(Name).second) {
-        out << importDirective << ' ' << Name.str() << ";\n";
-        if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
+        out << importDirective << ' ' << Name.str() << importDirectiveLineEnd;
+        if (useNonModularIncludes) {
           if (const clang::Module *underlyingClangModule =
                   swiftModule->findUnderlyingClangModule()) {
             collectClangModuleHeaderIncludes(
@@ -462,14 +520,13 @@ static void writeImports(raw_ostream &out,
         }
       }
     } else {
-      const auto *clangModule = import.get<const clang::Module *>();
-      assert(clangModule->isSubModule() &&
+      const auto *clangModule = cast<const clang::Module *>(import);
+      assert((useCxxImport || clangModule->isSubModule()) &&
              "top-level modules should use a normal swift::ModuleDecl");
       out << importDirective << ' ';
       ModuleDecl::ReverseFullNameIterator(clangModule).printForward(out);
-      out << ";\n";
-
-      if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
+      out << importDirectiveLineEnd;
+      if (useNonModularIncludes) {
         collectClangModuleHeaderIncludes(
             clangModule, fileManager, requiredTextualIncludes, visitedModules,
             includeDirs, cwd.get());
@@ -477,20 +534,30 @@ static void writeImports(raw_ostream &out,
     }
   }
 
-  if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
-    out << "#else\n";
-    for (auto header : requiredTextualIncludes) {
+  if (useNonModularIncludes && !requiredTextualIncludes.empty()) {
+    out << "#elif defined(__OBJC__)\n";
+    for (auto header : requiredTextualIncludes)
       out << "#import <" << header << ">\n";
-    }
+    out << "#else\n";
+    for (auto header : requiredTextualIncludes)
+      out << "#include <" << header << ">\n";
   }
   out << "#endif\n\n";
+  for (const auto header : textualIncludes) {
+    out << "#include <" << header << ">\n";
+  }
 
   if (includeUnderlying) {
     if (bridgingHeader.empty())
       out << "#import <" << M.getName().str() << '/' << M.getName().str()
           << ".h>\n\n";
-    else
-      out << "#import \"" << bridgingHeader << "\"\n\n";
+    else {
+      out << "#if defined(__OBJC__)\n";
+      out << "#import \"" << bridgingHeader << "\"\n";
+      out << "#else\n";
+      out << "#include \"" << bridgingHeader << "\"\n";
+      out << "#endif\n\n";
+    }
   }
 }
 
@@ -503,7 +570,11 @@ static void writePostImportPrologue(raw_ostream &os, ModuleDecl &M) {
         "#pragma clang diagnostic ignored \"-Wunknown-pragmas\"\n"
         "#pragma clang diagnostic ignored \"-Wnullability\"\n"
         "#pragma clang diagnostic ignored "
+        "\"-Warc-bridge-casts-disallowed-in-nonarc\"\n"
+        "#pragma clang diagnostic ignored "
         "\"-Wdollar-in-identifier-extension\"\n"
+        "#pragma clang diagnostic ignored "
+        "\"-Wunsafe-buffer-usage\"\n"
         "\n"
         "#if __has_attribute(external_source_symbol)\n"
         "# pragma push_macro(\"any\")\n"
@@ -519,14 +590,19 @@ static void writePostImportPrologue(raw_ostream &os, ModuleDecl &M) {
         "#endif\n\n";
 }
 
+static void writeBlockEpilogue(raw_ostream &os) {
+  // Pop out of `external_source_symbol` attribute
+  // before emitting the C++ section as the C++ section
+  // might include other files in it.
+  os << "#if __has_attribute(external_source_symbol)\n"
+        "# pragma clang attribute pop\n"
+        "#endif\n";
+}
+
 static void writeEpilogue(raw_ostream &os) {
-  os <<
-      "#if __has_attribute(external_source_symbol)\n"
-      "# pragma clang attribute pop\n"
-      "#endif\n"
-      "#pragma clang diagnostic pop\n"
-      // For the macro guard against recursive definition
-      "#endif\n";
+  os << "#pragma clang diagnostic pop\n"
+        // For the macro guard against recursive definition
+        "#endif\n";
 }
 
 static std::string computeMacroGuard(const ModuleDecl *M) {
@@ -541,48 +617,93 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   llvm::PrettyStackTraceString trace("While generating Clang header");
 
   SwiftToClangInteropContext interopContext(*M, irGenOpts);
-
-  SmallPtrSet<ImportModuleTy, 8> imports;
-  std::string objcModuleContentsBuf;
-  llvm::raw_string_ostream objcModuleContents{objcModuleContentsBuf};
-  printModuleContentsAsObjC(objcModuleContents, imports, *M, interopContext);
   writePrologue(os, M->getASTContext(), computeMacroGuard(M));
-  emitObjCConditional(os, [&] {
+
+  // C content (@c)
+  std::string moduleContentsScratch;
+  {
+    SmallPtrSet<ImportModuleTy, 8> imports;
+    llvm::raw_string_ostream cModuleContents{moduleContentsScratch};
+    printModuleContentsAsC(cModuleContents, imports, *M, interopContext,
+                           frontendOpts.ClangHeaderMinAccess);
+
+    llvm::StringMap<StringRef> exposedModuleHeaderNames;
     writeImports(os, imports, *M, bridgingHeader, frontendOpts,
-                 clangHeaderSearchInfo);
+                 clangHeaderSearchInfo, exposedModuleHeaderNames,
+                 /*useCxxImport=*/false, /*useNonModularIncludes*/true);
+
+    writePostImportPrologue(os, *M);
+    emitExternC(os, [&] { os << "\n" << cModuleContents.str(); });
+    writeBlockEpilogue(os);
+    moduleContentsScratch.clear();
+  }
+
+  // Objective-C content
+  SmallPtrSet<ImportModuleTy, 8> imports;
+  llvm::raw_string_ostream objcModuleContents{moduleContentsScratch};
+  printModuleContentsAsObjC(objcModuleContents, imports, *M, interopContext,
+                            frontendOpts.ClangHeaderMinAccess);
+  emitObjCConditional(os, [&] {
+    llvm::StringMap<StringRef> exposedModuleHeaderNames;
+    writeImports(os, imports, *M, bridgingHeader, frontendOpts,
+                 clangHeaderSearchInfo, exposedModuleHeaderNames);
   });
   writePostImportPrologue(os, *M);
-  emitObjCConditional(os, [&] { os << objcModuleContents.str(); });
+  emitObjCConditional(os, [&] { os << "\n" << objcModuleContents.str(); });
+  writeBlockEpilogue(os);
+
+  // C++ content
   emitCxxConditional(os, [&] {
     // FIXME: Expose Swift with @expose by default.
     bool enableCxx = frontendOpts.ClangHeaderExposedDecls.has_value() ||
-                     frontendOpts.EnableExperimentalCxxInteropInClangHeader ||
                      M->DeclContext::getASTContext().LangOpts.EnableCXXInterop;
     if (!enableCxx)
       return;
+
+    llvm::StringSet<> exposedModules;
+    for (const auto &mod : frontendOpts.clangHeaderExposedImports)
+      exposedModules.insert(mod.moduleName);
+
     // Include the shim header only in the C++ mode.
-    ClangSyntaxPrinter(os).printIncludeForShimHeader(
+    ClangSyntaxPrinter(M->getASTContext(), os).printIncludeForShimHeader(
         "_SwiftCxxInteroperability.h");
 
+    // Explicit @expose attribute is required only when the user specifies
+    // -clang-header-expose-decls flag.
+    // FIXME: should we detect any presence of @expose and require it then?
     bool requiresExplicitExpose =
+        frontendOpts.ClangHeaderExposedDecls.has_value() &&
+        (*frontendOpts.ClangHeaderExposedDecls ==
+             FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr ||
+         *frontendOpts.ClangHeaderExposedDecls ==
+             FrontendOptions::ClangHeaderExposeBehavior::
+                 HasExposeAttrOrImplicitDeps);
+    // Swift stdlib dependencies are emitted into the same header when
+    // -clang-header-expose-decls flag is not specified, or when it allows
+    // implicit dependency emission.
+    bool addStdlibDepsInline =
         !frontendOpts.ClangHeaderExposedDecls.has_value() ||
         *frontendOpts.ClangHeaderExposedDecls ==
-            FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr;
-    // Default dependency behavior is used when the -clang-header-expose-decls
-    // flag is not specified.
-    bool defaultDependencyBehavior =
-        !frontendOpts.ClangHeaderExposedDecls.has_value();
+            FrontendOptions::ClangHeaderExposeBehavior::
+                HasExposeAttrOrImplicitDeps ||
+        *frontendOpts.ClangHeaderExposedDecls ==
+            FrontendOptions::ClangHeaderExposeBehavior::AllPublic;
 
     std::string moduleContentsBuf;
     llvm::raw_string_ostream moduleContents{moduleContentsBuf};
     auto deps = printModuleContentsAsCxx(
         moduleContents, *M, interopContext,
-        /*requiresExposedAttribute=*/requiresExplicitExpose);
+        frontendOpts.ClangHeaderMinAccess.value_or(AccessLevel::Public),
+        /*requiresExposedAttribute=*/requiresExplicitExpose, exposedModules);
     // FIXME: In ObjC++ mode, we do not need to reimport duplicate modules.
+    llvm::StringMap<StringRef> exposedModuleHeaderNames;
+    for (const auto &mod : frontendOpts.clangHeaderExposedImports)
+      exposedModuleHeaderNames.insert({mod.moduleName, mod.headerName});
     writeImports(os, deps.imports, *M, bridgingHeader, frontendOpts,
-                 clangHeaderSearchInfo, /*useCxxImport=*/true);
+                 clangHeaderSearchInfo, exposedModuleHeaderNames,
+                 /*useCxxImport=*/true);
     // Embed the standard library directly.
-    if (defaultDependencyBehavior && deps.dependsOnStandardLibrary) {
+    if (addStdlibDepsInline && deps.dependsOnStandardLibrary) {
       assert(!M->isStdlibModule());
       SwiftToClangInteropContext interopContext(
           *M->getASTContext().getStdlibModule(), irGenOpts);
@@ -590,10 +711,11 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
       os << "#ifndef " << macroGuard << "\n";
       os << "#define " << macroGuard << "\n";
       printModuleContentsAsCxx(os, *M->getASTContext().getStdlibModule(),
-                               interopContext,
-                               /*requiresExposedAttribute=*/true);
+                               interopContext, AccessLevel::Public,
+                               /*requiresExposedAttribute=*/true,
+                               exposedModules);
       os << "#endif // " << macroGuard << "\n";
-      }
+    }
 
       os << moduleContents.str();
   });

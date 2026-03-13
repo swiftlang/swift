@@ -16,7 +16,7 @@ struct Int64Distance<Element>: Collection {
 let c = Int64Distance(_storage: [1,2,3])
 
 let i64: Int64 = 2
-_ = c.index(c.startIndex, offsetBy: i64) // expected-warning {{'index(_:offsetBy:)' is deprecated: all index distances are now of type Int}}
+_ = c.index(c.startIndex, offsetBy: i64) // expected-warning {{'index(_:offsetBy:)' is deprecated: all index distances are now of type Int}}{{documentation-file=deprecated-declaration}}
 
-let _: Int64 = c.distance(from: c.startIndex, to: c.endIndex) // expected-warning {{distance(from:to:)' is deprecated: all index distances are now of type Int}}
+let _: Int64 = c.distance(from: c.startIndex, to: c.endIndex) // expected-warning {{distance(from:to:)' is deprecated: all index distances are now of type Int}}{{documentation-file=deprecated-declaration}}
 

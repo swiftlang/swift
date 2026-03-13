@@ -26,13 +26,13 @@ REFACTORING(GlobalRename, "Global Rename", rename.global)
 /// (syntactically).
 REFACTORING(FindGlobalRenameRanges, "Find Global Rename Ranges", rename.global.find-ranges)
 
-/// Find and categorize all occurences of the file-local symbol at a given
+/// Find and categorize all occurrences of the file-local symbol at a given
 /// location.
 REFACTORING(FindLocalRenameRanges, "Find Local Rename Ranges", rename.local.find-ranges)
 
-/// Find and rename all occurences of the file-local symbol at a given
+/// Find and rename all occurrences of the file-local symbol at a given
 /// location.
-CURSOR_REFACTORING(LocalRename, "Local Rename", rename.local)
+REFACTORING(LocalRename, "Local Rename", rename.local)
 
 CURSOR_REFACTORING(FillProtocolStub, "Add Missing Protocol Requirements", fillstub)
 
@@ -65,6 +65,8 @@ CURSOR_REFACTORING(AddAsyncAlternative, "Add Async Alternative", add.async-alter
 CURSOR_REFACTORING(AddAsyncWrapper, "Add Async Wrapper", add.async-wrapper)
 
 CURSOR_REFACTORING(ExpandMacro, "Expand Macro", expand.macro)
+
+CURSOR_REFACTORING(InlineMacro, "Inline Macro", inline.macro)
 
 RANGE_REFACTORING(ExtractExpr, "Extract Expression", extract.expr)
 

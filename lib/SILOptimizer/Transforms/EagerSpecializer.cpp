@@ -34,10 +34,14 @@
 
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/Support/Debug.h"
 
@@ -71,6 +75,9 @@ static bool isTrivialReturnBlock(SILBasicBlock *RetBB) {
   //   % = tuple ()
   //   return % : $()
   if (RetOperand->getType().isVoid()) {
+    if (!RetBB->args_empty())
+      return false;
+
     auto *TupleI = dyn_cast<TupleInst>(RetBB->begin());
     if (!TupleI || !TupleI->getType().isVoid())
       return false;
@@ -435,7 +442,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   else {
     auto resultTy = GenericFunc->getConventions().getSILResultType(
         Builder.getTypeExpansionContext());
-    auto GenResultTy = GenericFunc->mapTypeIntoContext(resultTy);
+    auto GenResultTy = GenericFunc->mapTypeIntoEnvironment(resultTy);
 
     SILValue CastResult =
         Builder.createUncheckedForwardingCast(Loc, Result, GenResultTy);
@@ -464,7 +471,7 @@ void EagerDispatch::
 emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
               Type SubTy) {
   // Instantiate a thick metatype for T.Type
-  auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);
+  auto ContextTy = GenericFunc->mapTypeIntoEnvironment(ParamTy);
   auto GenericMT = Builder.createMetatype(
     Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
 
@@ -490,12 +497,10 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
   Builder.emitBlock(SuccessBB);
 }
 
-static SubstitutionMap getSingleSubstitutionMap(SILFunction *F,
-                                                  Type Ty) {
+static SubstitutionMap getSingleSubstitutionMap(SILFunction *F, Type Ty) {
   return SubstitutionMap::get(
-    F->getGenericEnvironment()->getGenericSignature(),
-    [&](SubstitutableType *type) { return Ty; },
-    MakeAbstractConformanceForGenericType());
+    F->getGenericEnvironment()->getGenericSignature(), Ty,
+    LookUpConformanceInModule());
 }
 
 void EagerDispatch::emitIsTrivialCheck(SILBasicBlock *FailedTypeCheckBB,
@@ -503,7 +508,7 @@ void EagerDispatch::emitIsTrivialCheck(SILBasicBlock *FailedTypeCheckBB,
                                        LayoutConstraint Layout) {
   auto &Ctx = Builder.getASTContext();
   // Instantiate a thick metatype for T.Type
-  auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);
+  auto ContextTy = GenericFunc->mapTypeIntoEnvironment(ParamTy);
   auto GenericMT = Builder.createMetatype(
       Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
   auto BoolTy = SILType::getBuiltinIntegerType(1, Ctx);
@@ -528,7 +533,7 @@ void EagerDispatch::emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
   }
   auto &Ctx = Builder.getASTContext();
   // Instantiate a thick metatype for T.Type
-  auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);
+  auto ContextTy = GenericFunc->mapTypeIntoEnvironment(ParamTy);
   auto GenericMT = Builder.createMetatype(
     Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
 
@@ -565,7 +570,7 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
                                               LayoutConstraint Layout) {
   auto &Ctx = Builder.getASTContext();
   // Instantiate a thick metatype for T.Type
-  auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);
+  auto ContextTy = GenericFunc->mapTypeIntoEnvironment(ParamTy);
   auto GenericMT = Builder.createMetatype(
     Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
 
@@ -730,7 +735,7 @@ SILValue EagerDispatch::emitArgumentConversion(
     // loadable on the caller's side?
     auto argConv = substConv.getSILArgumentConvention(ArgIdx);
     SILValue Val;
-    if (!argConv.isGuaranteedConvention()) {
+    if (!argConv.isGuaranteedConventionInCaller()) {
       Val = Builder.emitLoadValueOperation(Loc, CastArg,
                                            LoadOwnershipQualifier::Take);
     } else {
@@ -745,10 +750,8 @@ SILValue EagerDispatch::emitArgumentConversion(
 }
 
 namespace {
-// FIXME: This should be a function transform that pushes cloned functions on
-// the pass manager worklist.
 class EagerSpecializerTransform : public SILFunctionTransform {
-  bool onlyCreatePrespecializations;
+  const bool onlyCreatePrespecializations;
 public:
   EagerSpecializerTransform(bool onlyPrespecialize)
       : onlyCreatePrespecializations(onlyPrespecialize) {}
@@ -836,6 +839,8 @@ void EagerSpecializerTransform::run() {
   // performed.
   SmallVector<SILSpecializeAttr *, 8> attrsToRemove;
 
+  bool onlyCreatePrespecializations = this->onlyCreatePrespecializations;
+
   for (auto *SA : F.getSpecializeAttrs()) {
     if (onlyCreatePrespecializations && !SA->isExported()) {
       attrsToRemove.push_back(SA);
@@ -859,7 +864,7 @@ void EagerSpecializerTransform::run() {
       // That means we are loading it from another module. In this case, we
       // don't want to create a pre-specialization.
       SpecializedFuncs.push_back(nullptr);
-      ReInfoVec.emplace_back(ReabstractionInfo());
+      ReInfoVec.emplace_back(ReabstractionInfo(F.getModule()));
       continue;
     }
     ReInfoVec.emplace_back(FuncBuilder.getModule().getSwiftModule(),
@@ -879,12 +884,13 @@ void EagerSpecializerTransform::run() {
   // TODO: Optimize the dispatch code to minimize the amount
   // of checks. Use decision trees for this purpose.
   bool Changed = false;
+  CalleeCache *calleeCache = getAnalysis<BasicCalleeAnalysis>()->getCalleeCache();
   if (!onlyCreatePrespecializations)
     for_each3(F.getSpecializeAttrs(), SpecializedFuncs, ReInfoVec,
               [&](const SILSpecializeAttr *SA, SILFunction *NewFunc,
                   const ReabstractionInfo &ReInfo) {
                 if (NewFunc) {
-                  NewFunc->verify();
+                  NewFunc->verify(calleeCache);
                   Changed = true;
                   EagerDispatch(&F, ReInfo).emitDispatchTo(NewFunc);
                 }
@@ -894,6 +900,12 @@ void EagerSpecializerTransform::run() {
   // calls and branches.
   if (Changed) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    removeUnreachableBlocks(F);
+    if (F.needBreakInfiniteLoops())
+      breakInfiniteLoops(getPassManager(), &F);
+    if (F.needCompleteLifetimes())
+      completeAllLifetimes(getPassManager(), &F);
   }
 
   // As specializations are created, the non-exported attributes should be
@@ -904,7 +916,7 @@ void EagerSpecializerTransform::run() {
   // If any specializations were created, reverify the original body now that it
   // has checks.
   if (!newFunctions.empty())
-    F.verify();
+    F.verify(calleeCache);
 
   for (SILFunction *newF : newFunctions) {
     addFunctionToPassManagerWorklist(newF, nullptr);

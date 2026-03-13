@@ -1,5 +1,5 @@
 // REQUIRES: concurrency
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t 
+// RUN: %batch-code-completion
 
 class MyNonSendable {}
 struct MySendable {}
@@ -40,43 +40,37 @@ class MyClass {
 extension MyClass {
   @MyGlobalActor func testOnGlobalActor() {
     let _ = #^IN_FUNC_ON_GLOBAL_ACTOR^#
-// IN_FUNC_ON_GLOBAL_ACTOR: Begin completions
 // IN_FUNC_ON_GLOBAL_ACTOR-DAG: Decl[InstanceMethod]/CurrNominal:   funcOnGlobalActor()[#Int#]; name=funcOnGlobalActor()
-// IN_FUNC_ON_GLOBAL_ACTOR-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
+// IN_FUNC_ON_GLOBAL_ACTOR-DAG: Decl[InstanceMethod]/CurrNominal: funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
 // IN_FUNC_ON_GLOBAL_ACTOR-DAG: Decl[InstanceMethod]/CurrNominal:   funcSync()[#Int#]; name=funcSync()
 // IN_FUNC_ON_GLOBAL_ACTOR-DAG: Decl[InstanceMethod]/CurrNominal:   nonSenableFuncOnGlobalActor({#arg: MyNonSendable#})[#Int#]; name=nonSenableFuncOnGlobalActor(arg:)
-// IN_FUNC_ON_GLOBAL_ACTOR-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: nonSenableFuncOnOtherGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnOtherGlobalActor(arg:)
+// IN_FUNC_ON_GLOBAL_ACTOR-DAG: Decl[InstanceMethod]/CurrNominal: nonSenableFuncOnOtherGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnOtherGlobalActor(arg:)
 // IN_FUNC_ON_GLOBAL_ACTOR-DAG: Decl[InstanceVar]/CurrNominal:      varOnGlobalActor[#Int#]; name=varOnGlobalActor
-// IN_FUNC_ON_GLOBAL_ACTOR-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended: varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
+// IN_FUNC_ON_GLOBAL_ACTOR-DAG: Decl[InstanceVar]/CurrNominal: varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
 // IN_FUNC_ON_GLOBAL_ACTOR-DAG: Decl[InstanceVar]/CurrNominal:      varSync[#Int#]; name=varSync
-// IN_FUNC_ON_GLOBAL_ACTOR: End completions
 
     let _ = self.#^IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT^#
-// IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT: Begin completions
 // IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   funcOnGlobalActor()[#Int#]; name=funcOnGlobalActor()
-// IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
+// IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal: funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
 // IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   funcSync()[#Int#]; name=funcSync()
 // IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   nonSenableFuncOnGlobalActor({#arg: MyNonSendable#})[#Int#]; name=nonSenableFuncOnGlobalActor(arg:)
-// IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: nonSenableFuncOnOtherGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnOtherGlobalActor(arg:)
+// IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal: nonSenableFuncOnOtherGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnOtherGlobalActor(arg:)
 // IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT-DAG: Decl[InstanceVar]/CurrNominal:      varOnGlobalActor[#Int#]; name=varOnGlobalActor
-// IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended: varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
+// IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT-DAG: Decl[InstanceVar]/CurrNominal: varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
 // IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT-DAG: Decl[InstanceVar]/CurrNominal:      varSync[#Int#]; name=varSync
-// IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT: End completions
 
     let _ = self#^IN_FUNC_ON_GLOBAL_ACTOR_NODOT^#
-// IN_FUNC_ON_GLOBAL_ACTOR_NODOT: Begin completions
 // IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .funcOnGlobalActor()[#Int#]; name=funcOnGlobalActor()
-// IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: .funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
+// IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[InstanceMethod]/CurrNominal: .funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
 // IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .funcSync()[#Int#]; name=funcSync()
 // IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .nonSenableFuncOnGlobalActor({#arg: MyNonSendable#})[#Int#]; name=nonSenableFuncOnGlobalActor(arg:)
-// IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: .nonSenableFuncOnOtherGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnOtherGlobalActor(arg:)
+// IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[InstanceMethod]/CurrNominal: .nonSenableFuncOnOtherGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnOtherGlobalActor(arg:)
 // IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .varOnGlobalActor[#Int#]; name=varOnGlobalActor
-// IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended: .varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
+// IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[InstanceVar]/CurrNominal: .varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
 // IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .varSync[#Int#]; name=varSync
 // IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#onGlobalActor: Int#}][#Int#]; name=[onGlobalActor:]
-// IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[Subscript]/CurrNominal/NotRecommended: [{#onOtherGlobalActor: Int#}][' async'][#Int#]; name=[onOtherGlobalActor:]
+// IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[Subscript]/CurrNominal: [{#onOtherGlobalActor: Int#}][' async'][#Int#]; name=[onOtherGlobalActor:]
 // IN_FUNC_ON_GLOBAL_ACTOR_NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#sync: Int#}][#Int#]; name=[sync:]
-// IN_FUNC_ON_GLOBAL_ACTOR_NODOT: End completions
 
     let _ = otherInstanceOfMyClass.#^IN_FUNC_ON_GLOBAL_ACTOR_OTHER_DOT?check=IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT^#
     let _ = otherInstanceOfMyClass#^IN_FUNC_ON_GLOBAL_ACTOR_OTHER_NODOT?check=IN_FUNC_ON_GLOBAL_ACTOR_NODOT^#
@@ -84,43 +78,37 @@ extension MyClass {
 
   func testInSyncFunc() {
     let _ = #^IN_SYNC_FUNC^#
-// IN_SYNC_FUNC: Begin completions
-// IN_SYNC_FUNC_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended:   funcOnGlobalActor()[' async'][#Int#]; name=funcOnGlobalActor()
-// IN_SYNC_FUNC_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
-// IN_SYNC_FUNC_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   funcSync()[#Int#]; name=funcSync()
-// IN_SYNC_FUNC_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended:   nonSenableFuncOnGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnGlobalActor(arg:)
-// IN_SYNC_FUNC_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: nonSenableFuncOnOtherGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnOtherGlobalActor(arg:)
-// IN_SYNC_FUNC_DOT-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended:      varOnGlobalActor[#Int#][' async']; name=varOnGlobalActor
-// IN_SYNC_FUNC_DOT-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended: varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
-// IN_SYNC_FUNC_DOT-DAG: Decl[InstanceVar]/CurrNominal:      varSync[#Int#]; name=varSync
-// IN_SYNC_FUNC: End completions
+// IN_SYNC_FUNC-DAG: Decl[InstanceMethod]/CurrNominal:   funcOnGlobalActor()[' async'][#Int#]; name=funcOnGlobalActor()
+// IN_SYNC_FUNC-DAG: Decl[InstanceMethod]/CurrNominal: funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
+// IN_SYNC_FUNC-DAG: Decl[InstanceMethod]/CurrNominal:   funcSync()[#Int#]; name=funcSync()
+// IN_SYNC_FUNC-DAG: Decl[InstanceMethod]/CurrNominal:   nonSenableFuncOnGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnGlobalActor(arg:)
+// IN_SYNC_FUNC-DAG: Decl[InstanceMethod]/CurrNominal: nonSenableFuncOnOtherGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnOtherGlobalActor(arg:)
+// IN_SYNC_FUNC-DAG: Decl[InstanceVar]/CurrNominal:      varOnGlobalActor[#Int#][' async']; name=varOnGlobalActor
+// IN_SYNC_FUNC-DAG: Decl[InstanceVar]/CurrNominal: varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
+// IN_SYNC_FUNC-DAG: Decl[InstanceVar]/CurrNominal:      varSync[#Int#]; name=varSync
 
     let _ = self.#^IN_SYNC_FUNC_SELF_DOT^#
-// IN_SYNC_FUNC_SELF_DOT: Begin completions
-// IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended:   funcOnGlobalActor()[' async'][#Int#]; name=funcOnGlobalActor()
-// IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
+// IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   funcOnGlobalActor()[' async'][#Int#]; name=funcOnGlobalActor()
+// IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal: funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
 // IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   funcSync()[#Int#]; name=funcSync()
-// IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended:   nonSenableFuncOnGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnGlobalActor(arg:)
-// IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: nonSenableFuncOnOtherGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnOtherGlobalActor(arg:)
-// IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended:      varOnGlobalActor[#Int#][' async']; name=varOnGlobalActor
-// IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended: varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
+// IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   nonSenableFuncOnGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnGlobalActor(arg:)
+// IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal: nonSenableFuncOnOtherGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnOtherGlobalActor(arg:)
+// IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceVar]/CurrNominal:      varOnGlobalActor[#Int#][' async']; name=varOnGlobalActor
+// IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceVar]/CurrNominal: varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
 // IN_SYNC_FUNC_SELF_DOT-DAG: Decl[InstanceVar]/CurrNominal:      varSync[#Int#]; name=varSync
-// IN_SYNC_FUNC_SELF_DOT: End completions
 
     let _ = self#^IN_SYNC_FUNC_NODOT^#
-// IN_SYNC_FUNC_NODOT: Begin completions
-// IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended:   .funcOnGlobalActor()[' async'][#Int#]; name=funcOnGlobalActor()
-// IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: .funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
+// IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .funcOnGlobalActor()[' async'][#Int#]; name=funcOnGlobalActor()
+// IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceMethod]/CurrNominal: .funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
 // IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .funcSync()[#Int#]; name=funcSync()
-// IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended:   .nonSenableFuncOnGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnGlobalActor(arg:)
-// IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: .nonSenableFuncOnOtherGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnOtherGlobalActor(arg:)
-// IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended:      .varOnGlobalActor[#Int#][' async']; name=varOnGlobalActor
-// IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended: .varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
+// IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .nonSenableFuncOnGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnGlobalActor(arg:)
+// IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceMethod]/CurrNominal: .nonSenableFuncOnOtherGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnOtherGlobalActor(arg:)
+// IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .varOnGlobalActor[#Int#][' async']; name=varOnGlobalActor
+// IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceVar]/CurrNominal: .varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
 // IN_SYNC_FUNC_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .varSync[#Int#]; name=varSync
-// IN_SYNC_FUNC_NODOT-DAG: Decl[Subscript]/CurrNominal/NotRecommended:        [{#onGlobalActor: Int#}][' async'][#Int#]; name=[onGlobalActor:]
-// IN_SYNC_FUNC_NODOT-DAG: Decl[Subscript]/CurrNominal/NotRecommended: [{#onOtherGlobalActor: Int#}][' async'][#Int#]; name=[onOtherGlobalActor:]
+// IN_SYNC_FUNC_NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#onGlobalActor: Int#}][' async'][#Int#]; name=[onGlobalActor:]
+// IN_SYNC_FUNC_NODOT-DAG: Decl[Subscript]/CurrNominal: [{#onOtherGlobalActor: Int#}][' async'][#Int#]; name=[onOtherGlobalActor:]
 // IN_SYNC_FUNC_NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#sync: Int#}][#Int#]; name=[sync:]
-// IN_SYNC_FUNC_NODOT: End completions
 
     let _ = otherInstanceOfMyClass.#^IN_SYNC_FUNC_OTHER_DOT?check=IN_SYNC_FUNC_SELF_DOT^#
     let _ = otherInstanceOfMyClass#^IN_SYNC_FUNC_OTHER_NODOT?check=IN_SYNC_FUNC_NODOT^#
@@ -166,7 +154,6 @@ extension MyClass {
       }
     }
   }
-// IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT: Begin completions
 // IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   funcOnGlobalActor()[#Int#]; name=funcOnGlobalActor()
 // IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal: funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
 // IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   funcSync()[#Int#]; name=funcSync()
@@ -175,7 +162,6 @@ extension MyClass {
 // IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceVar]/CurrNominal:      varOnGlobalActor[#Int#]; name=varOnGlobalActor
 // IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceVar]/CurrNominal: varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
 // IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceVar]/CurrNominal:      varSync[#Int#]; name=varSync
-// IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT: End completions
 }
 
 actor ActorTests {

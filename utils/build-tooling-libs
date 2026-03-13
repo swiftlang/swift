@@ -156,6 +156,29 @@ class Builder(object):
             ]
             llvm_c_flags += " -target " + host_triple
 
+        elif self.host == "xrsimulator":
+            deployment_version = "1.0"
+            host_triple = "%s-apple-xros%s-simulator" % (
+                self.arch,
+                deployment_version,
+            )
+            host_sdk = "XROS_SIMULATOR"
+            cmake_args += [
+                "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + deployment_version,
+                "-DSWIFT_DARWIN_DEPLOYMENT_VERSION_XROS=" + deployment_version,
+            ]
+            llvm_c_flags += " -target " + host_triple
+
+        elif self.host == "xros":
+            deployment_version = "1.0"
+            host_triple = "%s-apple-xros%s" % (self.arch, deployment_version)
+            host_sdk = "XROS"
+            cmake_args += [
+                "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + deployment_version,
+                "-DSWIFT_DARWIN_DEPLOYMENT_VERSION_XROS=" + deployment_version,
+            ]
+            llvm_c_flags += " -target " + host_triple
+
         assert host_triple
         assert host_sdk
         cmake_args += [

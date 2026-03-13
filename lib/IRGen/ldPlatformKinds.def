@@ -26,5 +26,7 @@ LD_PLATFORM(macCatalyst, 6)
 LD_PLATFORM(iOS_sim, 7)
 LD_PLATFORM(tvOS_sim, 8)
 LD_PLATFORM(watchOS_sim, 9)
+LD_PLATFORM(xrOS, 11)
+LD_PLATFORM(xrOS_sim, 12)
 
 #undef LD_PLATFORM

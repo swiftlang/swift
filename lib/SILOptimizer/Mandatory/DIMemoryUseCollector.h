@@ -116,7 +116,9 @@ public:
   unsigned getNumElements() const { return NumElements; }
 
   /// Return true if this is 'self' in any kind of initializer.
-  bool isAnyInitSelf() const { return !MemoryInst->isVar(); }
+  bool isAnyInitSelf() const {
+    return !MemoryInst->isVar() && !MemoryInst->isOut();
+  }
 
   /// Return uninitialized value of 'self' if current memory object
   /// is located in an initializer (of any kind).
@@ -150,7 +152,7 @@ public:
     if (MemoryInst->isDelegatingSelf())
       return false;
 
-    if (!MemoryInst->isVar()) {
+    if (!MemoryInst->isVar() && !MemoryInst->isOut()) {
       if (auto decl = getASTType()->getAnyNominal()) {
         if (isa<ClassDecl>(decl)) {
           return true;
@@ -163,11 +165,6 @@ public:
   /// Returns the initializer if the memory use is 'self' and appears in an
   /// actor's initializer. Otherwise, returns nullptr.
   ConstructorDecl *getActorInitSelf() const;
-
-  /// If \c TheMemory is a temporary variable that is responsible for
-  /// member-by-member initialization of `$Storage` in a user-defined
-  /// initializer of a type wrapped type, return its declaration.
-  VarDecl *getAsTypeWrapperLocalStorageVar() const;
 
   /// True if this memory object is the 'self' of a derived class initializer.
   bool isDerivedClassSelf() const { return MemoryInst->isDerivedClassSelf(); }
@@ -205,6 +202,7 @@ public:
   bool isNonDelegatingInit() const {
     switch (MemoryInst->getMarkUninitializedKind()) {
     case MarkUninitializedInst::Var:
+    case MarkUninitializedInst::Out:
       return false;
     case MarkUninitializedInst::RootSelf:
     case MarkUninitializedInst::CrossModuleRootSelf:
@@ -226,6 +224,8 @@ public:
   bool isDelegatingSelfAllocated() const {
     return MemoryInst->isDelegatingSelfAllocated();
   }
+
+  bool isOut() const { return MemoryInst->isOut(); }
 
   enum class EndScopeKind { Borrow, Access };
 
@@ -264,9 +264,10 @@ enum DIUseKind {
   /// value.
   Assign,
 
-  /// The instruction is an assignment of a wrapped value with an already initialized
-  /// backing property wrapper.
-  AssignWrappedValue,
+  /// The instruction is a setter call for a computed property after all of
+  /// self is initialized. This is used for property wrappers and for init
+  /// accessors.
+  Set,
 
   /// The instruction is a store to a member of a larger struct value.
   PartialStore,
@@ -297,7 +298,12 @@ enum DIUseKind {
   LoadForTypeOfSelf,
 
   /// This instruction is a value_metatype on the address of 'self'.
-  TypeOfSelf
+  TypeOfSelf,
+
+  /// This instruction is the builtin for flow-sensitive current isolation
+  /// within an actor initializer. It will be replaced with either a copy of
+  /// its argument (injected into an (any Actor)?) or nil.
+  FlowSensitiveSelfIsolation,
 };
 
 /// This struct represents a single classified access to the memory object
@@ -313,9 +319,12 @@ struct DIMemoryUse {
   /// track of which tuple elements are affected.
   unsigned FirstElement, NumElements;
 
-  DIMemoryUse(SILInstruction *Inst, DIUseKind Kind, unsigned FE, unsigned NE)
-      : Inst(Inst), Kind(Kind), FirstElement(FE), NumElements(NE) {
-  }
+  NullablePtr<VarDecl> Field;
+
+  DIMemoryUse(SILInstruction *Inst, DIUseKind Kind, unsigned FE, unsigned NE,
+              NullablePtr<VarDecl> Field = 0)
+      : Inst(Inst), Kind(Kind), FirstElement(FE), NumElements(NE),
+        Field(Field) {}
 
   DIMemoryUse() : Inst(nullptr) {}
 
@@ -356,15 +365,6 @@ struct DIElementUseInfo {
 /// and storing the information found into the Uses and Releases lists.
 void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                               DIElementUseInfo &UseInfo);
-
-/// Check whether given function is a user-defined initializer of a
-/// type wrapped type.
-bool canHaveTypeWrapperLocalStorageVar(SILFunction &F);
-
-/// Check whether this instruction represents `_storage` variable
-/// injected by type-checker into user-defined designated initializer
-/// of a type wrapped type.
-bool isTypeWrapperLocalStorageVar(SILFunction &F, MarkUninitializedInst *Inst);
 
 } // end namespace ownership
 } // end namespace swift

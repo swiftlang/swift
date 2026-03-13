@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 class Node<A, B> {
   var next: Node<A, B>?
@@ -60,7 +60,7 @@ class Node2<A, B> {
 // CHECK: sil hidden [ossa] @$s31deinit_recursive_linear_generic5Node2Cfd : $@convention(method) <A, B> (@guaranteed Node2<A, B>) -> @owned Builtin.NativeObject {
 // CHECK: [[SELF:%.*]] "self"
 // CHECK: bb0([[SELF]] : @guaranteed $Node2<A, B>):
-// CHECK:   debug_value [[SELF]] : $Node2<A, B>, let, name "self", argno 1, implicit
+// CHECK:   debug_value [[SELF]] : $Node2<A, B>, let, name "self", argno 1
 // CHECK:   [[NEXT_ADDR:%.*]] = ref_element_addr [[SELF]] : $Node2<A, B>, #Node2.next
 // CHECK:   [[NEXT_ACCESS:%.*]] = begin_access [deinit] [static] [[NEXT_ADDR]] : $*Optional<Node2<Int, (A, B)>>
 // CHECK:   destroy_addr [[NEXT_ACCESS]] : $*Optional<Node2<Int, (A, B)>>

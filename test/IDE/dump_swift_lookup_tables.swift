@@ -1,5 +1,8 @@
-// RUN: %target-swift-ide-test -dump-importer-lookup-table -source-filename %s -import-objc-header %S/Inputs/swift_name.h -I %S/Inputs/custom-modules > %t.log 2>&1
-// RUN: %FileCheck %s < %t.log
+// RUN: %target-swift-ide-test -dump-importer-lookup-table -source-filename %s -import-objc-header %S/Inputs/swift_name.h -I %S/Inputs/custom-modules > %t.ide-test.log 2>&1
+// RUN: %FileCheck %s < %t.ide-test.log
+
+// RUN: %target-typecheck-verify-swift -dump-clang-lookup-tables -import-objc-header %S/Inputs/swift_name.h -I %S/Inputs/custom-modules > %t.frontend.log 2>&1
+// RUN: %FileCheck %s < %t.frontend.log
 
 // REQUIRES: objc_interop
 import ImportAsMember
@@ -38,19 +41,19 @@ import ImportAsMember
 // CHECK-NEXT:      TU: __swift
 // CHECK-NEXT:    adding:
 // CHECK-NEXT:      SNSomeStruct: SNAdding
-// CHECK-NEXT:    blue:
+// CHECK:         blue:
 // CHECK-NEXT:      SNColorChoice: SNColorBlue
 // CHECK-NEXT:    defaultValue:
 // CHECK-NEXT:      SNSomeStruct: SNSomeStructGetDefault, SNSomeStructSetDefault
-// CHECK-NEXT:    defaultX:
+// CHECK:         defaultX:
 // CHECK-NEXT:      SNSomeStruct: DefaultXValue
-// CHECK-NEXT:    foo:
+// CHECK:         foo:
 // CHECK-NEXT:      SNSomeStruct: SNSomeStructGetFoo, SNSomeStructSetFoo
-// CHECK-NEXT:    green:
+// CHECK:         green:
 // CHECK-NEXT:      SNColorChoice: SNColorGreen
 // CHECK-NEXT:    init:
 // CHECK-NEXT:      SNSomeStruct: SNCreate
-// CHECK-NEXT:    makeSomeStruct:
+// CHECK:         makeSomeStruct:
 // CHECK-NEXT:      TU: SNMakeSomeStruct, SNMakeSomeStructForX
 // CHECK-NEXT:    x:
 // CHECK-NEXT:      SNSomeStruct: X

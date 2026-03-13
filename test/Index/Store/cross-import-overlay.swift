@@ -25,7 +25,7 @@ from__ABAdditionsCAdditions()
 //
 // RUN: %FileCheck %s --input-file %t/units --check-prefix=MAIN
 // MAIN:      module-name: cross_import_overlay
-// MAIN:      out-file: {{.*}}/file1.o
+// MAIN:      out-file: {{.*}}{{/|\\}}file1.o
 // MAIN-NEXT: target: {{.*}}
 // MAIN-NEXT: is-debug: 1
 // MAIN-NEXT: DEPEND START

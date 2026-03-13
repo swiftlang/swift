@@ -1,7 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 6
-
-// '-swift-version 6' is currently asserts-only
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 6
 
 // rdar://85263844 - initializer 'init(_:)' requires the types be equivalent
 func rdar85263844(arr: [(q: String, a: Int)]) -> AnySequence<(question: String, answer: Int)> {
@@ -32,5 +29,5 @@ extension S4 where T == (outer: Int, y: Int) {
 
 public func rdar85263844_2(_ x: [Int]) -> S4<(outer: Int, y: Int)> {
   // FIXME: Bad error message.
-  S4(x.map { (inner: $0, y: $0) }) // expected-error {{type of expression is ambiguous without more context}}
+  S4(x.map { (inner: $0, y: $0) }) // expected-error {{failed to produce diagnostic for expression}}
 }

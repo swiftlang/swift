@@ -209,6 +209,12 @@ OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
       llvm::yaml::Node *Key = OutputPair.getKey();
       llvm::yaml::Node *Value = OutputPair.getValue();
 
+      if (!Key)
+        return constructError("bad kind");
+
+      if (!Value)
+        return constructError("bad path");
+
       auto *KindNode = dyn_cast<llvm::yaml::ScalarNode>(Key);
       if (!KindNode)
         return constructError("kind not a ScalarNode");

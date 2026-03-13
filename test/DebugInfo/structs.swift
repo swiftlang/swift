@@ -12,7 +12,11 @@ func test(_ x : A) {
 }
 // CHECK:    define hidden {{.*}}void @"$s7structs4test{{[_0-9a-zA-Z]*}}F"
 // CHECK: [[X_DBG:%.*]] = alloca
-// CHECK: call void @llvm.dbg.declare(metadata {{.*}}* [[X_DBG]], metadata [[X_MD:!.*]], metadata
+// CHECK: #dbg_declare(ptr [[X_DBG]], [[X_MD:!.*]], !DIExpression
+
+// A class is represented by a pointer, so B's total size should be PTRSIZE.
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "B",{{.*}}size: [[PTRSIZE]]
+
 // CHECK: ![[A:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "A",
 // CHECK-SAME:                         identifier
 
@@ -25,8 +29,8 @@ class C {
 // CHECK-SAME:                        type: ![[LET_A:[0-9]+]]
 // CHECK: ![[LET_A]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[A]])
 
-// A class is represented by a pointer, so B's total size should be PTRSIZE.
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "B",{{.*}}size: [[PTRSIZE]]
 struct B {
   var c : C
 }
+
+let b = B(c: C())

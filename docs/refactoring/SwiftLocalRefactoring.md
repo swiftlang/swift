@@ -4,7 +4,7 @@ Xcode 9 includes a brand new refactoring engine. It can transform code locally
 within a single Swift source file, or globally, such as renaming a method or property
 that occurs in multiple files and even different languages. The logic behind local refactorings is
 implemented entirely in the compiler and SourceKit, and is now open source in
-the [swift repository](https://github.com/apple/swift). Therefore, any Swift enthusiast can
+the [swift repository](https://github.com/swiftlang/swift). Therefore, any Swift enthusiast can
 contribute refactoring actions to the language. This post discusses how
 a simple refactoring can be implemented and surfaced in Xcode.
 
@@ -245,7 +245,7 @@ is built alongside the compiler.
 
 Let's again take String Localization as an example. The above code
 snippet is a test for contextual refactoring actions.
-Similar tests can be found in [test/refactoring/RefactoringKind/](https://github.com/apple/swift/tree/main/test/refactoring/RefactoringKind).
+Similar tests can be found in [test/refactoring/RefactoringKind/](https://github.com/swiftlang/swift/tree/main/test/refactoring/RefactoringKind).
 
 Let's take a look at the `RUN` line in more detail, starting with the use of the `%refactor` utility:
 
@@ -279,7 +279,7 @@ with interpolation.
 We should also test that when applying the refactoring, the automated code
 change matches our expectations. As a preparation, we need to teach [swift-refactor]
 a refactoring kind flag to specify the action we are testing with. To achieve this,
-the following entry is added in [swift-refactor.cpp](https://github.com/apple/swift/blob/main/tools/swift-refactor/swift-refactor.cpp):
+the following entry is added in [swift-refactor.cpp](https://github.com/swiftlang/swift/blob/main/tools/swift-refactor/swift-refactor.cpp):
 
 ~~~cpp
   clEnumValN(RefactoringKind::LocalizeString, "localize-string", "Perform String Localization refactoring"),
@@ -321,7 +321,7 @@ After implementing all of above pieces in the Swift codebase, we
 are ready to test/use the newly added refactoring in Xcode by integrating with
 a locally-built open source toolchain.
 
-1. Run [build-toolchain](https://github.com/apple/swift/blob/main/utils/build-toolchain)
+1. Run [build-toolchain](https://github.com/swiftlang/swift/blob/main/utils/build-toolchain)
 to build the open source toolchain locally.
 
 2. Untar and copy the toolchain to `/Library/Developer/Toolchains/`.
@@ -334,17 +334,17 @@ following figure illustrates.
 ## Potential Local Refactoring Ideas
 This post just touches on some of the things that are now possible to implement in the new refactoring engine.
 If you are excited about extending the refactoring engine to implement additional transformations,
-Swift's issue database contains [several ideas of refactoring transformations](https://github.com/apple/swift/issues?q=is%3Aissue+is%3Aopen+label%3ARefactoring) awaiting implementations.
+Swift's issue database contains [several ideas of refactoring transformations](https://github.com/swiftlang/swift/issues?q=is%3Aissue+is%3Aopen+label%3ARefactoring) awaiting implementations.
 
 For further help with implementing refactoring transformations, please feel free to ask questions on the [Swift forums](https://forums.swift.org/c/development/compiler/9).
 
-[sourcekitd]: https://github.com/apple/swift/tree/main/tools/SourceKit
-[ResolvedCursorInfo]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/Utils.h#L158
-[RangeInfo]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/Utils.h#L344
-[performChange]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/lib/IDE/Refactoring.cpp#L599
-[RefactoringKinds.def]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/RefactoringKinds.def
-[isApplicable]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/lib/IDE/Refactoring.cpp#L646
-[DiagnosticsRefactoring.def]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/AST/DiagnosticsRefactoring.def
-[swift-refactor]: https://github.com/apple/swift/tree/60a91bb7360dde5ce9531889e0ed10a2edbc961a/tools/swift-refactor
-[Refactoring.cpp]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/lib/IDE/Refactoring.cpp
-[EditConsumer]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/Utils.h#L506
+[sourcekitd]: https://github.com/swiftlang/swift/tree/main/tools/SourceKit
+[ResolvedCursorInfo]: https://github.com/swiftlang/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/Utils.h#L158
+[RangeInfo]: https://github.com/swiftlang/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/Utils.h#L344
+[performChange]: https://github.com/swiftlang/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/lib/IDE/Refactoring.cpp#L599
+[RefactoringKinds.def]: https://github.com/swiftlang/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/RefactoringKinds.def
+[isApplicable]: https://github.com/swiftlang/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/lib/IDE/Refactoring.cpp#L646
+[DiagnosticsRefactoring.def]: https://github.com/swiftlang/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/AST/DiagnosticsRefactoring.def
+[swift-refactor]: https://github.com/swiftlang/swift/tree/60a91bb7360dde5ce9531889e0ed10a2edbc961a/tools/swift-refactor
+[Refactoring.cpp]: https://github.com/swiftlang/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/lib/IDE/Refactoring.cpp
+[EditConsumer]: https://github.com/swiftlang/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/Utils.h#L506

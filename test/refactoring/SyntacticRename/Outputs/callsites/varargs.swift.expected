@@ -32,14 +32,14 @@ func /*trailing-only:def*/trailingOnly(a: () -> ()) {}
 /*trailing-only:call*/trailingOnly {}
 
 
-func /*varargs:def*/betterName(a: Int..., b: Int, c: Int) {}
+func /*varargs:def*/<base>withVarargs</base>(<arglabel index=0>x</arglabel><param index=0></param>: Int..., <arglabel index=1>y</arglabel><param index=1></param>: Int, <arglabel index=2>_</arglabel><param index=2></param>: Int) {}
 
 // valid
-/*varargs:call*/betterName(a: 1, 2, 3, b: 2, c: 4)
-/*varargs:call*/betterName(b: 2, c: 4)
+/*varargs:call*/<base>withVarargs</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>1, 2, 3, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>2, <callcombo index=2></callcombo>4)
+/*varargs:call*/<base>withVarargs</base>(<callarg index=1>y</callarg><callcolon index=1>: </callcolon>2, <callcombo index=2></callcombo>4)
 
 // false positives
-/*varargs:call*/betterName(a: 1, b: 2, c: 4, 5)
+/*varargs:call*/<base>withVarargs</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>1, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>2, <callcombo index=2></callcombo>4, 5)
 
 //invalid
 /*varargs:call*/withVarargs(2, y: 2)

@@ -10,8 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(Linux)
+#if canImport(Glibc)
 import Glibc
+#elseif canImport(Musl)
+import Musl
 #elseif os(Windows)
 import MSVCRT
 #else
@@ -81,7 +83,7 @@ class ArgumentParser<U> {
     /// Argument holds the name of the command line parameter, its help
     /// description and a rule that's applied to process it.
     ///
-    /// The the rule is typically a value processing closure used to convert it
+    /// The rule is typically a value processing closure used to convert it
     /// into given type and storing it in the parsing result.
     ///
     /// See also: addArgument, parseArgument

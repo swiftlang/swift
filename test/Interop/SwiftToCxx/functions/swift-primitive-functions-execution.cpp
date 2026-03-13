@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/swift-primitive-functions-cxx-bridging.swift -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %S/swift-primitive-functions-cxx-bridging.swift -module-name Functions -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/functions.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-functions-execution.o
 // RUN: %target-interop-build-swift %S/swift-primitive-functions-cxx-bridging.swift -o %t/swift-functions-execution -Xlinker %t/swift-functions-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -35,7 +35,7 @@ int main() {
   VERIFY_PASSTHROUGH_VALUE(passThroughCUnsignedInt, 0xFFFFFFFF);
   VERIFY_PASSTHROUGH_VALUE(passThroughCUnsignedLongLong, 0xFFFFFFFF);
 
-  VERIFY_PASSTHROUGH_VALUE(passThrougCFloat, 1.0f);
+  VERIFY_PASSTHROUGH_VALUE(passThroughCFloat, 1.0f);
   VERIFY_PASSTHROUGH_VALUE(passThroughCDouble, 42.125f);
 
   VERIFY_PASSTHROUGH_VALUE(passThroughInt8, -1);

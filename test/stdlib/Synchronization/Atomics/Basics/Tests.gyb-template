@@ -1,0 +1,368 @@
+%{
+  from SwiftAtomics import (
+    loadOrderings, storeOrderings, updateOrderings,
+    boolOperations, integerOperations, lowerFirst, argLabel)
+}%
+
+/// Exercises all operations in a single-threaded context, verifying
+/// they provide the expected results.
+
+import Synchronization
+import StdlibUnittest
+
+% for label, type, a, b in types:
+let suite = TestSuite("BasicAtomic${label}Tests")
+
+extension Unmanaged: @retroactive Equatable { // FIXME: This is terrible
+  public static func ==(left: Self, right: Self) -> Bool {
+    left.toOpaque() == right.toOpaque()
+  }
+}
+
+struct Foo: Equatable, CustomStringConvertible {
+  var value: Int
+  init(_ value: Int) { self.value = value }
+  var description: String { "Foo(\(value))" }
+}
+
+class Bar: Equatable, CustomStringConvertible {
+  var value: Int
+  init(_ value: Int) { self.value = value }
+  var description: String { "Bar(\(value))" }
+  static func ==(left: Bar, right: Bar) -> Bool {
+    left === right
+  }
+}
+
+enum Fred: Int, AtomicRepresentable {
+  case one
+  case two
+}
+
+struct Hyacinth: RawRepresentable, Equatable, AtomicOptionalRepresentable {
+  var rawValue: UnsafeRawPointer
+
+  init(rawValue: UnsafeRawPointer) {
+    self.rawValue = rawValue
+  }
+
+  static let bucket: Hyacinth = Hyacinth(
+    rawValue: UnsafeMutableRawPointer.allocate(byteCount: 8, alignment: 8))
+}
+
+% if label == "Pointer" or label == "OptionalPointer" or label == "MutablePointer" or label == "OptionalMutablePointer":
+let _mfoo1: UnsafeMutablePointer<Foo> = {
+  let p = UnsafeMutablePointer<Foo>.allocate(capacity: 1)
+  p.initialize(to: Foo(1))
+  return p
+}()
+let _mfoo2: UnsafeMutablePointer<Foo> = {
+  let p = UnsafeMutablePointer<Foo>.allocate(capacity: 1)
+  p.initialize(to: Foo(2))
+  return p
+}()
+
+var _foo1: UnsafePointer<Foo> { UnsafePointer(_mfoo1) }
+var _foo2: UnsafePointer<Foo> { UnsafePointer(_mfoo2) }
+% elif label == "RawPointer" or label == "OptionalRawPointer" or label == "MutableRawPointer" or label == "OptionalMutableRawPointer":
+let _mraw1 = UnsafeMutableRawPointer.allocate(byteCount: 16, alignment: 1)
+let _mraw2 = UnsafeMutableRawPointer.allocate(byteCount: 16, alignment: 1)
+
+var _raw1: UnsafeRawPointer { UnsafeRawPointer(_mraw1) }
+var _raw2: UnsafeRawPointer { UnsafeRawPointer(_mraw2) }
+% elif label == "Unmanaged" or label == "OptionalUnmanaged":
+let _bar1 = Unmanaged<Bar>.passRetained(Bar(1))
+let _bar2 = Unmanaged<Bar>.passRetained(Bar(2))
+% elif label == "Reference" or label == "OptionalReference":
+let _baz1 = Baz(1)
+let _baz2 = Baz(2)
+% end
+
+if #available(SwiftStdlib 6.0, *) {
+
+suite.test("Atomic${label} creation") {
+  let v = Atomic<${type}>(${a})
+  expectEqual(v.load(ordering: .relaxed), ${a})
+
+  let w = Atomic<${type}>(${b})
+  expectEqual(w.load(ordering: .relaxed), ${b})
+}
+
+% for (order, _, _, _) in loadOrderings:
+suite.test("Atomic${label} load ${order}") {
+  let v = Atomic<${type}>(${a})
+  expectEqual(v.load(ordering: .${order}), ${a})
+
+  let w = Atomic<${type}>(${b})
+  expectEqual(w.load(ordering: .${order}), ${b})
+}
+% end
+
+% for (order, _, _, _) in storeOrderings:
+suite.test("Atomic${label} store ${order}") {
+  let v = Atomic<${type}>(${a})
+  v.store(${b}, ordering: .${order})
+  expectEqual(v.load(ordering: .relaxed), ${b})
+
+  let w = Atomic<${type}>(${b})
+  w.store(${a}, ordering: .${order})
+  expectEqual(w.load(ordering: .relaxed), ${a})
+}
+% end
+
+% for (order, _, _, _, _) in updateOrderings:
+suite.test("Atomic${label} exchange ${order}") {
+  let v = Atomic<${type}>(${a})
+
+  expectEqual(v.exchange(${a}, ordering: .${order}), ${a})
+  expectEqual(v.load(ordering: .relaxed), ${a})
+
+  expectEqual(v.exchange(${b}, ordering: .${order}), ${a})
+  expectEqual(v.load(ordering: .relaxed), ${b})
+
+  expectEqual(v.exchange(${b}, ordering: .${order}), ${b})
+  expectEqual(v.load(ordering: .relaxed), ${b})
+}
+% end
+
+% for (order, _, _, _, _) in updateOrderings:
+suite.test("Atomic${label} compareExchange ${order}") {
+  let v = Atomic<${type}>(${a})
+
+  var (exchanged, original): (Bool, ${type}) = v.compareExchange(
+    expected: ${a},
+    desired: ${b},
+    ordering: .${order})
+  expectTrue(exchanged)
+  expectEqual(original, ${a})
+  expectEqual(v.load(ordering: .relaxed), ${b})
+
+  (exchanged, original) = v.compareExchange(
+    expected: ${a},
+    desired: ${b},
+    ordering: .${order})
+  expectFalse(exchanged)
+  expectEqual(original, ${b})
+  expectEqual(v.load(ordering: .relaxed), ${b})
+
+  (exchanged, original) = v.compareExchange(
+    expected: ${b},
+    desired: ${a},
+    ordering: .${order})
+  expectTrue(exchanged)
+  expectEqual(original, ${b})
+  expectEqual(v.load(ordering: .relaxed), ${a})
+
+  (exchanged, original) = v.compareExchange(
+    expected: ${b},
+    desired: ${a},
+    ordering: .${order})
+  expectFalse(exchanged)
+  expectEqual(original, ${a})
+  expectEqual(v.load(ordering: .relaxed), ${a})
+}
+
+% end
+
+% for (order, _, _, _, _) in updateOrderings:
+suite.test("Atomic${label} weakCompareExchange ${order}") {
+  let v = Atomic<${type}>(${a})
+
+  var (exchanged, original): (Bool, ${type})
+
+  repeat {
+    (exchanged, original) = v.weakCompareExchange(
+      expected: ${a},
+      desired: ${b},
+      ordering: .${order})
+  } while !exchanged
+  expectEqual(original, ${a})
+  expectEqual(v.load(ordering: .relaxed), ${b})
+
+  (exchanged, original) = v.weakCompareExchange(
+    expected: ${a},
+    desired: ${b},
+    ordering: .${order})
+  expectFalse(exchanged)
+  expectEqual(original, ${b})
+  expectEqual(v.load(ordering: .relaxed), ${b})
+
+  repeat {
+    (exchanged, original) = v.weakCompareExchange(
+      expected: ${b},
+      desired: ${a},
+      ordering: .${order})
+  } while !exchanged
+  expectEqual(original, ${b})
+  expectEqual(v.load(ordering: .relaxed), ${a})
+
+  (exchanged, original) = v.weakCompareExchange(
+    expected: ${b},
+    desired: ${a},
+    ordering: .${order})
+  expectFalse(exchanged)
+  expectEqual(original, ${a})
+  expectEqual(v.load(ordering: .relaxed), ${a})
+}
+
+% end
+
+% for (successorder, _, _, _, _) in updateOrderings:
+%   for (failorder, _, _, _) in loadOrderings:
+suite.test("Atomic${label} compareExchange success: ${successorder} failure: ${failorder}") {
+  let v = Atomic<${type}>(${a})
+
+  var (exchanged, original): (Bool, ${type}) = v.compareExchange(
+    expected: ${a},
+    desired: ${b},
+    successOrdering: .${successorder},
+    failureOrdering: .${failorder})
+  expectTrue(exchanged)
+  expectEqual(original, ${a})
+  expectEqual(v.load(ordering: .relaxed), ${b})
+
+  (exchanged, original) = v.compareExchange(
+    expected: ${a},
+    desired: ${b},
+    successOrdering: .${successorder},
+    failureOrdering: .${failorder})
+  expectFalse(exchanged)
+  expectEqual(original, ${b})
+  expectEqual(v.load(ordering: .relaxed), ${b})
+
+  (exchanged, original) = v.compareExchange(
+    expected: ${b},
+    desired: ${a},
+    successOrdering: .${successorder},
+    failureOrdering: .${failorder})
+  expectTrue(exchanged)
+  expectEqual(original, ${b})
+  expectEqual(v.load(ordering: .relaxed), ${a})
+
+  (exchanged, original) = v.compareExchange(
+    expected: ${b},
+    desired: ${a},
+    successOrdering: .${successorder},
+    failureOrdering: .${failorder})
+  expectFalse(exchanged)
+  expectEqual(original, ${a})
+  expectEqual(v.load(ordering: .relaxed), ${a})
+}
+%   end
+% end
+
+% for (successorder, _, _, _, _) in updateOrderings:
+%   for (failorder, _, _, _) in loadOrderings:
+suite.test("Atomic${label} weakCompareExchange success: ${successorder} failure: ${failorder}") {
+  let v = Atomic<${type}>(${a})
+
+  var (exchanged, original): (Bool, ${type})
+  repeat {
+    (exchanged, original) = v.weakCompareExchange(
+      expected: ${a},
+      desired: ${b},
+      successOrdering: .${successorder},
+      failureOrdering: .${failorder})
+  } while !exchanged
+  expectEqual(original, ${a})
+  expectEqual(v.load(ordering: .relaxed), ${b})
+
+  (exchanged, original) = v.weakCompareExchange(
+    expected: ${a},
+    desired: ${b},
+    successOrdering: .${successorder},
+    failureOrdering: .${failorder})
+  expectFalse(exchanged)
+  expectEqual(original, ${b})
+  expectEqual(v.load(ordering: .relaxed), ${b})
+
+  repeat {
+    (exchanged, original) = v.weakCompareExchange(
+      expected: ${b},
+      desired: ${a},
+      successOrdering: .${successorder},
+      failureOrdering: .${failorder})
+  } while !exchanged
+  expectEqual(original, ${b})
+  expectEqual(v.load(ordering: .relaxed), ${a})
+
+  (exchanged, original) = v.weakCompareExchange(
+    expected: ${b},
+    desired: ${a},
+    successOrdering: .${successorder},
+    failureOrdering: .${failorder})
+  expectFalse(exchanged)
+  expectEqual(original, ${a})
+  expectEqual(v.load(ordering: .relaxed), ${a})
+}
+%   end
+% end
+
+
+% if type == "Bool":
+  // Bool operations
+%   for (name, _, operator, _) in boolOperations:
+%     for (order, _, _, _, _) in updateOrderings:
+suite.test("AtomicBool ${name} ${order}") {
+  let v = Atomic<Bool>(false)
+
+  // The truth tables are super tiny, so just check every value
+  for a in [false, true] {
+    for b in [false, true] {
+      v.store(a, ordering: .relaxed)
+      let r = v.${lowerFirst(name)}(b, ordering: .${order})
+      expectEqual(r.oldValue, a, "a = \(a), b = \(b)")
+      expectEqual(r.newValue, a ${operator} b, "a = \(a), b = \(b)")
+      expectEqual(
+        v.load(ordering: .relaxed),
+        a ${operator} b,
+        "a = \(a), b =\(b)")
+    }
+  }
+}
+
+%     end
+%   end
+% end
+
+% if type.startswith("Int") or type.startswith("UInt"):
+// Integer operations
+%   for (name, _, operator, _) in integerOperations:
+%     for (order, _, _, _, _) in updateOrderings:
+suite.test("Atomic${label} ${name} ${order}") {
+  let a: ${type} = 3
+  let b: ${type} = 8
+  let c: ${type} = 12
+%       if name == "Min" or name == "Max":
+  let result1: ${type} = Swift.${lowerFirst(name)}(a, b)
+  let result2: ${type} = Swift.${lowerFirst(name)}(result1, c)
+%       else:
+  let result1: ${type} = a ${operator} b
+  let result2: ${type} = result1 ${operator} c
+%       end
+
+  let v = Atomic<${type}>(a)
+
+  let val1 = v.${lowerFirst(name)}(b, ordering: .${order})
+  expectEqual(val1.oldValue, a)
+  expectEqual(val1.newValue, result1)
+  expectEqual(v.load(ordering: .relaxed), result1)
+
+  let val2 = v.${lowerFirst(name)}(c, ordering: .${order})
+  expectEqual(val2.oldValue, result1)
+  expectEqual(val2.newValue, result2)
+  expectEqual(v.load(ordering: .relaxed), result2)
+}
+
+%     end
+%   end
+% end
+} // if #available(SwiftStdlib 6.0, *)
+% end
+%{
+# Local Variables:
+# mode: swift
+# End:
+}%
+
+runAllTests()

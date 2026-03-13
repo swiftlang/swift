@@ -17,6 +17,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Demangling/Demangle.h"
@@ -35,7 +36,7 @@
 
 using namespace swift;
 
-static llvm::Optional<SymbolicValue>
+static std::optional<SymbolicValue>
 evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
                      ArrayRef<SymbolicValue> arguments, SymbolicValue &result,
                      unsigned &numInstEvaluated, ConstExprEvaluator &evaluator);
@@ -44,37 +45,9 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 // ConstantFolding.h/cpp files should be subsumed by this, as this is a more
 // general framework.
 
-enum class WellKnownFunction {
-  // Array.init()
-  ArrayInitEmpty,
-  // Array._allocateUninitializedArray
-  AllocateUninitializedArray,
-  // Array._endMutation
-  EndArrayMutation,
-  // _finalizeUninitializedArray
-  FinalizeUninitializedArray,
-  // Array.append(_:)
-  ArrayAppendElement,
-  // String.init()
-  StringInitEmpty,
-  // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
-  StringMakeUTF8,
-  // static String.append (_: String, _: inout String)
-  StringAppend,
-  // static String.== infix(_: String)
-  StringEquals,
-  // String.percentEscapedString.getter
-  StringEscapePercent,
-  // BinaryInteger.description.getter
-  BinaryIntegerDescription,
-  // _assertionFailure(_: StaticString, _: StaticString, file: StaticString,...)
-  AssertionFailure,
-  // A function taking one argument that prints the symbolic value of the
-  // argument during constant evaluation. This must only be used for debugging.
-  DebugPrint
-};
 
-static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
+
+static std::optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
   if (fn->hasSemanticsAttr(semantics::ARRAY_INIT_EMPTY))
     return WellKnownFunction::ArrayInitEmpty;
   if (fn->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED_INTRINSIC))
@@ -108,7 +81,7 @@ static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
   // This functionality must be used only for debugging the evaluator.
   if (fn->hasSemanticsAttrThatStartsWith("constant_evaluator_debug_print"))
     return WellKnownFunction::DebugPrint;
-  return None;
+  return std::nullopt;
 }
 
 static bool isReadOnlyFunction(WellKnownFunction function) {
@@ -138,157 +111,56 @@ static SymbolicValue getUnknown(ConstExprEvaluator &evaluator, SILNode *node,
   return evaluator.getUnknown(node, UnknownReason::create(kind));
 }
 
-//===----------------------------------------------------------------------===//
-// ConstExprFunctionState implementation.
-//===----------------------------------------------------------------------===//
+ConstExprFunctionState::ConstExprFunctionState(ConstExprEvaluator &evaluator, SILFunction *fn,
+                       SubstitutionMap substitutionMap,
+                       unsigned &numInstEvaluated,
+                       bool enableTopLevelEvaluation)
+    : evaluator(evaluator), fn(fn), substitutionMap(substitutionMap),
+      numInstEvaluated(numInstEvaluated),
+      recursivelyComputeValueIfNotInState(enableTopLevelEvaluation) {
+  assert((!fn || !enableTopLevelEvaluation) &&
+         "top-level evaluation must be disabled when evaluating a function"
+         " body step by step");
+}
 
-namespace swift {
-/// This type represents the state of computed values within a function
-/// as evaluation happens.  A separate instance of this is made for each
-/// callee in a call chain to represent the constant values given the set of
-/// formal parameters that callee was invoked with.
-class ConstExprFunctionState {
-  /// This is the evaluator that is computing this function state.  We use it to
-  /// allocate space for values and to query the call stack.
-  ConstExprEvaluator &evaluator;
-
-  /// If we are analyzing the body of a constexpr function, this is the
-  /// function.  This is null for the top-level expression.
-  SILFunction *fn;
-
-  /// If we have a function being analyzed, this is the substitutionMap for
-  /// the call to it.
-  /// substitutionMap specifies a mapping from all of the protocol and type
-  /// requirements in the generic signature down to concrete conformances and
-  /// concrete types.
-  SubstitutionMap substitutionMap;
-
-  /// This keeps track of the number of instructions we've evaluated.  If this
-  /// goes beyond the execution cap, then we start returning unknown values.
-  unsigned &numInstEvaluated;
-
-  /// This is a state of previously analyzed values, maintained and filled in
-  /// by getConstantValue.  This does not hold the memory referred to by SIL
-  /// addresses.
-  llvm::DenseMap<SILValue, SymbolicValue> calculatedValues;
-
-  /// If a SILValue is not bound to a SymbolicValue in the calculatedValues,
-  /// try to compute it recursively by visiting its defining instruction.
-  bool recursivelyComputeValueIfNotInState = false;
-
-public:
-  ConstExprFunctionState(ConstExprEvaluator &evaluator, SILFunction *fn,
-                         SubstitutionMap substitutionMap,
-                         unsigned &numInstEvaluated,
-                         bool enableTopLevelEvaluation)
-      : evaluator(evaluator), fn(fn), substitutionMap(substitutionMap),
-        numInstEvaluated(numInstEvaluated),
-        recursivelyComputeValueIfNotInState(enableTopLevelEvaluation) {
-    assert((!fn || !enableTopLevelEvaluation) &&
-           "top-level evaluation must be disabled when evaluating a function"
-           " body step by step");
+/// Pretty print the state to stderr.
+void ConstExprFunctionState::dump() const {
+  llvm::errs() << "[ConstExprState: \n";
+  llvm::errs() << "   Caller: " << (fn ? fn->getName() : "null") << "\n";
+  llvm::errs() << "   evaluatedInstrCount: " << numInstEvaluated << "\n";
+  llvm::errs() << "   SubstMap: \n";
+  substitutionMap.dump(llvm::errs(), SubstitutionMap::DumpStyle::Full, 6);
+  llvm::errs() << "\n   calculatedValues: ";
+  for (auto kv : calculatedValues) {
+    llvm::errs() << "      " << kv.first << " --> " << kv.second << "\n";
   }
+}
 
-  /// Pretty print the state to stderr.
-  void dump() const {
-    llvm::errs() << "[ConstExprState: \n";
-    llvm::errs() << "   Caller: " << (fn ? fn->getName() : "null") << "\n";
-    llvm::errs() << "   evaluatedInstrCount: " << numInstEvaluated << "\n";
-    llvm::errs() << "   SubstMap: \n";
-    substitutionMap.dump(llvm::errs(), SubstitutionMap::DumpStyle::Full, 6);
-    llvm::errs() << "\n   calculatedValues: ";
-    for (auto kv : calculatedValues) {
-      llvm::errs() << "      " << kv.first << " --> " << kv.second << "\n";
-    }
-  }
+void ConstExprFunctionState::setValue(SILValue value, SymbolicValue symVal) {
+  calculatedValues.insert({value, symVal});
+}
 
-  void setValue(SILValue value, SymbolicValue symVal) {
-    calculatedValues.insert({value, symVal});
-  }
+/// Return the symbolic value for a SILValue if it is bound in the interpreter
+/// state. If not, return None.
+std::optional<SymbolicValue> ConstExprFunctionState::lookupValue(SILValue value) {
+  auto it = calculatedValues.find(value);
+  if (it != calculatedValues.end())
+    return it->second;
+  return std::nullopt;
+}
 
-  /// Return the symbolic value for a SILValue if it is bound in the interpreter
-  /// state. If not, return None.
-  llvm::Optional<SymbolicValue> lookupValue(SILValue value) {
-    auto it = calculatedValues.find(value);
-    if (it != calculatedValues.end())
-      return it->second;
-    return None;
-  }
-
-  /// Invariant: Before the call, `calculatedValues` must not contain `addr`
-  /// as a key.
-  SymbolicValue createMemoryObject(SILValue addr, SymbolicValue initialValue) {
-    assert(!calculatedValues.count(addr));
-    Type valueType =
-        substituteGenericParamsAndSimplify(addr->getType().getASTType());
-    auto *memObject = SymbolicValueMemoryObject::create(
-        valueType, initialValue, evaluator.getAllocator());
-    auto result = SymbolicValue::getAddress(memObject);
-    setValue(addr, result);
-    return result;
-  }
-
-  /// Return the SymbolicValue for the specified SIL value. If the SIL value is
-  /// not in \c calculatedValues, try computing the SymbolicValue recursively
-  /// if \c recursivelyComputeValueIfNotInState flag is set.
-  SymbolicValue getConstantValue(SILValue value);
-
-  /// Evaluate the specified instruction in a flow sensitive way, for use by
-  /// the constexpr function evaluator.  This does not handle control flow
-  /// statements.
-  llvm::Optional<SymbolicValue> evaluateFlowSensitive(SILInstruction *inst);
-
-  /// Evaluate a branch or non-branch instruction and if the evaluation was
-  /// successful, return the next instruction from where the evaluation must
-  /// continue.
-  /// \param instI basic-block iterator pointing to the instruction to evaluate.
-  /// \param visitedBlocks basic blocks already visited during evaluation.
-  ///   This is used to detect loops.
-  /// \returns a pair where the first and second elements are defined as
-  /// follows:
-  ///   If the evaluation of the instruction is successful, the first element
-  ///   is the iterator to the next instruction from the where the evaluation
-  ///   must continue. Otherwise, it is None.
-  ///
-  ///   Second element is None, if the evaluation is successful.
-  ///   Otherwise, is an unknown symbolic value that contains the error.
-  std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
-  evaluateInstructionAndGetNext(
-      SILBasicBlock::iterator instI,
-      SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks);
-
-  Type substituteGenericParamsAndSimplify(Type ty);
-  CanType substituteGenericParamsAndSimplify(CanType ty) {
-    return substituteGenericParamsAndSimplify(Type(ty))->getCanonicalType();
-  }
-  SymbolicValue computeConstantValue(SILValue value);
-  SymbolicValue computeConstantValueBuiltin(BuiltinInst *inst);
-
-  llvm::Optional<SymbolicValue> computeCallResult(ApplyInst *apply);
-
-  llvm::Optional<SymbolicValue> computeOpaqueCallResult(ApplyInst *apply,
-                                                        SILFunction *callee);
-
-  llvm::Optional<SymbolicValue>
-  computeWellKnownCallResult(ApplyInst *apply, WellKnownFunction callee);
-
-  /// Evaluate a closure creation instruction which is either a partial_apply
-  /// instruction or a thin_to_think_function instruction. On success, this
-  /// function will bind the \c closureInst parameter to its symbolic value.
-  /// On failure, it returns the unknown symbolic value that captures the error.
-  llvm::Optional<SymbolicValue>
-  evaluateClosureCreation(SingleValueInstruction *closureInst);
-
-  SymbolicValue getSingleWriterAddressValue(SILValue addr);
-  SymbolicValue getConstAddrAndLoadResult(SILValue addr);
-  SymbolicValue loadAddrValue(SILValue addr, SymbolicValue addrVal);
-  llvm::Optional<SymbolicValue> computeFSStore(SymbolicValue storedCst,
-                                               SILValue dest);
-private:
-  llvm::Optional<SymbolicValue>
-  initializeAddressFromSingleWriter(SILValue addr);
-};
-} // namespace swift
+/// Invariant: Before the call, `calculatedValues` must not contain `addr`
+/// as a key.
+SymbolicValue ConstExprFunctionState::createMemoryObject(SILValue addr, SymbolicValue initialValue) {
+  assert(!calculatedValues.count(addr));
+  Type valueType =
+      substituteGenericParamsAndSimplify(addr->getType().getASTType());
+  auto *memObject = SymbolicValueMemoryObject::create(
+      valueType, initialValue, evaluator.getAllocator());
+  auto result = SymbolicValue::getAddress(memObject);
+  setValue(addr, result);
+  return result;
+}
 
 /// Simplify the specified type based on knowledge of substitutions if we have
 /// any.
@@ -304,6 +176,8 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // immediately.
   if (auto *ili = dyn_cast<IntegerLiteralInst>(value))
     return SymbolicValue::getInteger(ili->getValue(), evaluator.getAllocator());
+  if (auto *fli = dyn_cast<FloatLiteralInst>(value))
+    return SymbolicValue::getFloat(fli->getValue(), evaluator.getAllocator());
   if (auto *sli = dyn_cast<StringLiteralInst>(value))
     return SymbolicValue::getString(sli->getValue(), evaluator.getAllocator());
 
@@ -334,8 +208,38 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     if (!val.isConstant()) {
       return val;
     }
+    if (val.getKind() == SymbolicValue::Array) {
+      // Extracting some internal members of Array.
+      // This code pattern appears for Array literal initialization:
+      //   %buffer = struct_extract %array
+      //   %element0 = ref_tail_addr %buffer
+      return val;
+    }
     assert(val.getKind() == SymbolicValue::Aggregate);
     return val.getAggregateMembers()[sei->getFieldIndex()];
+  }
+
+  if (auto *urc = dyn_cast<UncheckedRefCastInst>(value)) {
+    auto val = getConstantValue(urc->getOperand());
+    if (val.getKind() == SymbolicValue::Array) {
+      // Casting the array buffer for Array literal initialization:
+      //   %b1 = struct_extract %array
+      //   %buffer = unchecked_ref_cast %b1 to __ContiguousArrayStorageBase
+      //   %element0 = ref_tail_addr %buffer
+      return val;
+    }
+    return getUnknown(evaluator, value, UnknownReason::UnsupportedInstruction);
+  }
+
+  if (auto *rta = dyn_cast<RefTailAddrInst>(value)) {
+    auto val = getConstantValue(rta->getOperand());
+    if (val.getKind() == SymbolicValue::Array) {
+      // Projecting the elements base address from an Array buffer:
+      //   %buffer = struct_extract %array
+      //   %element0 = ref_tail_addr %buffer
+      return val.getAddressOfArrayElement(evaluator.getAllocator(), 0);
+    }
+    return getUnknown(evaluator, value, UnknownReason::UnsupportedInstruction);
   }
 
   // If this is an unchecked_enum_data from a fragile type, then we can return
@@ -424,13 +328,14 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // Try to resolve a witness method against our known conformances.
   if (auto *wmi = dyn_cast<WitnessMethodInst>(value)) {
     auto conf = substitutionMap.lookupConformance(
-        wmi->getLookupType(), wmi->getConformance().getRequirement());
+        wmi->getLookupType()->mapTypeOutOfEnvironment()->getCanonicalType(),
+        wmi->getConformance().getProtocol());
     if (conf.isInvalid())
       return getUnknown(evaluator, value,
                         UnknownReason::UnknownWitnessMethodConformance);
     auto &module = wmi->getModule();
     SILFunction *fn =
-        module.lookUpFunctionInWitnessTable(conf, wmi->getMember(),
+        module.lookUpFunctionInWitnessTable(conf, wmi->getMember(), wmi->isSpecialized(),
             SILModule::LinkingMode::LinkAll).first;
     // If we were able to resolve it, then we can proceed.
     if (fn)
@@ -464,13 +369,10 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   }
 
   if (isa<SelectEnumInst>(value) || isa<SelectEnumAddrInst>(value)) {
-    SelectEnumInstBase *selectInst = dyn_cast<SelectEnumInst>(value);
-    if (!selectInst) {
-      selectInst = dyn_cast<SelectEnumAddrInst>(value);
-    }
+    auto selectInst = SelectEnumOperation(value->getDefiningInstruction());
 
-    SILValue enumOperand = selectInst->getEnumOperand();
-    SymbolicValue enumValue = isa<SelectEnumInst>(selectInst)
+    SILValue enumOperand = selectInst.getEnumOperand();
+    SymbolicValue enumValue = isa<SelectEnumInst>(value)
                                   ? getConstantValue(enumOperand)
                                   : getConstAddrAndLoadResult(enumOperand);
     if (!enumValue.isConstant())
@@ -479,8 +381,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     assert(enumValue.getKind() == SymbolicValue::Enum ||
            enumValue.getKind() == SymbolicValue::EnumWithPayload);
 
-    SILValue resultOperand =
-        selectInst->getCaseResult(enumValue.getEnumValue());
+    SILValue resultOperand = selectInst.getCaseResult(enumValue.getEnumValue());
     return getConstantValue(resultOperand);
   }
 
@@ -488,9 +389,10 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   if (auto *bai = dyn_cast<BeginAccessInst>(value))
     return getConstantValue(bai->getOperand());
 
-  // Look through copy_value and begin_borrow since the interpreter doesn't
-  // model these memory management instructions.
-  if (isa<CopyValueInst>(value) || isa<BeginBorrowInst>(value))
+  // Look through copy_value, begin_borrow, and move_value since the
+  // interpreter doesn't model these memory management instructions.
+  if (isa<CopyValueInst>(value) || isa<BeginBorrowInst>(value) ||
+      isa<MoveValueInst>(value))
     return getConstantValue(cast<SingleValueInstruction>(value)->getOperand(0));
 
   // Builtin.RawPointer and addresses have the same representation.
@@ -522,13 +424,16 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // TODO: Certain covariant or otherwise ABI-compatible conversions should
   // be handled as well.
   if (auto cf = dyn_cast<ConvertFunctionInst>(value)) {
-    if (cf->onlyConvertsSubstitutions()) {
+    if (cf->onlyConvertsSubstitutions() || cf->onlyConvertsSendable()) {
       return getConstantValue(cf->getOperand());
     }
   }
 
   if (auto *convertEscapeInst = dyn_cast<ConvertEscapeToNoEscapeInst>(value))
     return getConstantValue(convertEscapeInst->getOperand());
+
+  if (auto *mdi = dyn_cast<MarkDependenceInst>(value))
+    return getConstantValue(mdi->getValue());
 
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
@@ -550,6 +455,9 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
       break;
     case BuiltinValueKind::AssertConf:
       return SymbolicValue::getInteger(evaluator.getAssertConfig(), 32);
+    case BuiltinValueKind::InfiniteLoopTrueCondition:
+      return getUnknown(evaluator, SILValue(inst),
+                        UnknownReason::Loop);
     }
   }
 
@@ -770,7 +678,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
 
       // Return a statically diagnosed overflow if the operation is supposed to
       // trap on overflow.
-      if (overflowed && !operand2.getIntegerValue().isNullValue())
+      if (overflowed && !operand2.getIntegerValue().isZero())
         return getUnknown(evaluator, SILValue(inst), UnknownReason::Overflow);
 
       auto &allocator = evaluator.getAllocator();
@@ -810,7 +718,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
 
 // Handle calls to opaque callees, either by handling them and returning None or
 // by returning with a Unknown indicating a failure.
-llvm::Optional<SymbolicValue>
+std::optional<SymbolicValue>
 ConstExprFunctionState::computeOpaqueCallResult(ApplyInst *apply,
                                                 SILFunction *callee) {
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Opaque Callee: " << *callee << "\n");
@@ -821,19 +729,19 @@ ConstExprFunctionState::computeOpaqueCallResult(ApplyInst *apply,
 
 /// Given a symbolic value representing an instance of StaticString, look into
 /// the aggregate and extract the static string value stored inside it.
-static Optional<StringRef>
+static std::optional<StringRef>
 extractStaticStringValue(SymbolicValue staticString) {
   if (staticString.getKind() != SymbolicValue::Aggregate)
-    return None;
+    return std::nullopt;
   ArrayRef<SymbolicValue> staticStringProps =
       staticString.getAggregateMembers();
   if (staticStringProps.empty() ||
       staticStringProps[0].getKind() != SymbolicValue::String)
-    return None;
+    return std::nullopt;
   return staticStringProps[0].getStringValue();
 }
 
-static Optional<StringRef>
+static std::optional<StringRef>
 extractStringOrStaticStringValue(SymbolicValue stringValue) {
   if (stringValue.getKind() == SymbolicValue::String)
     return stringValue.getStringValue();
@@ -853,7 +761,7 @@ static Type getArrayElementType(Type ty) {
 /// whether the type is signed. Returns \c None if \p ty is not a stdlib integer
 /// type, \c true if it is a signed integer type and \c false if it is an
 /// unsigned integer type.
-static Optional<bool> getSignIfStdlibIntegerType(Type ty) {
+static std::optional<bool> getSignIfStdlibIntegerType(Type ty) {
   if (ty->isInt() || ty->isInt8() || ty->isInt16() || ty->isInt32() ||
       ty->isInt64()) {
     return true;
@@ -864,14 +772,14 @@ static Optional<bool> getSignIfStdlibIntegerType(Type ty) {
     return false;
   }
 
-  return None;
+  return std::nullopt;
 }
 
 /// Given a call to a well known function, collect its arguments as constants,
 /// fold it, and return None.  If any of the arguments are not constants, marks
 /// the call's results as Unknown, and return an Unknown with information about
 /// the error.
-llvm::Optional<SymbolicValue>
+std::optional<SymbolicValue>
 ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
                                                    WellKnownFunction callee) {
   auto conventions = apply->getSubstCalleeConv();
@@ -881,7 +789,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     for (unsigned i = 0, e = apply->getNumArguments(); i < e; ++i) {
       SILValue argument = apply->getArgument(i);
       SymbolicValue argValue = getConstantValue(argument);
-      Optional<StringRef> stringOpt =
+      std::optional<StringRef> stringOpt =
           extractStringOrStaticStringValue(argValue);
       // The first argument is a prefix that specifies the kind of failure
       // this is.
@@ -925,7 +833,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     auto arrayVal = SymbolicValue::getArray(arrayType, arrayStorage,
                                             evaluator.getAllocator());
     setValue(apply, arrayVal);
-    return None;
+    return std::nullopt;
   }
   case WellKnownFunction::AllocateUninitializedArray: {
     // This function has this signature:
@@ -973,7 +881,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     SymbolicValue storageAddress = array.getAddressOfArrayElement(allocator, 0);
     setValue(apply, SymbolicValue::getAggregate({array, storageAddress},
                                                 resultType, allocator));
-    return None;
+    return std::nullopt;
   }
   case WellKnownFunction::EndArrayMutation: {
     // This function has the following signature in SIL:
@@ -984,7 +892,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
            "unexpected Array._endMutation() signature");
 
     // _endMutation is a no-op.
-    return None;
+    return std::nullopt;
   }
   case WellKnownFunction::FinalizeUninitializedArray: {
     // This function has the following signature in SIL:
@@ -999,7 +907,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
       return result;
     // Semantically, it's an identity function.
     setValue(apply, result);
-    return None;
+    return std::nullopt;
   }
   case WellKnownFunction::ArrayAppendElement: {
     // This function has the following signature in SIL:
@@ -1008,8 +916,12 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
            conventions.getNumDirectSILResults() == 0 &&
            conventions.getNumIndirectSILResults() == 0 &&
            "unexpected Array.append(_:) signature");
-    // Get the element to be appended which is passed indirectly (@in).
-    SymbolicValue element = getConstAddrAndLoadResult(apply->getOperand(1));
+    // Get the element to be appended which is usually passed indirectly (@in),
+    // or directly (in Embedded Swift where Array.append can be specialized).
+    SymbolicValue element = getConstantValue(apply->getOperand(1));
+    if (element.getKind() == SymbolicValue::Address) {
+      element = getConstAddrAndLoadResult(apply->getOperand(1));
+    }
     if (!element.isConstant())
       return element;
 
@@ -1039,7 +951,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     SymbolicValue newArray = SymbolicValue::getArray(arrayValue.getArrayType(),
                                                      newStorage, allocator);
     computeFSStore(newArray, arrayAddress);
-    return None;
+    return std::nullopt;
   }
   case WellKnownFunction::StringInitEmpty: { // String.init()
     assert(conventions.getNumDirectSILResults() == 1 &&
@@ -1047,7 +959,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
            "unexpected String.init() signature");
     auto result = SymbolicValue::getString("", evaluator.getAllocator());
     setValue(apply, result);
-    return None;
+    return std::nullopt;
   }
   case WellKnownFunction::StringMakeUTF8: {
     // String.init(_builtinStringLiteral start: Builtin.RawPointer,
@@ -1068,7 +980,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
       return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
     }
     setValue(apply, literal);
-    return None;
+    return std::nullopt;
   }
   case WellKnownFunction::StringAppend: {
     // static String.append (_: String, _: inout String)
@@ -1098,7 +1010,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     result.append(otherString.getStringValue());
     auto resultVal = SymbolicValue::getString(result, evaluator.getAllocator());
     computeFSStore(resultVal, inoutOperand);
-    return None;
+    return std::nullopt;
   }
   case WellKnownFunction::StringEquals: {
     // static String.== infix(_: String, _: String)
@@ -1125,7 +1037,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
                                               apply->getType().getASTType(),
                                               evaluator.getAllocator());
     setValue(apply, result);
-    return None;
+    return std::nullopt;
   }
   case WellKnownFunction::StringEscapePercent: {
     // String.percentEscapedString.getter
@@ -1156,7 +1068,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     auto resultVal = SymbolicValue::getString(percentEscapedString.str(),
                                               evaluator.getAllocator());
     setValue(apply, resultVal);
-    return None;
+    return std::nullopt;
   }
   case WellKnownFunction::BinaryIntegerDescription: {
     // BinaryInteger.description.getter
@@ -1169,7 +1081,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     SILValue integerArgument = apply->getOperand(1);
     CanType argumentType = substituteGenericParamsAndSimplify(
         integerArgument->getType().getASTType());
-    Optional<bool> isSignedIntegerType =
+    std::optional<bool> isSignedIntegerType =
         getSignIfStdlibIntegerType(argumentType);
     if (!isSignedIntegerType.has_value()) {
       return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
@@ -1191,7 +1103,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     SymbolicValue resultVal =
         SymbolicValue::getString(integerString.str(), evaluator.getAllocator());
     setValue(apply, resultVal);
-    return None;
+    return std::nullopt;
   }
   case WellKnownFunction::DebugPrint: {
     assert(apply->getNumArguments() == 1 &&
@@ -1201,12 +1113,12 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     llvm::errs() << "Debug print output ";
     argValue.print(llvm::errs());
     if (argValue.getKind() != SymbolicValue::Address)
-      return None;
+      return std::nullopt;
 
     llvm::errs() << "\n  Addressed Memory Object: ";
     SymbolicValueMemoryObject *memObj = argValue.getAddressValueMemoryObject();
     memObj->getValue().print(llvm::errs());
-    return None;
+    return std::nullopt;
   }
   }
   llvm_unreachable("unhandled WellKnownFunction");
@@ -1216,7 +1128,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
 /// function.  If so, collect its arguments as constants, fold it and return
 /// None.  If not, mark the results as Unknown, and return an Unknown with
 /// information about the error.
-llvm::Optional<SymbolicValue>
+std::optional<SymbolicValue>
 ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   // Determine the callee.
   auto calleeFn = getConstantValue(apply->getOperand(0));
@@ -1275,7 +1187,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     if (calleeFnType->getRepresentation() ==
         SILFunctionType::Representation::WitnessMethod) {
       auto protocol =
-          calleeFnType->getWitnessMethodConformanceOrInvalid().getRequirement();
+          calleeFnType->getWitnessMethodConformanceOrInvalid().getProtocol();
       // Compute a mapping that maps the Self type of the protocol given by
       // 'requirement' to the concrete type available in the substitutionMap.
       SubstitutionMap applySubstMap = apply->getSubstitutionMap();
@@ -1323,7 +1235,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   if (callResult.has_value())
     return callResult.value();
   setValue(apply, result);
-  return None;
+  return std::nullopt;
 }
 
 SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
@@ -1390,7 +1302,7 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
 ///
 /// Precondition: An address for `addr`, or an address that `addr` is derived
 /// from, must be cached in `computedValues`.
-llvm::Optional<SymbolicValue>
+std::optional<SymbolicValue>
 ConstExprFunctionState::initializeAddressFromSingleWriter(SILValue addr) {
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr: initializeAddressFromSingleWriter "
              << addr);
@@ -1579,7 +1491,7 @@ ConstExprFunctionState::initializeAddressFromSingleWriter(SILValue addr) {
     return error(
         getUnknown(evaluator, addr, UnknownReason::NotTopLevelConstant));
 
-  return None;
+  return std::nullopt;
 }
 
 /// Find the initializer (single writer) of `addr` among it users,
@@ -1691,7 +1603,7 @@ SymbolicValue ConstExprFunctionState::loadAddrValue(SILValue addr,
 }
 
 /// Evaluate a flow sensitive store to the specified pointer address.
-llvm::Optional<SymbolicValue>
+std::optional<SymbolicValue>
 ConstExprFunctionState::computeFSStore(SymbolicValue storedCst, SILValue dest) {
   // Only update existing memory locations that we're tracking.
   auto it = calculatedValues.find(dest);
@@ -1704,10 +1616,10 @@ ConstExprFunctionState::computeFSStore(SymbolicValue storedCst, SILValue dest) {
   auto *memoryObject = it->second.getAddressValue(accessPath);
   memoryObject->setIndexedElement(accessPath, storedCst,
                                   evaluator.getAllocator());
-  return None;
+  return std::nullopt;
 }
 
-llvm::Optional<SymbolicValue> ConstExprFunctionState::evaluateClosureCreation(
+std::optional<SymbolicValue> ConstExprFunctionState::evaluateClosureCreation(
     SingleValueInstruction *closureInst) {
   assert(isa<PartialApplyInst>(closureInst) ||
          isa<ThinToThickFunctionInst>(closureInst));
@@ -1735,7 +1647,7 @@ llvm::Optional<SymbolicValue> ConstExprFunctionState::evaluateClosureCreation(
     for (SILValue capturedSILValue : papply->getArguments()) {
       SymbolicValue capturedSymbolicValue = getConstantValue(capturedSILValue);
       if (!capturedSymbolicValue.isConstant()) {
-        captures.push_back({capturedSILValue, None});
+        captures.push_back({capturedSILValue, std::nullopt});
         continue;
       }
       captures.push_back({capturedSILValue, capturedSymbolicValue});
@@ -1749,14 +1661,14 @@ llvm::Optional<SymbolicValue> ConstExprFunctionState::evaluateClosureCreation(
   auto closureVal = SymbolicValue::makeClosure(
       target, captures, callSubstMap, closureInst, evaluator.getAllocator());
   setValue(closureInst, closureVal);
-  return None;
+  return std::nullopt;
 }
 
 /// Evaluate the specified instruction in a flow sensitive way, for use by
 /// the constexpr function evaluator.  This does not handle control flow
 /// statements.  This returns None on success, and an Unknown SymbolicValue with
 /// information about an error on failure.
-llvm::Optional<SymbolicValue>
+std::optional<SymbolicValue>
 ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   // These are just markers.
   if (isa<DebugValueInst>(inst) || isa<EndAccessInst>(inst) ||
@@ -1765,10 +1677,11 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       isa<DestroyAddrInst>(inst) || isa<RetainValueInst>(inst) ||
       isa<ReleaseValueInst>(inst) || isa<StrongRetainInst>(inst) ||
       isa<StrongReleaseInst>(inst) || isa<DestroyValueInst>(inst) ||
-      isa<EndBorrowInst>(inst) ||
+      isa<EndBorrowInst>(inst) || isa<DebugStepInst>(inst) ||
+      isa<ExtendLifetimeInst>(inst) ||
       // Skip instrumentation
       isInstrumentation(inst))
-    return None;
+    return std::nullopt;
 
   // If this is a special flow-sensitive instruction like a stack allocation,
   // store, copy_addr, etc, we handle it specially here.
@@ -1783,23 +1696,23 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
                                   ArrayRef<SymbolicValue>(),
                                   substituteGenericParamsAndSimplify(structType),
                                   evaluator.getAllocator()));
-      return None;
+      return std::nullopt;
     }
     createMemoryObject(asi, SymbolicValue::getUninitMemory());
-    return None;
+    return std::nullopt;
   }
 
   // If this is a deallocation of a memory object that we are tracking, then
   // don't do anything.  The memory is allocated in a BumpPtrAllocator so there
   // is no useful way to free it.
   if (isa<DeallocStackInst>(inst))
-    return None;
+    return std::nullopt;
 
   if (CondFailInst *condFail = dyn_cast<CondFailInst>(inst)) {
     auto failed = getConstantValue(inst->getOperand(0));
     if (failed.getKind() == SymbolicValue::Integer) {
       if (failed.getIntegerValue() == 0)
-        return None;
+        return std::nullopt;
       // Conditional fail actually failed.
       return evaluator.getUnknown(
           inst->asSILNode(),
@@ -1817,6 +1730,10 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
     return computeCallResult(apply);
 
   if (isa<StoreInst>(inst) || isa<StoreBorrowInst>(inst)) {
+    if (auto *sb = dyn_cast<StoreBorrowInst>(inst)) {
+      auto addr = getConstantValue(inst->getOperand(1));
+      setValue(sb, addr);
+    }
     auto stored = getConstantValue(inst->getOperand(0));
     if (!stored.isConstant())
       return stored;
@@ -1850,7 +1767,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       return result;
     setValue(singleValueInst, result);
     LLVM_DEBUG(llvm::dbgs() << "  RESULT: "; result.dump());
-    return None;
+    return std::nullopt;
   }
 
   if (isa<DestructureTupleInst>(inst) || isa<DestructureStructInst>(inst)) {
@@ -1867,7 +1784,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
     for (unsigned i = 0; i < mvi->getNumResults(); ++i) {
       setValue(mvi->getResult(i), aggElems[i]);
     }
-    return None;
+    return std::nullopt;
   }
 
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Unknown FS: " << *inst << "\n");
@@ -1876,7 +1793,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
                     UnknownReason::UnsupportedInstruction);
 }
 
-std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+std::pair<std::optional<SILBasicBlock::iterator>, std::optional<SymbolicValue>>
 ConstExprFunctionState::evaluateInstructionAndGetNext(
     SILBasicBlock::iterator instI,
     SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks) {
@@ -1886,8 +1803,8 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
   if (!isa<TermInst>(inst)) {
     auto fsResult = evaluateFlowSensitive(inst);
     if (fsResult.has_value())
-      return {None, fsResult};
-    return {++instI, None};
+      return {std::nullopt, fsResult};
+    return {++instI, std::nullopt};
   }
 
   // If this is a branch instruction, evaluate and return the target basic block.
@@ -1896,23 +1813,23 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
 
     // If we've already visited this block then fail - we have a loop.
     if (!visitedBlocks.insert(destBB).second)
-      return {None, getUnknown(evaluator, br, UnknownReason::Loop)};
+      return {std::nullopt, getUnknown(evaluator, br, UnknownReason::Loop)};
 
     // Set up basic block arguments.
     for (unsigned i = 0, e = br->getNumArgs(); i != e; ++i) {
       auto argument = getConstantValue(br->getArg(i));
-      if (!argument.isConstant())
-        return {None, argument};
+      // Do not fail if an argument is not constant because we still know enough to know what the next instruction will be.
+      // Failure may occur later, however, if/when this unknown argument value is used by an instruction in the target basic block.
       setValue(destBB->getArgument(i), argument);
     }
     // Set the instruction pointer to the first instruction of the block.
-    return {destBB->begin(), None};
+    return {destBB->begin(), std::nullopt};
   }
 
   if (auto *cbr = dyn_cast<CondBranchInst>(inst)) {
     auto val = getConstantValue(inst->getOperand(0));
     if (!val.isConstant())
-      return {None, val};
+      return {std::nullopt, val};
 
     SILBasicBlock *destBB;
     if (!val.getIntegerValue())
@@ -1922,9 +1839,9 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
 
     // If we've already visited this block then fail - we have a loop.
     if (!visitedBlocks.insert(destBB).second)
-      return {None, getUnknown(evaluator, cbr, UnknownReason::Loop)};
+      return {std::nullopt, getUnknown(evaluator, cbr, UnknownReason::Loop)};
 
-    return {destBB->begin(), None};
+    return {destBB->begin(), std::nullopt};
   }
 
   if (auto switchInst = SwitchEnumTermInst(inst)) {
@@ -1935,14 +1852,14 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
       value = getConstAddrAndLoadResult(switchInst.getOperand());
     }
     if (!value.isConstant())
-      return {None, value};
+      return {std::nullopt, value};
 
     assert(value.getKind() == SymbolicValue::Enum ||
            value.getKind() == SymbolicValue::EnumWithPayload);
 
     SILBasicBlock *caseBB = switchInst.getCaseDestination(value.getEnumValue());
     if (caseBB->getNumArguments() == 0)
-      return {caseBB->begin(), None};
+      return {caseBB->begin(), std::nullopt};
 
     // Set up the arguments.
 
@@ -1955,7 +1872,7 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
         // In OSSA, the default block forward the original enum value whenever
         // it does not correspond to a unique case.
         setValue(caseBB->getArgument(0), value);
-        return {caseBB->begin(), None};
+        return {caseBB->begin(), std::nullopt};
       }
     }
 
@@ -1964,7 +1881,7 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
     assert(argument.isConstant());
     setValue(caseBB->getArgument(0), argument);
 
-    return {caseBB->begin(), None};
+    return {caseBB->begin(), std::nullopt};
   }
 
   if (isa<CheckedCastBranchInst>(inst)) {
@@ -1972,7 +1889,7 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
         dyn_cast<CheckedCastBranchInst>(inst);
     SymbolicValue value = getConstantValue(checkedCastInst->getOperand());
     if (!value.isConstant())
-      return {None, value};
+      return {std::nullopt, value};
 
     // Determine success or failure of this cast.
     CanType sourceType;
@@ -1990,10 +1907,10 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
     CanType targetType = substituteGenericParamsAndSimplify(
         checkedCastInst->getTargetFormalType());
     DynamicCastFeasibility castResult = classifyDynamicCast(
-        inst->getModule().getSwiftModule(), sourceType, targetType);
+        inst->getFunction(), sourceType, targetType);
     if (castResult == DynamicCastFeasibility::MaySucceed) {
-      return {None, getUnknown(evaluator, inst->asSILNode(),
-                               UnknownReason::UnknownCastResult)};
+      return {std::nullopt, getUnknown(evaluator, inst->asSILNode(),
+                                       UnknownReason::UnknownCastResult)};
     }
     // Determine the basic block to jump to.
     SILBasicBlock *resultBB =
@@ -2002,27 +1919,27 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
             : checkedCastInst->getFailureBB();
     // Set up the arguments of the basic block, if any.
     if (resultBB->getNumArguments() == 0)
-      return {resultBB->begin(), None};
+      return {resultBB->begin(), std::nullopt};
     // There should be at most one argument to the basic block, which is the
     // casted value with the right type, or the input value if the cast fails,
     // and inst is in OSSA.
     assert(resultBB->getNumArguments() == 1);
     setValue(resultBB->getArgument(0), value);
-    return {resultBB->begin(), None};
+    return {resultBB->begin(), std::nullopt};
   }
 
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr: Unknown Branch Instruction: " << *inst
                           << "\n");
 
-  return {None, getUnknown(evaluator, inst->asSILNode(),
-                           UnknownReason::UnsupportedInstruction)};
+  return {std::nullopt, getUnknown(evaluator, inst->asSILNode(),
+                                   UnknownReason::UnsupportedInstruction)};
 }
 
 /// Evaluate a call to the specified function as if it were a constant
 /// expression, returning None and filling in `results` on success, or
 /// returning an 'Unknown' SymbolicValue on failure carrying the error.
 ///
-static llvm::Optional<SymbolicValue>
+static std::optional<SymbolicValue>
 evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
                      ArrayRef<SymbolicValue> arguments, SymbolicValue &result,
                      unsigned &numInstEvaluated,
@@ -2077,12 +1994,12 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
       // TODO: Handle caching of results.
 
       LLVM_DEBUG(llvm::dbgs() << "\n");
-      return None;
+      return std::nullopt;
     }
 
     // Handle other instructions here.
-    Optional<SILBasicBlock::iterator> nextInstOpt = None;
-    Optional<SymbolicValue> errorVal = None;
+    std::optional<SILBasicBlock::iterator> nextInstOpt = std::nullopt;
+    std::optional<SymbolicValue> errorVal = std::nullopt;
 
     std::tie(nextInstOpt, errorVal) =
         state.evaluateInstructionAndGetNext(nextInst, visitedBlocks);
@@ -2154,20 +2071,15 @@ ConstExprStepEvaluator::ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
 
 ConstExprStepEvaluator::~ConstExprStepEvaluator() { delete internalState; }
 
-std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+std::pair<std::optional<SILBasicBlock::iterator>, std::optional<SymbolicValue>>
 ConstExprStepEvaluator::evaluate(SILBasicBlock::iterator instI) {
   // Reset `stepsEvaluated` to zero.
   stepsEvaluated = 0;
   return internalState->evaluateInstructionAndGetNext(instI, visitedBlocks);
 }
 
-std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
-ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
-    SILBasicBlock::iterator instI) {
-  SILInstruction *inst = &(*instI);
-
-  // Set all constant state that could be mutated by the instruction
-  // to an unknown symbolic value.
+void ConstExprStepEvaluator::setMutableAddressesToUnknown(
+    SILInstruction *inst) {
   for (auto &operand : inst->getAllOperands()) {
     auto constValOpt = lookupConstValue(operand.get());
     if (!constValOpt) {
@@ -2224,6 +2136,15 @@ ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
       memoryObject->setValue(unknownValue);
     }
   }
+}
+
+std::pair<std::optional<SILBasicBlock::iterator>, std::optional<SymbolicValue>>
+ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
+    SILBasicBlock::iterator instI) {
+  SILInstruction *inst = &(*instI);
+
+  if (inst->mayWriteToMemory())
+    setMutableAddressesToUnknown(inst);
 
   // Map the results of this instruction to unknown values.
   for (auto result : inst->getResults()) {
@@ -2240,9 +2161,9 @@ ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
   // Note that we can find the next instruction in the case of unconditional
   // branches. But, there is no real need to do that as of now.
   if (!isa<TermInst>(inst)) {
-    return {++instI, None};
+    return {++instI, std::nullopt};
   }
-  return {None, None};
+  return {std::nullopt, std::nullopt};
 }
 
 bool swift::isFailStopError(SymbolicValue errorVal) {
@@ -2258,12 +2179,12 @@ bool swift::isFailStopError(SymbolicValue errorVal) {
   }
 }
 
-std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+std::pair<std::optional<SILBasicBlock::iterator>, std::optional<SymbolicValue>>
 ConstExprStepEvaluator::tryEvaluateOrElseMakeEffectsNonConstant(
     SILBasicBlock::iterator instI) {
   auto evaluateResult = evaluate(instI);
-  Optional<SILBasicBlock::iterator> nextI = evaluateResult.first;
-  Optional<SymbolicValue> errorVal = evaluateResult.second;
+  std::optional<SILBasicBlock::iterator> nextI = evaluateResult.first;
+  std::optional<SymbolicValue> errorVal = evaluateResult.second;
 
   if (!errorVal) {
     assert(nextI);
@@ -2288,11 +2209,11 @@ ConstExprStepEvaluator::tryEvaluateOrElseMakeEffectsNonConstant(
   return {result.first, errorVal};
 }
 
-Optional<SymbolicValue>
+std::optional<SymbolicValue>
 ConstExprStepEvaluator::lookupConstValue(SILValue value) {
   auto res = internalState->lookupValue(value);
   if (res && !res->isConstant()) {
-    return None;
+    return std::nullopt;
   }
   return res;
 }

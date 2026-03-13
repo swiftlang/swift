@@ -95,6 +95,7 @@ internal enum _PtrAuth {
   }
 
   /// Sign an unauthenticated pointer.
+  @_semantics("no.preserve.debugger") // Relies on inlining this function.
   @_transparent
   static func sign(pointer: UnsafeRawPointer,
                    key: Key,
@@ -104,12 +105,13 @@ internal enum _PtrAuth {
       key._value._value,
       discriminator._value))
 
-    return UnsafeRawPointer(bitPattern:
+    return unsafe UnsafeRawPointer(bitPattern:
       UInt(truncatingIfNeeded: bitPattern)).unsafelyUnwrapped
   }
 
   /// Authenticate a pointer using one scheme and resign it using another.
   @_transparent
+  @_semantics("no.preserve.debugger") // Relies on inlining this function.
   static func authenticateAndResign(pointer: UnsafeRawPointer,
                                 oldKey: Key,
                                 oldDiscriminator: UInt64,
@@ -122,11 +124,12 @@ internal enum _PtrAuth {
       newKey._value._value,
       newDiscriminator._value))
 
-    return UnsafeRawPointer(bitPattern:
+    return unsafe UnsafeRawPointer(bitPattern:
       UInt(truncatingIfNeeded: bitPattern)).unsafelyUnwrapped
   }
 
   /// Get the type-specific discriminator for a function type.
+  @_semantics("no.preserve.debugger") // Don't keep the generic version alive
   @_transparent
   static func discriminator<T>(for type: T.Type) -> UInt64 {
     return UInt64(Builtin.typePtrAuthDiscriminator(type))
@@ -147,7 +150,7 @@ internal enum _PtrAuth {
   static func sign(pointer: UnsafeRawPointer,
                    key: Key,
                    discriminator: UInt64) -> UnsafeRawPointer {
-    return pointer
+    return unsafe pointer
   }
 
   /// Authenticate a pointer using one scheme and resign it using another.
@@ -157,7 +160,7 @@ internal enum _PtrAuth {
                                 oldDiscriminator: UInt64,
                                 newKey: Key,
                                 newDiscriminator: UInt64) -> UnsafeRawPointer {
-    return pointer
+    return unsafe pointer
   }
 
   /// Get the type-specific discriminator for a function type.
@@ -175,48 +178,50 @@ internal enum _PtrAuth {
 extension UnsafeRawPointer {
   /// Load a function pointer from memory that has been authenticated
   /// specifically for its given address.
+  @_semantics("no.preserve.debugger") // Don't keep the generic version alive
   @_transparent
   internal func _loadAddressDiscriminatedFunctionPointer<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type,
     discriminator: UInt64
   ) -> T {
-    let src = self + offset
+    let src = unsafe self + offset
 
-    let srcDiscriminator = _PtrAuth.blend(pointer: src,
+    let srcDiscriminator = unsafe _PtrAuth.blend(pointer: src,
                                           discriminator: discriminator)
-    let ptr = src.load(as: UnsafeRawPointer.self)
-    let resigned = _PtrAuth.authenticateAndResign(
+    let ptr = unsafe src.load(as: UnsafeRawPointer.self)
+    let resigned = unsafe _PtrAuth.authenticateAndResign(
       pointer: ptr,
       oldKey: .processIndependentCode,
       oldDiscriminator: srcDiscriminator,
       newKey: .processIndependentCode,
       newDiscriminator: _PtrAuth.discriminator(for: type))
 
-    return unsafeBitCast(resigned, to: type)
+    return unsafe unsafeBitCast(resigned, to: type)
   }
 
+  @_semantics("no.preserve.debugger") // Don't keep the generic version alive
   @_transparent
   internal func _loadAddressDiscriminatedFunctionPointer<T>(
     fromByteOffset offset: Int = 0,
     as type: Optional<T>.Type,
     discriminator: UInt64
   ) -> Optional<T> {
-    let src = self + offset
+    let src = unsafe self + offset
 
-    let srcDiscriminator = _PtrAuth.blend(pointer: src,
+    let srcDiscriminator = unsafe _PtrAuth.blend(pointer: src,
                                           discriminator: discriminator)
-    guard let ptr = src.load(as: Optional<UnsafeRawPointer>.self) else {
+    guard let ptr = unsafe src.load(as: Optional<UnsafeRawPointer>.self) else {
       return nil
     }
-    let resigned = _PtrAuth.authenticateAndResign(
+    let resigned = unsafe _PtrAuth.authenticateAndResign(
       pointer: ptr,
       oldKey: .processIndependentCode,
       oldDiscriminator: srcDiscriminator,
       newKey: .processIndependentCode,
       newDiscriminator: _PtrAuth.discriminator(for: T.self))
 
-    return .some(unsafeBitCast(resigned, to: T.self))
+    return unsafe .some(unsafeBitCast(resigned, to: T.self))
   }
 
 }
@@ -228,22 +233,22 @@ extension UnsafeMutableRawPointer {
     from src: UnsafeRawPointer,
     discriminator: UInt64
   ) {
-    if src == UnsafeRawPointer(self) { return }
+    if unsafe src == UnsafeRawPointer(self) { return }
 
-    let srcDiscriminator = _PtrAuth.blend(pointer: src,
+    let srcDiscriminator = unsafe _PtrAuth.blend(pointer: src,
                                           discriminator: discriminator)
-    let destDiscriminator = _PtrAuth.blend(pointer: self,
+    let destDiscriminator = unsafe _PtrAuth.blend(pointer: self,
                                            discriminator: discriminator)
 
-    let ptr = src.load(as: UnsafeRawPointer.self)
-    let resigned = _PtrAuth.authenticateAndResign(
+    let ptr = unsafe src.load(as: UnsafeRawPointer.self)
+    let resigned = unsafe _PtrAuth.authenticateAndResign(
       pointer: ptr,
       oldKey: .processIndependentCode,
       oldDiscriminator: srcDiscriminator,
       newKey: .processIndependentCode,
       newDiscriminator: destDiscriminator)
 
-    storeBytes(of: resigned, as: UnsafeRawPointer.self)
+    unsafe storeBytes(of: resigned, as: UnsafeRawPointer.self)
   }
 
   @_transparent
@@ -251,11 +256,11 @@ extension UnsafeMutableRawPointer {
     _ unsignedPointer: UnsafeRawPointer,
     discriminator: UInt64
   ) {
-    let destDiscriminator = _PtrAuth.blend(pointer: self,
+    let destDiscriminator = unsafe _PtrAuth.blend(pointer: self,
                                            discriminator: discriminator)
-    let signed = _PtrAuth.sign(pointer: unsignedPointer,
+    let signed = unsafe _PtrAuth.sign(pointer: unsignedPointer,
                                key: .processIndependentCode,
                                discriminator: destDiscriminator)
-    storeBytes(of: signed, as: UnsafeRawPointer.self)
+    unsafe storeBytes(of: signed, as: UnsafeRawPointer.self)
   }
 }

@@ -1,7 +1,6 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -g)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -g -Xfrontend -disable-availability-checking)
 //
 // REQUIRES: executable_test
-// XFAIL: OS=windows-msvc
 
 import StdlibUnittest
 import POD
@@ -113,6 +112,16 @@ PODTestSuite.test("RefHoldingPairPtr") {
 
   x = RefHoldingPairPtr.create()
   expectEqual(x.test(), 41)
+}
+
+PODTestSuite.test("ValueHoldingPairRef") {
+  let x = ValueHoldingPairRef()
+  expectEqual(x.pair.test(), 1)
+
+  let pair2 = IntPair.create()
+  pair2.b = 123
+  expectEqual(x.sub(pair2), -121)
+  expectEqual(x.max(pair2).test(), pair2.test())
 }
 
 PODTestSuite.test("StructHoldingPair") {

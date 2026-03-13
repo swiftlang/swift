@@ -17,6 +17,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_ADCONTEXT_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_ADCONTEXT_H
 
+#include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Differentiation/Common.h"
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
 
@@ -50,7 +51,13 @@ struct NestedApplyInfo {
   AutoDiffConfig config;
   /// The original pullback type before reabstraction. `None` if the pullback
   /// type is not reabstracted.
-  Optional<CanSILFunctionType> originalPullbackType;
+  std::optional<CanSILFunctionType> originalPullbackType;
+  /// Index of `apply` pullback in nested pullback call
+  unsigned pullbackIdx = -1U;
+  /// Pullback value itself that is memoized in some cases (e.g. pullback is
+  /// called by `begin_apply`, but should be destroyed after `end_apply`).
+  SILValue pullback = SILValue();
+  SILValue beginApplyToken = SILValue();
 };
 
 /// Per-module contextual information for the Differentiation pass.
@@ -97,7 +104,7 @@ private:
 
   /// Mapping from original `apply` instructions to their corresponding
   /// `NestedApplyInfo`s.
-  llvm::DenseMap<ApplyInst *, NestedApplyInfo> nestedApplyInfo;
+  llvm::DenseMap<FullApplySite, NestedApplyInfo> nestedApplyInfo;
 
   /// List of generated functions (JVPs, VJPs, pullbacks, and thunks).
   /// Saved for deletion during cleanup.
@@ -185,7 +192,7 @@ public:
     invokers.insert({witness, DifferentiationInvoker(witness)});
   }
 
-  llvm::DenseMap<ApplyInst *, NestedApplyInfo> &getNestedApplyInfo() {
+  llvm::DenseMap<FullApplySite, NestedApplyInfo> &getNestedApplyInfo() {
     return nestedApplyInfo;
   }
 
@@ -217,16 +224,17 @@ public:
   DifferentiableFunctionInst *createDifferentiableFunction(
       SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
       IndexSubset *resultIndices, SILValue original,
-      Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None);
+      std::optional<std::pair<SILValue, SILValue>> derivativeFunctions =
+          std::nullopt);
 
   /// Creates a `linear_function` instruction using the given builder
   /// and arguments. Erase the newly created instruction from the processed set,
   /// if it exists - it may exist in the processed set if it has the same
   /// pointer value as a previously processed and deleted instruction.
-  LinearFunctionInst *
-  createLinearFunction(SILBuilder &builder, SILLocation loc,
-                       IndexSubset *parameterIndices, SILValue original,
-                       Optional<SILValue> transposeFunction = None);
+  LinearFunctionInst *createLinearFunction(
+      SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
+      SILValue original,
+      std::optional<SILValue> transposeFunction = std::nullopt);
 
   // Given a `differentiable_function` instruction, finds the corresponding
   // differential operator used in the AST. If no differential operator is

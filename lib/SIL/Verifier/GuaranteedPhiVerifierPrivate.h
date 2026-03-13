@@ -85,7 +85,7 @@ class DeadEndBlocks;
 class GuaranteedPhiVerifier {
   /// A cache of dead-end basic blocks that we use to determine if we can
   /// ignore "leaks".
-  DeadEndBlocks &deadEndBlocks;
+  DeadEndBlocks *deadEndBlocks = nullptr;
   /// The builder that the checker uses to emit error messages, crash if asked
   /// for, or supply back interesting info to the caller.
   LinearLifetimeChecker::ErrorBuilder errorBuilder;
@@ -96,9 +96,16 @@ class GuaranteedPhiVerifier {
       dependentPhiToBaseValueMap;
 
 public:
-  GuaranteedPhiVerifier(const SILFunction *func, DeadEndBlocks &deadEndBlocks,
+  // If not null, `instIndices` are used for efficiently computing dominance
+  // relations between instructions in the same basic block.
+  // If null, the algorithm falls back to linear search.
+  InstructionIndices *instIndices;
+
+  GuaranteedPhiVerifier(const SILFunction *func, DeadEndBlocks *deadEndBlocks,
+                        InstructionIndices *instIndices,
                         LinearLifetimeChecker::ErrorBuilder errorBuilder)
-      : deadEndBlocks(deadEndBlocks), errorBuilder(errorBuilder) {}
+      : deadEndBlocks(deadEndBlocks), errorBuilder(errorBuilder),
+        instIndices(instIndices) {}
 
   /// Verify whether all reborrows of \p borrow are within the lifetime of the
   /// borrowed value.

@@ -1,0 +1,71 @@
+// Without directory
+// RUN: %target-swift-frontend -O -cs-profile-generate -emit-ir %s | %FileCheck %s
+
+// With directory
+// RUN: %empty-directory(%t.dir)
+// RUN: %target-swift-frontend -O -cs-profile-generate=%t.dir -emit-ir %s | %FileCheck %s
+
+// Ensure Passes: PGOInstrumentationGenPass and InstrProfilingLoweringPass are invoked.
+// RUN: %target-swift-frontend  -O -cs-profile-generate -emit-ir %s -Xllvm -debug-pass=Structure -Xllvm --time-passes -o /dev/null 2>&1 | %FileCheck -check-prefix=CHECK-PASSES %s
+// CHECK-PASSES-DAG: PGOInstrumentationGen
+// CHECK-PASSES-DAG: InstrProfilingLoweringPass
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil @b : $@convention(thin) () -> ()
+
+sil @c : $@convention(thin) () -> ()
+
+
+// counter array (2 counters for the then/else)
+// CHECK: @__profc_a = {{.*}} global {{.*}}
+// data record pointing at the counter array and the function
+// CHECK: @__profd_a = {{.*}} global {{.*}} ptr @a.local
+
+
+// CHECK: br i1 {{.*}}, label %[[THEN:[0-9]+]], label %[[ELSE:[0-9]+]]
+// THEN: increment counter[0] and call b()
+// CHECK: [[THEN]]:
+// CHECK:   {{.*}}load{{.*}}@__profc_a
+// CHECK:   {{.*}}store{{.*}}@__profc_a
+// CHECK:   {{.*}}call{{.*}}@b(
+// CHECK:   br label %[[MERGE:[0-9]+]]
+
+// ELSE: increment counter[1] and call c()
+// CHECK: [[ELSE]]:
+// CHECK:   {{.*}} = {{.*}}@__profc_a{{.*}}
+// CHECK:   store{{.*}}@__profc_a
+// CHECK:   {{.*}}call{{.*}}@c(
+// CHECK:   br label %[[MERGE]]
+
+// CHECK: [[MERGE]]:
+// CHECK:   ret void
+
+// CHECK: declare {{.*}}@c(
+// CHECK: declare {{.*}}@b(
+
+sil @a : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %2 = struct_extract %0, #Bool._value
+  cond_br %2, bb1, bb2
+
+bb1:
+  // function_ref b()
+  %4 = function_ref @b : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  br bb3 
+
+bb2:
+  // function_ref c()
+  %7 = function_ref @c: $@convention(thin) () -> ()
+  %8 = apply %7() : $@convention(thin) () -> ()
+  br bb3 
+
+bb3:
+  %10 = tuple ()
+  return %10
+}

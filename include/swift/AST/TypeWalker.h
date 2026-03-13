@@ -22,7 +22,7 @@ class TypeWalker {
 public:
   enum class Action {
     Continue,
-    SkipChildren,
+    SkipNode,
     Stop
   };
 

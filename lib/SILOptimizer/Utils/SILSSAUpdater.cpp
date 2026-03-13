@@ -11,12 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Malloc.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -39,12 +42,13 @@ SILSSAUpdater::SILSSAUpdater(SmallVectorImpl<SILPhiArgument *> *phis)
 
 SILSSAUpdater::~SILSSAUpdater() = default;
 
-void SILSSAUpdater::initialize(SILType inputType, ValueOwnershipKind kind) {
+void SILSSAUpdater::initialize(SILFunction *fn, SILType inputType,
+                               ValueOwnershipKind kind) {
   type = inputType;
   ownershipKind = kind;
 
   phiSentinel = std::unique_ptr<SILUndef, void (*)(SILUndef *)>(
-      SILUndef::getSentinelValue(inputType, this),
+      SILUndef::getSentinelValue(fn, this, inputType),
       SILSSAUpdater::deallocateSentinel);
 
   if (!blockToAvailableValueMap)
@@ -85,20 +89,30 @@ areIdentical(llvm::DenseMap<SILBasicBlock *, SILValue> &availableValues) {
     return true;
   }
 
-  auto *mvir =
-      dyn_cast<MultipleValueInstructionResult>(availableValues.begin()->second);
-  if (!mvir)
-    return false;
+  if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(
+          availableValues.begin()->second)) {
+    for (auto value : availableValues) {
+      auto *result = dyn_cast<MultipleValueInstructionResult>(value.second);
+      if (!result)
+        return false;
+      if (!result->getParent()->isIdenticalTo(mvir->getParent()) ||
+          result->getIndex() != mvir->getIndex()) {
+        return false;
+      }
+    }
+    return true;
+  }
 
+  auto *firstArg = cast<SILArgument>(availableValues.begin()->second);
   for (auto value : availableValues) {
-    auto *result = dyn_cast<MultipleValueInstructionResult>(value.second);
-    if (!result)
+    auto *arg = dyn_cast<SILArgument>(value.second);
+    if (!arg)
       return false;
-    if (!result->getParent()->isIdenticalTo(mvir->getParent()) ||
-        result->getIndex() != mvir->getIndex()) {
+    if (arg != firstArg) {
       return false;
     }
   }
+
   return true;
 }
 
@@ -214,19 +228,20 @@ SILValue SILSSAUpdater::getValueInMiddleOfBlock(SILBasicBlock *block) {
 
   // Return undef for blocks without predecessor.
   if (predVals.empty())
-    return SILUndef::get(type, *block->getParent());
-
-  if (singularValue)
-    return singularValue;
+    return SILUndef::get(block->getParent(), type);
 
   // Check if we already have an equivalent phi.
   if (!block->getArguments().empty()) {
     llvm::SmallDenseMap<SILBasicBlock *, SILValue, 8> valueMap(predVals.begin(),
                                                                predVals.end());
-    for (auto *arg : block->getSILPhiArguments())
-      if (isEquivalentPHI(arg, valueMap))
+    for (auto *arg : block->getSILPhiArguments()) {
+      if (arg->isPhi() && isEquivalentPHI(arg, valueMap))
         return arg;
+    }
   }
+
+  if (singularValue)
+    return singularValue;
 
   // Create a new phi node.
   SILPhiArgument *phiArg = block->createPhiArgument(type, ownershipKind);
@@ -234,6 +249,7 @@ SILValue SILSSAUpdater::getValueInMiddleOfBlock(SILBasicBlock *block) {
     addNewEdgeValueToBranch(pair.first->getTerminator(), block, pair.second,
                             deleter);
   }
+
   if (insertedPhis)
     insertedPhis->push_back(phiArg);
 
@@ -310,8 +326,8 @@ public:
     llvm::copy(block->getPredecessorBlocks(), std::back_inserter(*predBlocks));
   }
 
-  static SILValue GetUndefVal(SILBasicBlock *block, SILSSAUpdater *ssaUpdater) {
-    return SILUndef::get(ssaUpdater->type, *block->getParent());
+  static SILValue GetPoisonVal(SILBasicBlock *block, SILSSAUpdater *ssaUpdater) {
+    return SILUndef::get(block->getParent(), ssaUpdater->type);
   }
 
   /// Add an Argument to the basic block.
@@ -478,78 +494,29 @@ Operand *UseWrapper::getOperand() {
   llvm_unreachable("uninitialize use type");
 }
 
-/// At least one value feeding the specified SILArgument is a Struct. Attempt to
-/// replace the Argument with a new Struct in the same block.
-///
-/// When we handle more types of casts, this can become a template.
-///
-/// ArgValues are the values feeding the specified Argument from each
-/// predecessor. They must be listed in order of Arg->getParent()->getPreds().
-static StructInst *
-replaceBBArgWithStruct(SILPhiArgument *phiArg,
-                       SmallVectorImpl<SILValue> &argValues) {
+namespace swift::test {
+// Arguments:
+// * the first arguments are values, which are added as "available values" to the SSA-updater
+// * the next arguments are operands, which are set to the computed values at that place
+static FunctionTest SSAUpdaterTest("update_ssa", [](auto &function,
+                                                    auto &arguments,
+                                                    auto &test) {
+  SILSSAUpdater updater;
+  SILValue firstVal = arguments.takeValue();
+  updater.initialize(&function, firstVal->getType(), firstVal->getOwnershipKind());
+  updater.addAvailableValue(firstVal->getParentBlock(), firstVal);
 
-  SILBasicBlock *phiBlock = phiArg->getParent();
-  auto *firstSI = dyn_cast<StructInst>(argValues[0]);
-  if (!firstSI)
-    return nullptr;
-
-  // Collect the BBArg index of each struct oper.
-  // e.g.
-  //   struct(A, B)
-  //   br (B, A)
-  // : ArgIdxForOper => {1, 0}
-  SmallVector<unsigned, 4> argIdxForOper;
-  for (unsigned operIdx : indices(firstSI->getElements())) {
-    bool foundMatchingArgIdx = false;
-    for (unsigned argIdx : indices(phiBlock->getArguments())) {
-      auto avIter = argValues.begin();
-      bool tryNextArgIdx = false;
-      for (SILBasicBlock *predBlock : phiBlock->getPredecessorBlocks()) {
-        // All argument values must be StructInst.
-        auto *predSI = dyn_cast<StructInst>(*avIter++);
-        if (!predSI)
-          return nullptr;
-        OperandValueArrayRef edgeValues =
-            getEdgeValuesForTerminator(predBlock->getTerminator(), phiBlock);
-        if (edgeValues[argIdx] != predSI->getElements()[operIdx]) {
-          tryNextArgIdx = true;
-          break;
-        }
-      }
-      if (!tryNextArgIdx) {
-        assert(avIter == argValues.end() &&
-               "# ArgValues does not match # BB preds");
-        foundMatchingArgIdx = true;
-        argIdxForOper.push_back(argIdx);
-        break;
-      }
+  while (arguments.hasUntaken()) {
+    auto &arg = arguments.takeArgument();
+    if (isa<ValueArgument>(arg)) {
+      SILValue val = cast<ValueArgument>(arg).getValue();
+      updater.addAvailableValue(val->getParentBlock(), val);
+    } else if (isa<OperandArgument>(arg)) {
+      Operand *op = cast<OperandArgument>(arg).getValue();
+      SILValue newValue = updater.getValueInMiddleOfBlock(op->getUser()->getParent());
+      op->set(newValue);
     }
-    if (!foundMatchingArgIdx)
-      return nullptr;
   }
+});
+} // end namespace swift::test
 
-  SmallVector<SILValue, 4> structArgs;
-  for (auto argIdx : argIdxForOper)
-    structArgs.push_back(phiBlock->getArgument(argIdx));
-
-  // TODO: We probably want to use a SILBuilderWithScope here. What should we
-  // use?
-  SILBuilder builder(phiBlock, phiBlock->begin());
-  return builder.createStruct(cast<StructInst>(argValues[0])->getLoc(),
-                              phiArg->getType(), structArgs);
-}
-
-/// Canonicalize BB arguments, replacing argument-of-casts with
-/// cast-of-arguments. This only eliminates existing arguments, replacing them
-/// with casts. No new arguments are created. This allows downstream pattern
-/// detection like induction variable analysis to succeed.
-///
-/// If Arg is replaced, return the cast instruction. Otherwise return nullptr.
-SILValue swift::replaceBBArgWithCast(SILPhiArgument *arg) {
-  SmallVector<SILValue, 4> argValues;
-  arg->getIncomingPhiValues(argValues);
-  if (isa<StructInst>(argValues[0]))
-    return replaceBBArgWithStruct(arg, argValues);
-  return nullptr;
-}

@@ -1,0 +1,26 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name _Concurrency
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name _Concurrency
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name _Concurrency -emit-sorted-sil | %FileCheck %s
+
+// REQUIRES: asserts
+// REQUIRES: concurrency
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// NOTE: In SIL we do not save/print out imports, so we cannot import _Concurrency here!
+
+public protocol AnyActor: AnyObject, Sendable {}
+public protocol Actor : AnyActor {}
+
+
+// CHECK-LABEL: sil [serialized] [ossa] @assumeIsolated : $@convention(method) <τ_0_0 where τ_0_0 : Actor> (@sil_isolated @guaranteed τ_0_0) -> () {
+
+sil [serialized] [ossa] @assumeIsolated : $@convention(method) <τ_0_0 where τ_0_0 : Actor> (@sil_isolated @guaranteed τ_0_0) -> () {
+bb0(%0 : @guaranteed $τ_0_0):
+  unreachable
+}

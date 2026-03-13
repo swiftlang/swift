@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name switch_isa %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name switch_isa %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -57,35 +57,31 @@ func guardFn(_ l: D, _ r: D) -> Bool { return true }
 // CHECK:       [[TUP:%.*]] = tuple ([[ARG0_COPY:%.*]] : $B, [[ARG1_COPY:%.*]] : $B)
 // CHECK:       [[BORROWED_TUP:%.*]] = begin_borrow [[TUP]]
 // CHECK:       ([[TUP_1:%.*]], [[TUP_2:%.*]]) = destructure_tuple [[BORROWED_TUP]]
-// CHECK:       checked_cast_br [[TUP_1]] : $B to D, [[R_CAST_YES:bb[0-9]+]], [[R_CAST_NO:bb[0-9]+]]
+// CHECK:       checked_cast_br B in [[TUP_1]] : $B to D, [[R_CAST_YES:bb[0-9]+]], [[R_CAST_NO:bb[0-9]+]]
 //
 // CHECK:       [[R_CAST_YES]]([[R:%.*]] : @guaranteed $D):
 // CHECK:         [[R2:%.*]] = copy_value [[R]]
-// CHECK:         checked_cast_br [[TUP_2]] : $B to D, [[L_CAST_YES:bb[0-9]+]], [[L_CAST_NO:bb[0-9]+]]
+// CHECK:         checked_cast_br B in [[TUP_2]] : $B to D, [[L_CAST_YES:bb[0-9]+]], [[L_CAST_NO:bb[0-9]+]]
 //
 // CHECK:       [[L_CAST_YES]]([[L:%.*]] : @guaranteed $D):
 // CHECK:         [[L2:%.*]] = copy_value [[L]]
-// CHECK:         [[BORROWED_R2:%.*]] = begin_borrow [lexical] [[R2]]
-// CHECK:         [[BORROWED_L2:%.*]] = begin_borrow [lexical] [[L2]]
+// CHECK:         [[MOVED_R2:%.*]] = move_value [lexical] [var_decl] [[R2]]
+// CHECK:         [[MOVED_L2:%.*]] = move_value [lexical] [var_decl] [[L2]]
 // CHECK:         function_ref @$s10switch_isa7guardFnySbAA1DC_ADtF
 // CHECK:         cond_br {{%.*}}, [[GUARD_YES:bb[0-9]+]], [[GUARD_NO:bb[0-9]+]]
 //
 // CHECK:       [[GUARD_YES]]:
-// CHECK-NEXT:    debug_value [[BORROWED_R2]]
-// CHECK-NEXT:    debug_value [[BORROWED_L2]]
-// CHECK-NEXT:    end_borrow [[BORROWED_L2]]
-// CHECK-NEXT:    destroy_value [[L2]]
-// CHECK-NEXT:    end_borrow [[BORROWED_R2]]
-// CHECK-NEXT:    destroy_value [[R2]]
+// CHECK-NEXT:    debug_value [[MOVED_R2]]
+// CHECK-NEXT:    debug_value [[MOVED_L2]]
+// CHECK-NEXT:    destroy_value [[MOVED_L2]]
+// CHECK-NEXT:    destroy_value [[MOVED_R2]]
 // CHECK-NEXT:    end_borrow [[BORROWED_TUP]]
 // CHECK-NEXT:    destroy_value [[TUP]]
 // CHECK-NEXT:    br [[EXIT:bb[0-9]+]]
 //
 // CHECK:       [[GUARD_NO]]:
-// CHECK-NEXT:    end_borrow [[BORROWED_L2]]
-// CHECK-NEXT:    destroy_value [[L2]]
-// CHECK-NEXT:    end_borrow [[BORROWED_R2]]
-// CHECK-NEXT:    destroy_value [[R2]]
+// CHECK-NEXT:    destroy_value [[MOVED_L2]]
+// CHECK-NEXT:    destroy_value [[MOVED_R2]]
 // CHECK-NEXT:    end_borrow [[BORROWED_TUP]]
 // CHECK-NEXT:    br [[CONT:bb[0-9]+]]
 //

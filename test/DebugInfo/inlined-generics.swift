@@ -12,8 +12,8 @@ func foo1<T:P>(_ t: T, _ dt: T.DT1) -> T.DT1 {
 
 // CHECK: define {{.*}}@"$s4main4foo2yyxAA1PRzlF"
 public func foo2<S:P>(_ s: S) {
-  // CHECK: call void @llvm.dbg.value(metadata %swift.type* %S,
-  // CHECK-SAME:                     metadata ![[META:[0-9]+]]
+  // CHECK: #dbg_value(ptr %S,
+  // CHECK-SAME:                     ![[META:[0-9]+]]
   foo1(s, s.getDT())
   // T should get substituted with S
   // CHECK: ![[META]] = !DILocalVariable(name: "$\CF\84_0_0"

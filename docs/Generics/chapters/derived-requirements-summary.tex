@@ -1,0 +1,88 @@
+\documentclass[../generics]{subfiles}
+
+\begin{document}
+
+\chapter{Derived Requirements}\label{derived summary}
+
+\index{$\vdash$}
+
+Let $G$ be a \index{generic signature!summary}generic signature. We generate the theory of~$G$ by repeated application of inference rules, starting from a finite set of elementary statements. A derivation proves that some element belongs to this set by giving a list of derivation steps where the assumptions in each step are conclusions of previous steps. Nomenclature:
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Symbol}&\textbf{Description}\\
+\midrule
+\tT, \tU, and \tV&\index{type parameter!summary}type parameters\\
+\SelfU\ and \texttt{Self.V}&type parameters rooted in the \Index{protocol Self type@protocol \tSelf\ type!summary}protocol \tSelf\ type\\
+\tX&a concrete type\\
+\tC&a concrete \index{class type!summary}class type\\
+$\Xprime$ and $\Cprime$&obtained from \tX\ and \tC\ by replacing \tSelf\ with \tT\\
+\tP\ and \tQ&protocols\\
+\nA&the name of an \index{associated type declaration!summary}associated type of \tP\\
+\texttt{[P]A}&an associated type declaration of \tP\\
+\texttt{T.[P]A} and \texttt{T.A}&\index{bound dependent member type!summary}bound and \index{unbound dependent member type!summary}unbound dependent member type\\
+$\TP$&a \index{conformance requirement!summary}conformance requirement\\
+$\TU$&a \index{same-type requirement!summary}same-type requirement between type parameters\\
+$\TX$&a concrete same-type requirement\\
+$\TC$&a \index{superclass requirement!summary}superclass requirement\\
+$\TAnyObject$&a \index{layout requirement!summary}layout requirement\\
+$\AssocConfReq{Self.U}{Q}{P}$&an \index{associated requirement!summary}associated requirement of protocol \tP\\
+\bottomrule
+\end{tabular}
+\end{center}
+See \index{derived requirement!summary}\index{valid type parameter!summary}\SecRef{derived req}, \SecRef{valid type params}, and \SecRef{bound type params} for details.
+
+\index{elementary derivation step!summary}\paragraph{Elementary statements.}
+For \IndexStepTwo{Generic}{summary}each generic parameter \ttgp{d}{i} of~$G$:
+\begin{gather*}
+\GenericStepDef
+\end{gather*}
+For \IndexStepTwo{Conf}{summary}\IndexStepTwo{Same}{summary}\IndexStepTwo{Concrete}{summary}\IndexStepTwo{Super}{summary}\IndexStepTwo{Layout}{summary}each explicit requirement of~$G$ by \index{requirement kind!summary}kind:
+\begin{gather*}
+\ConfStepDef\\
+\SameStepDef\\
+\ConcreteStepDef\\
+\SuperStepDef\\
+\LayoutStepDef
+\end{gather*}
+
+\index{requirement signature!summary}
+\paragraph{Requirement signatures.}
+Assume $G\vdash\TP$. For \IndexStepTwo{AssocName}{summary}\IndexStepTwo{AssocDecl}{summary}\IndexStepTwo{AssocBind}{summary}each associated type~\nA\ of~\tP:
+\begin{gather*}
+\AssocNameStepDef\\
+\AssocDeclStepDef\\
+\AssocBindStepDef
+\end{gather*}
+For each \IndexStepTwo{AssocConf}{summary}\IndexStepTwo{AssocSame}{summary}\IndexStepTwo{AssocConcrete}{summary}\IndexStepTwo{AssocSuper}{summary}\IndexStepTwo{AssocLayout}{summary}associated requirement of~\tP\ by kind:
+\begin{gather*}
+\AssocConfStepDef\\
+\AssocSameStepDef\\
+\AssocConcreteStepDef\\
+\AssocSuperStepDef\\
+\AssocLayoutStepDef
+\end{gather*}
+
+\paragraph{Equivalence.}
+Same-type requirements \IndexStepTwo{Reflex}{summary}\IndexStepTwo{Sym}{summary}\IndexStepTwo{Trans}{summary}generate an equivalence relation:
+\begin{gather*}
+\ReflexStepDef\\
+\SymStepDef\\
+\TransStepDef
+\end{gather*}
+
+\paragraph{Compatibility.}
+A derived conformance, superclass or layout requirement \IndexStepTwo{SameConf}{summary}\IndexStepTwo{SameSuper}{summary}\IndexStepTwo{SameLayout}{summary}\IndexStepTwo{SameName}{summary}\IndexStepTwo{SameDecl}{summary}applies to all type parameters in an equivalence class:
+\begin{gather*}
+\SameConfStepDef\\
+\SameConcreteStepDef\\
+\SameSuperStepDef\\
+\SameLayoutStepDef
+\end{gather*}
+If two type parameters are equivalent, so are \IndexStepTwo{SameName}{summary}\IndexStepTwo{SameDecl}{summary}all corresponding member types:
+\begin{gather*}
+\SameNameStepDef\\
+\SameDeclStepDef
+\end{gather*}
+
+\end{document}

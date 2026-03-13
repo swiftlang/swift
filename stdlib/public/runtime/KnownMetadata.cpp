@@ -93,10 +93,17 @@ namespace ctypes {
       void *storage[NumWords_DefaultActor];
     };
 
-    // ExecutorRef type.
+    // SerialExecutorRef type.
     struct Be {
       HeapObject *Identity;
       uintptr_t Implementation;
+    };
+
+    // Types that are defined in the Distributed library
+
+    // Non-default distributed actor storage type.
+    struct alignas(2 * alignof(void*)) Bd {
+      void *storage[NumWords_NonDefaultDistributedActor];
     };
   }
 }

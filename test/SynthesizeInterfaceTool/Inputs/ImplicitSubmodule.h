@@ -1,0 +1,3 @@
+struct ImplicitSubmoduleStruct {
+  int value;
+};

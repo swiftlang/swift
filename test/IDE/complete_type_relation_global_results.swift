@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t/ImportPath)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
-// RUN: %target-swift-frontend -disable-availability-checking -emit-module %t/Lib.swift -o %t/ImportPath/Lib.swiftmodule -emit-module-interface-path %t/ImportPath/Lib.swiftinterface
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-module %t/Lib.swift -o %t/ImportPath/Lib.swiftmodule -emit-module-interface-path %t/ImportPath/Lib.swiftinterface
 
 // BEGIN Lib.swift
 
@@ -69,14 +69,12 @@ func test() -> MyProto {
 	return #^COMPLETE^#
 }
 
-// CHECK: Begin completions
 // CHECK-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: Foo[#Foo#];
 // CHECK-DAG: Decl[GlobalVar]/OtherModule[Lib]/TypeRelation[Convertible]: GLOBAL_FOO[#Foo#];
 // CHECK-DAG: Decl[Struct]/OtherModule[Lib]:      Bar[#Bar#];
 // CHECK-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]/TypeRelation[Convertible]: MyProto[#MyProto#];
 // CHECK-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: makeFoo()[#Foo#];
 // CHECK-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: returnSomeMyProto()[#MyProto#];
-// CHECK: End completions
 
 
 // RUN: %empty-directory(%t/completion-cache)
@@ -88,14 +86,12 @@ func testOpaqueComposition() -> some MyProto & MyOtherProto {
 	return #^COMPLETE_OPAQUE_COMPOSITION^#
 }
 
-// COMPLETE_OPAQUE_COMPOSITION: Begin completions
 // COMPLETE_OPAQUE_COMPOSITION-DAG: Decl[Struct]/OtherModule[Lib]: Foo[#Foo#];
 // COMPLETE_OPAQUE_COMPOSITION-DAG: Decl[GlobalVar]/OtherModule[Lib]: GLOBAL_FOO[#Foo#];
 // COMPLETE_OPAQUE_COMPOSITION-DAG: Decl[Struct]/OtherModule[Lib]:      Bar[#Bar#];
 // COMPLETE_OPAQUE_COMPOSITION-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]: MyProto[#MyProto#];
 // COMPLETE_OPAQUE_COMPOSITION-DAG: Decl[FreeFunction]/OtherModule[Lib]: makeFoo()[#Foo#];
 // COMPLETE_OPAQUE_COMPOSITION-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: FooBar[#FooBar#];
-// COMPLETE_OPAQUE_COMPOSITION: End completions
 
 // RUN: %empty-directory(%t/completion-cache)
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token ALSO_CONSIDER_METATYPE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=ALSO_CONSIDER_METATYPE
@@ -105,11 +101,9 @@ func testOpaqueComposition() -> some MyProto & MyOtherProto {
 func testAlsoConsiderMetatype() -> MyClass.Type {
   return #^ALSO_CONSIDER_METATYPE^#
 }
-// ALSO_CONSIDER_METATYPE: Begin completions
 // ALSO_CONSIDER_METATYPE-DAG: Decl[Class]/OtherModule[Lib]/TypeRelation[Convertible]: MyClass[#MyClass#];
 // FIXME: MySubclass should be 'Convertible' but we don't currently store metatype supertypes in USRBasedType.
 // ALSO_CONSIDER_METATYPE-DAG: Decl[Class]/OtherModule[Lib]: MySubclass[#MySubclass#];
-// ALSO_CONSIDER_METATYPE: End completions
 
 // RUN: %empty-directory(%t/completion-cache)
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token OPAQUE_WITH_CLASS -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=OPAQUE_WITH_CLASS
@@ -120,14 +114,12 @@ func testOpaqueWithClass<T: MyClass & MyProto>() -> T {
 }
 
 // FIXME: We don't support USR-based type comparison in generic contexts. MySubclassConformingToMyProto should be 'Convertible'
-// OPAQUE_WITH_CLASS: Begin completions
 // OPAQUE_WITH_CLASS-DAG: Decl[FreeFunction]/OtherModule[Lib]: makeMySubclass()[#MySubclass#];
 // OPAQUE_WITH_CLASS-DAG: Decl[Class]/OtherModule[Lib]:       MySubclass[#MySubclass#];
 // OPAQUE_WITH_CLASS-DAG: Decl[Class]/OtherModule[Lib]: MySubclassConformingToMyProto[#MySubclassConformingToMyProto#];
 // OPAQUE_WITH_CLASS-DAG: Decl[FreeFunction]/OtherModule[Lib]: makeMyClass()[#MyClass#];
 // OPAQUE_WITH_CLASS-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]: MyProto[#MyProto#];
 // OPAQUE_WITH_CLASS-DAG: Decl[FreeFunction]/OtherModule[Lib]: returnSomeMyProto()[#MyProto#];
-// OPAQUE_WITH_CLASS: End completions
 
 // RUN: %empty-directory(%t/completion-cache)
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token GENERIC_RETURN -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=GENERIC_RETURN
@@ -137,7 +129,6 @@ func testGenericReturn<T: MyProto>() -> T {
   return #^GENERIC_RETURN^#
 }
 
-// GENERIC_RETURN: Begin completions
 // GENERIC_RETURN-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: Foo[#Foo#];
 // GENERIC_RETURN-DAG: Decl[GlobalVar]/OtherModule[Lib]/TypeRelation[Convertible]: GLOBAL_FOO[#Foo#];
 // GENERIC_RETURN-DAG: Decl[Struct]/OtherModule[Lib]:      Bar[#Bar#];
@@ -145,7 +136,6 @@ func testGenericReturn<T: MyProto>() -> T {
 // GENERIC_RETURN-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: makeFoo()[#Foo#];
 // GENERIC_RETURN-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: FooBar[#FooBar#];
 // GENERIC_RETURN-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: returnSomeMyProto()[#MyProto#];
-// GENERIC_RETURN: End completions
 
 // RUN: %empty-directory(%t/completion-cache)
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token OPAQUE_CLASS_AND_PROTOCOL -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=OPAQUE_CLASS_AND_PROTOCOL
@@ -155,14 +145,12 @@ func testGenericReturn() -> some MyClass & MyProto {
   return #^OPAQUE_CLASS_AND_PROTOCOL^#
 }
 
-// OPAQUE_CLASS_AND_PROTOCOL: Begin completions
 // OPAQUE_CLASS_AND_PROTOCOL-DAG: Decl[FreeFunction]/OtherModule[Lib]: makeMySubclass()[#MySubclass#];
 // OPAQUE_CLASS_AND_PROTOCOL-DAG: Decl[Class]/OtherModule[Lib]:       MySubclass[#MySubclass#];
 // OPAQUE_CLASS_AND_PROTOCOL-DAG: Decl[Class]/OtherModule[Lib]/TypeRelation[Convertible]: MySubclassConformingToMyProto[#MySubclassConformingToMyProto#];
 // OPAQUE_CLASS_AND_PROTOCOL-DAG: Decl[FreeFunction]/OtherModule[Lib]: makeMyClass()[#MyClass#];
 // OPAQUE_CLASS_AND_PROTOCOL-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]: MyProto[#MyProto#];
 // OPAQUE_CLASS_AND_PROTOCOL-DAG: Decl[FreeFunction]/OtherModule[Lib]: returnSomeMyProto()[#MyProto#];
-// OPAQUE_CLASS_AND_PROTOCOL: End completions
 
 // RUN: %empty-directory(%t/completion-cache)
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token TRANSITIVE_CONFORMANCE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=TRANSITIVE_CONFORMANCE
@@ -172,7 +160,6 @@ func testGenericReturn() -> MyBaseProto {
   return #^TRANSITIVE_CONFORMANCE^#
 }
 
-// TRANSITIVE_CONFORMANCE: Begin completions
 // TRANSITIVE_CONFORMANCE-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]: MyOtherProto[#MyOtherProto#];
 // TRANSITIVE_CONFORMANCE-DAG: Decl[Class]/OtherModule[Lib]:       MyClass[#MyClass#];
 // TRANSITIVE_CONFORMANCE-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: makeFoo()[#Foo#];
@@ -185,7 +172,6 @@ func testGenericReturn() -> MyBaseProto {
 // TRANSITIVE_CONFORMANCE-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: FooBar[#FooBar#];
 // TRANSITIVE_CONFORMANCE-DAG: Decl[FreeFunction]/OtherModule[Lib]: makeMyClass()[#MyClass#];
 // TRANSITIVE_CONFORMANCE-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]/TypeRelation[Convertible]: MyProto[#MyProto#];
-// TRANSITIVE_CONFORMANCE: End completions
 
 
 // RUN: %empty-directory(%t/completion-cache)
@@ -196,11 +182,9 @@ func protoWithAssocType() -> ProtoWithAssocType {
   return #^PROTO_WITH_ASSOC_TYPE^#
 }
 
-// PROTO_WITH_ASSOC_TYPE: Begin completions
 // PROTO_WITH_ASSOC_TYPE-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: StructWithAssocType[#StructWithAssocType#];
 // PROTO_WITH_ASSOC_TYPE-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: makeProtoWithAssocType()[#ProtoWithAssocType#];
 // PROTO_WITH_ASSOC_TYPE-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]/TypeRelation[Convertible]: ProtoWithAssocType[#ProtoWithAssocType#];
-// PROTO_WITH_ASSOC_TYPE: End completions
 
 // RUN: %empty-directory(%t/completion-cache)
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE_OPAQUE_CONTEXT -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROTO_WITH_ASSOC_TYPE
@@ -218,11 +202,9 @@ func protoWithAssocTypeInGenericContext<T: ProtoWithAssocType>() -> T {
   return #^PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT^#
 }
 
-// PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT: Begin completions
 // PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: StructWithAssocType[#StructWithAssocType#];
 // PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: makeProtoWithAssocType()[#ProtoWithAssocType#];
 // PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]/TypeRelation[Convertible]: ProtoWithAssocType[#ProtoWithAssocType#];
-// PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT: End completions
 
 
 // RUN: %empty-directory(%t/completion-cache)
@@ -234,7 +216,5 @@ struct TestPropertyWrapper {
   @#^PROPERTY_WRAPPER^# var foo: String
 }
 
-// PROPERTY_WRAPPER: Begin completions
-// PROPERTY_WRAPPER-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#];
+// PROPERTY_WRAPPER-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#];
 // PROPERTY_WRAPPER-DAG: Decl[Struct]/OtherModule[Lib]: StructWithAssocType[#StructWithAssocType#];
-// PROPERTY_WRAPPER: End completions

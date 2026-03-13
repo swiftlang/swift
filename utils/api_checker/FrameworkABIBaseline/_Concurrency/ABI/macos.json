@@ -261,110 +261,6 @@
     },
     {
       "kind": "Function",
-      "name": "_asyncLetGet",
-      "printedName": "_asyncLetGet(asyncLet:)",
-      "children": [
-        {
-          "kind": "TypeNominal",
-          "name": "GenericTypeParam",
-          "printedName": "τ_0_0"
-        },
-        {
-          "kind": "TypeNominal",
-          "name": "BuiltinRawPointer",
-          "printedName": "Builtin.RawPointer"
-        }
-      ],
-      "declKind": "Func",
-      "usr": "s:12_Concurrency12_asyncLetGet0bC0xBp_tYalF",
-      "mangledName": "swift_asyncLet_wait",
-      "moduleName": "_Concurrency",
-      "genericSig": "<τ_0_0>",
-      "sugared_genericSig": "<T>",
-      "intro_Macosx": "10.15",
-      "intro_iOS": "13.0",
-      "intro_tvOS": "13.0",
-      "intro_watchOS": "6.0",
-      "declAttributes": [
-        "SILGenName",
-        "Available",
-        "Available",
-        "Available",
-        "Available"
-      ],
-      "funcSelfKind": "NonMutating"
-    },
-    {
-      "kind": "Function",
-      "name": "_asyncLetGetThrowing",
-      "printedName": "_asyncLetGetThrowing(asyncLet:)",
-      "children": [
-        {
-          "kind": "TypeNominal",
-          "name": "GenericTypeParam",
-          "printedName": "τ_0_0"
-        },
-        {
-          "kind": "TypeNominal",
-          "name": "BuiltinRawPointer",
-          "printedName": "Builtin.RawPointer"
-        }
-      ],
-      "declKind": "Func",
-      "usr": "s:12_Concurrency20_asyncLetGetThrowing0bC0xBp_tYaKlF",
-      "mangledName": "swift_asyncLet_wait_throwing",
-      "moduleName": "_Concurrency",
-      "genericSig": "<τ_0_0>",
-      "sugared_genericSig": "<T>",
-      "intro_Macosx": "10.15",
-      "intro_iOS": "13.0",
-      "intro_tvOS": "13.0",
-      "intro_watchOS": "6.0",
-      "declAttributes": [
-        "SILGenName",
-        "Available",
-        "Available",
-        "Available",
-        "Available"
-      ],
-      "throwing": true,
-      "funcSelfKind": "NonMutating"
-    },
-    {
-      "kind": "Function",
-      "name": "_asyncLetEnd",
-      "printedName": "_asyncLetEnd(asyncLet:)",
-      "children": [
-        {
-          "kind": "TypeNominal",
-          "name": "Void",
-          "printedName": "()"
-        },
-        {
-          "kind": "TypeNominal",
-          "name": "BuiltinRawPointer",
-          "printedName": "Builtin.RawPointer"
-        }
-      ],
-      "declKind": "Func",
-      "usr": "s:12_Concurrency12_asyncLetEnd0bC0yBp_tF",
-      "mangledName": "swift_asyncLet_end",
-      "moduleName": "_Concurrency",
-      "intro_Macosx": "10.15",
-      "intro_iOS": "13.0",
-      "intro_tvOS": "13.0",
-      "intro_watchOS": "6.0",
-      "declAttributes": [
-        "SILGenName",
-        "Available",
-        "Available",
-        "Available",
-        "Available"
-      ],
-      "funcSelfKind": "NonMutating"
-    },
-    {
-      "kind": "Function",
       "name": "_asyncLet_get",
       "printedName": "_asyncLet_get(_:_:)",
       "children": [
@@ -714,7 +610,7 @@
         {
           "kind": "TypeFunc",
           "name": "Function",
-          "printedName": "(_Concurrency.CheckedContinuation<τ_0_0, Swift.Error>) -> ()",
+          "printedName": "(_Concurrency.CheckedContinuation<τ_0_0, any Swift.Error>) -> ()",
           "children": [
             {
               "kind": "TypeNominal",
@@ -724,7 +620,7 @@
             {
               "kind": "TypeNominal",
               "name": "CheckedContinuation",
-              "printedName": "_Concurrency.CheckedContinuation<τ_0_0, Swift.Error>",
+              "printedName": "_Concurrency.CheckedContinuation<τ_0_0, any Swift.Error>",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -734,7 +630,7 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Error",
-                  "printedName": "Swift.Error",
+                  "printedName": "any Swift.Error",
                   "usr": "s:s5ErrorP"
                 }
               ],
@@ -13874,7 +13770,7 @@
         {
           "kind": "TypeFunc",
           "name": "Function",
-          "printedName": "(inout _Concurrency.ThrowingTaskGroup<τ_0_0, Swift.Error>) async throws -> τ_0_1",
+          "printedName": "(inout _Concurrency.ThrowingTaskGroup<τ_0_0, any Swift.Error>) async throws -> τ_0_1",
           "children": [
             {
               "kind": "TypeNominal",
@@ -13884,7 +13780,7 @@
             {
               "kind": "TypeNominal",
               "name": "InOut",
-              "printedName": "inout _Concurrency.ThrowingTaskGroup<τ_0_0, Swift.Error>"
+              "printedName": "inout _Concurrency.ThrowingTaskGroup<τ_0_0, any Swift.Error>"
             }
           ],
           "typeAttributes": [
@@ -17482,8 +17378,8 @@
               "usr": "s:Scs12ContinuationV5yield4withAB11YieldResultOyxs5Error_p__Gs0E0OyxsAG_pG_tsAG_pRs_rlF",
               "mangledName": "$sScs12ContinuationV5yield4withAB11YieldResultOyxs5Error_p__Gs0E0OyxsAG_pG_tsAG_pRs_rlF",
               "moduleName": "_Concurrency",
-              "genericSig": "<τ_0_0, τ_0_1 where τ_0_1 == Swift.Error>",
-              "sugared_genericSig": "<Element, Failure where Failure == Swift.Error>",
+              "genericSig": "<τ_0_0, τ_0_1 where τ_0_1 == any Swift.Error>",
+              "sugared_genericSig": "<Element, Failure where Failure == any Swift.Error>",
               "declAttributes": [
                 "DiscardableResult"
               ],
@@ -17598,8 +17494,8 @@
           "usr": "s:Scs_15bufferingPolicy_Scsyxs5Error_pGxm_Scs12ContinuationV09BufferingB0OyxsAB_p__GyAEyxsAB_p_GXEtcsAB_pRs_rlufc",
           "mangledName": "$sScs_15bufferingPolicy_Scsyxs5Error_pGxm_Scs12ContinuationV09BufferingB0OyxsAB_p__GyAEyxsAB_p_GXEtcsAB_pRs_rlufc",
           "moduleName": "_Concurrency",
-          "genericSig": "<τ_0_0, τ_0_1 where τ_0_1 == Swift.Error>",
-          "sugared_genericSig": "<Element, Failure where Failure == Swift.Error>",
+          "genericSig": "<τ_0_0, τ_0_1 where τ_0_1 == any Swift.Error>",
+          "sugared_genericSig": "<Element, Failure where Failure == any Swift.Error>",
           "init_kind": "Designated"
         },
         {
@@ -17655,8 +17551,8 @@
           "usr": "s:Scs9unfoldingScsyxs5Error_pGxSgyYaKc_tcsAB_pRs_rlufc",
           "mangledName": "$sScs9unfoldingScsyxs5Error_pGxSgyYaKc_tcsAB_pRs_rlufc",
           "moduleName": "_Concurrency",
-          "genericSig": "<τ_0_0, τ_0_1 where τ_0_1 == Swift.Error>",
-          "sugared_genericSig": "<Element, Failure where Failure == Swift.Error>",
+          "genericSig": "<τ_0_0, τ_0_1 where τ_0_1 == any Swift.Error>",
+          "sugared_genericSig": "<Element, Failure where Failure == any Swift.Error>",
           "init_kind": "Designated"
         },
         {

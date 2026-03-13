@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
+// REQUIRES: swift_in_compiler
+
 struct A {
   var i : Int
   init(i : Int) { self.i = i }
@@ -50,8 +52,12 @@ extension B {
   }
 
   init(j : Int, x : Bool) {
-    if true { a = A(i: j) }
+    if 1 == 1 { a = A(i: j) }
   } // expected-error {{return from initializer without initializing all stored properties}}
+
+  init(j : Int, x2 : Bool) {
+    if true { a = A(i: j) }
+  }
 
   init(i : Int, x : Bool, y : Bool) {
     a = A(i: a.i)    // expected-error {{'self' used before all stored properties are initialized}}

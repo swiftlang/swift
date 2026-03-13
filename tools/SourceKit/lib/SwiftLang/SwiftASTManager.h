@@ -95,6 +95,7 @@ namespace swift {
   class CompilerInstance;
   class CompilerInvocation;
   class DiagnosticEngine;
+  class PluginRegistry;
   class SourceFile;
   class SourceManager;
 }
@@ -134,8 +135,9 @@ public:
 typedef IntrusiveRefCntPtr<ASTUnit> ASTUnitRef;
 
 class SwiftASTConsumer : public std::enable_shared_from_this<SwiftASTConsumer> {
-  /// Mutex guarding all accesses to CancellationRequestCallback
-  llvm::sys::Mutex CancellationRequestCallbackMtx;
+  /// Mutex guarding all accesses to \c CancellationRequestCallback and \c
+  /// IsCancelled.
+  llvm::sys::Mutex CancellationRequestCallbackAndIsCancelledMtx;
 
   /// A callback that informs the \c ASTBuildOperation, which is producing the
   /// AST for this consumer, that the consumer is no longer of interest. Calling
@@ -143,13 +145,22 @@ class SwiftASTConsumer : public std::enable_shared_from_this<SwiftASTConsumer> {
   /// If the consumer isn't associated with any \c ASTBuildOperation at the
   /// moment (e.g. if it hasn't been scheduled on one yet or if the build
   /// operation has already informed the ASTConsumer), the callback is \c None.
-  Optional<std::function<void(std::shared_ptr<SwiftASTConsumer>)>>
+  std::optional<std::function<void(std::shared_ptr<SwiftASTConsumer>)>>
       CancellationRequestCallback;
 
   bool IsCancelled = false;
 
 public:
   virtual ~SwiftASTConsumer() { }
+
+  /// Whether `handlePrimaryAST` should be executed with the same stack size as
+  /// the main thread.
+  ///
+  /// By default, it is assumed that `handlePrimaryAST` does not do a lot of
+  /// work and it is sufficient to run it on a background thread's stack with
+  /// reduced size. Set this to `true` if the consumer can perform additional
+  /// work that might require more stack size, such as invoking SwiftParser.
+  virtual bool requiresDeepStack() { return false; }
 
   // MARK: Cancellation
 
@@ -159,11 +170,16 @@ public:
   /// cause the \c ASTBuildOperation to be cancelled if no other consumer is
   /// depending on it.
   void requestCancellation() {
-    llvm::sys::ScopedLock L(CancellationRequestCallbackMtx);
-    IsCancelled = true;
-    if (CancellationRequestCallback.has_value()) {
-      (*CancellationRequestCallback)(shared_from_this());
-      CancellationRequestCallback = None;
+    std::optional<std::function<void(std::shared_ptr<SwiftASTConsumer>)>>
+        CallbackToCall;
+    {
+      llvm::sys::ScopedLock L(CancellationRequestCallbackAndIsCancelledMtx);
+      IsCancelled = true;
+      CallbackToCall = CancellationRequestCallback;
+      CancellationRequestCallback = std::nullopt;
+    }
+    if (CallbackToCall.has_value()) {
+      (*CallbackToCall)(shared_from_this());
     }
   }
 
@@ -176,21 +192,27 @@ public:
   /// called, \c NewCallback will be called immediately.
   void setCancellationRequestCallback(
       std::function<void(std::shared_ptr<SwiftASTConsumer>)> NewCallback) {
-    llvm::sys::ScopedLock L(CancellationRequestCallbackMtx);
-    assert(!CancellationRequestCallback.has_value() &&
-           "Can't set two cancellation callbacks on a SwiftASTConsumer");
-    if (IsCancelled) {
+    bool ShouldCallCallback = false;
+    {
+      llvm::sys::ScopedLock L(CancellationRequestCallbackAndIsCancelledMtx);
+      assert(!CancellationRequestCallback.has_value() &&
+             "Can't set two cancellation callbacks on a SwiftASTConsumer");
+      if (IsCancelled) {
+        ShouldCallCallback = true;
+      } else {
+        CancellationRequestCallback = NewCallback;
+      }
+    }
+    if (ShouldCallCallback) {
       NewCallback(shared_from_this());
-    } else {
-      CancellationRequestCallback = NewCallback;
     }
   }
 
   /// Removes the cancellation request callback previously set by \c
   /// setCancellationRequestCallback.
   void removeCancellationRequestCallback() {
-    llvm::sys::ScopedLock L(CancellationRequestCallbackMtx);
-    CancellationRequestCallback = None;
+    llvm::sys::ScopedLock L(CancellationRequestCallbackAndIsCancelledMtx);
+    CancellationRequestCallback = std::nullopt;
   }
 
   // MARK: Result methods
@@ -201,7 +223,7 @@ public:
 
   /// Creation of the AST failed due to \p Error. The request corresponding to
   /// this consumer should fail.
-  virtual void failed(StringRef Error);
+  virtual void failed(StringRef Error) = 0;
 
   /// The consumer was cancelled by the \c requestCancellation method and the \c
   /// ASTBuildOperation creating the AST for this consumer honored the request.
@@ -235,9 +257,9 @@ public:
                            std::shared_ptr<GlobalConfig> Config,
                            std::shared_ptr<SwiftStatistics> Stats,
                            std::shared_ptr<RequestTracker> ReqTracker,
+                           std::shared_ptr<swift::PluginRegistry> Plugins,
                            StringRef SwiftExecutablePath,
-                           StringRef RuntimeResourcePath,
-                           StringRef DiagnosticDocumentationPath);
+                           StringRef RuntimeResourcePath);
   ~SwiftASTManager();
 
   SwiftInvocationRef getTypecheckInvocation(ArrayRef<const char *> Args,
@@ -299,6 +321,7 @@ public:
                                       bool AllowInputs = true);
 
   void removeCachedAST(SwiftInvocationRef Invok);
+  void cancelBuildsForCachedAST(SwiftInvocationRef Invok);
 
   struct Implementation;
   Implementation &Impl;

@@ -27,15 +27,10 @@ class ClassDecl;
 class ClassHierarchyAnalysis : public SILAnalysis {
 public:
   typedef SmallVector<ClassDecl *, 8> ClassList;
-  typedef SmallPtrSet<ClassDecl *, 32> ClassSet;
-  typedef SmallVector<NominalTypeDecl *, 8> NominalTypeList;
-  typedef llvm::DenseMap<ProtocolDecl *, NominalTypeList>
-      ProtocolImplementations;
+  typedef llvm::DenseMap<ClassDecl *, ClassList> ClassListMap;
 
   ClassHierarchyAnalysis(SILModule *Mod)
-      : SILAnalysis(SILAnalysisKind::ClassHierarchy), M(Mod) {
-    init();
-  }
+      : SILAnalysis(SILAnalysisKind::ClassHierarchy), M(Mod) {}
 
   ~ClassHierarchyAnalysis();
 
@@ -65,7 +60,8 @@ public:
   /// Returns a list of the known direct subclasses of a class \p C in
   /// the current module.
   const ClassList &getDirectSubClasses(ClassDecl *C) {
-    return DirectSubclassesCache[C];
+    populateDirectSubclassesCacheIfNecessary();
+    return (*DirectSubclassesCache)[C];
   }
 
   /// Returns a list of the known indirect subclasses of a class \p C in
@@ -81,7 +77,8 @@ public:
 
   /// Returns true if the class is inherited by another class in this module.
   bool hasKnownDirectSubclasses(ClassDecl *C) {
-    return DirectSubclassesCache.count(C);
+    populateDirectSubclassesCacheIfNecessary();
+    return DirectSubclassesCache->count(C);
   }
 
   /// Returns true if the class is indirectly inherited by another class
@@ -92,18 +89,19 @@ public:
   }
 
 private:
-  /// Compute inheritance properties.
-  void init();
   void getIndirectSubClasses(ClassDecl *Base,
                              ClassList &IndirectSubs);
   /// The module
   SILModule *M;
 
   /// A cache that maps a class to all of its known direct subclasses.
-  llvm::DenseMap<ClassDecl*, ClassList> DirectSubclassesCache;
+  std::optional<ClassListMap> DirectSubclassesCache;
 
   /// A cache that maps a class to all of its known indirect subclasses.
-  llvm::DenseMap<ClassDecl*, ClassList> IndirectSubclassesCache;
+  ClassListMap IndirectSubclassesCache;
+
+  /// Populates `DirectSubclassesCache` if necessary.
+  void populateDirectSubclassesCacheIfNecessary();
 };
 
 }

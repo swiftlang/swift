@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/modulecache)
+// RUN: export SWIFT_BACKTRACE=
 
 // rdar://88830153
 // https://github.com/apple/swift/issues/58134
@@ -61,10 +62,9 @@
 // RUN: not %target-swift-frontend -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -I %t -module-cache-path %t/modulecache -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/err.txt 2>&1
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: %FileCheck %s -check-prefix=CHECK-ERROR <%t/err.txt
-// CHECK-ERROR: LeafModule.swiftinterface:7:8: error: no such module 'NotAModule'
-// CHECK-ERROR: OtherModule.swiftinterface:4:8: error: failed to build module 'LeafModule' for importation due to the errors above; the textual interface may be broken by project issues or a compiler bug
+// CHECK-ERROR: LeafModule.swiftinterface:8:8: error: no such module 'NotAModule'
+// CHECK-ERROR: OtherModule.swiftinterface:5:8: error: failed to build module 'LeafModule' for importation due to the errors above; the textual interface may be broken by project issues or a compiler bug
 // CHECK-ERROR: module-cache-diagnostics.swift:{{[0-9]+}}:8: error: failed to build module 'OtherModule' for importation due to the errors above; the textual interface may be broken by project issues or a compiler bug
-// CHECK-ERROR-NOT: error:
 //
 //
 // Next test: same as above, but with a .dia file
@@ -86,10 +86,9 @@
 // RUN: not %target-swift-frontend -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -I %t -module-cache-path %t/modulecache -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/err-inline.txt 2>&1
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: %FileCheck %s -check-prefix=CHECK-ERROR-INLINE <%t/err-inline.txt
-// CHECK-ERROR-INLINE: LeafModule.swiftinterface:6:33: error: cannot find 'unresolved' in scope
-// CHECK-ERROR-INLINE: OtherModule.swiftinterface:4:8: error: failed to build module 'LeafModule' for importation due to the errors above; the textual interface may be broken by project issues or a compiler bug
+// CHECK-ERROR-INLINE: LeafModule.swiftinterface:7:33: error: cannot find 'unresolved' in scope
+// CHECK-ERROR-INLINE: OtherModule.swiftinterface:5:8: error: failed to build module 'LeafModule' for importation due to the errors above; the textual interface may be broken by project issues or a compiler bug
 // CHECK-ERROR-INLINE: module-cache-diagnostics.swift:{{[0-9]+}}:8: error: failed to build module 'OtherModule' for importation due to the errors above; the textual interface may be broken by project issues or a compiler bug
-// CHECK-ERROR-INLINE-NOT: error:
 //
 //
 // Next test: same as above, but with a .dia file

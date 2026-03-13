@@ -30,7 +30,7 @@ enum E : Int {
   case a
 }
 
-// Don't profile the backing initalizers of the property wrapper.
+// Don't profile the backing initializers of the property wrapper.
 @available(*, unavailable)
 func hasExternalPropertyWrapper(@WrapperWithProjectedValue x: Int) {}
 
@@ -45,6 +45,11 @@ public func unavailableFunction() -> Int {
 struct TypeWithUnavailableMethods {
   @available(*, unavailable)
   func foo() -> Int {
+    .random() ? 1 : 2
+  }
+
+  @available(*, unavailable)
+  var qux: Int {
     .random() ? 1 : 2
   }
 }

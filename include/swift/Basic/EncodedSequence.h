@@ -25,7 +25,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/PrefixMap.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/Support/Host.h"
+#include "llvm/TargetParser/Host.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <climits>
 
@@ -102,14 +102,12 @@ private:
     }
 
     MutableArrayRef<Chunk> chunkStorage() {
-      return {getTrailingObjects<Chunk>(), Capacity};
+      return getTrailingObjects(Capacity);
     }
     ArrayRef<Chunk> chunkStorage() const {
-      return {getTrailingObjects<Chunk>(), Capacity};
+      return getTrailingObjects(Capacity);
     }
-    ArrayRef<Chunk> chunks() const {
-      return {getTrailingObjects<Chunk>(), Size};
-    }
+    ArrayRef<Chunk> chunks() const { return getTrailingObjects(Size); }
   };
   OutOfLineStorage *getOutOfLineStorage() {
     assert(hasOutOfLineStorage());

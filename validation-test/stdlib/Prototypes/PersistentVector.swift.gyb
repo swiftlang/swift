@@ -193,9 +193,9 @@ struct _${name}Bitmap {
 
   var setBitCount: Int {
 %   if underlyingType == 'UInt':
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if _pointerBitWidth(_32)
     return Int(Builtin.int_ctpop_Int32(_bits._value))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x) || arch(riscv64)
+#elseif _pointerBitWidth(_64)
     return Int(Builtin.int_ctpop_Int64(_bits._value))
 #endif
 %   elif underlyingType == 'UInt32':
@@ -209,11 +209,11 @@ struct _${name}Bitmap {
 
   subscript(i: Int) -> Bool {
     get {
-      precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // sanity check
+      precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // soundness check
       return _bits & (1 << ${underlyingType}(i)) != 0
     }
     set {
-      precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // sanity check
+      precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // soundness check
 %   if underlyingType == 'UInt':
       let iAsUnderlyingType = UInt(bitPattern: i)
 %   elif underlyingType == 'UInt32':
@@ -226,7 +226,7 @@ struct _${name}Bitmap {
   }
 
   func countBitsSetBelow(_ i: Int) -> Int {
-    precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // sanity check
+    precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // soundness check
 %   if underlyingType == 'UInt':
       let iAsUnderlyingType = UInt(bitPattern: i)
 %   elif underlyingType == 'UInt32':
@@ -370,7 +370,7 @@ struct _PVSparseVectorNodePointer<Key : LegacyHashable, Value>
     let old = _swift_stdlib_atomicFetchAddInt(
       object: _referenceCountPointer,
       operand: 1)
-    precondition(old != 0) // sanity check
+    precondition(old != 0) // soundness check
   }
 
   func release() {
@@ -467,8 +467,8 @@ struct _PVSparseVectorNodePointer<Key : LegacyHashable, Value>
     childNodePopulationBitmap: _Int32Bitmap,
     keyPopulationBitmap: _Int32Bitmap
   ) {
-    precondition(layout.childNodeCount >= 0) // sanity check
-    precondition(layout.keyCount >= 0) // sanity check
+    precondition(layout.childNodeCount >= 0) // soundness check
+    precondition(layout.keyCount >= 0) // soundness check
 
     self._nodePointer = allocBytes(
       count: _Self._nodeSize(layout: layout),
@@ -486,9 +486,9 @@ struct _PVSparseVectorNodePointer<Key : LegacyHashable, Value>
     value: Value,
     layout: _PVSparseVectorNodeLayoutParameters
   ) {
-    precondition(i >= keyCount && i < 32) // sanity check
-    precondition(!childNodePopulationBitmap[i]) // sanity check
-    precondition(!keyPopulationBitmap[i]) // sanity check
+    precondition(i >= keyCount && i < 32) // soundness check
+    precondition(!childNodePopulationBitmap[i]) // soundness check
+    precondition(!keyPopulationBitmap[i]) // soundness check
 
     (_keyVector(layout: layout) + keyCount).initialize(to: key)
     (_valueVector(layout: layout) + keyCount).initialize(to: value)
@@ -514,7 +514,7 @@ struct _PVSparseVectorNodePointer<Key : LegacyHashable, Value>
     except bucket: Int,
     replaceWith newChildNode: _PVAnyNodePointer<Key, Value>
   ) {
-    precondition(bucket >= 0 && bucket < 32) // sanity check
+    precondition(bucket >= 0 && bucket < 32) // soundness check
     let i = childNodePopulationBitmap.countBitsSetBelow(bucket)
     let childNodeVector = _childNodeVector
     childNodeVector.initialize(from: newChildNodes, count: i)
@@ -546,7 +546,7 @@ struct _PVSparseVectorNodePointer<Key : LegacyHashable, Value>
     at bucket: Int,
     insert newChildNode: _PVAnyNodePointer<Key, Value>
   ) {
-    precondition(bucket >= 0 && bucket < 32) // sanity check
+    precondition(bucket >= 0 && bucket < 32) // soundness check
     let i = childNodePopulationBitmap.countBitsSetBelow(bucket)
     let childNodeVector = _childNodeVector
     childNodeVector.initialize(from: newChildNodes, count: i)
@@ -583,7 +583,7 @@ struct _PVSparseVectorNodePointer<Key : LegacyHashable, Value>
     replaceWith newKey: Key,
     layout: _PVSparseVectorNodeLayoutParameters
   ) {
-    precondition(bucket >= 0 && bucket < 32) // sanity check
+    precondition(bucket >= 0 && bucket < 32) // soundness check
     let keyVector = _keyVector(layout: layout)
     let i = keyPopulationBitmap.countBitsSetBelow(bucket)
     keyVector.initialize(from: newKeys, count: i)
@@ -607,7 +607,7 @@ struct _PVSparseVectorNodePointer<Key : LegacyHashable, Value>
     replaceWith newValue: Value,
     layout: _PVSparseVectorNodeLayoutParameters
   ) {
-    precondition(bucket >= 0 && bucket < 32) // sanity check
+    precondition(bucket >= 0 && bucket < 32) // soundness check
     let valueVector = _valueVector(layout: layout)
     let i = keyPopulationBitmap.countBitsSetBelow(bucket)
     valueVector.initialize(from: newValues, count: i)
@@ -624,7 +624,7 @@ struct _PVSparseVectorNodePointer<Key : LegacyHashable, Value>
     omit bucket: Int,
     layout: _PVSparseVectorNodeLayoutParameters
   ) {
-    precondition(bucket >= 0 && bucket < 32) // sanity check
+    precondition(bucket >= 0 && bucket < 32) // soundness check
     if layout.keyCount == 0 {
       // Fast path when we are not copying anything.
       return
@@ -657,7 +657,7 @@ struct _PVSparseVectorNodePointer<Key : LegacyHashable, Value>
     _ newValue: Value,
     layout: _PVSparseVectorNodeLayoutParameters
   ) {
-    precondition(bucket >= 0 && bucket < 32) // sanity check
+    precondition(bucket >= 0 && bucket < 32) // soundness check
 
     let i = keyPopulationBitmap.countBitsSetBelow(bucket)
     do {
@@ -1032,7 +1032,7 @@ struct _PVArrayNodePointer<Key : LegacyHashable, Value>
     let old = _swift_stdlib_atomicFetchAddInt(
       object: _referenceCountPointer,
       operand: 1)
-    precondition(old != 0) // sanity check
+    precondition(old != 0) // soundness check
   }
 
   func release() {
@@ -1130,9 +1130,9 @@ struct _PVArrayNodePointer<Key : LegacyHashable, Value>
     key: Key,
     value: Value
   ) {
-    precondition(i >= 0 && i < 32) // sanity check
-    precondition(!childNodePopulationBitmap[i]) // sanity check
-    precondition(!keyPopulationBitmap[i]) // sanity check
+    precondition(i >= 0 && i < 32) // soundness check
+    precondition(!childNodePopulationBitmap[i]) // soundness check
+    precondition(!keyPopulationBitmap[i]) // soundness check
 
     (_childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
       .initializeMemory(as: Key.self, repeating: key, count: 1)
@@ -1252,7 +1252,7 @@ struct _PVCollisionNodePointer<Key : LegacyHashable, Value>
     let old = _swift_stdlib_atomicFetchAddInt(
       object: _referenceCountPointer,
       operand: 1)
-    precondition(old != 0) // sanity check
+    precondition(old != 0) // soundness check
   }
 
   func release() {
@@ -1337,7 +1337,7 @@ struct _PVCollisionNodePointer<Key : LegacyHashable, Value>
     value: Value,
     layout: _PVCollisionNodePointerLayoutParameters
   ) {
-    precondition(i >= 0 && i < layout.keyCount) // sanity check
+    precondition(i >= 0 && i < layout.keyCount) // soundness check
 
     (_keyArray + i).initialize(to: key)
     (_valueArray(layout: layout) + i).initialize(to: value)
@@ -1491,20 +1491,20 @@ struct _PVAnyNodePointer<Key : LegacyHashable, Value>
 
   init(_ sparseVectorNode: _PVSparseVectorNodePointer<Key, Value>) {
     precondition(
-      Int(bitPattern: sparseVectorNode._nodePointer) & 0x3 == 0) // sanity check
+      Int(bitPattern: sparseVectorNode._nodePointer) & 0x3 == 0) // soundness check
     self.taggedPointer = sparseVectorNode._nodePointer
   }
 
   init(_ arrayNode: _PVArrayNodePointer<Key, Value>) {
     precondition(
-      Int(bitPattern: arrayNode._nodePointer) & 0x3 == 0) // sanity check
+      Int(bitPattern: arrayNode._nodePointer) & 0x3 == 0) // soundness check
     self.taggedPointer = UnsafeMutableRawPointer(bitPattern:
       Int(bitPattern: arrayNode._nodePointer) | 1)!
   }
 
   init(_ collisionNode: _PVCollisionNodePointer<Key, Value>) {
     precondition(
-      Int(bitPattern: collisionNode._nodePointer) & 0x3 == 0) // sanity check
+      Int(bitPattern: collisionNode._nodePointer) & 0x3 == 0) // soundness check
     self.taggedPointer = UnsafeMutableRawPointer(bitPattern:
       Int(bitPattern: collisionNode._nodePointer) | 2)!
   }
@@ -1523,17 +1523,17 @@ struct _PVAnyNodePointer<Key : LegacyHashable, Value>
   }
 
   var asSparseVectorNode: _PVSparseVectorNodePointer<Key, Value> {
-    precondition(tag == 0) // sanity check
+    precondition(tag == 0) // soundness check
     return _PVSparseVectorNodePointer(_nodePointer: taggedPointer)
   }
 
   var asArrayNode: _PVArrayNodePointer<Key, Value> {
-    precondition(tag == 1) // sanity check
+    precondition(tag == 1) // soundness check
     return _PVArrayNodePointer(_nodePointer: _untaggedPointer)
   }
 
   var asCollisionNode: _PVCollisionNodePointer<Key, Value> {
-    precondition(tag == 2) // sanity check
+    precondition(tag == 2) // soundness check
     return _PVCollisionNodePointer(_nodePointer: _untaggedPointer)
   }
 
@@ -1541,7 +1541,7 @@ struct _PVAnyNodePointer<Key : LegacyHashable, Value>
     let old = _swift_stdlib_atomicFetchAddInt(
       object: _referenceCountPointer,
       operand: 1)
-    precondition(old != 0) // sanity check
+    precondition(old != 0) // soundness check
   }
 
   func release() {
@@ -1562,7 +1562,7 @@ struct _PVAnyNodePointer<Key : LegacyHashable, Value>
     case 2:
       asCollisionNode.dealloc()
     default:
-      preconditionFailure("unknown pointer tag") // sanity check
+      preconditionFailure("unknown pointer tag") // soundness check
     }
   }
 
@@ -1586,7 +1586,7 @@ struct _PVAnyNodePointer<Key : LegacyHashable, Value>
       return asCollisionNode.unsafeMaybeGet(
         key: key, hashValue: hashValue, depth: depth)
     default:
-      preconditionFailure("unknown pointer tag") // sanity check
+      preconditionFailure("unknown pointer tag") // soundness check
     }
   }
 
@@ -1618,7 +1618,7 @@ struct _PVAnyNodePointer<Key : LegacyHashable, Value>
         value, forKey: key, hashValue: hashValue, depth: depth,
         pathIsUnique: pathIsUnique)
     default:
-      preconditionFailure("unknown pointer tag") // sanity check
+      preconditionFailure("unknown pointer tag") // soundness check
     }
   }
 
@@ -1648,7 +1648,7 @@ struct _PVAnyNodePointer<Key : LegacyHashable, Value>
         forKey: key, hashValue: hashValue,
         depth: depth, pathIsUnique: pathIsUnique)
     default:
-      preconditionFailure("unknown pointer tag") // sanity check
+      preconditionFailure("unknown pointer tag") // soundness check
     }
   }
 

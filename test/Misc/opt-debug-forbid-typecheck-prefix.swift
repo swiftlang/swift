@@ -63,3 +63,11 @@ class C {
   var member = FORBID_ref
 }
 #endif
+
+// Verify that multiple -debug-forbid-typecheck-prefix arguments may be specified.
+// RUN: not --crash %target-swift-frontend -typecheck %s -D TRY9 -debug-forbid-typecheck-prefix FORBID_ -debug-forbid-typecheck-prefix FORBID2_ 2> %t.txt
+// RUN: %FileCheck -check-prefix=CHECK9 -input-file %t.txt %s
+#if TRY9
+// CHECK9: note: forbidden typecheck occurred: FORBID2_global
+var FORBID2_global = 0
+#endif

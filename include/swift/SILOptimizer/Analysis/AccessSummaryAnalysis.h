@@ -122,6 +122,7 @@ public:
     unsigned getArgumentCount() const { return ArgAccesses.size(); }
 
     void print(raw_ostream &os, SILFunction *fn) const;
+    void dump(SILFunction *fn) const;
   };
 
   class FunctionInfo;
@@ -203,6 +204,12 @@ public:
                                            const IndexTrieNode *SubPath,
                                            SILModule &M,
                                            TypeExpansionContext context);
+
+  /// Returns the type associated with the subpath \p SubPath.
+  ///
+  /// \p BaseType must be the type of the root of the path.
+  static SILType getSubPathType(SILType BaseType, const IndexTrieNode *SubPath,
+                                SILModule &M, TypeExpansionContext context);
 
   /// Performs a lexicographic comparison of two subpaths, first by path length
   /// and then by index of the last path component. Returns true when lhs

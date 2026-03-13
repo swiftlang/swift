@@ -38,8 +38,8 @@ public func testCaptureGlobal() {
 
 // CHECK-x86_64-SYSV-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
 // CHECK-x86_64-SYSV-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
-// CHECK-x86_64-WIN-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="none"{{.*}}
-// CHECK-x86_64-WIN-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="none" {{.*}}"target-cpu"
+// CHECK-x86_64-WIN-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}
+// CHECK-x86_64-WIN-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"target-cpu"
 
 // CHECK-armv7-SYSV-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
 // CHECK-armv7-SYSV-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"

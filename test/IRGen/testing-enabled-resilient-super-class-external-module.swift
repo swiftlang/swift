@@ -9,6 +9,8 @@
 // RUN: %target-run %t/main %t/%target-library-name(FrameworkA) %t/%target-library-name(FrameworkB) | %FileCheck --check-prefix=EXEC-CHECK %s
 
 // REQUIRES: executable_test
+// WebAssembly does not have stable dynamic linking ABI yet
+// UNSUPPORTED: CPU=wasm32
 
 @testable import FrameworkB
 

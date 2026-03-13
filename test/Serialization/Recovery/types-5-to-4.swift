@@ -16,8 +16,8 @@ import Lib
 func requiresConformance(_: B_RequiresConformance<B_ConformsToProto>) {}
 func requiresConformance(_: B_RequiresConformance<C_RelyOnConformanceImpl.Assoc>) {}
 
-class Sub: Base {} // expected-error {{cannot inherit from class 'Base' (compiled with Swift 5.9) because it has overridable members that could not be loaded in Swift 4.1.50}}
-class Impl: Proto {} // expected-error {{type 'Impl' cannot conform to protocol 'Proto' (compiled with Swift 5.9) because it has requirements that could not be loaded in Swift 4.1.50}}
+class Sub: Base {} // expected-error {{cannot inherit from class 'Base' (compiled with Swift 5.10) because it has overridable members that could not be loaded in Swift 4.1.50}}
+class Impl: Proto {} // expected-error {{type 'Impl' cannot conform to protocol 'Proto' (compiled with Swift 5.10) because it has requirements that could not be loaded in Swift 4.1.50}}
 
 #else // TEST
 
@@ -42,7 +42,7 @@ public func A_renameAllTheThings(
 // CHECK-SAME: c: RenamedTypedef
 // CHECK-SAME: d: RenamedStruct
 // CHECK-SAME: e: RenamedEnum
-// CHECK-SAME: f: RenamedProtocol
+// CHECK-SAME: f: any RenamedProtocol
 // CHECK-SAME: g: RenamedWrappedTypedef
 // CHECK-SAME: )
 

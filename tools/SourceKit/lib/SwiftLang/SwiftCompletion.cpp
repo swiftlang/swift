@@ -101,8 +101,8 @@ static void swiftCodeCompleteImpl(
   CompletionContext.setAnnotateResult(opts.annotatedDescription);
   CompletionContext.setIncludeObjectLiterals(opts.includeObjectLiterals);
   CompletionContext.setAddInitsToTopLevel(opts.addInitsToTopLevel);
-  CompletionContext.setCallPatternHeuristics(opts.callPatternHeuristics);
   CompletionContext.setAddCallWithNoDefaultArgs(opts.addCallWithNoDefaultArgs);
+  CompletionContext.setVerifyUSRToDecl(opts.verifyUSRToDecl);
 
   Lang.performWithParamsToCompletionLikeOperation(
       UnresolvedInputFile, Offset, /*InsertCodeCompletionToken=*/true, Args,
@@ -191,7 +191,7 @@ deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
 void SwiftLangSupport::codeComplete(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     OptionsDictionary *options, SourceKit::CodeCompletionConsumer &SKConsumer,
-    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+    ArrayRef<const char *> Args, std::optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken) {
 
   CodeCompletion::Options CCOpts;
@@ -206,7 +206,8 @@ void SwiftLangSupport::codeComplete(
   std::string error;
   // FIXME: the use of None as primary file is to match the fact we do not read
   // the document contents using the editor documents infrastructure.
-  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/None, error);
+  auto fileSystem =
+      getFileSystem(vfsOptions, /*primaryFile=*/std::nullopt, error);
   if (!fileSystem) {
     return SKConsumer.failed(error);
   }
@@ -721,7 +722,6 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyAddInnerResults("key.codecomplete.addinnerresults");
   static UIdent KeyAddInnerOperators("key.codecomplete.addinneroperators");
   static UIdent KeyAddInitsToTopLevel("key.codecomplete.addinitstotoplevel");
-  static UIdent KeyCallPatternHeuristics("key.codecomplete.callpatternheuristics");
   static UIdent KeyFuzzyMatching("key.codecomplete.fuzzymatching");
   static UIdent KeyTopNonLiteral("key.codecomplete.showtopnonliteralresults");
   static UIdent KeyContextWeight("key.codecomplete.sort.contextweight");
@@ -729,6 +729,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyPopularityBonus("key.codecomplete.sort.popularitybonus");
   static UIdent KeyAnnotatedDescription("key.codecomplete.annotateddescription");
   static UIdent KeyIncludeObjectLiterals("key.codecomplete.includeobjectliterals");
+  static UIdent KeyVerifyUSRToDecl("key.codecomplete.verifyusrtodecl");
 
   from.valueForOption(KeySortByName, to.sortByName);
   from.valueForOption(KeyUseImportDepth, to.useImportDepth);
@@ -746,7 +747,6 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   from.valueForOption(KeyAddInnerResults, to.addInnerResults);
   from.valueForOption(KeyAddInnerOperators, to.addInnerOperators);
   from.valueForOption(KeyAddInitsToTopLevel, to.addInitsToTopLevel);
-  from.valueForOption(KeyCallPatternHeuristics, to.callPatternHeuristics);
   from.valueForOption(KeyFuzzyMatching, to.fuzzyMatching);
   from.valueForOption(KeyContextWeight, to.semanticContextWeight);
   from.valueForOption(KeyFuzzyWeight, to.fuzzyMatchWeight);
@@ -755,6 +755,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   from.valueForOption(KeyTopNonLiteral, to.showTopNonLiteralResults);
   from.valueForOption(KeyAnnotatedDescription, to.annotatedDescription);
   from.valueForOption(KeyIncludeObjectLiterals, to.includeObjectLiterals);
+  from.valueForOption(KeyVerifyUSRToDecl, to.verifyUSRToDecl);
 }
 
 /// Canonicalize a name that is in the format of a reference to a function into
@@ -911,17 +912,16 @@ static void transformAndForwardResults(
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
             innerSink.swiftSink, CodeCompletionResultKind::BuiltinOperator,
             completionString, CodeCompletionOperatorKind::None,
-            /*IsAsync=*/false,
             /*BriefDocComment=*/"", CodeCompletionResultType::notApplicable(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None,
             /*DiagnosticMessage=*/"");
     auto *paren = new (innerSink.allocator) CodeCompletion::SwiftResult(
-        *contextFreeResult, SemanticContextKind::CurrentNominal,
+        *contextFreeResult, /*DeclOrCtx=*/nullptr,
+        SemanticContextKind::CurrentNominal,
         CodeCompletionFlairBit::ExpressionSpecific,
         exactMatch ? exactMatch->getNumBytesToErase() : 0,
-        /*TypeContext=*/nullptr, /*DC=*/nullptr, /*USRTypeContext=*/nullptr,
-        /*CanCurrDeclContextHandleAsync=*/false,
+        CodeCompletionResultTypeRelation::Unrelated,
         ContextualNotRecommendedReason::None);
 
     SwiftCompletionInfo info;
@@ -1096,14 +1096,13 @@ void SwiftLangSupport::codeCompleteOpen(
     StringRef name, llvm::MemoryBuffer *inputBuf, unsigned offset,
     OptionsDictionary *options, ArrayRef<FilterRule> rawFilterRules,
     GroupedCodeCompletionConsumer &consumer, ArrayRef<const char *> args,
-    Optional<VFSOptions> vfsOptions,
+    std::optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken) {
   StringRef filterText;
   unsigned resultOffset = 0;
   unsigned maxResults = 0;
   CodeCompletion::Options CCOpts;
   // Enable "call pattern heuristics" by default for this API.
-  CCOpts.callPatternHeuristics = true;
   if (options)
     translateCodeCompletionOptions(*options, CCOpts, filterText, resultOffset,
                                    maxResults);
@@ -1112,7 +1111,7 @@ void SwiftLangSupport::codeCompleteOpen(
   // FIXME: the use of None as primary file is to match the fact we do not read
   // the document contents using the editor documents infrastructure.
   auto fileSystem =
-      getFileSystem(vfsOptions, /*primaryFile=*/None, fileSystemError);
+      getFileSystem(vfsOptions, /*primaryFile=*/std::nullopt, fileSystemError);
   if (!fileSystem)
     return consumer.failed(fileSystemError);
 

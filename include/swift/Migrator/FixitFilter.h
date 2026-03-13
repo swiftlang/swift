@@ -18,6 +18,7 @@
 #define SWIFT_MIGRATOR_FIXITFILTER_H
 
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 
 namespace swift {
@@ -80,13 +81,6 @@ struct FixitFilter {
     if (Info.ID == diag::could_not_find_enum_case.ID)
       return false;
 
-    // Sema suggests adding both `@objc` and `@nonobjc` as alternative fix-its
-    // for inferring Swift-3 style @objc visibility, but we don't want the
-    // migrator to suggest `@nonobjc`.
-    if (Info.ID == diag::objc_inference_swift3_addnonobjc.ID) {
-      return false;
-    }
-
     // With SE-110, the migrator may get a recommendation to add a Void
     // placeholder in the call to f in:
     // func foo(f: (Void) -> ()) {
@@ -132,10 +126,6 @@ struct FixitFilter {
         Info.ID == diag::deprecated_any_composition.ID ||
         Info.ID == diag::deprecated_operator_body.ID ||
         Info.ID == diag::unbound_generic_parameter_explicit_fix.ID ||
-        Info.ID == diag::objc_inference_swift3_addobjc.ID ||
-        Info.ID == diag::objc_inference_swift3_dynamic.ID ||
-        Info.ID == diag::override_swift3_objc_inference.ID ||
-        Info.ID == diag::objc_inference_swift3_objc_derived.ID ||
         Info.ID == diag::missing_several_cases.ID ||
         Info.ID == diag::missing_particular_case.ID ||
         Info.ID == diag::missing_unknown_case.ID ||

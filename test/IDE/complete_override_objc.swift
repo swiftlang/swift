@@ -27,13 +27,10 @@ class Sub : FooClassBase {
 // CHECK1: Decl[StaticMethod]/Super:           override class func _internalMeth1() -> Any! {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func _internalMeth1() -> Any! {|}
 // CHECK1: Decl[Constructor]/Super:            override init!() {|}
-// CHECK1: End completions
 
 class Sub : FooClassDerived {
   var #^PROPERTY^#
 }
-// PROPERTY: Begin completions
 // PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty1: Int32;
 // PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty2: Int32;
 // PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty3: Int32;
-// PROPERTY: End completions

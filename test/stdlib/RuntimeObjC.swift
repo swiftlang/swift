@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
-// RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o %s -o %t.out -Xfrontend -disable-deserialization-safety
+// RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o %s -o %t.out -Xfrontend -disable-deserialization-safety -lswiftCoreGraphics
 // RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
@@ -170,6 +170,11 @@ func withSwiftObjectCanary<T>(
   }
   expectEqual(0, swiftObjectCanaryCount, stackTrace: stackTrace)
 }
+
+// Hack to ensure the CustomReflectable conformance is used directly by the test
+// in case it comes from a library that would otherwise not be autolinked.
+@inline(never)
+func assertCustomReflectable<T: CustomReflectable>(_ t: T) {}
 
 var Runtime = TestSuite("Runtime")
 
@@ -614,7 +619,9 @@ Reflection.test("MetatypeMirror") {
 
 Reflection.test("CGPoint") {
   var output = ""
-  dump(CGPoint(x: 1.25, y: 2.75), to: &output)
+  let point = CGPoint(x: 1.25, y: 2.75)
+  assertCustomReflectable(point)
+  dump(point, to: &output)
 
   let expected =
     "▿ (1.25, 2.75)\n" +
@@ -626,7 +633,9 @@ Reflection.test("CGPoint") {
 
 Reflection.test("CGSize") {
   var output = ""
-  dump(CGSize(width: 1.25, height: 2.75), to: &output)
+  let size = CGSize(width: 1.25, height: 2.75)
+  assertCustomReflectable(size)
+  dump(size, to: &output)
 
   let expected =
     "▿ (1.25, 2.75)\n" +
@@ -638,11 +647,11 @@ Reflection.test("CGSize") {
 
 Reflection.test("CGRect") {
   var output = ""
-  dump(
-    CGRect(
-      origin: CGPoint(x: 1.25, y: 2.25),
-      size: CGSize(width: 10.25, height: 11.75)),
-    to: &output)
+  let rect = CGRect(
+    origin: CGPoint(x: 1.25, y: 2.25),
+    size: CGSize(width: 10.25, height: 11.75))
+  assertCustomReflectable(rect)
+  dump(rect, to: &output)
 
   let expected =
     "▿ (1.25, 2.25, 10.25, 11.75)\n" +
@@ -738,6 +747,7 @@ Reflection.test("Name of metatype of artificial subclass") {
   expectEqual("\(type(of: obj))", "TestArtificialSubclass")
   expectEqual(String(describing: type(of: obj)), "TestArtificialSubclass")
   expectEqual(String(reflecting: type(of: obj)), "a.TestArtificialSubclass")
+  expectTrue(String(reflecting: obj).starts(with: "<a.TestArtificialSubclass: "))
 
   // Trigger the creation of a KVO subclass for TestArtificialSubclass.
   obj.addObserver(obj, forKeyPath: "foo", options: [.new], context: &KVOHandle)
@@ -749,6 +759,37 @@ Reflection.test("Name of metatype of artificial subclass") {
   expectEqual("\(type(of: obj))", "TestArtificialSubclass")
   expectEqual(String(describing: type(of: obj)), "TestArtificialSubclass")
   expectEqual(String(reflecting: type(of: obj)), "a.TestArtificialSubclass")
+  expectTrue(String(reflecting: obj).starts(with: "<a.TestArtificialSubclass: "))
+}
+
+Reflection.test("Name of ObjC class") {
+  let obj = NSObject()
+  let klass: AnyClass = object_getClass(obj)!
+  expectEqual("NSObject", String(describing: klass))
+  expectEqual("NSObject", String(reflecting: klass))
+  expectEqual("NSObject", _typeName(klass))
+  expectTrue(String(describing: obj).starts(with: "<NSObject: "))
+  expectTrue(String(reflecting: obj).starts(with: "<NSObject: "))
+}
+
+Reflection.test("Name of runtime subclass")
+.require(.stdlib_6_4).code {
+  let klass: AnyClass = objc_allocateClassPair(TestArtificialSubclass.self, "RuntimeSubclass", 0)!
+  objc_registerClassPair(klass)
+  let obj = class_createInstance(klass, 0) as! NSObject
+
+  expectEqual("RuntimeSubclass", String(describing: klass))
+  expectEqual("RuntimeSubclass", String(reflecting: klass))
+  expectTrue(String(describing: obj).starts(with: "<RuntimeSubclass: "))
+  expectTrue(String(reflecting: obj).starts(with: "<RuntimeSubclass: "))
+
+  obj.addObserver(obj, forKeyPath: "foo", options: [.new], context: &KVOHandle)
+  expectTrue(String(describing: obj).starts(with: "<RuntimeSubclass: "))
+  expectTrue(String(reflecting: obj).starts(with: "<RuntimeSubclass: "))
+  obj.removeObserver(obj, forKeyPath: "foo")
+
+  expectTrue(String(describing: obj).starts(with: "<RuntimeSubclass: "))
+  expectTrue(String(reflecting: obj).starts(with: "<RuntimeSubclass: "))
 }
 
 @objc class StringConvertibleInDebugAndOtherwise_Native : NSObject {

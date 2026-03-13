@@ -15,6 +15,7 @@
 // __gnu_h2f_ieee
 // __gnu_f2h_ieee
 // __truncdfhf2
+// __extendhfxf2
 //
 // On Darwin platforms, these are provided by the host compiler-rt, but we
 // can't depend on that everywhere, so we have to provide them in the Swift
@@ -30,7 +31,7 @@
 // Android NDK <r21 do not provide `__aeabi_d2h` in the compiler runtime,
 // provide shims in that case.
 #if (defined(__ANDROID__) && defined(__ARM_ARCH_7A__) && defined(__ARM_EABI__)) || \
-  ((defined(__i386__) || defined(__i686__) || defined(__x86_64__)) && !defined(__APPLE__))
+  ((defined(__i386__) || defined(__i686__) || defined(__arm__) || defined(__x86_64__)) && !defined(__APPLE__))
 
 #include "swift/shims/Visibility.h"
 
@@ -48,6 +49,20 @@ static float fromEncoding(unsigned int e) {
   return f;
 }
 
+static unsigned short toEncoding(_Float16 f) {
+  unsigned short s;
+  static_assert(sizeof s == sizeof f, "_Float16 and short must have the same size");
+  __builtin_memcpy(&s, &f, sizeof f);
+  return s;
+}
+
+static _Float16 fromEncoding(unsigned short s) {
+  _Float16 f;
+  static_assert(sizeof s == sizeof f, "_Float16 and short must have the same size");
+  __builtin_memcpy(&f, &s, sizeof f);
+  return f;
+}
+
 #if defined(__x86_64__) && defined(__F16C__)
 
 // If we're compiling the runtime for a target that has the conversion
@@ -56,11 +71,11 @@ static float fromEncoding(unsigned int e) {
 // but who knows what could go wrong, and they're tiny functions.
 # include <immintrin.h>
 
-SWIFT_RUNTIME_EXPORT float __gnu_h2f_ieee(short h) {
+SWIFT_RUNTIME_EXPORT float __gnu_h2f_ieee(unsigned short h) {
   return _mm_cvtss_f32(_mm_cvtph_ps(_mm_set_epi64x(0,h)));
 }
 
-SWIFT_RUNTIME_EXPORT short __gnu_f2h_ieee(float f) {
+SWIFT_RUNTIME_EXPORT unsigned short __gnu_f2h_ieee(float f) {
   return (unsigned short)_mm_cvtsi128_si32(
     _mm_cvtps_ph(_mm_set_ss(f), _MM_FROUND_CUR_DIRECTION)
   );
@@ -125,7 +140,7 @@ SWIFT_RUNTIME_EXPORT unsigned short __gnu_f2h_ieee(float f) {
 //
 // Note that F16C doesn't provide this operation, so we still need a software
 // implementation on those cores.
-SWIFT_RUNTIME_EXPORT unsigned short __truncdfhf2(double d) {
+SWIFT_RUNTIME_EXPORT _Float16 __truncdfhf2(double d) {
   // You can't just do (half)(float)x, because that makes the result
   // susceptible to double-rounding. Instead we need to make the first
   // rounding use round-to-odd, but that doesn't exist on x86, so we have
@@ -147,7 +162,30 @@ SWIFT_RUNTIME_EXPORT unsigned short __truncdfhf2(double d) {
     if (fabs < dabs) e |= 1;
     f = fromEncoding(e);
   }
-  return __gnu_f2h_ieee(f);
+  return fromEncoding(__gnu_f2h_ieee(f));
+}
+
+// Convert from Float16 to long double.
+//
+// Since Float32 covers the entire range
+// of Float16 values and since we already know how to convert Float32 to long
+// double (which, at least on x86, doesn't involve function calls), we just
+// let the compiler do the latter part for us.
+//
+// There's no risk of rounding problems from the double conversion, because
+// we're extending.
+SWIFT_RUNTIME_EXPORT long double __extendhfxf2(_Float16 h) {
+  return __gnu_h2f_ieee(toEncoding(h));
+}
+
+// This is just an alternative name for __gnu_h2f_ieee
+SWIFT_RUNTIME_EXPORT float __extendhfsf2(_Float16 h) {
+  return __gnu_h2f_ieee(toEncoding(h));
+}
+
+// Same again but for __gnu_f2h_ieee
+SWIFT_RUNTIME_EXPORT _Float16 __truncsfhf2(float f) {
+  return fromEncoding(__gnu_f2h_ieee(f));
 }
 
 #if defined(__ARM_EABI__)

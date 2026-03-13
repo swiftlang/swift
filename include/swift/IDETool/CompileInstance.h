@@ -25,13 +25,15 @@ namespace swift {
 
 class CompilerInstance;
 class DiagnosticConsumer;
+class PluginRegistry;
 
 namespace ide {
 
 /// Manages \c CompilerInstance for completion like operations.
 class CompileInstance {
+  const std::string &SwiftExecutablePath;
   const std::string &RuntimeResourcePath;
-  const std::string &DiagnosticDocumentationPath;
+  const std::shared_ptr<swift::PluginRegistry> Plugins;
 
   struct Options {
     unsigned MaxASTReuseCount = 100;
@@ -65,10 +67,11 @@ class CompileInstance {
                    std::shared_ptr<std::atomic<bool>> CancellationFlag);
 
 public:
-  CompileInstance(const std::string &RuntimeResourcePath,
-                  const std::string &DiagnosticDocumentationPath)
-      : RuntimeResourcePath(RuntimeResourcePath),
-        DiagnosticDocumentationPath(DiagnosticDocumentationPath),
+  CompileInstance(const std::string &SwiftExecutablePath,
+                  const std::string &RuntimeResourcePath,
+                  std::shared_ptr<swift::PluginRegistry> Plugins = nullptr)
+      : SwiftExecutablePath(SwiftExecutablePath),
+        RuntimeResourcePath(RuntimeResourcePath), Plugins(Plugins),
         CachedCIInvalidated(false), CachedReuseCount(0) {}
 
   /// NOTE: \p Args is only used for checking the equaity of the invocation.

@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -Xllvm -sil-print-types -emit-sil -O %s | %FileCheck %s
 // REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
+// REQUIRES: swift_in_compiler
 
 import Swift
 
@@ -116,4 +117,96 @@ public func testWithMemoryRebound<T, Result>(
     Builtin.rebindMemory(rawPtr, binding)
   }
   return try body(.init(rawPtr))
+}
+
+@_silgen_name("takeRawPointer")
+func takeRawPointer(_: UnsafeRawPointer)
+
+@_silgen_name("takeObjectPointer")
+func takeObjectPointer(_: UnsafePointer<AnyObject>)
+
+@_silgen_name("takeStringPointer")
+func takeStringPointer(_: UnsafePointer<String>)
+
+@_silgen_name("takeDictionaryPointer")
+func takeDictionaryPointer(_: UnsafePointer<Dictionary<Int, Int>>)
+
+// Test conversion of a dictionary to a raw pointer. This is not a sound
+// conversion, but the compiler must still generate memory-safe code.
+//
+// A dictionary is an eager-move type, so it will be destroyed at its
+// last use. An address_to_pointer operation escapes the pointer, so
+// the compiler never sees those pointer uses. The pointer's scope
+// must be protected by a fix_lifetime.
+//
+// NOTE: If this test triggers a compiler error because of the unsafe
+// inout conversion, then we have arrived at a better world. Delete
+// the test. The eagerMoveToPointer test below is sufficient.
+//
+// CHECK-LABEL: sil [stack_protection] @$s18pointer_conversion22dictionaryToRawPointeryyF : $@convention(thin) () -> () {
+// CHECK: [[A:%.*]] = alloc_stack [var_decl] $Dictionary<Int, Int>, var, name "d"
+// CHECK: [[PTR:%.*]] = address_to_pointer [stack_protection] [[A]] : $*Dictionary<Int, Int> to $Builtin.RawPointer
+// CHECK: [[UP:%.*]] = struct $UnsafeRawPointer ([[PTR]] : $Builtin.RawPointer)
+// CHECK: apply %{{.*}}([[UP]]) : $@convention(thin) (UnsafeRawPointer) -> ()
+// CHECK: [[D:%.*]] = load %0 : $*Dictionary<Int, Int>
+// CHECK: fix_lifetime [[D]] : $Dictionary<Int, Int>
+// CHECK: release_value [[D]] : $Dictionary<Int, Int>
+// CHECK: dealloc_stack [[A]] : $*Dictionary<Int, Int>
+// CHECK-LABEL: } // end sil function '$s18pointer_conversion22dictionaryToRawPointeryyF'
+public func dictionaryToRawPointer() {
+  var d = [1:1]
+  takeRawPointer(&d)
+}
+
+// Test conversion of a non-trivial eager-move type to a raw pointer.
+// This currently only applies to Dictionary, but converting a
+// dictionary to a pointer will likely be a compiler error in the
+// future. So force an eagerMove type here.
+//
+// An eager-move type will be destroyed at its last use. An
+// address_to_pointer operation escapes the pointer, so the compiler
+// never sees those pointer uses. The pointer's scope must be
+// protected by a fix_lifetime.
+// CHECK-LABEL: sil [stack_protection] @$s18pointer_conversion18eagerMoveToPointer1oyyXln_tF : $@convention(thin) (@owned AnyObject) -> () {
+// CHECK: [[A:%.*]] = alloc_stack [var_decl] [moveable_value_debuginfo] $AnyObject, var, name "o"
+// CHECK: [[PTR:%.*]] = address_to_pointer [stack_protection] [[A]] : $*AnyObject to $Builtin.RawPointer
+// CHECK: [[UP:%.*]] = struct $UnsafePointer<AnyObject> ([[PTR]] : $Builtin.RawPointer)
+// CHECK: apply %{{.*}}([[UP]]) : $@convention(thin) (UnsafePointer<AnyObject>) -> ()
+// CHECK: [[O:%.*]] = load [[A]] : $*AnyObject
+// CHECK: fix_lifetime [[O]] : $AnyObject
+// CHECK: strong_release [[O]] : $AnyObject
+// CHECK: dealloc_stack [[A]] : $*AnyObject
+// CHECK-LABEL: } // end sil function '$s18pointer_conversion18eagerMoveToPointer1oyyXln_tF'
+public func eagerMoveToPointer(@_eagerMove o: consuming AnyObject ) {
+  takeObjectPointer(&o)
+}
+
+// CHECK-LABEL: sil [stack_protection] @$s18pointer_conversion15stringToPointer2ssySS_tF : $@convention(thin) (@guaranteed String) -> () {
+// CHECK:   [[A:%.*]] = alloc_stack [var_decl] $String, var, name "s"
+// CHECK:   [[PTR:%.*]] = address_to_pointer [stack_protection] [[A]] : $*String to $Builtin.RawPointer
+// CHECK:   [[UP:%.*]] = struct $UnsafePointer<String> ([[PTR]] : $Builtin.RawPointer)
+// CHECK:   apply {{.*}}([[UP]]) : $@convention(thin) (UnsafePointer<String>) -> ()
+// CHECK:   [[S:%.*]] = load [[A]] : $*String
+// CHECK:   fix_lifetime [[S]] : $String
+// CHECK:   release_value [[S]] : $String
+// CHECK:   dealloc_stack [[A]] : $*String
+// CHECK-LABEL: } // end sil function '$s18pointer_conversion15stringToPointer2ssySS_tF'
+public func stringToPointer(ss: String) {
+  var s = ss
+  takeStringPointer(&s)
+}
+
+// CHECK-LABEL: sil [stack_protection] @$s18pointer_conversion19dictionaryToPointer2ddySDyS2iG_tF : $@convention(thin) (@guaranteed Dictionary<Int, Int>) -> () {
+// CHECK:   [[A:%.*]] = alloc_stack [var_decl] $Dictionary<Int, Int>, var, name "d"
+// CHECK:   [[PTR:%.*]] = address_to_pointer [stack_protection] [[A]] : $*Dictionary<Int, Int> to $Builtin.RawPointer
+// CHECK:   [[UP:%.*]] = struct $UnsafePointer<Dictionary<Int, Int>> ([[PTR]] : $Builtin.RawPointer)
+// CHECK:   apply %{{.*}}([[UP]]) : $@convention(thin) (UnsafePointer<Dictionary<Int, Int>>) -> ()
+// CHECK:   [[D:%.*]] = load [[A]] : $*Dictionary<Int, Int>
+// CHECK:   fix_lifetime [[D]] : $Dictionary<Int, Int>
+// CHECK:   release_value [[D]] : $Dictionary<Int, Int>
+// CHECK:   dealloc_stack [[A]] : $*Dictionary<Int, Int>
+// CHECK-LABEL: } // end sil function '$s18pointer_conversion19dictionaryToPointer2ddySDyS2iG_tF'
+public func dictionaryToPointer(dd: Dictionary<Int, Int>) {
+  var d = dd
+  takeDictionaryPointer(&d)
 }

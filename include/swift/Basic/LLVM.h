@@ -22,9 +22,7 @@
 // dependencies.
 // Casting.h has complex templates that cannot be easily forward declared.
 #include "llvm/Support/Casting.h"
-// None.h includes an enumerator that is desired & cannot be forward declared
-// without a definition of NoneType.
-#include "llvm/ADT/None.h"
+
 #if defined(__clang_major__) && __clang_major__ < 6
 // Add this header as a workaround to prevent `too few template arguments for
 // class template 'SmallVector'` on the buggy Clang 5 compiler (it doesn't
@@ -36,10 +34,10 @@
 
 // Don't pre-declare certain LLVM types in the runtime, which must
 // not put things in namespace llvm for ODR reasons.
-#if !defined(swiftCore_EXPORTS)
-#define SWIFT_LLVM_ODR_SAFE 1
-#else
+#if defined(SWIFT_RUNTIME)
 #define SWIFT_LLVM_ODR_SAFE 0
+#else
+#define SWIFT_LLVM_ODR_SAFE 1
 #endif
 
 // Forward declarations.
@@ -55,15 +53,12 @@ namespace llvm {
   template <typename T, unsigned N> class SmallVector;
 #endif
   template <unsigned N> class SmallString;
-  template <typename T, unsigned N> class SmallSetVector;
 #if SWIFT_LLVM_ODR_SAFE
   template<typename T> class ArrayRef;
   template<typename T> class MutableArrayRef;
 #endif
-  template<typename T> class TinyPtrVector;
-#if SWIFT_LLVM_ODR_SAFE
-  template<typename T> class Optional;
-#endif
+  template <typename T>
+  class TinyPtrVector;
   template <typename ...PTs> class PointerUnion;
   template <typename IteratorT> class iterator_range;
   class SmallBitVector;
@@ -93,15 +88,10 @@ namespace swift {
   using llvm::MutableArrayRef;
 #endif
   using llvm::iterator_range;
-  using llvm::None;
-#if SWIFT_LLVM_ODR_SAFE
-  using llvm::Optional;
-#endif
   using llvm::PointerUnion;
   using llvm::SmallBitVector;
   using llvm::SmallPtrSet;
   using llvm::SmallPtrSetImpl;
-  using llvm::SmallSetVector;
   using llvm::SmallString;
 #if SWIFT_LLVM_ODR_SAFE
   using llvm::SmallVector;
@@ -118,7 +108,6 @@ namespace swift {
 #if SWIFT_LLVM_ODR_SAFE
   using llvm::function_ref;
 #endif
-  using llvm::NoneType;
   using llvm::raw_ostream;
 } // end namespace swift
 

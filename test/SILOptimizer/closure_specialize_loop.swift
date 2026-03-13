@@ -1,4 +1,4 @@
-// RUN: %{python} %S/../Inputs/timeout.py 10 %target-swift-frontend -O -parse-as-library %s -emit-sil | %FileCheck %s
+// RUN: %{python} %S/../Inputs/timeout.py 20 %target-swift-frontend -O -parse-as-library %s -emit-sil | %FileCheck %s
 
 public func callit() {
     testit { false }

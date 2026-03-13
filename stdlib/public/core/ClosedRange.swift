@@ -70,6 +70,7 @@ public struct ClosedRange<Bound: Comparable> {
 
   // This works around _debugPrecondition() impacting the performance of
   // optimized code. (rdar://72246338)
+  @unsafe
   @_alwaysEmitIntoClient @inline(__always)
   internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
@@ -85,10 +86,13 @@ public struct ClosedRange<Bound: Comparable> {
   ///
   /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
   @inlinable
+  @unsafe
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     _debugPrecondition(bounds.lower <= bounds.upper,
       "ClosedRange requires lowerBound <= upperBound")
-    self.init(_uncheckedBounds: (lower: bounds.lower, upper: bounds.upper))
+    unsafe self.init(
+      _uncheckedBounds: (lower: bounds.lower, upper: bounds.upper)
+    )
   }
 }
 
@@ -108,7 +112,7 @@ extension ClosedRange: RangeExpression {
   @inlinable // trivial-implementation
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
-    return Range(
+    return unsafe Range(
       _uncheckedBounds: (
         lower: lowerBound,
         upper: collection.index(after: self.upperBound)))
@@ -125,6 +129,7 @@ extension ClosedRange: RangeExpression {
   /// - Returns: `true` if `element` is contained in the range; otherwise,
   ///   `false`.
   @inlinable
+  @inline(__always)
   public func contains(_ element: Bound) -> Bool {
     return element >= self.lowerBound && element <= self.upperBound
   }
@@ -324,6 +329,65 @@ where Bound: Strideable, Bound.Stride: SignedInteger
     // The first and last elements are the same because each element is unique.
     return _customIndexOfEquatableElement(element)
   }
+  
+  /// Returns a Boolean value indicating whether the given range is contained
+  /// within this closed range.
+  ///
+  /// The given range is contained within this closed range if the elements of
+  /// the range are all contained within this closed range.
+  ///
+  ///     let range = 0...10
+  ///     range.contains(5..<7)     // true
+  ///     range.contains(5..<10)    // true
+  ///     range.contains(5..<12)    // false
+  ///
+  ///     // Note that `5..<11` contains 5, 6, 7, 8, 9, and 10.
+  ///     range.contains(5..<11)    // true
+  ///
+  /// Additionally, passing any empty range as `other` results in the value
+  /// `true`, even if the empty range's bounds are outside the bounds of this
+  /// closed range.
+  ///
+  ///     range.contains(3..<3)     // true
+  ///     range.contains(20..<20)   // true
+  ///
+  /// - Parameter other: A range to check for containment within this closed
+  ///   range.
+  /// - Returns: `true` if `other` is empty or wholly contained within this
+  ///   closed range; otherwise, `false`.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func contains(_ other: Range<Bound>) -> Bool {
+    if other.isEmpty { return true }
+    let otherInclusiveUpper = other.upperBound.advanced(by: -1)
+    return lowerBound <= other.lowerBound && upperBound >= otherInclusiveUpper
+  }
+}
+
+extension ClosedRange {
+  /// Returns a Boolean value indicating whether the given closed range is
+  /// contained within this closed range.
+  ///
+  /// The given closed range is contained within this range if its bounds are
+  /// contained within this closed range.
+  ///
+  ///     let range = 0...10
+  ///     range.contains(2...5)        // true
+  ///     range.contains(2...10)       // true
+  ///     range.contains(2...12)       // false
+  ///
+  /// - Parameter other: A closed range to check for containment within this
+  ///   closed range.
+  /// - Returns: `true` if `other` is wholly contained within this closed range;
+  ///   otherwise, `false`.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func contains(_ other: ClosedRange<Bound>) -> Bool {
+    lowerBound <= other.lowerBound && upperBound >= other.upperBound
+  }
 }
 
 extension Comparable {  
@@ -346,7 +410,7 @@ extension Comparable {
   public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
     _precondition(
       minimum <= maximum, "Range requires lowerBound <= upperBound")
-    return ClosedRange(_uncheckedBounds: (lower: minimum, upper: maximum))
+    return unsafe ClosedRange(_uncheckedBounds: (lower: minimum, upper: maximum))
   }
 }
 
@@ -380,6 +444,7 @@ extension ClosedRange: Hashable where Bound: Hashable {
   }
 }
 
+@_unavailableInEmbedded
 extension ClosedRange: CustomStringConvertible {
   /// A textual representation of the range.
   @inlinable // trivial-implementation...
@@ -388,6 +453,7 @@ extension ClosedRange: CustomStringConvertible {
   }
 }
 
+@_unavailableInEmbedded
 extension ClosedRange: CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
   public var debugDescription: String {
@@ -435,7 +501,7 @@ extension ClosedRange {
       limits.upperBound < self.upperBound ? limits.upperBound
           : limits.lowerBound > self.upperBound ? limits.lowerBound
           : self.upperBound
-    return ClosedRange(_uncheckedBounds: (lower: lower, upper: upper))
+    return unsafe ClosedRange(_uncheckedBounds: (lower: lower, upper: upper))
   }
 }
 
@@ -451,11 +517,25 @@ extension ClosedRange where Bound: Strideable, Bound.Stride: SignedInteger {
   public init(_ other: Range<Bound>) {
     _precondition(!other.isEmpty, "Can't form an empty closed range")
     let upperBound = other.upperBound.advanced(by: -1)
-    self.init(_uncheckedBounds: (lower: other.lowerBound, upper: upperBound))
+    unsafe self.init(
+      _uncheckedBounds: (lower: other.lowerBound, upper: upperBound)
+    )
   }
 }
 
 extension ClosedRange {
+  /// Returns a Boolean value indicating whether this range and the given closed
+  /// range contain an element in common.
+  ///
+  /// This example shows two overlapping ranges:
+  ///
+  ///     let x: Range = 0...20
+  ///     print(x.overlaps(10...1000))
+  ///     // Prints "true"
+  ///
+  /// - Parameter other: A range to check for elements in common.
+  /// - Returns: `true` if this range and `other` have at least one element in
+  ///   common; otherwise, `false`.
   @inlinable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
     // Disjoint iff the other range is completely before or after our range.
@@ -466,6 +546,25 @@ extension ClosedRange {
     return !isDisjoint
   }
 
+  /// Returns a Boolean value indicating whether this range and the given range
+  /// contain an element in common.
+  ///
+  /// This example shows two overlapping ranges:
+  ///
+  ///     let x: Range = 0...20
+  ///     print(x.overlaps(10..<1000))
+  ///     // Prints "true"
+  ///
+  /// Because a closed range includes its upper bound, the ranges in the
+  /// following example overlap:
+  ///
+  ///     let y = 20..<30
+  ///     print(x.overlaps(y))
+  ///     // Prints "true"
+  ///
+  /// - Parameter other: A range to check for elements in common.
+  /// - Returns: `true` if this range and `other` have at least one element in
+  ///   common; otherwise, `false`.
   @inlinable
   public func overlaps(_ other: Range<Bound>) -> Bool {
     return other.overlaps(self)
@@ -477,6 +576,7 @@ extension ClosedRange {
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
   where Bound.Stride: SignedInteger
 
+@_unavailableInEmbedded
 extension ClosedRange: Decodable where Bound: Decodable {
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
@@ -488,10 +588,11 @@ extension ClosedRange: Decodable where Bound: Decodable {
           codingPath: decoder.codingPath,
           debugDescription: "Cannot initialize \(ClosedRange.self) with a lowerBound (\(lowerBound)) greater than upperBound (\(upperBound))"))
     }
-    self.init(_uncheckedBounds: (lower: lowerBound, upper: upperBound))
+    unsafe self.init(_uncheckedBounds: (lower: lowerBound, upper: upperBound))
   }
 }
 
+@_unavailableInEmbedded
 extension ClosedRange: Encodable where Bound: Encodable {
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()

@@ -7,8 +7,10 @@
 let i: Int = "Hello"
 #endif
 
-#if arch(i386) && os(watchOS) && _runtime(_ObjC) && _endian(little)
+#if arch(i386) && os(watchOS) && _runtime(_ObjC) && _endian(little) && _pointerBitWidth(_32)
+#if _hasAtomicBitWidth(_8) && _hasAtomicBitWidth(_16) && _hasAtomicBitWidth(_32) && _hasAtomicBitWidth(_64)
 class C {}
 var x = C()
+#endif
 #endif
 var y = x

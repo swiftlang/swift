@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 /// Devirtualizes release instructions which are known to destruct the object.
@@ -30,135 +31,194 @@ import SIL
 /// The optimization is only done for stack promoted objects because they are
 /// known to have no associated objects (which are not explicitly released
 /// in the deinit method).
-let releaseDevirtualizerPass = FunctionPass(
-  name: "release-devirtualizer", { function, context in
-    for block in function.blocks {
-      // The last `release_value`` or `strong_release`` instruction before the
-      // deallocation.
-      var lastRelease: RefCountingInst?
+let releaseDevirtualizerPass = FunctionPass(name: "release-devirtualizer") {
+  (function: Function, context: FunctionPassContext) in
 
-      for instruction in block.instructions {
-        if let release = lastRelease {
-          // We only do the optimization for stack promoted object, because for
-          // these we know that they don't have associated objects, which are
-          // _not_ released by the deinit method.
-          if let deallocStackRef = instruction as? DeallocStackRefInst {
-            if !context.continueWithNextSubpassRun(for: release) {
-              return
-            }
-            tryDevirtualizeReleaseOfObject(context, release, deallocStackRef)
-            lastRelease = nil
-            continue
-          }
-        }
-
-        switch instruction {
-          case is ReleaseValueInst, is StrongReleaseInst:
-            lastRelease = instruction as? RefCountingInst
-          case is DeallocRefInst, is SetDeallocatingInst:
-            lastRelease = nil
-          default:
-            if instruction.mayRelease {
-              lastRelease = nil
-            }
-        }
+  for inst in function.instructions {
+    if let dealloc = inst as? DeallocStackRefInst {
+      if !context.continueWithNextSubpassRun(for: dealloc) {
+        return
       }
+      tryDevirtualizeRelease(of: dealloc, context)
     }
   }
-)
+}
 
-/// Tries to de-virtualize the final release of a stack-promoted object.
-private func tryDevirtualizeReleaseOfObject(
-  _ context: FunctionPassContext,
-  _ release: RefCountingInst,
-  _ deallocStackRef: DeallocStackRefInst
-) {
-  let allocRefInstruction = deallocStackRef.allocRef
-
-  // Check if the release instruction right before the `dealloc_stack_ref` really releases
-  // the allocated object (and not something else).
-  var finder = FindAllocationOfRelease(allocation: allocRefInstruction)
-  if !finder.allocationIsRoot(of: release.operand) {
+private func tryDevirtualizeRelease(of dealloc: DeallocStackRefInst, _ context: FunctionPassContext) {
+  guard let (lastRelease, pathToRelease) = findLastRelease(of: dealloc, context) else {
     return
   }
 
-  let type = allocRefInstruction.type
+  if !pathToRelease.isMaterializable {
+    return
+  }
+
+  let allocRef = dealloc.allocRef
+  var upWalker = FindAllocationWalker(allocation: allocRef)
+  if upWalker.walkUp(value: lastRelease.operand.value, path: pathToRelease) == .abortWalk {
+    return
+  }
+
+  let type = allocRef.type
 
   guard let dealloc = context.calleeAnalysis.getDestructor(ofExactType: type) else {
     return
   }
 
-  let builder = Builder(before: release, location: release.location, context)
+  let builder = Builder(before: lastRelease, location: lastRelease.location, context)
 
-  var object: Value = allocRefInstruction
+  var object = lastRelease.operand.value.createProjection(path: pathToRelease, builder: builder)
   if object.type != type {
-    object = builder.createUncheckedRefCast(object: object, type: type)
+    object = builder.createUncheckedRefCast(from: object, to: type)
   }
 
   // Do what a release would do before calling the deallocator: set the object
   // in deallocating state, which means set the RC_DEALLOCATING_FLAG flag.
-  builder.createSetDeallocating(operand: object, isAtomic: release.isAtomic)
+  let beginDealloc = builder.createBeginDeallocRef(reference: object, allocation: allocRef)
 
   // Create the call to the destructor with the allocated object as self
   // argument.
   let functionRef = builder.createFunctionRef(dealloc)
 
-  let substitutionMap = context.getContextSubstitutionMap(for: type)
-  builder.createApply(function: functionRef, substitutionMap, arguments: [object])
-  context.erase(instruction: release)
+  let substitutionMap: SubstitutionMap
+  if dealloc.isGeneric {
+    substitutionMap = context.getContextSubstitutionMap(for: type)
+  } else {
+    // In embedded Swift, dealloc might be a specialized deinit, so the substitution map on the old apply isn't valid for the new apply
+    substitutionMap = SubstitutionMap()
+  }
+
+  builder.createApply(function: functionRef, substitutionMap, arguments: [beginDealloc])
+  context.erase(instruction: lastRelease)
 }
 
-// Up-walker to find the root of a release instruction.
-private struct FindAllocationOfRelease : ValueUseDefWalker {
-  private let allocInst: AllocRefInstBase
-  private var allocFound = false
+private func findLastRelease(
+  of dealloc: DeallocStackRefInst,
+  _ context: FunctionPassContext
+) -> (lastRelease: RefCountingInst, pathToRelease: SmallProjectionPath)? {
+  let allocRef = dealloc.allocRef
 
-  var walkUpCache = WalkerCache<UnusedWalkingPath>()
-
-  init(allocation: AllocRefInstBase) { allocInst = allocation }
-
-  /// The top-level entry point: returns true if the root of `value` is the `allocInst`.
-  mutating func allocationIsRoot(of value: Value) -> Bool {
-    return walkUp(value: value, path: UnusedWalkingPath()) != .abortWalk &&
-           allocFound
-  }
-
-  mutating func rootDef(value: Value, path: UnusedWalkingPath) -> WalkResult {
-    if value == allocInst {
-      allocFound = true
-      return .continueWalk
+  // Search for the final release in the same basic block of the dealloc.
+  for instruction in ReverseInstructionList(first: dealloc.previous) {
+    switch instruction {
+    case let strongRelease as StrongReleaseInst:
+      if let pathToRelease = getPathToRelease(from: allocRef, to: strongRelease) {
+        return (strongRelease, pathToRelease)
+      }
+    case let releaseValue as ReleaseValueInst:
+      if releaseValue.value.type.containsSingleReference(in: dealloc.parentFunction) {
+        if let pathToRelease = getPathToRelease(from: allocRef, to: releaseValue) {
+          return (releaseValue, pathToRelease)
+        }
+      }
+    case is BeginDeallocRefInst, is DeallocRefInst:
+      // Check if the last release was already de-virtualized.
+      if allocRef.escapes(to: instruction, context) {
+        return nil
+      }
+    default:
+      break
     }
-    return .abortWalk
+    if instruction.mayRelease && allocRef.escapes(to: instruction, context) {
+      // This instruction may release the allocRef, which means that any release we find
+      // earlier in the block is not guaranteed to be the final release.
+      return nil
+    }
+  }
+  return nil
+}
+
+// If the release is a release_value it might release a struct which _contains_ the allocated object.
+// Return a projection path to the contained object in this case.
+private func getPathToRelease(from allocRef: AllocRefInstBase, to release: RefCountingInst) -> SmallProjectionPath? {
+  var downWalker = FindReleaseWalker(release: release)
+  if downWalker.walkDownUses(ofValue: allocRef, path: SmallProjectionPath()) == .continueWalk {
+    return downWalker.result
+  }
+  return nil
+}
+
+private struct FindReleaseWalker : ValueDefUseWalker {
+  private let release: RefCountingInst
+  private(set) var result: SmallProjectionPath? = nil
+
+  var walkDownCache = WalkerCache<SmallProjectionPath>()
+
+  init(release: RefCountingInst) {
+    self.release = release
   }
 
-  // This function is called for `struct` and `tuple` instructions in case the `path` doesn't select
-  // a specific operand but all operands.
-  mutating func walkUpAllOperands(of def: Instruction, path: UnusedWalkingPath) -> WalkResult {
-  
-    // Instead of walking up _all_ operands (which would be the default behavior), require that only a
-    // _single_ operand is not trivial and walk up that operand.
-    // We need to check this because the released value must not contain multiple copies of the
-    // allocated object. We can only replace a _single_ release with the destructor call and not
-    // multiple releases of the same object. E.g.
-    //
-    //    %x = alloc_ref [stack] $X
-    //    strong_retain %x
-    //    %t = tuple (%x, %x)
-    //    release_value %t       // -> releases %x two times!
-    //    dealloc_stack_ref %x
-    //
-    var nonTrivialOperandFound = false
-    for operand in def.operands {
-      if !operand.value.hasTrivialType {
-        if nonTrivialOperandFound {
-          return .abortWalk
-        }
-        nonTrivialOperandFound = true
-        if walkUp(value: operand.value, path: path) == .abortWalk {
-          return .abortWalk
-        }
+  mutating func leafUse(value: Operand, path: SmallProjectionPath) -> WalkResult {
+    if value.instruction == release {
+      if let existingResult = result {
+        result = existingResult.merge(with: path)
+      } else {
+        result = path
       }
     }
     return .continueWalk
+  }
+}
+
+private extension AllocRefInstBase {
+  func escapes(to instruction: Instruction, _ context: FunctionPassContext) -> Bool {
+    return self.isEscaping(using: EscapesToInstructionVisitor(target: instruction), context)
+  }
+}
+
+private struct EscapesToInstructionVisitor : EscapeVisitor {
+  let target: Instruction
+
+  mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+    if operand.instruction == target {
+      return .abort
+    }
+    return .continueWalk
+  }
+}
+
+// Up-walker to find the root of a release instruction.
+private struct FindAllocationWalker : ValueUseDefWalker {
+  private let allocInst: AllocRefInstBase
+
+  var walkUpCache = WalkerCache<SmallProjectionPath>()
+
+  init(allocation: AllocRefInstBase) { allocInst = allocation }
+
+  mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
+    return value == allocInst && path.isEmpty ? .continueWalk : .abortWalk
+  }
+}
+
+private extension Type {
+  func containsSingleReference(in function: Function) -> Bool {
+    if isClass {
+      return true
+    }
+    if isStruct {
+      return getNominalFields(in: function)?.containsSingleReference(in: function) ?? false
+    } else if isTuple {
+      return tupleElements.containsSingleReference(in: function)
+    } else {
+      return false
+    }
+  }
+}
+
+private extension Collection where Element == Type {
+  func containsSingleReference(in function: Function) -> Bool {
+    var nonTrivialFieldFound = false
+    for elementTy in self {
+      if !elementTy.isTrivial(in: function) {
+        if nonTrivialFieldFound {
+          return false
+        }
+        if !elementTy.containsSingleReference(in: function) {
+          return false
+        }
+        nonTrivialFieldFound = true
+      }
+    }
+    return nonTrivialFieldFound
   }
 }

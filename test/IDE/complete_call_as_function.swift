@@ -24,31 +24,28 @@ func testCallAsFunction(add: Adder, addTy: Adder.Type) {
 // INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   .callAsFunction({#x: Int#}, {#y: Int#})[#Int#];
 // INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ({#x: Int#}, {#y: Int#})[#Int#];
 // INSTANCE_NO_DOT-DAG: Keyword[self]/CurrNominal:          .self[#Adder#];
-// INSTANCE_NO_DOT: End completions
 
   let _ = add.#^INSTANCE_DOT^#;
 // INSTANCE_DOT: Begin completions, 2 items
 // INSTANCE_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   callAsFunction({#x: Int#}, {#y: Int#})[#Int#];
 // INSTANCE_DOT-DAG: Keyword[self]/CurrNominal:          self[#Adder#];
-// INSTANCE_DOT: End completions
 
   let _ = add(#^INSTANCE_PAREN^#)
 // INSTANCE_PAREN: Begin completions, 1 items
 // INSTANCE_PAREN-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#x: Int#}, {#y: Int#}[')'][#Int#];
-// INSTANCE_PAREN: End completions
 
   let _ = add(x: 12, #^INSTANCE_ARG2^#)
 // INSTANCE_ARG2: Begin completions, 1 items
 // INSTANCE_ARG2: Pattern/Local/Flair[ArgLabels]:               {#y: Int#}[#Int#];
-// INSTANCE_ARG2: End completions
 
   let _ = addTy#^METATYPE_NO_DOT^#;
-// METATYPE_NO_DOT: Begin completions, 3 items
+// METATYPE_NO_DOT: Begin completions, 5 items
 // METATYPE_NO_DOT-NOT: {#x: Int#}, {#y: Int#}
 // METATYPE_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   .callAsFunction({#(self): Adder#})[#(x: Int, y: Int) -> Int#];
 // METATYPE_NO_DOT-DAG: Decl[Constructor]/CurrNominal:      .init({#base: Int#})[#Adder#];
 // METATYPE_NO_DOT-DAG: Keyword[self]/CurrNominal:          .self[#Adder.Type#];
-// METATYPE_NO_DOT: End completions
+// METATYPE_NO_DOT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: != {#(any (~Copyable & ~Escapable).Type)?#}[#Bool#];
+// METATYPE_NO_DOT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: == {#(any (~Copyable & ~Escapable).Type)?#}[#Bool#];
 
   let _ = addTy.#^METATYPE_DOT^#;
 // METATYPE_DOT: Begin completions, 3 items
@@ -56,13 +53,10 @@ func testCallAsFunction(add: Adder, addTy: Adder.Type) {
 // METATYPE_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   callAsFunction({#(self): Adder#})[#(x: Int, y: Int) -> Int#];
 // METATYPE_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#base: Int#})[#Adder#];
 // METATYPE_DOT-DAG: Keyword[self]/CurrNominal:          self[#Adder.Type#];
-// METATYPE_DOT: End completions
 
   let _ = addTy(#^METATYPE_PAREN^#)
-// METATYPE_PAREN: Begin completions
 // METATYPE_PAREN-NOT: {#x: Int#}, {#y: Int#}
 // METATYPE_PAREN-NOT: {#base: Int#}
-// METATYPE_PAREN: End completions
 
   let _ = Adder#^TYPEEXPR_NO_DOT^#;
 // TYPEEXPR_NO_DOT: Begin completions, 4 items
@@ -71,7 +65,6 @@ func testCallAsFunction(add: Adder, addTy: Adder.Type) {
 // TYPEEXPR_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   .callAsFunction({#(self): Adder#})[#(x: Int, y: Int) -> Int#];
 // TYPEEXPR_NO_DOT-DAG: Keyword[self]/CurrNominal:          .self[#Adder.Type#];
 // TYPEEXPR_NO_DOT-DAG: Keyword/CurrNominal:                .Type[#Adder.Type#];
-// TYPEEXPR_NO_DOT: End completions
 
   let _ = Adder.#^TYPEEXPR_DOT^#;
 // TYPEEXPR_DOT: Begin completions, 4 items
@@ -80,13 +73,11 @@ func testCallAsFunction(add: Adder, addTy: Adder.Type) {
 // TYPEEXPR_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#base: Int#})[#Adder#];
 // TYPEEXPR_DOT-DAG: Keyword[self]/CurrNominal:          self[#Adder.Type#];
 // TYPEEXPR_DOT-DAG: Keyword/CurrNominal:                Type[#Adder.Type#];
-// TYPEEXPR_DOT: End completions
 
   let _ = Adder(#^TYPEEXPR_PAREN^#)
 // TYPEEXPR_PAREN: Begin completions, 1 items
 // TYPEEXPR_PAREN-NOT: {#x: Int#}, {#y: Int#}
 // TYPEEXPR_PAREN-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#base: Int#}[')'][#Adder#];
-// TYPEEXPR_PAREN: End completions
 }
 
 struct Functor {
@@ -100,17 +91,14 @@ func testCallAsFunctionOverloaded(fn: Functor) {
 //OVERLOADED_PAREN: Begin completions, 2 items
 //OVERLOADED_PAREN-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#h: Functor.Horizontal#}, {#v: Functor.Vertical#}[')'][#Void#];
 //OVERLOADED_PAREN-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#v: Functor.Vertical#}, {#h: Functor.Horizontal#}[')'][#Void#];
-//OVERLOADED_PAREN: End completions
 
   fn(h: .left, #^OVERLOADED_ARG2_LABEL^#)
 //OVERLOADED_ARG2_LABEL: Begin completions, 1 item
 //OVERLOADED_ARG2_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:               {#v: Functor.Vertical#}[#Functor.Vertical#];
-//OVERLOADED_ARG2_LABEL: End completions
 
   fn(h: .left, v: .#^OVERLOADED_ARG2_VALUE^#)
 //OVERLOADED_ARG2_VALUE: Begin completions, 3 items
 //OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: up[#Functor.Vertical#];
 //OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: down[#Functor.Vertical#];
 //OVERLOADED_ARG2_VALUE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Functor.Vertical#})[#(into: inout Hasher) -> Void#];
-//OVERLOADED_ARG2_VALUE: End completions
 }

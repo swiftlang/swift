@@ -13,17 +13,21 @@
 import SwiftPrivate
 import SwiftPrivateLibcExtras
 #if canImport(Darwin)
-import Darwin
+internal import Darwin
 #elseif canImport(Glibc)
-import Glibc
+internal import Glibc
+#elseif canImport(Musl)
+internal import Musl
+#elseif canImport(Android)
+internal import Android
 #elseif os(WASI)
-import WASILibc
+internal import WASILibc
 #elseif os(Windows)
-import CRT
+internal import CRT
 #endif
 
 #if _runtime(_ObjC)
-import Foundation
+internal import Foundation
 #endif
 
 //

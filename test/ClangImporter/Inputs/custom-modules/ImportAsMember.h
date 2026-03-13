@@ -70,11 +70,11 @@ typedef float MNInnerFloat __attribute__((swift_name("IAMMultipleNested.Inner"))
 
 typedef int IAMBadInnerInt
     __attribute__((swift_name("IAMNonexistent.Inner")));
-// CHECK: ImportAsMember.h:[[@LINE-1]]:{{[0-9]+}}: warning: imported declaration 'IAMBadInnerInt' could not be mapped to 'IAMNonexistent.Inner'
-// CHECK: ImportAsMember.h:[[@LINE-2]]:{{[0-9]+}}: note: please report this issue to the owners of 'ImportAsMember'
+// CHECK: ImportAsMember.h:[[@LINE-1]]:{{[0-9]+}}: warning: imported declaration 'IAMBadInnerInt' could not be mapped to 'IAMNonexistent.Inner' [#ClangDeclarationImport]
+// CHECK: note: please report this issue to the owners of 'ImportAsMember' [#ClangDeclarationImport]
 typedef int IAMBadInnerIntAPINotes;
 // CHECK: ImportAsMember.h:[[@LINE-1]]:{{[0-9]+}}: warning: imported declaration 'IAMBadInnerIntAPINotes' could not be mapped to 'IAMNonexistent.Inner2'
-// CHECK: ImportAsMember.h:[[@LINE-2]]:{{[0-9]+}}: note: please report this issue to the owners of 'ImportAsMember'
+// CHECK: note: please report this issue to the owners of 'ImportAsMember'
 
 @interface IAMPrivateParent @end
 @interface IAMPrivateChild

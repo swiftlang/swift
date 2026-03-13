@@ -77,7 +77,11 @@ StringForPrintObjectTests.test("NSStringUTF8") {
   let debug = debugVal(&newNSUTF16)
   expectEqual("🏂☃❅❆❄︎⛄️❄️", String(reflecting: nsUTF16))
   expectEqual("\"🏂☃❅❆❄︎⛄️❄️\"", String(reflecting: newNSUTF16))
-  expectEqual("\"🏂☃❅❆❄︎⛄️❄️\"\n", printed)
+
+  if #available(SwiftStdlib 6.1, *) {
+    expectEqual("🏂☃❅❆❄︎⛄️❄️\n", printed)
+  }
+
   expectEqual(printed, debug)
 }
 

@@ -1,9 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -gdwarf-types -o - | %FileCheck %s -allow-deprecated-dag-overlap
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s --check-prefix=AST
 
-// CHECK-DAG: ![[SINODE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int64",{{.*}} identifier: [[SI:.*]])
-// CHECK-DAG: ![[SFNODE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Float",{{.*}} identifier: [[SF:.*]])
-// CHECK-DAG: ![[VOIDNODE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sytD",{{.*}} identifier: [[VOID:.*]])
 func bar() {}
 func baz(_ i: Float) -> Int64 { return 0; }
 func barz(_ i: Float, _ j: Float) -> Int64 { return 0; }
@@ -18,7 +15,7 @@ func main() -> Int64 {
     // CHECK-DAG: ![[BARPTR]] = !DIDerivedType(tag: DW_TAG_pointer_type,{{.*}} baseType: ![[BART:[0-9]+]]
     // CHECK-DAG: ![[BART]] = !DISubroutineType(types: ![[BARARGS:[0-9]+]])
     // CHECK-DAG: ![[BARARGS]] = !{![[VOID:.*]]}
-    // CHECK-DAG: ![[VOID]] = {{.*}}identifier: "$sytD"
+    // CHECK-DAG: ![[VOID]] = {{.*}}name: "$sytD"
     bar_fnptr();
 
     // CHECK-DAG: !DILocalVariable(name: "baz_fnptr",{{.*}} type: ![[BAZPT:[0-9]+]]
@@ -30,8 +27,8 @@ func main() -> Int64 {
     // CHECK-DAG: ![[BAZPTR]] = !DIDerivedType(tag: DW_TAG_pointer_type,{{.*}} baseType: ![[BAZT:[0-9]+]]
     // CHECK-DAG: ![[BAZT]] = !DISubroutineType(types: ![[BAZARGS:.*]])
     // CHECK-DAG: ![[BAZARGS]] = !{![[INT:.*]], ![[FLOAT:.*]]}
-    // CHECK-DAG: ![[INT]] = {{.*}}identifier: "$ss5Int64VD"
-    // CHECK-DAG: ![[FLOAT]] = {{.*}}identifier: "$sSfD"
+    // CHECK-DAG: ![[INT]] = {{.*}}"$ss5Int64VD"
+    // CHECK-DAG: ![[FLOAT]] = {{.*}}"$sSfD"
     var baz_fnptr = baz
     baz_fnptr(2.89)
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-borrow-scopes=false -emit-sil %s -verify -Osize -o /dev/null -module-name main
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -emit-sil %s -verify -Osize -o /dev/null -module-name main
 //
 // NOTE: We only emit opt-remarks with -Osize,-O today! -O does drop way more
 // stuff though, so we test with -Osize.

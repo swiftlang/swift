@@ -1,0 +1,15 @@
+macro(enable_asm_language)
+  # On Windows, use MASM or MARMASM
+  set(SWIFT_ASM_DIALECT ASM)
+  set(SWIFT_ASM_EXT S)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64")
+      set(SWIFT_ASM_DIALECT ASM_MARMASM)
+    else()
+      set(SWIFT_ASM_DIALECT ASM_MASM)
+    endif()
+    set(SWIFT_ASM_EXT asm)
+  endif()
+
+  enable_language(${SWIFT_ASM_DIALECT})
+endmacro()

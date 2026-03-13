@@ -170,7 +170,7 @@ void swift::symbolgraphgen::serialize(const ModuleDecl &Module,
 
 void
 swift::symbolgraphgen::filterGenericParams(
-    TypeArrayView<GenericTypeParamType> GenericParams,
+    ArrayRef<GenericTypeParamType *> GenericParams,
     SmallVectorImpl<const GenericTypeParamType*> &FilteredParams,
     SubstitutionMap SubMap) {
 
@@ -216,6 +216,9 @@ swift::symbolgraphgen::filterGenericParams(
   }
 }
 
+// FIXME: This is wrong. We should instead compute the new requirements of a
+// member declaration by comparing against the generic signature of its
+// parent, with getRequirementsNotSatisfiedBy().
 static bool containsParams(swift::Type Ty, llvm::ArrayRef<const swift::GenericTypeParamType*> Others) {
   return Ty.findIf([&](swift::Type T) -> bool {
     if (auto AT = T->getAs<swift::ArchetypeType>()) {
@@ -232,12 +235,13 @@ static bool containsParams(swift::Type Ty, llvm::ArrayRef<const swift::GenericTy
 
 void swift::symbolgraphgen::filterGenericRequirements(
     ArrayRef<Requirement> Requirements,
-    const NominalTypeDecl *Self,
+    const ProtocolDecl *Self,
     SmallVectorImpl<Requirement> &FilteredRequirements,
     SubstitutionMap SubMap,
     ArrayRef<const GenericTypeParamType *> FilteredParams) {
 
   for (const auto &Req : Requirements) {
+    // FIXME: We're just dropping "Self: AnyObject", etc.
     if (Req.getKind() == RequirementKind::Layout) {
       continue;
     }
@@ -245,7 +249,9 @@ void swift::symbolgraphgen::filterGenericRequirements(
     // func foo() {}
     // }
     // ignore Self : Q, obvious
-    if (Req.getSecondType()->getAnyNominal() == Self) {
+    if (Self &&
+        Req.getKind() == RequirementKind::Conformance &&
+        Req.getProtocolDecl() == Self) {
       continue;
     }
 
@@ -274,21 +280,31 @@ void swift::symbolgraphgen::filterGenericRequirements(
 void
 swift::symbolgraphgen::filterGenericRequirements(const ExtensionDecl *Extension,
     SmallVectorImpl<Requirement> &FilteredRequirements) {
-  for (const auto &Req : Extension->getGenericRequirements()) {
-    if (Req.getKind() == RequirementKind::Layout) {
-      continue;
-    }
+  auto Sig = Extension->getGenericSignature();
+  if (!Sig)
+    return;
 
-    if (!isa<ProtocolDecl>(Extension->getExtendedNominal()) &&
-        Req.getFirstType()->isEqual(Extension->getExtendedType())) {
+  SmallVector<Requirement, 2> Reqs;
+  SmallVector<InverseRequirement, 2> InverseReqs;
+  Sig->getRequirementsWithInverses(Reqs, InverseReqs);
+  // FIXME(noncopyable_generics): Do something with InverseReqs, or just use
+  // getRequirements() above and update the tests.
+
+  for (const auto &Req : Reqs) {
+    if (Req.getKind() == RequirementKind::Layout) {
       continue;
     }
 
     // extension /* protocol */ Q
     // ignore Self : Q, obvious
-    if (Req.getSecondType()->isEqual(Extension->getExtendedType())) {
-      continue;
+    if (auto *Proto = Extension->getExtendedProtocolDecl()) {
+      if (Req.getKind() == RequirementKind::Conformance &&
+          Req.getFirstType()->isEqual(Extension->getSelfInterfaceType()) &&
+          Req.getProtocolDecl() == Proto) {
+        continue;
+      }
     }
+
     FilteredRequirements.push_back(Req);
   }
 }

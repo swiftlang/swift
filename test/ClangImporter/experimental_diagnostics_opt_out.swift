@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-experimental-clang-importer-diagnostics -enable-objc-interop -typecheck %s 2>&1 | %FileCheck %s --strict-whitespace
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -swift-version 5 -disable-experimental-clang-importer-diagnostics -enable-objc-interop -typecheck %s -diagnostic-style llvm 2>&1 | %FileCheck %s --strict-whitespace
 
 // REQUIRES: objc_interop
 
@@ -19,8 +19,8 @@ _ = bar.methodReturningForwardDeclaredInterface()
 let s: PartialImport
 s.c = 5
 // CHECK: experimental_diagnostics_opt_out.swift:{{[0-9]+}}:{{[0-9]+}}: error: value of type 'PartialImport' has no member 'c'
-// CHECK: ctypes.PartialImport:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'a'?
-// CHECK: ctypes.PartialImport:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'b'?
+// CHECK: ctypes.h:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'a'?
+// CHECK: ctypes.h:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'b'?
 // CHECK-NOT: warning
 // CHECK-NOT: error
 // CHECK-NOT: note

@@ -70,6 +70,9 @@ if #available(SwiftStdlib 5.3, *) {
     func test(bufferSize: Int, input: [UInt8], expected: String) {
       let strs = (0..<100).map { _ in
         String(unsafeUninitializedCapacity: bufferSize) { buffer in
+          if #available(SwiftStdlib 5.10, *) {
+            expectEqual(bufferSize, buffer.count)
+          }
           _ = buffer.initialize(from: input)
           return input.count
         }
@@ -139,4 +142,138 @@ if #available(SwiftStdlib 5.3, *) {
     }
     expectEqual(str1, str6)
   }
+}
+
+let s1 = "Long string containing the characters é, ß, 🦆, and 👨‍👧‍👦."
+let s2 = "Long ascii string with no accented characters (obviously)."
+
+StringCreateTests.test("Validating.utf8")
+.require(.stdlib_6_0)
+.code {
+  guard #available(SwiftStdlib 6.0, *) else { return }
+
+  let i1 = Array(s1.utf8)
+  let i2 = Array(s2.utf8)
+  let i3 = {
+    var modified = i1
+    let index = modified.lastIndex(of: 240)
+    expectNotNil(index)
+    index.map { modified[$0] = 0 }
+    return modified
+  }()
+
+  var actual: String?
+  for simpleString in SimpleString.allCases {
+    let expected = simpleString.rawValue
+    actual = String(validating: expected.utf8, as: Unicode.UTF8.self)
+    expectEqual(actual, expected)
+  }
+
+  expectEqual(String(validating: i1, as: UTF8.self), s1)
+  expectEqual(String(validating: i2, as: UTF8.self), s2)
+  expectNil(String(validating: i3, as: UTF8.self))
+
+  expectEqual(String(validating: AnyCollection(i1), as: UTF8.self), s1)
+  expectEqual(String(validating: AnyCollection(i2), as: UTF8.self), s2)
+  expectNil(String(validating: AnyCollection(i3), as: UTF8.self))
+}
+
+StringCreateTests.test("Validating.utf8.from.int8")
+.require(.stdlib_6_0)
+.code {
+  guard #available(SwiftStdlib 6.0, *) else { return }
+
+  let i1 = s1.utf8.map(Int8.init(bitPattern:))
+  let i2 = s2.utf8.map(Int8.init(bitPattern:))
+  let i3 = {
+    var modified = i1
+    let index = modified.lastIndex(of: Int8(bitPattern: 240))
+    expectNotNil(index)
+    index.map { modified[$0] = 0 }
+    return modified
+  }()
+
+  expectEqual(String(validating: i1, as: UTF8.self), s1)
+  expectEqual(String(validating: i2, as: UTF8.self), s2)
+  expectNil(String(validating: i3, as: UTF8.self))
+
+  expectEqual(String(validating: AnyCollection(i1), as: UTF8.self), s1)
+  expectEqual(String(validating: AnyCollection(i2), as: UTF8.self), s2)
+  expectNil(String(validating: AnyCollection(i3), as: UTF8.self))
+}
+
+StringCreateTests.test("Validating.ascii")
+.require(.stdlib_6_0)
+.code {
+  guard #available(SwiftStdlib 6.0, *) else { return }
+
+  let i1 = Array(s1.utf8)
+  let i2 = Array(s2.utf8)
+
+  expectNil(String(validating: i1, as: Unicode.ASCII.self))
+  expectEqual(String(validating: i2, as: Unicode.ASCII.self), s2)
+
+  expectNil(String(validating: AnyCollection(i1), as: Unicode.ASCII.self))
+  expectEqual(String(validating: AnySequence(i2), as: Unicode.ASCII.self), s2)
+
+  let i3 = i1.map(Int8.init(bitPattern:))
+  let i4 = i2.map(Int8.init(bitPattern:))
+
+  expectNil(String(validating: i3, as: Unicode.ASCII.self))
+  expectEqual(String(validating: i4, as: Unicode.ASCII.self), s2)
+
+  expectNil(String(validating: AnyCollection(i3), as: Unicode.ASCII.self))
+  expectEqual(String(validating: AnySequence(i4), as: Unicode.ASCII.self), s2)
+}
+
+StringCreateTests.test("Validating.utf16")
+.require(.stdlib_6_0)
+.code {
+  guard #available(SwiftStdlib 6.0, *) else { return }
+
+  let i1 = Array(s1.utf16)
+  let i2 = Array(s2.utf16)
+  let i3 = {
+    var modified = i1
+    let index = modified.lastIndex(of: 32)
+    expectNotNil(index)
+    index.map { modified[$0] = 0xd801 }
+    return modified
+  }()
+
+  expectEqual(String(validating: i1, as: UTF16.self), s1)
+  expectEqual(String(validating: i2, as: UTF16.self), s2)
+  expectNil(String(validating: i3, as: UTF16.self))
+
+  expectEqual(String(validating: AnySequence(i1), as: UTF16.self), s1)
+  expectEqual(String(validating: AnySequence(i2), as: UTF16.self), s2)
+  expectNil(String(validating: AnyCollection(i3), as: UTF16.self))
+}
+
+StringCreateTests.test("Validating.utf32")
+.require(.stdlib_6_0)
+.code {
+  guard #available(SwiftStdlib 6.0, *) else { return }
+
+  let i1 = s1.unicodeScalars.map(\.value)
+  let i2 = s2.unicodeScalars.map(\.value)
+  let i3 = {
+    var modified = i1
+    let index = modified.lastIndex(of: .init(bitPattern: 32))
+    expectNotNil(index)
+    index.map { modified[$0] = .max }
+    return modified
+  }()
+  let s4 = SimpleString.emoji.rawValue
+  let i4 = s4.unicodeScalars.map(\.value)
+
+  expectEqual(String(validating: i1, as: UTF32.self), s1)
+  expectEqual(String(validating: i2, as: UTF32.self), s2)
+  expectNil(String(validating: i3, as: UTF32.self))
+  expectEqual(String(validating: i4, as: UTF32.self), s4)
+
+  expectEqual(String(validating: AnySequence(i1), as: UTF32.self), s1)
+  expectEqual(String(validating: AnySequence(i2), as: UTF32.self), s2)
+  expectNil(String(validating: AnyCollection(i3), as: UTF32.self))
+  expectEqual(String(validating: AnySequence(i4), as: UTF32.self), s4)
 }

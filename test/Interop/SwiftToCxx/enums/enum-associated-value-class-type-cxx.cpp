@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/enum-associated-value-class-type-cxx.swift -typecheck -module-name Enums -clang-header-expose-decls=all-public -emit-clang-header-path %t/enums.h
+// RUN: %target-swift-frontend %S/enum-associated-value-class-type-cxx.swift -module-name Enums -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/enums.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-enums-execution.o
 // RUN: %target-interop-build-swift %S/enum-associated-value-class-type-cxx.swift -o %t/swift-enums-execution -Xlinker %t/swift-enums-execution.o -module-name Enums -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -10,7 +10,7 @@
 
 // RUN: %empty-directory(%t-evo)
 
-// RUN: %target-swift-frontend %S/enum-associated-value-class-type-cxx.swift -typecheck -module-name Enums -clang-header-expose-decls=all-public -enable-library-evolution -emit-clang-header-path %t-evo/enums.h
+// RUN: %target-swift-frontend %S/enum-associated-value-class-type-cxx.swift -module-name Enums -clang-header-expose-decls=all-public -enable-library-evolution -typecheck -verify -emit-clang-header-path %t-evo/enums.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t-evo -o %t-evo/swift-enums-execution.o
 // RUN: %target-interop-build-swift %S/enum-associated-value-class-type-cxx.swift -o %t-evo/swift-enums-execution -Xlinker %t-evo/swift-enums-execution.o -module-name Enums -enable-library-evolution -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -50,6 +50,19 @@ int main() {
         extracted.setX(5678);
         assert(extracted.getX() == 5678);
         assert(c.getX() == 5678);
+    }
+
+    {
+      auto c = C::init(5);
+      auto arr = swift::Array<C>::init(c, 2);
+      auto f = F::b(arr);
+      assert(f.getB().getCount() == 2);
+    }
+
+    {
+      auto arr = swift::Array<swift::Int>::init(42, 2);
+      auto g = G<swift::Int>::b(arr);
+      assert(g.getB().getCount() == 2);
     }
 
     assert(getRetainCount(c) == 1);

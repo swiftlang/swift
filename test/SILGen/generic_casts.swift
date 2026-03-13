@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -swift-version 5 -module-name generic_casts -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -disable-objc-interop -swift-version 5 -module-name generic_casts -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 protocol ClassBound : class {}
 protocol NotClassBound {}
@@ -59,8 +59,7 @@ func class_archetype_to_class_archetype
 <T:ClassBound, U:ClassBound>(_ t:T) -> U {
   return t as! U
   // Error bridging can change the identity of class-constrained archetypes.
-  // CHECK: unconditional_checked_cast_addr T in {{%.*}} : $*T to U in [[DOWNCAST_ADDR:%.*]] : $*U
-  // CHECK: [[DOWNCAST:%.*]] = load [take] [[DOWNCAST_ADDR]]
+  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast {{%.*}} : $T to U
   // CHECK: return [[DOWNCAST]] : $U
 }
 
@@ -69,7 +68,7 @@ func class_archetype_is_class_archetype
 <T:ClassBound, U:ClassBound>(_ t:T, u:U.Type) -> Bool {
   return t is U
   // Error bridging can change the identity of class-constrained archetypes.
-  // CHECK: checked_cast_addr_br {{.*}} T in {{%.*}} : $*T to U in {{%.*}} : $*U
+  // CHECK: checked_cast_br T in {{%.*}} : $T to U
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts38opaque_archetype_to_addr_only_concrete{{[_0-9a-zA-Z]*}}F
@@ -115,7 +114,7 @@ func class_archetype_to_class
 func class_archetype_is_class
 <T:ClassBound>(_ t:T) -> Bool {
   return t is C
-  // CHECK: checked_cast_br {{%.*}} to C
+  // CHECK: checked_cast_br {{.*}} to C
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts022opaque_existential_to_C10_archetype{{[_0-9a-zA-Z]*}}F
@@ -158,8 +157,7 @@ func opaque_existential_is_class_archetype
 func class_existential_to_class_archetype
 <T:ClassBound>(_ p:ClassBound) -> T {
   return p as! T
-  // CHECK: unconditional_checked_cast_addr any ClassBound in {{%.*}} : $*any ClassBound to T in [[DOWNCAST_ADDR:%.*]] : $*T
-  // CHECK: [[DOWNCAST:%.*]] = load [take] [[DOWNCAST_ADDR]]
+  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast {{%.*}} : $any ClassBound to T
   // CHECK: return [[DOWNCAST]] : $T
 }
 
@@ -167,7 +165,7 @@ func class_existential_to_class_archetype
 func class_existential_is_class_archetype
 <T:ClassBound>(_ p:ClassBound, _: T) -> Bool {
   return p is T
-  // CHECK: checked_cast_addr_br {{.*}} any ClassBound in {{%.*}} : $*any ClassBound to T in {{%.*}} : $*T
+  // CHECK: checked_cast_br any ClassBound in {{%.*}} : $any ClassBound to T
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts40opaque_existential_to_addr_only_concrete{{[_0-9a-zA-Z]*}}F
@@ -207,13 +205,13 @@ func class_existential_to_class(_ p: ClassBound) -> C {
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts021class_existential_is_C0{{[_0-9a-zA-Z]*}}F
 func class_existential_is_class(_ p: ClassBound) -> Bool {
   return p is C
-  // CHECK: checked_cast_br {{%.*}} to C
+  // CHECK: checked_cast_br {{.*}} to C
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts27optional_anyobject_to_classyAA1CCSgyXlSgF
 func optional_anyobject_to_class(_ p: AnyObject?) -> C? {
   return p as? C
-  // CHECK: checked_cast_br {{%.*}} : $AnyObject to C
+  // CHECK: checked_cast_br AnyObject in {{%.*}} : $AnyObject to C
 }
 
 // The below tests are to ensure we don't dig into an optional operand when

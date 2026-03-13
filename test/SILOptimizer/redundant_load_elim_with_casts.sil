@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -module-name Swift -redundant-load-elim | %FileCheck -check-prefix=CHECK-FUTURE %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -module-name Swift -redundant-load-elimination | %FileCheck -check-prefix=CHECK-FUTURE %s
 //
 // FIXME: Contains tests which are handled by old RLE, but not current one. Mostly due to casting. Eventually we probably should
 // handle these cases if they turn out to be important.
@@ -52,6 +52,7 @@ sil @use : $@convention(thin) (Builtin.Int32) -> ()
 sil @use_a : $@convention(thin) (@in A) -> ()
 sil @escaped_a_ptr : $@convention(thin) () -> @out A
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
+sil @b_i_plus_one : $@convention(method) (@guaranteed B) -> ()
 
 // *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.
 // CHECK-FUTURE: sil @store_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (Optional<A>) -> () {
@@ -546,4 +547,45 @@ bb0(%0 : $*(I32, I32, I32), %1 : $*((I32, I32), I32)):
   %62 = tuple (%56 : $I32, %57 : $I32, %58 : $I32)
   %63 = tuple (%60 : $(I32, I32), %61 : $(I32, I32), %62 : $(I32, I32, I32))
   return %63 : $((I32, I32), (I32, I32), (I32, I32, I32))
+}
+
+// Tests unchecked_ref_cast between Optional<ClassType1> and ClassType2.
+// E? -> B is safe
+//
+// CHECK-FUTURE: sil @unchecked_ref_cast_from_optional_class
+// CHECK: bb3(%6 : $Optional<AnyObject>):
+// CHECK: %8 = load %7 : $*Builtin.Int32
+// CHECK: %10 = apply %9(%5) : $@convention(method) (@guaranteed B) -> ()
+// CHECK: %12 = load %11 : $*Builtin.Int32
+// CHECK: return
+sil @unchecked_ref_cast_from_optional_class : $@convention(thin) (Optional<E>) -> () {
+bb0(%0 : $Optional<E>):
+  switch_enum %0 : $Optional<E>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%1 : $E):
+  %2 = enum $Optional<E>, #Optional.some!enumelt, %1 : $E
+  br bb3(%2 : $Optional<E>)
+
+bb2:
+  %3 = enum $Optional<E>, #Optional.none!enumelt
+  br bb3(%3 : $Optional<E>)
+
+bb3(%4 : $Optional<E>):
+  %5 = unchecked_ref_cast %4 : $Optional<E> to $B
+
+  %6 = ref_element_addr %5 : $B, #B.i
+  %7 = begin_access [read] [dynamic] [no_nested_conflict] %6 : $* Builtin.Int32
+  %8 = load %7 : $*Builtin.Int32
+  end_access %7 : $*Builtin.Int32
+
+  %9 = function_ref @b_i_plus_one : $@convention(method) (@guaranteed B) -> ()
+  %10 = apply %9(%5) : $@convention(method) (@guaranteed B) -> ()
+
+  %11 = begin_access [read] [dynamic] [no_nested_conflict] %6 : $*Builtin.Int32
+  %12 = load %11 : $*Builtin.Int32
+  end_access %11 : $*Builtin.Int32
+
+  release_value %4 : $Optional<E>
+  %13 = tuple ()
+  return %13 : $()
 }

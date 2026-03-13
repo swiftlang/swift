@@ -13,6 +13,7 @@
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/Range.h"
@@ -39,6 +40,7 @@ FrontendInputsAndOutputs::FrontendInputsAndOutputs(
     addInput(input);
   IsSingleThreadedWMO = other.IsSingleThreadedWMO;
   ShouldRecoverMissingInputs = other.ShouldRecoverMissingInputs;
+  PrincipalOutputType = other.PrincipalOutputType;
 }
 
 FrontendInputsAndOutputs &FrontendInputsAndOutputs::
@@ -48,6 +50,7 @@ operator=(const FrontendInputsAndOutputs &other) {
     addInput(input);
   IsSingleThreadedWMO = other.IsSingleThreadedWMO;
   ShouldRecoverMissingInputs = other.ShouldRecoverMissingInputs;
+  PrincipalOutputType = other.PrincipalOutputType;
   return *this;
 }
 
@@ -148,6 +151,19 @@ std::string FrontendInputsAndOutputs::getStatsFileMangledInputName() const {
   return isWholeModule() ? "all" : firstPrimaryInput().getFileName();
 }
 
+const InputFile &
+FrontendInputsAndOutputs::getFirstOutputProducingInput() const {
+  // Get the first input file that produces the output file. That is currently
+  // used to compute with input should the cached diagnostics be associated
+  // with. The first output producing input file is the first input if using
+  // whole module, or first primary input if not using whole module.
+  return isWholeModule() ? firstInput() : firstPrimaryInput();
+}
+
+unsigned FrontendInputsAndOutputs::getIndexOfFirstOutputProducingInput() const {
+  return isWholeModule() ? 0 : PrimaryInputsInOrder[0];
+}
+
 bool FrontendInputsAndOutputs::isInputPrimary(StringRef file) const {
   return primaryInputNamed(file) != nullptr;
 }
@@ -156,7 +172,7 @@ unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
     StringRef extension) const {
   unsigned n = 0;
   (void)forEachPrimaryInput([&](const InputFile &input) -> bool {
-    if (llvm::sys::path::extension(input.getFileName()).endswith(extension))
+    if (llvm::sys::path::extension(input.getFileName()).ends_with(extension))
       ++n;
     return false;
   });
@@ -186,6 +202,16 @@ bool FrontendInputsAndOutputs::shouldTreatAsModuleInterface() const {
   StringRef InputExt = llvm::sys::path::extension(getFilenameOfFirstInput());
   file_types::ID InputType = file_types::lookupTypeForExtension(InputExt);
   return InputType == file_types::TY_SwiftModuleInterfaceFile;
+}
+
+bool FrontendInputsAndOutputs::shouldTreatAsNonPackageModuleInterface() const {
+  if (!hasSingleInput())
+    return false;
+
+  file_types::ID InputType =
+      file_types::lookupTypeFromFilename(getFilenameOfFirstInput());
+  return InputType == file_types::TY_SwiftModuleInterfaceFile ||
+         InputType == file_types::TY_PrivateSwiftModuleInterfaceFile;
 }
 
 bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
@@ -354,13 +380,23 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
     }
     return;
   }
-  assert(supplementaryOutputs.size() == 1 &&
-         "WMO only ever produces one set of supplementary outputs");
+
+  assert(supplementaryOutputs.size() == 1 ||
+         supplementaryOutputs.size() == AllInputs.size() &&
+             "WMO produces wrong number of sets of supplementary outputs");
   if (outputFiles.size() == 1) {
-    AllInputs.front().setPrimarySpecificPaths(PrimarySpecificPaths(
-        outputFiles.front(), outputFilesForIndexUnits.front(),
-        firstInputProducingOutput().getFileName(),
-        supplementaryOutputs.front()));
+    for (auto i : indices(AllInputs)) {
+      if (i == 0)
+        AllInputs[i].setPrimarySpecificPaths(PrimarySpecificPaths(
+            outputFiles.front(), outputFilesForIndexUnits.front(),
+            firstInputProducingOutput().getFileName(),
+            supplementaryOutputs.front()));
+      else
+        AllInputs[i].setPrimarySpecificPaths(PrimarySpecificPaths(
+            "", "", "",
+            supplementaryOutputs.size() == 1 ? SupplementaryOutputPaths()
+                                             : supplementaryOutputs[i]));
+    }
     return;
   }
   assert(outputFiles.size() == AllInputs.size() &&
@@ -368,7 +404,8 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
   for (auto i : indices(AllInputs))
     AllInputs[i].setPrimarySpecificPaths(PrimarySpecificPaths(
         outputFiles[i], outputFilesForIndexUnits[i], outputFiles[i],
-        i == 0 ? supplementaryOutputs.front() : SupplementaryOutputPaths()));
+        supplementaryOutputs.size() == 1 && i != 0 ? SupplementaryOutputPaths()
+                                                   : supplementaryOutputs[i]));
 }
 
 std::vector<std::string> FrontendInputsAndOutputs::copyOutputFilenames() const {
@@ -449,105 +486,8 @@ bool FrontendInputsAndOutputs::hasSupplementaryOutputPath(
   });
 }
 
-bool FrontendInputsAndOutputs::hasDependenciesPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.DependenciesFilePath;
-      });
-}
-bool FrontendInputsAndOutputs::hasReferenceDependenciesPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ReferenceDependenciesFilePath;
-      });
-}
-bool FrontendInputsAndOutputs::hasClangHeaderOutputPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ClangHeaderOutputPath;
-      });
-}
-bool FrontendInputsAndOutputs::hasLoadedModuleTracePath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.LoadedModuleTracePath;
-      });
-}
-bool FrontendInputsAndOutputs::hasModuleOutputPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ModuleOutputPath;
-      });
-}
-bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ModuleDocOutputPath;
-      });
-}
-bool FrontendInputsAndOutputs::hasModuleSourceInfoOutputPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ModuleSourceInfoOutputPath;
-      });
-}
-bool FrontendInputsAndOutputs::hasModuleInterfaceOutputPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ModuleInterfaceOutputPath;
-      });
-}
-bool FrontendInputsAndOutputs::hasPrivateModuleInterfaceOutputPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.PrivateModuleInterfaceOutputPath;
-      });
-}
-bool FrontendInputsAndOutputs::hasABIDescriptorOutputPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ABIDescriptorOutputPath;
-      });
-}
-bool FrontendInputsAndOutputs::hasConstValuesOutputPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ConstValuesOutputPath;
-      });
-}
-bool FrontendInputsAndOutputs::hasModuleSemanticInfoOutputPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ModuleSemanticInfoOutputPath;
-      });
-}
-bool FrontendInputsAndOutputs::hasModuleSummaryOutputPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ModuleSummaryOutputPath;
-      });
-}
-bool FrontendInputsAndOutputs::hasTBDPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.TBDPath;
-      });
-}
-bool FrontendInputsAndOutputs::hasYAMLOptRecordPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.YAMLOptRecordPath;
-      });
-}
-bool FrontendInputsAndOutputs::hasBitstreamOptRecordPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.BitstreamOptRecordPath;
-      });
-}
-
 bool FrontendInputsAndOutputs::hasDependencyTrackerPath() const {
-  return hasDependenciesPath() || hasReferenceDependenciesPath() ||
+  return hasDependenciesFilePath() || hasReferenceDependenciesFilePath() ||
          hasLoadedModuleTracePath();
 }
 
@@ -557,6 +497,14 @@ FrontendInputsAndOutputs::getPrimarySpecificPathsForAtMostOnePrimary() const {
   static auto emptyPaths = PrimarySpecificPaths();
   return hasInputs() ? firstInputProducingOutput().getPrimarySpecificPaths()
                      : emptyPaths;
+}
+
+const PrimarySpecificPaths &
+FrontendInputsAndOutputs::getPrimarySpecificPathsForRemaining(unsigned i) const {
+  static auto emptyPaths = PrimarySpecificPaths();
+  unsigned firstProducingIdx = getIndexOfFirstOutputProducingInput();
+  return (hasInputs()  && i > 0) ?
+    AllInputs[firstProducingIdx+i].getPrimarySpecificPaths() : emptyPaths;
 }
 
 const PrimarySpecificPaths &

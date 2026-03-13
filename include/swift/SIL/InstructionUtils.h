@@ -13,8 +13,10 @@
 #ifndef SWIFT_SIL_INSTRUCTIONUTILS_H
 #define SWIFT_SIL_INSTRUCTIONUTILS_H
 
+#include "swift/SIL/NodeBits.h"
+#include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/RuntimeEffect.h"
-#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
 
 namespace swift {
 
@@ -40,6 +42,14 @@ SILValue stripCastsWithoutMarkDependence(SILValue V);
 /// begin_borrow instructions.
 SILValue lookThroughOwnershipInsts(SILValue v);
 
+SILValue lookThroughMoveOnlyCheckerPattern(SILValue value);
+
+/// Reverse of lookThroughOwnershipInsts.
+///
+/// Return true if \p visitor returned true for all uses.
+bool visitNonOwnershipUses(SILValue value,
+                           function_ref<bool(Operand *)> visitor);
+
 /// Return the underlying SILValue after looking through all copy_value
 /// instructions.
 SILValue lookThroughCopyValueInsts(SILValue v);
@@ -61,6 +71,9 @@ SILValue stripAddressProjections(SILValue V);
 
 /// Look through any projections that transform an address -> an address.
 SILValue lookThroughAddressToAddressProjections(SILValue v);
+
+/// Look through address and value projections
+SILValue lookThroughAddressAndValueProjections(SILValue V);
 
 /// Return the underlying SILValue after stripping off all aggregate projection
 /// instructions.
@@ -88,8 +101,8 @@ SILValue stripBorrow(SILValue V);
 //===----------------------------------------------------------------------===//
 
 /// Return a non-null SingleValueInstruction if the given instruction merely
-/// copies the value of its first operand, possibly changing its type or
-/// ownership state, but otherwise having no effect.
+/// copies or moves the value of its first operand, possibly changing its type
+/// or ownership state, but otherwise having no effect.
 ///
 /// The returned instruction may have additional "incidental" operands;
 /// mark_dependence for example.
@@ -100,8 +113,16 @@ SILValue stripBorrow(SILValue V);
 /// type may be changed by a cast.
 SingleValueInstruction *getSingleValueCopyOrCast(SILInstruction *I);
 
+// Return true if this instruction begins a SIL-level scope. If so, it must have
+// a single result. That result must have an isEndOfScopeMarker direct use on
+// all reachable paths. This instruction along with its scope-ending
+// instructions are considered a single operation. They must be inserted and
+// deleted together.
+bool isBeginScopeMarker(SILInstruction *user);
+
 /// Return true if this instruction terminates a SIL-level scope. Scope end
-/// instructions do not produce a result.
+/// instructions do not produce a result. Their single operand must be an
+/// isBeginScopeMarker and cannot be 'undef'.
 bool isEndOfScopeMarker(SILInstruction *user);
 
 /// Return true if the given instruction has no effect on it's operand values
@@ -110,6 +131,11 @@ bool isEndOfScopeMarker(SILInstruction *user);
 /// This is useful for checking all users of a value to verify that the value is
 /// only used in recognizable patterns without otherwise "escaping".
 bool isIncidentalUse(SILInstruction *user);
+
+/// Returns true if this is a move only wrapper use.
+///
+/// E.x.: moveonlywrapper_to_copyable_addr, copyable_to_moveonlywrapper_value
+bool isMoveOnlyWrapperUse(SILInstruction *user);
 
 /// Return true if the given `user` instruction modifies the value's refcount
 /// without propagating the value or having any other effect aside from
@@ -135,9 +161,9 @@ bool isInstrumentation(SILInstruction *Instruction);
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
 
-/// Returns true if \p PAI is only used by an assign_by_wrapper instruction as
-/// init or set function.
-bool onlyUsedByAssignByWrapper(PartialApplyInst *PAI);
+/// Returns true if \p PAI is only used by an \c assign_or_init
+/// instruction as init or set function.
+bool onlyUsedByAssignOrInit(PartialApplyInst *PAI);
 
 /// Returns the runtime effects of \p inst.
 ///
@@ -194,6 +220,65 @@ private:
 /// polymorphic builtin or does not have any available overload for these types,
 /// return SILValue().
 SILValue getStaticOverloadForSpecializedPolymorphicBuiltin(BuiltinInst *bi);
+
+/// Visit the exploded leaf elements of a tuple type that contains potentially
+/// a tree of tuples.
+///
+/// If visitor returns false, we stop processing early. We return true if we
+/// visited all of the tuple elements without the visitor returing false.
+bool visitExplodedTupleType(SILType type,
+                            llvm::function_ref<bool(SILType)> callback);
+
+/// Visit the exploded leaf elements of a tuple type that contains potentially
+/// a tree of tuples.
+///
+/// If visitor returns false, we stop processing early. We return true if we
+/// visited all of the tuple elements without the visitor returing false.
+bool visitExplodedTupleValue(SILValue value,
+                             llvm::function_ref<SILValue(SILValue, std::optional<unsigned>)> callback);
+
+std::pair<SILFunction *, SILWitnessTable *>
+lookUpFunctionInWitnessTable(WitnessMethodInst *wmi, SILModule::LinkingMode linkingMode);
+
+/// True if a type can be expanded without a significant increase to code size.
+///
+/// False if expanding a type is invalid. For example, expanding a
+/// struct-with-deinit drops the deinit.
+bool shouldExpand(SILModule &module, SILType ty);
+
+/// Returns true if `arg` is mutated.
+/// if `ignoreDestroys` is true, `destroy_addr` instructions are ignored.
+/// `defaultIsMutating` specifies the state of instructions which are not explicitly handled.
+/// For historical reasons this utility is implemented in SILVerifier.cpp.
+bool isIndirectArgumentMutated(SILFunctionArgument *arg, bool ignoreDestroys = false,
+                               bool defaultIsMutating = false);
+
+/// Caches instruction indices per basic block.
+///
+/// Instruction indices start at 0 at the first instruction of each basic block.
+///
+/// Note: in case there are more instructions in a block than can be stored in
+///       the index bitfield, the indices are maxed out for the remaining instructions.
+///
+/// Note: as this data structure occupies almost all custom SILNode bits, there
+///       is little room for using other InstructionSet or similar data structures
+///       concurrently.
+class InstructionIndices {
+  NodeBitfield indices;
+
+public:
+  // Leave a few bits for other purposes (e.g. InstructionSet).
+  enum { numIndexBits = SILNode::numCustomBits - 4 };
+
+  static_assert(numIndexBits >= 16,
+                "should at least be able to index 65536 instructions in a block");
+
+  InstructionIndices(SILFunction *f);
+
+  unsigned get(SILInstruction *inst) {
+    return indices.get(inst->asSILNode());
+  }
+};
 
 } // end namespace swift
 

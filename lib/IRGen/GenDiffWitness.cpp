@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 
 #include "ConstantBuilder.h"
@@ -39,10 +40,8 @@ void IRGenModule::emitSILDifferentiabilityWitness(
          "Differentiability witness definition should have JVP");
   assert(dw->getVJP() &&
          "Differentiability witness definition should have VJP");
-  diffWitnessContents.addBitCast(
-      getAddrOfSILFunction(dw->getJVP(), NotForDefinition), Int8PtrTy);
-  diffWitnessContents.addBitCast(
-      getAddrOfSILFunction(dw->getVJP(), NotForDefinition), Int8PtrTy);
+  diffWitnessContents.add(getAddrOfSILFunction(dw->getJVP(), NotForDefinition));
+  diffWitnessContents.add(getAddrOfSILFunction(dw->getVJP(), NotForDefinition));
   getAddrOfDifferentiabilityWitness(
       dw, diffWitnessContents.finishAndCreateFuture());
 }

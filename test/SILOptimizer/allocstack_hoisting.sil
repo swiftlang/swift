@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -alloc-stack-hoisting | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -alloc-stack-hoisting | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-MERGING %s
 // RUN: %target-sil-opt -enable-sil-verify-all %s -alloc-stack-hoisting -sil-merge-stack-slots=false | %FileCheck %s
 sil_stage canonical
 
@@ -280,3 +280,43 @@ bb3:
   %3 = tuple ()
   return %3 : $()
 }
+
+// CHECK-MERGING-LABEL: sil @merging
+// CHECK-MERGING:         %1 = alloc_stack $T
+// CHECK-MERGING-NEXT:    debug_value %1
+// CHECK-MERGING-NEXT:    debug_value %1
+// CHECK-MERGING:         dealloc_stack %1
+// CHECK-MERGING-NOT:     alloc_stack
+// CHECK:       } // end sil function 'merging'
+sil @merging : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  %1 = alloc_stack $T
+  debug_value %1 : $*T, name "x"
+  dealloc_stack %1 : $*T
+  %2 = alloc_stack $T
+  debug_value %2 : $*T, name "y"
+  dealloc_stack %2 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_merge
+// CHECK:         %1 = alloc_stack $T
+// CHECK-NEXT:    %2 = alloc_stack $T
+// CHECK-NEXT:    debug_value %2
+// CHECK-NEXT:    debug_value %1
+// CHECK:         dealloc_stack %2
+// CHECK-NEXT:    dealloc_stack %1
+// CHECK:       } // end sil function 'dont_merge'
+sil @dont_merge : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  %1 = alloc_stack $T
+  debug_value %1 : $*T, name "x"
+  %3 = alloc_stack $T
+  debug_value %3 : $*T, name "y"
+  dealloc_stack %3 : $*T
+  dealloc_stack %1 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+

@@ -1,0 +1,87 @@
+// RUN: %target-sil-opt -sil-print-types %s -performance-constant-propagation | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct Wrapper {
+  let bytes: UInt64
+  private func pop(numBits: UInt64) -> Wrapper
+  public static func maker(bits: UInt64) -> Wrapper
+}
+
+sil_scope 3 { loc "e.swift":6:16 parent @pop : $@convention(method) (UInt64, Wrapper) -> Wrapper }
+sil_scope 4 { loc "e.swift":8:12 parent 3 }
+
+// Wrapper.pop(numBits:), scope 3
+sil private @pop : $@convention(method) (UInt64, Wrapper) -> Wrapper {
+[global: ]
+bb0(%0 : $UInt64, %1 : $Wrapper):
+  debug_value %0 : $UInt64, let, name "numBits", argno 1, scope 3
+  debug_value %1 : $Wrapper, let, name "self", argno 2, scope 3
+  %4 = struct_extract %1 : $Wrapper, #Wrapper.bytes, scope 3
+  %5 = struct_extract %4 : $UInt64, #UInt64._value, scope 3
+  %6 = struct_extract %0 : $UInt64, #UInt64._value, scope 3
+  %7 = integer_literal $Builtin.Int1, -1, scope 3
+  %8 = builtin "usub_with_overflow_Int64"(%5 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1), scope 3
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0, scope 3
+  %10 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1, scope 3
+  cond_fail %10 : $Builtin.Int1, "arithmetic overflow", scope 3
+  %12 = struct $UInt64 (%9 : $Builtin.Int64), scope 3
+  %13 = struct $Wrapper (%12 : $UInt64), loc * "e.swift":3:8
+  return %13 : $Wrapper, scope 3
+} // end sil function 'pop'
+
+sil_scope 7 { loc "e.swift":12:22 parent @maker : $@convention(method) (UInt64, @thin Wrapper.Type) -> Wrapper }
+sil_scope 8 { loc "e.swift":17:12 parent 7 }
+sil_scope 10 { loc "e.swift":17:39 parent 7 }
+sil_scope 11 { loc "e.swift":6:16 parent @pop : $@convention(method) (UInt64, Wrapper) -> Wrapper inlined_at 10 }
+sil_scope 12 { loc "e.swift":8:12 parent 11 inlined_at 10 }
+
+// static Wrapper.maker(bits:), scope 7
+// CHECK-LABEL: sil {{.*}} @maker
+sil hidden @maker : $@convention(method) (UInt64, @thin Wrapper.Type) -> Wrapper {
+[global: ]
+bb0(%0 : $UInt64, %1 : $@thin Wrapper.Type):
+  // CHECK: debug_value %0 : $UInt64, let, name "bits", argno 1
+  debug_value %0 : $UInt64, let, name "bits", argno 1, scope 7
+  // CHECK: debug_value %1 : $@thin Wrapper.Type, let, name "self", argno 2
+  debug_value %1 : $@thin Wrapper.Type, let, name "self", argno 2, scope 7
+  %4 = integer_literal $Builtin.Int64, 3735928559, scope 7
+  %5 = struct $UInt64 (%4 : $Builtin.Int64), scope 7
+  %6 = struct $Wrapper (%5 : $UInt64), loc * "e.swift":3:8
+  // CHECK-DAG: debug_value %0 : $UInt64, let, name "numBits", argno 1
+  debug_value %0 : $UInt64, let, name "numBits", argno 1, scope 11
+  // CHECK-DAG: debug_value %{{.*}} : $Builtin.Int64, let, name "self", {{.*}}, type $Wrapper, expr op_fragment:#Wrapper.bytes:op_fragment:#UInt64._value
+  debug_value %6 : $Wrapper, let, name "self", argno 2, scope 11
+  %9 = struct_extract %6 : $Wrapper, #Wrapper.bytes, scope 11
+  %10 = struct_extract %9 : $UInt64, #UInt64._value, scope 11
+  %11 = struct_extract %0 : $UInt64, #UInt64._value, scope 11
+  %12 = integer_literal $Builtin.Int1, -1, scope 11
+  %13 = builtin "usub_with_overflow_Int64"(%10 : $Builtin.Int64, %11 : $Builtin.Int64, %12 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1), scope 11
+  %14 = tuple_extract %13 : $(Builtin.Int64, Builtin.Int1), 0, scope 11
+  %15 = tuple_extract %13 : $(Builtin.Int64, Builtin.Int1), 1, scope 11
+  cond_fail %15 : $Builtin.Int1, "arithmetic overflow", scope 11
+  %17 = struct $UInt64 (%14 : $Builtin.Int64), scope 11
+  %18 = struct $Wrapper (%17 : $UInt64), loc * "e.swift":3:8
+  return %18 : $Wrapper, scope 7
+} // end sil function 'maker'
+
+
+// Generated and adapted from this Swift source code:
+// ```swift
+// struct Wrapper {
+//   let bytes: UInt64
+//
+//   private func pop(numBits: UInt64) -> Wrapper {
+//     // `self` in here is a nested fragment. It should be salvaged, when inlined in `maker(bits:)`
+//     return Self(bytes: bytes - numBits)
+//   }
+//
+//   public static func maker(bits: UInt64) -> Wrapper {
+//     // This function is static, but `pop`'s self should be inlined in here
+//     return Wrapper(bytes: 0xDEADBEEF).pop(numBits: bits)
+//   }
+// }
+// ```

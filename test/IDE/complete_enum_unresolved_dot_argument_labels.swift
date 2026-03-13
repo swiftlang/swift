@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 enum DragState {
   case inactive
@@ -11,25 +10,21 @@ func testInit() {
   var state = DragState.inactive
   state = .dragging(#^SIGNATURE^#)
   // SIGNATURE: Begin completions, 1 item
-  // SIGNATURE: Pattern/CurrModule/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#translationX: Int#}, {#translationY: Int#}[')'][#DragState#];
-  // SIGNATURE: End completions
+  // SIGNATURE: Pattern/CurrNominal/Flair[ArgLabels]: ['(']{#translationX: Int#}, {#translationY: Int#}[')'][#DragState#];
 
   state = .dragging(translationX: 2, #^ARGUMENT^#)
   // ARGUMENT: Begin completions, 1 item
   // ARGUMENT: Pattern/Local/Flair[ArgLabels]: {#translationY: Int#}[#Int#];
-  // ARGUMENT: End completions
 
   state = .defaulted(#^DEFAULTED^#)
   // DEFAULTED: Begin completions, 1 items
-  // DEFAULTED: Pattern/CurrModule/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#x: Int#}, {#y: Int#}, {#z: Int#}, {#extra: Int#}[')'][#DragState#];
-  // DEFAULTED: End completions
+  // DEFAULTED: Pattern/CurrNominal/Flair[ArgLabels]: ['(']{#x: Int#}, {#y: Int#}, {#z: Int#}, {#extra: Int#}[')'][#DragState#];
 
   state = .defaulted(x: 1, #^DEFAULTEDARG^#)
   state = .defaulted(x: "Wrong type", #^ERRORTYPE?check=DEFAULTEDARG^#)
   // DEFAULTEDARG: Begin completions, 2 items
   // DEFAULTEDARG: Pattern/Local/Flair[ArgLabels]:     {#y: Int#}[#Int#];
   // DEFAULTEDARG: Pattern/Local/Flair[ArgLabels]:     {#z: Int#}[#Int#];
-  // DEFAULTEDARG: End completions
 
   state = .defaulted(wrongLabel: 2, #^ERRORARG^#)
   // ERRORARG: Begin completions, 3 items
@@ -43,11 +38,9 @@ func testMatch() {
   let localInt = 42
   switch state {
   case .dragging(translationX: 2, #^MATCH_ARGY^#):
-    // MATCH_ARGY: Begin completions
     // FIXME: This should have an identical type relation
     // MATCH_ARGY: Decl[LocalVar]/Local/TypeRelation[Convertible]: localInt[#Int#]; name=localInt
     // FIXME: We should offer 'translationY:' (without any flair since it's optional), `let translationY`, and `_`
-    // MATCH_ARGY: End completions
     break
   default:
     break

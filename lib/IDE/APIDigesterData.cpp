@@ -14,6 +14,7 @@
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/IDE/APIDigesterData.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -66,12 +67,12 @@ raw_ostream &swift::ide::api::operator<<(raw_ostream &Out, const DeclKind Value)
   return Out << getDeclKindStrRaw(Value);
 }
 
-Optional<SDKNodeKind> swift::ide::api::parseSDKNodeKind(StringRef Content) {
-  return llvm::StringSwitch<Optional<SDKNodeKind>>(Content)
+std::optional<SDKNodeKind>
+swift::ide::api::parseSDKNodeKind(StringRef Content) {
+  return llvm::StringSwitch<std::optional<SDKNodeKind>>(Content)
 #define NODE_KIND(NAME, VALUE) .Case(#VALUE, SDKNodeKind::NAME)
 #include "swift/IDE/DigesterEnums.def"
-    .Default(None)
-  ;
+      .Default(std::nullopt);
 }
 
 NodeAnnotation swift::ide::api::parseSDKNodeAnnotation(StringRef Content) {
@@ -339,7 +340,7 @@ static APIDiffItem*
 serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
                   llvm::yaml::MappingNode* Node) {
 #define DIFF_ITEM_KEY_KIND_STRING(NAME) StringRef NAME;
-#define DIFF_ITEM_KEY_KIND_INT(NAME) Optional<int> NAME;
+#define DIFF_ITEM_KEY_KIND_INT(NAME) std::optional<int> NAME;
 #include "swift/IDE/DigesterEnums.def"
   for (auto &Pair : *Node) {
     switch(parseKeyKind(getScalarString(Pair.getKey()))) {
@@ -360,8 +361,8 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
                      LeftUsr, RightUsr, LeftComment, RightComment, ModuleName);
   }
   case APIDiffItemKind::ADK_TypeMemberDiffItem: {
-    Optional<uint8_t> SelfIndexShort;
-    Optional<uint8_t> RemovedIndexShort;
+    std::optional<uint8_t> SelfIndexShort;
+    std::optional<uint8_t> RemovedIndexShort;
     if (SelfIndex)
       SelfIndexShort = SelfIndex.value();
     if (RemovedIndex)

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -125,6 +125,25 @@ extension KeyValuePairs: RandomAccessCollection {
   }
 }
 
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension KeyValuePairs {
+  @available(SwiftCompatibilitySpan 5.0, *)
+  @_alwaysEmitIntoClient
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    get {
+      let rp = unsafe UnsafeRawPointer(_elements._buffer.firstElementAddress)
+      let span = unsafe Span(
+        _unsafeStart: unsafe rp.assumingMemoryBound(to: Element.self),
+        count: _elements.count
+      )
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+  }
+}
+
+@_unavailableInEmbedded
 extension KeyValuePairs: CustomStringConvertible {
   /// A string that represents the contents of the dictionary.
   public var description: String {
@@ -132,6 +151,7 @@ extension KeyValuePairs: CustomStringConvertible {
   }
 }
 
+@_unavailableInEmbedded
 extension KeyValuePairs: CustomDebugStringConvertible {
   /// A string that represents the contents of the dictionary, suitable for
   /// debugging.

@@ -54,8 +54,8 @@ class RequirementMachine final {
   friend class swift::AbstractGenericSignatureRequest;
   friend class swift::InferredGenericSignatureRequest;
 
-  CanGenericSignature Sig;
-  SmallVector<Type, 2> Params;
+  GenericSignature Sig;
+  SmallVector<GenericTypeParamType *, 2> Params;
 
   RewriteContext &Context;
   RewriteSystem System;
@@ -64,10 +64,19 @@ class RequirementMachine final {
   bool Dump = false;
   bool Complete = false;
 
+  /// Whether completion failed, either for this rewrite system, or one of
+  /// its imported protocols. In this case, name lookup might find type
+  /// parameters that are not valid according to the rewrite system, because
+  /// not all conformance requirements will be present. This flag allows
+  /// us to skip certain verification checks in that case.
+  bool Failed = false;
+
   /// Parameters to prevent runaway completion and property map construction.
   unsigned MaxRuleCount;
   unsigned MaxRuleLength;
   unsigned MaxConcreteNesting;
+  unsigned MaxConcreteSize;
+  unsigned MaxTypeDifferences;
 
   UnifiedStatsReporter *Stats;
 
@@ -95,7 +104,7 @@ class RequirementMachine final {
       ArrayRef<const ProtocolDecl *> protos);
 
   std::pair<CompletionResult, unsigned>
-  initWithGenericSignature(CanGenericSignature sig);
+  initWithGenericSignature(GenericSignature sig);
 
   std::pair<CompletionResult, unsigned>
   initWithProtocolWrittenRequirements(
@@ -108,54 +117,62 @@ class RequirementMachine final {
       ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<StructuralRequirement> requirements);
 
-  bool isComplete() const;
+  bool isComplete() const {
+    return Complete;
+  }
 
   std::pair<CompletionResult, unsigned>
   computeCompletion(RewriteSystem::ValidityPolicy policy);
 
   void freeze();
 
-  void computeRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
-                                     SourceLoc signatureLoc);
+  void computeRequirementDiagnostics(
+                            SmallVectorImpl<RequirementError> &errors,
+                            ArrayRef<InverseRequirement> inverses,
+                            SourceLoc signatureLoc);
 
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
   void buildRequirementsFromRules(
     ArrayRef<unsigned> requirementRules,
     ArrayRef<unsigned> typeAliasRules,
-    TypeArrayView<GenericTypeParamType> genericParams,
+    ArrayRef<GenericTypeParamType *> genericParams,
     bool reconstituteSugar,
     std::vector<Requirement> &reqs,
     std::vector<ProtocolTypeAlias> &aliases) const;
 
-  TypeArrayView<GenericTypeParamType> getGenericParams() const {
-    return TypeArrayView<GenericTypeParamType>(
-      ArrayRef<Type>(Params));
+  ArrayRef<GenericTypeParamType *> getGenericParams() const {
+    return Params;
   }
 
 public:
   ~RequirementMachine();
 
+  bool isFailed() const {
+    return Failed;
+  }
+
   // Generic signature queries. Generally you shouldn't have to construct a
   // RequirementMachine instance; instead, call the corresponding methods on
   // GenericSignature, which lazily create a RequirementMachine for you.
-  GenericSignature::LocalRequirements getLocalRequirements(Type depType,
-                      TypeArrayView<GenericTypeParamType> genericParams) const;
+  GenericSignature::LocalRequirements getLocalRequirements(Type depType) const;
   bool requiresClass(Type depType) const;
   LayoutConstraint getLayoutConstraint(Type depType) const;
   bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
   GenericSignature::RequiredProtocols getRequiredProtocols(Type depType) const;
   Type getSuperclassBound(Type depType,
-                          TypeArrayView<GenericTypeParamType> genericParams) const;
+                          ArrayRef<GenericTypeParamType *> genericParams) const;
   bool isConcreteType(Type depType,
                       const ProtocolDecl *proto=nullptr) const;
   Type getConcreteType(Type depType,
-                       TypeArrayView<GenericTypeParamType> genericParams,
+                       ArrayRef<GenericTypeParamType *> genericParams,
                        const ProtocolDecl *proto=nullptr) const;
   bool areReducedTypeParametersEqual(Type depType1, Type depType2) const;
   bool isReducedType(Type type) const;
+  Type getReducedTypeParameter(CanType type,
+                      ArrayRef<GenericTypeParamType *> genericParams) const;
   Type getReducedType(Type type,
-                      TypeArrayView<GenericTypeParamType> genericParams) const;
+                      ArrayRef<GenericTypeParamType *> genericParams) const;
   bool isValidTypeParameter(Type type) const;
   ConformancePath getConformancePath(Type type, ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
@@ -164,7 +181,8 @@ private:
   MutableTerm getReducedShapeTerm(Type type) const;
 
 public:
-  Type getReducedShape(Type type) const;
+  Type getReducedShape(Type type,
+                       ArrayRef<GenericTypeParamType *> genericParams) const;
 
   bool haveSameShape(Type type1, Type type2) const;
 

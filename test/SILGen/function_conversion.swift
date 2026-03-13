@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name function_conversion -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name function_conversion -primary-file %s | %FileCheck %s
 // RUN: %target-swift-emit-ir -module-name function_conversion -primary-file %s
 
 // Check SILGen against various FunctionConversionExprs emitted by Sema.
@@ -568,21 +568,18 @@ func convTupleAny(_ f1: @escaping () -> (),
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sypSgIegn_S2iIegyy_TR : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in_guaranteed Optional<Any>) -> ()) -> ()
-// CHECK:         [[ANY_VALUE:%.*]] = alloc_stack $Any
-// CHECK-NEXT:    [[ANY_PAYLOAD:%.*]] = init_existential_addr [[ANY_VALUE]]
-// CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
+// CHECK:         [[OPTIONAL_ADDR:%.*]] = alloc_stack $Optional<Any>
+// CHECK-NEXT:    [[OPTIONAL_PAYLOAD_ADDR:%.*]] = init_enum_data_addr [[OPTIONAL_ADDR]] : $*Optional<Any>, #Optional.some
+// CHECK-NEXT:    [[ANY_PAYLOAD_ADDR:%.*]] = init_existential_addr [[OPTIONAL_PAYLOAD_ADDR]] : $*Any, $(Int, Int)
+// CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD_ADDR]]
 // CHECK-NEXT:    store %0 to [trivial] [[LEFT_ADDR]]
-// CHECK-NEXT:    [[RIGHT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
+// CHECK-NEXT:    [[RIGHT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD_ADDR]]
 // CHECK-NEXT:    store %1 to [trivial] [[RIGHT_ADDR]]
-// CHECK-NEXT:    [[OPTIONAL_VALUE:%.*]] = alloc_stack $Optional<Any>
-// CHECK-NEXT:    [[OPTIONAL_PAYLOAD:%.*]] = init_enum_data_addr [[OPTIONAL_VALUE]]
-// CHECK-NEXT:    copy_addr [take] [[ANY_VALUE]] to [init] [[OPTIONAL_PAYLOAD]]
-// CHECK-NEXT:    inject_enum_addr [[OPTIONAL_VALUE]]
-// CHECK-NEXT:    apply %2([[OPTIONAL_VALUE]])
+// CHECK-NEXT:    inject_enum_addr [[OPTIONAL_ADDR]]
+// CHECK-NEXT:    apply %2([[OPTIONAL_ADDR]])
 // CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    destroy_addr [[OPTIONAL_VALUE]]
-// CHECK-NEXT:    dealloc_stack [[OPTIONAL_VALUE]]
-// CHECK-NEXT:    dealloc_stack [[ANY_VALUE]]
+// CHECK-NEXT:    destroy_addr [[OPTIONAL_ADDR]]
+// CHECK-NEXT:    dealloc_stack [[OPTIONAL_ADDR]]
 // CHECK-NEXT:    return
 
 // ==== Support collection subtyping in function argument position
@@ -663,14 +660,26 @@ struct FunctionConversionParameterSubstToOrigReabstractionTest {
   }
 }
 
-// CHECK: sil {{.*}} [ossa] @$sS4SIgggoo_S2Ss11AnyHashableVyps5Error_pIegggrrzo_TR
-// CHECK:  [[TUPLE:%.*]] = apply %4(%2, %3) : $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)
+
+//   TODO: we really ought to be able to fully peephole this into the
+//   emission of the closure.
+// CHECK-LABEL: sil {{.*}} [ossa] @$sS4SIgggoo_SS3key_SS5valuets11AnyHashableV_ypts5NeverOIegnrzr_TR
+// CHECK: bb0(%0 : $*(AnyHashable, Any), %1 : $*Never, %2 : $*(key: String, value: String), %3 : @guaranteed $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)):
+// CHECK:  [[KEY_ADDR:%.*]] = tuple_element_addr %2 : $*(key: String, value: String), 0
+// CHECK:  [[KEY:%.*]] = load_borrow [[KEY_ADDR]] :
+// CHECK:  [[VALUE_ADDR:%.*]] = tuple_element_addr %2 : $*(key: String, value: String), 1
+// CHECK:  [[VALUE:%.*]] = load_borrow [[VALUE_ADDR]] :
+// CHECK:  [[OUT_KEY_ADDR:%.*]] = tuple_element_addr %0 : $*(AnyHashable, Any), 0
+// CHECK:  [[OUT_VALUE_ADDR:%.*]] = tuple_element_addr %0 : $*(AnyHashable, Any), 1
+// CHECK:  [[TUPLE:%.*]] = apply %3([[KEY]], [[VALUE]]) : $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)
 // CHECK:  ([[LHS:%.*]], [[RHS:%.*]]) = destructure_tuple [[TUPLE]]
 // CHECK:  [[ADDR:%.*]] = alloc_stack $String
 // CHECK:  store [[LHS]] to [init] [[ADDR]] : $*String
 // CHECK:  [[CVT:%.*]] = function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
-// CHECK:  apply [[CVT]]<String>(%0, [[ADDR]])
-// CHECK: } // end sil function '$sS4SIgggoo_S2Ss11AnyHashableVyps5Error_pIegggrrzo_TR'
+// CHECK:  apply [[CVT]]<String>([[OUT_KEY_ADDR]], [[ADDR]])
+// CHECK:  [[OUT_VALUE_BUF:%.*]] = init_existential_addr [[OUT_VALUE_ADDR]] : $*Any, $String
+// CHECK:  store [[RHS]] to [init] [[OUT_VALUE_BUF]]
+// CHECK: } // end sil function '$sS4SIgggoo_SS3key_SS5valuets11AnyHashableV_ypts5NeverOIegnrzr_TR'
 
 func dontCrash() {
   let userInfo = ["hello": "world"]

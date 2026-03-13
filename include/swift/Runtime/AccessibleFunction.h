@@ -24,7 +24,8 @@
 namespace swift {
 namespace runtime {
 
-SWIFT_RUNTIME_STDLIB_SPI const AccessibleFunctionRecord *
+SWIFT_RUNTIME_STDLIB_SPI
+const AccessibleFunctionRecord *
 swift_findAccessibleFunction(const char *targetNameStart,
                              size_t targetNameLength);
 

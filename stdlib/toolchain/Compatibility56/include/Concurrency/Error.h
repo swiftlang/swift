@@ -23,6 +23,7 @@
 
 namespace swift {
 
+__attribute__((visibility("hidden")))
 SWIFT_NORETURN void swift_Concurrency_fatalError(uint32_t flags, const char *format, ...);
 
 } // namespace swift

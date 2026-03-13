@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering -verify | %FileCheck %s
 
 // These are all regression tests to ensure that the memory promotion pass
 // doesn't crash.
@@ -129,5 +129,38 @@ bb5(%40 : @owned $Error):
   destroy_addr %4 : $*AStruct
   dealloc_stack %3 : $*AStruct
   throw %40 : $Error
+}
+
+struct Empty {}
+
+sil hidden [ossa] @empty_tuple_di1 : $@convention(thin) () -> @out () {
+bb0(%0 : $*()):
+  %2 = mark_uninitialized [out] %0
+  %3 = tuple ()
+  %5 = begin_access [modify] [static] %2
+  end_access %5
+  %7 = tuple ()
+  return %7
+}
+
+sil hidden [ossa] @empty_tuple_di2 : $@convention(thin) () -> @out ((), ()) {
+bb0(%0 : $*((), ())):
+  %2 = mark_uninitialized [out] %0
+  %3 = tuple ()
+  %5 = begin_access [modify] [static] %2
+  end_access %5
+  %7 = tuple ()
+  return %7
+}
+
+// Ensure no crash while emitting a diagnostic
+sil hidden [ossa] @empty_struct_di : $@convention(thin) () -> @out Empty { // expected-error{{}}
+bb0(%0 : $*Empty):
+  %2 = mark_uninitialized [out] %0
+  %3 = tuple ()
+  %5 = begin_access [modify] [static] %2
+  end_access %5
+  %7 = tuple ()
+  return %7
 }
 

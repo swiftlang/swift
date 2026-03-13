@@ -1,4 +1,5 @@
 // RUN: %swift -swift-version 4 -target arm64e-apple-ios12.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls | %FileCheck %s --check-prefix=CHECK
+// RUN: %swift -swift-version 4 -target arm64e-apple-ios12.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls
 
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios
@@ -6,6 +7,9 @@
 import Builtin
 
 struct S { var a, b, c: Builtin.NativeObject }
+
+// Check the constant discriminators for all value witnesses.
+
 // CHECK: @"$s4test1SVwCP.ptrauth" = private constant {{.*}} i64 55882
 // CHECK: @"$s4test1SVwxx.ptrauth" = private constant {{.*}} i64 1272
 // CHECK: @"$s4test1SVwcp.ptrauth" = private constant {{.*}} i64 58298
@@ -15,6 +19,11 @@ struct S { var a, b, c: Builtin.NativeObject }
 // CHECK: @"$s4test1SVwet.ptrauth" = private constant {{.*}} i64 24816
 // CHECK: @"$s4test1SVwst.ptrauth" = private constant {{.*}} i64 41169
 
+// The pointer to the value witness table is signed too.
+
+// 0x2e3f == 11839 is the constant discriminator for value witness tables.
+// CHECK: @"$s4test1SVWV.ptrauth" = private constant {{.*}} i64 11839
+
 sil @test_destroy : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
   destroy_addr %0 : $*T
@@ -22,13 +31,18 @@ bb0(%0 : $*T):
   return %result : $()
 }
 // CHECK-LABEL: define swiftcc void @test_destroy(
-// CHECK:      [[VWT:%.*]] = load i8**,
-// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32
-// CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
-// CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
-// CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 1272)
-// CHECK-NEXT: call void [[WITNESS]](%swift.opaque* noalias %0, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK:      [[SIGNED_VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i64 -1
+// CHECK:      [[SIGNED_VWT:%.*]] = load ptr, ptr [[SIGNED_VWT_ADDR]]
+// CHECK:      [[SIGNED_VWT_ADDR_INT:%.*]] = ptrtoint ptr [[SIGNED_VWT_ADDR]]
+// CHECK:      [[BLENDED_ADDR:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[SIGNED_VWT_ADDR_INT]], i64 11839)
+// CHECK:      [[SIGNED_VWT_INT:%.*]] = ptrtoint ptr [[SIGNED_VWT]]
+// CHECK:      [[AUTHENTICATED_VWT_INT:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[SIGNED_VWT_INT]], i32 2, i64 [[BLENDED_ADDR]])
+// CHECK:      [[AUTHENTICATED_VWT:%.*]] = inttoptr i64 [[AUTHENTICATED_VWT_INT]]
+// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[AUTHENTICATED_VWT]], i32
+// CHECK-NEXT: [[T0:%.*]] = load ptr, ptr [[SLOT]], align
+// CHECK-NEXT: [[T1:%.*]] = ptrtoint ptr [[SLOT]] to i64
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T1]], i64 1272)
+// CHECK-NEXT: call void [[T0]](ptr noalias %0, ptr %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: ret void
 
 sil @test_copy_init : $@convention(thin) <T> (@in_guaranteed T) -> (@out T) {
@@ -38,13 +52,18 @@ bb0(%0 : $*T, %1 : $*T):
   return %result : $()
 }
 // CHECK-LABEL: define swiftcc void @test_copy_init(
-// CHECK:      [[VWT:%.*]] = load i8**,
-// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32
-// CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
-// CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
-// CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 58298)
-// CHECK-NEXT: call %swift.opaque* [[WITNESS]](%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK:      [[SIGNED_VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i64 -1
+// CHECK:      [[SIGNED_VWT:%.*]] = load ptr, ptr [[SIGNED_VWT_ADDR]]
+// CHECK:      [[SIGNED_VWT_ADDR_INT:%.*]] = ptrtoint ptr [[SIGNED_VWT_ADDR]]
+// CHECK:      [[BLENDED_ADDR:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[SIGNED_VWT_ADDR_INT]], i64 11839)
+// CHECK:      [[SIGNED_VWT_INT:%.*]] = ptrtoint ptr [[SIGNED_VWT]]
+// CHECK:      [[AUTHENTICATED_VWT_INT:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[SIGNED_VWT_INT]], i32 2, i64 [[BLENDED_ADDR]])
+// CHECK:      [[AUTHENTICATED_VWT:%.*]] = inttoptr i64 [[AUTHENTICATED_VWT_INT]]
+// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[AUTHENTICATED_VWT]], i32
+// CHECK-NEXT: [[T0:%.*]] = load ptr, ptr [[SLOT]], align
+// CHECK-NEXT: [[T1:%.*]] = ptrtoint ptr [[SLOT]] to i64
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T1]], i64 58298)
+// CHECK-NEXT: call ptr [[T0]](ptr noalias %0, ptr noalias %1, ptr %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: ret void
 
 sil @test_take_init : $@convention(thin) <T> (@in T) -> (@out T) {
@@ -54,13 +73,18 @@ bb0(%0 : $*T, %1 : $*T):
   return %result : $()
 }
 // CHECK-LABEL: define swiftcc void @test_take_init(
-// CHECK:      [[VWT:%.*]] = load i8**,
-// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32
-// CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
-// CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
-// CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 18648)
-// CHECK-NEXT: call %swift.opaque* [[WITNESS]](%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK:      [[SIGNED_VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i64 -1
+// CHECK:      [[SIGNED_VWT:%.*]] = load ptr, ptr [[SIGNED_VWT_ADDR]]
+// CHECK:      [[SIGNED_VWT_ADDR_INT:%.*]] = ptrtoint ptr [[SIGNED_VWT_ADDR]]
+// CHECK:      [[BLENDED_ADDR:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[SIGNED_VWT_ADDR_INT]], i64 11839)
+// CHECK:      [[SIGNED_VWT_INT:%.*]] = ptrtoint ptr [[SIGNED_VWT]]
+// CHECK:      [[AUTHENTICATED_VWT_INT:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[SIGNED_VWT_INT]], i32 2, i64 [[BLENDED_ADDR]])
+// CHECK:      [[AUTHENTICATED_VWT:%.*]] = inttoptr i64 [[AUTHENTICATED_VWT_INT]]
+// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[AUTHENTICATED_VWT]], i32
+// CHECK-NEXT: [[T0:%.*]] = load ptr, ptr [[SLOT]], align
+// CHECK-NEXT: [[T1:%.*]] = ptrtoint ptr [[SLOT]] to i64
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T1]], i64 18648)
+// CHECK-NEXT: call ptr [[T0]](ptr noalias %0, ptr noalias %1, ptr %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: ret void
 
 sil @test_copy_assign : $@convention(thin) <T> (@inout T, @in_guaranteed T) -> () {
@@ -70,13 +94,18 @@ bb0(%0 : $*T, %1 : $*T):
   return %result : $()
 }
 // CHECK-LABEL: define swiftcc void @test_copy_assign(
-// CHECK:      [[VWT:%.*]] = load i8**,
-// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32
-// CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
-// CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
-// CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 34641)
-// CHECK-NEXT: call %swift.opaque* [[WITNESS]](%swift.opaque* %0, %swift.opaque* %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK:      [[SIGNED_VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i64 -1
+// CHECK:      [[SIGNED_VWT:%.*]] = load ptr, ptr [[SIGNED_VWT_ADDR]]
+// CHECK:      [[SIGNED_VWT_ADDR_INT:%.*]] = ptrtoint ptr [[SIGNED_VWT_ADDR]]
+// CHECK:      [[BLENDED_ADDR:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[SIGNED_VWT_ADDR_INT]], i64 11839)
+// CHECK:      [[SIGNED_VWT_INT:%.*]] = ptrtoint ptr [[SIGNED_VWT]]
+// CHECK:      [[AUTHENTICATED_VWT_INT:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[SIGNED_VWT_INT]], i32 2, i64 [[BLENDED_ADDR]])
+// CHECK:      [[AUTHENTICATED_VWT:%.*]] = inttoptr i64 [[AUTHENTICATED_VWT_INT]]
+// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[AUTHENTICATED_VWT]], i32
+// CHECK-NEXT: [[T0:%.*]] = load ptr, ptr [[SLOT]], align
+// CHECK-NEXT: [[T1:%.*]] = ptrtoint ptr [[SLOT]] to i64
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T1]], i64 34641)
+// CHECK-NEXT: call ptr [[T0]](ptr %0, ptr %1, ptr %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: ret void
 
 sil @test_take_assign : $@convention(thin) <T> (@inout T, @in T) -> () {
@@ -86,13 +115,18 @@ bb0(%0 : $*T, %1 : $*T):
   return %result : $()
 }
 // CHECK-LABEL: define swiftcc void @test_take_assign(
-// CHECK:      [[VWT:%.*]] = load i8**,
-// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32
-// CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
-// CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
-// CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 61402)
-// CHECK-NEXT: call %swift.opaque* [[WITNESS]](%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK:      [[SIGNED_VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i64 -1
+// CHECK:      [[SIGNED_VWT:%.*]] = load ptr, ptr [[SIGNED_VWT_ADDR]]
+// CHECK:      [[SIGNED_VWT_ADDR_INT:%.*]] = ptrtoint ptr [[SIGNED_VWT_ADDR]]
+// CHECK:      [[BLENDED_ADDR:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[SIGNED_VWT_ADDR_INT]], i64 11839)
+// CHECK:      [[SIGNED_VWT_INT:%.*]] = ptrtoint ptr [[SIGNED_VWT]]
+// CHECK:      [[AUTHENTICATED_VWT_INT:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[SIGNED_VWT_INT]], i32 2, i64 [[BLENDED_ADDR]])
+// CHECK:      [[AUTHENTICATED_VWT:%.*]] = inttoptr i64 [[AUTHENTICATED_VWT_INT]]
+// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[AUTHENTICATED_VWT]], i32
+// CHECK-NEXT: [[T0:%.*]] = load ptr, ptr [[SLOT]], align
+// CHECK-NEXT: [[T1:%.*]] = ptrtoint ptr [[SLOT]] to i64
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T1]], i64 61402)
+// CHECK-NEXT: call ptr [[T0]](ptr noalias %0, ptr noalias %1, ptr %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: ret void
 
 // Make sure that the local-type-data caching mechanism sets things up right.
@@ -104,12 +138,17 @@ bb0(%0 : $*T, %1 : $*T):
   return %result : $()
 }
 // CHECK-LABEL: define swiftcc void @test_destroy_twice(
-// CHECK:      [[VWT:%.*]] = load i8**,
-// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32
-// CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
-// CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
-// CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 1272)
-// CHECK-NEXT: call void [[WITNESS]](%swift.opaque* noalias %0, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
-// CHECK-NEXT: call void [[WITNESS]](%swift.opaque* noalias %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK:      [[SIGNED_VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i64 -1
+// CHECK:      [[SIGNED_VWT:%.*]] = load ptr, ptr [[SIGNED_VWT_ADDR]]
+// CHECK:      [[SIGNED_VWT_ADDR_INT:%.*]] = ptrtoint ptr [[SIGNED_VWT_ADDR]]
+// CHECK:      [[BLENDED_ADDR:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[SIGNED_VWT_ADDR_INT]], i64 11839)
+// CHECK:      [[SIGNED_VWT_INT:%.*]] = ptrtoint ptr [[SIGNED_VWT]]
+// CHECK:      [[AUTHENTICATED_VWT_INT:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[SIGNED_VWT_INT]], i32 2, i64 [[BLENDED_ADDR]])
+// CHECK:      [[AUTHENTICATED_VWT:%.*]] = inttoptr i64 [[AUTHENTICATED_VWT_INT]]
+// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[AUTHENTICATED_VWT]], i32
+// CHECK-NEXT: [[T0:%.*]] = load ptr, ptr [[SLOT]], align
+// CHECK-NEXT: [[T1:%.*]] = ptrtoint ptr [[SLOT]] to i64
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T1]], i64 1272)
+// CHECK-NEXT: call void [[T0]](ptr noalias %0, ptr %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK-NEXT: call void [[T0]](ptr noalias %1, ptr %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: ret void

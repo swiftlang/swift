@@ -1,0 +1,271 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=pointer_to_address | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class C {}
+
+// CHECK-LABEL: sil @remove_conversion :
+// CHECK-NOT:     address_to_pointer
+// CHECK-NOT:     pointer_to_address
+// CHECK:         [[L:%.*]] = load %0
+// CHECK:         return [[L]]
+// CHECK:       } // end sil function 'remove_conversion'
+sil @remove_conversion : $@convention(thin) (@in Int) -> Int {
+bb0(%0 : $*Int):
+  %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int
+  %3 = load %2 : $*Int
+  return %3 : $Int
+}
+
+// CHECK-LABEL: sil @mismatching_type :
+// CHECK:         %1 = unchecked_addr_cast %0
+// CHECK:         %2 = load %1
+// CHECK:         return %2
+// CHECK:       } // end sil function 'mismatching_type'
+sil @mismatching_type : $@convention(thin) (@in Int) -> Bool {
+bb0(%0 : $*Int):
+  %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Bool
+  %3 = load %2 : $*Bool
+  return %3 : $Bool
+}
+
+// CHECK-LABEL: sil @no_strict :
+// CHECK:         address_to_pointer
+// CHECK:         [[A:%.*]] = pointer_to_address
+// CHECK:         [[L:%.*]] = load [[A]]
+// CHECK:         return [[L]]
+// CHECK:       } // end sil function 'no_strict'
+sil @no_strict : $@convention(thin) (@in Int) -> Int {
+bb0(%0 : $*Int):
+  %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to $*Int
+  %3 = load %2 : $*Int
+  return %3 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @borrow_escape :
+// CHECK:         address_to_pointer
+// CHECK:         [[A:%.*]] = pointer_to_address
+// CHECK:         [[L:%.*]] = load [trivial] [[A]]
+// CHECK:         return [[L]]
+// CHECK:       } // end sil function 'borrow_escape'
+sil [ossa] @borrow_escape : $@convention(thin) (@guaranteed C) -> Int {
+bb0(%0 : @guaranteed $C):
+  %1 = begin_borrow %0 : $C
+  %2 = ref_tail_addr %1: $C, $Int
+  %3 = address_to_pointer %2 : $*Int to $Builtin.RawPointer
+  %5 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Int
+  end_borrow %1 : $C
+  %6 = load [trivial] %5 : $*Int
+  return %6 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @borrow_no_escape :
+// CHECK-NOT:     address_to_pointer
+// CHECK-NOT:     pointer_to_address
+// CHECK:       } // end sil function 'borrow_no_escape'
+sil [ossa] @borrow_no_escape : $@convention(thin) (@guaranteed C) -> Int {
+bb0(%0 : @guaranteed $C):
+  %1 = begin_borrow %0 : $C
+  %2 = ref_tail_addr %1: $C, $Int
+  %3 = address_to_pointer %2 : $*Int to $Builtin.RawPointer
+  %5 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Int
+  %6 = load [trivial] %5 : $*Int
+  end_borrow %1 : $C
+  return %6 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @stack_escape :
+// CHECK:         address_to_pointer
+// CHECK:         %4 = pointer_to_address
+// CHECK:         load [trivial] %4
+// CHECK:       } // end sil function 'stack_escape'
+sil [ossa] @stack_escape : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to [trivial] %1
+  %3 = address_to_pointer %1 to $Builtin.RawPointer
+  %4 = pointer_to_address %3 to [strict] $*Int
+  dealloc_stack %1
+  %6 = load [trivial] %4 : $*Int
+  return %6 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @stack_no_escape :
+// CHECK-NOT:     address_to_pointer
+// CHECK-NOT:     pointer_to_address
+// CHECK:         load [trivial] %1
+// CHECK:       } // end sil function 'stack_no_escape'
+sil [ossa] @stack_no_escape : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to [trivial] %1
+  %3 = address_to_pointer %1 to $Builtin.RawPointer
+  %4 = pointer_to_address %3 to [strict] $*Int
+  %6 = load [trivial] %4 : $*Int
+  dealloc_stack %1
+  return %6 : $Int
+}
+
+sil @createC : $@convention(thin) () -> @owned C
+
+// CHECK-LABEL: sil @non_ossa_local_ownership :
+// CHECK:         [[A:%.*]] = ref_tail_addr
+// CHECK-NOT:     address_to_pointer
+// CHECK-NOT:     pointer_to_address
+// CHECK:         [[L:%.*]] = load [[A]]
+// CHECK:         return [[L]]
+// CHECK:       } // end sil function 'non_ossa_local_ownership'
+sil @non_ossa_local_ownership : $@convention(thin) () -> Int {
+bb0:
+  %f = function_ref @createC : $@convention(thin) () -> @owned C
+  %0 = apply %f() : $@convention(thin) () -> @owned C
+  %2 = ref_tail_addr %0: $C, $Int
+  %3 = address_to_pointer %2 : $*Int to $Builtin.RawPointer
+  %5 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Int
+  %6 = load %5 : $*Int
+  strong_release %0 : $C
+  return %6 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @const_alignemnt :
+// CHECK:         pointer_to_address %1 to [align=8] $*T
+// CHECK:       } // end sil function 'const_alignemnt'
+sil [ossa] @const_alignemnt : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
+bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
+  %3 = integer_literal $Builtin.Word, 8
+  %4 = builtin "assumeAlignment"(%1, %3) : $Builtin.RawPointer
+  %5 = pointer_to_address %4 to [align=1] $*T
+  copy_addr %5 to [init] %0
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @zero_alignemnt :
+// CHECK:         pointer_to_address %1 to $*T
+// CHECK:       } // end sil function 'zero_alignemnt'
+sil [ossa] @zero_alignemnt : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
+bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
+  %3 = integer_literal $Builtin.Word, 0
+  %4 = builtin "assumeAlignment"(%1, %3) : $Builtin.RawPointer
+  %5 = pointer_to_address %4 to [align=1] $*T
+  copy_addr %5 to [init] %0
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @type_alignment :
+// CHECK:         pointer_to_address %1 to $*T
+// CHECK:       } // end sil function 'type_alignment'
+sil [ossa] @type_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
+bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
+  %3 = metatype $@thick T.Type
+  %4 = builtin "alignof"<T>(%3) : $Builtin.Word
+  %5 = builtin "sextOrBitCast_Word_Int64"(%4) : $Builtin.Int64
+  %6 = builtin "truncOrBitCast_Int64_Word"(%5) : $Builtin.Word
+  %7 = builtin "assumeAlignment"(%1, %6) : $Builtin.RawPointer
+  %8 = pointer_to_address %7 to [align=1] $*T
+  copy_addr %8 to [init] %0
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @indexrawpointer_to_indexaddr :
+// CHECK:         %2 = pointer_to_address %0
+// CHECK-NEXT:    %3 = index_addr %2, %1
+// CHECK-NEXT:    load [trivial] %3
+// CHECK:       } // end sil function 'indexrawpointer_to_indexaddr'
+sil [ossa] @indexrawpointer_to_indexaddr : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Int8 {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %3 = metatype $@thick Int8.Type
+  %4 = builtin "strideof"<Int8>(%3) : $Builtin.Word
+  %6 = integer_literal $Builtin.Int1, -1
+  %7 = builtin "smul_with_overflow_Word"(%4, %1, %6) : $(Builtin.Word, Builtin.Int1)
+  %8 = tuple_extract %7, 0
+  %9 = index_raw_pointer %0, %8
+  %10 = pointer_to_address %9 to [strict] $*Int8
+  %11 = load [trivial] %10
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @indexrawpointer_to_indexaddr_strideof :
+// CHECK:         %2 = pointer_to_address %0
+// CHECK-NEXT:    %3 = index_addr %2, %1
+// CHECK-NEXT:    load [trivial] %3
+// CHECK:       } // end sil function 'indexrawpointer_to_indexaddr_strideof'
+sil [ossa] @indexrawpointer_to_indexaddr_strideof : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Int8 {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %3 = metatype $@thick Int8.Type
+  %4 = builtin "strideof"<Int8>(%3) : $Builtin.Word
+  %6 = integer_literal $Builtin.Int1, -1
+  %7 = builtin "smul_with_overflow_Word"(%4, %1, %6) : $(Builtin.Word, Builtin.Int1)
+  %8 = tuple_extract %7, 0
+  %9 = index_raw_pointer %0, %8
+  %10 = pointer_to_address %9 to [strict] $*Int8
+  %11 = load [trivial] %10
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @indexrawpointer_to_indexaddr_mismatched_metatype :
+// CHECK-NOT:     index_addr
+// CHECK:         index_raw_pointer
+// CHECK-NOT:     index_addr
+// CHECK:       } // end sil function 'indexrawpointer_to_indexaddr_mismatched_metatype'
+sil [ossa] @indexrawpointer_to_indexaddr_mismatched_metatype : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Int32 {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %3 = metatype $@thick Int8.Type
+  %4 = builtin "strideof"<Int8>(%3) : $Builtin.Word
+  %6 = integer_literal $Builtin.Int1, -1
+  %7 = builtin "smul_with_overflow_Word"(%4, %1, %6) : $(Builtin.Word, Builtin.Int1)
+  %8 = tuple_extract %7, 0
+  %9 = index_raw_pointer %0, %8
+  %10 = pointer_to_address %9 to [strict] $*Int32
+  %11 = load [trivial] %10
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @indexrawpointer_to_indexaddr_with_casts :
+// CHECK:         %2 = pointer_to_address %0
+// CHECK-NEXT:    %3 = builtin "truncOrBitCast_Int64_Word"(%1)
+// CHECK-NEXT:    %4 = index_addr %2, %3
+// CHECK-NEXT:    load [trivial] %4
+// CHECK:       } // end sil function 'indexrawpointer_to_indexaddr_with_casts'
+sil [ossa] @indexrawpointer_to_indexaddr_with_casts : $@convention(thin) (Builtin.RawPointer, Builtin.Int64) -> Int32 {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = metatype $@thick Int32.Type
+  %4 = builtin "strideof"<Int32>(%3) : $Builtin.Word
+  %5 = builtin "zextOrBitCast_Word_Int64"(%4) : $Builtin.Int64
+  %6 = builtin "smul_with_overflow_Int64"(%1, %5, %2) : $(Builtin.Int64, Builtin.Int1)
+  %7 = tuple_extract %6, 0
+  %8 = builtin "truncOrBitCast_Int64_Word"(%7) : $Builtin.Word
+  %9 = index_raw_pointer %0, %8
+  %10 = pointer_to_address %9 to [strict] $*Int32
+  %11 =  load [trivial] %10
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_ownership_conversion :
+// CHECK:         %4 = ref_tail_addr
+// CHECK-NEXT:    %5 = load [trivial] %4
+// CHECK:       } // end sil function 'unchecked_ownership_conversion'
+sil [ossa] @unchecked_ownership_conversion : $@convention(thin) (Unmanaged<C>) -> Int {
+bb0(%0 : $Unmanaged<C>):
+  %1 = struct_extract %0, #Unmanaged._value
+  %2 = unmanaged_to_ref %1 to $C
+  %3 = unchecked_ownership_conversion %2, @unowned to @guaranteed
+  %4 = ref_tail_addr %3, $*Int
+  %5 = address_to_pointer %4 to $Builtin.RawPointer
+  %6 = pointer_to_address %5 to [strict] $*Int
+  %7 = load [trivial] %6
+  end_borrow %3
+  return %7
+}

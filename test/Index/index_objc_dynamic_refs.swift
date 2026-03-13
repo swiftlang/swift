@@ -5,15 +5,15 @@ import Foundation
 
 @objc protocol AProtocol {
     @objc optional func dynamicMethod()
-    // CHECK: [[@LINE-1]]:25 | instance-method/Swift | dynamicMethod() | [[DynamicMethod_USR:.*]] | Def
+    // CHECK: [[@LINE-1]]:25 | instance-method(internal)/Swift | dynamicMethod() | [[DynamicMethod_USR:.*]] | Def
     @objc optional var property: String { get }
-    // CHECK: [[@LINE-1]]:24 | instance-property/Swift | property | [[DynamicProperty_USR:.*]] | Def
+    // CHECK: [[@LINE-1]]:24 | instance-property(internal)/Swift | property | [[DynamicProperty_USR:.*]] | Def
 }
 
 class AClass {
 
     weak var objcDelegate: AProtocol?
-    // CHECK: [[@LINE-1]]:14 | instance-property/Swift | objcDelegate | [[Delegate_USR:.*]] | Def
+    // CHECK: [[@LINE-1]]:14 | instance-property(internal)/Swift | objcDelegate | [[Delegate_USR:.*]] | Def
 
     func doSomething() {
         objcDelegate?.dynamicMethod?()

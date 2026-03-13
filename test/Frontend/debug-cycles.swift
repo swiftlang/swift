@@ -5,7 +5,7 @@ class Outer2: Outer2.Inner {
   class Inner {}
 }
 // CHECK:===CYCLE DETECTED===
-// CHECK-NEXT: `--TypeCheckSourceFileRequest({{.*}})
+// CHECK-NEXT: `--TypeCheckPrimaryFileRequest({{.*}})
 // CHECK-NEXT:     `--[0;32mSuperclassDeclRequest({{.*}})[0m
 // CHECK-NEXT:         `--InheritedDeclsReferencedRequest({{.*}})
 // CHECK-NEXT:             `--QualifiedLookupRequest({{.*}})

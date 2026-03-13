@@ -1,20 +1,17 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 func testAll0() {
   // Not type context.
   let x = #^NO_CONTEXT_0^#
-// NO_CONTEXT_0-DAG: Begin completions
 // NO_CONTEXT_0-DAG: Literal[Integer]/None:              0[#Int#];
 // NO_CONTEXT_0-DAG: Literal[Boolean]/None:              true[#Bool#];
 // NO_CONTEXT_0-DAG: Literal[Boolean]/None:              false[#Bool#];
 // NO_CONTEXT_0-DAG: Literal[Nil]/None:                  nil;
 // NO_CONTEXT_0-DAG: Literal[String]/None:               "{#(abc)#}"[#String#];
-// NO_CONTEXT_0-DAG: Literal[Array]/None:                [{#(values)#}][#Array#];
-// NO_CONTEXT_0-DAG: Literal[Dictionary]/None:           [{#(key)#}: {#(value)#}][#Dictionary#];
+// NO_CONTEXT_0-DAG: Literal[Array]/None:                [{#(values)#}][#Array<Element>#];
+// NO_CONTEXT_0-DAG: Literal[Dictionary]/None:           [{#(key)#}: {#(value)#}][#Dictionary<Key, Value>#];
 // NO_CONTEXT_0-DAG: Literal[_Color]/None:               #colorLiteral({#red: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#});
 // NO_CONTEXT_0-DAG: Literal[_Image]/None:               #imageLiteral({#resourceName: String#});
-// NO_CONTEXT_0: End completions
 }
 
 struct MyNil1: ExpressibleByNilLiteral {
@@ -149,7 +146,7 @@ func testString5() {
 func testArray0() {
   let x: Int = #^ARRAY_0^#
 }
-// ARRAY_0: Literal[Array]/None: [{#(values)#}][#Array#];
+// ARRAY_0: Literal[Array]/None: [{#(values)#}][#Array<Element>#];
 
 func testArray1() {
   let x: MyArray1<MyInt1> = #^ARRAY_1^#
@@ -164,7 +161,7 @@ func testArray2() {
 func testDict0() {
   let x: Int = #^DICT_0^#
 }
-// DICT_0: Literal[Dictionary]/None: [{#(key)#}: {#(value)#}][#Dictionary#];
+// DICT_0: Literal[Dictionary]/None: [{#(key)#}: {#(value)#}][#Dictionary<Key, Value>#];
 
 func testDict1() {
   let x: MyDict1<MyInt1, MyString1> = #^DICT_1^#

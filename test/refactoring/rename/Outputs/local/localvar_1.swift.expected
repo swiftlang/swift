@@ -1,7 +1,7 @@
 func test1() {
   if true {
-    let xRenamed = 1
-    print(xRenamed)
+    let <base>x</base> = 1
+    print(<base>x</base>)
   } else {
     let x = 2
     print(x)

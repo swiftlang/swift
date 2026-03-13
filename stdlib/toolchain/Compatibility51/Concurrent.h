@@ -434,7 +434,7 @@ public:
       auto newCapacity = std::max((size_t)16, count * 2);
       auto *newStorage = Storage::allocate(newCapacity);
       if (storage) {
-        std::copy(storage->data(), storage->data() + count, newStorage->data());
+        std::copy_n(storage->data(), count, newStorage->data());
         newStorage->Count.store(count, std::memory_order_relaxed);
         FreeList.push_back(storage);
       }

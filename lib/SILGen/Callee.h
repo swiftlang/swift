@@ -24,34 +24,35 @@ namespace Lowering {
 
 class CalleeTypeInfo {
 public:
-  Optional<AbstractionPattern> origFormalType;
+  std::optional<AbstractionPattern> origFormalType;
   CanSILFunctionType substFnType;
-  Optional<AbstractionPattern> origResultType;
+  std::optional<AbstractionPattern> origResultType;
   CanType substResultType;
   ForeignInfo foreign;
 
 private:
-  Optional<SILFunctionTypeRepresentation> overrideRep;
+  std::optional<SILFunctionTypeRepresentation> overrideRep;
 
 public:
   CalleeTypeInfo() = default;
 
-  CalleeTypeInfo(CanSILFunctionType substFnType,
-                 AbstractionPattern origResultType, CanType substResultType,
-                 const Optional<ForeignErrorConvention> &foreignError,
-                 const Optional<ForeignAsyncConvention> &foreignAsync,
-                 ImportAsMemberStatus foreignSelf,
-                 Optional<SILFunctionTypeRepresentation> overrideRep = None)
-      : origFormalType(llvm::None), substFnType(substFnType),
-        origResultType(origResultType),
-        substResultType(substResultType), foreign{foreignSelf, foreignError,
-                                                  foreignAsync},
+  CalleeTypeInfo(
+      CanSILFunctionType substFnType, AbstractionPattern origResultType,
+      CanType substResultType,
+      const std::optional<ForeignErrorConvention> &foreignError,
+      const std::optional<ForeignAsyncConvention> &foreignAsync,
+      ImportAsMemberStatus foreignSelf,
+      std::optional<SILFunctionTypeRepresentation> overrideRep = std::nullopt)
+      : origFormalType(std::nullopt), substFnType(substFnType),
+        origResultType(origResultType), substResultType(substResultType),
+        foreign{foreignSelf, foreignError, foreignAsync},
         overrideRep(overrideRep) {}
 
-  CalleeTypeInfo(CanSILFunctionType substFnType,
-                 AbstractionPattern origResultType, CanType substResultType,
-                 Optional<SILFunctionTypeRepresentation> overrideRep = None)
-      : origFormalType(llvm::None), substFnType(substFnType),
+  CalleeTypeInfo(
+      CanSILFunctionType substFnType, AbstractionPattern origResultType,
+      CanType substResultType,
+      std::optional<SILFunctionTypeRepresentation> overrideRep = std::nullopt)
+      : origFormalType(std::nullopt), substFnType(substFnType),
         origResultType(origResultType), substResultType(substResultType),
         foreign(), overrideRep(overrideRep) {}
 

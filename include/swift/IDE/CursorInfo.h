@@ -26,7 +26,7 @@ namespace ide {
 class CursorInfoConsumer {
 public:
   virtual ~CursorInfoConsumer() {}
-  virtual void handleResults(const ResolvedCursorInfo &) = 0;
+  virtual void handleResults(std::vector<ResolvedCursorInfoPtr>) = 0;
 };
 
 /// Create a factory for code completion callbacks.

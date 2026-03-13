@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -primary-file %s | %FileCheck %s
 
 class C<T> {}
 protocol P {

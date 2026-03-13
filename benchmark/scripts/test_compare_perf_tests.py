@@ -629,7 +629,7 @@ class TestReportFormatter(OldAndNewLog):
         )
 
     def test_justified_columns(self):
-        """Table columns are all formated with same width, defined by the
+        """Table columns are all formatted with same width, defined by the
         longest value.
         """
         self.assert_markdown_contains(
@@ -860,7 +860,7 @@ class Test_parse_args(unittest.TestCase):
             )
         self.assertIn(
             "error: argument --format: invalid choice: 'bogus' "
-            "(choose from 'markdown', 'git', 'html')",
+            "(choose from ",
             err.getvalue(),
         )
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name function_conversion_objc -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -enable-objc-interop -verify | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name function_conversion_objc -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -enable-objc-interop -verify | %FileCheck %s
 
 import Foundation
 
@@ -59,7 +59,7 @@ func funcToBlock(_ x: @escaping () -> ()) -> @convention(block) () -> () {
 // CHECK-LABEL: sil hidden [ossa] @$s24function_conversion_objc11blockToFuncyyycyyXBF : $@convention(thin) (@guaranteed @convention(block) () -> ()) -> @owned @callee_guaranteed () -> ()
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@convention(block) () -> ()):
 // CHECK:   [[COPIED:%.*]] = copy_block [[ARG]]
-// CHECK:   [[BORROWED_COPIED:%.*]] = begin_borrow [lexical] [[COPIED]]
+// CHECK:   [[BORROWED_COPIED:%.*]] = begin_borrow [[COPIED]]
 // CHECK:   [[COPIED_2:%.*]] = copy_value [[BORROWED_COPIED]]
 // CHECK:   [[THUNK:%.*]] = function_ref @$sIeyB_Ieg_TR
 // CHECK:   [[FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[COPIED_2]])

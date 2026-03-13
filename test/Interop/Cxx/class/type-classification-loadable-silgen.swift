@@ -54,17 +54,17 @@ func pass(s: StructWithSubobjectDefaultedCopyConstructor) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithCopyAssignment)
 func pass(s: StructWithCopyAssignment) {
-  // CHECK: bb0(%0 : $*StructWithCopyAssignment):
+  // CHECK: bb0(%0 : $StructWithCopyAssignment):
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithInheritedCopyAssignment)
 func pass(s: StructWithInheritedCopyAssignment) {
-  // CHECK: bb0(%0 : $*StructWithInheritedCopyAssignment):
+  // CHECK: bb0(%0 : $StructWithInheritedCopyAssignment):
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithSubobjectCopyAssignment)
 func pass(s: StructWithSubobjectCopyAssignment) {
-  // CHECK: bb0(%0 : $*StructWithSubobjectCopyAssignment):
+  // CHECK: bb0(%0 : $StructWithSubobjectCopyAssignment):
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithDestructor)

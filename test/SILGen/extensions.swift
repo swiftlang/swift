@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 class Foo {
   // CHECK-LABEL: sil hidden [ossa] @$s10extensions3FooC3zim{{[_0-9a-zA-Z]*}}F
@@ -52,7 +52,7 @@ struct Box<T> {
 // CHECK-LABEL: sil hidden [ossa] @$s10extensions3BoxV1tACyxGx_tcfC : $@convention(method) <T> (@in T, @thin Box<T>.Type) -> @out Box<T>
 // CHECK:      [[SELF_BOX:%.*]] = alloc_box $<τ_0_0> { var Box<τ_0_0> } <T>
 // CHECK-NEXT: [[UNINIT_SELF_BOX:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]
-// CHECK-NEXT: [[UNINIT_SELF_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[UNINIT_SELF_BOX]]
+// CHECK-NEXT: [[UNINIT_SELF_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[UNINIT_SELF_BOX]]
 // CHECK-NEXT: [[SELF_ADDR:%.*]] = project_box [[UNINIT_SELF_BOX_LIFETIME]] : $<τ_0_0> { var Box<τ_0_0> } <T>
 // CHECK:      [[RESULT:%.*]] = struct_element_addr [[SELF_ADDR]] : $*Box<T>, #Box.t
 // CHECK:      [[INIT:%.*]] = function_ref @$s10extensions3BoxV1txSgvpfi : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>

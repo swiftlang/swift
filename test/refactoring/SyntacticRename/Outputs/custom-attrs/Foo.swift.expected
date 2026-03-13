@@ -1,5 +1,5 @@
 @propertyWrapper
-struct /*wrapper:def*/Foo2<T> {
+struct /*wrapper:def*/<base>Foo</base><T> {
     public var wrappedValue: T
     init(initialValue: T) {
         wrappedValue = initialValue
@@ -24,14 +24,14 @@ struct /*builder:def*/Other {
 }
 
 struct Bar {
-    @/*wrapper*/Foo2
+    @/*wrapper*/<base>Foo</base>
     var /*wrapped:def*/foo: Int = 10
-    @/*wrapper*/Foo2(initialValue: "hello")
+    @/*wrapper*/<base>Foo</base>(initialValue: "hello")
     var bar: String
-    @/*wrapper*/Foo2
+    @/*wrapper*/<base>Foo</base>
     var jim: String = {
         struct Bar {
-            @/*wrapper*/Foo2
+            @/*wrapper*/<base>Foo</base>
             var inner: String = "It's 42"
         }
         return Bar().inner
@@ -48,11 +48,11 @@ struct Bar {
     }
 
     func baz() {
-        let _: /*wrapper*/Foo2<Int> = /*wrapped+1*/_foo
+        let _: /*wrapper*/<base>Foo</base><Int> = /*wrapped+1*/_foo
         let _: Int = /*wrapped+1*/_foo.wrappedValue
         let _: Int = /*wrapped*/foo
         let _: Projection<Int> = /*wrapped+1*/$foo
-        let _: /*wrapper*/Foo2<String> = _bar
+        let _: /*wrapper*/<base>Foo</base><String> = _bar
     }
 }
 

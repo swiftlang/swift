@@ -23,51 +23,6 @@
 
 namespace swift {
 
-/// A type associated with a protocol.
-///
-/// This struct exists largely so that we can maybe eventually
-/// generalize it to an arbitrary path.
-class AssociatedType {
-  AssociatedTypeDecl *Association;
-  using AssociationInfo = llvm::DenseMapInfo<AssociatedTypeDecl*>;
-
-  struct SpecialValue {};
-  explicit AssociatedType(SpecialValue _, AssociatedTypeDecl *specialValue)
-      : Association(specialValue) {}
-
-public:
-  explicit AssociatedType(AssociatedTypeDecl *association)
-      : Association(association) {
-    assert(association);
-  }
-
-  ProtocolDecl *getSourceProtocol() const {
-    return Association->getProtocol();
-  }
-
-  AssociatedTypeDecl *getAssociation() const {
-    return Association;
-  }
-
-  friend bool operator==(AssociatedType lhs, AssociatedType rhs) {
-    return lhs.Association == rhs.Association;
-  }
-  friend bool operator!=(AssociatedType lhs, AssociatedType rhs) {
-    return !(lhs == rhs);
-  }
-
-  unsigned getHashValue() const {
-    return llvm::hash_value(Association);
-  }
-
-  static AssociatedType getEmptyKey() {
-    return AssociatedType(SpecialValue(), AssociationInfo::getEmptyKey());
-  }
-  static AssociatedType getTombstoneKey() {
-    return AssociatedType(SpecialValue(), AssociationInfo::getTombstoneKey());
-  }
-};
-
 /// A base conformance of a protocol.
 class BaseConformance {
   ProtocolDecl *Source;
@@ -147,24 +102,6 @@ public:
 } // end namespace swift
 
 namespace llvm {
-  template <> struct DenseMapInfo<swift::AssociatedType> {
-    static inline swift::AssociatedType getEmptyKey() {
-      return swift::AssociatedType::getEmptyKey();
-    }
-
-    static inline swift::AssociatedType getTombstoneKey() {
-      return swift::AssociatedType::getTombstoneKey();
-    }
-
-    static unsigned getHashValue(swift::AssociatedType val) {
-      return val.getHashValue();
-    }
-
-    static bool isEqual(swift::AssociatedType lhs, swift::AssociatedType rhs) {
-      return lhs == rhs;
-    }
-  };
-
   template <> struct DenseMapInfo<swift::AssociatedConformance> {
     static inline swift::AssociatedConformance getEmptyKey() {
       return swift::AssociatedConformance::getEmptyKey();

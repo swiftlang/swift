@@ -11,6 +11,7 @@ swift_is_installing_component(sourcekit-inproc SOURCEKIT_INSTALLING_INPROC)
 
 set(sourcekitdInProc_args
   sourcekitdInProc.cpp
+  CodeCompletionSwiftInterop.cpp
   LLVM_LINK_COMPONENTS support coverage
 )
 
@@ -18,6 +19,8 @@ if (SOURCEKIT_INSTALLING_INPROC)
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     add_sourcekit_framework(sourcekitdInProc
       ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
+      ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/plugin.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/CodeCompletionSwiftInterop.h
       ${sourcekitdInProc_args}
       MODULEMAP module.modulemap
       INSTALL_IN_COMPONENT sourcekit-inproc
@@ -49,6 +52,8 @@ else()
     HAS_SWIFT_MODULES
   )
 endif()
+set_target_properties(sourcekitdInProc PROPERTIES
+  DEFINE_SYMBOL sourcekitd_EXPORTS)
 target_link_libraries(sourcekitdInProc PRIVATE
   SourceKitSwiftLang
   sourcekitdAPI

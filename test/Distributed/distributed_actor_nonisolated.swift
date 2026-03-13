@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -9,6 +9,10 @@ import FakeDistributedActorSystems
 
 @available(SwiftStdlib 5.5, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
+
+@propertyWrapper struct P {
+  var wrappedValue = 0
+}
 
 distributed actor DA {
 
@@ -21,7 +25,7 @@ distributed actor DA {
 
   nonisolated var computedNonisolated: Int {
     // nonisolated computed properties are outside of the actor and as such cannot access local
-    _ = self.local // expected-error{{distributed actor-isolated property 'local' can not be accessed from a non-isolated context}}
+    _ = self.local // expected-error{{distributed actor-isolated property 'local' can not be accessed from a nonisolated context}}
 
     _ = self.id // ok, special handled and always available
     _ = self.actorSystem // ok, special handled and always available
@@ -34,7 +38,7 @@ distributed actor DA {
     _ = self.actorSystem // ok
     
     // self is a distributed actor self is NOT isolated
-    _ = self.local // expected-error{{distributed actor-isolated property 'local' can not be accessed from a non-isolated context}}
+    _ = self.local // expected-error{{distributed actor-isolated property 'local' can not be accessed from a nonisolated context}}
     _ = try await self.dist() // ok, was made implicitly throwing and async
     _ = self.computedNonisolated // it's okay, only the body of computedNonisolated is wrong
   }
@@ -49,4 +53,20 @@ distributed actor DA {
     fatalError()
   }
 
+  nonisolated lazy var a = 0 // expected-error {{'nonisolated' can not be applied to distributed actor stored properties}}
+  @P nonisolated var b = 0 // expected-error {{'nonisolated' can not be applied to distributed actor stored properties}}
+
+}
+
+func invalidIsolatedCall<DA: DistributedActor> (
+  to actor: DA,
+  queue: AsyncStream<@Sendable (isolated DA) async -> Void>
+) {
+  Task {
+    // expected-note@+1 {{let declared here}}
+    for await closure in queue {
+      // expected-warning@+1 {{distributed actor-isolated let 'closure' can not be accessed from a nonisolated context; this is an error in the Swift 6 language mode}}
+      await closure(actor)
+    }
+  }
 }

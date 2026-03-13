@@ -12,23 +12,35 @@
 
 #define DEBUG_TYPE "flow-isolation"
 
-#include "llvm/Support/WithColor.h"
+#include "DiagnosticHelpers.h"
+
 #include "swift/AST/Expr.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Sema/Concurrency.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BitDataflow.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SIL/OperandDatastructures.h"
+
+#include "llvm/Support/WithColor.h"
 
 using namespace swift;
+using namespace swift::siloptimizer;
 
 namespace {
 
-class AnalysisInfo;
+class FunctionInfo;
 
-// MARK: utilities
+} // namespace
+
+//===----------------------------------------------------------------------===//
+//                              MARK: Utilities
+//===----------------------------------------------------------------------===//
 
 static SILFunction* getCallee(SILInstruction *someInst) {
   if (auto apply = ApplySite::isa(someInst))
@@ -37,51 +49,63 @@ static SILFunction* getCallee(SILInstruction *someInst) {
   return nullptr;
 }
 
-// Represents the state of isolation for `self` during the flow-analysis,
-// at entry and exit to a block. The states are part of a semi-lattice,
-// where the extra top element represents a conflict in isolation:
-//
-//         T = "top"
-//        / \
-//      Iso  NonIso
-//        \ /
-//         B = "bottom"
-//
-// While we will be talking about isolated vs nonisolated uses, the only
-// isolated uses that we consider are stored property accesses.
-struct State {
-  // Each state kind, as an integer, is its position in any bit vectors.
+//===----------------------------------------------------------------------===//
+//                             MARK: LatticeState
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Represents the state of isolation for `self` during the flow-analysis,
+/// at entry and exit to a block. The states are part of a semi-lattice,
+/// where the extra top element represents a conflict in isolation:
+///
+///         T = "top"
+///        / \
+///      Iso  NonIso
+///        \ /
+///         B = "bottom"
+///
+/// While we will be talking about isolated vs nonisolated uses, the only
+/// isolated uses that we consider are stored property accesses.
+struct LatticeState {
+  /// Each state kind, as an integer, is its position in any bit vectors.
   enum Kind {
     Isolated = 0,
     Nonisolated = 1
   };
 
-  // Number of states, excluding Top or Bottom, in this flow problem.
+  /// Number of states, excluding Top or Bottom, in this flow problem.
   static constexpr unsigned NumStates = 2;
 };
 
-/// Information gathered for analysis that is specific to a block.
-struct Info {
-  using UseSet = SmallPtrSet<SILInstruction*, 8>;
+} // namespace
 
+//===----------------------------------------------------------------------===//
+//                            MARK: Per Block Info
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Information gathered for analysis that is specific to a block.
+struct BlockInfo {
   /// Records all nonisolated uses of `self` in the block, and their kind of
   /// use to aid diagnostics.
-  UseSet nonisolatedUses;
+  SmallPtrSet<SILInstruction *, 8> nonisolatedUses;
 
   /// Records all stored property uses based on `self` in the block.
   /// These are the only isolated uses that we care about.
-  UseSet propertyUses;
+  SmallPtrSet<Operand *, 8> propertyUses;
 
-  Info() : nonisolatedUses(), propertyUses() {}
+  BlockInfo() : nonisolatedUses(), propertyUses() {}
 
   // Diagnoses all property uses as being an error.
-  void diagnoseAll(AnalysisInfo &info, bool forDeinit,
+  void diagnoseAll(FunctionInfo &info, bool forDeinit,
                    SILInstruction *blame = nullptr);
 
   /// Returns the block corresponding to this information.
   SILBasicBlock* getBlock() const {
     if (!propertyUses.empty())
-      return (*(propertyUses.begin()))->getParent();
+      return (*(propertyUses.begin()))->getParentBlock();
 
     if (!nonisolatedUses.empty())
       return (*(nonisolatedUses.begin()))->getParent();
@@ -92,12 +116,14 @@ struct Info {
     return nullptr;
   }
 
-  SILInstruction* firstPropertyUse() const {
+  SILInstruction *firstPropertyUse() const {
     auto *blk = getBlock();
 
     for (auto &inst : *blk) {
-      if (propertyUses.count(&inst))
-        return &inst;
+      for (auto &op : inst.getAllOperands()) {
+        if (propertyUses.count(&op))
+          return &inst;
+      }
     }
 
     assert(false && "no first property use found!");
@@ -112,16 +138,20 @@ struct Info {
     return !propertyUses.empty();
   }
 
-  void dump() const LLVM_ATTRIBUTE_USED {
-    llvm::dbgs() << "nonisolatedUses:\n";
+  void print(llvm::raw_ostream &os) const {
+    os << "nonisolatedUses:\n";
     for (auto const *i : nonisolatedUses)
-      i->dump();
+      i->print(os);
 
-    llvm::dbgs() << "propertyUses:\n";
+    os << "propertyUses:\n";
     for (auto const *i : propertyUses)
-      i->dump();
+      i->print(os);
   }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 };
+
+} // namespace
 
 /// \returns true iff the function is a deinit, or a defer of a deinit.
 static bool isWithinDeinit(SILFunction *fn) {
@@ -134,19 +164,25 @@ static bool isWithinDeinit(SILFunction *fn) {
   return isa<DestructorDecl>(astFn);
 }
 
+//===----------------------------------------------------------------------===//
+//                          MARK: Per Function Info
+//===----------------------------------------------------------------------===//
+
+namespace {
+
 /// Carries the state of analysis for an entire SILFunction.
-class AnalysisInfo : public BasicBlockData<Info> {
+class FunctionInfo : public BasicBlockData<BlockInfo> {
 private:
   /// Isolation state at the start of the entry block to this function.
   /// This should always be `isolated`, unless if this is a `defer`.
-  State::Kind startingIsolation = State::Isolated;
+  LatticeState::Kind startingIsolation = LatticeState::Isolated;
 
 public:
 
   // The deferBlocks information is shared between all blocks of
   // this analysis information's function.
-  llvm::SmallMapVector< SILFunction*,
-                        std::unique_ptr<AnalysisInfo>, 8> deferBlocks;
+  llvm::SmallMapVector<SILFunction *, std::unique_ptr<FunctionInfo>, 8>
+      deferBlocks;
 
   // Only computed after calling solve()
   BitDataflow flow;
@@ -155,13 +191,14 @@ public:
   /// a normal return is reached, along with the block that returns normally.
   /// Only computed after calling solve(), where it remains None if the function
   /// doesn't return normally.
-  Optional<std::pair<SILBasicBlock*, State::Kind>> normalReturn = None;
+  std::optional<std::pair<SILBasicBlock *, LatticeState::Kind>> normalReturn =
+      std::nullopt;
 
   /// indicates whether the SILFunction is (or contained in) a deinit.
   bool forDeinit;
 
-  AnalysisInfo(SILFunction *fn) : BasicBlockData<Info>(fn),
-                                  flow(fn, State::NumStates) {
+  FunctionInfo(SILFunction *fn)
+      : BasicBlockData<BlockInfo>(fn), flow(fn, LatticeState::NumStates) {
     forDeinit = isWithinDeinit(fn);
   }
 
@@ -172,7 +209,7 @@ public:
   void solve();
 
   // Verifies uses in this function, assuming solving has been performed.
-  void verifyIsolation();
+  void emitDiagnostics();
 
   /// Finds an appropriate instruction that can be blamed for introducing a
   /// source of `nonisolation` in a control-flow path leading the given
@@ -212,14 +249,14 @@ public:
     return deferBlocks.count(someFn) > 0;
   }
 
-  AnalysisInfo& getOrCreateDeferInfo(SILFunction* someFn) {
+  FunctionInfo &getOrCreateDeferInfo(SILFunction *someFn) {
     assert(someFn);
 
     if (haveDeferInfo(someFn))
       return *(deferBlocks[someFn]);
 
     // otherwise, insert fresh info and retry.
-    deferBlocks.insert({someFn, std::make_unique<AnalysisInfo>(someFn)});
+    deferBlocks.insert({someFn, std::make_unique<FunctionInfo>(someFn)});
     return getOrCreateDeferInfo(someFn);
   }
 
@@ -227,22 +264,22 @@ public:
   /// \returns true iff the start state has changed from isolated to nonisolated
   bool setNonisolatedStart() {
     // once we enter the nonisolated state, nothing will change that.
-    if (startingIsolation == State::Nonisolated)
+    if (startingIsolation == LatticeState::Nonisolated)
       return false;
 
-    startingIsolation = State::Nonisolated;
+    startingIsolation = LatticeState::Nonisolated;
     return true;
   }
 
   /// Test whether the incoming isolation kind was set to nonisolated.
   bool hasNonisolatedStart() const {
-    return startingIsolation == State::Nonisolated;
+    return startingIsolation == LatticeState::Nonisolated;
   }
 
   /// Records that the instruction accesses an isolated property.
-  void markPropertyUse(SILInstruction *i) {
+  void markPropertyUse(Operand *i) {
     LLVM_DEBUG(llvm::dbgs() << "marking as isolated: " << *i);
-    auto &blockData = this->operator[](i->getParent());
+    auto &blockData = this->operator[](i->getParentBlock());
     blockData.propertyUses.insert(i);
   }
 
@@ -253,60 +290,45 @@ public:
     blockData.nonisolatedUses.insert(i);
   }
 
-  void dump() const LLVM_ATTRIBUTE_USED {
-    llvm::dbgs() << "analysis-info for " << getFunction()->getName() << "\n";
+  void print(llvm::raw_ostream &os) const {
+    os << "analysis-info for " << getFunction()->getName() << "\n";
     for (auto const& bnd : *this) {
-      llvm::dbgs() << "bb" << bnd.block.getDebugID() << "\n";
-      bnd.data.dump();
+      os << "bb" << bnd.block.getDebugID() << "\n";
+      bnd.data.print(os);
     }
-    llvm::dbgs() << "flow-problem state:\n";
-    flow.dump();
+    os << "flow-problem state:\n";
+    flow.print(os);
 
     // print the defer information in a different color, if supported.
-    llvm::WithColor color(llvm::dbgs(), raw_ostream::BLUE);
+    llvm::WithColor color(os, raw_ostream::BLUE);
     for (auto const& entry : deferBlocks)
-      entry.second->dump();
+      entry.second->print(os);
   }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 };
 
-// MARK: diagnostics
+} // namespace
 
-SILInstruction *AnalysisInfo::findNonisolatedBlame(SILInstruction* startInst) {
+//===----------------------------------------------------------------------===//
+//                             MARK: Diagnostics
+//===----------------------------------------------------------------------===//
+
+SILInstruction *FunctionInfo::findNonisolatedBlame(SILInstruction *startInst) {
   assert(startInst);
 
   SILBasicBlock* firstBlk = startInst->getParent();
   assert(firstBlk->getParent() == getFunction());
 
-  // workList for breadth-first search to find one of the closest blocks.
-  std::deque<SILBasicBlock*> workList;
-  BasicBlockSet visited(getFunction());
-
-  // seed the search
-  workList.push_back(firstBlk);
-  SILBasicBlock::reverse_iterator cursor = startInst->getReverseIterator();
-
-  while (!workList.empty()) {
-    auto *block = workList.front();
-    workList.pop_front();
+  // searches the a block starting at the provided position in reverse
+  // order of instructions (i.e., from terminator to first instruction).
+  auto searchBlockForNonisolated =
+      [&](SILBasicBlock::reverse_iterator cursor) -> SILInstruction * {
+    SILBasicBlock *block = cursor->getParent();
     auto &state = flow[block];
 
-    // if this block doesn't have exiting nonisolation, then there's no
-    // way we'll find nonisolation in a predecessor.
-    assert(state.exitSet[State::Nonisolated] && "nonisolation is unreachable!");
-
-    // If this is the first time we're scanning the start block, then leave
-    // the cursor alone and do a partial scan. If the block is part of
-    // a cycle, we want to scan the block entirely on the second visit, so we
-    // do not count this as a visit.
-    if (startInst) {
-      startInst = nullptr; // make sure second visit scans entirely.
-    } else {
-      cursor = block->rbegin();
-      visited.insert(block);
-    }
-
     // does this block generate non-isolation?
-    if (state.genSet[State::Nonisolated]) {
+    if (state.genSet[LatticeState::Nonisolated]) {
       auto &data = this->operator[](block);
       assert(!data.nonisolatedUses.empty());
 
@@ -321,16 +343,36 @@ SILInstruction *AnalysisInfo::findNonisolatedBlame(SILInstruction* startInst) {
       }
     }
 
+    return nullptr;
+  };
+
+  // whether we should visit a given predecessor block in the search.
+  auto shouldVisit = [&](SILBasicBlock *pred) {
+    // visit blocks that contribute nonisolation to successors.
+    return flow[pred].exitSet[LatticeState::Nonisolated];
+  };
+
+  // first check if the nonisolated use precedes the start instruction in
+  // this same block.
+  if (auto *inst = searchBlockForNonisolated(startInst->getReverseIterator()))
+    return inst;
+
+  // Seed a workQueue with the predecessors of this start block to
+  // begin a breadth-first search to find one of the closest predecessors.
+  BasicBlockWorkqueue workQueue(firstBlk->getFunction());
+  for (auto *pred : firstBlk->getPredecessorBlocks())
+    if (shouldVisit(pred))
+      workQueue.push(pred);
+
+  while (auto *block = workQueue.pop()) {
+    // do we have a nonisolated use here?
+    if (auto *inst = searchBlockForNonisolated(block->rbegin()))
+      return inst;
+
+    // otherwise keep looking
     for (auto *pred : block->getPredecessorBlocks()) {
-      // skip visited
-      if (visited.contains(pred))
-        continue;
-
-      // skip blocks that do not contribute nonisolation.
-      if (flow[pred].exitSet[State::Nonisolated] == false)
-        continue;
-
-      workList.push_back(pred);
+      if (shouldVisit(pred))
+        workQueue.pushIfNotVisited(pred);
     }
   }
 
@@ -418,8 +460,8 @@ describe(SILInstruction *blame) {
 /// search.
 /// \param info the AnalysisInfo corresponding to the function containing this
 /// block.
-void Info::diagnoseAll(AnalysisInfo &info, bool forDeinit,
-                       SILInstruction* blame) {
+void BlockInfo::diagnoseAll(FunctionInfo &info, bool forDeinit,
+                            SILInstruction *blame) {
   if (propertyUses.empty())
     return;
 
@@ -448,31 +490,37 @@ void Info::diagnoseAll(AnalysisInfo &info, bool forDeinit,
     }
   }
 
-  auto &diag = fn->getASTContext().Diags;
-
-  SILLocation blameLoc = blame->getDebugLocation().getLocation();
-
   for (auto *use : propertyUses) {
     // If the illegal use is a call to a defer, then recursively diagnose
     // all of the defer's uses, if this is the first time encountering it.
-    if (auto *callee = getCallee(use)) {
-      assert(info.haveDeferInfo(callee) && "non-defer call as a property use?");
-      auto &defer = info.getOrCreateDeferInfo(callee);
-      if (defer.setNonisolatedStart()) {
-        defer.diagnoseEntireFunction(blame);
+    if (auto *callee = getCallee(use->getUser())) {
+      if (info.haveDeferInfo(callee)) {
+        auto &defer = info.getOrCreateDeferInfo(callee);
+        if (defer.setNonisolatedStart()) {
+          defer.diagnoseEntireFunction(blame);
+        }
+        continue;
       }
+
+      // Init accessor `setter` use.
+      auto *accessor =
+          cast<AccessorDecl>(callee->getLocation().getAsDeclContext());
+      diagnoseError(use,
+                    diag::isolated_property_mutation_in_nonisolated_context,
+                    accessor->getStorage(), accessor->isSetter())
+          .warnUntilLanguageMode(LanguageMode::v6);
       continue;
     }
 
-    assert(isa<RefElementAddrInst>(use) && "only expecting one kind of instr.");
+    auto *user = use->getUser();
+    assert(isa<RefElementAddrInst>(user) &&
+           "only expecting one kind of instr.");
 
-    SILLocation illegalLoc = use->getDebugLocation().getLocation();
-    VarDecl *var = cast<RefElementAddrInst>(use)->getField();
+    VarDecl *var = cast<RefElementAddrInst>(user)->getField();
 
-    diag.diagnose(illegalLoc.getSourceLoc(), diag::isolated_after_nonisolated,
-                  forDeinit, var->getDescriptiveKind(), var->getName())
-      .highlight(illegalLoc.getSourceRange())
-      .warnUntilSwiftVersion(6);
+    diagnoseErrorAndHighlight(user, diag::isolated_after_nonisolated, forDeinit,
+                              var)
+        .warnUntilLanguageMode(LanguageMode::v6);
 
     // after <verb><adjective> <subject>, ... can't use self anymore, etc ...
     //   example:
@@ -481,14 +529,14 @@ void Info::diagnoseAll(AnalysisInfo &info, bool forDeinit,
     StringRef adjective;
     DeclName subject;
     std::tie(verb, adjective, subject) = describe(blame);
-
-    diag.diagnose(blameLoc.getSourceLoc(), diag::nonisolated_blame,
-                  forDeinit, verb, adjective, subject)
-      .highlight(blameLoc.getSourceRange());
+    diagnoseNoteAndHighlight(blame, diag::nonisolated_blame, forDeinit, verb,
+                             adjective, subject);
   }
 }
 
-// MARK: analysis
+//===----------------------------------------------------------------------===//
+//                               MARK: Analysis
+//===----------------------------------------------------------------------===//
 
 /// \returns true iff the access is concurrency-safe in a nonisolated context
 /// without an await.
@@ -496,9 +544,8 @@ static bool accessIsConcurrencySafe(ModuleDecl *module,
                                     RefElementAddrInst *inst) {
   VarDecl *var = inst->getField();
 
-  // must be accessible from nonisolated and Sendable
-  return isLetAccessibleAnywhere(module, var)
-      && isSendableType(module, var->getType());
+  // must be accessible from nonisolated.
+  return isLetAccessibleAnywhere(module, var);
 }
 
 /// \returns true iff the ref_element_addr instruction is only used
@@ -516,52 +563,42 @@ static bool onlyDeinitAccess(RefElementAddrInst *inst) {
 /// diagnostic if it is not Sendable. The diagnostic assumes that the access
 /// is happening in a deinit that uses flow-isolation.
 /// \returns true iff a diagnostic was emitted for this reference.
-static bool diagnoseNonSendableFromDeinit(ModuleDecl *module,
-                                          RefElementAddrInst *inst) {
-  VarDecl *var = inst->getField();
-  Type ty = var->getType();
-  DeclContext* dc = inst->getFunction()->getDeclContext();
+static bool diagnoseNonSendableFromDeinit(RefElementAddrInst *inst) {
+  auto dc = inst->getFunction()->getDeclContext();
 
-// FIXME: we should emit diagnostics in other modes using:
-//
-//  if (!shouldDiagnoseExistingDataRaces(dc))
-//    return false;
-//
-// but until we decide how we want to handle isolated state from deinits,
-// we're going to limit the noise to complete mode for now.
+  // For historical reasons, only diagnose this issue in strict mode.
   if (dc->getASTContext().LangOpts.StrictConcurrencyLevel
-      != StrictConcurrency::Complete)
-      return false;
-
-  if (isSendableType(module, ty))
+        != StrictConcurrency::Complete)
     return false;
 
-  auto &diag = var->getASTContext().Diags;
-
-  diag.diagnose(inst->getLoc().getSourceLoc(), diag::non_sendable_from_deinit,
-                ty, var->getDescriptiveKind(), var->getName())
-      .warnUntilSwiftVersion(6);
-
-  return true;
+  return swift::diagnoseNonSendableFromDeinit(
+      inst->getLoc().getSourceLoc(),
+      inst->getField(),
+      dc);
 }
 
 /// Analyzes a function for uses of `self` and records the kinds of isolation
 /// required.
 /// \param selfParam the parameter of \c getFunction() that should be
 /// treated as \c self
-void AnalysisInfo::analyze(const SILArgument *selfParam) {
+void FunctionInfo::analyze(const SILArgument *selfParam) {
   assert(selfParam && "analyzing a function with no self?");
 
   ModuleDecl *module = getFunction()->getModule().getSwiftModule();
 
   // Use a worklist to track the uses left to be searched.
-  SmallVector<Operand *, 32> worklist;
+  OperandWorklist worklist(getFunction());
 
   // Seed with direct users of `self`
-  worklist.append(selfParam->use_begin(), selfParam->use_end());
+  worklist.pushResultOperandsIfNotVisited(selfParam);
 
-  while (!worklist.empty()) {
-    Operand *operand = worklist.pop_back_val();
+  while (Operand *operand = worklist.pop()) {
+    // A type-dependent use of `self` is an instruction that contains the
+    // DynamicSelfType. These instructions do not access any protected
+    // state.
+    if (operand->isTypeDependent())
+      continue;
+
     SILInstruction *user = operand->getUser();
 
     // First, check if this is an apply that involves `self`
@@ -595,7 +632,7 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
               // if it can return normally, and if it does, it carries
               // nonisolation.
               if (defer.normalReturn) {
-                if (defer.normalReturn->second == State::Nonisolated) {
+                if (defer.normalReturn->second == LatticeState::Nonisolated) {
                   markNonIsolated(user);
                 }
               }
@@ -603,8 +640,39 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
               // If the defer body has any stored property uses, we record that
               // in the parent by declaring this call-site being a property use.
               if (defer.hasPropertyUse())
-                markPropertyUse(user);
+                markPropertyUse(operand);
 
+              continue;
+            }
+          }
+        }
+
+        // Detect and handle use of init accessor properties.
+        if (callee->hasLocation()) {
+          auto loc = callee->getLocation();
+          if (auto *accessor =
+                  dyn_cast_or_null<AccessorDecl>(loc.getAsDeclContext())) {
+            auto *storage = accessor->getStorage();
+
+            // Note 'nonisolated' property use.
+            if (storage->getAttrs().hasAttribute<NonisolatedAttr>()) {
+              markNonIsolated(user);
+              continue;
+            }
+
+            // Init accessor is used exclusively for initialization
+            // of properties while 'self' is not fully initialized.
+            if (accessor->isInitAccessor()) {
+              markNonIsolated(user);
+              continue;
+            }
+
+            // Otherwise if this is an init accessor property, it's either
+            // a call to a getter or a setter and should be treated like
+            // an isolated computed property reference.
+
+            if (storage->hasInitAccessor()) {
+              markPropertyUse(operand);
               continue;
             }
           }
@@ -633,10 +701,10 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
           continue;
 
         // emit a diagnostic and skip if it's non-sendable in a deinit
-        if (forDeinit && diagnoseNonSendableFromDeinit(module, refInst))
+        if (forDeinit && diagnoseNonSendableFromDeinit(refInst))
           continue;
 
-        markPropertyUse(user);
+        markPropertyUse(operand);
         break;
       }
 
@@ -650,11 +718,19 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
         break;
 
       case SILInstructionKind::BeginAccessInst:
-      case SILInstructionKind::BeginBorrowInst: {
+      case SILInstructionKind::BeginBorrowInst:
+      case SILInstructionKind::EndInitLetRefInst: {
         auto *svi = cast<SingleValueInstruction>(user);
-        worklist.append(svi->use_begin(), svi->use_end());
+        worklist.pushResultOperandsIfNotVisited(svi);
         break;
       }
+
+      case SILInstructionKind::BranchInst: {
+        auto *arg = cast<BranchInst>(user)->getArgForOperand(operand);
+        worklist.pushResultOperandsIfNotVisited(arg);
+        break;
+      }
+
 
       default:
         // don't follow this instruction.
@@ -667,7 +743,7 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
 
 /// Initialize and solve the dataflow problem, assuming the entry block starts
 /// isolated.
-void AnalysisInfo::solve() {
+void FunctionInfo::solve() {
   SILFunction *fn = getFunction();
   SILBasicBlock *returnBlk = nullptr;
 
@@ -697,8 +773,8 @@ void AnalysisInfo::solve() {
 
     // A nonisolated use "kills" isolation and generates nonisolation.
     if (this->operator[](blk).hasNonisolatedUse()) {
-      data.killSet.set(State::Isolated);
-      data.genSet.set(State::Nonisolated);
+      data.killSet.set(LatticeState::Isolated);
+      data.genSet.set(LatticeState::Nonisolated);
     }
   }
 
@@ -709,15 +785,15 @@ void AnalysisInfo::solve() {
   // in that case. This is needed to implement `defer`.
   if (returnBlk) {
     auto &returnInfo = flow[returnBlk];
-    if (returnInfo.exitSet[State::Nonisolated])
-      normalReturn = std::make_pair(returnBlk, State::Nonisolated);
+    if (returnInfo.exitSet[LatticeState::Nonisolated])
+      normalReturn = std::make_pair(returnBlk, LatticeState::Nonisolated);
     else
-      normalReturn = std::make_pair(returnBlk, State::Isolated);
+      normalReturn = std::make_pair(returnBlk, LatticeState::Isolated);
   }
 }
 
 /// Enforces isolation rules, given the flow and block-local information.
-void AnalysisInfo::verifyIsolation() {
+void FunctionInfo::emitDiagnostics() {
   // go through all the blocks.
   for (auto entry : *this) {
     auto &block = entry.block;
@@ -730,18 +806,18 @@ void AnalysisInfo::verifyIsolation() {
 
     // If flow-analysis determined that we might be `nonisolated` coming
     // into this block, then all isolated uses in this block are invalid.
-    if (flowInfo.entrySet[State::Nonisolated]) {
+    if (flowInfo.entrySet[LatticeState::Nonisolated]) {
       data.diagnoseAll(*this, forDeinit);
       continue;
     }
 
     // Otherwise, we must be starting off isolated.
-    assert(flowInfo.entrySet[State::Isolated]);
+    assert(flowInfo.entrySet[LatticeState::Isolated]);
 
     // If this block doesn't introduce nonisolation, then we can skip it.
     if (data.nonisolatedUses.empty()) {
       // make sure flow analysis agrees.
-      assert(flowInfo.exitSet[State::Nonisolated] == 0);
+      assert(flowInfo.exitSet[LatticeState::Nonisolated] == 0);
       continue;
     }
 
@@ -761,7 +837,9 @@ void AnalysisInfo::verifyIsolation() {
         break;
       }
 
-      data.propertyUses.erase(inst);
+      for (auto &op : inst->getAllOperands()) {
+        data.propertyUses.erase(&op);
+      }
       current++;
     }
 
@@ -775,27 +853,29 @@ void AnalysisInfo::verifyIsolation() {
     if (entry.second->hasNonisolatedStart())
       continue;
 
-    entry.second->verifyIsolation();
+    entry.second->emitDiagnostics();
   }
 }
 
-// MARK: high-level setup
+//===----------------------------------------------------------------------===//
+//                            MARK: Top Level Code
+//===----------------------------------------------------------------------===//
 
 /// Performs flow-sensitive actor-isolation checking on the given SILFunction.
 void checkFlowIsolation(SILFunction *fn) {
   assert(fn->hasSelfParam() && "cannot analyze without a self param!");
 
   // Step 1 -- Analyze uses of `self` within the function.
-  AnalysisInfo info(fn);
+  FunctionInfo info(fn);
   info.analyze(fn->getSelfArgument());
 
   // Step 2 -- Initialize and solve the dataflow problem.
   info.solve();
 
-  LLVM_DEBUG(info.dump());
+  LLVM_DEBUG(info.print(llvm::dbgs()));
 
   // Step 3 -- With the information gathered, check for flow-isolation issues.
-  info.verifyIsolation();
+  info.emitDiagnostics();
 }
 
 /// The FlowIsolation pass performs flow-sensitive actor-isolation checking in
@@ -814,6 +894,11 @@ class FlowIsolation : public SILFunctionTransform {
     if (fn->wasDeserializedCanonical())
       return;
 
+    // Do not run on thunks. We trust those and there isn't a benefit to the
+    // user. Any issue there is a compiler bug.
+    if (fn->isThunk())
+      return;
+
     // Look for functions that use flow-isolation.
     if (auto *dc = fn->getDeclContext())
       if (auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(dc->getAsDecl()))
@@ -824,8 +909,6 @@ class FlowIsolation : public SILFunctionTransform {
   }
 
 }; // class
-
-} // anonymous namespace
 
 /// This pass is known to depend on the following passes having run before it:
 ///   - NoReturnFolding

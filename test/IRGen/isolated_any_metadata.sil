@@ -1,0 +1,44 @@
+// RUN: %swift -emit-ir %s -target x86_64-apple-macosx10.10 -disable-legacy-type-info -parse-stdlib -module-name Swift | %FileCheck -DINT=i64 %s -check-prefixes=CHECK,CHECK-ACCESSOR,CHECK-COMBO-ACCESSOR
+// RUN: %swift -emit-ir %s -target x86_64-apple-macos15.0 -disable-legacy-type-info -parse-stdlib -module-name Swift | %FileCheck -DINT=i64 %s -check-prefixes=CHECK,CHECK-DEMANGLE,CHECK-COMBO-ACCESSOR
+// RUN: %swift -emit-ir %s -target x86_64-unknown-linux-gnu -disable-legacy-type-info -parse-stdlib -module-name Swift | %FileCheck -DINT=i64 %s -check-prefixes=CHECK,CHECK-DEMANGLE,CHECK-COMBO-DEMANGLE
+
+// REQUIRES: concurrency
+
+sil_stage canonical
+
+struct NonSendable {}
+
+// CHECK-LABEL:        define{{.*}} swiftcc ptr @get_metadata
+// CHECK:              entry:
+// CHECK-ACCESSOR-NEXT:  [[T0:%.*]] = call swiftcc %swift.metadata_response @"$syyYbYAcMa"([[INT]] 0)
+// CHECK-ACCESSOR-NEXT:  [[METADATA:%.]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-DEMANGLE:       [[METADATA:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyYbYAcMD")
+// CHECK-NEXT:           ret ptr [[METADATA]]
+sil @get_metadata : $() -> @thick Any.Type {
+entry:
+  %type = metatype $@thick (@isolated(any) @Sendable () -> ()).Type
+  %result = init_existential_metatype %type : $@thick (@isolated(any) @Sendable () -> ()).Type, $@thick Any.Type
+  return %result : $@thick Any.Type
+}
+
+// CHECK-ACCESSOR-LABEL: define{{.*}} swiftcc %swift.metadata_response @"$syyYbYAcMa"
+//   3288334336 == 0xc4000000 == (ExtendedFlags | Sendable | Escaping)
+//   2 == IsolatedAny
+// CHECK-ACCESSOR:         call ptr @swift_getExtendedFunctionTypeMetadata([[INT]] 3288334336, [[INT]] 0, ptr null, ptr null, ptr getelementptr inbounds {{.*}} @"$sytN"{{.*}}), ptr null, i32 2, ptr null)
+
+// CHECK-LABEL:        define{{.*}} swiftcc ptr @get_combo_metadata
+// CHECK:              entry:
+// CHECK-COMBO-ACCESSOR-NEXT: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$ss11NonSendableVyYbYAYTcMa"([[INT]] 0)
+// CHECK-COMBO-ACCESSOR-NEXT:  [[METADATA:%.]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-COMBO-DEMANGLE-NEXT: [[METADATA:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$ss11NonSendableVyYbYAYTcMD")
+// CHECK-NEXT:           ret ptr [[METADATA]]
+sil @get_combo_metadata : $() -> @thick Any.Type {
+entry:
+  %type = metatype $@thick (@isolated(any) @Sendable () -> sending NonSendable).Type
+  %result = init_existential_metatype %type : $@thick (@isolated(any) @Sendable () -> sending NonSendable).Type, $@thick Any.Type
+  return %result : $@thick Any.Type
+}
+
+// CHECK-COMBO-ACCESSOR-LABEL: define{{.*}} swiftcc %swift.metadata_response @"$ss11NonSendableVyYbYAYTcMa"
+//   18 == 0x12 == IsolatedAny | HasSendingResult
+// CHECK-COMBO-ACCESSOR:         call ptr @swift_getExtendedFunctionTypeMetadata([[INT]] 3288334336, [[INT]] 0, ptr null, ptr null, ptr getelementptr inbounds {{.*}} @"$ss11NonSendableVMf"{{.*}}), ptr null, i32 18, ptr null)

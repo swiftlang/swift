@@ -13,14 +13,12 @@ import Foundation
 
 enum ModuleDependencyId: Hashable {
   case swift(String)
-  case swiftPlaceholder(String)
   case swiftPrebuiltExternal(String)
   case clang(String)
 
   var moduleName: String {
     switch self {
     case .swift(let name): return name
-    case .swiftPlaceholder(let name): return name
     case .swiftPrebuiltExternal(let name): return name
     case .clang(let name): return name
     }
@@ -30,7 +28,6 @@ enum ModuleDependencyId: Hashable {
 extension ModuleDependencyId: Codable {
   enum CodingKeys: CodingKey {
     case swift
-    case swiftPlaceholder
     case swiftPrebuiltExternal
     case clang
   }
@@ -42,16 +39,11 @@ extension ModuleDependencyId: Codable {
       self = .swift(moduleName)
     } catch {
       do {
-        let moduleName =  try container.decode(String.self, forKey: .swiftPlaceholder)
-        self = .swiftPlaceholder(moduleName)
+        let moduleName =  try container.decode(String.self, forKey: .swiftPrebuiltExternal)
+        self = .swiftPrebuiltExternal(moduleName)
       } catch {
-        do {
-          let moduleName =  try container.decode(String.self, forKey: .swiftPrebuiltExternal)
-          self = .swiftPrebuiltExternal(moduleName)
-        } catch {
-          let moduleName =  try container.decode(String.self, forKey: .clang)
-          self = .clang(moduleName)
-        }
+        let moduleName =  try container.decode(String.self, forKey: .clang)
+        self = .clang(moduleName)
       }
     }
   }
@@ -61,8 +53,6 @@ extension ModuleDependencyId: Codable {
     switch self {
       case .swift(let moduleName):
         try container.encode(moduleName, forKey: .swift)
-      case .swiftPlaceholder(let moduleName):
-        try container.encode(moduleName, forKey: .swiftPlaceholder)
       case .swiftPrebuiltExternal(let moduleName):
         try container.encode(moduleName, forKey: .swiftPrebuiltExternal)
       case .clang(let moduleName):
@@ -86,31 +76,17 @@ struct SwiftModuleDetails: Codable {
   /// The paths of potentially ready-to-use compiled modules for the interface.
   var compiledModuleCandidates: [String]?
 
-  /// The bridging header, if any.
-  var bridgingHeaderPath: String?
-
-  /// The source files referenced by the bridging header.
-  var bridgingSourceFiles: [String]? = []
-
   /// Options to the compile command
   var commandLine: [String]? = []
 
-  /// To build a PCM to be used by this Swift module, we need to append these
-  /// arguments to the generic PCM build arguments reported from the dependency
-  /// graph.
-  var extraPcmArgs: [String]
-
   /// A flag to indicate whether or not this module is a framework.
   var isFramework: Bool
-}
 
-/// Details specific to Swift placeholder dependencies.
-struct SwiftPlaceholderModuleDetails: Codable {
-  /// The path to the .swiftModuleDoc file.
-  var moduleDocPath: String?
+   /// The bridging header info, if any.
+  var bridgingHeader: BridgingHeader?  
 
-  /// The path to the .swiftSourceInfo file.
-  var moduleSourceInfoPath: String?
+  /// A set of Swift Overlays of Clang Module Dependencies
+  var swiftOverlayDependencies: [ModuleDependencyId]?
 }
 
 /// Details specific to Swift externally-pre-built modules.
@@ -130,10 +106,6 @@ struct SwiftPrebuiltExternalModuleDetails: Codable {
 struct ClangModuleDetails: Codable {
   /// The path to the module map used to build this module.
   public var moduleMapPath: String
-
-  /// Set of PCM Arguments of depending modules which
-  /// are covered by the directDependencies info of this module
-  public var dependenciesCapturedPCMArgs: Set<[String]>?
 
   /// clang-generated context hash
   var contextHash: String
@@ -161,10 +133,6 @@ struct ModuleInfo: Codable {
     /// a bridging header.
     case swift(SwiftModuleDetails)
 
-    /// Swift placeholder modules carry additional details that specify their
-    /// module doc path and source info paths.
-    case swiftPlaceholder(SwiftPlaceholderModuleDetails)
-
     /// Swift externally-prebuilt modules must communicate the path to pre-built binary artifacts
     case swiftPrebuiltExternal(SwiftPrebuiltExternalModuleDetails)
 
@@ -176,7 +144,6 @@ struct ModuleInfo: Codable {
 extension ModuleInfo.Details: Codable {
   enum CodingKeys: CodingKey {
     case swift
-    case swiftPlaceholder
     case swiftPrebuiltExternal
     case clang
   }
@@ -188,18 +155,12 @@ extension ModuleInfo.Details: Codable {
       self = .swift(details)
     } catch {
       do {
-        let details = try container.decode(SwiftPlaceholderModuleDetails.self,
-                                           forKey: .swiftPlaceholder)
-        self = .swiftPlaceholder(details)
+        let details = try container.decode(SwiftPrebuiltExternalModuleDetails.self,
+                                           forKey: .swiftPrebuiltExternal)
+        self = .swiftPrebuiltExternal(details)
       } catch {
-        do {
-          let details = try container.decode(SwiftPrebuiltExternalModuleDetails.self,
-                                             forKey: .swiftPrebuiltExternal)
-          self = .swiftPrebuiltExternal(details)
-        } catch {
-          let details = try container.decode(ClangModuleDetails.self, forKey: .clang)
-          self = .clang(details)
-        }
+        let details = try container.decode(ClangModuleDetails.self, forKey: .clang)
+        self = .clang(details)
       }
     }
   }
@@ -209,8 +170,6 @@ extension ModuleInfo.Details: Codable {
     switch self {
       case .swift(let details):
         try container.encode(details, forKey: .swift)
-      case .swiftPlaceholder(let details):
-        try container.encode(details, forKey: .swiftPlaceholder)
       case .swiftPrebuiltExternal(let details):
         try container.encode(details, forKey: .swiftPrebuiltExternal)
       case .clang(let details):

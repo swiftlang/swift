@@ -37,26 +37,20 @@ public:
   }
   BAD_MEMBER(Extension)
   BAD_MEMBER(Import)
-  BAD_MEMBER(Protocol)
   BAD_MEMBER(TopLevelCode)
   BAD_MEMBER(Operator)
   BAD_MEMBER(PrecedenceGroup)
   BAD_MEMBER(Macro)
+  BAD_MEMBER(Using)
 
-  // The children of these are automatically inserted into the
-  // surrounding context.
-  RetTy visitIfConfigDecl(IfConfigDecl *D) {
-    return RetTy();
-  }
-
-  // These decls are disregarded.
-  RetTy visitPoundDiagnosticDecl(PoundDiagnosticDecl *D) {
+  RetTy visitMacroExpansionDecl(MacroExpansionDecl *D) {
+    // Expansion already visited as auxiliary decls.
     return RetTy();
   }
 
   /// A convenience method to visit all the members.
   void visitMembers(NominalTypeDecl *D) {
-    for (Decl *member : D->getMembers()) {
+    for (Decl *member : D->getAllMembers()) {
       asImpl().visit(member);
     }
   }
@@ -66,7 +60,7 @@ public:
   ///
   /// \seealso IterableDeclContext::getImplementationContext()
   void visitImplementationMembers(NominalTypeDecl *D) {
-    for (Decl *member : D->getImplementationContext()->getMembers()) {
+    for (Decl *member : D->getImplementationContext()->getAllMembers()) {
       asImpl().visit(member);
     }
     
@@ -77,12 +71,6 @@ public:
       if (dd->getDeclContext() == cd && cd->getImplementationContext() != cd)
         asImpl().visit(dd);
     }
-  }
-
-  /// Visit expanded macros.
-  void visitMacroExpansionDecl(MacroExpansionDecl *D) {
-    for (auto *decl : D->getRewritten())
-      asImpl().visit(decl);
   }
 };
 

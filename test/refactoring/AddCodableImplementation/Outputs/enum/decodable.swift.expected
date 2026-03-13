@@ -8,19 +8,21 @@ enum Payload_D: Decodable {
   case plain(String)
   case pair(key: String, value: String)
 
-  enum CodingKeys: CodingKey {
+  private enum CodingKeys: CodingKey {
     case plain
     case pair
   }
-  enum PlainCodingKeys: CodingKey {
+
+  private enum PlainCodingKeys: CodingKey {
     case _0
   }
-  enum PairCodingKeys: CodingKey {
+
+  private enum PairCodingKeys: CodingKey {
     case key
     case value
   }
 
-  init(from decoder: Decoder) throws {
+  init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: Payload_D.CodingKeys.self)
 
     var allKeys = ArraySlice(container.allKeys)
@@ -30,12 +32,10 @@ enum Payload_D: Decodable {
     }
     switch onlyKey {
     case .plain:
-
       let nestedContainer = try container.nestedContainer(keyedBy: Payload_D.PlainCodingKeys.self, forKey: Payload_D.CodingKeys.plain)
 
       self = Payload_D.plain(try nestedContainer.decode(String.self, forKey: Payload_D.PlainCodingKeys._0))
-      case .pair:
-
+    case .pair:
       let nestedContainer = try container.nestedContainer(keyedBy: Payload_D.PairCodingKeys.self, forKey: Payload_D.CodingKeys.pair)
 
       self = Payload_D.pair(key: try nestedContainer.decode(String.self, forKey: Payload_D.PairCodingKeys.key), value: try nestedContainer.decode(String.self, forKey: Payload_D.PairCodingKeys.value))

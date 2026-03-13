@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-sil -module-name unmanaged %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -module-name unmanaged %s | %FileCheck %s
 
 class C {}
 
@@ -46,7 +46,7 @@ func get(holder holder: inout Holder) -> C {
 func project(fn fn: () -> Holder) -> C {
   return fn().value
 }
-// CHECK-LABEL: sil hidden @$s9unmanaged7project2fnAA1CCAA6HolderVyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Holder) -> @owned C
+// CHECK-LABEL: sil hidden @$s9unmanaged7project2fnAA1CCAA6HolderVyXE_tF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Holder) -> @owned C
 // CHECK: bb0([[FN:%.*]] : $@noescape @callee_guaranteed () -> Holder):
 // CHECK-NEXT: debug_value
 // CHECK-NEXT: [[T0:%.*]] = apply [[FN]]()

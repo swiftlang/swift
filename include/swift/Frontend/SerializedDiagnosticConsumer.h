@@ -36,7 +36,16 @@ namespace swift {
     ///
     /// \returns A new diagnostic consumer that serializes diagnostics.
     std::unique_ptr<DiagnosticConsumer>
-    createConsumer(llvm::StringRef outputPath);
+    createConsumer(llvm::StringRef outputPath, bool emitMacroExpansionFiles);
+
+    /// Create a thread-safe DiagnosticConsumer that serializes diagnostics to a file,
+    /// using Clang's serialized diagnostics format.
+    ///
+    /// \param outputPath the file path to write the diagnostics to.
+    ///
+    /// \returns A new diagnostic consumer that serializes diagnostics.
+    std::unique_ptr<DiagnosticConsumer>
+    createThreadSafeConsumer(llvm::StringRef outputPath, bool emitMacroExpansionFiles);
   }
 }
 

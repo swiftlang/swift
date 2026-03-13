@@ -64,7 +64,7 @@ swift::extractNearestSourceLoc(const SILPipelineExecutionDescriptor &desc) {
 std::unique_ptr<SILModule>
 LoweredSILRequest::evaluate(Evaluator &evaluator,
                             ASTLoweringDescriptor desc) const {
-  auto silMod = llvm::cantFail(evaluator(ASTLoweringRequest{desc}));
+  auto silMod = evaluateOrFatal(evaluator, ASTLoweringRequest{desc});
   silMod->installSILRemarkStreamer();
   silMod->setSerializeSILAction([]() {});
 

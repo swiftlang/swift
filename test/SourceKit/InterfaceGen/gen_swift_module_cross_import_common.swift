@@ -12,7 +12,7 @@
 // Make sure cursor info within the generated interface of SwiftFramework on one of the
 // decls originally from a cross-import decls shows 'SwiftFramework' as the parent module.
 //
-// RUN: %sourcekitd-test -req=interface-gen-open -module SwiftFramework -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -module-cache-path %t/mcp == -req=cursor -print-raw-response -pos=10:13 -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -Xfrontend -enable-cross-import-overlays > %t.response
+// RUN: %sourcekitd-test -req=interface-gen-open -module SwiftFramework -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -module-cache-path %t/mcp == -req=cursor -print-raw-response -pos=7:13 -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -Xfrontend -enable-cross-import-overlays > %t.response
 // RUN: %FileCheck --input-file %t.response --check-prefix=CHECKSWIFT %s
 //
 // CHECKSWIFT: key.name: "fromSwiftFrameworkCrossImport()"
@@ -27,7 +27,7 @@
 // Make sure cursor info within the generated interface of ClangFramework on one of the
 // decls originally from a cross-import decls shows 'ClangFramework' as the parent module.
 //
-// RUN: %sourcekitd-test -req=interface-gen-open -module ClangFramework -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -module-cache-path %t/mcp == -req=cursor -print-raw-response -pos=9:13 -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -Xfrontend -enable-cross-import-overlays > %t.response
+// RUN: %sourcekitd-test -req=interface-gen-open -module ClangFramework -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -module-cache-path %t/mcp == -req=cursor -print-raw-response -pos=7:13 -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -Xfrontend -enable-cross-import-overlays > %t.response
 // RUN: %FileCheck --input-file %t.response --check-prefix=CHECKCLANG %s
 //
 // CHECKCLANG: key.name: "fromClangFrameworkCrossImport()"
@@ -42,7 +42,7 @@
 // Make sure cursor info within the generated interface of OverlaidClangFramework on one of the
 // decls originally from a cross-import decls shows 'OverlaidClangFramework' as the parent module.
 //
-// RUN: %sourcekitd-test -req=interface-gen-open -module OverlaidClangFramework -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -module-cache-path %t/mcp == -req=cursor -print-raw-response -pos=11:13 -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -Xfrontend -enable-cross-import-overlays > %t.response
+// RUN: %sourcekitd-test -req=interface-gen-open -module OverlaidClangFramework -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -module-cache-path %t/mcp == -req=cursor -print-raw-response -pos=9:13 -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -Xfrontend -enable-cross-import-overlays > %t.response
 // RUN: %FileCheck --input-file %t.response --check-prefix=CHECKOVERLAIDCLANG %s
 //
 // CHECKOVERLAIDCLANG: key.name: "fromOverlaidClangFrameworkCrossImport()"

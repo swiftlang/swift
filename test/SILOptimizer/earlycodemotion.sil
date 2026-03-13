@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all %s -early-codemotion -retain-sinking | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -module-name Swift -enable-sil-verify-all %s -early-codemotion -retain-sinking | %FileCheck %s
 
 import Builtin
 
@@ -522,6 +522,58 @@ bb3(%12 : $Bool):
   return %12 : $Bool
 }
 
+// CHECK-LABEL: sil [ossa] @sink_struct_ossa :
+// CHECK:       bb0({{.*}}):
+// CHECK:         switch_enum
+// CHECK:       bb1({{.*}}):
+// CHECK:         integer_literal $Builtin.Int1, -1
+// CHECK:         br bb3({{.*}} : $Builtin.Int1)
+// CHECK:       bb2:
+// CHECK:         integer_literal $Builtin.Int1, 0
+// CHECK:         br bb3({{.*}} : $Builtin.Int1)
+// CHECK:       bb3({{.*}} : $Builtin.Int1):
+// CHECK:         struct $Bool
+// CHECK:       } // end sil function 'sink_struct_ossa'
+sil [ossa] @sink_struct_ossa : $@convention(thin) (Optional<Builtin.Int32>) -> Bool {
+bb0(%0 : $Optional<Builtin.Int32>):
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%2 : $Builtin.Int32):
+  %6 = integer_literal $Builtin.Int1, -1
+  %7 = struct $Bool (%6 : $Builtin.Int1)
+  br bb3(%7 : $Bool)
+
+bb2:
+  %9 = integer_literal $Builtin.Int1, 0
+  %10 = struct $Bool (%9 : $Builtin.Int1)
+  br bb3(%10 : $Bool)
+
+bb3(%12 : $Bool):
+  return %12 : $Bool
+}
+
+// CHECK-LABEL: sil [ossa] @dont_sink_owned_trivial_enum :
+// CHECK:       bb1:
+// CHECK-NEXT:    enum
+// CHECK:       bb2:
+// CHECK-NEXT:    enum
+// CHECK:       bb3([[A:%.*]] : @owned $Optional<C>):
+// CHECK-NEXT:    return [[A]]
+// CHECK:       } // end sil function 'dont_sink_owned_trivial_enum'
+sil [ossa] @dont_sink_owned_trivial_enum : $@convention(thin) () -> @owned Optional<C> {
+bb0:
+  cond_br undef, bb1, bb2
+bb1:
+  %2 = enum $Optional<C>, #Optional.none!enumelt
+  br bb3(%2)
+bb2:
+  %4 = enum $Optional<C>, #Optional.none!enumelt
+  br bb3(%4)
+bb3(%6 : @owned $Optional<C>):
+  return %6
+}
+
+
 // Sink retain down the successors so we can pair up retain with release on the
 // fast path.
 class Test {
@@ -548,7 +600,7 @@ bb1:
   strong_retain %17 : $Test
   %19 = class_method %17 : $Test, #Test.testing : (Test) -> () -> UInt64, $@convention(method) (@guaranteed Test) -> UInt64
   %20 = load %7 : $*UInt64
-  checked_cast_br [exact] %17 : $Test to Test, bb3, bb4
+  checked_cast_br [exact] Test in %17 : $Test to Test, bb3, bb4
 bb2:
 // CHECK: bb2:
 // CHECK-NOT: strong_retain
@@ -1262,7 +1314,7 @@ bb0(%0 : $Optional<X>):
 
 bb1:                                              // Preds: bb0
   %3 = unchecked_enum_data %0 : $Optional<X>, #Optional.some!enumelt // users: %4, %13, %14, %15
-  checked_cast_br [exact] %3 : $X to X, bb4, bb5 // id: %4
+  checked_cast_br [exact] X in %3 : $X to X, bb4, bb5 // id: %4
 
 // Make sure we were able to sink the release.
 // CHECK: strong_release
@@ -1305,13 +1357,13 @@ bb5:                                              // Preds: bb1
 sil @canonicalize_casts: $@convention(thin) (@owned X) -> Int32 {
 bb0(%0 : $X):
   debug_value %0 : $X, let, name "x" // id: %1
-  checked_cast_br %0 : $X to Y, bb1, bb3         // id: %2
+  checked_cast_br X in %0 : $X to Y, bb1, bb3         // id: %2
 
 bb1(%3 : $Y):                                     // Preds: bb0
   debug_value %3 : $Y, let, name "z" // id: %4
   %5 = upcast %3 : $Y to $X                       // users: %6, %7, %21, %23
   %6 = class_method %5 : $X, #X.ping : (X) -> () -> (), $@convention(method) (@guaranteed X) -> () // users: %21, %23
-  checked_cast_br [exact] %5 : $X to Y, bb5, bb6 // id: %7
+  checked_cast_br [exact] X in %5 : $X to Y, bb5, bb6 // id: %7
 
 bb2:                                              // Preds: bb5 bb6
   //CHECK: strong_release %0
@@ -1399,6 +1451,26 @@ bb2:
 bb3(%z1 : $Builtin.RawPointer):
   //CHECK: string_literal utf8 "0"
   //CHECK-NEXT: return
+  return %z1 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil [ossa] @sink_literals_through_arguments_ossa :
+// CHECK:         string_literal utf8 "0"
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'sink_literals_through_arguments_ossa'
+sil [ossa] @sink_literals_through_arguments_ossa : $@convention(thin) (Builtin.Int1) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %x1 = string_literal utf8 "0"
+  br bb3(%x1 : $Builtin.RawPointer)
+
+bb2:
+  %y1 = string_literal utf8 "0"
+  br bb3(%y1 : $Builtin.RawPointer)
+
+bb3(%z1 : $Builtin.RawPointer):
   return %z1 : $Builtin.RawPointer
 }
 

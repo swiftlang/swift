@@ -1,5 +1,6 @@
 /// Test xref error description by removing a type from a module after building
-/// a client.
+/// a client. This test disables deserialization recovery to hit a crash
+/// reliably.
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/partials)
 // RUN: %empty-directory(%t/normal)
@@ -32,30 +33,26 @@
 // NORMALFAILURE-LABEL: *** DESERIALIZATION FAILURE ***
 // NORMALFAILURE-LABEL: *** If any module named here was modified in the SDK, please delete the ***
 // NORMALFAILURE-LABEL: *** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***
-// NORMALFAILURE-NEXT: module 'Client', builder version {{.*}}', built from source, resilient, loaded from
+// NORMALFAILURE-NEXT: module 'Client', builder version {{.*}}', built from source against SDK {{.*}}, resilient, loaded from
 // NORMALFAILURE-NEXT: Could not deserialize type for 'foo()'
-// NORMALFAILURE-NEXT: Caused by: top-level value not found
+// NORMALFAILURE-NEXT: Caused by: modularization issue on 'SomeType', reference from 'Client' not resolvable: expected in 'A' but found in 'B'
 // NORMALFAILURE-NEXT: Cross-reference to module 'A'
 // NORMALFAILURE-NEXT: ... SomeType
-// NORMALFAILURE-NEXT: Notes:
-// NORMALFAILURE-NEXT: * There is a matching 'SomeType' in module 'B'. If this is imported from clang, please make sure the header is part of a single clang module.
 
 // RUN: cat %t/error_stderr | %FileCheck %s -check-prefixes=ALLOWFAILURE
 // ALLOWFAILURE-LABEL: *** DESERIALIZATION FAILURE ***
 // ALLOWFAILURE-LABEL: *** If any module named here was modified in the SDK, please delete the ***
 // ALLOWFAILURE-LABEL: *** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***
-// ALLOWFAILURE-NEXT: module 'Client', builder version {{.*}}', built from source, non-resilient, built with -experimental-allow-module-with-compiler-errors, loaded from
+// ALLOWFAILURE-NEXT: module 'Client', builder version {{.*}}', built from source against SDK {{.*}}, non-resilient, built with -experimental-allow-module-with-compiler-errors, loaded from
 // ALLOWFAILURE-NEXT: Could not deserialize type for 'foo()'
-// ALLOWFAILURE-NEXT: Caused by: top-level value not found
+// ALLOWFAILURE-NEXT: Caused by: modularization issue on 'SomeType', reference from 'Client' not resolvable: expected in 'A' but found in 'B'
 // ALLOWFAILURE-NEXT: Cross-reference to module 'A'
 // ALLOWFAILURE-NEXT: ... SomeType
-// ALLOWFAILURE-NEXT: Notes:
-// ALLOWFAILURE-NEXT: * There is a matching 'SomeType' in module 'B'. If this is imported from clang, please make sure the header is part of a single clang module.
 
 /// Test a swiftmodule rebuilt from the swiftinterface.
 // RUN: not --crash %target-swift-frontend -emit-sil %t/cache/Client-*.swiftmodule -module-name Client -I %t/partials -disable-deserialization-recovery 2> %t/cache_stderr
 // RUN: cat %t/cache_stderr | %FileCheck %s -check-prefixes=CACHEFAILURE
-// CACHEFAILURE: module 'Client', builder version {{.*}}', built from swiftinterface, resilient
+// CACHEFAILURE: module 'Client', builder version {{.*}}', built from swiftinterface against SDK {{.*}}, resilient
 
 #if LIB
 public struct SomeType {

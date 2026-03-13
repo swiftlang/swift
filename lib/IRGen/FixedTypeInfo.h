@@ -42,10 +42,13 @@ private:
 protected:
   FixedTypeInfo(llvm::Type *type, Size size,
                 const SpareBitVector &spareBits,
-                Alignment align, IsPOD_t pod, IsBitwiseTakable_t bt,
+                Alignment align, IsTriviallyDestroyable_t pod,
+                IsBitwiseTakable_t bt,
+                IsCopyable_t copy,
                 IsFixedSize_t alwaysFixedSize,
+                IsABIAccessible_t isABIAccessible,
                 SpecialTypeInfoKind stik = SpecialTypeInfoKind::Fixed)
-      : TypeInfo(type, align, pod, bt, alwaysFixedSize, IsABIAccessible, stik),
+      : TypeInfo(type, align, pod, bt, copy, alwaysFixedSize, isABIAccessible, stik),
         SpareBits(spareBits) {
     assert(SpareBits.size() == size.getValueInBits());
     assert(isFixedSize());
@@ -55,12 +58,16 @@ protected:
 
   FixedTypeInfo(llvm::Type *type, Size size,
                 SpareBitVector &&spareBits,
-                Alignment align, IsPOD_t pod, IsBitwiseTakable_t bt,
+                Alignment align, IsTriviallyDestroyable_t pod,
+                IsBitwiseTakable_t bt,
+                IsCopyable_t copy,
                 IsFixedSize_t alwaysFixedSize,
+                IsABIAccessible_t isABIAccessible,
                 SpecialTypeInfoKind stik = SpecialTypeInfoKind::Fixed)
-      : TypeInfo(type, align, pod, bt, alwaysFixedSize, IsABIAccessible, stik),
+      : TypeInfo(type, align, pod, bt, copy, alwaysFixedSize, isABIAccessible, stik),
         SpareBits(std::move(spareBits)) {
-    assert(SpareBits.size() == size.getValueInBits());
+    // SpareBits implementation is limited to 32bits.
+    assert(SpareBits.size() == (size.getValueInBits() & 0xFFFFFFFF));
     assert(isFixedSize());
     Bits.FixedTypeInfo.Size = size.getValue();
     assert(Bits.FixedTypeInfo.Size == size.getValue() && "truncation");
@@ -69,7 +76,6 @@ protected:
 public:
   // This is useful for metaprogramming.
   static bool isFixed() { return true; }
-  static IsABIAccessible_t isABIAccessible() { return IsABIAccessible; }
 
   /// Whether this type is known to be empty.
   bool isKnownEmpty(ResilienceExpansion expansion) const {
@@ -77,21 +83,27 @@ public:
   }
 
   StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                             const llvm::Twine &name) const override;
-  void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
+                             const llvm::Twine &name,
+                             StackAllocationIsNested_t isNested =
+                                 StackAllocationIsNested) const override;
+  void deallocateStack(IRGenFunction &IGF, StackAddress addr,
+                       SILType T) const override;
   void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
                     bool isOutlined) const override;
 
   // We can give these reasonable default implementations.
 
   void initializeWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
-                          SILType T, bool isOutlined) const override;
+                          SILType T, bool isOutlined,
+                          bool zeroizeIfSensitive) const override;
 
   llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override;
-  llvm::Value *getIsPOD(IRGenFunction &IGF, SILType T) const override;
+  llvm::Value *getIsTriviallyDestroyable(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override;
+  llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const override;
+  llvm::Value *getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override;
 
@@ -147,7 +159,7 @@ public:
 
   /// Get the bit mask that must be applied before testing an extra inhabitant.
   virtual APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const {
-    return APInt::getAllOnesValue(getFixedSize().getValueInBits());
+    return APInt::getAllOnes(getFixedSize().getValueInBits());
   }
 
   /// Create a constant of the given bit width holding one of the extra

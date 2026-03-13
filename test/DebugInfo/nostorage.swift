@@ -8,8 +8,8 @@ func used<T>(_ t: T) {}
 public class Foo {
     func foo() {
       { [weak self] in
-      // CHECK1: call void @llvm.dbg.value(metadata i{{.*}} 0,
-      // CHECK1-SAME:                      metadata ![[TYPE:.*]], metadata
+      // CHECK1: #dbg_value(i{{.*}} 0,
+      // CHECK1-SAME:                      ![[TYPE:.*]], !DIExpression
       // CHECK1: ![[TYPE]] = !DILocalVariable(name: "type",
       // CHECK1-SAME:                         line: [[@LINE+6]],
       // CHECK1-SAME:                         type: ![[LET_METAFOO:[0-9]+]]
@@ -28,8 +28,8 @@ struct AStruct {}
 // CHECK2: define{{.*}}app
 public func app() {
   // No members? No storage!
-  // CHECK2: call void @llvm.dbg.value(metadata {{.*}}* undef,
-  // CHECK2-SAME:                      metadata ![[AT:.*]], metadata
+  // CHECK2: #dbg_value(ptr undef,
+  // CHECK2-SAME:                      ![[AT:.*]], !DIExpression
   // CHECK2: ![[AT]] = !DILocalVariable(name: "at",{{.*}}line: [[@LINE+1]]
   var at = AStruct()
   

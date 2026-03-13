@@ -1,4 +1,7 @@
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking -parse-as-library
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
@@ -12,7 +15,7 @@
 import _Concurrency
 import StdlibUnittest
 
-var tests = TestSuite("Time")
+@MainActor var tests = TestSuite("Time")
 
 @main struct Main {
   static func main() async {
@@ -155,6 +158,13 @@ var tests = TestSuite("Time")
         expectEqual(comps.seconds, Int64(ns / 1_000_000_000))
         expectEqual(comps.attoseconds, Int64(ns % 1_000_000_000) * 1_000_000_000)
       }
+    }
+
+    tests.test("Ensure abi layout size of Instant") {
+      // If this test fails it means the ABI of ContinuousClock.Instant has been broken!
+      // it MUST be the same laoyut of that of Duration
+      expectEqual(MemoryLayout<ContinuousClock.Instant>.size, MemoryLayout<Duration>.size)
+      expectEqual(MemoryLayout<SuspendingClock.Instant>.size, MemoryLayout<Duration>.size)
     }
 
     await runAllTestsAsync()

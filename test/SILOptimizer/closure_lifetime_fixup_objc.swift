@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend %s -sil-verify-all -emit-sil -enable-copy-propagation=false -o - -I %S/Inputs/usr/include | %FileCheck %s
+// RUN: %target-swift-frontend %s -sil-verify-all -Xllvm -sil-print-types -emit-sil -enable-copy-propagation=false -o - -I %S/Inputs/usr/include | %FileCheck %s
 // REQUIRES: objc_interop
+
+// REQUIRES: swift_in_compiler
 
 // Using -enable-copy-propagation=false to pattern match against older SIL
 // output. At least until -enable-copy-propagation has been around
@@ -22,8 +24,8 @@ public protocol DangerousEscaper {
 // CHECK:   strong_retain [[ARG]] : $@callee_guaranteed () -> ()
 
 // CHECK:   [[NE:%.*]] = convert_escape_to_noescape [[ARG]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK:   [[WITHOUT_ACTUALLY_ESCAPING_THUNK:%.*]] = function_ref @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
-// CHECK:   [[C:%.*]] = partial_apply [callee_guaranteed] [[WITHOUT_ACTUALLY_ESCAPING_THUNK]]([[NE]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:   [[WITHOUT_ACTUALLY_ESCAPING_THUNK:%.*]] = function_ref @$sIg_Ieg_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:   [[C:%.*]] = partial_apply [callee_guaranteed] [[WITHOUT_ACTUALLY_ESCAPING_THUNK]]([[NE]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
 
 // Sentinel without actually escaping closure (3).
 // CHECK:   [[SENTINEL:%.*]] = mark_dependence [[C]] : $@callee_guaranteed () -> () on [[NE]] : $@noescape @callee_guaranteed () -> ()
@@ -48,11 +50,8 @@ public protocol DangerousEscaper {
 
 // Release sentinel closure copy (5).
 // CHECK:   strong_release [[BLOCK_COPY]] : $@convention(block) @noescape () -> ()
-// CHECK:   [[ESCAPED:%.*]] = is_escaping_closure [objc] [[SENTINEL]]
+// CHECK:   [[ESCAPED:%.*]] = destroy_not_escaped_closure [objc] [[SENTINEL]]
 // CHECK:   cond_fail [[ESCAPED]] : $Builtin.Int1
-
-// Release of sentinel copy (4).
-// CHECK:   strong_release [[SENTINEL]]
 
 // Extended lifetime (2).
 // CHECK:   strong_release [[ARG]]
@@ -75,12 +74,6 @@ public func couldActuallyEscapeWithLoop(_ closure: @escaping () -> (), _ villain
 // CHECK-LABEL: sil @$s27closure_lifetime_fixup_objc9dontCrashyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[NONE:%.*]] = enum $Optional<{{.*}}>, #Optional.none!enumelt
-// CHECK:   br bb1
-//
-// CHECK: bb1:
-// CHECK:   br bb2
-//
-// CHECK: bb2:
 // CHECK:   br [[LOOP_HEADER_BB:bb[0-9]+]]([[NONE]]
 //
 // CHECK: [[LOOP_HEADER_BB]]([[LOOP_IND_VAR:%.*]] : $Optional
@@ -95,20 +88,17 @@ public func couldActuallyEscapeWithLoop(_ closure: @escaping () -> (), _ villain
 // CHECK:   [[BLOCK_PROJ:%.*]] = project_block_storage [[BLOCK_SLOT]]
 // CHECK:   store [[MDI]] to [[BLOCK_PROJ]] :
 // CHECK:   [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_SLOT]]
-// CHECK:   release_value [[LOOP_IND_VAR]]
 // CHECK:   [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[MDI]]
 // CHECK:   [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
 // CHECK:   destroy_addr [[BLOCK_PROJ]]
-// CHECK:   [[DISPATCH_SYNC_FUNC:%.*]] = function_ref @dispatch_sync :
+// CHECK:   [[DISPATCH_SYNC_FUNC:%.*]] = function_ref @$sSo17OS_dispatch_queueC4sync7executeyyyXE_tFTo :
 // CHECK:   apply [[DISPATCH_SYNC_FUNC]]({{%.*}}, [[BLOCK_COPY]])
 // CHECK:   strong_release [[BLOCK_COPY]]
-// CHECK:   is_escaping_closure [objc] [[SOME]]
-// CHECK:   release_value [[SOME]]
+// CHECK:   destroy_not_escaped_closure [objc] [[SOME]]
 // CHECK:   [[NONE_FOR_BACKEDGE:%.*]] = enum $Optional<{{.*}}>, #Optional.none
 // CHECK:   br [[LOOP_HEADER_BB]]([[NONE_FOR_BACKEDGE]] :
 //
 // CHECK: [[NONE_BB]]:
-// CHECK:   release_value [[LOOP_IND_VAR]]
 // CHECK:   return
 // CHECK: } // end sil function '$s27closure_lifetime_fixup_objc9dontCrashyyF'
 public func dontCrash() {
@@ -142,7 +132,6 @@ class C: NSObject {
 // Make sure even if we have a loop, we do not release the value after calling super.deinit
 // CHECK-LABEL: sil hidden @$s27closure_lifetime_fixup_objc9CWithLoopCfD : $@convention(method) (@owned CWithLoop) -> () {
 // CHECK:        [[METH:%.*]] = objc_super_method
-// CHECK-NEXT:   release_value
 // CHECK-NEXT:   release_value
 // CHECK-NEXT:   upcast {{%.*}} : $CWithLoop to $NSObject
 // CHECK-NEXT:   apply [[METH]]({{%.*}}) : $@convention(objc_method) (NSObject) -> ()

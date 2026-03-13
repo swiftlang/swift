@@ -26,7 +26,7 @@ def Availability(bits):
 }%
 
 % if bits == 80:
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 % end
 % if bits == 16:
 #if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
@@ -42,6 +42,7 @@ extension ${Self}: Differentiable {
   public typealias TangentVector = ${Self}
 
   ${Availability(bits)}
+  @inlinable
   public mutating func move(by offset: TangentVector) {
     self += offset
   }
@@ -51,10 +52,51 @@ extension ${Self}: Differentiable {
 // Derivatives
 //===----------------------------------------------------------------------===//
 
+/// Derivatives of constructors.
+${Availability(bits)}
+extension ${Self} {
+
+  % for other_type in all_floating_point_types():
+  %{
+  Other = other_type.stdlib_name
+  other_bits = other_type.bits
+  }%
+  
+  % if other_bits == 80:
+  #if !(os(Windows) || os(Android) || $Embedded) && (arch(i386) || arch(x86_64))
+  % end
+  % if other_bits == 16:
+  #if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
+  % end
+
+  ${Availability(other_bits)}
+  @inlinable
+  @_transparent
+  @derivative(of: init(_:))
+  static func _vjpInit(x: ${Other})
+  -> (value: ${Self}, pullback: (${Self}) -> ${Other}) {
+    return (value: ${Self}(x), pullback: { v in ${Other}(v) })
+  }
+  
+  ${Availability(other_bits)}
+  @inlinable
+  @_transparent
+  @derivative(of: init(_:))
+  static func _jvpInit(x: ${Other})
+  -> (value: ${Self}, differential: (${Other}) -> ${Self}) {
+    return (value: ${Self}(x), differential: { dx in ${Self}(dx) })
+  }
+  
+  % if other_bits == 80 or other_bits == 16:
+  #endif
+  % end
+  % end
+}
+
 /// Derivatives of standard unary operators.
 ${Availability(bits)}
 extension ${Self} {
-  @usableFromInline
+  @inlinable
   @_transparent
   @derivative(of: -)
   static func _vjpNegate(x: ${Self})
@@ -62,7 +104,7 @@ extension ${Self} {
     return (-x, { v in -v })
   }
 
-  @usableFromInline
+  @inlinable
   @_transparent
   @derivative(of: -)
   static func _jvpNegate(x: ${Self})

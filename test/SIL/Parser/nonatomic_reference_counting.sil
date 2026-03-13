@@ -59,15 +59,6 @@ bb0:
   return %3 : $()
 }
 
-// CHECK-LABEL: sil @test_set_deallocating
-// CHECK: set_deallocating [nonatomic]
-// CHECK: return
-sil @test_set_deallocating : $(C) -> C {
-bb0(%0 : $C):
-  set_deallocating [nonatomic] %0 : $C
-  return %0 : $C
-}
-
 // C.__deallocating_deinit
 sil @_TFC28nonatomic_reference_counting1CD : $@convention(method) (@owned C) -> () {
 bb0(%0 : $C):

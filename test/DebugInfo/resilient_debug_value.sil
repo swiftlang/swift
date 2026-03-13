@@ -15,13 +15,13 @@ import resilient_struct
 
 sil @test_debug_value_resilient : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $Size, var, name "assertions", implicit
-  debug_value %0 : $*Size, var, name "assertions", implicit
+  %0 = alloc_stack $Size, var, name "assertions"
+  debug_value %0 : $*Size, var, name "assertions"
   dealloc_stack %0: $*Size
   %1 = tuple ()
   return %1 : $()
 }
 // CHECK: define{{.*}} swiftcc void @test_debug_value_resilient()
-// CHECK:  [[ASSERTIONSDBG:%.*]] = alloca i8*
+// CHECK:  [[ASSERTIONSDBG:%.*]] = alloca ptr
 // CHECK:  [[ASSERTIONS:%.*]] = alloca i8, i64 %size
-// CHECK:  store i8* [[ASSERTIONS]], i8** [[ASSERTIONSDBG]]
+// CHECK:  store ptr [[ASSERTIONS]], ptr [[ASSERTIONSDBG]]

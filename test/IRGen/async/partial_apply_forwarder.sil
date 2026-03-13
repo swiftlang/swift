@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -g -enable-objc-interop  -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc
 // RUN: %target-swift-frontend  -g -disable-objc-interop -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native
 
-// REQUIRES: concurrency
+// REQUIRES: concurrency, objc_codegen
 
 sil_stage canonical
 
@@ -88,6 +88,11 @@ entry(%e : $EmptyType, %b : $WeakBox<τ_0_0>):
   %0 = builtin "int_trap"() : $Never
   unreachable
 }
+
+// CHECK-DAG: @"$s7takingQTATu" = internal
+// CHECK-DAG: @"$s11takingQAndSTATu" = internal
+// CHECK-DAG: @"$s13inner_closureTATu" = internal
+// CHECK-DAG: @"$s15returns_closureTATu" = internal
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @bind_polymorphic_param_from_context(
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingQTA"(

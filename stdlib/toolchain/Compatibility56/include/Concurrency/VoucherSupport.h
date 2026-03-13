@@ -17,10 +17,10 @@
 #ifndef SWIFT_CONCURRENCY_VOUCHERSUPPORT_H
 #define SWIFT_CONCURRENCY_VOUCHERSUPPORT_H
 
-#include "llvm/ADT/Optional.h"
 #include "Concurrency/Task.h"
 #include "Concurrency/VoucherShims.h"
 #include "TaskPrivate.h"
+#include <optional>
 
 namespace swift {
 
@@ -29,7 +29,13 @@ class VoucherManager {
   /// The original voucher that was set on the thread before Swift started
   /// doing async work. This must be restored on the thread after we finish
   /// async work.
-  llvm::Optional<voucher_t> OriginalVoucher;
+  std::optional<voucher_t> OriginalVoucher;
+
+  /// Determine whether vouchers are disabled entirely. This evaluates
+  /// true on platforms whose concurrency library does not support the
+  /// propagation of vouchers, in which case all of the operations of
+  /// this class must be no-ops.
+  static bool vouchersAreDisabled();
 
 public:
   VoucherManager() {
@@ -41,6 +47,9 @@ public:
   /// VoucherManager object is destroyed. It may also be called in other
   /// places to restore the original voucher and reset the VoucherManager.
   void leave() {
+    if (vouchersAreDisabled())
+      return;
+
     if (OriginalVoucher) {
       SWIFT_TASK_DEBUG_LOG("[%p] Restoring original voucher %p", this,
                            *OriginalVoucher);
@@ -50,7 +59,7 @@ public:
       } else {
         swift_voucher_release(*OriginalVoucher);
       }
-      OriginalVoucher = llvm::None;
+      OriginalVoucher = std::nullopt;
     } else
       SWIFT_TASK_DEBUG_LOG("[%p] Leaving empty VoucherManager", this);
   }
@@ -62,6 +71,9 @@ public:
   /// this is permanent. For Tasks, the voucher must be restored using
   /// restoreVoucher if the task suspends.
   void swapToJob(Job *job) {
+    if (vouchersAreDisabled())
+      return;
+
     SWIFT_TASK_DEBUG_LOG("[%p] Swapping jobs to %p", this, job);
     assert(job);
     assert(job->Voucher != SWIFT_DEAD_VOUCHER);
@@ -99,6 +111,9 @@ public:
   // Take the current thread's adopted voucher and place it back into the task
   // that previously owned it, re-adopting the thread's original voucher.
   void restoreVoucher(AsyncTask *task) {
+    if (vouchersAreDisabled())
+      return;
+
     SWIFT_TASK_DEBUG_LOG("[%p] Restoring %svoucher on task %p", this,
                          OriginalVoucher ? "" : "missing ", task);
     assert(OriginalVoucher);
@@ -115,7 +130,7 @@ public:
     }
 
     // We've given up ownership of OriginalVoucher, clear it out.
-    OriginalVoucher = llvm::None;
+    OriginalVoucher = std::nullopt;
   }
 };
 

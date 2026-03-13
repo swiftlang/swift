@@ -49,7 +49,7 @@ open class SubClass: ParentClass {
 // Removed the underlying file, so should use the generated source instead
 // RUN: mv %t/moda.swift %t/moda.swift-moved
 // RUN: not %target-swift-frontend -typecheck -I %t/mods -D MODB %s 2>&1 | %FileCheck -check-prefix=CHECK-GENERATED %s
-// CHECK-GENERATED: moda.ParentClass:{{.*}}: note:
+// CHECK-GENERATED: moda.ParentClass.overridableMethodA:{{.*}}: note:
 
 // Underlying file has changed, so the locations in .swiftsourceinfo may not
 // make sense any more. Ignored for now (ie. it is used regardless)
@@ -65,7 +65,7 @@ open class SubClass: ParentClass {
 // RUN: rm %t/moda.swift
 // RUN: touch %t/moda.swift
 // RUN: not %target-swift-frontend -typecheck -I %t/mods -D MODB %s 2>&1 | %FileCheck -check-prefix=CHECK-EMPTY %s
-// CHECK-EMPTY: moda.ParentClass:{{.*}}: note:
+// CHECK-EMPTY: moda.ParentClass.overridableMethodA:{{.*}}: note:
 
 // The file and line from a location directive should be used whether or not it
 // exists - the actual source still comes from the original file, so that's what

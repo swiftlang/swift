@@ -607,7 +607,7 @@ bb0:
 
 // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
 // The semantics attribute is used by the interpreter.
-sil [serialized] [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+sil [serialized] [heuristic_always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
 
 // CHECK-LABEL: @interpretStringInitIntrinsic
 sil hidden @interpretStringInitIntrinsic : $@convention(thin) () ->  @owned String {
@@ -1220,7 +1220,7 @@ sil @interpretAssertionFailure : $@convention(thin) () -> Never {
 sil [serialized] [_semantics "array.init.empty"] @$sS2ayxGycfC : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
 
 // _allocateUninitializedArray<A>(_:)
-sil [serialized] [always_inline] [_semantics "array.uninitialized_intrinsic"] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+sil [serialized] [heuristic_always_inline] [_semantics "array.uninitialized_intrinsic"] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 
 // CHECK-LABEL: @interpretArrayInit
 sil @interpretArrayInit : $@convention(thin) () -> @owned Array<Int> {
@@ -1241,6 +1241,7 @@ bb0:
   %1 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
   %2 = apply %1<String>(%0) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
   (%3, %4) = destructure_tuple %2 : $(Array<String>, Builtin.RawPointer)
+  %5 = mark_dependence %4 : $Builtin.RawPointer on %3 : $Array<String>
   return %3 : $Array<String>
 } // CHECK: Returns Array<String>
   // CHECK: size: 0 contents []
@@ -1480,7 +1481,7 @@ bb0:
 
 sil [ossa] @testMetatypeCast : $@convention(thin) <T> (@thick T.Type) -> Builtin.Int1 {
 bb0(%0 : $@thick T.Type):
-  checked_cast_br %0 : $@thick T.Type to Int64.Type, bb1, bb2
+  checked_cast_br T.Type in %0 : $@thick T.Type to Int64.Type, bb1, bb2
 
 bb1(%3 : $@thick Int64.Type):
   %4 = metatype $@thin Int64.Type

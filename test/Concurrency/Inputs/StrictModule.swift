@@ -1,4 +1,6 @@
-public struct StrictStruct: Hashable { }
+public struct StrictStruct: Hashable {
+  public init() {}
+}
 
 open class StrictClass {
   open func send(_ body: @Sendable () -> Void) {}
