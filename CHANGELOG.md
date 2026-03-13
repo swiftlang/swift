@@ -216,7 +216,7 @@
   }
   ```
 
-* [SE-0471][]:
+* [SE-0371][]:
   Actor and global actor annotated types may now declare a synchronous `isolated deinit`, which allows such deinitializer
   to access actor isolated state while deinitializing the actor. This enables actor deinitializers to safely access
   and shut down or close resources during an actors deinitialization, without explicitly resorting to unstructured 
@@ -11059,6 +11059,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0365]: <https://github.com/apple/swift-evolution/blob/main/proposals/0365-implicit-self-weak-capture.md>
 [SE-0366]: <https://github.com/apple/swift-evolution/blob/main/proposals/0366-move-function.md>
 [SE-0370]: <https://github.com/apple/swift-evolution/blob/main/proposals/0370-pointer-family-initialization-improvements.md>
+[SE-0371]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0376]: <https://github.com/apple/swift-evolution/blob/main/proposals/0376-function-back-deployment.md>
 [SE-0377]: <https://github.com/apple/swift-evolution/blob/main/proposals/0377-parameter-ownership-modifiers.md>
 [SE-0380]: <https://github.com/apple/swift-evolution/blob/main/proposals/0380-if-switch-expressions.md>
@@ -11094,7 +11095,6 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0462]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0462-task-priority-escalation-apis.md
 [SE-0469]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0469-task-names.md
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
-[SE-0471]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
 [SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
