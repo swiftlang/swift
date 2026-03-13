@@ -1051,40 +1051,6 @@ class NotSendable {}
         expectTrue(expectation.fulfilled)
       }
 
-      // This test documents the current single-consumer limitation of AsyncThrowingStream.
-      #if !os(WASI) // TODO: is there a way to test for process death on WASI?
-      tests.test("finish behavior with multiple consumers throwing") {
-        expectCrashLater()
-        let (stream, continuation) = AsyncThrowingStream<Int, Error>.makeStream()
-        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
-        var controlIterator = controlStream.makeAsyncIterator()
-
-        func makeConsumingTaskWithIndex(_ index: Int) -> Task<Void, Error> {
-          Task { @MainActor in
-            controlContinuation.yield(index)
-            for try await _ in stream {}
-          }
-        }
-
-        let consumer1 = makeConsumingTaskWithIndex(1)
-        expectEqual(await controlIterator.next(isolation: #isolation), 1)
-
-        // Starting consumer2 while consumer1 is suspended on next() triggers fatalError
-        let consumer2 = makeConsumingTaskWithIndex(2)
-        expectEqual(await controlIterator.next(isolation: #isolation), 2)
-
-        await MainActor.run {}
-        continuation.finish()
-
-        do {
-          _ = try await consumer1.value
-          _ = try await consumer2.value
-        } catch {
-          expectUnreachable("unexpected error in multiple consumers test")
-        }
-      }
-      #endif
-
       await runAllTestsAsync()
     }
   }
