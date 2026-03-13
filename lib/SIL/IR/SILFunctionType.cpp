@@ -2473,7 +2473,13 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       }
 
       if (isolatedParam == varDecl) {
-        options |= SILParameterInfo::Isolated;
+        auto isolation = function.getActorIsolation();
+        // The function has to be isolated to this capture for it to be marked
+        // as `isolated`. It's possible to i.e. have a `nonisolated(nonsending)`
+        // closure that captures and isolated parameter.
+        if (isolation.isActorInstanceIsolated() &&
+            isolation.getActorInstance() == isolatedParam)
+          options |= SILParameterInfo::Isolated;
         isolatedParam = nullptr;
       }
     }

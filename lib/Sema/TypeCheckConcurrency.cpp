@@ -4891,16 +4891,12 @@ ActorIsolationChecker::determineClosureIsolation(AbstractClosureExpr *closure,
     // global actor, nonisolated/@concurrent attributes and doesn't have
     // isolated parameters. If our closure is nonisolated and we have a
     // conversion to nonisolated(nonsending), then we should respect that.
-    if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
-        isIsolationBoundary || !normalIsolation.isGlobalActor()) {
+    if (isIsolationBoundary || normalIsolation.isNonisolated()) {
       if (auto *fce = dyn_cast_or_null<FunctionConversionExpr>(context)) {
         auto expectedIsolation =
             fce->getType()->castTo<FunctionType>()->getIsolation();
-        if (expectedIsolation.isNonIsolatedCaller()) {
-          auto captureInfo = explicitClosure->getCaptureInfo();
-          if (!captureInfo.getIsolatedParamCapture())
-            return ActorIsolation::forCallerIsolationInheriting();
-        }
+        if (expectedIsolation.isNonIsolatedCaller())
+          return ActorIsolation::forCallerIsolationInheriting();
       }
     }
 
