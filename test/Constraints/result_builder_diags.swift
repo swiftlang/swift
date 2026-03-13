@@ -1088,6 +1088,17 @@ enum SimpleArrayBuilder<ElementKind> {
 }
 
 @resultBuilder
+enum SimpleDictionaryBuilder<Key: Hashable, Value> {
+  static func buildBlock(_ elements: (Key, Value)...) -> [Key: Value] {
+    var dict = [Key: Value]()
+    for element in elements {
+      dict[element.0] = element.1
+    }
+    return dict
+  }
+}
+
+@resultBuilder
 enum CollectionBuilder<Element> {
     static func buildBlock(_ component: Element...) -> [Element] {
       component
@@ -1122,6 +1133,67 @@ func testInferResultBuilderGenerics() {
   @SimpleArrayBuilder // expected-error{{unable to infer generic arguments for result builder @SimpleArrayBuilder}}
   var string: String {
     "foo"
+  }
+
+  @SimpleArrayBuilder<String>
+  var elements: [String] {
+    "foo"
+    "bar"
+  }
+
+  @SimpleArrayBuilder<(_, _)>
+  var elements2: [(String, Int)] {
+    ("foo", 42)
+  }
+
+  @SimpleArrayBuilder<(String, _)>
+  var elements3: [(String, Int)] {
+    ("foo", 42)
+  }
+
+  @SimpleArrayBuilder<(_, Int)>
+  var elements4: [(String, Int)] {
+    ("foo", 42)
+  }
+
+  @SimpleArrayBuilder<(Int, _)> // expected-error {{unable to infer generic arguments for result builder @SimpleArrayBuilder<(Int, _)>}} expeced-error {{cannot convert return expression of type '(String, Int)' to return type '[(String, Int)]'}}
+  var elements5: [(String, Int)] {
+    ("foo", 42) // expected-error {{cannot convert return expression of type '(String, Int)' to return type '[(String, Int)]'}}
+  }
+
+  @SimpleArrayBuilder<(_, String)>
+  var elements6: [(String, Int)] { // expected-error {{cannot convert return expression of type '[(String, String)]' to return type '[(String, Int)]'}} expected-note {{arguments to generic parameter 'Element' ('(String, String)' and '(String, Int)') are expected to be equal}}
+    ("foo", 42) // expected-error {{cannot convert value of type '(String, Int)' to expected argument type '(String, String)'}}
+  }
+
+  @SimpleArrayBuilder<(Int, String)>
+  var elements7: [(String, Int)] { // expected-error {{cannot convert return expression of type '[(Int, String)]' to return type '[(String, Int)]'}} expected-note {{arguments to generic parameter 'Element' ('(Int, String)' and '(String, Int)') are expected to be equal}}
+    ("foo", 42) // expected-error {{cannot convert value of type '(String, Int)' to expected argument type '(Int, String)'}}
+  }
+
+  @SimpleDictionaryBuilder
+  var dictionary: [String: Int] {
+    ("foo", 42)
+  }
+
+  @SimpleDictionaryBuilder<_, _>
+  var dictionary2: [String: Int] {
+    ("foo", 42)
+  }
+
+  @SimpleDictionaryBuilder<String, _>
+  var dictionary3: [String: Int] {
+    ("foo", 42)
+  }
+
+  @SimpleDictionaryBuilder<_, Int>
+  var dictionary4: [String: Int] {
+    ("foo", 42)
+  }
+
+  @SimpleDictionaryBuilder<Int, _>
+  var dictionary5: [String: Int] { // expected-error {{cannot convert return expression of type '[Int : Int]' to return type '[String : Int]'}} expected-note {{arguments to generic parameter 'Key' ('Int' and 'String') are expected to be equal}}
+    ("foo", 42) // expected-error {{cannot convert value of type '(String, Int)' to expected argument type '(Int, Int)'}}
   }
 
   struct MyValue {
@@ -1315,5 +1387,42 @@ func testNonGenericResultBuildersInGenericTypeExtensions() {
   var dictionary2: [(String, String)] {
     ("foo", "bar") // expected-warning {{expression of type '(String, String)' is unused}}
     ("baaz", "quux") // expected-warning {{expression of type '(String, String)' is unused}}
+  }
+
+  @Array<_>.Builder
+  var elements2: [String] {
+    "foo"
+    "bar"
+  }
+
+  @Array<String>.Builder
+  var elements3: [String] {
+    "foo"
+    "bar"
+  }
+
+  @Array<(_, _)>.Builder
+  var elements4: [(String, Int)] {
+    ("foo", 42)
+  }
+
+  @Array<(String, _)>.Builder
+  var elements5: [(String, Int)] {
+    ("foo", 42)
+  }
+
+  @Array<(_, Int)>.Builder
+  var elements6: [(String, Int)] {
+    ("foo", 42)
+  }
+
+  @Array<(Int, _)>.Builder // expected-error {{unable to infer generic arguments for result builder @Array<(Int, _)>.Builder}}
+  var elements7: [(String, Int)] {
+    ("foo", 42) // expected-error {{cannot convert return expression of type '(String, Int)' to return type '[(String, Int)]'}}
+  }
+
+  @Array<(Int, String)>.Builder
+  var elements8: [(String, Int)] { // expected-error {{cannot convert return expression of type '[(Int, String)]' to return type '[(String, Int)]'}} expected-note {{arguments to generic parameter 'Element' ('(Int, String)' and '(String, Int)') are expected to be equal}}
+    ("foo", 42) // expected-error {{cannot convert value of type '(String, Int)' to expected argument type '(Int, String)'}}
   }
 }

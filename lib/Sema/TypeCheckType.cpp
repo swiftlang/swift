@@ -7267,6 +7267,57 @@ struct ResultBuilderUnboundTypeOpener {
   CustomAttr *attr;
 
   Type operator()(UnboundGenericType *unboundTy) const {
+    return open(unboundTy, /*genericArgs=*/{});
+  }
+
+  // Opens a partially-bound result builder type by evaluating any
+  // placeholder types in the generic signature
+  Type openPlaceholders(Type type) const {
+    auto &ctx = dc->getASTContext();
+
+    if (!type->hasPlaceholder()) {
+      return type;
+    }
+
+    // @Builder<_>: placeholder is in the type's own generic args
+    if (auto *boundGeneric = type->getAs<BoundGenericType>()) {
+      if (auto *nominalDecl =
+              dyn_cast<NominalTypeDecl>(boundGeneric->getDecl())) {
+        auto *unboundTy = UnboundGenericType::get(
+            nominalDecl, boundGeneric->getParent(), ctx);
+        return open(unboundTy, boundGeneric->getGenericArgs());
+      }
+    }
+
+    // @Array<_>.Builder: placeholder is in the parent type
+    else if (auto *nominalType = type->getAs<NominalType>()) {
+      if (auto *parentBoundGeneric =
+              nominalType->getParent()->getAs<BoundGenericType>()) {
+        if (auto *parentNominalDecl =
+                dyn_cast<NominalTypeDecl>(parentBoundGeneric->getDecl())) {
+          auto *unboundParent = UnboundGenericType::get(
+              parentNominalDecl, parentBoundGeneric->getParent(), ctx);
+          auto solvedParent =
+              open(unboundParent, parentBoundGeneric->getGenericArgs());
+
+          if (solvedParent->hasError()) {
+            return solvedParent;
+          }
+
+          return NominalType::get(nominalType->getDecl(), solvedParent, ctx);
+        }
+      }
+    }
+    return type;
+  }
+
+  /// Opens the given result builder type by solving its generic parameters
+  /// against the owning declaration's return type.
+  ///
+  /// If `genericArgs` is provided, any non-placeholder type remains
+  /// constrained to that type, and only the placeholders are solved.
+  Type open(UnboundGenericType *unboundTy,
+            ArrayRef<Type> genericArgs = {}) const {
     auto resultBuilderDecl = attr->getNominalDecl();
     if (!resultBuilderDecl) {
       return invalidResultBuilderType();
@@ -7274,7 +7325,7 @@ struct ResultBuilderUnboundTypeOpener {
 
     auto unboundTyDecl =
         dyn_cast_or_null<NominalTypeDecl>(unboundTy->getDecl());
-    if (!resultBuilderDecl) {
+    if (!unboundTyDecl) {
       return invalidResultBuilderType();
     }
 
@@ -7302,19 +7353,37 @@ struct ResultBuilderUnboundTypeOpener {
 
       ConstraintSystem cs(dc, options);
 
-      // Create a type variable for each of the result builder's generic params
+      // For each generic parameter position, either pin the fixed argument
+      // (when genericArgs supplies a non-placeholder at that index) or create a
+      // type variable to be solved.
       llvm::SmallVector<Type, 8> typeVarReplacements;
-      llvm::SmallVector<TypeVariableType *, 8> typeVars;
       for (unsigned i = 0; i < genericSig.getGenericParams().size(); ++i) {
-        auto locator = cs.getConstraintLocator(
-            unboundTyDecl, {ConstraintLocator::GenericArgument, i});
-        auto typeVar = cs.createTypeVariable(locator, TVO_CanBindToHole);
-        typeVarReplacements.push_back(typeVar);
-        typeVars.push_back(typeVar);
+        if (i < genericArgs.size() && !genericArgs[i]->hasPlaceholder()) {
+          typeVarReplacements.push_back(genericArgs[i]);
+        } else {
+          auto locator = cs.getConstraintLocator(
+              unboundTyDecl, {ConstraintLocator::GenericArgument, i});
+          auto makeTypeVar = [&] {
+            return Type(cs.createTypeVariable(locator, TVO_CanBindToHole));
+          };
+
+          if (i >= genericArgs.size()) {
+            typeVarReplacements.push_back(makeTypeVar());
+          } else {
+            typeVarReplacements.push_back(
+                genericArgs[i].transformRec([&](Type t) -> std::optional<Type> {
+                  if (t->is<PlaceholderType>()) {
+                    return makeTypeVar();
+                  } else {
+                    return std::nullopt;
+                  }
+                }));
+          }
+        }
       }
 
       // Replace any references to the result builder's generic params
-      // in the result type with the corresponding type variables.
+      // in the result type with the corresponding replacements.
       auto subMap = SubstitutionMap::get(genericSig, typeVarReplacements,
                                          LookUpConformanceInModule());
 
@@ -7328,12 +7397,19 @@ struct ResultBuilderUnboundTypeOpener {
 
       auto solution = cs.solveSingle();
 
-      // If a solution exists, bind the result builder's generic params to the
-      // solved types.
+      // If a solution exists, build the final replacement list by substituting
+      // all type variables with their solved bindings.
       if (solution) {
         llvm::SmallVector<Type, 8> solvedReplacements;
-        for (auto typeVar : typeVars) {
-          solvedReplacements.push_back(solution->typeBindings[typeVar]);
+        for (auto replacement : typeVarReplacements) {
+          solvedReplacements.push_back(
+              replacement.transformRec([&](Type t) -> std::optional<Type> {
+                if (auto *typeVar = t->getAs<TypeVariableType>()) {
+                  return solution->typeBindings[typeVar];
+                } else {
+                  return std::nullopt;
+                }
+              }));
         }
 
         return BoundGenericType::get(unboundTyDecl, unboundTy->getParent(),
@@ -7431,6 +7507,7 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
   const TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+  HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
 
   // Property wrappers and result builders allow their type to be an unbound
   // generic.
@@ -7441,11 +7518,19 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
     void *mem = ctx.Allocate(sizeof(ResultBuilderUnboundTypeOpener),
                              alignof(ResultBuilderUnboundTypeOpener));
     unboundTyOpener = *new (mem) ResultBuilderUnboundTypeOpener{dc, attr};
+    placeholderHandler = PlaceholderType::get;
   }
 
   auto type = TypeResolution::resolveContextualType(
       attr->getTypeRepr(), dc, options, unboundTyOpener,
-      /*placeholderHandler*/ nullptr, /*packElementOpener*/ nullptr);
+      /*placeholderHandler*/ placeholderHandler,
+      /*packElementOpener*/ nullptr);
+
+  // Open any pl
+  if (typeKind == CustomAttrTypeKind::ResultBuilder && type->hasPlaceholder()) {
+    ResultBuilderUnboundTypeOpener opener{dc, attr};
+    type = opener.openPlaceholders(type);
+  }
 
   // We always require the type to resolve to a nominal type. If the type was
   // not a nominal type, we should have already diagnosed an error via
