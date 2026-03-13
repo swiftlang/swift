@@ -12,7 +12,9 @@
 
 #include "ClangDerivedConformances.h"
 #include "ImporterImpl.h"
+#include "SwiftLookupTable.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/ParameterList.h"
@@ -188,30 +190,92 @@ static Decl *lookupDirectSingleWithoutExtensions(NominalTypeDecl *decl,
   return dyn_cast<Decl>(results.front());
 }
 
-static ValueDecl *lookupOperator(NominalTypeDecl *decl, Identifier id,
-                                 function_ref<bool(ValueDecl *)> isValid) {
+// isValidSwiftMember is used to validate the operators declared as member functions
+// and operate on Swift declarations while isValidClangGlobal is used to validate
+// operators defined in global or namespace scope and is operating on Clang declarations.
+static ValueDecl *lookupOperator(
+    NominalTypeDecl *decl, Identifier id,
+    function_ref<bool(ValueDecl *)> isValidSwiftMember,
+    function_ref<bool(const clang::FunctionDecl *)> isValidClangGlobal) {
   // First look for operator declared as a member.
   auto memberResults = lookupDirectWithoutExtensions(decl, id);
   for (const auto &member : memberResults) {
-    if (isValid(member))
+    if (isValidSwiftMember(member))
       return member;
   }
 
-  // If no member operator was found, look for out-of-class definitions in the
-  // same module.
-  auto module = decl->getModuleContextForNameLookup();
-  SmallVector<ValueDecl *> nonMemberResults;
-  module->lookupValue(id, NLKind::UnqualifiedLookup, nonMemberResults);
-  for (const auto &nonMember : nonMemberResults) {
-    if (isValid(nonMember))
-      return nonMember;
+  // Look up global operators. We want to do the filtering before import to avoid
+  // overly eager imports.
+  auto &ctx = decl->getASTContext();
+  auto loader = ctx.getClangModuleLoader();
+  auto clangDecl = decl->getClangDecl();
+  auto *clangModule =
+      importer::getClangOwningModule(clangDecl, clangDecl->getASTContext());
+  auto lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
+  // Look up operators in the namespace context first.
+  for (auto entry : lookupTable->lookupMemberOperators(DeclBaseName(id))) {
+    if (isValidClangGlobal(dyn_cast<clang::FunctionDecl>(entry))) {
+      return cast_or_null<ValueDecl>(loader->importDeclDirectly(entry));
+    }
+  }
+  // Look up operators in the global namespace
+  for (auto entry : lookupTable->lookup(
+           DeclBaseName(id),
+           EffectiveClangContext(
+               clangDecl->getASTContext().getTranslationUnitDecl()))) {
+    auto decl = dyn_cast_or_null<clang::FunctionDecl>(
+        entry.dyn_cast<clang::NamedDecl *>());
+    if (!decl)
+      continue;
+    if (isValidClangGlobal(decl)) {
+      return cast_or_null<ValueDecl>(loader->importDeclDirectly(decl));
+    }
   }
 
   return nullptr;
 }
 
+// Is this an operator where both arguments take T, or const T&?
+static bool isValidBinOp(NominalTypeDecl *decl, const clang::FunctionDecl *fd) {
+  if (!fd)
+    return false;
+  auto ty = cast<clang::TypeDecl>(decl->getClangDecl())->getTypeForDecl();
+  auto getParamTy = [](const clang::ParmVarDecl *param) {
+    auto ty = param->getType();
+    if (ty->isReferenceType()) {
+      ty = ty->getPointeeType();
+      if (!ty.isConstQualified() || ty.isVolatileQualified())
+        return clang::QualType();
+    }
+    return ty;
+  };
+  if (auto method = dyn_cast<clang::CXXMethodDecl>(fd)) {
+    if (method->param_size() != 1)
+      return false;
+    if (!method->isConst())
+      return false;
+
+    auto parTy = getParamTy(fd->getParamDecl(0));
+    if (parTy.isNull())
+      return false;
+    auto thisTy = method->getParent()->getTypeForDecl();
+    return parTy.getCanonicalType() == thisTy->getCanonicalTypeUnqualified() &&
+           parTy.getCanonicalType() == ty->getCanonicalTypeUnqualified();
+  }
+  if (fd->param_size() != 2)
+    return false;
+  auto lhsTy = getParamTy(fd->getParamDecl(0));
+  auto rhsTy = getParamTy(fd->getParamDecl(1));
+  if (lhsTy.isNull() || rhsTy.isNull())
+    return false;
+  return lhsTy->getCanonicalTypeUnqualified() ==
+             rhsTy->getCanonicalTypeUnqualified() &&
+         lhsTy->getCanonicalTypeUnqualified() ==
+             ty->getCanonicalTypeUnqualified();
+}
+
 static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
-  auto isValid = [&](ValueDecl *equalEqualOp) -> bool {
+  auto isValidMember = [&](ValueDecl *equalEqualOp) -> bool {
     auto equalEqual = dyn_cast<FuncDecl>(equalEqualOp);
     if (!equalEqual)
       return false;
@@ -230,15 +294,16 @@ static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
     auto rhsNominal = rhsTy->getAnyNominal();
     return lhsNominal == rhsNominal && lhsNominal == decl;
   };
-
-  return lookupOperator(decl, decl->getASTContext().Id_EqualsOperator, isValid);
+  return lookupOperator(
+      decl, decl->getASTContext().Id_EqualsOperator, isValidMember,
+      [decl](const clang::FunctionDecl *fd) { return isValidBinOp(decl, fd); });
 }
 
 static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
   auto binaryIntegerProto =
       decl->getASTContext().getProtocol(KnownProtocolKind::BinaryInteger);
 
-  auto isValid = [&](ValueDecl *minusOp) -> bool {
+  auto isValidMember = [&](ValueDecl *minusOp) -> bool {
     auto minus = dyn_cast<FuncDecl>(minusOp);
     if (!minus)
       return false;
@@ -260,14 +325,59 @@ static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
     auto returnTy = minus->getResultInterfaceType();
     return static_cast<bool>(checkConformance(returnTy, binaryIntegerProto));
   };
+  auto isValidGlobal = [&](const clang::FunctionDecl *minusOp) -> bool {
+    if (!isValidBinOp(decl, minusOp))
+      return false;
+    return minusOp->getReturnType()->isIntegerType();
+  };
 
   ValueDecl *result =
-      lookupOperator(decl, decl->getASTContext().getIdentifier("-"), isValid);
+      lookupOperator(decl, decl->getASTContext().getIdentifier("-"),
+                     isValidMember, isValidGlobal);
   return dyn_cast_or_null<FuncDecl>(result);
 }
 
-static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
-  auto isValid = [&](ValueDecl *plusEqualOp) -> bool {
+static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl) {
+  auto isValidGlobal = [&](const clang::FunctionDecl *fd) -> bool {
+    if (!fd)
+      return false;
+    auto ty = cast<clang::TypeDecl>(decl->getClangDecl())->getTypeForDecl();
+    auto getParamTy = [](const clang::ParmVarDecl *param) {
+      auto ty = param->getType();
+      if (ty->isReferenceType()) {
+        ty = ty->getPointeeType();
+        if (!ty.isConstQualified())
+          return clang::QualType();
+      }
+      return ty;
+    };
+    if (auto method = dyn_cast<clang::CXXMethodDecl>(fd)) {
+      if (method->param_size() != 1)
+        return false;
+      if (!method->isConst())
+        return false;
+
+      auto parTy = getParamTy(fd->getParamDecl(0));
+      if (parTy.isNull())
+        return false;
+      if (!parTy->isIntegerType())
+        return false;
+      auto thisTy = method->getParent()->getTypeForDecl();
+      return thisTy->getCanonicalTypeUnqualified() ==
+             ty->getCanonicalTypeUnqualified();
+    }
+    if (fd->param_size() != 2)
+      return false;
+    auto lhsTy = getParamTy(fd->getParamDecl(0));
+    auto rhsTy = getParamTy(fd->getParamDecl(1));
+    if (lhsTy.isNull() || rhsTy.isNull())
+      return false;
+    if (rhsTy->isIntegerType())
+      return false;
+    return lhsTy->getCanonicalTypeUnqualified() ==
+           ty->getCanonicalTypeUnqualified();
+  };
+  auto isValidMember = [&](ValueDecl *plusEqualOp) -> bool {
     auto plusEqual = dyn_cast<FuncDecl>(plusEqualOp);
     if (!plusEqual)
       return false;
@@ -282,8 +392,6 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
     auto rhsTy = rhs->getTypeInContext();
     if (!lhsTy || !rhsTy)
       return false;
-    if (rhsTy->getCanonicalType() != distanceTy->getCanonicalType())
-      return false;
     auto lhsNominal = lhsTy->getAnyNominal();
     if (lhsNominal != decl)
       return false;
@@ -292,7 +400,8 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
   };
 
   ValueDecl *result =
-      lookupOperator(decl, decl->getASTContext().getIdentifier("+="), isValid);
+      lookupOperator(decl, decl->getASTContext().getIdentifier("+="),
+                     isValidMember, isValidGlobal);
   return dyn_cast_or_null<FuncDecl>(result);
 }
 
@@ -626,7 +735,7 @@ swift::importer::getImportedMemberOperator(const DeclBaseName &name,
   }
   if (name.getIdentifier() == selfType->getASTContext().getIdentifier("+=") &&
       parameterType) {
-    return getPlusEqualOperator(selfType, *parameterType);
+    return getPlusEqualOperator(selfType);
   }
   return nullptr;
 }
@@ -762,28 +871,15 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   }
   if (!minus)
     return;
-  auto distanceTy = minus->getResultInterfaceType();
   // distanceTy conforms to BinaryInteger, this is ensured by getMinusOperator.
+  auto distanceTy = minus->getResultInterfaceType();
 
-  auto plusEqual = getPlusEqualOperator(decl, distanceTy);
-  if (!plusEqual) {
-    clang::FunctionDecl *instantiated = instantiateTemplatedOperator(
-        impl, clangDecl, clang::BinaryOperatorKind::BO_AddAssign);
-    if (instantiated && !impl.isUnavailableInSwift(instantiated)) {
-      plusEqual = getPlusEqualOperator(decl, distanceTy);
-      if (!plusEqual) {
-        clang::QualType returnTy = instantiated->getReturnType();
-        auto clangMinus = cast<clang::FunctionDecl>(minus->getClangDecl());
-        auto lhsTy = clangCtx.getRecordType(clangDecl);
-        auto rhsTy = clangMinus->getReturnType();
-        synthesizeCXXOperator(impl, clangDecl,
-                              clang::BinaryOperatorKind::BO_AddAssign, lhsTy,
-                              rhsTy, returnTy);
-        plusEqual = getPlusEqualOperator(decl, distanceTy);
-      }
-    }
-  }
-  if (!plusEqual)
+  auto plusEqual = getPlusEqualOperator(decl);
+  if (!plusEqual ||
+      plusEqual->getParameters()
+              ->get(1)
+              ->getInterfaceType()
+              ->getCanonicalType() != distanceTy->getCanonicalType())
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Distance"), distanceTy);
