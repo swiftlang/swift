@@ -2003,11 +2003,9 @@ func inferLocationOfCapturedTaskIsolatedSelfCorrectly() {
     let a = A()
 
     func d() {
-      a.block = c // expected-warning {{converting non-Sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
-      // expected-warning @-1 {{non-Sendable '@MainActor () -> ()'-typed result can not be returned from main actor-isolated function to nonisolated context}}
-      // expected-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-      // expected-warning @-3 {{sending 'self' risks causing data races}}
-      // expected-note @-4 {{task-isolated 'self' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      a.block = c
+      // expected-warning @-1 {{sending 'self' risks causing data races}}
+      // expected-note @-2 {{task-isolated 'self' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
 
     @MainActor

@@ -3288,9 +3288,13 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
 
     Type mainActor = context.getMainActorType();
     if (mainActor) {
-      auto extInfo = ASTExtInfoBuilder().withIsolation(
-          FunctionTypeIsolation::forGlobalActor(mainActor))
-        .withThrows(true, throwsTypeVar);
+      auto extInfo =
+          ASTExtInfoBuilder()
+              .withIsolation(FunctionTypeIsolation::forGlobalActor(mainActor))
+              .withThrows(true, throwsTypeVar)
+              .withSendable(context.LangOpts.hasFeature(
+                  Feature::GlobalActorIsolatedTypesUsability));
+
       mainTypes.push_back(FunctionType::get(
           /*params*/ {}, context.TheEmptyTupleType,
           extInfo.build()));

@@ -7973,6 +7973,17 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
   innerFnType = innerFnType->withExtInfo(
       innerFnType->getExtInfo().withIsolation(*funcIsolation));
 
+  // When `GlobalActorIsolatedTypesUsability` feature is enabled, inner type
+  // should be marked as `@Sendable` when inferred to be global-actor isolated.
+  {
+    auto &ctx = decl->getASTContext();
+    if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability) &&
+        funcIsolation->isGlobalActor()) {
+      innerFnType =
+          innerFnType->withExtInfo(innerFnType->getExtInfo().withSendable());
+    }
+  }
+
   // Rebuild the outer function type around it.
   if (auto genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(

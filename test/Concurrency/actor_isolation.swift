@@ -1764,8 +1764,7 @@ struct ReferenceSelfDotMethods {
   nonisolated
   private func testCurry() -> (Self) -> (@MainActor () -> Void) {
     let functionRef = Self.mainActorAffinedFunction
-    // warning goes away with InferSendableFromCaptures, see actor_isolation_swift6.swift
-    return functionRef // expected-warning {{converting non-Sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
+    return functionRef // Ok
   }
 
   @MainActor
