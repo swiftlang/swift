@@ -26,8 +26,8 @@ struct ReferenceCollector : public SourceEntityWalker {
   SmallVector<ValueDecl *, 4> References;
 
   ReferenceCollector(Expr *E) { walk(E); }
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
     References.emplace_back(D);
     return true;
@@ -158,7 +158,7 @@ swift::refactoring::checkExtractConditions(const ResolvedRangeInfo &RangeInfo,
 
   // Disallow extracting certain kinds of statements.
   if (RangeInfo.Kind == RangeKind::SingleStatement) {
-    Stmt *S = RangeInfo.ContainedNodes[0].get<Stmt *>();
+    Stmt *S = cast<Stmt *>(RangeInfo.ContainedNodes[0]);
 
     // These aren't independent statement.
     if (isa<BraceStmt>(S) || isa<CaseStmt>(S))
@@ -167,7 +167,7 @@ swift::refactoring::checkExtractConditions(const ResolvedRangeInfo &RangeInfo,
 
   // Disallow extracting literals.
   if (RangeInfo.Kind == RangeKind::SingleExpression) {
-    Expr *E = RangeInfo.ContainedNodes[0].get<Expr *>();
+    Expr *E = cast<Expr *>(RangeInfo.ContainedNodes[0]);
 
     // Until implementing the performChange() part of extracting trailing
     // closures, we disable them for now.
@@ -211,7 +211,7 @@ bool RefactoringActionExtractExprBase::performChange() {
   ContextFinder Finder(*TheFile, RangeInfo.ContainedNodes.front(),
                        [](ASTNode N) { return N.isStmt(StmtKind::Brace); });
 
-  auto *SelectedExpr = RangeInfo.ContainedNodes[0].get<Expr *>();
+  auto *SelectedExpr = cast<Expr *>(RangeInfo.ContainedNodes[0]);
   Finder.resolve();
   SourceLoc InsertLoc;
   llvm::SetVector<ValueDecl *> AllVisibleDecls;
@@ -231,7 +231,7 @@ bool RefactoringActionExtractExprBase::performChange() {
 
     // Get the innermost brace statement.
     auto BS =
-        static_cast<BraceStmt *>(Finder.getContexts().back().get<Stmt *>());
+        static_cast<BraceStmt *>(cast<Stmt *>(Finder.getContexts().back()));
 
     // Collect all value decls inside the brace statement.
     Collector.walk(BS);

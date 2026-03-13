@@ -142,7 +142,6 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   }
 
   bool visitCopyValueInst(CopyValueInst *cvi);
-  bool visitBeginBorrowInst(BeginBorrowInst *bbi);
   bool visitMoveValueInst(MoveValueInst *mvi);
   bool
   visitUncheckedOwnershipConversionInst(UncheckedOwnershipConversionInst *uoci);
@@ -197,6 +196,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   FORWARDING_INST(DifferentiableFunctionExtract)
   FORWARDING_INST(LinearFunctionExtract)
   FORWARDING_INST(FunctionExtractIsolation)
+  FORWARDING_INST(ImplicitActorToOpaqueIsolationCast)
 #undef FORWARDING_INST
 
   bool processWorklist();

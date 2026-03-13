@@ -63,9 +63,9 @@ MutableTerm TypeDifference::getReplacementSubstitution(unsigned index) const {
 }
 
 void TypeDifference::dump(llvm::raw_ostream &out) const {
-  llvm::errs() << "Base term: " << BaseTerm << "\n";
-  llvm::errs() << "LHS: " << LHS << "\n";
-  llvm::errs() << "RHS: " << RHS << "\n";
+  out << "Base term: " << BaseTerm << "\n";
+  out << "LHS: " << LHS << "\n";
+  out << "RHS: " << RHS << "\n";
 
   for (const auto &pair : SameTypes) {
     out << "- " << getOriginalSubstitution(pair.first) << " (#";
@@ -79,11 +79,12 @@ void TypeDifference::dump(llvm::raw_ostream &out) const {
 }
 
 void TypeDifference::verify(RewriteContext &ctx) const {
-#define VERIFY(expr, str) \
-  if (!(expr)) { \
-    llvm::errs() << "TypeDifference::verify(): " << str << "\n"; \
-    dump(llvm::errs()); \
-    abort(); \
+#define VERIFY(expr, str)                                                      \
+  if (!(expr)) {                                                               \
+    ABORT([&](auto &out) {                                                     \
+      out << "TypeDifference::verify(): " << str << "\n";                      \
+      dump(out);                                                               \
+    });                                                                        \
   }
 
   VERIFY(LHS.getKind() == RHS.getKind(), "Kind mismatch");
@@ -214,12 +215,13 @@ namespace {
     }
 
     void verify() const {
-#define VERIFY(expr, str) \
-  if (!(expr)) { \
-    llvm::errs() << "ConcreteTypeMatcher::verify(): " << str << "\n"; \
-    dump(llvm::errs()); \
-    abort(); \
-  }
+#define VERIFY(expr, str)                                                      \
+    if (!(expr)) {                                                             \
+      ABORT([&](auto &out) {                                                   \
+        out << "ConcreteTypeMatcher::verify(): " << str << "\n";               \
+        dump(out);                                                             \
+      });                                                                      \
+    }
 
       llvm::DenseSet<unsigned> lhsVisited;
       llvm::DenseSet<unsigned> rhsVisited;
@@ -460,16 +462,17 @@ bool RewriteSystem::computeTypeDifference(
   if (!isConflict) {
     // The meet operation should be commutative.
     if (lhsMeetRhs.RHS != rhsMeetLhs.RHS) {
-      llvm::errs() << "Meet operation was not commutative:\n\n";
+      ABORT([&](auto &out) {
+        out << "Meet operation was not commutative:\n\n";
 
-      llvm::errs() << "LHS: " << lhs << "\n";
-      llvm::errs() << "RHS: " << rhs << "\n";
-      matcher.dump(llvm::errs());
+        out << "LHS: " << lhs << "\n";
+        out << "RHS: " << rhs << "\n";
+        matcher.dump(out);
 
-      llvm::errs() << "\n";
-      llvm::errs() << "LHS ∧ RHS: " << lhsMeetRhs.RHS << "\n";
-      llvm::errs() << "RHS ∧ LHS: " << rhsMeetLhs.RHS << "\n";
-      abort();
+        out << "\n";
+        out << "LHS ∧ RHS: " << lhsMeetRhs.RHS << "\n";
+        out << "RHS ∧ LHS: " << rhsMeetLhs.RHS;
+      });
     }
 
     // The meet operation should be idempotent.
@@ -483,16 +486,17 @@ bool RewriteSystem::computeTypeDifference(
       lhsMeetLhsMeetRhs.verify(Context);
 
       if (lhsMeetRhs.RHS != lhsMeetLhsMeetRhs.RHS) {
-        llvm::errs() << "Meet operation was not idempotent:\n\n";
+        ABORT([&](auto &out) {
+          out << "Meet operation was not idempotent:\n\n";
 
-        llvm::errs() << "LHS: " << lhs << "\n";
-        llvm::errs() << "RHS: " << rhs << "\n";
-        matcher.dump(llvm::errs());
+          out << "LHS: " << lhs << "\n";
+          out << "RHS: " << rhs << "\n";
+          matcher.dump(out);
 
-        llvm::errs() << "\n";
-        llvm::errs() << "LHS ∧ RHS: " << lhsMeetRhs.RHS << "\n";
-        llvm::errs() << "LHS ∧ (LHS ∧ RHS): " << lhsMeetLhsMeetRhs.RHS << "\n";
-        abort();
+          out << "\n";
+          out << "LHS ∧ RHS: " << lhsMeetRhs.RHS << "\n";
+          out << "LHS ∧ (LHS ∧ RHS): " << lhsMeetLhsMeetRhs.RHS;
+        });
       }
     }
 
@@ -506,16 +510,17 @@ bool RewriteSystem::computeTypeDifference(
       rhsMeetRhsMeetRhs.verify(Context);
 
       if (lhsMeetRhs.RHS != rhsMeetRhsMeetRhs.RHS) {
-        llvm::errs() << "Meet operation was not idempotent:\n\n";
+        ABORT([&](auto &out) {
+          out << "Meet operation was not idempotent:\n\n";
 
-        llvm::errs() << "LHS: " << lhs << "\n";
-        llvm::errs() << "RHS: " << rhs << "\n";
-        matcher.dump(llvm::errs());
+          out << "LHS: " << lhs << "\n";
+          out << "RHS: " << rhs << "\n";
+          matcher.dump(out);
 
-        llvm::errs() << "\n";
-        llvm::errs() << "RHS ∧ LHS: " << rhsMeetLhs.RHS << "\n";
-        llvm::errs() << "RHS ∧ (RHS ∧ LHS): " << rhsMeetRhsMeetRhs.RHS << "\n";
-        abort();
+          out << "\n";
+          out << "RHS ∧ LHS: " << rhsMeetLhs.RHS << "\n";
+          out << "RHS ∧ (RHS ∧ LHS): " << rhsMeetRhsMeetRhs.RHS;
+        });
       }
     }
   }

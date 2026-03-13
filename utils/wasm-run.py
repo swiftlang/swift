@@ -11,7 +11,7 @@ def collect_wasm_env(local_env=os.environ, prefix='WASM_RUN_CHILD_'):
                 for key, value in local_env.items() if key.startswith(prefix))
 
 
-class WasmtimeRunner(object):
+class WASIRunner(object):
     def __init__(self):
         pass
 
@@ -24,7 +24,7 @@ class WasmtimeRunner(object):
             subprocess.check_call(command)
 
     def invocation(self, args):
-        command = ["wasmkit-cli", "run"]
+        command = ["wasmkit", "run"]
         envs = collect_wasm_env()
         for key in envs:
             command.append("--env")
@@ -46,7 +46,7 @@ def main():
                         help='the command to run', metavar='command...')
 
     args = parser.parse_args()
-    runner = WasmtimeRunner()
+    runner = WASIRunner()
     runner.run(args)
 
 

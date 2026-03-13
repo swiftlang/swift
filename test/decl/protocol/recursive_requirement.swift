@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // -----
 
@@ -95,7 +95,7 @@ protocol AsExistentialB {
 }
 
 protocol AsExistentialAssocTypeA {
-  var delegate : AsExistentialAssocTypeB? { get } // expected-error {{use of protocol 'AsExistentialAssocTypeB' as a type must be written 'any AsExistentialAssocTypeB'}}
+  var delegate : (any AsExistentialAssocTypeB)? { get }
 }
 protocol AsExistentialAssocTypeB {
   func aMethod(_ object : AsExistentialAssocTypeA)
@@ -107,7 +107,7 @@ protocol AsExistentialAssocTypeAgainA {
   associatedtype Bar
 }
 protocol AsExistentialAssocTypeAgainB {
-  func aMethod(_ object : AsExistentialAssocTypeAgainA) // expected-error {{use of protocol 'AsExistentialAssocTypeAgainA' as a type must be written 'any AsExistentialAssocTypeAgainA'}}
+  func aMethod(_ object : any AsExistentialAssocTypeAgainA)
 }
 
 // https://github.com/apple/swift/issues/43164

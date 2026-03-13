@@ -79,6 +79,11 @@ public:
   /// destroying the old value and emplacing a new value with the modified
   /// field in the same place.
   bool isMutable() const { return LoweredTypeAndFlags.getInt() & IsMutable; }
+
+  /// Change the current SILField's mutability field.
+  void setIsMutable(bool newValue) {
+    LoweredTypeAndFlags = {getLoweredType(), getFlagsValue(newValue)};
+  }
 };
 
 /// A layout.
@@ -133,18 +138,27 @@ public:
   bool isMutable() const {
     return GenericSigAndFlags.getInt() & IsMutable;
   }
-  
+
+  /// Returns a SILLayout that is the same as the current layout but with the
+  /// mutability of each field specified via index in \p
+  /// fieldIndexMutabilityUpdatePairs to have its mutability be the index's
+  /// associated bool pair.
+  SILLayout *withMutable(ASTContext &ctx,
+                         std::initializer_list<std::pair<unsigned, bool>>
+                             fieldIndexMutabilityUpdatePairs) const;
+
   /// True if the layout captures the generic arguments it is substituted with
   /// and can provide generic bindings when passed as a closure argument.
   bool capturesGenericEnvironment() const {
     return GenericSigAndFlags.getInt() & CapturesGenericEnvironment;
   }
-  
+
   /// Get the fields inside the layout.
-  ArrayRef<SILField> getFields() const {
-    return llvm::ArrayRef(getTrailingObjects<SILField>(), NumFields);
-  }
-  
+  ///
+  /// NOTE: The types inside the fields have not been specialized for the given
+  /// environment.
+  ArrayRef<SILField> getFields() const { return getTrailingObjects(NumFields); }
+
   /// Produce a profile of this layout, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id,
                       CanGenericSignature Generics,

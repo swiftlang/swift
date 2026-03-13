@@ -14,7 +14,7 @@ func f2<T: P1>(_: T) where () throws(T.A) -> () == () throws -> () {}
 
 protocol P2 {
   associatedtype A where A == () throws(E) -> ()
-  associatedtype E
+  associatedtype E: Error
 }
 
 // CHECK-LABEL: typed_throws.(file).f3@

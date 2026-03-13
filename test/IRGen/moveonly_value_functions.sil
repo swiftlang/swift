@@ -29,7 +29,7 @@ sil @deinit_count : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (move
 // CHECK:       entry:
 // CHECK:         [[CELL_VWT_ADDR:%[^,]+]] = getelementptr inbounds ptr, ptr %"_Cell<Value>", [[INT]] -1
 // CHECK:         %"_Cell<Value>.valueWitnesses" = load ptr, ptr [[CELL_VWT_ADDR]]
-// CHECK:         [[CELL_SIZE_ADDR:%[^,]+]] = getelementptr inbounds %swift.vwtable
+// CHECK:         [[CELL_SIZE_ADDR:%[^,]+]] = getelementptr inbounds{{.*}} %swift.vwtable
 //           :        ptr %"_Cell<Value>.valueWitnesses",
 // CHECK-SAME:        i32 0
 // CHECK-SAME:        i32 8

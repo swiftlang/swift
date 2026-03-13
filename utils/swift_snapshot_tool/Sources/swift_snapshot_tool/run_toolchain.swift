@@ -17,8 +17,11 @@ struct RunToolchains: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "run",
     discussion: """
-    Run a toolchain like bisect would. Passed the environment variables:
-    \(environmentVariables)
+      Run and determine success/failure of a script against a specified snapshot
+      like the bisect command would. Used to determine the start/end bisect
+      dates to pass to the bisect command. The script is passed paths into the
+      downloaded snapshot via environment variables and is expected to compile
+      and or run swift programs using the snapshot artifacts.
     """)
 
   @Flag var platform: Platform = .osx
@@ -34,13 +37,23 @@ struct RunToolchains: AsyncParsableCommand {
 
   @Option(
     help: """
-      The script that should be run. The environment variable
-      SWIFT_EXEC is used by the script to know where swift-frontend is
+      The script that should be run. It should run a specific swift compilation and
+      or program. Paths into the snapshots are passed in via the environment variables \(environmentVariables).
       """)
   var script: String
 
-  @Option(help: "Snapshot tag to run the test for")
-  var tag: String
+  @Option(help: "Date. We use the first snapshot produced before the given date")
+  var date: String
+
+  var dateAsDate: Date {
+    let d = DateFormatter()
+    d.dateFormat = "yyyy-MM-dd"
+    guard let result = d.date(from: date) else {
+      log("Improperly formatted date: \(date)! Expected format: yyyy_MM_dd.")
+      fatalError()
+    }
+    return result
+  }
 
   @Flag(help: "Invert the test so that we assume the newest succeeds")
   var invert = false
@@ -69,8 +82,9 @@ struct RunToolchains: AsyncParsableCommand {
     // Load our tags from swift's github repo
     let tags = try! await getTagsFromSwiftRepo(branch: branch)
 
-    guard var tagIndex = tags.firstIndex(where: { $0.tag.name == self.tag }) else {
-      log("Failed to find tag: \(self.tag)")
+    let date = self.dateAsDate
+    guard var tagIndex = tags.firstIndex(where: { $0.tag.date(branch: self.branch) <= date }) else {
+      log("Failed to find tag with date: \(date)")
       fatalError()
     }
 

@@ -38,7 +38,6 @@
 ///     fails. The default is the line number where `assert(_:_:file:line:)`
 ///     is called.
 @_transparent
-@_unavailableInEmbedded
 #if $Embedded
 @_disfavoredOverload
 #endif
@@ -101,7 +100,6 @@ public func assert(
 ///     fails. The default is the line number where
 ///     `precondition(_:_:file:line:)` is called.
 @_transparent
-@_unavailableInEmbedded
 #if $Embedded
 @_disfavoredOverload
 #endif
@@ -165,9 +163,7 @@ public func precondition(
 ///     where `assertionFailure(_:file:line:)` is called.
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `assertionFailure(_:file:line:)` is called.
-@inlinable
-@inline(__always)
-@_unavailableInEmbedded
+@_transparent
 #if $Embedded
 @_disfavoredOverload
 #endif
@@ -185,8 +181,7 @@ public func assertionFailure(
 }
 
 #if $Embedded
-@inlinable
-@inline(__always)
+@_transparent
 public func assertionFailure(
   _ message: @autoclosure () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
@@ -229,7 +224,6 @@ public func assertionFailure(
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `preconditionFailure(_:file:line:)` is called.
 @_transparent
-@_unavailableInEmbedded
 #if $Embedded
 @_disfavoredOverload
 #endif
@@ -275,7 +269,6 @@ public func preconditionFailure(
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `fatalError(_:file:line:)` is called.
 @_transparent
-@_unavailableInEmbedded
 #if $Embedded
 @_disfavoredOverload
 #endif
@@ -283,8 +276,19 @@ public func fatalError(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
+#if !$Embedded
   _assertionFailure("Fatal error", message(), file: file, line: line,
     flags: _fatalErrorFlags())
+#else
+  if _isDebugAssertConfiguration() {
+    _assertionFailure("Fatal error", message(), file: file, line: line,
+      flags: _fatalErrorFlags())
+  } else {
+    Builtin.condfail_message(true._value,
+      StaticString("fatal error").unsafeRawPointer)
+    Builtin.unreachable()
+  }
+#endif
 }
 
 #if $Embedded

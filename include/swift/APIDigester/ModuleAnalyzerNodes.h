@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,11 +17,6 @@
 #ifndef __SWIFT_ABI_DIGESTER_MODULE_NODES_H__
 #define __SWIFT_ABI_DIGESTER_MODULE_NODES_H__
 
-#include "clang/AST/ASTContext.h"
-#include "clang/AST/DeclObjC.h"
-#include "clang/Lex/Preprocessor.h"
-#include "clang/Sema/Lookup.h"
-#include "clang/Sema/Sema.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -163,6 +158,7 @@ struct CheckerOptions {
   StringRef LocationFilter;
   std::vector<std::string> ToolArgs;
   llvm::StringSet<> SPIGroupNamesToIgnore;
+  llvm::StringSet<> SPIGroupNamesToIgnoreNewAPI;
 };
 
 class SDKContext {
@@ -242,7 +238,9 @@ public:
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... args) {
     auto smRange = node->getSourceRange();
-    auto range = SourceRange(SourceLoc(smRange.Start), SourceLoc(smRange.End));
+    auto range =
+        SourceRange(SourceLoc::getFromPointer(smRange.Start.getPointer()),
+                    SourceLoc::getFromPointer(smRange.End.getPointer()));
     Diags.diagnose(range.Start, ID, std::forward<ArgTypes>(args)...)
       .highlight(range);
   }
@@ -335,9 +333,12 @@ struct PlatformIntroVersion {
   StringRef ios;
   StringRef tvos;
   StringRef watchos;
+  StringRef visionos;
   StringRef swift;
+  StringRef anyappleos;
   bool hasOSAvailability() const {
-    return !macos.empty() || !ios.empty() || !tvos.empty() || !watchos.empty();
+    return !macos.empty() || !ios.empty() || !tvos.empty() ||
+           !watchos.empty() || !visionos.empty() || !anyappleos.empty();
   }
 };
 
@@ -357,7 +358,6 @@ class SDKNodeDecl: public SDKNode {
   bool IsOverriding;
   bool IsOpen;
   bool IsInternal;
-  bool IsABIPlaceholder;
   bool IsFromExtension;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
@@ -397,7 +397,6 @@ public:
   bool isOptional() const { return hasDeclAttribute(DeclAttrKind::Optional); }
   bool isOpen() const { return IsOpen; }
   bool isInternal() const { return IsInternal; }
-  bool isABIPlaceholder() const { return IsABIPlaceholder; }
   bool isFromExtension() const { return IsFromExtension; }
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getSugaredGenericSignature() const { return SugaredGenericSig; }
@@ -609,13 +608,12 @@ class SDKNodeConformance: public SDKNode {
   StringRef MangledName;
   SDKNodeDeclType *TypeDecl;
   friend class SDKNodeDeclType;
-  bool IsABIPlaceholder;
+
 public:
   SDKNodeConformance(SDKNodeInitInfo Info);
   StringRef getUsr() const { return Usr; }
   ArrayRef<SDKNode*> getTypeWitnesses() const { return Children; }
   SDKNodeDeclType *getNominalTypeDecl() const { return TypeDecl; }
-  bool isABIPlaceholder() const { return IsABIPlaceholder; }
   void jsonize(json::Output &out) override;
   static bool classof(const SDKNode *N);
 };

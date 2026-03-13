@@ -101,15 +101,20 @@ public struct ObservableMacro {
       """
   }
 
-  static func canCacheKeyPaths(_ lexicalContext: [Syntax]) -> Bool {
-    lexicalContext.allSatisfy { $0.isNonGeneric }
-  }
-
   static var ignoredAttribute: AttributeSyntax {
     AttributeSyntax(
       leadingTrivia: .space,
       atSign: .atSignToken(),
       attributeName: IdentifierTypeSyntax(name: .identifier(ignoredMacroName)),
+      trailingTrivia: .space
+    )
+  }
+
+  static var trackedAttribute: AttributeSyntax {
+    AttributeSyntax(
+      leadingTrivia: .space,
+      atSign: .atSignToken(),
+      attributeName: IdentifierTypeSyntax(name: .identifier(trackedMacroName)),
       trailingTrivia: .space
     )
   }
@@ -146,8 +151,13 @@ extension DiagnosticsError {
   }
 }
 
+
+struct LocalMacroExpansionContext<Context: MacroExpansionContext> {
+  var context: Context
+}
+
 extension DeclModifierListSyntax {
-  func privatePrefixed(_ prefix: String) -> DeclModifierListSyntax {
+  func privatePrefixed(_ prefix: String, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> DeclModifierListSyntax {
     let modifier: DeclModifierSyntax = DeclModifierSyntax(name: "private", trailingTrivia: .space)
     return [modifier] + filter {
       switch $0.name.tokenKind {
@@ -174,7 +184,7 @@ extension DeclModifierListSyntax {
 }
 
 extension TokenSyntax {
-  func privatePrefixed(_ prefix: String) -> TokenSyntax {
+  func privatePrefixed(_ prefix: String, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> TokenSyntax {
     switch tokenKind {
     case .identifier(let identifier):
       return TokenSyntax(.identifier(prefix + identifier), leadingTrivia: leadingTrivia, trailingTrivia: trailingTrivia, presence: presence)
@@ -184,8 +194,58 @@ extension TokenSyntax {
   }
 }
 
+extension CodeBlockSyntax {
+  func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> CodeBlockSyntax {
+    guard let firstStatement = statements.first, let loc = context.context.location(of: firstStatement) else {
+      return self
+    }
+    
+    return CodeBlockSyntax(
+      leadingTrivia: leadingTrivia,
+      leftBrace: leftBrace,
+      statements: CodeBlockItemListSyntax {
+        "#sourceLocation(file: \(loc.file), line: \(loc.line))"
+        statements
+        "#sourceLocation()"
+      },
+      rightBrace: rightBrace,
+      trailingTrivia: trailingTrivia
+    )
+  }
+}
+
+
+extension AccessorDeclSyntax {
+  func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> AccessorDeclSyntax {
+    return AccessorDeclSyntax(
+      leadingTrivia: leadingTrivia,
+      attributes: attributes,
+      modifiers: modifiers,
+      accessorSpecifier: accessorSpecifier,
+      parameters: parameters,
+      effectSpecifiers: effectSpecifiers,
+      body: body?.locationAnnotated(in: context),
+      trailingTrivia: trailingTrivia
+    )
+  }
+}
+
+extension AccessorBlockSyntax {
+  func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> AccessorBlockSyntax {
+    switch accessors {
+    case .accessors(let accessorList):
+      let remapped = AccessorDeclListSyntax {
+        accessorList.map { $0.locationAnnotated(in: context) }
+      }
+      return AccessorBlockSyntax(accessors: .accessors(remapped))
+    case .getter(let codeBlockList):
+      return AccessorBlockSyntax(accessors: .getter(codeBlockList))
+    }
+  }
+}
+
 extension PatternBindingListSyntax {
-  func privatePrefixed(_ prefix: String) -> PatternBindingListSyntax {
+  func privatePrefixed(_ prefix: String, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> PatternBindingListSyntax {
     var bindings = self.map { $0 }
     for index in 0..<bindings.count {
       let binding = bindings[index]
@@ -194,12 +254,12 @@ extension PatternBindingListSyntax {
           leadingTrivia: binding.leadingTrivia,
           pattern: IdentifierPatternSyntax(
             leadingTrivia: identifier.leadingTrivia,
-            identifier: identifier.identifier.privatePrefixed(prefix),
+            identifier: identifier.identifier.privatePrefixed(prefix, in: context),
             trailingTrivia: identifier.trailingTrivia
           ),
           typeAnnotation: binding.typeAnnotation,
           initializer: binding.initializer,
-          accessorBlock: binding.accessorBlock,
+          accessorBlock: binding.accessorBlock?.locationAnnotated(in: context),
           trailingComma: binding.trailingComma,
           trailingTrivia: binding.trailingTrivia)
         
@@ -211,14 +271,35 @@ extension PatternBindingListSyntax {
 }
 
 extension VariableDeclSyntax {
-  func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax) -> VariableDeclSyntax {
-    let newAttributes = attributes + [.attribute(attribute)]
+  func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax, removingAttribute toRemove: AttributeSyntax, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> VariableDeclSyntax {
+    var newAttribute = attribute
+    newAttribute.leadingTrivia = .newline
+
+    let newAttributes = attributes.filter { attribute in
+      switch attribute {
+      case .attribute(let attr):
+        attr.attributeName.identifier != toRemove.attributeName.identifier
+      default: true
+      }
+    } + [.attribute(newAttribute)]
+
+    var newModifiers = modifiers.privatePrefixed(prefix, in: context)
+    let hasModifiers = !newModifiers.isEmpty
+    if hasModifiers {
+      newModifiers.leadingTrivia += .newline
+    }
+
     return VariableDeclSyntax(
       leadingTrivia: leadingTrivia,
       attributes: newAttributes,
-      modifiers: modifiers.privatePrefixed(prefix),
-      bindingSpecifier: TokenSyntax(bindingSpecifier.tokenKind, leadingTrivia: .space, trailingTrivia: .space, presence: .present),
-      bindings: bindings.privatePrefixed(prefix),
+      modifiers: newModifiers,
+      bindingSpecifier: TokenSyntax(
+        bindingSpecifier.tokenKind,
+        leadingTrivia: hasModifiers ? .space : .newline,
+        trailingTrivia: .space,
+        presence: .present
+      ),
+      bindings: bindings.privatePrefixed(prefix, in: context),
       trailingTrivia: trailingTrivia
     )
   }
@@ -315,7 +396,7 @@ extension ObservableMacro: ExtensionMacro {
     }
 
     let decl: DeclSyntax = """
-        extension \(raw: type.trimmedDescription): \(raw: qualifiedConformanceName) {}
+        extension \(raw: type.trimmedDescription): nonisolated \(raw: qualifiedConformanceName) {}
         """
     let ext = decl.cast(ExtensionDeclSyntax.self)
 
@@ -342,7 +423,7 @@ public struct ObservationTrackedMacro: AccessorMacro {
       return []
     }
     
-    guard let container = context.lexicalContext[0].as(ClassDeclSyntax.self) else {
+    guard context.lexicalContext[0].as(ClassDeclSyntax.self) != nil else {
       return []
     }
 
@@ -357,88 +438,48 @@ public struct ObservationTrackedMacro: AccessorMacro {
         _\(identifier) = initialValue
       }
       """
-    if ObservableMacro.canCacheKeyPaths(context.lexicalContext) {
-      let getAccessor: AccessorDeclSyntax =
-        """
-        get {
-          access(keyPath: \(container.trimmed.name)._cachedKeypath_\(identifier))
-          return _\(identifier)
-        }
-        """
+    let getAccessor: AccessorDeclSyntax =
+      """
+      get {
+        access(keyPath: \\.\(identifier))
+        return _\(identifier)
+      }
+      """
 
-      let setAccessor: AccessorDeclSyntax =
-        """
-        set {
-          guard shouldNotifyObservers(_\(identifier), newValue) else {
-            return
-          }
-          withMutation(keyPath: \(container.trimmed.name)._cachedKeypath_\(identifier)) {
-            _\(identifier) = newValue
-          }
+    // the guard else case must include the assignment else
+    // cases that would notify then drop the side effects of `didSet` etc
+    let setAccessor: AccessorDeclSyntax =
+      """
+      set {
+        guard shouldNotifyObservers(_\(identifier), newValue) else {
+          _\(identifier) = newValue
+          return
         }
-        """
-        
-      // Note: this accessor cannot test the equality since it would incur
-      // additional CoW's on structural types. Most mutations in-place do
-      // not leave the value equal so this is "fine"-ish.
-      // Warning to future maintence: adding equality checks here can make
-      // container mutation O(N) instead of O(1).
-      // e.g. observable.array.append(element) should just emit a change
-      // to the new array, and NOT cause a copy of each element of the
-      // array to an entirely new array.
-      let modifyAccessor: AccessorDeclSyntax =
-        """
-        _modify {
-          let keyPath = \(container.trimmed.name)._cachedKeypath_\(identifier)
-          access(keyPath: keyPath)
-          \(raw: ObservableMacro.registrarVariableName).willSet(self, keyPath: keyPath)
-          defer { \(raw: ObservableMacro.registrarVariableName).didSet(self, keyPath: keyPath) }
-          yield &_\(identifier)
+        withMutation(keyPath: \\.\(identifier)) {
+          _\(identifier) = newValue
         }
-        """
+      }
+      """
+      
+    // Note: this accessor cannot test the equality since it would incur
+    // additional CoW's on structural types. Most mutations in-place do
+    // not leave the value equal so this is "fine"-ish.
+    // Warning to future maintence: adding equality checks here can make
+    // container mutation O(N) instead of O(1).
+    // e.g. observable.array.append(element) should just emit a change
+    // to the new array, and NOT cause a copy of each element of the
+    // array to an entirely new array.
+    let modifyAccessor: AccessorDeclSyntax =
+      """
+      _modify {
+        access(keyPath: \\.\(identifier))
+        \(raw: ObservableMacro.registrarVariableName).willSet(self, keyPath: \\.\(identifier))
+        defer { \(raw: ObservableMacro.registrarVariableName).didSet(self, keyPath: \\.\(identifier)) }
+        yield &_\(identifier)
+      }
+      """
 
-      return [initAccessor, getAccessor, setAccessor, modifyAccessor]
-    } else {
-      let getAccessor: AccessorDeclSyntax =
-        """
-        get {
-          access(keyPath: \\.\(identifier))
-          return _\(identifier)
-        }
-        """
-
-      let setAccessor: AccessorDeclSyntax =
-        """
-        set {
-          guard shouldNotifyObservers(_\(identifier), newValue) else {
-            return
-          }
-          withMutation(keyPath: \\.\(identifier)) {
-            _\(identifier) = newValue
-          }
-        }
-        """
-        
-      // Note: this accessor cannot test the equality since it would incur
-      // additional CoW's on structural types. Most mutations in-place do
-      // not leave the value equal so this is "fine"-ish.
-      // Warning to future maintence: adding equality checks here can make
-      // container mutation O(N) instead of O(1).
-      // e.g. observable.array.append(element) should just emit a change
-      // to the new array, and NOT cause a copy of each element of the
-      // array to an entirely new array.
-      let modifyAccessor: AccessorDeclSyntax =
-        """
-        _modify {
-          access(keyPath: \\.\(identifier))
-          \(raw: ObservableMacro.registrarVariableName).willSet(self, keyPath: \\.\(identifier))
-          defer { \(raw: ObservableMacro.registrarVariableName).didSet(self, keyPath: \\.\(identifier)) }
-          yield &_\(identifier)
-        }
-        """
-
-      return [initAccessor, getAccessor, setAccessor, modifyAccessor]
-    }
+    return [initAccessor, getAccessor, setAccessor, modifyAccessor]
   }
 }
 
@@ -453,29 +494,21 @@ extension ObservationTrackedMacro: PeerMacro {
   ) throws -> [DeclSyntax] {
     guard let property = declaration.as(VariableDeclSyntax.self),
           property.isValidForObservation,
-          let identifier = property.identifier?.trimmed else {
+          property.identifier?.trimmed != nil else {
       return []
     }
     
-    guard let container = context.lexicalContext[0].as(ClassDeclSyntax.self) else {
+    guard context.lexicalContext[0].as(ClassDeclSyntax.self) != nil else {
       return []
     }
     
-    if property.hasMacroApplication(ObservableMacro.ignoredMacroName) ||
-       property.hasMacroApplication(ObservableMacro.trackedMacroName) {
+    if property.hasMacroApplication(ObservableMacro.ignoredMacroName) {
       return []
     }
     
-    let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute))
-    if ObservableMacro.canCacheKeyPaths(context.lexicalContext) {
-      let cachedKeypath: DeclSyntax =
-        """
-        private static let _cachedKeypath_\(identifier) = \\\(container.name).\(identifier)
-        """
-      return [storage, cachedKeypath]
-    } else {
-      return [storage]
-    }
+    let localContext = LocalMacroExpansionContext(context: context)
+    let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute, removingAttribute: ObservableMacro.trackedAttribute, in: localContext))
+    return [storage]
   }
 }
 

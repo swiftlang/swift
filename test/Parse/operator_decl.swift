@@ -83,6 +83,9 @@ precedencegroup D {
 precedencegroup E {
   higherThan:
 } // expected-error {{expected name of related precedence group after 'higherThan'}}
+precedencegroup EE {
+  higherThan: E,
+} // expected-error {{expected name of related precedence group after 'higherThan'}}
 
 precedencegroup F {
   higherThan: A, B, C

@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -update-borrowed-from -jumpthread-simplify-cfg
-// RUN: %target-sil-opt -enable-sil-verify-all %s -update-borrowed-from -jumpthread-simplify-cfg -debug-only=sil-simplify-cfg
+// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg
+// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg -debug-only=sil-simplify-cfg
 //
 // REQUIRES: asserts
 
@@ -340,51 +340,52 @@ bb6:
 //       (!SuccessPreds.empty() && !FailurePreds.empty() && numUnknownPreds > 0)
 sil [ossa] @redundant_checked_cast_br_joined_success_fail_unknown : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : @guaranteed $Base):
-  %middle = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  checked_cast_br [exact] Base in %0 : $Base to Base, bb1, bb4
+  %1 = class_method %0, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+  checked_cast_br [exact] Base in %0 to Base, bb1, bb4
 
-bb1(%successBB0 : @guaranteed $Base):
+bb1(%3 : @guaranteed $Base):
   cond_br undef, bb2, bb3
 
 bb2:
-  %successBB0call2 = apply %middle(%successBB0) : $@convention(method) (@guaranteed Base) -> ()
-  br bb8(%successBB0 : $Base)
+  %5 = apply %1(%3) : $@convention(method) (@guaranteed Base) -> ()
+  br bb8(%3)
 
 bb3:
-  %successBB0call3 = apply %middle(%successBB0) : $@convention(method) (@guaranteed Base) -> ()
-  br bb7(%successBB0 : $Base)
+  %7 = apply %1(%3) : $@convention(method) (@guaranteed Base) -> ()
+  br bb7(%3)
 
-bb4(%failBB0 : @guaranteed $Base):
+bb4(%9 : @guaranteed $Base):
   cond_br undef, bb5, bb6
 
 bb5:
-  %failBB0call5 = apply %middle(%failBB0) : $@convention(method) (@guaranteed Base) -> ()
-  br bb7(%failBB0 : $Base)
+  %11 = apply %1(%9) : $@convention(method) (@guaranteed Base) -> ()
+  br bb7(%9)
 
 bb6:
-  %failBB0call6 = apply %middle(%failBB0) : $@convention(method) (@guaranteed Base) -> ()
-  br bb8(%failBB0 : $Base)
+  %13 = apply %1(%9) : $@convention(method) (@guaranteed Base) -> ()
+  br bb8(%9)
 
-bb7(%unknown : @guaranteed $Base):
-  %unknownCall = apply %middle(%unknown) : $@convention(method) (@guaranteed Base) -> ()
-  br bb8(%unknown : $Base)
+bb7(%15 : @guaranteed $Base):
+  %16 = borrowed %15 from (%0)
+  %17 = apply %1(%16) : $@convention(method) (@guaranteed Base) -> ()
+  br bb8(%16)
 
-bb8(%joined : @guaranteed $Base):
-  %joinedCall = apply %middle(%joined) : $@convention(method) (@guaranteed Base) -> ()
-  checked_cast_br [exact] Base in %joined : $Base to Base, bb9, bb10
+bb8(%19 : @guaranteed $Base):
+  %20 = borrowed %19 from (%0)
+  %21 = apply %1(%20) : $@convention(method) (@guaranteed Base) -> ()
+  checked_cast_br [exact] Base in %20 to Base, bb9, bb10
 
-bb9(%successBB7 : @guaranteed $Base):
-  %successBB7call8 = apply %middle(%successBB7) : $@convention(method) (@guaranteed Base) -> ()
+bb9(%23 : @guaranteed $Base):
+  %24 = apply %1(%23) : $@convention(method) (@guaranteed Base) -> ()
   br bb11
 
-bb10(%failBB7 : @guaranteed $Base):
-  %failBB7call8 = apply %middle(%failBB7) : $@convention(method) (@guaranteed Base) -> ()
+bb10(%26 : @guaranteed $Base):
+  %27 = apply %1(%26) : $@convention(method) (@guaranteed Base) -> ()
   br bb11
 
 bb11:
-  %20 = tuple ()
-  return %20 : $()
-
+  %29 = tuple ()
+  return %29
 }
 
 // Verify that checked-cast jump-threading kicks in and generates verifiable SIL.
@@ -539,7 +540,7 @@ bb7:
 // Simplify down to a single diamond.
 //
 // TODO: Simplify some of the obviously dead copy/destroy/borrows
-// on-the-fly after each simplify-cfg. Possible using CanonicalizeOSSALifetime.
+// on-the-fly after each simplify-cfg. Possible using OSSACanonicalizeOwned.
 //
 // TODO-CHECK-LABEL: sil [ossa] @redundant_checked_cast_br_rauw_guaranteed_to_owned_merge : $@convention(method) (@owned Base) -> () {
 // TODO-CHECK: bb0(%0 : @owned $Base):
@@ -711,31 +712,32 @@ bbexit:
 // TODO-CHECK-LABEL: } // end sil function 'redundant_checked_cast_failure_path_not_idom'
 sil [ossa] @redundant_checked_cast_failure_path_not_idom : $@convention(method) (@owned Base) -> () {
 bb0(%0 : @owned $Base):
-  %borrow = begin_borrow %0 : $Base
-  checked_cast_br Base in %borrow : $Base to Derived, bb1, bb2
+  %1 = begin_borrow %0
+  checked_cast_br Base in %1 to Derived, bb1, bb2
 
-bb1(%succ1 : @guaranteed $Derived):
-  br bbexit
+bb1(%3 : @guaranteed $Derived):
+  br bb6
 
 bb2(%5 : @guaranteed $Base):
-  br bb3(%5 : $Base)
+  br bb3(%5)
 
-bb3(%6 : @guaranteed $Base):
-  checked_cast_br Base in %6 : $Base to Derived, bb4, bb5
+bb3(%7 : @guaranteed $Base):
+  %8 = borrowed %7 from (%1)
+  checked_cast_br Base in %8 to Derived, bb4, bb5
 
-bb4(%9 : @guaranteed $Derived):
-  br bbexit
+bb4(%10 : @guaranteed $Derived):
+  br bb6
 
-bb5(%10 : @guaranteed $Base):
-  %m = class_method %10 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  apply %m(%10) : $@convention(method) (@guaranteed Base) -> ()
-  br bbexit
+bb5(%12 : @guaranteed $Base):
+  %13 = class_method %12, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+  %14 = apply %13(%12) : $@convention(method) (@guaranteed Base) -> ()
+  br bb6
 
-bbexit:
-  end_borrow %borrow : $Base
-  destroy_value %0 : $Base
-  %t = tuple ()
-  return %t : $()
+bb6:
+  end_borrow %1
+  destroy_value %0
+  %18 = tuple ()
+  return %18
 }
 
 //!!!TODO: test replacing a guaranteed value with an ownedvalue

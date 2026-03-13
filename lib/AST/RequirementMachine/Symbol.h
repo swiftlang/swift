@@ -242,6 +242,8 @@ public:
       const MutableTerm &prefix,
       RewriteContext &ctx) const;
 
+  bool containsNameSymbols() const;
+
   void dump(llvm::raw_ostream &out) const;
 
   friend bool operator==(Symbol lhs, Symbol rhs) {

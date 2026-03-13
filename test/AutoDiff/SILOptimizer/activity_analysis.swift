@@ -249,12 +249,12 @@ func testArrayUninitializedIntrinsic(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [ACTIVE]   %6 = apply %5<Float>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [ACTIVE] (**%7**, %8) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer)
 // CHECK: [VARIED] (%7, **%8**) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer)
-// CHECK: [VARIED]   %9 = mark_dependence %8 : $Builtin.RawPointer on %7 : $Array<Float>
-// CHECK: [ACTIVE]   %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Float
-// CHECK: [VARIED]   %12 = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   %13 = index_addr %10 : $*Float, %12 : $Builtin.Word
+// CHECK: [VARIED]   %9 = begin_borrow %7
+// CHECK: [ACTIVE]   [[T:%.*]] = ref_tail_addr
+// CHECK: [VARIED]   [[I:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [[T]] : $*Float, [[I]] : $Builtin.Word
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
-// CHECK: [ACTIVE]   %16 = apply %15<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [ACTIVE]   [[A:%.*]] = apply %{{[0-9]+}}<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
 @differentiable(reverse where T: Differentiable)
 func testArrayUninitializedIntrinsicGeneric<T>(_ x: T, _ y: T) -> [T] {
@@ -269,12 +269,12 @@ func testArrayUninitializedIntrinsicGeneric<T>(_ x: T, _ y: T) -> [T] {
 // CHECK: [ACTIVE]   %6 = apply %5<T>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [ACTIVE] (**%7**, %8) = destructure_tuple %6 : $(Array<T>, Builtin.RawPointer)
 // CHECK: [VARIED] (%7, **%8**) = destructure_tuple %6 : $(Array<T>, Builtin.RawPointer)
-// CHECK: [VARIED]   %9 = mark_dependence %8 : $Builtin.RawPointer on %7 : $Array<T>
-// CHECK: [ACTIVE]   %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*T
-// CHECK: [VARIED]   %12 = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   %13 = index_addr %10 : $*T, %12 : $Builtin.Word
+// CHECK: [VARIED]   %9 = begin_borrow %7
+// CHECK: [ACTIVE]   [[T:%.*]] = ref_tail_addr
+// CHECK: [VARIED]   [[I:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [[T]] : $*T, [[I]] : $Builtin.Word
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
-// CHECK: [ACTIVE]   %16 = apply %15<T>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [ACTIVE]   [[A:%.*]] = apply %{{[0-9]+}}<T>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
 // TF-952: Test array literal initialized from an address (e.g. `var`).
 @differentiable(reverse)
@@ -297,14 +297,14 @@ func testArrayUninitializedIntrinsicAddress(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [ACTIVE]   %17 = apply %16<Float>(%15) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [ACTIVE] (**%18**, %19) = destructure_tuple %17 : $(Array<Float>, Builtin.RawPointer)
 // CHECK: [VARIED] (%18, **%19**) = destructure_tuple %17 : $(Array<Float>, Builtin.RawPointer)
-// CHECK: [VARIED]   %20 = mark_dependence %19 : $Builtin.RawPointer on %18 : $Array<Float>
-// CHECK: [ACTIVE]   %21 = pointer_to_address %20 : $Builtin.RawPointer to [strict] $*Float
-// CHECK: [ACTIVE]   %22 = begin_access [read] [static] %4 : $*Float
-// CHECK: [VARIED]   %25 = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   %26 = index_addr %21 : $*Float, %25 : $Builtin.Word
-// CHECK: [ACTIVE]   %27 = begin_access [read] [static] %4 : $*Float
+// CHECK: [VARIED]   %20 = begin_borrow %18
+// CHECK: [ACTIVE]   [[T:%.*]] = ref_tail_addr
+// CHECK: [ACTIVE]   [[BA:%.*]] = begin_access [read] [static] %4 : $*Float
+// CHECK: [VARIED]   [[I:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [[T]] : $*Float, [[I]] : $Builtin.Word
+// CHECK: [ACTIVE]   [[BA2:%.*]] = begin_access [read] [static] %4 : $*Float
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
-// CHECK: [ACTIVE]   %31 = apply %30<Float>(%18) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [ACTIVE]   [[A:%.*]] = apply %{{[0-9]+}}<Float>(%18) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 // TF-952: Test array literal initialized with `apply` direct results.
 @differentiable(reverse)
 func testArrayUninitializedIntrinsicFunctionResult(_ x: Float, _ y: Float) -> [Float] {
@@ -318,18 +318,18 @@ func testArrayUninitializedIntrinsicFunctionResult(_ x: Float, _ y: Float) -> [F
 // CHECK: [ACTIVE]   %6 = apply %5<Float>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [ACTIVE] (**%7**, %8) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer)
 // CHECK: [VARIED] (%7, **%8**) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer)
-// CHECK: [VARIED]   %9 = mark_dependence %8 : $Builtin.RawPointer on %7 : $Array<Float>
-// CHECK: [ACTIVE]   %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Float
-// CHECK: [USEFUL]   %11 = metatype $@thin Float.Type
+// CHECK: [VARIED]   %9 = begin_borrow %7
+// CHECK: [ACTIVE]   [[T:%.*]] = ref_tail_addr
+// CHECK: [USEFUL]   [[MT:%.*]] = metatype $@thin Float.Type
 // CHECK: [NONE]   // function_ref static Float.* infix(_:_:)
-// CHECK: [ACTIVE]   %13 = apply %12(%0, %1, %11) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
-// CHECK: [VARIED]   %15 = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   %16 = index_addr %10 : $*Float, %15 : $Builtin.Word
-// CHECK: [USEFUL]   %17 = metatype $@thin Float.Type
+// CHECK: [ACTIVE]   [[A:%.*]] = apply %{{[0-9]+}}(%0, %1, [[MT]]) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: [VARIED]   [[I:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [[T]] : $*Float, [[I]] : $Builtin.Word
+// CHECK: [USEFUL]   [[MT2:%.*]] = metatype $@thin Float.Type
 // CHECK: [NONE]   // function_ref static Float.* infix(_:_:)
-// CHECK: [ACTIVE]   %19 = apply %18(%0, %1, %17) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: [ACTIVE]   [[A2:%.*]] = apply %{{[0-9]+}}(%0, %1, [[MT2]]) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
-// CHECK: [ACTIVE]   %22 = apply %21<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [ACTIVE]   [[A3:%.*]] = apply %{{[0-9]+}}<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
 // TF-975: Test nested array literals.
 @differentiable(reverse)
@@ -345,37 +345,38 @@ func testArrayUninitializedIntrinsicNested(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [ACTIVE]   %6 = apply %5<Float>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [ACTIVE] (**%7**, %8) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer)
 // CHECK: [VARIED] (%7, **%8**) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer)
-// CHECK: [VARIED]   %9 = mark_dependence %8 : $Builtin.RawPointer on %7 : $Array<Float>
-// CHECK: [ACTIVE]   %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Float
-// CHECK: [VARIED]   %12 = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   %13 = index_addr %10 : $*Float, %12 : $Builtin.Word
+// CHECK: [VARIED]   %9 = begin_borrow %7
+// CHECK: [ACTIVE]   [[T:%.*]] = ref_tail_addr
+// CHECK: [VARIED]   [[I:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [[T]] : $*Float, [[I]] : $Builtin.Word
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
-// CHECK:   %15 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
-// CHECK: [ACTIVE]   %16 = apply %15<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
-// CHECK: [USEFUL]   %19 = integer_literal $Builtin.Word, 2
+// CHECK:            [[FR:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [ACTIVE]   [[A:%.*]] = apply [[FR]]<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [ACTIVE]   [[MV:%.*]] = move_value [var_decl] [[A]]
+// CHECK: [USEFUL]   [[I2:%.*]] = integer_literal $Builtin.Word, 2
 // CHECK: [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
-// CHECK:   %20 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
-// CHECK: [ACTIVE]   %21 = apply %20<Float>(%19) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
-// CHECK: [ACTIVE] (**%22**, %23) = destructure_tuple %21 : $(Array<Float>, Builtin.RawPointer)
-// CHECK: [VARIED] (%22, **%23**) = destructure_tuple %21 : $(Array<Float>, Builtin.RawPointer)
-// CHECK: [VARIED]   %24 = mark_dependence %23 : $Builtin.RawPointer on %22 : $Array<Float>
-// CHECK: [ACTIVE]   %25 = pointer_to_address %24 : $Builtin.RawPointer to [strict] $*Float
-// CHECK: [USEFUL]   %26 = integer_literal $Builtin.IntLiteral, 0
-// CHECK: [USEFUL]   %27 = metatype $@thin Int.Type
+// CHECK:            [[FR2:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [ACTIVE]   [[A2:%.*]] = apply [[FR2]]<Float>([[I2]]) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [ACTIVE] (**[[ARR2:%.*]]**, %{{[0-9]+}}) = destructure_tuple [[A2]] : $(Array<Float>, Builtin.RawPointer)
+// CHECK: [VARIED] ([[ARR2]], **%{{[0-9]+}}**) = destructure_tuple [[A2]] : $(Array<Float>, Builtin.RawPointer)
+// CHECK: [VARIED]   [[BB:%.*]] = begin_borrow [[ARR2]]
+// CHECK: [ACTIVE]   [[T2:%.*]] = ref_tail_addr
+// CHECK: [USEFUL]   [[I3:%.*]] = integer_literal $Builtin.IntLiteral, 0
+// CHECK: [USEFUL]   [[MT:%.*]] = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
-// CHECK: [USEFUL]   %29 = apply %28(%26, %27) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [USEFUL]   [[A3:%.*]] = apply %{{[0-9]+}}([[I3]], [[MT]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [NONE]   // function_ref Array.subscript.getter
-// CHECK: [NONE]   %31 = apply %30<Float>(%25, %29, %17) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
-// CHECK: [VARIED]   %32 = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   %33 = index_addr %25 : $*Float, %32 : $Builtin.Word
-// CHECK: [USEFUL]   %34 = integer_literal $Builtin.IntLiteral, 1
-// CHECK: [USEFUL]   %35 = metatype $@thin Int.Type
+// CHECK: [NONE]     [[A4:%.*]] = apply %{{[0-9]+}}<Float>([[T2]], [[A3]], [[MV]]) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+// CHECK: [VARIED]   [[I4:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK: [ACTIVE]   [[IA2:%.*]] = index_addr [[T2]] : $*Float, [[I4]] : $Builtin.Word
+// CHECK: [USEFUL]   [[I5:%.*]] = integer_literal $Builtin.IntLiteral, 1
+// CHECK: [USEFUL]   [[MT2:%.*]] = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
-// CHECK: [USEFUL]   %37 = apply %36(%34, %35) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [USEFUL]   [[A4:%.*]] = apply %{{[0-9]+}}([[I5]], [[MT2]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [NONE]   // function_ref Array.subscript.getter
-// CHECK: [NONE]   %39 = apply %38<Float>(%33, %37, %17) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+// CHECK: [NONE]     [[A5:%.*]] = apply %{{[0-9]+}}<Float>([[IA2]], [[A4]], [[MV]]) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
-// CHECK: [ACTIVE]   %41 = apply %40<Float>(%22) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [ACTIVE]   [[A6:%.*]] = apply %{{[0-9]+}}<Float>([[ARR2]]) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
 // TF-978: Test array literal initialized with `apply` indirect results.
 struct Wrapper<T: Differentiable>: Differentiable {
@@ -393,20 +394,20 @@ func testArrayUninitializedIntrinsicApplyIndirectResult<T>(_ x: T, _ y: T) -> [W
 // CHECK: [ACTIVE]   %6 = apply %5<Wrapper<T>>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [ACTIVE] (**%7**, %8) = destructure_tuple %6 : $(Array<Wrapper<T>>, Builtin.RawPointer)
 // CHECK: [VARIED] (%7, **%8**) = destructure_tuple %6 : $(Array<Wrapper<T>>, Builtin.RawPointer)
-// CHECK: [VARIED]   %9 = mark_dependence %8 : $Builtin.RawPointer on %7 : $Array<Wrapper<T>>
-// CHECK: [ACTIVE]   %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Wrapper<T>
-// CHECK: [USEFUL]   %11 = metatype $@thin Wrapper<T>.Type
-// CHECK: [ACTIVE]   %12 = alloc_stack $T
+// CHECK: [VARIED]   %9 = begin_borrow %7
+// CHECK: [ACTIVE]   [[T:%.*]] = ref_tail_addr
+// CHECK: [USEFUL]   [[MT:%.*]] = metatype $@thin Wrapper<T>.Type
+// CHECK: [ACTIVE]   [[AS:%.*]] = alloc_stack $T
 // CHECK: [NONE]   // function_ref Wrapper.init(value:)
-// CHECK: [NONE]   %15 = apply %14<T>(%10, %12, %11) : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
-// CHECK: [VARIED]   %17 = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   %18 = index_addr %10 : $*Wrapper<T>, %17 : $Builtin.Word
-// CHECK: [USEFUL]   %19 = metatype $@thin Wrapper<T>.Type
-// CHECK: [ACTIVE]   %20 = alloc_stack $T
+// CHECK: [NONE]     [[A:%.*]] = apply %{{[0-9]+}}<T>([[T]], [[AS]], [[MT]]) : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
+// CHECK: [VARIED]   [[I:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [[T]] : $*Wrapper<T>, [[I]] : $Builtin.Word
+// CHECK: [USEFUL]   [[MT2:%.*]] = metatype $@thin Wrapper<T>.Type
+// CHECK: [ACTIVE]   [[AS2:%.*]] = alloc_stack $T
 // CHECK: [NONE]   // function_ref Wrapper.init(value:)
-// CHECK: [NONE]   %23 = apply %22<T>(%18, %20, %19) : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
+// CHECK: [NONE]     [[A2:%.*]] = apply %{{[0-9]+}}<T>([[IA]], [[AS2]], [[MT2]]) : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
-// CHECK: [ACTIVE]   %26 = apply %25<Wrapper<T>>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [ACTIVE]   [[A3:%.*]] = apply %{{[0-9]+}}<Wrapper<T>>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
 //===----------------------------------------------------------------------===//
 // `inout` argument differentiation
@@ -692,32 +693,32 @@ func testBeginApplyActiveButInitiallyNonactiveInoutArgument(x: Float) -> Float {
 // CHECK: [USEFUL]   %5 = apply %4<Float>(%3) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [USEFUL] (**%6**, %7) = destructure_tuple %5 : $(Array<Float>, Builtin.RawPointer)
 // CHECK: [NONE] (%6, **%7**) = destructure_tuple %5 : $(Array<Float>, Builtin.RawPointer)
-// CHECK: [NONE]   %8 = mark_dependence %7 : $Builtin.RawPointer on %6 : $Array<Float> // user: %9
-// CHECK: [USEFUL]   %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*Float // user: %14
-// CHECK: [USEFUL]   %10 = integer_literal $Builtin.IntLiteral, 0    // user: %13
-// CHECK: [USEFUL]   %11 = metatype $@thin Float.Type                // user: %13
+// CHECK: [NONE]   %8 = begin_borrow %6
+// CHECK: [USEFUL]   [[T:%.*]] = ref_tail_addr
+// CHECK: [USEFUL]   [[I:%.*]] = integer_literal $Builtin.IntLiteral, 0
+// CHECK: [USEFUL]   [[MT:%.*]] = metatype $@thin Float.Type
 // CHECK: [NONE]   // function_ref Float.init(_builtinIntegerLiteral:)
-// CHECK: [USEFUL]   %13 = apply %12(%10, %11) : $@convention(method) (Builtin.IntLiteral, @thin Float.Type) -> Float // user: %14
+// CHECK: [USEFUL]   [[A:%.*]] = apply %{{[0-9]+}}([[I]], [[MT]]) : $@convention(method) (Builtin.IntLiteral, @thin Float.Type) -> Float
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
-// CHECK: [USEFUL]   %16 = apply %15<Float>(%6) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %17
-// CHECK: [USEFUL]   %18 = integer_literal $Builtin.IntLiteral, 0    // user: %21
-// CHECK: [USEFUL]   %19 = metatype $@thin Int.Type                  // user: %21
+// CHECK: [USEFUL]   [[A2:%.*]] = apply %{{[0-9]+}}<Float>(%6) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [USEFUL]   [[I2:%.*]] = integer_literal $Builtin.IntLiteral, 0
+// CHECK: [USEFUL]   [[MT2:%.*]] = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
-// CHECK: [USEFUL]   %21 = apply %20(%18, %19) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %24
-// CHECK: [ACTIVE]   %22 = begin_access [modify] [static] %2 : $*Array<Float> // users: %28, %24
+// CHECK: [USEFUL]   [[A3:%.*]] = apply %{{[0-9]+}}([[I2]], [[MT2]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [ACTIVE]   [[BA:%.*]] = begin_access [modify] [static] %2 : $*Array<Float>
 // CHECK: [NONE]   // function_ref Array.subscript.modify
-// CHECK: [ACTIVE] (**%24**, %25) = begin_apply %23<Float>(%21, %22) : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0 // user: %26
-// CHECK: [VARIED] (%24, **%25**) = begin_apply %23<Float>(%21, %22) : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0 // user: %27
-// CHECK: [USEFUL]   %29 = integer_literal $Builtin.IntLiteral, 0    // user: %32
-// CHECK: [USEFUL]   %30 = metatype $@thin Int.Type                  // user: %32
+// CHECK: [ACTIVE]   (**%{{[0-9]+}}**, %{{[0-9]+}}) = begin_apply %{{[0-9]+}}<Float>([[A3]], [[BA]]) : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0
+// CHECK: [VARIED]   (%{{[0-9]+}}, **%{{[0-9]+}}**) = begin_apply %{{[0-9]+}}<Float>([[A3]], [[BA]]) : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0
+// CHECK: [USEFUL]   [[I3:%.*]] = integer_literal $Builtin.IntLiteral, 0
+// CHECK: [USEFUL]   [[MT3:%.*]] = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
-// CHECK: [USEFUL]   %32 = apply %31(%29, %30) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %37
-// CHECK: [ACTIVE]   %33 = begin_access [read] [static] %2 : $*Array<Float> // users: %40, %34
-// CHECK: [ACTIVE]   %34 = load_borrow %33 : $*Array<Float>          // users: %39, %37
-// CHECK: [ACTIVE]   %35 = alloc_stack $Float                        // users: %41, %38, %37
+// CHECK: [USEFUL]   [[A4:%.*]] = apply %{{[0-9]+}}([[I3]], [[MT3]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [ACTIVE]   [[BA2:%.*]] = begin_access [read] [static] %2 : $*Array<Float>
+// CHECK: [ACTIVE]   [[LB:%.*]] = load_borrow [[BA2]] : $*Array<Float>
+// CHECK: [ACTIVE]   [[AS:%.*]] = alloc_stack $Float
 // CHECK: [NONE]   // function_ref Array.subscript.getter
-// CHECK: [NONE]   %37 = apply %36<Float>(%35, %32, %34) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
-// CHECK: [ACTIVE]   %38 = load [trivial] %35 : $*Float              // user: %44
+// CHECK: [NONE]     [[A5:%.*]] = apply %{{[0-9]+}}<Float>([[AS]], [[A4]], [[LB]]) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+// CHECK: [ACTIVE]   [[L:%.*]] = load [trivial] [[AS]] : $*Float
 
 //===----------------------------------------------------------------------===//
 // Class differentiation
@@ -798,7 +799,7 @@ func testActiveOptional(_ x: Float) -> Float {
 // CHECK: [NONE]   // function_ref _diagnoseUnexpectedNilOptional(_filenameStart:_filenameLength:_filenameIsASCII:_line:_isImplicitUnwrap:)
 // CHECK: [NONE]   %24 = apply %23(%17, %18, %19, %20, %22) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Int1) -> ()
 // CHECK: bb2:
-// CHECK: [ACTIVE] %26 = argument of bb2 : $Float
+// CHECK: [ACTIVE] {{%[0-9]+}} = argument of bb2 : $Float
 
 enum DirectEnum: Differentiable & AdditiveArithmetic {
   case case0

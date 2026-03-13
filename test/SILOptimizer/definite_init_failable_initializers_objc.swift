@@ -46,18 +46,17 @@ class Cat : FakeNSObject {
   // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Bool, [[ARG2:%.*]] : $Cat):
     // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack [var_decl] $Cat
     // CHECK:      store [[ARG2]] to [[SELF_BOX]] : $*Cat
-    // CHECK:      [[FIELD_ADDR:%.*]] = ref_element_addr [[ARG2]] : $Cat, #Cat.x
+    // CHECK:      [[FIELD_ADDR:%.*]] = ref_element_addr {{.*}} : $Cat, #Cat.x
     // CHECK-NEXT: store {{%.*}} to [[FIELD_ADDR]] : $*LifetimeTracked
-    // CHECK-NEXT: strong_release [[ARG2]]
     // CHECK-NEXT: [[COND:%.*]] = struct_extract %1 : $Bool, #Bool._value
     // CHECK-NEXT: cond_br [[COND]], bb1, bb2
 
   // CHECK: bb1:
-    // CHECK-NEXT: [[FIELD_ADDR:%.*]] = ref_element_addr [[ARG2]] : $Cat, #Cat.x
+    // CHECK-NEXT: [[LD:%.*]] = load {{.*}} : $*Cat
+    // CHECK-NEXT: [[FIELD_ADDR:%.*]] = ref_element_addr [[LD]] : $Cat, #Cat.x
     // CHECK-NEXT: [[FIELD_ADDR_ACCESS:%.*]] = begin_access [deinit] [static] [[FIELD_ADDR]]
     // CHECK-NEXT: destroy_addr [[FIELD_ADDR_ACCESS]] : $*LifetimeTracked
     // CHECK-NEXT: end_access [[FIELD_ADDR_ACCESS]]
-    // CHECK-NEXT: strong_release [[ARG2]]
     // CHECK-NEXT: [[RELOAD_FROM_BOX:%.*]] = load [[SELF_BOX]]
     // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick Cat.Type
     // CHECK-NEXT: dealloc_partial_ref [[RELOAD_FROM_BOX]] : $Cat, [[METATYPE]] : $@thick Cat.Type
@@ -66,7 +65,6 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: br bb3([[RESULT]] : $Optional<Cat>)
 
   // CHECK: bb2:
-    // CHECK-NEXT: strong_release [[ARG2]]
     // CHECK-NEXT: [[RELOAD_ARG2:%.*]] = load [[SELF_BOX]]
     // CHECK-NEXT: [[SUPER:%.*]] = upcast [[RELOAD_ARG2]] : $Cat to $FakeNSObject
     // CHECK-NEXT: [[SUB:%.*]] = unchecked_ref_cast [[RELOAD_ARG2]] : $Cat to $Cat
@@ -102,7 +100,6 @@ class Cat : FakeNSObject {
 
   // CHECK-LABEL: sil hidden @$s40definite_init_failable_initializers_objc3CatC4fail5afterACSgSb_Sbtcfc : $@convention(method) (Bool, Bool, @owned Cat) -> @owned Optional<Cat>
   // CHECK: bb0([[ARG0:%.*]] : $Bool, [[ARG1:%.*]] : $Bool, [[ARG2:%.*]] : $Cat):
-    // CHECK-NEXT: [[HAS_RUN_INIT_BOX:%.+]] = alloc_stack $Builtin.Int1
     // CHECK-NEXT: [[SELF_BOX:%.+]] = alloc_stack [dynamic_lifetime] [var_decl] $Cat
     // CHECK:      store [[ARG2]] to [[SELF_BOX]] : $*Cat
     // CHECK-NEXT: [[COND:%.+]] = struct_extract [[ARG0]] : $Bool, #Bool._value
@@ -132,8 +129,7 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
     // CHECK-NEXT: br [[RESULT_BRANCH:bb[0-9]+]]([[RESULT]] : $Optional<Cat>)
 
-  // CHECK: [[ERROR_BRANCH]]:
-    // CHECK-NEXT: [[COND:%.+]] = load [[HAS_RUN_INIT_BOX]] : $*Builtin.Int1
+  // CHECK: [[ERROR_BRANCH]]([[COND:%.*]] : $Builtin.Int1):
     // CHECK-NEXT: cond_br [[COND]], [[ERROR_WITHOUT_DESTROY_BRANCH:bb[0-9]+]], [[ERROR_WITH_DESTROY_BRANCH:bb[0-9]+]]
 
   // CHECK: [[ERROR_WITHOUT_DESTROY_BRANCH]]:
@@ -151,7 +147,6 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: br [[RESULT_BRANCH]]([[NIL_RESULT]] : $Optional<Cat>)
 
   // CHECK: [[RESULT_BRANCH]]([[RESULT:%.+]] : $Optional<Cat>):
-    // CHECK-NEXT: dealloc_stack [[HAS_RUN_INIT_BOX]] : $*Builtin.Int1
     // CHECK-NEXT: return [[RESULT]] : $Optional<Cat>
 
   // CHECK: end sil function '$s40definite_init_failable_initializers_objc3CatC4fail5afterACSgSb_Sbtcfc'

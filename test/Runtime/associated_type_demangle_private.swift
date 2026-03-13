@@ -101,14 +101,9 @@ private struct Parent<Unused> {
 
 AssociatedTypeDemangleTests.test("nested private generic types in associated type witnesses") {
   // Fixed in Swift 5.1+ runtimes.
-  if #available(SwiftStdlib 5.1, *) {}
-  // Bug is still present in Swift 5.0 runtime.
-  else {
-    expectCrashLater(withMessage: "failed to demangle witness for associated type 'Second' in conformance")
-    return
+  if #available(SwiftStdlib 5.1, *) {
+    _ = Parent<Never>.Nested(first: "String", second: 0).pair
   }
-
-  _ = Parent<Never>.Nested(first: "String", second: 0).pair
 }
 
 

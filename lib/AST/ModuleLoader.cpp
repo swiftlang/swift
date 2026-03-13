@@ -202,7 +202,7 @@ void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
 llvm::StringMap<llvm::SmallSetVector<Identifier, 4>>
 ModuleDependencyInfo::collectCrossImportOverlayNames(
     ASTContext &ctx, StringRef moduleName,
-    std::vector<std::pair<std::string, std::string>> &overlayFiles) const {
+    std::set<std::pair<std::string, std::string>> &overlayFiles) const {
   using namespace llvm::sys;
   using namespace file_types;
   std::optional<std::string> modulePath;
@@ -240,9 +240,6 @@ ModuleDependencyInfo::collectCrossImportOverlayNames(
     case swift::ModuleDependencyKind::SwiftSource: {
       return result;
     }
-    case swift::ModuleDependencyKind::SwiftPlaceholder: {
-      return result;
-    }
     case swift::ModuleDependencyKind::LastKind:
       llvm_unreachable("Unhandled dependency kind.");
   }
@@ -254,7 +251,7 @@ ModuleDependencyInfo::collectCrossImportOverlayNames(
       ModuleDecl::collectCrossImportOverlay(ctx, file, moduleName,
                                             bystandingModule);
     result[bystandingModule] = std::move(overlayNames);
-    overlayFiles.push_back({moduleName.str(), file.str()});
+    overlayFiles.insert({moduleName.str(), file.str()});
   });
   return result;
 }

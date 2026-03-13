@@ -306,6 +306,12 @@ void swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
   swift_executor_invokeSwiftCheckIsolated(executor);
 }
 
+/// Check if the specified executor is the current executor.
+SWIFT_CC(swift)
+int8_t swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor) {
+  return swift_executor_invokeSwiftIsIsolatingCurrentContext(executor);
+}
+
 /// Get a reference to the main executor.
 SWIFT_CC(swift)
 SwiftExecutorRef swift_task_getMainExecutorImpl() {

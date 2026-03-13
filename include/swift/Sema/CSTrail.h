@@ -20,6 +20,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/CatchNode.h"
 #include "swift/Sema/Constraint.h"
 #include "llvm/ADT/ilist.h"
 #include <vector>
@@ -36,7 +37,12 @@ class TypeVariableType;
 namespace constraints {
 
 class Constraint;
+enum ScoreKind : unsigned int;
 struct SyntacticElementTargetKey;
+
+namespace inference {
+struct PotentialBinding;
+}
 
 class SolverTrail {
 public:
@@ -90,6 +96,12 @@ public:
       } Relation;
 
       struct {
+        TypeVariableType *TypeVar;
+        TypeVariableType *OtherTypeVar;
+        Constraint *Constraint;
+      } BindingRelation;
+
+      struct {
         /// The type variable being updated.
         TypeVariableType *TypeVar;
 
@@ -128,9 +140,25 @@ public:
         Constraint *Constraint;
       } Retiree;
 
+      struct {
+        TypeVariableType *TypeVar;
+
+        /// These two fields together with 'Options' above store the contents
+        /// of a PotentialBinding.
+        Type BindingType;
+        PointerUnion<Constraint *, ConstraintLocator *> BindingSource;
+        TypeVariableType *Originator;
+      } Binding;
+
+      struct {
+        Constraint *Disjunction;
+        FunctionType *ArgFuncType;
+      } Disjunction;
+
       ConstraintFix *TheFix;
       ConstraintLocator *TheLocator;
       PackExpansionType *TheExpansion;
+      PackExpansionExpr *TheExpansionExpr;
       PackElementExpr *TheElement;
       Expr *TheExpr;
       Stmt *TheStmt;
@@ -155,6 +183,9 @@ public:
 #define SCORE_CHANGE(Name) static Change Name(ScoreKind kind, unsigned value);
 #define GRAPH_NODE_CHANGE(Name) static Change Name(TypeVariableType *typeVar, \
                                                    Constraint *constraint);
+#define BINDING_RELATION_CHANGE(Name)                                          \
+  static Change Name(TypeVariableType *typeVar,                                \
+                     TypeVariableType *otherTypeVar, Constraint *constraint);
 #include "swift/Sema/CSTrail.def"
 
     /// Create a change that added a type variable.
@@ -191,7 +222,11 @@ public:
 
     /// Create a change that recorded a mapping from a pack element expression
     /// to its parent expansion expression.
-    static Change RecordedPackEnvironment(PackElementExpr *packElement);
+    static Change RecordedPackElementExpansion(PackElementExpr *packElement);
+
+    /// Create a change that records the GenericEnvironment for a given
+    /// PackExpansionExpr.
+    static Change RecordedPackExpansionEnvironment(PackExpansionExpr *expr);
 
     /// Create a change that recorded an assignment of a type to an AST node.
     static Change RecordedNodeType(ASTNode node, Type oldType);
@@ -225,6 +260,20 @@ public:
     /// Create a change that removed a constraint from the inactive constraint list.
     static Change RetiredConstraint(llvm::ilist<Constraint>::iterator where,
                                     Constraint *constraint);
+
+    /// Create a change that added a binding to a type variable's potential
+    /// bindings. This could be caused by direct or transitive inference.
+    static Change AddedBinding(TypeVariableType *typeVar,
+                               inference::PotentialBinding binding);
+
+    /// Create a change that removed a binding from a type variable's potential
+    /// bindings.
+    static Change RetractedBinding(TypeVariableType *typeVar,
+                                   inference::PotentialBinding binding);
+
+    /// Create a change that disjunction pruning was performed.
+    static Change PrunedDisjunction(Constraint *disjunction,
+                                    FunctionType *argFuncType);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

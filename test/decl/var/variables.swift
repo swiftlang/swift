@@ -15,7 +15,7 @@ var bfx : Int, bfy : Int
 _ = 10
 
 var self1 = self1
-// expected-note@-1 2{{through reference here}}
+// expected-note@-1 {{through reference here}}
 // expected-error@-2 {{circular reference}}
 
 var self2 : Int = self2
@@ -23,15 +23,15 @@ var (self3) : Int = self3
 var (self4) : Int = self4
 
 var self5 = self5 + self5
-// expected-note@-1 2{{through reference here}}
+// expected-note@-1 {{through reference here}}
 // expected-error@-2 {{circular reference}}
 
 var self6 = !self6
-// expected-note@-1 2{{through reference here}}
+// expected-note@-1 {{through reference here}}
 // expected-error@-2 {{circular reference}}
 
 var (self7a, self7b) = (self7b, self7a)
-// expected-note@-1 2{{through reference here}}
+// expected-note@-1 {{through reference here}}
 // expected-error@-2 {{circular reference}}
 
 var self8 = 0
@@ -87,16 +87,17 @@ var shouldWarnWithoutSugar = (arrayOfEmptyTuples as Array<()>) // expected-warni
 
 class SomeClass {}
 
-// <rdar://problem/16877304> weak let's should be rejected
-weak let V = SomeClass()  // expected-error {{'weak' must be a mutable variable, because it may change at runtime}}
+
+weak let V = SomeClass() // ok since SE-0481
+// expected-warning@-1 {{instance will be immediately deallocated because variable 'V' is 'weak'}}
+// expected-note@-2 {{'V' declared here}}
+// expected-note@-3 {{a strong reference is required to prevent the instance from being deallocated}}
 
 let a = b ; let b = a
-// expected-error@-1 {{circular reference}}
-// expected-note@-2 {{through reference here}}
-// expected-note@-3 {{through reference here}}
-// expected-note@-4 {{through reference here}}
-// expected-note@-5 {{through reference here}}
-// expected-note@-6 {{through reference here}}
+// expected-error@-1:1 {{circular reference}}
+// expected-note@-2:5 {{through reference here}}
+// expected-note@-3:13 {{through reference here}}
+// expected-note@-4:17 {{through reference here}}
 
 // <rdar://problem/17501765> Swift should warn about immutable default initialized values
 let uselessValue : String?
@@ -123,7 +124,12 @@ func test21057425() -> (Int, Int) {
 // rdar://problem/21081340
 func test21081340() {
   func foo() { }
+
+  // FIXME: The double diagnostic here is a little unfortunate but is a result of
+  // the fact that we essentially type-check the pattern twice, once on its own,
+  // and again as part of the initialization.
   let (x: a, y: b): () = foo() // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
+  // expected-error@-1 {{pattern of type '(x: _, y: _)' cannot match '()'}}
 }
 
 // <rdar://problem/22322266> Swift let late initialization in top level control flow statements

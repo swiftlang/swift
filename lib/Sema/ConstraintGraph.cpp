@@ -20,6 +20,7 @@
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSTrail.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
@@ -49,6 +50,10 @@ ConstraintGraph::~ConstraintGraph() {
     delete node;
   }
 }
+
+ConstraintGraphNode::ConstraintGraphNode(ConstraintGraph &CG,
+                                         TypeVariableType *typeVar)
+    : CG(CG), TypeVar(typeVar), Potential(CG.getConstraintSystem(), typeVar) {}
 
 #pragma mark Graph accessors
 
@@ -254,50 +259,66 @@ void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
 void ConstraintGraphNode::addReferencedVar(TypeVariableType *typeVar) {
   bool inserted = References.insert(typeVar);
   if (!inserted) {
-    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " already "
-                 << "references $T" << typeVar->getImpl().getID() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "$T" << TypeVar->getImpl().getID() << " already "
+          << "references $T" << typeVar->getImpl().getID();
+    });
   }
 }
 
 void ConstraintGraphNode::addReferencedBy(TypeVariableType *typeVar) {
   bool inserted = ReferencedBy.insert(typeVar);
   if (!inserted) {
-    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " already "
-                 << "referenced by $T" << typeVar->getImpl().getID() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "$T" << TypeVar->getImpl().getID() << " already "
+          << "referenced by $T" << typeVar->getImpl().getID();
+    });
   }
 }
 
 void ConstraintGraphNode::removeReference(TypeVariableType *typeVar) {
   auto removed = References.remove(typeVar);
   if (!removed) {
-    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " does not "
-                 << "reference $T" << typeVar->getImpl().getID() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "$T" << TypeVar->getImpl().getID() << " does not "
+          << "reference $T" << typeVar->getImpl().getID();
+    });
   }
 }
 
 void ConstraintGraphNode::removeReferencedBy(TypeVariableType *typeVar) {
   auto removed = ReferencedBy.remove(typeVar);
   if (!removed) {
-    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " not "
-                 << "referenced by $T" << typeVar->getImpl().getID() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "$T" << TypeVar->getImpl().getID() << " not "
+          << "referenced by $T" << typeVar->getImpl().getID();
+    });
   }
 }
 
-void ConstraintGraphNode::updateFixedType(
-    Type fixedType,
-    llvm::function_ref<void (ConstraintGraphNode &,
-                             Constraint *)> notification) const {
+void ConstraintGraphNode::retractFromInference() {
+  // Notify all of the type variables that reference this one.
+  //
+  // Since this type variable is going to be replaced with a fixed type
+  // all of the concrete types that reference it are going to change,
+  // which means that all of the not-yet-attempted bindings should
+  // change as well.
+  return notifyReferencingVars(
+      [](ConstraintGraphNode &node, Constraint *constraint) {
+        node.getPotentialBindings().retract(constraint);
+      });
+}
+
+void ConstraintGraphNode::introduceToInference(Type fixedType) {
   // Notify all of the type variables that reference this one.
   //
   // Since this type variable has been replaced with a fixed type
   // all of the concrete types that reference it are going to change,
   // which means that all of the not-yet-attempted bindings should
   // change as well.
-  notifyReferencingVars(notification);
+  notifyReferencingVars([](ConstraintGraphNode &node, Constraint *constraint) {
+    node.getPotentialBindings().infer(constraint);
+  });
 
   if (!fixedType->hasTypeVariable())
     return;
@@ -317,27 +338,9 @@ void ConstraintGraphNode::updateFixedType(
     // all of the constraints that reference bound type variable.
     for (auto *constraint : getConstraints()) {
       if (isUsefulForReferencedVars(constraint))
-        notification(node, constraint);
+        node.getPotentialBindings().infer(constraint);
     }
   }
-}
-
-void ConstraintGraphNode::retractFromInference(Type fixedType) {
-  auto &cs = CG.getConstraintSystem();
-  return updateFixedType(
-      fixedType,
-      [&cs](ConstraintGraphNode &node, Constraint *constraint) {
-        node.getPotentialBindings().retract(cs, node.getTypeVariable(), constraint);
-      });
-}
-
-void ConstraintGraphNode::introduceToInference(Type fixedType) {
-  auto &cs = CG.getConstraintSystem();
-  return updateFixedType(
-      fixedType,
-      [&cs](ConstraintGraphNode &node, Constraint *constraint) {
-        node.getPotentialBindings().infer(cs, node.getTypeVariable(), constraint);
-      });
 }
 
 #pragma mark Graph mutation
@@ -363,11 +366,11 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
 
     auto *repr = typeVar->getImpl().getRepresentative(/*record=*/nullptr);
     if (!repr->getImpl().getFixedType(/*record=*/nullptr))
-      (*this)[repr].getPotentialBindings().infer(CS, repr, constraint);
+      (*this)[repr].getPotentialBindings().infer(constraint);
 
     if (isUsefulForReferencedVars(constraint)) {
       (*this)[typeVar].notifyReferencedVars([&](ConstraintGraphNode &node) {
-        node.getPotentialBindings().infer(CS, node.getTypeVariable(), constraint);
+        node.getPotentialBindings().infer(constraint);
       });
     }
   }
@@ -401,11 +404,11 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
   for (auto typeVar : referencedTypeVars) {
     auto *repr = typeVar->getImpl().getRepresentative(/*record=*/nullptr);
     if (!repr->getImpl().getFixedType(/*record=*/nullptr))
-      (*this)[repr].getPotentialBindings().retract(CS, repr, constraint);
+      (*this)[repr].getPotentialBindings().retract(constraint);
 
     if (isUsefulForReferencedVars(constraint)) {
       (*this)[typeVar].notifyReferencedVars([&](ConstraintGraphNode &node) {
-        node.getPotentialBindings().retract(CS, node.getTypeVariable(), constraint);
+        node.getPotentialBindings().retract(constraint);
       });
     }
 
@@ -450,9 +453,9 @@ void ConstraintGraph::mergeNodesPre(TypeVariableType *typeVar2) {
     auto &node = (*this)[newMember];
 
     node.notifyReferencingVars(
-      [&](ConstraintGraphNode &node, Constraint *constraint) {
-        node.getPotentialBindings().retract(CS, node.getTypeVariable(), constraint);
-      });
+        [&](ConstraintGraphNode &node, Constraint *constraint) {
+          node.getPotentialBindings().retract(constraint);
+        });
   }
 }
 
@@ -482,20 +485,20 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
 
     for (auto *constraint : node.getConstraints()) {
       if (!typeVar1->getImpl().getFixedType(/*record=*/nullptr))
-        repNode.getPotentialBindings().infer(CS, typeVar1, constraint);
+        repNode.getPotentialBindings().infer(constraint);
 
       if (!isUsefulForReferencedVars(constraint))
         continue;
 
       repNode.notifyReferencedVars([&](ConstraintGraphNode &node) {
-        node.getPotentialBindings().infer(CS, node.getTypeVariable(), constraint);
+        node.getPotentialBindings().infer(constraint);
       });
     }
 
     node.notifyReferencingVars(
-      [&](ConstraintGraphNode &node, Constraint *constraint) {
-        node.getPotentialBindings().infer(CS, node.getTypeVariable(), constraint);
-      });
+        [&](ConstraintGraphNode &node, Constraint *constraint) {
+          node.getPotentialBindings().infer(constraint);
+        });
   }
 }
 
@@ -523,8 +526,8 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   }
 }
 
-void ConstraintGraph::retractFromInference(TypeVariableType *typeVar, Type fixed) {
-  (*this)[typeVar].retractFromInference(fixed);
+void ConstraintGraph::retractFromInference(TypeVariableType *typeVar) {
+  (*this)[typeVar].retractFromInference();
 }
 
 void ConstraintGraph::introduceToInference(TypeVariableType *typeVar, Type fixed) {
@@ -540,31 +543,24 @@ void ConstraintGraph::unrelateTypeVariables(TypeVariableType *typeVar,
   node.removeReference(otherTypeVar);
 }
 
-void ConstraintGraph::inferBindings(TypeVariableType *typeVar,
-                                    Constraint *constraint) {
-  (*this)[typeVar].getPotentialBindings().infer(CS, typeVar, constraint);
-}
-
 void ConstraintGraph::retractBindings(TypeVariableType *typeVar,
                                       Constraint *constraint) {
-  (*this)[typeVar].getPotentialBindings().retract(CS, typeVar, constraint);
+  (*this)[typeVar].getPotentialBindings().retract(constraint);
 }
 
 #pragma mark Algorithms
 
-/// Perform a depth-first search.
-///
-/// \param cg The constraint graph.
-/// \param typeVar The type variable we're searching from.
-/// \param visitConstraint Called before considering a constraint.
-/// \param visitedConstraints Set of already-visited constraints, used
-/// internally to avoid duplicated work.
 static void depthFirstSearch(
     ConstraintGraph &cg,
     TypeVariableType *typeVar,
-    llvm::function_ref<void(Constraint *)> visitConstraint,
     llvm::SmallPtrSet<TypeVariableType *, 4> &typeVars,
+    llvm::TinyPtrVector<Constraint *> &constraints,
     llvm::SmallPtrSet<Constraint *, 8> &visitedConstraints) {
+  // If we're not looking at this type variable right now because we're
+  // solving a conjunction element, don't consider its adjacencies.
+  if (!cg.getConstraintSystem().isActiveTypeVariable(typeVar))
+    return;
+
   // Visit this node. If we've already seen it, bail out.
   if (!typeVars.insert(typeVar).second)
     return;
@@ -572,11 +568,8 @@ static void depthFirstSearch(
   // Local function to visit adjacent type variables.
   auto visitAdjacencies = [&](ArrayRef<TypeVariableType *> adjTypeVars) {
     for (auto adj : adjTypeVars) {
-      if (adj == typeVar)
-        continue;
-
-      // Recurse into this node.
-      depthFirstSearch(cg, adj, visitConstraint, typeVars, visitedConstraints);
+      if (adj != typeVar)
+        depthFirstSearch(cg, adj, typeVars, constraints, visitedConstraints);
     }
   };
 
@@ -587,7 +580,7 @@ static void depthFirstSearch(
     if (!visitedConstraints.insert(constraint).second)
       continue;
 
-    visitConstraint(constraint);
+    constraints.push_back(constraint);
   }
 
   // Visit all of the other nodes in the equivalence class.
@@ -606,28 +599,22 @@ static void depthFirstSearch(
   visitAdjacencies(node.getReferencedVars());
 }
 
-llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
-    TypeVariableType *typeVar, GatheringKind kind,
-    llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
+llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherAllConstraints(
+    TypeVariableType *typeVar) {
   llvm::TinyPtrVector<Constraint *> constraints;
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
   llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
 
-  if (kind == GatheringKind::AllMentions) {
-    // If we've been asked for "all mentions" of a type variable, search for
-    // constraints involving both it and its fixed bindings.
-    depthFirstSearch(
-        *this, typeVar,
-        [&](Constraint *constraint) {
-          if (acceptConstraintFn(constraint))
-            constraints.push_back(constraint);
-        },
-        typeVars, visitedConstraints);
-    return constraints;
-  }
+  depthFirstSearch(*this, typeVar, typeVars, constraints, visitedConstraints);
+  return constraints;
+}
 
-  // Otherwise only search in the type var's equivalence class and immediate
-  // fixed bindings.
+llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherNearbyConstraints(
+    TypeVariableType *typeVar, 
+    llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
+  llvm::TinyPtrVector<Constraint *> constraints;
+  llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
+  llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
 
   // Local function to add constraints.
   auto addTypeVarConstraints = [&](TypeVariableType *adjTypeVar) {
@@ -824,7 +811,7 @@ namespace {
 
       for (auto typeVar : typeVars) {
         auto &impl = typeVar->getImpl();
-        if (auto fixedType = impl.getRepresentativeOrFixed().dyn_cast<TypeBase *>()) {
+        if (isa<TypeBase *>(impl.getRepresentativeOrFixed())) {
           auto &node = cg[typeVar];
           for (auto otherTypeVar : node.getReferencedVars()) {
             unionSets(typeVar, otherTypeVar);
@@ -924,6 +911,9 @@ bool ConstraintGraph::contractEdges() {
     if (!(tyvar1 && tyvar2))
       continue;
 
+    auto rep1 = CS.getRepresentative(tyvar1);
+    auto rep2 = CS.getRepresentative(tyvar2);
+
     // If the argument is allowed to bind to `inout`, in general,
     // it's invalid to contract the edge between argument and parameter,
     // but if we can prove that there are no possible bindings
@@ -933,9 +923,10 @@ bool ConstraintGraph::contractEdges() {
     // Such action is valid because argument type variable can
     // only get its bindings from related overload, which gives
     // us enough information to decided on l-valueness.
-    if (tyvar1->getImpl().canBindToInOut()) {
+    if (rep1->getImpl().canBindToInOut()) {
       bool isNotContractable = true;
-      if (auto bindings = CS.getBindingsFor(tyvar1)) {
+      auto bindings = CS.getBindingsFor(rep1);
+      if (bindings.isViable()) {
         // Holes can't be contracted.
         if (bindings.isHole())
           continue;
@@ -961,9 +952,6 @@ bool ConstraintGraph::contractEdges() {
       if (isNotContractable)
         continue;
     }
-
-    auto rep1 = CS.getRepresentative(tyvar1);
-    auto rep2 = CS.getRepresentative(tyvar2);
 
     if (CS.isDebugMode()) {
       auto indent = CS.solverState ? CS.solverState->getCurrentIndent() : 0;
@@ -1001,7 +989,7 @@ void ConstraintGraph::incrementConstraintsPerContractionCounter() {
 #pragma mark Debugging output
 
 void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
-                                PrintOptions PO) const {
+                                const PrintOptions &PO) const {
   out.indent(indent);
   Type(TypeVar).print(out, PO);
   out << ":\n";
@@ -1062,19 +1050,14 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
 }
 
 void ConstraintGraphNode::dump() const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-  print(llvm::dbgs(), 0, PO);
+  print(llvm::dbgs(), 0, PrintOptions::forDebugging());
 }
 
 void ConstraintGraph::print(ArrayRef<TypeVariableType *> typeVars,
                             llvm::raw_ostream &out) {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-
   for (auto typeVar : typeVars) {
-    (*this)[typeVar].print(
-        out, (CS.solverState ? CS.solverState->getCurrentIndent() : 0) + 2, PO);
+    auto indent = (CS.solverState ? CS.solverState->getCurrentIndent() : 0) + 2;
+    (*this)[typeVar].print(out, indent, PrintOptions::forDebugging());
     out << "\n";
   }
 }
@@ -1091,8 +1074,7 @@ void ConstraintGraph::printConnectedComponents(
     ArrayRef<TypeVariableType *> typeVars,
     llvm::raw_ostream &out) {
   auto components = computeConnectedComponents(typeVars);
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+
   for (const auto& component : components) {
     out.indent((CS.solverState ? CS.solverState->getCurrentIndent() : 0) + 2);
     out << component.solutionIndex << ": ";
@@ -1101,13 +1083,12 @@ void ConstraintGraph::printConnectedComponents(
     };
 
     // Print all of the type variables in this connected component.
-    interleave(component.typeVars,
-               [&](TypeVariableType *typeVar) {
-                 Type(typeVar).print(out, PO);
-               },
-               [&] {
-                 out << ' ';
-               });
+    interleave(
+        component.typeVars,
+        [&](TypeVariableType *typeVar) {
+          Type(typeVar).print(out, PrintOptions::forDebugging());
+        },
+        [&] { out << ' '; });
   }
 }
 

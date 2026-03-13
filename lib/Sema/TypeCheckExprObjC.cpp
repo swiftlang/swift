@@ -16,20 +16,16 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 
 using namespace swift;
 
-std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
-                                                      KeyPathExpr *expr,
-                                                      bool requireResultType) {
-  // TODO: Native keypaths
-  assert(expr->isObjC() && "native keypaths not type-checked this way");
-  
-  // If there is already a semantic expression, do nothing.
-  if (expr->getObjCStringLiteralExpr() && !requireResultType)
-    return std::nullopt;
+Expr *
+ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
+                                   DeclContext *dc) const {
+  ASSERT(expr->isObjC() && "native keypaths not type-checked this way");
 
   // ObjC #keyPath only makes sense when we have the Objective-C runtime.
   auto &Context = dc->getASTContext();
@@ -37,10 +33,8 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   if (!Context.LangOpts.EnableObjCInterop) {
     diags.diagnose(expr->getLoc(), diag::expr_keypath_no_objc_runtime);
 
-    expr->setObjCStringLiteralExpr(
-      new (Context) StringLiteralExpr("", expr->getSourceRange(),
-                                      /*Implicit=*/true));
-    return std::nullopt;
+    return new (Context) StringLiteralExpr("", expr->getSourceRange(),
+                                           /*Implicit=*/true);
   }
 
   // The key path string we're forming.
@@ -165,9 +159,10 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   auto performLookup = [&](DeclNameRef componentName,
                            SourceLoc componentNameLoc,
                            Type &lookupType) -> LookupResult {
-    if (state == Beginning)
-      return lookupUnqualified(dc, componentName, componentNameLoc);
-
+    if (state == Beginning) {
+      return TypeChecker::lookupUnqualified(dc, componentName,
+                                            componentNameLoc);
+    }
     assert(currentType && "Non-beginning state must have a type");
     if (!currentType->mayHaveMembers())
       return LookupResult();
@@ -181,7 +176,7 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       lookupType = currentType;
 
     // Look for a member with the given name within this type.
-    return lookupMember(dc, lookupType, componentName);
+    return TypeChecker::lookupMember(dc, lookupType, componentName);
   };
 
   // Local function to print a component to the string.
@@ -209,7 +204,8 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     case KeyPathExpr::Component::Kind::CodeCompletion:
       continue;
 
-    case KeyPathExpr::Component::Kind::UnresolvedProperty:
+    case KeyPathExpr::Component::Kind::UnresolvedMember:
+    case KeyPathExpr::Component::Kind::UnresolvedApply:
       break;
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
     case KeyPathExpr::Component::Kind::OptionalChain:
@@ -220,8 +216,9 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
                      (unsigned)kind);
       continue;
     case KeyPathExpr::Component::Kind::OptionalWrap:
-    case KeyPathExpr::Component::Kind::Property:
+    case KeyPathExpr::Component::Kind::Member:
     case KeyPathExpr::Component::Kind::Subscript:
+    case KeyPathExpr::Component::Kind::Apply:
     case KeyPathExpr::Component::Kind::DictionaryKey:
       llvm_unreachable("already resolved!");
     }
@@ -331,8 +328,8 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       // Updates currentType
       updateState(/*isProperty=*/true, varTy);
 
-      auto resolved = KeyPathExpr::Component::forProperty(varRef, currentType,
-                                                          componentNameLoc);
+      auto resolved = KeyPathExpr::Component::forMember(varRef, currentType,
+                                                        componentNameLoc);
       resolvedComponents.push_back(resolved);
 
       // Check that the property is @objc.
@@ -340,10 +337,8 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
         diags.diagnose(componentNameLoc, diag::expr_keypath_non_objc_property,
                        var->getName());
         if (var->getLoc().isValid() && var->getDeclContext()->isTypeContext()) {
-          diags.diagnose(var, diag::make_decl_objc,
-                         var->getDescriptiveKind())
-            .fixItInsert(var->getAttributeInsertionLoc(false),
-                         "@objc ");
+          diags.diagnose(var, diag::make_decl_objc, var)
+              .fixItInsert(var->getAttributeInsertionLoc(false), "@objc ");
         }
       } else {
         // FIXME: Warn about non-KVC-compliant getter/setter names?
@@ -390,8 +385,8 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
       // Resolve this component to the type we found.
       auto typeRef = ConcreteDeclRef(type);
-      auto resolved = KeyPathExpr::Component::forProperty(typeRef, currentType,
-                                                          componentNameLoc);
+      auto resolved = KeyPathExpr::Component::forMember(typeRef, currentType,
+                                                        componentNameLoc);
       resolvedComponents.push_back(resolved);
 
       continue;
@@ -413,15 +408,7 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   if (keyPathString.empty() && !isInvalid)
     diags.diagnose(expr->getLoc(), diag::expr_keypath_empty);
 
-  // Set the string literal expression for the ObjC key path.
-  if (!expr->getObjCStringLiteralExpr()) {
-    expr->setObjCStringLiteralExpr(
-      new (Context) StringLiteralExpr(Context.AllocateCopy(keyPathString),
-                                      expr->getSourceRange(),
-                                      /*Implicit=*/true));
-  }
-
-  if (!currentType)
-    return std::nullopt;
-  return currentType;
+  return new (Context) StringLiteralExpr(Context.AllocateCopy(keyPathString),
+                                         expr->getSourceRange(),
+                                         /*Implicit=*/true);
 }

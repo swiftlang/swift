@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -55,19 +55,19 @@ extension ASTGenVisitor {
     let stringLiteralKind = node.stringLiteralKind ?? .singleLine
     let delimiterLength = node.delimiterLength
     let startLoc = self.generateSourceLoc(node)
-    let afterQuoteLoc: BridgedSourceLoc = {
+    let afterQuoteLoc: SourceLoc = {
       var l = startLoc
       if let pound = node.openingPounds {
-        l = l.advanced(by: pound.trimmedLength.utf8Length)
-        l = l.advanced(by: pound.trailingTriviaLength.utf8Length)
-        l = l.advanced(by: node.openingQuote.leadingTriviaLength.utf8Length)
+        l = l.advanced(by: CInt(pound.trimmedLength.utf8Length))
+        l = l.advanced(by: CInt(pound.trailingTriviaLength.utf8Length))
+        l = l.advanced(by: CInt(node.openingQuote.leadingTriviaLength.utf8Length))
       }
-      l = l.advanced(by: node.openingQuote.trimmedLength.utf8Length)
+      l = l.advanced(by: CInt(node.openingQuote.trimmedLength.utf8Length))
       return l
     }()
 
     // 'stmts' is a list of body elements of 'TapExpr' aka "appendingExpr" for the 'InterpolatedStringLiteralExpr'.
-    var stmts: [ASTNode] = []
+    var stmts: [BridgedASTNode] = []
 
     // The first element is a 'VarDecl'.
     let interpolationVar = BridgedVarDecl.createImplicitStringInterpolationVar(self.declContext)
@@ -76,12 +76,15 @@ extension ASTGenVisitor {
     // Name reference to `appendLiteral(_:)`
     let appendLiteral = BridgedDeclNameRef.createParsed(
       self.ctx,
-      baseName: .createIdentifier(self.ctx.getIdentifier("appendLiteral")),
-      argumentLabels: CollectionOfOne(BridgedIdentifier()).bridgedArray(in: self)
+      moduleSelector: nil,
+      baseName: .init(self.ctx.getIdentifier("appendLiteral")),
+      argumentLabels: CollectionOfOne(Identifier()).bridgedArray(in: self)
     )
     // Name reference to `appendInterpolation`. Arguments labels are not determined yet.
     let appendInterpolation = BridgedDeclNameRef.createParsed(
-      .createIdentifier(self.ctx.getIdentifier("appendInterpolation"))
+      self.ctx,
+      moduleSelector: nil,
+      baseName: .init(self.ctx.getIdentifier("appendInterpolation"))
     )
 
     // Total byte length of "literal" segments.
@@ -91,7 +94,7 @@ extension ASTGenVisitor {
 
     // In multi-line string literals, each line has '.stringSegment' even without
     // interpolations. We need to join them into single string literal value in AST.
-    var currLiteral: (value: String, loc: BridgedSourceLoc)? = nil
+    var currLiteral: (value: String, loc: SourceLoc)? = nil
     var isFirst = true
     func consumeCurrentLiteralValue() {
       guard var literal = currLiteral else {
@@ -199,7 +202,7 @@ extension ASTGenVisitor {
     let body = BridgedBraceStmt.createParsed(
       self.ctx,
       lBraceLoc: nil,
-      elements: stmts.lazy.map({ $0.bridged }).bridgedArray(in: self),
+      elements: stmts.lazy.bridgedArray(in: self),
       rBraceLoc: nil
     )
     let appendingExpr = BridgedTapExpr.create(

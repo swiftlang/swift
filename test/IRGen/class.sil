@@ -154,6 +154,6 @@ entry(%x : $ClassConstrainedGenericField<ClassConstraintConformance>):
   return %b : $ClassConstraintConformance
 }
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @fixed_class_generic_field(ptr %0)
-// CHECK:         [[FIELD_ADDR_GENERIC:%.*]] = getelementptr inbounds %T5class28ClassConstrainedGenericFieldCyAA0B21ConstraintConformanceCG, ptr %0, i32 0, i32 1
+// CHECK:         [[FIELD_ADDR_GENERIC:%.*]] = getelementptr inbounds{{.*}} %T5class28ClassConstrainedGenericFieldCyAA0B21ConstraintConformanceCG, ptr %0, i32 0, i32 1
 // CHECK:         load ptr, ptr [[FIELD_ADDR_GENERIC]]
 

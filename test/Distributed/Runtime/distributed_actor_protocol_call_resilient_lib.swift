@@ -71,6 +71,7 @@
 // Locating the built libraries failed on Linux (construction of test case),
 // but we primarily care about macOS in this test
 // UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=freebsd
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

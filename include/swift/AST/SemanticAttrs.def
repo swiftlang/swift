@@ -64,7 +64,6 @@ SEMANTICS_ATTR(ARRAY_DEALLOC_UNINITIALIZED, "array.dealloc_uninitialized")
 SEMANTICS_ATTR(ARRAY_UNINITIALIZED_INTRINSIC, "array.uninitialized_intrinsic")
 SEMANTICS_ATTR(ARRAY_FINALIZE_INTRINSIC, "array.finalize_intrinsic")
 SEMANTICS_ATTR(ARRAY_GET_CONTIGUOUSARRAYSTORAGETYPE, "array.getContiguousArrayStorageType")
-SEMANTICS_ATTR(ARRAY_COPY_INTO_VECTOR, "array.copy_into_vector")
 
 SEMANTICS_ATTR(SEQUENCE_FOR_EACH, "sequence.forEach")
 SEMANTICS_ATTR(TYPENAME, "typeName")
@@ -72,10 +71,16 @@ SEMANTICS_ATTR(TYPENAME, "typeName")
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_NEVER, "optimize.sil.specialize.generic.never")
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER,
           "optimize.sil.specialize.generic.partial.never")
+SEMANTICS_ATTR(OPTIMIZE_SIL_INLINE_CONSTANT_ARGUMENTS,
+          "optimize.sil.inline.constant.arguments")
+SEMANTICS_ATTR(DERIVED_ENUM_EQUALS,
+          "derived_enum_equals")
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER,
           "optimize.sil.specialize.generic.size.never")
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_OWNED2GUARANTEE_NEVER,
           "optimize.sil.specialize.owned2guarantee.never")
+SEMANTICS_ATTR(OPTIMIZE_SIL_INLINE_AGGRESSIVE,
+          "optimize.sil.inline.aggressive")
 
 // To be used on a nominal type declaration.
 // Assumes that a class (or class references inside a nominal type) are immortal.
@@ -158,6 +163,11 @@ SEMANTICS_ATTR(DELETE_IF_UNUSED, "sil.optimizer.delete_if_unused")
 
 // Force the use of the frame pointer for the specified function
 SEMANTICS_ATTR(USE_FRAME_POINTER, "use_frame_pointer")
+
+SEMANTICS_ATTR(FIXED_STORAGE_CHECK_INDEX, "fixed_storage.check_index")
+SEMANTICS_ATTR(FIXED_STORAGE_GET_COUNT, "fixed_storage.get_count")
+
+SEMANTICS_ATTR(NO_SIL_VERIFICATION, "sil.verify_none")
 
 #undef SEMANTICS_ATTR
 

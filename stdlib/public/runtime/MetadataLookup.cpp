@@ -23,7 +23,6 @@
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
-#include "swift/RemoteInspection/Records.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Debug.h"
@@ -48,7 +47,8 @@
 
 using namespace swift;
 using namespace Demangle;
-using namespace reflection;
+
+using FieldDescriptor = reflection::TargetFieldDescriptor<InProcess>;
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
@@ -1053,9 +1053,17 @@ _findContextDescriptor(Demangle::NodePointer node,
   return foundContext;
 }
 
-void swift::_swift_registerConcurrencyStandardTypeDescriptors(
-    const ConcurrencyStandardTypeDescriptors *descriptors) {
+/// Function to check whether we're currently running on the given global
+/// actor.
+bool (* __ptrauth_swift_is_global_actor_function SWIFT_CC(swift)
+        swift::_swift_task_isCurrentGlobalActorHook)(
+    const Metadata *, const WitnessTable *);
+
+void swift::_swift_registerConcurrencyRuntime(
+    const ConcurrencyStandardTypeDescriptors *descriptors,
+    IsCurrentGlobalActor isCurrentGlobalActor) {
   concurrencyDescriptors = descriptors;
+  _swift_task_isCurrentGlobalActorHook = isCurrentGlobalActor;
 }
 
 #pragma mark Protocol descriptor cache
@@ -1594,7 +1602,8 @@ _gatherGenericParameters(const ContextDescriptor *context,
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
-        });
+        },
+        nullptr);
     if (error)
       return *error;
 
@@ -2035,7 +2044,8 @@ public:
         },
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("never called");
-        });
+        },
+        nullptr);
     if (error)
       return *error;
 
@@ -2434,6 +2444,12 @@ public:
     return BuiltType();
   }
 
+  TypeLookupErrorOr<BuiltType> createInlineArrayType(BuiltType count,
+                                                     BuiltType element) {
+    // Mangled types for building metadata don't contain sugared types
+    return BuiltType();
+  }
+
   TypeLookupErrorOr<BuiltType> createDictionaryType(BuiltType key,
                                                     BuiltType value) {
     // Mangled types for building metadata don't contain sugared types
@@ -2463,6 +2479,12 @@ public:
     return BuiltType(swift_getFixedArrayTypeMetadata(MetadataState::Abstract,
                                                      size.getValue(),
                                                      element.getMetadata()));
+  }
+
+  TypeLookupErrorOr<BuiltType> createBuiltinBorrowType(BuiltType referent) {
+    llvm_unreachable("not implemented");
+    // return BuiltType(swift_getBorrowTypeMetadata(MetadataState::Abstract,
+    //                                                  referent.getValue());
   }
 };
 
@@ -2891,25 +2913,6 @@ static NodePointer getParameterList(NodePointer funcType) {
   return parameterContainer;
 }
 
-static const Metadata *decodeType(TypeDecoder<DecodedMetadataBuilder> &decoder,
-                                  NodePointer type) {
-  assert(type->getKind() == Node::Kind::Type);
-
-  auto builtTypeOrError = decoder.decodeMangledType(type);
-
-  if (builtTypeOrError.isError()) {
-    auto err = builtTypeOrError.getError();
-    char *errStr = err->copyErrorString();
-    err->freeErrorString(errStr);
-    return nullptr;
-  }
-
-  if (!builtTypeOrError.getType().isMetadata())
-    return nullptr;
-
-  return builtTypeOrError.getType().getMetadata();
-}
-
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_SPI
 unsigned swift_func_getParameterCount(const char *typeNameStart,
@@ -2945,8 +2948,12 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
 
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
 
-  DecodedMetadataBuilder builder(
-      demangler,
+  auto request = MetadataRequest(MetadataState::Complete);
+
+  NodePointer nodePointer = resultType->getFirstChild();
+  auto typeInfoOrErr = swift_getTypeByMangledNode(
+      request, demangler, nodePointer,
+      /*arguments=*/genericArguments,
       /*substGenericParam=*/
       [&substFn](unsigned depth, unsigned index) {
         return substFn.getMetadata(depth, index).Ptr;
@@ -2956,9 +2963,12 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
         return substFn.getWitnessTable(type, index);
       });
 
-  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
+  if (typeInfoOrErr.isError()) {
+    return nullptr;
+  }
 
-  return decodeType(decoder, resultType->getFirstChild());
+  auto typeInfo = typeInfoOrErr.getType();
+  return typeInfo.getMetadata();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
@@ -2986,8 +2996,21 @@ swift_func_getParameterTypeInfo(
 
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
 
-  DecodedMetadataBuilder builder(
-      demangler,
+  // for each parameter (TupleElement), store it into the provided buffer
+  for (unsigned index = 0; index != typesLength; ++index) {
+    auto nodePointer = parameterList->getChild(index);
+
+    if (nodePointer->getKind() == Node::Kind::TupleElement) {
+      assert(nodePointer->getNumChildren() == 1);
+      nodePointer = nodePointer->getFirstChild();
+    }
+    assert(nodePointer->getKind() == Node::Kind::Type);
+
+    auto request = MetadataRequest(MetadataState::Complete);
+
+    auto typeInfoOrErr = swift_getTypeByMangledNode(
+      request, demangler, nodePointer,
+      /*arguments=*/genericArguments,
       /*substGenericParam=*/
       [&substFn](unsigned depth, unsigned index) {
         return substFn.getMetadata(depth, index).Ptr;
@@ -2996,24 +3019,13 @@ swift_func_getParameterTypeInfo(
       [&substFn](const Metadata *type, unsigned index) {
         return substFn.getWitnessTable(type, index);
       });
-  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
 
-  // for each parameter (TupleElement), store it into the provided buffer
-  for (unsigned index = 0; index != typesLength; ++index) {
-    auto *parameter = parameterList->getChild(index);
-
-    if (parameter->getKind() == Node::Kind::TupleElement) {
-      assert(parameter->getNumChildren() == 1);
-      parameter = parameter->getFirstChild();
+    if (typeInfoOrErr.isError()) {
+      return -3; // Failed to decode a type.
     }
 
-    assert(parameter->getKind() == Node::Kind::Type);
-
-    auto type = decodeType(decoder, parameter);
-    if (!type)
-      return -3; // Failed to decode a type.
-
-    types[index] = type;
+    auto typeInfo = typeInfoOrErr.getType();
+    types[index] = typeInfo.getMetadata();
   } // end foreach parameter
 
   return typesLength;
@@ -3041,7 +3053,8 @@ swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
       },
       [&substFn](const Metadata *type, unsigned index) {
         return substFn.getWitnessTable(type, index);
-      });
+      },
+      nullptr);
 
   if (error) {
     return {/*ptr=*/nullptr, -1};
@@ -3258,12 +3271,14 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
   return OldGetClassHook(typeName, outClass);
 }
 
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 __attribute__((constructor))
 static void installGetClassHook() {
   if (SWIFT_RUNTIME_WEAK_CHECK(objc_setHook_getClass)) {
     SWIFT_RUNTIME_WEAK_USE(objc_setHook_getClass(getObjCClassByMangledName, &OldGetClassHook));
   }
 }
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
 #endif
 
@@ -3715,7 +3730,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
         reinterpret_cast<void **>(&chainRoot->implementationFunction),
         reinterpret_cast<void *const *>(&previous->implementationFunction),
         replacedFunctionKey->getExtraDiscriminator(),
-        !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+        !replacedFunctionKey->isData(), /*allowNull*/ false);
   }
 
   // First populate the current replacement's chain entry.
@@ -3726,7 +3741,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
       reinterpret_cast<void **>(&currentEntry->implementationFunction),
       reinterpret_cast<void *const *>(&chainRoot->implementationFunction),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+      !replacedFunctionKey->isData(), /*allowNull*/ false);
 
   currentEntry->next = chainRoot->next;
 
@@ -3737,7 +3752,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
       reinterpret_cast<void **>(&chainRoot->implementationFunction),
       reinterpret_cast<void *>(getReplacementFunction()),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync());
+      !replacedFunctionKey->isData());
 }
 
 void DynamicReplacementDescriptor::disableReplacement() const {
@@ -3762,7 +3777,7 @@ void DynamicReplacementDescriptor::disableReplacement() const {
       reinterpret_cast<void **>(&previous->implementationFunction),
       reinterpret_cast<void *const *>(&thisEntry->implementationFunction),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+      !replacedFunctionKey->isData(), /*allowNull*/ false);
 }
 
 /// An automatic dynamic replacement entry.

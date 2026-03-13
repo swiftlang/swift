@@ -53,6 +53,7 @@
 @property (readonly) int readonlyPropertyFromHeader4;
 @property (readonly) int readonlyPropertyFromHeader5;
 @property (readonly) int readonlyPropertyFromHeader6;
+@property (readonly) int readonlyPropertyFromHeader7;
 
 + (void)classMethod1:(int)param;
 + (void)classMethod2:(int)param;
@@ -84,6 +85,10 @@
 @property int categoryPropertyFromHeader2;
 @property int categoryPropertyFromHeader3;
 @property int categoryPropertyFromHeader4;
+@property int categoryPropertyFromHeader5;
+
+@property (readonly) int categoryReadonlyPropertyFromHeader1;
+
 
 @end
 
@@ -118,6 +123,7 @@
 - (void)doSomethingAsynchronousWithCompletionHandler:(void (^ _Nonnull)(id _Nullable result, NSError * _Nullable error))completionHandler;
 - (void)doSomethingElseAsynchronousWithCompletionHandler:(void (^ _Nullable)(id _Nonnull result))completionHandler;
 - (void)doSomethingFunAndAsynchronousWithCompletionHandler:(void (^ _Nonnull)(id _Nullable result, NSError * _Nullable error))completionHandler;
+- (void)doSomethingMissingAndAsynchronousWithCompletionHandler:(void (^ _Nonnull)(id _Nullable result, NSError * _Nullable error))completionHandler;
 
 - (void)doSomethingOverloadedWithCompletionHandler:(void (^ _Nonnull)())completionHandler;
 - (void)doSomethingOverloaded __attribute__((__swift_attr__("@_unavailableFromAsync(message: \"Use async doSomethingOverloaded instead.\")")));
@@ -151,6 +157,14 @@
 @end
 
 @interface ObjCClass (Conformance) <PartiallyOptionalProtocol>
+
+@end
+
+@interface ObjCClass (OwnershipTests)
+
+- (void)consumingMismatchMethod:(id)param;
+- (void)consumingMismatchMethod2:(__attribute__((ns_consumed)) id)param;
+- (void)consumingMethod:(__attribute__((ns_consumed)) id)param;
 
 @end
 
@@ -224,6 +238,8 @@
 
 void CImplFunc1(int param);
 void CImplFunc2(int param);
+
+void CImplFuncRenamed_C(int param) __attribute__((swift_name("CImplFuncRenamed_Swift(arg:)")));
 
 void CImplFuncMismatch1(int param);
 void CImplFuncMismatch2(int param);

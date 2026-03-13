@@ -1,10 +1,13 @@
-// RUN: %target-swift-frontend -typecheck -disable-availability-checking -dump-ast %s | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.15 -typecheck -dump-ast %s | %FileCheck %s
+
+// REQUIRES: OS=macosx
 
 class AnyP: P {
   init<T: P>(erasing: T) {}
 }
 
 @_typeEraser(AnyP)
+@_typeEraser(NewAnyP)
 protocol P {}
 
 struct ConcreteP: P, Hashable {}
@@ -116,6 +119,64 @@ extension DynamicReplacement {
     // CHECK:            argument_list implicit labels="erasing:"
     // CHECK-NEXT:         argument label="erasing"
     // CHECK-NEXT:           call_expr type="ConcreteP"
+    return ConcreteP()
+  }
+}
+
+@available(macOS 100, *)
+struct NewAnyP: P {
+  init(erasing: some P) {}
+}
+
+@available(macOS 100, *)
+struct NewConcreteP: P {}
+
+// CHECK-LABEL: var_decl{{.*}}x0
+dynamic var x0: some P {
+  // CHECK:      return_stmt
+  // CHECK-NEXT:   underlying_to_opaque_expr implicit type="some P"
+  // CHECK-NEXT:     call_expr implicit type="AnyP"
+  ConcreteP()
+}
+
+// CHECK-LABEL: var_decl{{.*}}x1
+@available(macOS 99, *)
+dynamic var x1: some P {
+  // CHECK:      return_stmt
+  // CHECK-NEXT:   underlying_to_opaque_expr implicit type="some P"
+  // CHECK-NEXT:     call_expr implicit type="AnyP"
+  ConcreteP()
+}
+
+// CHECK-LABEL: var_decl{{.*}}x2
+@available(macOS 100, *)
+dynamic var x2: some P {
+  // CHECK:      return_stmt
+  // CHECK-NEXT:   underlying_to_opaque_expr implicit type="some P"
+  // CHECK-NEXT:     call_expr implicit type="NewAnyP"
+  ConcreteP()
+}
+
+// CHECK-LABEL: var_decl{{.*}}x3
+@available(macOS 101, *)
+dynamic var x3: some P {
+  // CHECK:      return_stmt
+  // CHECK-NEXT:   underlying_to_opaque_expr implicit type="some P"
+  // CHECK-NEXT:     call_expr implicit type="NewAnyP"
+  ConcreteP()
+}
+
+// CHECK-LABEL: var_decl{{.*}}x4
+dynamic var x4: some P {
+  if #available(macOS 101, *) {
+    // CHECK:      return_stmt
+    // CHECK-NEXT:   underlying_to_opaque_expr implicit type="some P"
+    // CHECK-NEXT:     call_expr implicit type="NewAnyP"
+    return NewConcreteP()
+  } else {
+    // CHECK:      return_stmt
+    // CHECK-NEXT:   underlying_to_opaque_expr implicit type="some P"
+    // CHECK-NEXT:     call_expr implicit type="AnyP"
     return ConcreteP()
   }
 }

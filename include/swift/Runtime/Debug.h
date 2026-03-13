@@ -160,6 +160,10 @@ void swift_abortDynamicReplacementDisabling();
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void swift_abortDisabledUnicodeSupport();
 
+// Halt due to a failure to allocate memory.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+void swift_abortAllocationFailure(size_t size, size_t alignMask);
+
 /// This function dumps one line of a stack trace. It is assumed that \p framePC
 /// is the address of the stack frame at index \p index. If \p shortOutput is
 /// true, this functions prints only the name of the symbol and offset, ignores
@@ -261,6 +265,14 @@ bool _swift_debug_metadataAllocationIterationEnabled;
 
 SWIFT_RUNTIME_STDLIB_SPI
 const void * const _swift_debug_allocationPoolPointer;
+
+SWIFT_RUNTIME_STDLIB_SPI
+const size_t _swift_debug_allocationPoolSize;
+
+// The size of the pages the metadata allocator allocates on the heap. May be
+// used to filter out possible metadata pages when examining the heap.
+SWIFT_RUNTIME_STDLIB_SPI
+const size_t _swift_debug_metadataAllocatorPageSize;
 
 SWIFT_RUNTIME_STDLIB_SPI
 std::atomic<const void *> _swift_debug_metadataAllocationBacktraceList;

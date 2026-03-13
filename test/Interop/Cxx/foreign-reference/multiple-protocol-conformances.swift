@@ -2,8 +2,6 @@
 // RUN: split-file %s %t
 // RUN: %target-build-swift -I %S/Inputs %t/main.swift %t/second.swift -cxx-interoperability-mode=default -Xfrontend -disable-availability-checking
 
-// XFAIL: OS=windows-msvc
-
 //--- main.swift
 import ReferenceCounted
 

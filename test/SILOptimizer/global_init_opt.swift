@@ -9,6 +9,7 @@ var gg: Int = {
 
 // Test that the compiler doesn't crash with a global C bitfield.
 var bitfield = S(a: 0, b: 0)
+var bitfield2 = S2(a: 0, b: 0)
 
 // CHECK-LABEL: sil @$s4test3cseSiyF
 // CHECK:   builtin "once"

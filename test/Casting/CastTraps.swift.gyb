@@ -142,4 +142,35 @@ CastTrapsTestSuite.test("Unexpected Obj-C null")
 }
 #endif
 
+class Base {}
+final class Derived: Base {}
+final class Other: Base {}
+
+@inline(never)
+func getDerived(_ v: Base) -> Derived {
+  return v as! Derived
+}
+
+@inline(never)
+func getDerivedFromOptional(_ v: Base?) -> Derived {
+  return v as! Derived
+}
+
+CastTrapsTestSuite.test("unconditinal fast class cast") {
+  let c = Other()
+  expectCrashLater()
+  _ = getDerived(c)
+}
+
+CastTrapsTestSuite.test("unconditinal optional fast class cast") {
+  let c = Other()
+  expectCrashLater()
+  _ = getDerivedFromOptional(c)
+}
+
+CastTrapsTestSuite.test("unconditinal optional nil fast class cast") {
+  expectCrashLater()
+  _ = getDerivedFromOptional(nil)
+}
+
 runAllTests()

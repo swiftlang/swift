@@ -10,18 +10,21 @@
 
 // RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 -swift-version 5 -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -lInterface %t/src/Crash1.swift -o %t/crash1.out
 // RUN: %target-codesign %t/crash1.out
-// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash1.out 2>&1 | %FileCheck %t/src/Crash1.swift --check-prefix=LEGACY_CHECK
-// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash1.out 2>&1 | %FileCheck %t/src/Crash1.swift --check-prefix=SWIFT6_CHECK --dump-input=always
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 SWIFT_BACKTRACE=enable=no %target-run %t/crash1.out 2>&1 | %FileCheck %t/src/Crash1.swift --check-prefix=LEGACY_CHECK
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 SWIFT_BACKTRACE=enable=no %target-run %t/crash1.out 2>&1 | %FileCheck %t/src/Crash1.swift --check-prefix=SWIFT6_CHECK --dump-input=always
 
 // RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 -swift-version 6 -I %t -L %t -lInterface %t/src/Crash2.swift -o %t/crash2.out
 // RUN: %target-codesign %t/crash2.out
-// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash2.out 2>&1 | %FileCheck %t/src/Crash2.swift --check-prefix=LEGACY_CHECK
-// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash2.out 2>&1 | %FileCheck %t/src/Crash2.swift --check-prefix=SWIFT6_CHECK --dump-input=always
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 SWIFT_BACKTRACE=enable=no %target-run %t/crash2.out 2>&1 | %FileCheck %t/src/Crash2.swift --check-prefix=LEGACY_CHECK
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 SWIFT_BACKTRACE=enable=no %target-run %t/crash2.out 2>&1 | %FileCheck %t/src/Crash2.swift --check-prefix=SWIFT6_CHECK --dump-input=always
 
 // RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 -swift-version 6 -I %t -L %t -lInterface %t/src/Crash3.swift -o %t/crash3.out
 // RUN: %target-codesign %t/crash3.out
-// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash3.out 2>&1 | %FileCheck %t/src/Crash3.swift --check-prefix=LEGACY_CHECK
-// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash3.out 2>&1 | %FileCheck %t/src/Crash3.swift --check-prefix=SWIFT6_CHECK --dump-input=always
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 SWIFT_BACKTRACE=enable=no %target-run %t/crash3.out 2>&1 | %FileCheck %t/src/Crash3.swift --check-prefix=LEGACY_CHECK
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 SWIFT_BACKTRACE=enable=no %target-run %t/crash3.out 2>&1 | %FileCheck %t/src/Crash3.swift --check-prefix=SWIFT6_CHECK --dump-input=always
+
+// We set SWIFT_BACKTRACE=enable=no, as backtracing output can cause false
+// positive matches with CHECK-NOT: OK.
 
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime

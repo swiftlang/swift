@@ -149,6 +149,7 @@ public protocol RawRepresentable<RawValue> {
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
 @inlinable // trivial-implementation
+@_semantics("rawrepresentable.is_equal")
 public func == <T: RawRepresentable>(lhs: T, rhs: T) -> Bool
   where T.RawValue: Equatable {
   return lhs.rawValue == rhs.rawValue
@@ -266,8 +267,9 @@ public protocol CaseIterable {
 /// `Optional` type conforms to `ExpressibleByNilLiteral`.
 /// `ExpressibleByNilLiteral` conformance for types that use `nil` for other
 /// purposes is discouraged.
-public protocol ExpressibleByNilLiteral: ~Copyable {
+public protocol ExpressibleByNilLiteral: ~Copyable, ~Escapable {
   /// Creates an instance initialized with `nil`.
+  @lifetime(immortal)
   init(nilLiteral: ())
 }
 

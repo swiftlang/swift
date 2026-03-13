@@ -45,7 +45,7 @@ FileUnit *TBDGenDescriptor::getSingleFile() const {
 ModuleDecl *TBDGenDescriptor::getParentModule() const {
   if (auto *module = Input.dyn_cast<ModuleDecl *>())
     return module;
-  return Input.get<FileUnit *>()->getParentModule();
+  return cast<FileUnit *>(Input)->getParentModule();
 }
 
 const StringRef TBDGenDescriptor::getDataLayoutString() const {
@@ -74,7 +74,7 @@ void swift::simple_display(llvm::raw_ostream &out,
     simple_display(out, module);
   } else {
     out << "file ";
-    simple_display(out, desc.getFileOrModule().get<FileUnit *>());
+    simple_display(out, cast<FileUnit *>(desc.getFileOrModule()));
   }
 }
 

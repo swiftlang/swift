@@ -692,3 +692,6 @@ Added: _$s15Synchronization20AtomicUpdateOrderingV22sequentiallyConsistentACvpZM
 Added: _$s15Synchronization20AtomicUpdateOrderingV7relaxedACvpZMV
 Added: _$s15Synchronization20AtomicUpdateOrderingV9acquiringACvpZMV
 Added: _$s15Synchronization20AtomicUpdateOrderingV9releasingACvpZMV
+
+// WordPair to Comparable conformance
+Added: _$s15Synchronization8WordPairVSLAAMc

@@ -128,7 +128,7 @@ func downloadToolchainAndRunTest(
   let fileType = platform.fileType
   let toolchainType = platform.toolchainType
 
-  let realBranch = branch != .development ? "swift-\(branch)-branch" : branch.rawValue
+  let realBranch = branch.urlBranchName
   let toolchainDir = "\(workspace)/\(tag.name)-\(platform)"
   let downloadPath = URL(fileURLWithPath: "\(workspace)/\(tag.name)-\(platform).\(fileType)")
   if !fileExists(toolchainDir) {

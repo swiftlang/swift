@@ -26,7 +26,7 @@
 /// Test the same build but remapping the path.
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   -scanner-prefix-map %swift_src_root=/^src -scanner-prefix-map %t/src=/^tmp -scanner-prefix-map %t/sdk=/^sdk \
+// RUN:   -scanner-prefix-map-paths %swift_src_root /^src -scanner-prefix-map-paths %t/src /^tmp -scanner-prefix-map-paths %t/sdk /^sdk \
 // RUN:   %t/src/main.swift -o %t/deps-1.json -swift-version 5 -cache-compile-job -cas-path %t/cas -I %t/src/include
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps-1.json clang:A > %t/A-1.cmd
@@ -42,7 +42,7 @@
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -module-name Test -explicit-swift-module-map-file @%t/map-1.casid \
-// RUN:   -cache-replay-prefix-map /^src=%swift_src_root -cache-replay-prefix-map /^tmp=%t/src -cache-replay-prefix-map /^sdk=%t/sdk \
+// RUN:   -cache-replay-prefix-map /^src %swift_src_root -cache-replay-prefix-map /^tmp %t/src -cache-replay-prefix-map /^sdk %t/sdk \
 // RUN:   /^tmp/main.swift @%t/MyApp-1.cmd
 
 //--- private/main.swift

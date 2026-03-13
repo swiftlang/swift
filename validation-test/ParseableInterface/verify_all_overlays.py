@@ -48,6 +48,7 @@ for filename in os.listdir(sdk_overlay_dir):
         "SwiftLang",
         # swiftCxxStdlib uses `-module-interface-preserve-types-as-written`
         "CxxStdlib",
+        "CompatibilitySpan",
     ]:
         continue
 

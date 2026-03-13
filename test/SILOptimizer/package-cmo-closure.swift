@@ -32,14 +32,14 @@ public func reproduce(_ e: Something) {
 }
 
 // use(_:)
-// CHECK: sil [serialized_for_package] [canonical] @$s3Lib3useyySiyXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> () {
-// CHECK:   bb0(%0 : $@noescape @callee_guaranteed () -> Int):
+// CHECK: sil [serialized_for_package] [canonical] [ossa] @$s3Lib3useyySiyXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> () {
+// CHECK:   bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> Int):
 // CHECK:       [[RESULT:%.*]] = tuple ()
 // CHECK:       return [[RESULT]] : $()
 // CHECK:     } // end sil function '$s3Lib3useyySiyXEF'
 
 // closure #1 in reproduce(_:)
-// CHECK: sil shared [serialized] [canonical] @$s3Lib9reproduceyyAA9SomethingVFSiyXEfU_ : $@convention(thin) (@in_guaranteed Something) -> Int {
+// CHECK: sil shared [serialized] [canonical] [ossa] @$s3Lib9reproduceyyAA9SomethingVFSiyXEfU_ : $@convention(thin) (@in_guaranteed Something) -> Int {
   // function_ref Something.f()
 // CHECK: bb0(%0 : @closureCapture $*Something):
 // CHECK: [[REF:%.*]] = function_ref @$s3Lib9SomethingV1fSiyF : $@convention(method) (@in_guaranteed Something) -> Int
@@ -48,13 +48,13 @@ public func reproduce(_ e: Something) {
 // CHECK: } // end sil function '$s3Lib9reproduceyyAA9SomethingVFSiyXEfU_'
 
 // Something.f()
-// CHECK: sil [serialized_for_package] [canonical] @$s3Lib9SomethingV1fSiyF : $@convention(method) (@in_guaranteed Something) -> Int {
+// CHECK: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9SomethingV1fSiyF : $@convention(method) (@in_guaranteed Something) -> Int {
 
 // Something.init()
-// CHECK: sil [serialized_for_package] [canonical] @$s3Lib9SomethingVACycfC : $@convention(method) (@thin Something.Type) -> @out Something {
+// CHECK: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9SomethingVACycfC : $@convention(method) (@thin Something.Type) -> @out Something {
 
 // reproduce(_:)
-// CHECK: sil [serialized] [canonical] @$s3Lib9reproduceyyAA9SomethingVF : $@convention(thin) (@in_guaranteed Something) -> () {
+// CHECK: sil [serialized] [canonical] [ossa] @$s3Lib9reproduceyyAA9SomethingVF : $@convention(thin) (@in_guaranteed Something) -> () {
 // CHECK:   bb0(%0 : $*Something):
 // CHECK:     [[CLOSURE_PTR:%.*]] = function_ref @$s3Lib9reproduceyyAA9SomethingVFSiyXEfU_ : $@convention(thin) (@in_guaranteed Something) -> Int
 // CHECK:     [[CLOSURE_W_ARG:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[CLOSURE_PTR]](%0) : $@convention(thin) (@in_guaranteed Something) -> Int

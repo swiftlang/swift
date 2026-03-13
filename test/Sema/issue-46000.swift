@@ -11,7 +11,7 @@ struct Data {}
 extension DispatchData {
   func asFoundationData<T>(execute: (Data) throws -> T) rethrows -> T {
     return try withUnsafeBytes { (ptr: UnsafePointer<Int8>) -> Void in
-      // expected-error@-1 {{declared closure result 'Void' is incompatible with contextual type 'T'}}
+      // expected-error@-1 {{cannot convert return expression of type 'Void' to return type 'T'}}
       let data = Data()
       return try execute(data) // expected-error {{cannot convert value of type 'T' to closure result type 'Void'}}
     }

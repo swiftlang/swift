@@ -11,4 +11,4 @@ public func foo() {
 func bar(_: UnsafePointer<UInt?>) {
 }
 
-// CHECK: define {{.*}}@main(
+// CHECK: define {{.*}}@{{_*}}main{{.*}}(

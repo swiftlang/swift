@@ -50,7 +50,7 @@ class ClangSyntaxPrinter {
 public:
   enum class LeadingTrivia { None, Comma };
 
-  ClangSyntaxPrinter(const ASTContext &Ctx, raw_ostream &os) : os(os), mangler(Ctx) {}
+  ClangSyntaxPrinter(ASTContext &Ctx, raw_ostream &os) : os(os), mangler(Ctx) {}
 
   /// Print a given identifier. If the identifer conflicts with a keyword, add a
   /// trailing underscore.
@@ -96,7 +96,8 @@ public:
       const NominalTypeDecl *typeDecl);
 
   // Returns true when no qualifiers were printed.
-  bool printNestedTypeNamespaceQualifiers(const ValueDecl *D) const;
+  bool printNestedTypeNamespaceQualifiers(const ValueDecl *D,
+                                          bool forC = false) const;
 
   /// Print out the C++ class access qualifier for the given Swift  type
   /// declaration.

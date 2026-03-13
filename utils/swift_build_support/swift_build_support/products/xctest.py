@@ -17,6 +17,7 @@ from . import libdispatch
 from . import llvm
 from . import product
 from . import swift
+from . import swift_testing
 
 
 class XCTest(product.Product):
@@ -47,7 +48,8 @@ class XCTest(product.Product):
                 libcxx.LibCXX,
                 swift.Swift,
                 libdispatch.LibDispatch,
-                foundation.Foundation]
+                foundation.Foundation,
+                swift_testing.SwiftTesting]
 
     @classmethod
     def is_nondarwin_only_build_product(cls):

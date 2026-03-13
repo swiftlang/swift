@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,42 +10,46 @@
 //
 //===----------------------------------------------------------------------===//
 
+import BasicBridging
 import ASTBridging
+import swiftBasicSwift
 import SwiftDiagnostics
 @_spi(Compiler) import SwiftIfConfig
-import SwiftParser
-import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) import SwiftParser
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+
+extension BridgedASTContext {
+  /// Retrieve the (cached) static build configuration for this ASTContext.
+  public var staticBuildConfiguration: StaticBuildConfiguration {
+    staticBuildConfigurationPtr.assumingMemoryBound(
+      to: StaticBuildConfiguration.self
+    ).pointee
+  }
+}
 
 /// A build configuration that uses the compiler's ASTContext to answer
 /// queries.
 struct CompilerBuildConfiguration: BuildConfiguration {
   let ctx: BridgedASTContext
+  let staticBuildConfiguration: StaticBuildConfiguration
   let sourceBuffer: UnsafeBufferPointer<UInt8>
 
   init(ctx: BridgedASTContext, sourceBuffer: UnsafeBufferPointer<UInt8>) {
     self.ctx = ctx
+    self.staticBuildConfiguration = ctx.staticBuildConfiguration
     self.sourceBuffer = sourceBuffer
   }
 
-  func isCustomConditionSet(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOptsCustomConditionSet(nameRef)
-    }
+  func isCustomConditionSet(name: String) -> Bool {
+    staticBuildConfiguration.isCustomConditionSet(name: name)
   }
   
-  func hasFeature(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOptsHasFeatureNamed(nameRef)
-    }
+  func hasFeature(name: String) -> Bool {
+    staticBuildConfiguration.hasFeature(name: name)
   }
   
-  func hasAttribute(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOptsHasAttributeNamed(nameRef)
-    }
+  func hasAttribute(name: String) -> Bool {
+    staticBuildConfiguration.hasAttribute(name: name)
   }
   
   func canImport(
@@ -74,7 +78,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
       versionComponents.withUnsafeBufferPointer { versionComponentsBuf in
         ctx.canImport(
           importPath: bridgedImportPathStr,
-          location: BridgedSourceLoc(
+          location: SourceLoc(
             at: importPath.first!.0.position,
             in: sourceBuffer
           ),
@@ -86,85 +90,54 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     }
   }
   
-  func isActiveTargetOS(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOptsIsActiveTargetOS(nameRef)
-    }
+  func isActiveTargetOS(name: String) -> Bool {
+    staticBuildConfiguration.isActiveTargetOS(name: name)
   }
   
-  func isActiveTargetArchitecture(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOptsIsActiveTargetArchitecture(nameRef)
-    }
+  func isActiveTargetArchitecture(name: String) -> Bool {
+    staticBuildConfiguration.isActiveTargetArchitecture(name: name)
   }
   
-  func isActiveTargetEnvironment(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOptsIsActiveTargetEnvironment(nameRef)
-    }
+  func isActiveTargetEnvironment(name: String) -> Bool {
+    staticBuildConfiguration.isActiveTargetEnvironment(name: name)
   }
   
   func isActiveTargetRuntime(name: String) throws -> Bool {
-    var name = name
-
     // Complain if the provided runtime isn't one of the known values.
     switch name {
     case "_Native", "_ObjC", "_multithreaded": break
     default: throw IfConfigError.unexpectedRuntimeCondition
     }
 
-    return name.withBridgedString { nameRef in
-      ctx.langOptsIsActiveTargetRuntime(nameRef)
-    }
+    return staticBuildConfiguration.isActiveTargetRuntime(name: name)
   }
-  
-  func isActiveTargetPointerAuthentication(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOptsIsActiveTargetPtrAuth(nameRef)
-    }
+
+  func isActiveTargetPointerAuthentication(name: String) -> Bool {
+    staticBuildConfiguration.isActiveTargetPointerAuthentication(name: name)
   }
   
   var targetPointerBitWidth: Int {
-    Int(ctx.langOptsTargetPointerBitWidth)
+    staticBuildConfiguration.targetPointerBitWidth
+  }
+
+  func isActiveTargetObjectFormat(name: String) throws -> Bool {
+    staticBuildConfiguration.isActiveTargetObjectFormat(name: name)
   }
 
   var targetAtomicBitWidths: [Int] {
-    var bitWidthsBuf: UnsafeMutablePointer<SwiftInt>? = nil
-    let count = ctx.langOptsGetTargetAtomicBitWidths(&bitWidthsBuf)
-    let bitWidths = Array(UnsafeMutableBufferPointer(start: bitWidthsBuf, count: count))
-    deallocateIntBuffer(bitWidthsBuf);
-    return bitWidths
+    staticBuildConfiguration.targetAtomicBitWidths
   }
 
   var endianness: Endianness {
-    switch ctx.langOptsTargetEndianness {
-    case .EndianBig: return .big
-    case .EndianLittle: return .little
-    }
+    staticBuildConfiguration.endianness
   }
 
-  var languageVersion: VersionTuple { 
-    var componentsBuf: UnsafeMutablePointer<SwiftInt>? = nil
-    let count = ctx.langOptsGetLanguageVersion(&componentsBuf)
-    let version = VersionTuple(
-      components: Array(UnsafeMutableBufferPointer(start: componentsBuf, count: count))
-    )
-    deallocateIntBuffer(componentsBuf);
-    return version
+  var languageVersion: VersionTuple {
+    staticBuildConfiguration.languageVersion
   }
 
-  var compilerVersion: VersionTuple { 
-    var componentsBuf: UnsafeMutablePointer<SwiftInt>? = nil
-    let count = ctx.langOptsGetCompilerVersion(&componentsBuf)
-    let version = VersionTuple(
-      components: Array(UnsafeMutableBufferPointer(start: componentsBuf, count: count))
-    )
-    deallocateIntBuffer(componentsBuf);
-    return version
+  var compilerVersion: VersionTuple {
+    staticBuildConfiguration.compilerVersion
   }
 }
 
@@ -359,11 +332,15 @@ private enum InactiveCodeChecker {
       // match.
       switch self {
       case .name(let name):
-        guard let identifier = token.identifier, identifier.name == name else {
-          continue
+        if let identifier = token.identifier, identifier.name == name {
+          break
         }
 
-        break
+        if case .keyword = token.tokenKind, token.text == name {
+          break
+        }
+
+        continue
 
       case .tryOrThrow:
         guard let keywordKind = token.keywordKind,
@@ -517,7 +494,11 @@ public func extractInlinableText(
   sourceText: BridgedStringRef
 ) -> BridgedStringRef {
   let textBuffer = UnsafeBufferPointer<UInt8>(start: sourceText.data, count: sourceText.count)
-  var parser = Parser(textBuffer)
+  var parser = Parser(
+    textBuffer,
+    swiftVersion: Parser.SwiftVersion(from: astContext),
+    experimentalFeatures: Parser.ExperimentalFeatures(from: astContext)
+  )
   let syntax = SourceFileSyntax.parse(from: &parser)
 
   let configuration = CompilerBuildConfiguration(
@@ -531,6 +512,30 @@ public func extractInlinableText(
     retainFeatureCheckIfConfigs: true
   ).result
 
+  // Remove "unsafe" expressions.
+  let inlineableSyntax = syntaxWithoutInactive.withoutUnsafeExpressions
+
   // Remove comments and return the result.
-  return allocateBridgedString(syntaxWithoutInactive.descriptionWithoutCommentsAndSourceLocations)
+  return allocateBridgedString(inlineableSyntax.descriptionWithoutCommentsAndSourceLocations)
+}
+
+/// Used by withoutUnsafeExpressions to remove "unsafe" expressions from
+/// a syntax tree.
+fileprivate class RemoveUnsafeExprSyntaxRewriter: SyntaxRewriter {
+  override func visit(_ node: UnsafeExprSyntax) -> ExprSyntax {
+    let rewritten = super.visit(node).cast(UnsafeExprSyntax.self)
+    return rewritten.expression.with(\.leadingTrivia, node.leadingTrivia)
+  }
+
+  override func visit(_ node: ForStmtSyntax) -> StmtSyntax {
+    let rewritten = super.visit(node).cast(ForStmtSyntax.self)
+    return StmtSyntax(rewritten.with(\.unsafeKeyword, nil))
+  }
+}
+
+extension SyntaxProtocol {
+  /// Return a new syntax tree with all "unsafe" expressions removed.
+  var withoutUnsafeExpressions: Syntax {
+    RemoveUnsafeExprSyntaxRewriter().rewrite(self)
+  }
 }

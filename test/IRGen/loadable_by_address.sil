@@ -53,3 +53,27 @@ entry(%x : $X):
   %retval = tuple ()
   return %retval : $()
 }
+
+sil @branch_inst_f : $@convention(thin) (@owned X, UInt8) -> ()
+sil @branch_inst_f2 : $@convention(thin) (@owned X, UInt8) -> ()
+
+sil @trigger : $@convention(thin) (@owned X) -> ()
+
+// This used to crash.
+sil @branch_inst_test : $@convention(thin) (Builtin.Int1, @owned X) -> (@convention(thin) (@owned X, UInt8) -> ()) {
+entry(%1 : $Builtin.Int1, %t: $X):
+  %f = function_ref @trigger : $@convention(thin) (@owned X) -> ()
+  %x = apply %f(%t) : $@convention(thin) (@owned X) -> ()
+  cond_br %1,  bb1, bb2
+
+bb1:
+  %2 = function_ref @branch_inst_f : $@convention(thin) (@owned X, UInt8) -> ()
+  br bb3(%2)
+
+bb2:
+  %3 = function_ref @branch_inst_f2 : $@convention(thin) (@owned X, UInt8) -> ()
+  br bb3(%3)
+
+bb3(%r : $@convention(thin) (@owned X, UInt8) -> ()):
+  return %r : $@convention(thin) (@owned X, UInt8) -> ()
+}

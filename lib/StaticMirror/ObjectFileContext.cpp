@@ -29,6 +29,7 @@
 #include "llvm/Object/ELFTypes.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Object/RelocationResolver.h"
+#include "llvm/Object/Wasm.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/StringSaver.h"
 
@@ -266,6 +267,38 @@ void Image::scanCOFF(const llvm::object::COFFObjectFile *O) {
   Segments.push_back({HeaderAddress, O->getData()});
 }
 
+void Image::scanWasm(const llvm::object::WasmObjectFile *O) {
+  HeaderAddress = 0;
+
+  auto resolver = getRelocationResolver(*O);
+  auto resolverSupports = resolver.first;
+  auto resolve = resolver.second;
+
+  if (!resolverSupports || !resolve)
+    return;
+
+  for (auto SectionRef : O->sections()) {
+    auto Section = O->getWasmSection(SectionRef);
+    for (auto &r : Section.Relocations) {
+      auto sym = O->symbol_begin();
+      for (unsigned i = 0; sym != O->symbol_end() && i < r.Index; ++i)
+        ++sym;
+      if (sym == O->symbol_end())
+        continue;
+      auto &wsym = O->getWasmSymbol(*sym);
+      if (!resolverSupports(r.Type)) {
+        llvm::errs() << "Unsupported +" << r.Offset << " " << wsym.Info.Name
+                     << " +" << r.Addend << "\n";
+        continue;
+      }
+      uint64_t offset = resolve(r.Type, r.Offset, 0, 0, r.Addend);
+      DynamicRelocations.insert({r.Offset, {wsym.Info.Name, offset}});
+    }
+  }
+
+  Segments.push_back({HeaderAddress, O->getData()});
+}
+
 bool Image::isMachOWithPtrAuth() const {
   auto macho = dyn_cast<llvm::object::MachOObjectFile>(O);
   if (!macho)
@@ -286,6 +319,8 @@ Image::Image(const llvm::object::ObjectFile *O) : O(O) {
     scanELF(elf);
   } else if (auto coff = dyn_cast<llvm::object::COFFObjectFile>(O)) {
     scanCOFF(coff);
+  } else if (auto wasm = dyn_cast<llvm::object::WasmObjectFile>(O)) {
+    scanWasm(wasm);
   } else {
     fputs("unsupported image format\n", stderr);
     abort();
@@ -321,10 +356,11 @@ Image::resolvePointer(uint64_t Addr, uint64_t pointerValue) const {
   // base address in the low 32 bits, and ptrauth discriminator info in the top
   // 32 bits.
   if (isMachOWithPtrAuth()) {
-    return remote::RemoteAbsolutePointer(
-        "", HeaderAddress + (pointerValue & 0xffffffffull));
+    return remote::RemoteAbsolutePointer(remote::RemoteAddress(
+        HeaderAddress + (pointerValue & 0xffffffffull), 0));
   } else {
-    return remote::RemoteAbsolutePointer("", pointerValue);
+    return remote::RemoteAbsolutePointer(remote::RemoteAddress(
+        pointerValue, reflection::RemoteAddress::DefaultAddressSpace));
   }
 }
 
@@ -332,8 +368,13 @@ remote::RemoteAbsolutePointer Image::getDynamicSymbol(uint64_t Addr) const {
   auto found = DynamicRelocations.find(Addr);
   if (found == DynamicRelocations.end())
     return nullptr;
-  return remote::RemoteAbsolutePointer(found->second.Symbol,
-                                       found->second.Offset);
+  if (!found->second.Symbol.empty())
+    return remote::RemoteAbsolutePointer(found->second.Symbol,
+                                         found->second.OffsetOrAddress,
+                                         remote::RemoteAddress());
+  return remote::RemoteAbsolutePointer(
+      remote::RemoteAddress(found->second.OffsetOrAddress,
+                            remote::RemoteAddress::DefaultAddressSpace));
 }
 
 std::pair<const Image *, uint64_t>
@@ -347,9 +388,8 @@ ObjectMemoryReader::decodeImageIndexAndAddress(uint64_t Addr) const {
   return {nullptr, 0};
 }
 
-uint64_t
-ObjectMemoryReader::encodeImageIndexAndAddress(const Image *image,
-                                               uint64_t imageAddr) const {
+remote::RemoteAddress ObjectMemoryReader::encodeImageIndexAndAddress(
+    const Image *image, remote::RemoteAddress imageAddr) const {
   auto entry = (const ImageEntry *)image;
   return imageAddr + entry->Slide;
 }
@@ -481,19 +521,21 @@ ObjectMemoryReader::getImageStartAddress(unsigned i) const {
   assert(i < Images.size());
 
   return reflection::RemoteAddress(encodeImageIndexAndAddress(
-      &Images[i].TheImage, Images[i].TheImage.getStartAddress()));
+      &Images[i].TheImage,
+      remote::RemoteAddress(Images[i].TheImage.getStartAddress(),
+                            reflection::RemoteAddress::DefaultAddressSpace)));
 }
 
 ReadBytesResult ObjectMemoryReader::readBytes(reflection::RemoteAddress Addr,
                                               uint64_t Size) {
-  auto addrValue = Addr.getAddressData();
+  auto addrValue = Addr.getRawAddress();
   auto resultBuffer = getContentsAtAddress(addrValue, Size);
   return ReadBytesResult(resultBuffer.data(), no_op_destructor);
 }
 
 bool ObjectMemoryReader::readString(reflection::RemoteAddress Addr,
                                     std::string &Dest) {
-  auto addrValue = Addr.getAddressData();
+  auto addrValue = Addr.getRawAddress();
   auto resultBuffer = getContentsAtAddress(addrValue, 1);
   if (resultBuffer.empty())
     return false;
@@ -514,7 +556,7 @@ found_terminator:
 remote::RemoteAbsolutePointer
 ObjectMemoryReader::resolvePointer(reflection::RemoteAddress Addr,
                                    uint64_t pointerValue) {
-  auto addrValue = Addr.getAddressData();
+  auto addrValue = Addr.getRawAddress();
   const Image *image;
   uint64_t imageAddr;
   std::tie(image, imageAddr) = decodeImageIndexAndAddress(addrValue);
@@ -525,14 +567,13 @@ ObjectMemoryReader::resolvePointer(reflection::RemoteAddress Addr,
   auto resolved = image->resolvePointer(imageAddr, pointerValue);
   // Mix in the image index again to produce a remote address pointing into the
   // same image.
-  return remote::RemoteAbsolutePointer(
-      "", encodeImageIndexAndAddress(
-              image, resolved.getResolvedAddress().getAddressData()));
+  return remote::RemoteAbsolutePointer(remote::RemoteAddress(
+      encodeImageIndexAndAddress(image, resolved.getResolvedAddress())));
 }
 
 remote::RemoteAbsolutePointer
 ObjectMemoryReader::getDynamicSymbol(reflection::RemoteAddress Addr) {
-  auto addrValue = Addr.getAddressData();
+  auto addrValue = Addr.getRawAddress();
   const Image *image;
   uint64_t imageAddr;
   std::tie(image, imageAddr) = decodeImageIndexAndAddress(addrValue);
@@ -541,6 +582,31 @@ ObjectMemoryReader::getDynamicSymbol(reflection::RemoteAddress Addr) {
     return nullptr;
 
   return image->getDynamicSymbol(imageAddr);
+}
+
+uint64_t ObjectMemoryReader::getPtrauthMask() {
+  auto initializePtrauthMask = [&]() -> uint64_t {
+    uint8_t pointerSize = 0;
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize, nullptr,
+                         &pointerSize))
+      return ~0ull;
+
+    if (pointerSize == 4) {
+      uint32_t ptrauthMask32 = 0;
+      if (queryDataLayout(DataLayoutQueryType::DLQ_GetPtrAuthMask, nullptr,
+                          &ptrauthMask32))
+        return (uint64_t)ptrauthMask32;
+    } else if (pointerSize == 8) {
+      uint64_t ptrauthMask64 = 0;
+      if (queryDataLayout(DataLayoutQueryType::DLQ_GetPtrAuthMask, nullptr,
+                          &ptrauthMask64))
+        return ptrauthMask64;
+    }
+    return ~0ull;
+  };
+  if (!PtrauthMask)
+    PtrauthMask = initializePtrauthMask();
+  return PtrauthMask;
 }
 
 template <typename Runtime>
@@ -564,16 +630,18 @@ std::unique_ptr<ReflectionContextHolder> makeReflectionContextForObjectFiles(
   const std::vector<const ObjectFile *> &objectFiles, bool ObjCInterop) {
   auto Reader = std::make_shared<ObjectMemoryReader>(objectFiles);
 
-  uint8_t pointerSize;
-  Reader->queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize, nullptr,
-                          &pointerSize);
+  auto pointerSize = Reader->getPointerSize();
+  if (!pointerSize) {
+    fputs("unable to get target pointer size\n", stderr);
+    abort();
+  }
 
-  switch (pointerSize) {
+  switch (pointerSize.value()) {
   case 4:
 #define MAKE_CONTEXT(INTEROP, PTRSIZE)                                         \
   makeReflectionContextForMetadataReader<                                      \
       External<INTEROP<RuntimeTarget<PTRSIZE>>>>(std::move(Reader),            \
-                                                 pointerSize)
+                                                 pointerSize.value())
 #if SWIFT_OBJC_INTEROP
     if (ObjCInterop)
       return MAKE_CONTEXT(WithObjCInterop, 4);

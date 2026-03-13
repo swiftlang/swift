@@ -1,11 +1,12 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -swift-version 6 -g -import-objc-header %S/Inputs/RunOnMainActor.h %import-libdispatch -enable-experimental-feature UnspecifiedMeansMainActorIsolated )
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -swift-version 6 -g -import-objc-header %S/Inputs/RunOnMainActor.h %import-libdispatch -Xfrontend -default-isolation=MainActor )
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -swift-version 6 -g -import-objc-header %S/Inputs/RunOnMainActor.h %import-libdispatch -Xfrontend -default-isolation=MainActor  -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // REQUIRES: libdispatch
 // REQUIRES: asserts
-// REQUIRES: swift_feature_UnspecifiedMeansMainActorIsolated
 
 // UNSUPPORTED: freestanding
 
@@ -76,7 +77,9 @@ tests.test("checkIfOnMainQueue crashes off the main queue 2") { @CustomActor () 
 class Klass {}
 
 struct MainActorIsolated {
-  init() {}
+  init() {
+    checkIfOnMainQueue()
+  }
 
   func test() async {
     checkIfOnMainQueue()
@@ -84,7 +87,7 @@ struct MainActorIsolated {
 };
 
 tests.test("callNominalType") { @CustomActor () -> () in
-  let x = MainActorIsolated()
+  let x = await MainActorIsolated()
   // We would crash without hopping here.
   await x.test()
 }

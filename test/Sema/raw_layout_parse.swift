@@ -20,12 +20,12 @@ struct SmallVectorBuf<T>: ~Copyable {}
 @_rawLayout // expected-error{{expected '('}}
 struct NoLayoutSpecified: ~Copyable {}
 
-@_rawLayout() // expected-error{{expected 'size', 'like', or 'likeArrayOf' argument to @_rawLayout attribute}}
+@_rawLayout() // expected-error{{expected 'size', 'like', or 'likeArrayOf' argument to '@_rawLayout'}}
 struct NoParamsSpecified: ~Copyable {}
 
-@_rawLayout(size: 4) // expected-error{{expected alignment argument after size argument in @_rawLayout attribute}}
+@_rawLayout(size: 4) // expected-error{{expected alignment argument after size argument in '@_rawLayout'}}
 struct SizeWithoutAlignment: ~Copyable {}
 
-@_rawLayout(likeArrayOf: Optional<Int>) // expected-error{{expected count argument after likeArrayOf argument in @_rawLayout attribute}}
+@_rawLayout(likeArrayOf: Optional<Int>) // expected-error{{expected count argument after likeArrayOf argument in '@_rawLayout'}}
 struct ArrayWithoutSize: ~Copyable {}
 

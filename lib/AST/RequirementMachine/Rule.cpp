@@ -221,7 +221,12 @@ bool Rule::isDerivedFromConcreteProtocolTypeAliasRule() const {
   return true;
 }
 
-/// Returns the length of the left hand side.
+/// Returns the maximum among the length of the left-hand side,
+/// and the length of any substitution terms that appear in a
+/// property symbol at the end of the left-hand side.
+///
+/// This is a measure of the complexity of the rule, which stops
+/// completion from running forever.
 unsigned Rule::getDepth() const {
   auto result = LHS.size();
 
@@ -234,26 +239,30 @@ unsigned Rule::getDepth() const {
   return result;
 }
 
-/// Returns the nesting depth of the concrete symbol at the end of the
-/// left hand side, or 0 if there isn't one.
-unsigned Rule::getNesting() const {
+/// Returns the complexity of the concrete type in the property symbol
+/// at the end of the left-hand side, if there is one.
+///
+/// This is a measure of the complexity of the rule, which stops
+/// completion from running forever.
+std::pair<unsigned, unsigned>
+Rule::getNestingAndSize() const {
   if (LHS.back().hasSubstitutions()) {
     auto type = LHS.back().getConcreteType();
 
     struct Walker : TypeWalker {
       unsigned Nesting = 0;
       unsigned MaxNesting = 0;
+      unsigned Size = 0;
 
       Action walkToTypePre(Type ty) override {
+        ++Size;
         ++Nesting;
-        MaxNesting = std::max(Nesting, MaxNesting);
-
+        MaxNesting = std::max(MaxNesting, Nesting);
         return Action::Continue;
       }
 
       Action walkToTypePost(Type ty) override {
         --Nesting;
-
         return Action::Continue;
       }
     };
@@ -261,10 +270,10 @@ unsigned Rule::getNesting() const {
     Walker walker;
     type.walk(walker);
 
-    return walker.MaxNesting;
+    return std::make_pair(walker.MaxNesting, walker.Size);
   }
 
-  return 0;
+  return std::make_pair(0, 0);
 }
 
 /// Linear order on rules; compares LHS followed by RHS.

@@ -571,3 +571,16 @@ func testEnumeratedForLoop(a: [Int]) {
     let _ = c
   }
 }
+
+// https://github.com/swiftlang/swift/issues/79555
+final class A {
+  var x: () -> Void {
+    { [weak self] in // Used to warn: variable 'self' was written to, but never read
+      #if NOT_PROCESSED
+      self?.f()
+      #endif
+    }
+  }
+
+ func f() {}
+}

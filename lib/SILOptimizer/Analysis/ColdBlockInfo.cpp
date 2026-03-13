@@ -17,6 +17,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "llvm/ADT/PostOrderIterator.h"
 
 #define DEBUG_TYPE "cold-block-info"
@@ -102,6 +103,7 @@ static bool isColdTerminator(const TermInst *term) {
   case TermKind::TryApplyInst:
   case TermKind::YieldInst:
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
     return false;
   case TermKind::ThrowInst:
   case TermKind::ThrowAddrInst:
@@ -441,7 +443,7 @@ bool ColdBlockInfo::isCold(const SILBasicBlock *BB) const {
 }
 
 void ColdBlockInfo::resetToCold(const SILBasicBlock *BB) {
-  auto &entry = EnergyMap.getOrInsertDefault(BB);
+  auto &entry = EnergyMap[BB];
   if (isColdEnergy(entry))
     return;
 
@@ -451,7 +453,7 @@ void ColdBlockInfo::resetToCold(const SILBasicBlock *BB) {
 }
 
 void ColdBlockInfo::set(const SILBasicBlock *BB, State::Temperature temp) {
-  auto &entry = EnergyMap.getOrInsertDefault(BB);
+  auto &entry = EnergyMap[BB];
   if (entry.contains(temp))
     return;
 
@@ -492,4 +494,17 @@ void ColdBlockInfo::setExpectedCondition(CondBranchInst *CBI, ExpectedValue valu
                             << " | _slowPath = " << toString(CBI->getTrueBB())
                             << "\n");
   }
+}
+
+void ColdBlockAnalysis::initialize(SILPassManager *PM) {
+  DA = PM->getAnalysis<DominanceAnalysis>();
+  PDA = PM->getAnalysis<PostDominanceAnalysis>();
+}
+
+std::unique_ptr<ColdBlockInfo>
+ColdBlockAnalysis::newFunctionAnalysis(SILFunction *F) {
+  assert(DA && PDA && "ColdBlockAnalysis not initialized");
+  auto info = std::make_unique<ColdBlockInfo>(DA, PDA);
+  info->analyze(F);
+  return info;
 }

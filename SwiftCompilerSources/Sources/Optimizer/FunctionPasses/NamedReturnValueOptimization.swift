@@ -78,7 +78,7 @@ private func findCopyForNRVO(for outArg: FunctionArgument) -> CopyAddrInst? {
   //     %local = alloc_stack $T
   //     store %in to %local : $*T
   //     copy_addr %local to [init] %out : $*T
-  if !copyToArg.isTakeOfSrc {
+  if !copyToArg.isTakeOfSource {
     return nil
   }
 

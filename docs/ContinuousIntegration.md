@@ -91,6 +91,7 @@ macOS platform               | @swift-ci Please smoke benchmark              | S
 Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 Linux platform               | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 Linux platform               | @swift-ci Please test WebAssembly             | Swift Test WebAssembly (Ubuntu 20.04)
+Swift SDK for Android        | @swift-ci Please test android                 | Swift SDK for Android
 
 The core principles of validation testing is that:
 
@@ -126,6 +127,7 @@ A validation test on Linux does the following:
 Platform        | Comment | Check Status
 ------------    | ------- | ------------
 macOS platform  | @swift-ci Please benchmark       | Swift Benchmark on macOS Platform (many runs - rigorous)
+macOS platform (Apple Silicon) | @swift-ci Apple Silicon benchmark | Swift Benchmark on macOS Platform using Apple Silicon (many runs - rigorous)
 macOS platform  | @swift-ci Please smoke benchmark | Swift Benchmark on macOS Platform (few runs - soundness)
 
 ### Linting
@@ -160,10 +162,9 @@ You can also build a toolchain for a specific Linux distribution
 Distro         | Comment                                          | Check Status
 -------------- | ------------------------------------------------ | ----------------------------------------------
 UBI9           | @swift-ci Please Build Toolchain UBI9            | Swift Build Toolchain UBI9 (x86_64)
-CentOS 7       | @swift-ci Please Build Toolchain CentOS 7        | Swift Build Toolchain CentOS 7 (x86_64)
-Ubuntu 18.04   | @swift-ci Please Build Toolchain Ubuntu 18.04    | Swift Build Toolchain Ubuntu 18.04 (x86_64)
 Ubuntu 20.04   | @swift-ci Please Build Toolchain Ubuntu 20.04    | Swift Build Toolchain Ubuntu 20.04 (x86_64)
 Ubuntu 22.04   | @swift-ci Please Build Toolchain Ubuntu 22.04    | Swift Build Toolchain Ubuntu 22.04 (x86_64)
+Ubuntu 24.04   | @swift-ci Please Build Toolchain Ubuntu 24.04    | Swift Build Toolchain Ubuntu 24.04 (x86_64)
 Amazon Linux 2 | @swift-ci Please Build Toolchain Amazon Linux 2  | Swift Build Toolchain Amazon Linux 2 (x86_64)
 
 ### Build and Test Stdlib against Snapshot Toolchain

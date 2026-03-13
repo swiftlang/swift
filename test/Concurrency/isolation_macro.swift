@@ -63,7 +63,7 @@ func mainActorIsolated() {
   // CHECK-NEXT: inject_into_optional
   // CHECK-NEXT: erasure_expr
   // CHECK: member_ref_expr type="MainActor" location=@__swiftmacro_{{.*}} decl="_Concurrency.(file).MainActor.shared"
-  // CHECK-NEXT: type_expr type="MainActor.Type"
+  // CHECK-NEXT: type_expr implicit type="MainActor.Type"
   _ = #isolation
 }
 
@@ -126,3 +126,19 @@ func testContextualType() {
   await concreteActorIsolation()
 }
 #endif
+
+func isolationMacroDefault(
+  isolation: isolated (any Actor)? = #isolation,
+) async -> Void {}
+
+class C {
+  @globalActor
+  actor NestedActor {
+    static let shared = NestedActor()
+  }
+
+  @NestedActor
+  func expandIsolation() async {
+    await isolationMacroDefault()
+  }
+}

@@ -125,3 +125,9 @@ TEST_F(VersionRangeLattice, JoinWithClosedEndedPositiveInfinity) {
   EXPECT_TRUE(unionEquals(GreaterThanEqual10_10, GreaterThanEqual10_9,
                           GreaterThanEqual10_9));
 }
+
+TEST_F(VersionRangeLattice, ValidVersionTuples) {
+  EXPECT_TRUE(VersionRange::isValidVersion(llvm::VersionTuple()));
+  EXPECT_FALSE(VersionRange::isValidVersion(llvm::VersionTuple(0x7FFFFFFE)));
+  EXPECT_FALSE(VersionRange::isValidVersion(llvm::VersionTuple(0x7FFFFFFF)));
+}

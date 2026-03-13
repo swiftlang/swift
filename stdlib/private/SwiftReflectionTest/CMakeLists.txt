@@ -1,7 +1,12 @@
-if(SWIFT_BUILD_SDK_OVERLAY)
-set(swift_reflection_test_darwin_dependencies Darwin)
-else()
 set(swift_reflection_test_darwin_dependencies)
+
+if((SWIFT_BUILD_CLANG_OVERLAYS
+    OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+   AND (NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT
+        OR NOT SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT))
+  # This library imports Darwin from the SDK, which re-exports
+  # _Builtin_float which is part of this build.
+  list(APPEND swift_reflection_test_darwin_dependencies _Builtin_float)
 endif()
 
 if (SWIFT_INCLUDE_TESTS AND SWIFT_BUILD_DYNAMIC_STDLIB)

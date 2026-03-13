@@ -96,11 +96,19 @@ public:
   bool operator!=(Field other) const { return declOrKind != other.declOrKind; }
 };
 
+// Don't export private C++ fields that were imported as private Swift fields.
+// The type of a private field might not have all the type witness operations
+// that Swift requires, for instance, `std::unique_ptr<IncompleteType>` would
+// not have a destructor.
+bool isExportableField(Field field);
+
 /// Iterate all the fields of the given struct or class type, including
 /// any implicit fields that might be accounted for in
 /// getFieldVectorLength.
 void forEachField(IRGenModule &IGM, const NominalTypeDecl *typeDecl,
                   llvm::function_ref<void(Field field)> fn);
+
+unsigned countExportableFields(IRGenModule &IGM, const NominalTypeDecl *type);
 
 } // end namespace irgen
 } // end namespace swift

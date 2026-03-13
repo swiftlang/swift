@@ -31,6 +31,7 @@
 namespace swift {
 
 class BasicCalleeAnalysis;
+class DestructorAnalysis;
 
 /// Information about a formal access within a function pertaining to a
 /// particular AccessStorage location.
@@ -202,7 +203,7 @@ public:
 
   /// Record any access scopes entered by the given single SIL instruction. 'I'
   /// must not be a FullApply; use mergeFromApply instead.
-  void analyzeInstruction(SILInstruction *I);
+  void analyzeInstruction(SILInstruction *I, DestructorAnalysis *DA);
 
   void print(raw_ostream &os) const;
   void dump() const;
@@ -317,8 +318,8 @@ public:
   /// Analyze the side-effects of a single SIL instruction \p I.
   /// Visited callees are added to \p BottomUpOrder until \p RecursionDepth
   /// reaches MaxRecursionDepth.
-  void analyzeInstruction(SILInstruction *I) {
-    accessResult.analyzeInstruction(I);
+  void analyzeInstruction(SILInstruction *I, DestructorAnalysis *DA) {
+    accessResult.analyzeInstruction(I, DA);
   }
 
   void print(raw_ostream &os) const { accessResult.print(os); }
@@ -380,6 +381,10 @@ class AccessStorageAnalysis : public BottomUpIPAnalysis {
   /// Callee analysis, used for determining the callees at call sites.
   BasicCalleeAnalysis *BCA;
 
+  /// Destructor analysis, used for determined which releases are harmless wrt
+  /// to their side-effects.
+  DestructorAnalysis *DA;
+
 public:
   AccessStorageAnalysis()
       : BottomUpIPAnalysis(SILAnalysisKind::AccessStorage) {}
@@ -411,6 +416,8 @@ public:
   }
 
   BasicCalleeAnalysis *getBasicCalleeAnalysis() { return BCA; }
+
+  DestructorAnalysis *getDestructorAnalysis() { return DA; }
 
   virtual void initialize(SILPassManager *PM) override;
 

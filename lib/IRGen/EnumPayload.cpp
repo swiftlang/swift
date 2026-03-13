@@ -414,7 +414,7 @@ EnumPayload::emitApplyAndMask(IRGenFunction &IGF, const APInt &mask) {
       continue;
 
     // If the payload value is vacant, the mask can't change it.
-    if (pv.is<llvm::Type *>())
+    if (isa<llvm::Type *>(pv))
       continue;
 
     // If this piece is zero, it wipes out the chunk entirely, and we can
@@ -425,7 +425,7 @@ EnumPayload::emitApplyAndMask(IRGenFunction &IGF, const APInt &mask) {
     }
     
     // Otherwise, apply the mask to the existing value.
-    auto v = pv.get<llvm::Value*>();
+    auto v = cast<llvm::Value *>(pv);
     auto payloadIntTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), size);
     auto maskConstant = llvm::ConstantInt::get(payloadIntTy, maskPiece);
     v = IGF.Builder.CreateBitOrPointerCast(v, payloadIntTy);
@@ -461,13 +461,13 @@ EnumPayload::emitApplyOrMask(IRGenModule &IGM,
     
     // If the payload value is vacant, or the mask is all ones,
     // we can adopt the mask value directly.
-    if (pv.is<llvm::Type *>() || maskPiece.isAllOnes()) {
+    if (isa<llvm::Type *>(pv) || maskPiece.isAllOnes()) {
       pv = builder.CreateBitOrPointerCast(maskConstant, payloadTy);
       continue;
     }
-    
+
     // Otherwise, apply the mask to the existing value.
-    auto v = pv.get<llvm::Value*>();
+    auto v = cast<llvm::Value *>(pv);
     v = builder.CreateBitOrPointerCast(v, payloadIntTy);
     v = builder.CreateOr(v, maskConstant);
     v = builder.CreateBitOrPointerCast(v, payloadTy);
@@ -488,18 +488,16 @@ EnumPayload::emitApplyOrMask(IRGenFunction &IGF,
 
     auto payloadIntTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), size);
 
-    if (mask.PayloadValues[i].is<llvm::Type *>()) {
+    if (isa<llvm::Type *>(mask.PayloadValues[i])) {
       // We're ORing with zero, do nothing
-    } else if (PayloadValues[i].is<llvm::Type *>()) {
+    } else if (isa<llvm::Type *>(PayloadValues[i])) {
       PayloadValues[i] = mask.PayloadValues[i];
     } else {
       auto v1 = IGF.Builder.CreateBitOrPointerCast(
-          PayloadValues[i].get<llvm::Value *>(),
-          payloadIntTy);
+          cast<llvm::Value *>(PayloadValues[i]), payloadIntTy);
 
       auto v2 = IGF.Builder.CreateBitOrPointerCast(
-          mask.PayloadValues[i].get<llvm::Value *>(),
-          payloadIntTy);
+          cast<llvm::Value *>(mask.PayloadValues[i]), payloadIntTy);
 
       PayloadValues[i] = IGF.Builder.CreateBitOrPointerCast(
           IGF.Builder.CreateOr(v1, v2),
@@ -584,7 +582,7 @@ EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,
     // If this value is zero, it has nothing to add to the spare bits.
     auto v = pv.dyn_cast<llvm::Value*>();
     if (!v) {
-      spareBitReader.skip(DL.getTypeSizeInBits(pv.get<llvm::Type*>()));
+      spareBitReader.skip(DL.getTypeSizeInBits(cast<llvm::Type *>(pv)));
       continue;
     }
 
@@ -644,7 +642,7 @@ void EnumPayload::print(llvm::raw_ostream &OS) {
       v->print(OS);
       OS << '\n';
     } else {
-      auto *t = pv.get<llvm::Type*>();
+      auto *t = cast<llvm::Type *>(pv);
       OS << "type: ";
       t->print(OS);
       OS << '\n';

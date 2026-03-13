@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "cross-module-serialization-setup"
 #include "swift/AST/Module.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/TBDGen.h"
 #include "swift/SIL/ApplySite.h"
@@ -77,6 +78,7 @@ public:
   void serializeFunctionsInModule(SILPassManager *manager);
   void serializeWitnessTablesInModule();
   void serializeVTablesInModule();
+  void serializeMoveonlyDeinitsInModule();
 
 private:
   bool isReferenceSerializeCandidate(SILFunction *F, SILOptions options);
@@ -102,6 +104,11 @@ private:
   bool canSerializeType(SILType type);
   bool canSerializeType(CanType type);
   bool canSerializeDecl(NominalTypeDecl *decl);
+
+  /// Check whether decls imported with certain access levels or attributes
+  /// can be serialized.
+  /// The \p ctxt can e.g. be a NominalType or the context of a function.
+  bool checkImports(DeclContext *ctxt) const;
 
   bool canUseFromInline(DeclContext *declCtxt);
 
@@ -153,6 +160,12 @@ private:
 public:
   InstructionVisitor(SILFunction &F, CrossModuleOptimization &CMS, VisitMode visitMode) :
     SILCloner(F), CMS(CMS), mode(visitMode) {}
+
+  ~InstructionVisitor() {
+    // We use the cloner for type visiting which may clone `unreachable` instructions.
+    // However, this does not introduce any incomplete lifetimes.
+    Builder.getFunction().setNeedCompleteLifetimes(false);
+  }
 
   SILType remapType(SILType Ty) {
     if (Ty.hasLocalArchetype()) {
@@ -431,6 +444,15 @@ void CrossModuleOptimization::serializeWitnessTablesInModule() {
 }
 
 void CrossModuleOptimization::serializeVTablesInModule() {
+  if (everything) {
+    for (SILVTable *vt : M.getVTables()) {
+      vt->setSerializedKind(IsSerialized);
+      for (auto &entry : vt->getEntries()) {
+        makeFunctionUsableFromInline(entry.getImplementation());
+      }
+    }
+    return;
+  }
   if (!isPackageCMOEnabled(M.getSwiftModule()))
     return;
 
@@ -452,6 +474,24 @@ void CrossModuleOptimization::serializeVTablesInModule() {
       // serialize the vtable at all.
       if (!containsInternal)
         vt->setSerializedKind(getRightSerializedKind(M));
+    }
+  }
+}
+
+void CrossModuleOptimization::serializeMoveonlyDeinitsInModule() {
+  for (SILMoveOnlyDeinit *deinit : M.getMoveOnlyDeinits()) {
+    if (deinit->isAnySerialized())
+      continue;
+    SILFunction *deinitFunc = deinit->getImplementation();
+    if (!canUseFromInline(deinitFunc))
+      continue;
+
+    if (everything)
+      makeFunctionUsableFromInline(deinitFunc);
+    if (deinitFunc->hasValidLinkageForFragileRef(IsSerialized)) {
+      deinit->setSerializedKind(IsSerialized);
+    } else if (deinitFunc->hasValidLinkageForFragileRef(IsSerializedForPackage)) {
+      deinit->setSerializedKind(IsSerializedForPackage);
     }
   }
 }
@@ -636,6 +676,21 @@ bool CrossModuleOptimization::canSerializeFieldsByInstructionKind(
             canUse = methodScope.isPublicOrPackage();
           }
         });
+    auto pattern = KPI->getPattern();
+    for (auto &component : pattern->getComponents()) {
+      if (!canUse) {
+        break;
+      }
+      switch (component.getKind()) {
+      case KeyPathPatternComponent::Kind::StoredProperty: {
+        auto property = component.getStoredPropertyDecl();
+        canUse = isPackageOrPublic(property->getEffectiveAccess());
+        break;
+      }
+      default:
+        break;
+      }
+    }
     return canUse;
   }
   if (auto *MI = dyn_cast<MethodInst>(inst)) {
@@ -736,7 +791,12 @@ static bool couldBeLinkedStatically(DeclContext *funcCtxt, SILModule &module) {
   // The stdlib module is always linked dynamically.
   if (funcModule == module.getASTContext().getStdlibModule())
     return false;
-    
+
+  // An sdk or system module should be linked dynamically.
+  if (isPackageCMOEnabled(module.getSwiftModule()) &&
+      funcModule->isNonUserModule())
+    return false;
+
   // Conservatively assume the function is in a statically linked module.
   return true;
 }
@@ -746,7 +806,7 @@ bool CrossModuleOptimization::canUseFromInline(DeclContext *declCtxt) {
   if (everything)
     return true;
 
-  if (!M.getSwiftModule()->canBeUsedForCrossModuleOptimization(declCtxt))
+  if (!checkImports(declCtxt))
     return false;
 
   /// If we are emitting a TBD file, the TBD file only contains public symbols
@@ -759,6 +819,58 @@ bool CrossModuleOptimization::canUseFromInline(DeclContext *declCtxt) {
   if (conservative && M.getOptions().emitTBD && couldBeLinkedStatically(declCtxt, M))
     return false;
     
+  return true;
+}
+
+bool CrossModuleOptimization::checkImports(DeclContext *ctxt) const {
+  ModuleDecl *moduleOfCtxt = ctxt->getParentModule();
+
+  // If the context defined in the same module - or is the same module, it's
+  // fine.
+  if (moduleOfCtxt == M.getSwiftModule())
+    return true;
+
+  ModuleDecl::ImportFilter filter;
+
+  if (isPackageCMOEnabled(M.getSwiftModule())) {
+    // When Package CMO is enabled, types imported with `package import`
+    // or `@_spiOnly import` into this module should be allowed to be
+    // serialized. These types may be used in APIs with `package` or
+    // higher access level, with or without `@_spi`, and such APIs should
+    // be serializable to allow direct access by another module if it's
+    // in the same package.
+    //
+    // However, types are from modules imported as `@_implementationOnly`
+    // should not be serialized, even if their defining modules are SDK
+    // or system modules. Since these types are intended to remain hidden
+    // from external clients, their metadata (e.g. field offsets) may be
+    // stripped, making it unavailable for look up at runtime. If serialized,
+    // the client will attempt to use the serialized accessor and fail
+    // because the metadata is missing, leading to a linker error.
+    //
+    // This issue applies to transitively imported types as well;
+    // `@_implementationOnly import Foundation` imports `ObjectiveC`
+    // indirectly, and metadata for types like `NSObject` from `ObjectiveC`
+    // can also be stripped, thus such types should not be allowed for
+    // serialization.
+    filter = { ModuleDecl::ImportFilterKind::ImplementationOnly };
+  } else {
+    // See if context is imported in a "regular" way, i.e. not with
+    // @_implementationOnly, `package import` or @_spiOnly.
+    filter = {
+      ModuleDecl::ImportFilterKind::ImplementationOnly,
+      ModuleDecl::ImportFilterKind::PackageOnly,
+      ModuleDecl::ImportFilterKind::SPIOnly
+    };
+  }
+  SmallVector<ImportedModule, 4> results;
+  M.getSwiftModule()->getImportedModules(results, filter);
+
+  auto &imports = M.getSwiftModule()->getASTContext().getImportCache();
+  for (auto &desc : results) {
+    if (imports.isImportedBy(moduleOfCtxt, desc.importedModule))
+      return false;
+  }
   return true;
 }
 
@@ -834,7 +946,7 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
                                        const FunctionFlags &canSerializeFlags) {
   // Put callees onto the worklist if they should be serialized as well.
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(inst)) {
-    SILFunction *callee = FRI->getReferencedFunctionOrNull();
+    SILFunction *callee = FRI->getInitiallyReferencedFunction();
     assert(callee);
     if (!callee->isDefinition() || callee->isAvailableExternally())
       return;
@@ -863,7 +975,9 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
     }
     serializeFunction(callee, canSerializeFlags);
     assert(isSerializedWithRightKind(M, callee) ||
-           isPackageOrPublic(callee->getLinkage()));
+           isPackageOrPublic(callee->getLinkage()) ||
+           M.getSwiftModule()->getASTContext().LangOpts.hasFeature(
+              Feature::Embedded));
     return;
   }
 
@@ -918,30 +1032,26 @@ void CrossModuleOptimization::keepMethodAlive(SILDeclRef method) {
 void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function) {
   assert(canUseFromInline(function));
   if (!isAvailableExternally(function->getLinkage()) &&
-      !isPackageOrPublic(function->getLinkage())) {
+      !isPackageOrPublic(function->getLinkage()) &&
+      !(function->getLinkage() == SILLinkage::Shared &&
+        M.getSwiftModule()->getASTContext().LangOpts.hasFeature(
+            Feature::Embedded))) {
     function->setLinkage(SILLinkage::Public);
   }
 }
 
-/// Make a nominal type, including it's context, usable from inline.
+/// Make a nominal type, including its context, usable from inline.
 void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
   if (decl->getEffectiveAccess() >= AccessLevel::Package)
+    return;  
+
+  // In Embedded Swift every ValueDecl is usableFromInline. (see
+  // ValueDecl::isUsableFromInline.
+  if (decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return;
 
-  // FIXME: rdar://130456707
-  // Currently not all types are visited in canSerialize* calls, sometimes
-  // resulting in an internal type getting @usableFromInline, which is
-  // incorrect.
-  // For example, for `let q = P() as? Q`, where Q is an internal class
-  // inherting a public class P, Q is not visited in the canSerialize*
-  // checks, thus resulting in `@usableFromInline class Q`; this is not
-  // the intended behavior in the conservative mode as it modifies AST.
-  //
-  // To properly fix, instruction visitor needs to be refactored to do
-  // both the "canSerialize" check (that visits all types) and serialize
-  // or update visibility (modify AST in non-conservative modes). 
-  if (isPackageCMOEnabled(M.getSwiftModule()))
-    return;
+  // This function should not be called in Package CMO mode.
+  assert(!isPackageCMOEnabled(M.getSwiftModule()));
 
   // We must not modify decls which are defined in other modules.
   if (M.getSwiftModule() != decl->getDeclContext()->getParentModule())
@@ -954,7 +1064,7 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
     // immutable at this point.
     auto &ctx = decl->getASTContext();
     auto *attr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-    decl->getAttrs().add(attr);
+    decl->addAttribute(attr);
 
     if (everything) {
       // The following does _not_ apply to the Package CMO as
@@ -1059,6 +1169,7 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
     // Serialize SIL v-tables and witness-tables if package-cmo is enabled.
     CMO.serializeVTablesInModule();
     CMO.serializeWitnessTablesInModule();
+    CMO.serializeMoveonlyDeinitsInModule();
   }
 };
 

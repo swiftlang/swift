@@ -13,8 +13,6 @@ func initStaticVars() -> CInt {
 // CHECK: sil_global public_external @staticVarInit : $Int32
 // CHECK: // clang name: staticVarInlineInit
 // CHECK: sil_global public_external @staticVarInlineInit : $Int32
-// CHECK: // clang name: staticConst
-// CHECK: sil_global public_external [let] @staticConst : $Int32
 // CHECK: // clang name: staticConstInit
 // CHECK: sil_global public_external [let] @staticConstInit : $Int32
 // CHECK: // clang name: staticConstInlineInit
@@ -23,6 +21,14 @@ func initStaticVars() -> CInt {
 // CHECK: sil_global public_external @staticNonTrivial : $NonTrivial
 // CHECK: // clang name: staticConstNonTrivial
 // CHECK: sil_global public_external [let] @staticConstNonTrivial : $NonTrivial
+
+// CHECK: // staticConst.getter
+// CHECK: sil shared [transparent] @$sSo11staticConsts5Int32Vvg : $@convention(thin) () -> Int32 {
+// CHECK: bb0:
+// CHECK:   %0 = integer_literal $Builtin.Int32, 4
+// CHECK:   %1 = struct $Int32 (%0 : $Builtin.Int32)
+// CHECK:   return %1 : $Int32
+// CHECK: }
 
 func readStaticVar() -> CInt {
   return staticVar

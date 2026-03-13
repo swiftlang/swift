@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -parse-as-library -emit-sil -enable-ossa-modules %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -parse-as-library -emit-sil %s | %FileCheck %s
 // REQUIRES: PTRSIZE=32,swift_stdlib_asserts
 
 import Swift

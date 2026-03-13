@@ -14,6 +14,8 @@ struct Bool {
 
 protocol Error {}
 
+class C {}
+
 // CHECK-LABEL: sil @simple_promotion
 sil @simple_promotion : $(Int) -> Int {
 bb0(%0 : $Int):
@@ -125,10 +127,9 @@ bb1(%0 : $Int):
 
 sil @callee : $@convention(thin) (@inout Int) -> ()
 
-// CHECK-LABEL: sil @inout_nocapture
-sil @inout_nocapture : $@convention(thin) () -> Int {
+// CHECK-LABEL: sil @escaping_pointer
+sil @escaping_pointer : $@convention(thin) () -> Int {
 bb0:
-  // CHECK: alloc_stack
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
   %6 = function_ref @callee : $@convention(thin) (@inout Int) -> ()
@@ -398,7 +399,7 @@ bb0(%0 : $Int):
 }
 
 // CHECK-LABEL: sil private @$s6struct8useStack1tySi_tFSiycfU_Tf0s_n
-// CHECK-LABEL: sil private [_semantics "sil.optimizer.delete_if_unused"] @$s6struct8useStack1tySi_tFSiycfU_
+// CHECK-LABEL: sil private @$s6struct8useStack1tySi_tFSiycfU_
 // struct.(useStack (t : Swift.Int) -> ()).(closure #1)
 sil private @$s6struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>):
@@ -651,7 +652,7 @@ bb0(%0 : $Int, %1 : $*S<T>):
   return %9 : $Bool
 }
 
-// CHECK-LABEL: sil shared [_semantics "sil.optimizer.delete_if_unused"] @closure1
+// CHECK-LABEL: sil shared @closure1
 sil shared @closure1 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool {
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
@@ -673,7 +674,7 @@ bb0(%0 : $Int, %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
 // CHECK: return
 // CHECK-NOT: bb1
 
-// CHECK-LABEL: sil shared [_semantics "sil.optimizer.delete_if_unused"] @closure2
+// CHECK-LABEL: sil shared @closure2
 sil shared @closure2 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool {
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
@@ -901,7 +902,6 @@ bb2:
 // CHECK:      bb1:
 // CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   dealloc_stack [[STACK2]]
-// CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
 // CHECK:        store {{%[0-9]+}}
@@ -1059,10 +1059,8 @@ bb3:
 // CHECK-NEXT:   [[AI:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT:   cond_br
 // CHECK:      bb1:
-// CHECK-NEXT:   dealloc_stack [[AI]]
 // CHECK-NEXT:   br bb3
 // CHECK:      bb2:
-// CHECK-NEXT:   dealloc_stack [[AI]]
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
 // CHECK-NEXT:   store {{%[0-9]+}}
@@ -1088,6 +1086,9 @@ bb3:
   %3 = load %as1 : $*Bool
   unreachable
 }
+//   StackNesting used to split the edge to bb3, but that's not really
+//   necessary. Also, this input very arguably should not be allowed
+//   because there isn't a consistent stack depth on entry to bb3.
 // CHECK-LABEL: sil @nesting_and_unreachable_critical_edge
 // CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
@@ -1097,17 +1098,15 @@ bb3:
 // CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   cond_br
 // CHECK:      bb2:
-// CHECK-NEXT:   dealloc_stack [[STACK2]]
-// CHECK-NEXT:   br bb4
-// CHECK:      bb3:
 // CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[STACK2]]
 // CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
-// CHECK:      bb4:
+// CHECK:      bb3:
 // CHECK-NEXT:   unreachable
+// CHECK:        // end sil function 'nesting_and_unreachable_critical_edge'
 sil @nesting_and_unreachable_critical_edge : $(Int) -> () {
 bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
@@ -1225,4 +1224,202 @@ bb0:
   %value = load [trivial] %addr : $*Builtin.Int32
   destroy_value %box : ${ var Builtin.Int32 }
   return %value : $Builtin.Int32
+}
+
+sil @getC : $@convention(thin) () -> (@owned C)
+
+// CHECK-LABEL: sil @leak_to_inf_loop_1 : {{.*}} {
+// CHECK-NOT:     destroy_addr
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'leak_to_inf_loop_1'
+sil @leak_to_inf_loop_1 : $@convention(thin) (@owned C) -> () {
+entry(%c : $C):
+  %box = alloc_box ${ var C }
+  %c_addr = project_box %box, 0
+  store %c to %c_addr
+  strong_retain %box
+  strong_release %box
+  br loop
+
+loop:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
+  %c_old = load %c_addr
+  store %c2 to %c_addr
+  release_value %c_old
+  br loop
+}
+
+// CHECK-LABEL: sil @leak_to_inf_loop_2 : {{.*}} {
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[TO_LOOP:bb[0-9]+]]
+// CHECK:       [[EXIT]]
+// CHECK:         destroy_addr
+// CHECK:         dealloc_stack
+// CHECK:       [[TO_LOOP]]
+// CHECK-NOT:     destroy_addr
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'leak_to_inf_loop_2'
+sil @leak_to_inf_loop_2 : $@convention(thin) (@owned C) -> () {
+entry(%c : $C):
+  %box = alloc_box ${ var C }
+  %c_addr = project_box %box, 0
+  store %c to %c_addr
+  strong_retain %box
+  strong_release %box
+  cond_br undef, exit, to_loop
+
+exit:
+  strong_release %box
+  return undef : $()
+
+to_loop:
+  strong_retain %box
+  strong_release %box
+  br loop
+
+loop:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
+  %c_old = load %c_addr
+  store %c2 to %c_addr
+  release_value %c_old
+  br loop
+}
+
+// CHECK-LABEL: sil @leak_to_inf_loop_3 : {{.*}} {
+// CHECK-NOT:     destroy_addr
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'leak_to_inf_loop_3'
+sil @leak_to_inf_loop_3 : $@convention(thin) (@owned C) -> () {
+entry(%c : $C):
+  %box = alloc_box ${ var C }
+  %c_addr = project_box %box, 0
+  store %c to %c_addr
+  br to_loop
+
+to_loop:
+  strong_retain %box
+  strong_release %box
+  br loop
+
+loop:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
+  %c_old = load %c_addr
+  store %c2 to %c_addr
+  release_value %c_old
+  br loop
+}
+
+// CHECK-LABEL: sil @dealloc_box_before_loop
+// CHECK:         dealloc_stack
+// CHECK-LABEL: } // end sil function 'dealloc_box_before_loop'
+sil @dealloc_box_before_loop : $@convention(thin) (@owned C) -> () {
+entry(%c : $C):
+  %box = alloc_box ${ var C }
+  %c_addr = project_box %box, 0
+  store %c to %c_addr
+  cond_br undef, exit, to_loop
+
+exit:
+  strong_release %box
+  return undef : $()
+
+to_loop:
+  dealloc_box %box
+  br loop
+
+loop:
+  br loop
+}
+
+// CHECK-LABEL: sil @alloc_box_in_deadend_loop
+// CHECK:         alloc_stack
+// CHECK:         dealloc_stack
+// CHECK-LABEL: } // end sil function 'alloc_box_in_deadend_loop'
+sil @alloc_box_in_deadend_loop : $@convention(thin) () -> () {
+entry:
+  br loop
+
+loop:
+  %box = alloc_box ${ var C }
+  %c_addr = project_box %box, 0
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c = apply %getC() : $@convention(thin) () -> (@owned C)
+  store %c to %c_addr
+  strong_release %box
+  br loop
+}
+
+// CHECK-LABEL: sil @alloc_box_in_exiting_loop
+// CHECK:         br [[EXITING_LOOP:bb[0-9]+]]
+// CHECK:       [[EXITING_LOOP]]:
+// CHECK:         alloc_stack
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[LATCH:bb[0-9]+]]
+// CHECK:       [[LATCH]]:
+// CHECK:         cond_br undef, [[BACKEDGE:bb[0-9]+]], [[INFINITE_LOOP:bb[0-9]+]]
+// CHECK:       [[BACKEDGE]]:
+// CHECK:         dealloc_stack
+// CHECK:         br [[EXITING_LOOP]]
+// CHECK:       [[EXIT]]:
+// CHECK:         dealloc_stack
+// CHECK:       [[INFINITE_LOOP]]:
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'alloc_box_in_exiting_loop'
+sil @alloc_box_in_exiting_loop : $@convention(thin) () -> () {
+entry:
+  br exiting_loop
+
+exiting_loop:
+  %box = alloc_box ${ var C }
+  %c_addr = project_box %box, 0
+  cond_br undef, exit, latch
+
+latch:
+  cond_br undef, backedge, infinite_loop
+
+backedge:
+  strong_release %box
+  br exiting_loop
+
+exit:
+  strong_release %box
+  return undef : $()
+
+infinite_loop:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c = apply %getC() : $@convention(thin) () -> (@owned C)
+  store %c to %c_addr
+  strong_retain %box
+  strong_release %box
+  br infinite_loop
+}
+
+// CHECK-LABEL: sil @alloc_box_in_deadend_loop_with_another_deadend
+// CHECK:         br [[LOOP:bb[0-9]+]]
+// CHECK:       [[LOOP]]:
+// CHECK:         alloc_stack
+// CHECK:         cond_br undef, [[BACKEDGE:bb[0-9]+]], [[DIE:bb[0-9]+]]
+// CHECK:       [[BACKEDGE]]:
+// CHECK:         dealloc_stack
+// CHECK:         br [[LOOP]]
+// CHECK:       [[DIE]]:
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'alloc_box_in_deadend_loop_with_another_deadend'
+sil @alloc_box_in_deadend_loop_with_another_deadend : $@convention(thin) () -> () {
+entry:
+  br loop
+
+loop:
+  %box = alloc_box ${ var C }
+  cond_br undef, backedge, die
+
+backedge:
+  strong_release %box
+  br loop
+
+die:
+  strong_retain %box
+  strong_release %box
+  unreachable
 }

@@ -19,7 +19,7 @@ struct CS: ~Copyable {
 }
 
 struct DS: ~Copyable {
-  nonisolated deinit {} // expected-error {{only classes and actors can have isolated deinit}}
+  nonisolated deinit {}
 }
 
 struct ES: ~Copyable {
@@ -47,7 +47,7 @@ enum CE: ~Copyable {
 enum DE: ~Copyable {
   case dummy
   // expected-error@+1 {{deinitializers are not yet supported on noncopyable enums}}
-  nonisolated deinit {} // expected-error {{only classes and actors can have isolated deinit}}
+  nonisolated deinit {}
 }
 
 enum EE: ~Copyable {

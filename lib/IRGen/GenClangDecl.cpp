@@ -70,7 +70,7 @@ public:
           // underlying Clang function that was also synthesized.
           BraceStmt *body = defaultArgGenerator->getTypecheckedBody();
           auto returnStmt =
-              cast<ReturnStmt>(body->getSingleActiveElement().get<Stmt *>());
+              cast<ReturnStmt>(cast<Stmt *>(body->getSingleActiveElement()));
           auto callExpr = cast<CallExpr>(returnStmt->getResult());
           auto calledFuncDecl = cast<FuncDecl>(callExpr->getCalledValue());
           auto calledClangFuncDecl =
@@ -390,8 +390,12 @@ irgen::getBasesAndOffsets(const clang::CXXRecordDecl *decl) {
       continue;
 
     auto offset = Size(layout.getBaseClassOffset(baseRecord).getQuantity());
-    auto size =
-        Size(decl->getASTContext().getTypeSizeInChars(baseType).getQuantity());
+    // A base type might have different size and data size (sizeof != dsize).
+    // Make sure we are using data size here, since fields of the derived type
+    // might be packed into the base's tail padding.
+    auto size = Size(decl->getASTContext()
+                         .getTypeInfoDataSizeInChars(baseType)
+                         .Width.getQuantity());
 
     baseOffsetsAndSizes.push_back({baseRecord, offset, size});
   }

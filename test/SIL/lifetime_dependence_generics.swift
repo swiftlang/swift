@@ -1,32 +1,32 @@
 // RUN: %target-swift-frontend %s -emit-sil \
-// RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypesWithDefaults \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 protocol P {
   associatedtype E: ~Escapable
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   borrowing func getE() -> E
 }
 
 extension P {
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   borrowing func getDefault() -> E {
     return getE()
   }
 }
 
 public struct View: ~Escapable {
-  @lifetime(immortal)
+  @_lifetime(immortal)
   init() { }
 }
 
 public struct PView: P {
-  @lifetime(immortal)
+  @_lifetime(immortal)
   borrowing func getE() -> View { return View() }
 }
 
@@ -34,7 +34,7 @@ public func test(pview: borrowing PView) -> View {
   return pview.getDefault()
 }
 
-// CHECK-LABEL: sil hidden @$s28lifetime_dependence_generics1PPAAE10getDefault1EQzyF : $@convention(method) <Self where Self : P> (@in_guaranteed Self) -> @lifetime(borrow 0)  @out Self.E {
+// CHECK-LABEL: sil hidden @$s28lifetime_dependence_generics1PPAAE10getDefault1EQzyF : $@convention(method) <Self where Self : P> (@in_guaranteed Self) -> @lifetime(borrow address_for_deps 0)  @out Self.E {
 
 // CHECK-LABEL: sil hidden @$s28lifetime_dependence_generics5PViewV4getEAA4ViewVyF : $@convention(method) (PView) -> @lifetime(immortal) @owned View {
 

@@ -29,6 +29,7 @@ extern llvm::cl::opt<bool> EnableSILInliningOfGenerics;
 
 namespace swift {
 class BasicCalleeAnalysis;
+class IsSelfRecursiveAnalysis;
 
 // Controls the decision to inline functions with @_semantics, @effect and
 // global_init attributes.
@@ -40,7 +41,8 @@ enum class InlineSelection {
 
 /// Check if this ApplySite is eligible for inlining. If so, return the callee.
 SILFunction *getEligibleFunction(FullApplySite AI,
-                                 InlineSelection WhatToInline);
+                                 InlineSelection WhatToInline,
+                                 IsSelfRecursiveAnalysis *SRA);
 
 // Returns true if this is a pure call, i.e. the callee has no side-effects
 // and all arguments are constants.
@@ -418,7 +420,7 @@ public:
   /// Compute the distances. The function \p getApplyLength returns the length
   /// of a function call.
   template <typename Func>
-  void analyze(ColdBlockInfo &CBI, Func getApplyLength) {
+  void analyze(ColdBlockAnalysis *CBA, Func getApplyLength) {
     assert(!isValid());
     valid = true;
     unsigned numBlocks = F->size();
@@ -429,13 +431,13 @@ public:
       return;
 
     BlockInfoStorage.resize(numBlocks);
-    CBI.analyze(F);
+    ColdBlockInfo *CBI = CBA->get(F);
 
     // First step: compute the length of the blocks.
     unsigned BlockIdx = 0;
     for (SILBasicBlock &BB : *F) {
       int Length = 0;
-      if (CBI.isCold(&BB)) {
+      if (CBI->isCold(&BB)) {
         Length = ColdBlockLength;
       } else {
         for (SILInstruction &I : BB) {

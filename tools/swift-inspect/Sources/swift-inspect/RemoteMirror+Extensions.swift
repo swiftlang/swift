@@ -79,6 +79,18 @@ extension SwiftReflectionContextRef {
     let typeref = swift_reflection_typeRefForMetadata(self, UInt(type))
     if typeref == 0 { return nil }
 
+    let info = swift_reflection_infoForTypeRef(self, typeref)
+    let nominalKinds = [
+      SWIFT_STRUCT,
+      SWIFT_TUPLE,
+      SWIFT_NO_PAYLOAD_ENUM,
+      SWIFT_SINGLE_PAYLOAD_ENUM,
+      SWIFT_MULTI_PAYLOAD_ENUM,
+      SWIFT_CLASS_INSTANCE,
+      SWIFT_ARRAY
+    ]
+    guard nominalKinds.contains(info.Kind) else { return nil }
+
     guard let name = swift_reflection_copyNameForTypeRef(self, typeref, mangled) else {
       return nil
     }

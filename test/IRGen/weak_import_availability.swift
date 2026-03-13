@@ -12,15 +12,48 @@
 
 import weak_import_availability_helper
 
+// AlwaysAvailableEnum.conditionallyAvailableCase enum case
+// CHECK-OLD-LABEL: @"$s31weak_import_availability_helper19AlwaysAvailableEnumO013conditionallyF4CaseyA2CmFWC" = extern_weak constant
+// CHECK-NEW-LABEL: @"$s31weak_import_availability_helper19AlwaysAvailableEnumO013conditionallyF4CaseyA2CmFWC" = external constant
+
+
+// Protocol witness table for AlwaysAvailableStruct: AlwaysAvailableProtocol
+// FIXME: We reference the witness table directly -- that's a bug since the
+// module is resilient. Should reference the conformance descriptor instead.
+// CHECK-OLD-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructVAA0eF8ProtocolAAWP" = extern_weak global ptr
+// CHECK-NEW-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructVAA0eF8ProtocolAAWP" = external global ptr
+
+
+// Protocol witness table for AlwaysAvailableStruct: UnavailableProtocol
+// CHECK-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructVAA19UnavailableProtocolAAWP" = extern_weak global ptr
+
+
+// Opaque type descriptor for conditionallyAvailableOpaqueReturnFunction()
+// CHECK-OLD-LABEL: @"$s31weak_import_availability_helper42conditionallyAvailableOpaqueReturnFunctionQryFQOMQ" = extern_weak global %swift.type_descriptor
+// CHECK-NEW-LABEL: @"$s31weak_import_availability_helper42conditionallyAvailableOpaqueReturnFunctionQryFQOMQ" = external global %swift.type_descriptor
+
+
+// Opaque type descriptor for AlwaysAvailableStruct.opaqueReturnMethodInConditionallyAvailableExtension()
+// CHECK-OLD-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructV033opaqueReturnMethodInConditionallyF9ExtensionQryFQOMQ" = extern_weak global %swift.type_descriptor
+// CHECK-NEW-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructV033opaqueReturnMethodInConditionallyF9ExtensionQryFQOMQ" = external global %swift.type_descriptor
+
+
+// Opaque type descriptor for AlwaysAvailableStruct.conditionallyAvailableOpaqueReturnMethodInExtension()
+// CHECK-OLD-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF29OpaqueReturnMethodInExtensionQryFQOMQ" = extern_weak global %swift.type_descriptor
+// CHECK-NEW-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF29OpaqueReturnMethodInExtensionQryFQOMQ" = external global %swift.type_descriptor
+
+
+// Opaque type descriptor for AlwaysAvailableStruct.conditionallyAvailableOpaqueReturnMethodInExplicitlyAvailableExtension()
+// CHECK-OLD-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyf30OpaqueReturnMethodInExplicitlyF9ExtensionQryFQOMQ" = extern_weak global %swift.type_descriptor
+// CHECK-NEW-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyf30OpaqueReturnMethodInExplicitlyF9ExtensionQryFQOMQ" = external global %swift.type_descriptor
+
+
 public func useConditionallyAvailableCase(e: AlwaysAvailableEnum) {
   switch e {
     case .alwaysAvailableCase: break
     case .conditionallyAvailableCase: break
   }
 }
-
-// CHECK-OLD-LABEL: @"$s31weak_import_availability_helper19AlwaysAvailableEnumO013conditionallyF4CaseyA2CmFWC" = extern_weak constant i32
-// CHECK-NEW-LABEL: @"$s31weak_import_availability_helper19AlwaysAvailableEnumO013conditionallyF4CaseyA2CmFWC" = external constant i32
 
 func useConformance<T : AlwaysAvailableProtocol>(_: T.Type) {}
 
@@ -29,12 +62,6 @@ public func useConditionallyAvailableConformance() {
   useConformance(AlwaysAvailableStruct.self)
 }
 
-// FIXME: We reference the witness table directly -- that's a bug since the module is resilient. Should reference the
-// conformance descriptor instead.
-
-// CHECK-OLD-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructVAA0eF8ProtocolAAWP" = extern_weak global ptr
-// CHECK-NEW-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructVAA0eF8ProtocolAAWP" = external global ptr
-
 @available(macOS, unavailable)
 func useUnavailableConformance<T : UnavailableProtocol>(_: T.Type) {}
 
@@ -42,8 +69,6 @@ func useUnavailableConformance<T : UnavailableProtocol>(_: T.Type) {}
 public func useUnavailableConformance() {
   useUnavailableConformance(AlwaysAvailableStruct.self)
 }
-
-// CHECK-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructVAA19UnavailableProtocolAAWP" = extern_weak global ptr, align 8
 
 @available(macOS 50, *)
 public func callConditionallyAvailableFunction() {
@@ -59,6 +84,14 @@ public func callUnavailableFunction() {
 }
 
 // CHECK-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper19unavailableFunctionyyF"()
+
+@available(macOS 50, *)
+public func callConditionallyAvailableOpaqueReturnFunction() {
+  blackHole(conditionallyAvailableOpaqueReturnFunction())
+}
+
+// CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper42conditionallyAvailableOpaqueReturnFunctionQryF"
+// CHECK-NEW-LABEL: declare swiftcc void @"$s31weak_import_availability_helper42conditionallyAvailableOpaqueReturnFunctionQryF"
 
 @available(macOS 50, *)
 public func useConditionallyAvailableGlobal() {
@@ -112,6 +145,99 @@ public func useConditionallyAvailableMethod(s: ConditionallyAvailableStruct) {
 
 // CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(ptr noalias swiftself)
 // CHECK-NEW-LABEL: declare swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(ptr noalias swiftself)
+
+@available(macOS 50, *)
+public func useMethodInConditionallyAvailableExtension(s: AlwaysAvailableStruct) {
+  s.methodInConditionallyAvailableExtension()
+}
+
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV021methodInConditionallyF9ExtensionyyF"
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV021methodInConditionallyF9ExtensionyyF"
+
+@available(macOS 50, *)
+public func useOpaqueReturnMethodInConditionallyAvailableExtension(s: AlwaysAvailableStruct) {
+  blackHole(s.opaqueReturnMethodInConditionallyAvailableExtension())
+}
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV033opaqueReturnMethodInConditionallyF9ExtensionQryF"
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV033opaqueReturnMethodInConditionallyF9ExtensionQryF"
+
+@available(macOS 50, *)
+public func useVarInConditionallyAvailableExtension(s: inout AlwaysAvailableStruct) {
+  _ = s.varInConditionallyAvailableExtension
+  s.varInConditionallyAvailableExtension = 0
+  s.varInConditionallyAvailableExtension += 0
+}
+
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV018varInConditionallyF9ExtensionSivg"
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV018varInConditionallyF9ExtensionSivs"
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV018varInConditionallyF9ExtensionSivM"
+
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV018varInConditionallyF9ExtensionSivg"
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV018varInConditionallyF9ExtensionSivs"
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV018varInConditionallyF9ExtensionSivM"
+
+@available(macOS 50, *)
+public func useConditionallyAvailableMethodInExtension(s: AlwaysAvailableStruct) {
+  s.conditionallyAvailableMethodInExtension()
+}
+
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF17MethodInExtensionyyF"
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF17MethodInExtensionyyF"
+
+@available(macOS 50, *)
+public func useConditionallyAvailableOpaqueReturnMethodInExtension(s: AlwaysAvailableStruct) {
+  blackHole(s.conditionallyAvailableOpaqueReturnMethodInExtension())
+}
+
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF29OpaqueReturnMethodInExtensionQryF"
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF29OpaqueReturnMethodInExtensionQryF"
+
+@available(macOS 50, *)
+public func useConditionallyAvailableVarInExtension(s: inout AlwaysAvailableStruct) {
+  _ = s.conditionallyAvailableVarInExtension
+  s.conditionallyAvailableVarInExtension = 0
+  s.conditionallyAvailableVarInExtension += 0
+}
+
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF14VarInExtensionSivg"
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF14VarInExtensionSivs"
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF14VarInExtensionSivM"
+
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF14VarInExtensionSivg"
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF14VarInExtensionSivs"
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF14VarInExtensionSivM"
+
+@available(macOS 50, *)
+public func useConditionallyAvailableMethodInExplicitlyAvailableExtension(s: AlwaysAvailableStruct) {
+  s.conditionallyAvailableMethodInExplicitlyAvailableExtension()
+}
+
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyf18MethodInExplicitlyF9ExtensionyyF"
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyf18MethodInExplicitlyF9ExtensionyyF"
+
+@available(macOS 50, *)
+public func useConditionallyAvailableOpaqueReturnMethodInExplicitlyAvailableExtension(s: AlwaysAvailableStruct) {
+  blackHole(s.conditionallyAvailableOpaqueReturnMethodInExplicitlyAvailableExtension())
+}
+
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyf30OpaqueReturnMethodInExplicitlyF9ExtensionQryF"
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyf30OpaqueReturnMethodInExplicitlyF9ExtensionQryF"
+
+
+@available(macOS 50, *)
+public func useConditionallyAvailableVarInExplicitlyAvailableExtension(s: inout AlwaysAvailableStruct) {
+  _ = s.conditionallyAvailableVarInExplicitlyAvailablextension
+  s.conditionallyAvailableVarInExplicitlyAvailablextension = 0
+  s.conditionallyAvailableVarInExplicitlyAvailablextension += 0
+}
+
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF32VarInExplicitlyAvailablextensionSivg"
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF32VarInExplicitlyAvailablextensionSivs"
+// CHECK-OLD-LABEL: declare extern_weak swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF32VarInExplicitlyAvailablextensionSivM"
+
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF32VarInExplicitlyAvailablextensionSivg"
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF32VarInExplicitlyAvailablextensionSivs"
+// CHECK-NEW-LABEL: declare swiftcc {{.+}} @"$s31weak_import_availability_helper21AlwaysAvailableStructV013conditionallyF32VarInExplicitlyAvailablextensionSivM"
 
 @available(macOS, unavailable)
 public func useUnavailableStruct() {

@@ -567,6 +567,9 @@ public:
   /// generic requirements (e.g., those that need to be
   /// passed to an instantiation function) will be added to this vector.
   ///
+  /// \param context When non-NULL, receives any information about the
+  /// execution context that is required to use this conformance.
+  ///
   /// \returns the error if an error occurred, None otherwise.
   std::optional<TypeLookupError> _checkGenericRequirements(
       llvm::ArrayRef<GenericParamDescriptor> genericParams,
@@ -574,7 +577,8 @@ public:
       llvm::SmallVectorImpl<const void *> &extraArguments,
       SubstGenericParameterFn substGenericParam,
       SubstGenericParameterOrdinalFn substGenericParamOrdinal,
-      SubstDependentWitnessTableFn substWitnessTable);
+      SubstDependentWitnessTableFn substWitnessTable,
+      ConformanceExecutionContext *context);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
@@ -679,6 +683,19 @@ public:
   bool _isCImportedTagType(const TypeContextDescriptor *type,
                            const ParsedTypeIdentity &identity);
 
+  /// The execution context for a conformance, containing any additional
+  /// checking that has to be done in context to determine whether a given
+  /// conformance is available.
+  struct ConformanceExecutionContext {
+    /// The global actor to which this conformance is isolated, or NULL for
+    /// a nonisolated conformances.
+    const Metadata *globalActorIsolationType = nullptr;
+
+    /// When the conformance is global-actor-isolated, this is the conformance
+    /// of globalActorIsolationType to GlobalActor.
+    const WitnessTable *globalActorIsolationWitnessTable = nullptr;
+  };
+
   /// Check whether a type conforms to a protocol.
   ///
   /// \param value - can be null, in which case the question should
@@ -686,10 +703,26 @@ public:
   /// \param conformance - if non-null, and the protocol requires a
   ///   witness table, and the type implements the protocol, the witness
   ///   table will be placed here
-  bool _conformsToProtocol(const OpaqueValue *value,
-                           const Metadata *type,
-                           ProtocolDescriptorRef protocol,
-                           const WitnessTable **conformance);
+  /// \param context - when non-NULL, receives any information about the
+  /// required execution context for this conformance.
+  bool _conformsToProtocol(
+      const OpaqueValue *value,
+      const Metadata *type,
+      ProtocolDescriptorRef protocol,
+      const WitnessTable **conformance,
+      ConformanceExecutionContext *context);
+
+  /// Check whether a type conforms to a value within the currently-executing
+  /// context.
+  ///
+  /// This is equivalent to a _conformsToProtocol check followed by runtime
+  /// checking for global actor isolation, if needed.
+  bool _conformsToProtocolInContext(
+      const OpaqueValue *value,
+      const Metadata *type,
+      ProtocolDescriptorRef protocol,
+      const WitnessTable **conformance,
+      bool prohibitIsolatedConformances);
 
   /// Construct type metadata for the given protocol.
   const Metadata *
@@ -750,6 +783,13 @@ public:
   SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
   id _quickLookObjectForPointer(void *value);
 #endif
+
+  /// Hook function that calls into the concurrency library to check whether
+  /// we are currently executing the given global actor.
+  SWIFT_RUNTIME_LIBRARY_VISIBILITY
+  extern bool (* __ptrauth_swift_is_global_actor_function SWIFT_CC(swift)
+                     _swift_task_isCurrentGlobalActorHook)(
+      const Metadata *, const WitnessTable *);
 
 } // end namespace swift
 

@@ -1,0 +1,6 @@
+---
+Name: NoncopyableStructs
+Tags:
+- Name: NonCopyableWithAPINotesDeinit
+  SwiftCopyable: false
+  SwiftDestroyOp: freeNonCopyableWithAPINotesDeinit

@@ -1,14 +1,18 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -enable-bare-slash-regex -disable-availability-checking -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: %target-swift-frontend %s -dump-parse -enable-bare-slash-regex -disable-availability-checking > %t/cpp-parser.ast.raw
-
-// Filter out any addresses in the dump, since they can differ.
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/astgen.ast.raw > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse \
+// RUN:    -target %target-swift-5.7-abi-triple \
+// RUN:    -enable-bare-slash-regex -enable-experimental-feature ParserASTGen \
+// RUN:    | %sanitize-address > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse \
+// RUN:    -target %target-swift-5.7-abi-triple \
+// RUN:    -enable-bare-slash-regex \
+// RUN:    | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserASTGen -enable-bare-slash-regex -disable-availability-checking
+// RUN: %target-typecheck-verify-swift \
+// RUN:    -target %target-swift-5.7-abi-triple \
+// RUN:    -enable-experimental-feature ParserASTGen -enable-bare-slash-regex
 
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen

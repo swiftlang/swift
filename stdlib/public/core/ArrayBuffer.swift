@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -135,7 +135,22 @@ extension _ArrayBuffer {
 #endif
     return isUnique
   }
-  
+
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+   @_alwaysEmitIntoClient
+  internal mutating func beginCOWMutationUnchecked() -> Bool {
+    let isUnique: Bool
+    if !_isClassOrObjCExistential(Element.self) {
+      isUnique = _storage.beginCOWMutationUnflaggedNative()
+    } else if !_storage.beginCOWMutationNative() {
+      return false
+    } else {
+      isUnique = _isNative
+    }
+    return isUnique
+  }
+#endif
+
   /// Puts the buffer in an immutable state.
   ///
   /// - Precondition: The buffer must be mutable or the empty array singleton.
@@ -201,12 +216,12 @@ extension _ArrayBuffer {
     if bufferIsUnique {
       // As an optimization, if the original buffer is unique, we can just move
       // the elements instead of copying.
-      let dest = newBuffer.firstElementAddress
-      dest.moveInitialize(from: mutableFirstElementAddress,
+      let dest = unsafe newBuffer.firstElementAddress
+      unsafe dest.moveInitialize(from: mutableFirstElementAddress,
                           count: c)
       _native.mutableCount = 0
     } else {
-      _copyContents(
+      unsafe _copyContents(
         subRange: 0..<c,
         initializing: newBuffer.mutableFirstElementAddress)
     }
@@ -307,14 +322,14 @@ extension _ArrayBuffer {
   ) -> UnsafeMutablePointer<Element> {
     _typeCheck(bounds)
     if _fastPath(_isNative) {
-      return _native._copyContents(subRange: bounds, initializing: target)
+      return unsafe _native._copyContents(subRange: bounds, initializing: target)
     }
-    let buffer = UnsafeMutableRawPointer(target)
+    let buffer = unsafe UnsafeMutableRawPointer(target)
       .assumingMemoryBound(to: AnyObject.self)
-    let result = _nonNative._copyContents(
+    let result = unsafe _nonNative._copyContents(
       subRange: bounds,
       initializing: buffer)
-    return UnsafeMutableRawPointer(result).assumingMemoryBound(to: Element.self)
+    return unsafe UnsafeMutableRawPointer(result).assumingMemoryBound(to: Element.self)
   }
 
   @inlinable
@@ -322,13 +337,13 @@ extension _ArrayBuffer {
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
     if _fastPath(_isNative) {
-      let (_, c) = _native._copyContents(initializing: buffer)
+      let (_, c) = unsafe _native._copyContents(initializing: buffer)
       return (IndexingIterator(_elements: self, _position: c), c)
     }
     guard buffer.count > 0 else { return (makeIterator(), 0) }
-    let ptr = UnsafeMutableRawPointer(buffer.baseAddress)?
+    let ptr = unsafe UnsafeMutableRawPointer(buffer.baseAddress)?
       .assumingMemoryBound(to: AnyObject.self)
-    let (_, c) = _nonNative._copyContents(
+    let (_, c) = unsafe _nonNative._copyContents(
       initializing: UnsafeMutableBufferPointer(start: ptr, count: buffer.count))
     return (IndexingIterator(_elements: self, _position: c), c)
   }
@@ -355,7 +370,7 @@ extension _ArrayBuffer {
   @inlinable
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
     _internalInvariant(_isNative, "must be a native buffer")
-    return _native.firstElementAddress
+    return unsafe _native.firstElementAddress
   }
 
   /// A mutable pointer to the first element.
@@ -364,12 +379,12 @@ extension _ArrayBuffer {
   @_alwaysEmitIntoClient
   internal var mutableFirstElementAddress: UnsafeMutablePointer<Element> {
     _internalInvariant(_isNative, "must be a native buffer")
-    return _native.mutableFirstElementAddress
+    return unsafe _native.mutableFirstElementAddress
   }
 
   @inlinable
   internal var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
-    return _fastPath(_isNative) ? firstElementAddress : nil
+    return unsafe _fastPath(_isNative) ? firstElementAddress : nil
   }
 
   /// The number of elements the buffer stores.
@@ -500,7 +515,7 @@ extension _ArrayBuffer {
     if _fastPath(wasNativeTypeChecked) {
       return _nativeTypeChecked[i]
     }
-    return unsafeBitCast(_getElementSlowPath(i), to: Element.self)
+    return unsafe unsafeBitCast(_getElementSlowPath(i), to: Element.self)
   }
 
   @inline(never)
@@ -570,24 +585,24 @@ extension _ArrayBuffer {
   @inlinable @_alwaysEmitIntoClient
   static var associationKey: UnsafeRawPointer {
     //We never dereference this, we just need an address to use as a unique key
-    UnsafeRawPointer(Builtin.addressof(&_swiftEmptyArrayStorage))
+    unsafe UnsafeRawPointer(Builtin.addressof(&_swiftEmptyArrayStorage))
   }
   
   @inlinable @_alwaysEmitIntoClient
   internal func getAssociatedBuffer() -> _ContiguousArrayBuffer<Element>? {
-    let getter = unsafeBitCast(
+    let getter = unsafe unsafeBitCast(
       getGetAssociatedObjectPtr(),
       to: (@convention(c)(
         AnyObject,
         UnsafeRawPointer
       ) -> UnsafeRawPointer?).self
     )
-    if let assocPtr = getter(
+    if let assocPtr = unsafe getter(
       _storage.objCInstance,
       _ArrayBuffer.associationKey
     ) {
       let buffer: _ContiguousArrayStorage<Element>
-      buffer = Unmanaged.fromOpaque(assocPtr).takeUnretainedValue()
+      buffer = unsafe Unmanaged.fromOpaque(assocPtr).takeUnretainedValue()
       return _ContiguousArrayBuffer(buffer)
     }
     return nil
@@ -595,24 +610,23 @@ extension _ArrayBuffer {
   
   @inlinable @_alwaysEmitIntoClient
   internal func setAssociatedBuffer(_ buffer: _ContiguousArrayBuffer<Element>) {
-    let setter = unsafeBitCast(getSetAssociatedObjectPtr(), to: (@convention(c)(
+    let setter = unsafe unsafeBitCast(getSetAssociatedObjectPtr(), to: (@convention(c)(
       AnyObject,
       UnsafeRawPointer,
       AnyObject?,
       UInt
     ) -> Void).self)
-    setter(
+    unsafe setter(
       _storage.objCInstance,
       _ArrayBuffer.associationKey,
       buffer._storage,
       1 //OBJC_ASSOCIATION_RETAIN_NONATOMIC
     )
   }
-  
-  @_alwaysEmitIntoClient @inline(never)
-  internal func withUnsafeBufferPointer_nonNative<R, E>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
-  ) throws(E) -> R {
+
+  @_alwaysEmitIntoClient
+  internal func getOrAllocateAssociatedObjectBuffer(
+  ) -> _ContiguousArrayBuffer<Element> {
     let unwrapped: _ContiguousArrayBuffer<Element>
     // libobjc already provides the necessary memory barriers for
     // double checked locking to be safe, per comments on
@@ -627,18 +641,22 @@ extension _ArrayBuffer {
         unwrapped = associatedBuffer
       } else {
         associatedBuffer = ContiguousArray(self)._buffer
-        unwrapped = associatedBuffer.unsafelyUnwrapped
+        unwrapped = unsafe associatedBuffer.unsafelyUnwrapped
         setAssociatedBuffer(unwrapped)
       }
       defer { _fixLifetime(unwrapped) }
       objc_sync_exit(lock)
     }
-    return try body(
-      UnsafeBufferPointer(
-        start: unwrapped.firstElementAddress,
-        count: unwrapped.count
-      )
-    )
+    return unwrapped
+  }
+
+  @_alwaysEmitIntoClient @inline(never)
+  internal func withUnsafeBufferPointer_nonNative<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    let buffer = getOrAllocateAssociatedObjectBuffer()
+    let (pointer, count) = unsafe (buffer.firstElementAddress, buffer.count)
+    return try unsafe body(UnsafeBufferPointer(start: pointer,  count: count))
   }
   
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
@@ -653,10 +671,10 @@ extension _ArrayBuffer {
   ) rethrows -> R {
     if _fastPath(_isNative) {
       defer { _fixLifetime(self) }
-      return try body(
+      return try unsafe body(
         UnsafeBufferPointer(start: firstElementAddress, count: count))
     }
-    return try ContiguousArray(self).withUnsafeBufferPointer(body)
+    return try unsafe ContiguousArray(self).withUnsafeBufferPointer(body)
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
@@ -668,10 +686,10 @@ extension _ArrayBuffer {
   ) throws(E) -> R {
     if _fastPath(_isNative) {
       defer { _fixLifetime(self) }
-      return try body(
+      return try unsafe body(
         UnsafeBufferPointer(start: firstElementAddress, count: count))
     }
-    return try withUnsafeBufferPointer_nonNative(body)
+    return try unsafe withUnsafeBufferPointer_nonNative(body)
   }
 
   // Superseded by the typed-throws version of this function, but retained
@@ -681,7 +699,7 @@ extension _ArrayBuffer {
   internal mutating func __abi_withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    return try withUnsafeMutableBufferPointer(body)
+    return try unsafe withUnsafeMutableBufferPointer(body)
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
@@ -697,7 +715,7 @@ extension _ArrayBuffer {
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"
     )
     defer { _fixLifetime(self) }
-    return try body(UnsafeMutableBufferPointer(
+    return try unsafe body(UnsafeMutableBufferPointer(
       start: firstElementAddressIfContiguous, count: count))
   }
   
@@ -722,10 +740,10 @@ extension _ArrayBuffer {
   @inlinable
   internal var identity: UnsafeRawPointer {
     if _isNative {
-      return _native.identity
+      return unsafe _native.identity
     }
     else {
-      return UnsafeRawPointer(
+      return unsafe UnsafeRawPointer(
         Unmanaged.passUnretained(_nonNative.buffer).toOpaque())
     }
   }

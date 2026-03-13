@@ -78,8 +78,8 @@ TYPE("fine-module-trace",   FineModuleTrace,           "",                "")
 // Complete dependency information for the given Swift files as JSON.
 TYPE("json-dependencies",   JSONDependencies,          "dependencies.json",      "")
 
-// Complete feature information for the given Swift compiler.
-TYPE("json-features",       JSONFeatures,              "features.json",   "")
+// Complete supported argument information for the given Swift compiler.
+TYPE("json-arguments",      JSONArguments,            "arguments.json",   "")
 
 // Gathered compile-time-known value information for the given Swift input file as JSON.
 TYPE("const-values",       ConstValues,              "swiftconstvalues",   "")

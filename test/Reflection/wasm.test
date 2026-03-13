@@ -1,0 +1,28 @@
+# RUN: %yaml2obj %S/Inputs/wasm.yaml -o %t.wasm
+# RUN: %target-swift-reflection-dump --arch=wasi --no-objc-interop %t.wasm | %FileCheck %s
+#
+# CHECK: FIELDS
+# CHECK: t:
+# CHECK: ASSOCIATED TYPES
+# CHECK: -  : simple.P
+# CHECK: typealias A = Builtin.Int32
+# CHECK: Builtin.Int32
+# CHECK: (builtin Builtin.Int32)
+#
+# simple.swift
+# protocol P { associatedtype A }
+# struct T {}
+# struct S : P {
+#   typealias A = Builtin.Int32
+#   let t: T
+# }
+# sys.c
+# void swift_addNewDSOImage() {}
+#
+# compiled for -target wasm32-unknown-wasip1
+# obj2yaml simple.o -o simple.o.yaml
+# (replace UNDEFINED symbol with a definition)
+# obj2yaml simple.o.yaml -o simple-mod.o
+# swiftc simple-mod.o sys.o -o simple.wasm
+# yaml2obj simple.wasm -o simple-mod.o
+#

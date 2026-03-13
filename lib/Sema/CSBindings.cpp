@@ -20,12 +20,17 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/Subtyping.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <tuple>
 
 #define DEBUG_TYPE "PotentialBindings"
+
+STATISTIC(NumBindingSetsSkipped, "binding sets that did not need recomputation");
+STATISTIC(NumBindingSetsRecomputed, "binding sets that required recomputation");
 
 using namespace swift;
 using namespace constraints;
@@ -38,14 +43,138 @@ void ConstraintGraphNode::initBindingSet() {
   Set.emplace(CG.getConstraintSystem(), TypeVar, Potential);
 }
 
-/// Check whether there exists a type that could be implicitly converted
-/// to a given type i.e. is the given type is Double or Optional<..> this
-/// function is going to return true because CGFloat could be converted
-/// to a Double and non-optional value could be injected into an optional.
-static bool hasConversions(Type);
+static bool isDirectRequirement(ConstraintSystem &cs,
+                                TypeVariableType *typeVar,
+                                Constraint *constraint) {
+  if (auto *other = constraint->getFirstType()->getAs<TypeVariableType>()) {
+    return typeVar == cs.getRepresentative(other);
+  }
 
-static std::optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
-                                              Type type);
+  return false;
+}
+
+BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
+                       const PotentialBindings &info)
+    : CS(CS), TypeVar(TypeVar), Info(info) {
+  GenerationNumber = Info.GenerationNumber;
+  Salvage = CS.shouldAttemptFixes();
+  IsDirty = false;
+  IsConflicting = false;
+  LValueState = unsigned(KnownLValueKind::Unknown);
+
+  computeLValueState();
+
+  // Collect protocols first, so that addBinding() can make use of them.
+  for (auto *constraint : Info.Protocols) {
+    if (auto *protoTy = constraint->getSecondType()->getAs<ProtocolType>()) {
+      auto *protoDecl = protoTy->getDecl();
+      Protocols.insert(protoDecl);
+    }
+  }
+
+  // Literal protocols next.
+  for (const auto &literal : info.Literals) {
+    Literals.push_back(literal);
+    if (literal.IsDirectRequirement)
+      Protocols.insert(literal.getProtocol());
+  }
+
+  // Now, the subtype and supertype bindings.
+  for (const auto &binding : info.Bindings)
+    addBinding(binding);
+
+  // Finally, the defaults.
+  for (auto *constraint : info.Defaults) {
+    if (isDirectRequirement(CS, TypeVar, constraint))
+      addDefault(constraint);
+  }
+
+  for (auto &entry : info.AdjacentVars)
+    AdjacentVars.insert(entry.first);
+
+  ASSERT(!IsDirty);
+}
+
+bool BindingSet::isUpToDate() const {
+  return (!IsDirty &&
+          GenerationNumber == Info.GenerationNumber &&
+          Salvage == CS.shouldAttemptFixes());
+}
+
+void BindingSet::computeLValueState() {
+  // If this type variable is not an lvalue, there is nothing to check.
+  if (!TypeVar->getImpl().canBindToLValue()) {
+    setLValueState(KnownLValueKind::RValue);
+    return;
+  }
+
+  // If this type variable appears on the left-hand side of an LValueObject
+  // constraint, we know it has to be bound to an lvalue type.
+  if (!Info.LValueOf.empty()) {
+    setLValueState(KnownLValueKind::LValue);
+    return;
+  }
+
+  // Assume something is an rvalue unless proven otherwise.
+  setLValueState(KnownLValueKind::RValue);
+
+  for (auto *constraint : Info.DelayedBy) {
+    // If this type variable is delayed by a disjunction or member reference,
+    // we won't know if its an lvalue until an overload choice is picked.
+    //
+    // FIXME: Consider if any active choices are actually lvalues.
+    switch (constraint->getKind()) {
+    case ConstraintKind::Disjunction:
+    case ConstraintKind::ValueMember:
+    case ConstraintKind::UnresolvedValueMember:
+    case ConstraintKind::OptionalObject:
+      setLValueState(KnownLValueKind::Unknown);
+      return;
+
+    // This handles subscript result types, which require one more level of
+    // indirection.
+    //
+    // The setup is something like:
+    //
+    // ($T1) -> $T2 applicable fn $T1
+    // $T1 is a disjunction where some of the overloads return lvalue results
+    // $T1 arg conv Int
+    //
+    // We must consider $T1 to have unknown lvalue status, and we cannot
+    // attempt the Int binding until it has been resolved.
+    //
+    // FIXME: Consider if any active choices are actually lvalues.
+    case ConstraintKind::ApplicableFunction: {
+      auto secondType = constraint->getSecondType();
+      if (auto *otherTypeVar = secondType->getAs<TypeVariableType>()) {
+        if (!CS.getFixedType(otherTypeVar)) {
+          otherTypeVar = CS.getRepresentative(otherTypeVar);
+
+          const auto &node = CS.getConstraintGraph()[otherTypeVar];
+          const auto &info = node.getPotentialBindings();
+
+          // Now check if the type variable representing the applied function is
+          // itself delayed by a disjunction.
+          for (auto *constraint : info.DelayedBy) {
+            switch (constraint->getKind()) {
+            case ConstraintKind::Disjunction:
+            case ConstraintKind::ValueMember:
+            case ConstraintKind::UnresolvedValueMember:
+              setLValueState(KnownLValueKind::Unknown);
+              return;
+            default:
+              break;
+            }
+          }
+        }
+      }
+      break;
+    }
+    default:
+      break;
+    }
+  }
+}
 
 bool BindingSet::forClosureResult() const {
   return TypeVar->getImpl().isClosureResultType();
@@ -56,9 +185,12 @@ bool BindingSet::forGenericParameter() const {
 }
 
 bool BindingSet::canBeNil() const {
-  auto &ctx = CS.getASTContext();
-  return Literals.count(
-      ctx.getProtocol(KnownProtocolKind::ExpressibleByNilLiteral));
+  for (const auto &literal : Literals) {
+    if (literal.getProtocol()->isSpecificProtocol(
+        KnownProtocolKind::ExpressibleByNilLiteral))
+      return true;
+  }
+  return false;
 }
 
 bool BindingSet::isDirectHole() const {
@@ -66,8 +198,7 @@ bool BindingSet::isDirectHole() const {
   if (!CS.shouldAttemptFixes())
     return false;
 
-  return Bindings.empty() && getNumViableLiteralBindings() == 0 &&
-         Defaults.empty() && TypeVar->getImpl().canBindToHole();
+  return !hasViableBindings() && TypeVar->getImpl().canBindToHole();
 }
 
 static bool isGenericParameter(TypeVariableType *TypeVar) {
@@ -78,12 +209,88 @@ static bool isGenericParameter(TypeVariableType *TypeVar) {
 bool PotentialBinding::isViableForJoin() const {
   return Kind == AllowedBindingKind::Supertypes &&
          !BindingType->hasLValueType() &&
-         !BindingType->hasUnresolvedType() &&
          !BindingType->hasTypeVariable() &&
          !BindingType->hasPlaceholder() &&
          !BindingType->hasUnboundGenericType() &&
          !hasDefaultedLiteralProtocol() &&
          !isDefaultableBinding();
+}
+
+namespace {
+
+struct PrintableBinding {
+private:
+  enum class BindingKind { Exact, Subtypes, Supertypes, Fallback, Literal };
+  BindingKind Kind;
+  Type BindingType;
+  bool Viable;
+  PrintableBinding(BindingKind kind, Type bindingType, bool viable)
+      : Kind(kind), BindingType(bindingType), Viable(viable) {}
+
+public:
+  static PrintableBinding supertypesOf(Type binding) {
+    return PrintableBinding{BindingKind::Supertypes, binding, true};
+  }
+
+  static PrintableBinding subtypesOf(Type binding) {
+    return PrintableBinding{BindingKind::Subtypes, binding, true};
+  }
+
+  static PrintableBinding exact(Type binding) {
+    return PrintableBinding{BindingKind::Exact, binding, true};
+  }
+
+  static PrintableBinding fallback(Type binding) {
+    return PrintableBinding{BindingKind::Fallback, binding, true};
+  }
+
+  static PrintableBinding literalDefaultType(Type binding, bool viable) {
+    return PrintableBinding{BindingKind::Literal, binding, viable};
+  }
+
+  void print(llvm::raw_ostream &out, const PrintOptions &PO,
+             unsigned indent = 0) const {
+    switch (Kind) {
+    case BindingKind::Exact:
+      break;
+    case BindingKind::Subtypes:
+      out << "(subtypes of) ";
+      break;
+    case BindingKind::Supertypes:
+      out << "(supertypes of) ";
+      break;
+    case BindingKind::Fallback:
+      out << "(fallback to) ";
+      break;
+    case BindingKind::Literal:
+      out << "(default type of literal) ";
+      break;
+    }
+    if (BindingType)
+      BindingType.print(out, PO);
+    if (!Viable)
+      out << " [literal not viable]";
+  }
+};
+
+}
+
+void PotentialBinding::print(llvm::raw_ostream &out,
+                             const PrintOptions &PO) const {
+  switch (Kind) {
+  case AllowedBindingKind::Exact:
+    PrintableBinding::exact(BindingType).print(out, PO);
+    break;
+  case AllowedBindingKind::Supertypes:
+    PrintableBinding::supertypesOf(BindingType).print(out, PO);
+    break;
+  case AllowedBindingKind::Subtypes:
+    PrintableBinding::subtypesOf(BindingType).print(out, PO);
+    break;
+  case AllowedBindingKind::Fallback:
+    PrintableBinding::fallback(BindingType).print(out, PO);
+    break;
+  }
 }
 
 bool BindingSet::isDelayed() const {
@@ -97,9 +304,22 @@ bool BindingSet::isDelayed() const {
       if (Bindings.empty())
         return true;
 
+      if (Bindings[0].BindingType->isConstraintType()) {
+        auto *bindingLoc = Bindings[0].getLocator();
+        // This set shouldn't be delayed because there won't be any
+        // other inference sources when the protocol binding got
+        // inferred from a contextual type and the leading-dot chain
+        // this type variable is a base of, is connected directly to it.
 
-      if (Bindings[0].BindingType->is<ProtocolType>())
-        return true;
+        if (!bindingLoc->findLast<LocatorPathElt::ContextualType>())
+          return true;
+
+        auto *chainResult =
+            getAsExpr<UnresolvedMemberChainResultExpr>(bindingLoc->getAnchor());
+        if (!chainResult || CS.getParentExpr(chainResult) ||
+            chainResult->getChainBase() != getAsExpr(locator->getAnchor()))
+          return true;
+      }
     }
 
     // Since force unwrap preserves l-valueness, resulting
@@ -180,10 +400,11 @@ bool BindingSet::involvesTypeVariables() const {
       TypeVar->getImpl().canBindToPack())
     return true;
 
-  // This is effectively O(1) right now since bindings are re-computed
-  // on each step of the solver, but once bindings are computed
-  // incrementally it becomes more important to double-check that
-  // any adjacent type variables found previously are still unresolved.
+  // This is effectively a no-op right now since bindings are re-computed
+  // on each step of the solver and fixed types won't appear in AdjancentVars,
+  // but once bindings are computed incrementally it becomes important
+  // to double-check that any adjacent type variables found previously are
+  // still unresolved.
   return llvm::any_of(AdjacentVars, [](TypeVariableType *typeVar) {
     return !typeVar->getImpl().getFixedType(/*record=*/nullptr);
   });
@@ -224,8 +445,9 @@ bool BindingSet::isPotentiallyIncomplete() const {
     // let's consider this binding set to be potentially incomplete since
     // that's done as a last resort effort at resolving first member.
     if (auto *constraint = binding.getSource()) {
-      if (binding.BindingType->is<ProtocolType>() &&
-          constraint->getKind() == ConstraintKind::ConformsTo)
+      if (binding.BindingType->is<ProtocolType, ProtocolCompositionType>() &&
+          (constraint->getKind() == ConstraintKind::ConformsTo ||
+           constraint->getKind() == ConstraintKind::NonisolatedConformsTo))
         return true;
     }
   }
@@ -327,6 +549,8 @@ void BindingSet::inferTransitiveProtocolRequirements() {
     }
 
     auto &bindings = node.getBindingSet();
+    auto conformanceReqs =
+        node.getPotentialBindings().getConformanceRequirements();
 
     // If current variable already has transitive protocol
     // conformances inferred, there is no need to look deeper
@@ -335,8 +559,8 @@ void BindingSet::inferTransitiveProtocolRequirements() {
       TypeVariableType *parent = nullptr;
       std::tie(parent, currentVar) = workList.pop_back_val();
       assert(parent);
-      propagateProtocolsTo(parent, bindings.getConformanceRequirements(),
-                           *bindings.TransitiveProtocols);
+      propagateProtocolsTo(parent, conformanceReqs,
+                            *bindings.TransitiveProtocols);
       continue;
     }
 
@@ -377,14 +601,16 @@ void BindingSet::inferTransitiveProtocolRequirements() {
       if (!node.hasBindingSet())
         continue;
 
-      const auto &bindings = node.getBindingSet();
+      auto conformanceReqs =
+          node.getPotentialBindings().getConformanceRequirements();
 
       llvm::SmallPtrSet<Constraint *, 2> placeholder;
       // Add any direct protocols from members of the
       // equivalence class, so they could be propagated
       // to all of the members.
-      propagateProtocolsTo(currentVar, bindings.getConformanceRequirements(),
-                           placeholder);
+      propagateProtocolsTo(currentVar, conformanceReqs, placeholder);
+
+      const auto &bindings = node.getBindingSet();
 
       // Since type variables are equal, current type variable
       // becomes a subtype to any supertype found in the current
@@ -404,8 +630,7 @@ void BindingSet::inferTransitiveProtocolRequirements() {
     // are transitive to its parent, propagate them down the subtype/equivalence
     // chain.
     if (parent) {
-      propagateProtocolsTo(parent, bindings.getConformanceRequirements(),
-                           protocols[currentVar]);
+      propagateProtocolsTo(parent, conformanceReqs, protocols[currentVar]);
     }
 
     auto &inferredProtocols = protocols[currentVar];
@@ -418,9 +643,8 @@ void BindingSet::inferTransitiveProtocolRequirements() {
     // - all of the transitive protocols inferred through
     //   the members of the equivalence class.
     {
-      auto directRequirements = bindings.getConformanceRequirements();
-      protocolsForEquivalence.insert(directRequirements.begin(),
-                                     directRequirements.end());
+      protocolsForEquivalence.insert(conformanceReqs.begin(),
+                                     conformanceReqs.end());
 
       protocolsForEquivalence.insert(inferredProtocols.begin(),
                                      inferredProtocols.end());
@@ -444,9 +668,20 @@ void BindingSet::inferTransitiveProtocolRequirements() {
   } while (!workList.empty());
 }
 
-void BindingSet::inferTransitiveBindings() {
-  using BindingKind = AllowedBindingKind;
+static AllowedBindingKind flipBindingKind(AllowedBindingKind kind) {
+  switch (kind) {
+  case AllowedBindingKind::Exact:
+    return AllowedBindingKind::Exact;
+  case AllowedBindingKind::Supertypes:
+    return AllowedBindingKind::Subtypes;
+  case AllowedBindingKind::Subtypes:
+    return AllowedBindingKind::Supertypes;
+  case AllowedBindingKind::Fallback:
+    return AllowedBindingKind::Fallback;
+  }
+}
 
+void BindingSet::inferTransitiveKeyPathBindings() {
   // If the current type variable represents a key path root type
   // let's try to transitively infer its type through bindings of
   // a key path type.
@@ -454,60 +689,111 @@ void BindingSet::inferTransitiveBindings() {
     auto *locator = TypeVar->getImpl().getLocator();
     if (auto *keyPathTy =
             CS.getType(locator->getAnchor())->getAs<TypeVariableType>()) {
-      auto &node = CS.getConstraintGraph()[keyPathTy];
-      if (node.hasBindingSet()) {
-        auto &bindings = node.getBindingSet();
+      auto &keyPathNode = CS.getConstraintGraph()[keyPathTy];
+      if (keyPathNode.hasBindingSet()) {
+        const auto &keyPathBindings = keyPathNode.getBindingSet();
 
-        for (auto &binding : bindings.Bindings) {
+        // Look through all of the keypath type's bindings.
+        for (auto &binding : keyPathBindings.Bindings) {
           auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
 
+          auto inferredRootKind = AllowedBindingKind::Exact;
           Type inferredRootTy;
-          if (isKnownKeyPathType(bindingTy)) {
+          if (bindingTy->isKnownKeyPathType()) {
             // AnyKeyPath doesn't have a root type.
             if (bindingTy->isAnyKeyPath())
               continue;
 
             auto *BGT = bindingTy->castTo<BoundGenericType>();
             inferredRootTy = BGT->getGenericArgs()[0];
+
+            // The generic argument of a keypath type is invariant.
+            inferredRootKind = AllowedBindingKind::Exact;
           } else if (auto *fnType = bindingTy->getAs<FunctionType>()) {
-            if (fnType->getNumParams() == 1)
+            if (fnType->getNumParams() == 1) {
               inferredRootTy = fnType->getParams()[0].getParameterType();
+
+              // The parameter of a function type is contravariant.
+              inferredRootKind = flipBindingKind(binding.Kind);
+            }
           }
 
           if (inferredRootTy) {
             // If contextual root is not yet resolved, let's try to see if
-            // there are any bindings in its set. The bindings could be
-            // transitively used because conversions between generic arguments
-            // are not allowed.
+            // there are any bindings in its set.
             if (auto *contextualRootVar = inferredRootTy->getAs<TypeVariableType>()) {
-              auto &node = CS.getConstraintGraph()[contextualRootVar];
-              if (node.hasBindingSet()) {
-                auto &bindings = node.getBindingSet();
+              auto &contextualRootNode = CS.getConstraintGraph()[contextualRootVar];
+              if (contextualRootNode.hasBindingSet()) {
+                const auto &contextualRootBindings = contextualRootNode.getBindingSet();
 
                 // Don't infer if root is not yet fully resolved.
-                if (bindings.isDelayed())
+                if (contextualRootBindings.isDelayed())
                   continue;
 
-                // Copy the bindings over to the root.
-                for (const auto &binding : bindings.Bindings)
-                  addBinding(binding, /*isTransitive=*/true);
+                // Look at all of the inferred root type's bindings, and copy
+                // them over to our binding set.
+                for (const auto &binding : contextualRootBindings.Bindings) {
+                  AllowedBindingKind newKind;
+
+                  // Only consider bindings with the correct variance.
+
+                  // If we're looking at an exact binding, add a new binding
+                  // with the variance of the binding we're using to look
+                  // through.
+                  if (binding.Kind == AllowedBindingKind::Exact)
+                    newKind = inferredRootKind;
+                  // If the binding we're using to look through is exact,
+                  // preserve the variance.
+                  else if (inferredRootKind == AllowedBindingKind::Exact)
+                    newKind = binding.Kind;
+                  // If the binding we're using to look through has the
+                  // same variance as the binding we're looking at, add
+                  // it and preserve its variance.
+                  else if (inferredRootKind == binding.Kind)
+                    newKind = inferredRootKind;
+                  // Skip the binding if it has the opposite variance of
+                  // the one we're looking through.
+                  else
+                    continue;
+
+                  auto newBinding = binding.withSameSource(
+                      binding.BindingType, newKind);
+                  addBinding(newBinding.asTransitiveFrom(contextualRootVar));
+                }
 
                 // Make a note that the key path root is transitively adjacent
                 // to contextual root type variable and all of its variables.
                 // This is important for ranking.
                 AdjacentVars.insert(contextualRootVar);
-                AdjacentVars.insert(bindings.AdjacentVars.begin(),
-                                    bindings.AdjacentVars.end());
+                AdjacentVars.insert(contextualRootBindings.AdjacentVars.begin(),
+                                    contextualRootBindings.AdjacentVars.end());
+
+                // Note the fact that we modified the binding set.
+                markDirty();
               }
             } else {
-              addBinding(
-                  binding.withSameSource(inferredRootTy, BindingKind::Exact),
-                  /*isTransitive=*/true);
+
+              // We have a concrete root type. Add a binding for it to
+              // our binding set.
+              auto newBinding = binding.withSameSource(
+                  inferredRootTy, inferredRootKind);
+              addBinding(newBinding.asTransitiveFrom(keyPathTy));
+
+              // Note the fact that we modified the binding set.
+              markDirty();
             }
           }
         }
       }
     }
+  }
+}
+
+void BindingSet::inferTransitiveSupertypeBindings() {
+  llvm::SmallDenseSet<ProtocolDecl *> seenLiterals;
+  for (const auto &literal : Literals) {
+    bool inserted = seenLiterals.insert(literal.getProtocol()).second;
+    ASSERT(inserted);
   }
 
   for (const auto &entry : Info.SupertypeOf) {
@@ -515,7 +801,7 @@ void BindingSet::inferTransitiveBindings() {
     if (!node.hasBindingSet())
       continue;
 
-    auto &bindings = node.getBindingSet();
+    const auto &bindings = node.getBindingSet();
 
     // FIXME: This is a workaround necessary because solver doesn't filter
     // bindings based on protocol requirements placed on a type variable.
@@ -539,15 +825,17 @@ void BindingSet::inferTransitiveBindings() {
     // If one of the literal arguments doesn't propagate its
     // `ExpressibleByStringLiteral` conformance, we'd end up picking
     // `T` with only one type `Any?` which is incorrect.
-    for (const auto &literal : bindings.Literals)
-      addLiteralRequirement(literal.second.getSource());
+    for (auto literal : bindings.Literals) {
+      auto *protocol = literal.getProtocol();
 
-    // Infer transitive defaults.
-    for (const auto &def : bindings.Defaults) {
-      if (def.getSecond()->getKind() == ConstraintKind::FallbackType)
+      if (!seenLiterals.insert(protocol).second)
         continue;
 
-      addDefault(def.second);
+      literal.setDirectRequirement(false);
+      Literals.push_back(literal);
+
+      // Note the fact that we modified the binding set.
+      markDirty();
     }
 
     // TODO: We shouldn't need this in the future.
@@ -559,8 +847,8 @@ void BindingSet::inferTransitiveBindings() {
       // either be Exact or Supertypes in order for it to make sense
       // to add Supertype bindings based on the relationship between
       // our type variables.
-      if (binding.Kind != BindingKind::Exact &&
-          binding.Kind != BindingKind::Supertypes)
+      if (binding.Kind != AllowedBindingKind::Exact &&
+          binding.Kind != AllowedBindingKind::Supertypes)
         continue;
 
       auto type = binding.BindingType;
@@ -571,8 +859,78 @@ void BindingSet::inferTransitiveBindings() {
       if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
         continue;
 
-      addBinding(binding.withSameSource(type, BindingKind::Supertypes),
-                 /*isTransitive=*/true);
+      auto newBinding =
+          binding.withSameSource(type, AllowedBindingKind::Supertypes);
+      addBinding(newBinding.asTransitiveFrom(entry.first));
+
+      // Note the fact that we modified the binding set.
+      markDirty();
+    }
+  }
+}
+
+void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
+  if (!hasViableBindings()) {
+    if (auto *locator = TypeVar->getImpl().getLocator()) {
+      if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
+        // If this is a base of an unresolved member chain, as a last
+        // resort effort let's infer base to be a protocol type based
+        // on contextual conformance requirements.
+        //
+        // This allows us to find solutions in cases like this:
+        //
+        // \code
+        // func foo<T: P>(_: T) {}
+        // foo(.bar) <- `.bar` should be a static member of `P`.
+        // \endcode
+        inferTransitiveProtocolRequirements();
+
+        SmallVector<Type, 4> protocols;
+        std::optional<Constraint*> constraintSource;
+        if (TransitiveProtocols.has_value()) {
+          for (auto *constraint : *TransitiveProtocols) {
+            Type protocolTy = constraint->getSecondType();
+            assert(protocolTy->is<ProtocolType>());
+
+            // Compiler-known marker protocols cannot be extended with members,
+            // so do not consider them.
+            if (auto p = protocolTy->getAs<ProtocolType>()) {
+              ProtocolDecl *decl = p->getDecl();
+              if (decl->getKnownProtocolKind() && decl->isMarkerProtocol())
+                continue;
+
+              // During normal type-checking filter inferred protocols based on
+              // whether they have the member or not. There is no reason to
+              // attempt unrelated protocols and adding them as bindings affects
+              // type variable selection as well. They can be attempted during
+              // diagnostics mode in case the member is misspelled or
+              // inaccessible.
+              if (!CS.shouldAttemptFixes()) {
+                auto memberRef =
+                    castToExpr<UnresolvedMemberExpr>(locator->getAnchor());
+
+                auto &results = CS.lookupMember(
+                    protocolTy, memberRef->getName(), memberRef->getLoc());
+                if (results.empty())
+                  continue;
+              }
+            }
+            protocols.push_back(protocolTy);
+            if (!constraintSource.has_value())
+              constraintSource = constraint;
+          }
+          if (protocols.size() > 0) {
+            assert(constraintSource.has_value());
+            auto ty = ProtocolCompositionType::get(CS.getASTContext(),
+                                                   protocols,
+                                                   InvertibleProtocolSet(),
+                                                   false /*anyObject*/);
+            addBinding({ty, AllowedBindingKind::Fallback, constraintSource.value()});
+            // Note the fact that we modified the binding set.
+            markDirty();
+          }
+        }
+      }
     }
   }
 }
@@ -614,51 +972,11 @@ static Type getKeyPathType(ASTContext &ctx, KeyPathCapability capability,
   return keyPathTy;
 }
 
-bool BindingSet::finalize(bool transitive) {
-  if (transitive)
-    inferTransitiveBindings();
-
-  determineLiteralCoverage();
-
+bool BindingSet::finalizeKeyPathBindings() {
   if (auto *locator = TypeVar->getImpl().getLocator()) {
-    if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
-      // If this is a base of an unresolved member chain, as a last
-      // resort effort let's infer base to be a protocol type based
-      // on contextual conformance requirements.
-      //
-      // This allows us to find solutions in cases like this:
-      //
-      // \code
-      // func foo<T: P>(_: T) {}
-      // foo(.bar) <- `.bar` should be a static member of `P`.
-      // \endcode
-      if (transitive && !hasViableBindings()) {
-        inferTransitiveProtocolRequirements();
-
-        if (TransitiveProtocols.has_value()) {
-          for (auto *constraint : *TransitiveProtocols) {
-            Type protocolTy = constraint->getSecondType();
-
-            // Compiler-known marker protocols cannot be extended with members,
-            // so do not consider them.
-            if (auto p = protocolTy->getAs<ProtocolType>()) {
-              if (ProtocolDecl *decl = p->getDecl())
-                if (decl->getKnownProtocolKind() && decl->isMarkerProtocol())
-                  continue;
-            }
-
-            addBinding({protocolTy, AllowedBindingKind::Exact, constraint},
-                       /*isTransitive=*/false);
-          }
-        }
-      }
-    }
-
     if (TypeVar->getImpl().isKeyPathType()) {
       auto &ctx = CS.getASTContext();
-
-      auto *keyPathLoc = TypeVar->getImpl().getLocator();
-      auto *keyPath = castToExpr<KeyPathExpr>(keyPathLoc->getAnchor());
+      auto *keyPath = castToExpr<KeyPathExpr>(locator->getAnchor());
 
       bool isValid;
       std::optional<KeyPathCapability> capability;
@@ -670,13 +988,15 @@ bool BindingSet::finalize(bool transitive) {
       if (isValid && !capability)
         return false;
 
+      bool isContextualTypeReadOnly = false;
       // If the key path is sufficiently resolved we can add inferred binding
       // to the set.
       SmallSetVector<PotentialBinding, 4> updatedBindings;
       for (const auto &binding : Bindings) {
         auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
 
-        assert(isKnownKeyPathType(bindingTy) || bindingTy->is<FunctionType>());
+        assert(bindingTy->isKnownKeyPathType() ||
+               bindingTy->is<FunctionType>());
 
         // Functions don't have capability so we can simply add them.
         if (auto *fnType = bindingTy->getAs<FunctionType>()) {
@@ -689,19 +1009,30 @@ bool BindingSet::finalize(bool transitive) {
           }
 
           updatedBindings.insert(binding.withType(fnType));
+          isContextualTypeReadOnly = true;
+        } else if (!(bindingTy->isWritableKeyPath() ||
+                     bindingTy->isReferenceWritableKeyPath())) {
+          isContextualTypeReadOnly = true;
         }
       }
 
       // Note that even though key path literal maybe be invalid it's
       // still the best course of action to use contextual function type
       // bindings because they allow to propagate type information from
-      // the key path into the context, so key path bindings are addded
+      // the key path into the context, so key path bindings are added
       // only if there is absolutely no other choice.
       if (updatedBindings.empty()) {
         auto rootTy = CS.getKeyPathRootType(keyPath);
 
         // A valid key path literal.
         if (capability) {
+          // Capability inference always results in a maximum mutability
+          // but if context is read-only it can be downgraded to avoid
+          // conversions.
+          if (isContextualTypeReadOnly)
+            capability =
+                std::make_pair(KeyPathMutability::ReadOnly, capability->second);
+
           // Note that the binding is formed using root & value
           // type variables produced during constraint generation
           // because at this point root is already known (otherwise
@@ -711,8 +1042,8 @@ bool BindingSet::finalize(bool transitive) {
           // better diagnostics.
           auto keyPathTy = getKeyPathType(ctx, *capability, rootTy,
                                           CS.getKeyPathValueType(keyPath));
-          updatedBindings.insert(
-              {keyPathTy, AllowedBindingKind::Exact, keyPathLoc});
+          updatedBindings.insert({keyPathTy, AllowedBindingKind::Fallback, locator,
+                                  /*originator=*/nullptr});
         } else if (CS.shouldAttemptFixes()) {
           auto fixedRootTy = CS.getFixedType(rootTy);
           // If key path is structurally correct and has a resolved root
@@ -724,11 +1055,13 @@ bool BindingSet::finalize(bool transitive) {
               (keyPath->getParsedRoot() ||
                (fixedRootTy && !fixedRootTy->isTypeVariableOrMember()))) {
             auto fallback = llvm::find_if(Defaults, [](const auto &entry) {
-              return entry.second->getKind() == ConstraintKind::FallbackType;
+              return entry->getKind() == ConstraintKind::FallbackType;
             });
             assert(fallback != Defaults.end());
             updatedBindings.insert(
-                {fallback->first, AllowedBindingKind::Exact, fallback->second});
+                {(*fallback)->getSecondType(),
+                 AllowedBindingKind::Fallback,
+                 *fallback});
           } else {
             updatedBindings.insert(PotentialBinding::forHole(
                 TypeVar, CS.getConstraintLocator(
@@ -737,12 +1070,20 @@ bool BindingSet::finalize(bool transitive) {
         }
       }
 
-      Bindings = std::move(updatedBindings);
+      Bindings.clear();
+      Bindings.append(updatedBindings.begin(), updatedBindings.end());
       Defaults.clear();
 
-      return true;
+      // Note the fact that we modified the binding set.
+      markDirty();
     }
+  }
 
+  return true;
+}
+
+void BindingSet::finalizeUnresolvedMemberChainResult() {
+  if (auto *locator = TypeVar->getImpl().getLocator()) {
     if (CS.shouldAttemptFixes() &&
         locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
       // Let's see whether this chain is valid, if it isn't then to avoid
@@ -759,21 +1100,504 @@ bool BindingSet::finalize(bool transitive) {
         CS.recordPotentialHole(TypeVar);
         // Clear all of the previously collected bindings which are inferred
         // from inside of a member chain.
-        Bindings.remove_if([](const PotentialBinding &binding) {
-          return binding.Kind == AllowedBindingKind::Supertypes;
-        });
+        Bindings.erase(
+          llvm::remove_if(Bindings,
+                          [](const PotentialBinding &binding) {
+                            return binding.Kind == AllowedBindingKind::Supertypes;
+                          }),
+          Bindings.end());
+
+        // Note the fact that we modified the binding set.
+        markDirty();
+      }
+    }
+  }
+}
+
+/// Decide if the new binding subsumes the existing binding, or vice versa.
+///
+/// Return value:
+/// - std::nullopt: new binding is unrelated to old binding; both bindings
+///   remain valid.
+/// - true: the possibly modified new binding subsumes old binding.
+/// - false: discard new binding
+std::optional<bool>
+BindingSet::subsumeBinding(PotentialBinding &binding,
+                           const PotentialBinding &existing) {
+  // (Exact, Exact)
+  if (existing.Kind == AllowedBindingKind::Exact &&
+      binding.Kind == AllowedBindingKind::Exact) {
+    // If we have two incompatible Exact bindings, our partial solution so far
+    // is unsatisfiable. Mark this binding set as conflicting, so that we
+    // attempt it next and fail as soon as possible.
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && !*result) {
+      markConflicting();
+    }
+
+    // In any case, drop all Exact bindings but the first one, because it
+    // doesn't matter which one we attempt.
+    if (!CS.shouldAttemptFixes())
+      return false;
+
+    // FIXME: Drop exact bindings in diagnostic mode also
+    if (result.has_value() && *result) {
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      return true;
+    }
+  }
+
+  // (Exact, Supertypes)
+  if (existing.Kind == AllowedBindingKind::Exact &&
+      binding.Kind == AllowedBindingKind::Supertypes) {
+    // FIXME: Do this in diagnostic mode also
+    if (!CS.shouldAttemptFixes()) {
+      // Existing exact binding must be a supertype of the new lower bound.
+      if (canPossiblyConvertTo(CS, binding.BindingType, existing.BindingType,
+                               GenericSignature())) {
+        markConflicting();
+      }
+
+      // Once we have an Exact binding, we don't need anything else.
+      return false;
+    }
+
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+  }
+
+  // (Exact, Subtypes)
+  if (existing.Kind == AllowedBindingKind::Exact &&
+      binding.Kind == AllowedBindingKind::Subtypes) {
+    // FIXME: Do this in diagnostic mode also
+    if (!CS.shouldAttemptFixes()) {
+      // Existing exact binding must be a subtype of the new upper bound.
+      if (canPossiblyConvertTo(CS, existing.BindingType, binding.BindingType,
+                               GenericSignature())) {
+        markConflicting();
+      }
+
+      // Once we have an Exact binding, we don't need anything else.
+      return false;
+    }
+
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+  }
+
+  // (Exact, Fallback)
+  if (existing.Kind == AllowedBindingKind::Exact &&
+      binding.Kind == AllowedBindingKind::Fallback) {
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+  }
+
+  // (Supertypes, Exact)
+  if (existing.Kind == AllowedBindingKind::Supertypes &&
+      binding.Kind == AllowedBindingKind::Exact) {
+    // FIXME: Do this in diagnostic mode also
+    if (!CS.shouldAttemptFixes()) {
+      // Exact binding must be a supertype of the existing lower bound.
+      if (canPossiblyConvertTo(CS, existing.BindingType, binding.BindingType,
+                               GenericSignature())) {
+        markConflicting();
+      }
+
+      // Exact bindings replace Supertype bindings.
+      return true;
+    }
+
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && *result) {
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      return true;
+    }
+  }
+
+  // (Supertypes, Supertypes)
+  if (existing.Kind == AllowedBindingKind::Supertypes &&
+      binding.Kind == AllowedBindingKind::Supertypes) {
+    // Drop duplicate supertype bindings.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+
+    // FIXME: This is unsound. We need Type::join() to handle type variables
+    // instead.
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && *result) {
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      ASSERT(existing.BindingType->hasTypeVariable());
+      return true;
+    }
+
+    // If this is a non-defaulted supertype binding,
+    // check whether we can combine it with another
+    // supertype binding by computing the 'join' of the types.
+    if (binding.isViableForJoin()) {
+      if (existing.isViableForJoin()) {
+        auto isAcceptableJoin = [](Type type) {
+          return !type->isAny() && (!type->getOptionalObjectType() ||
+                                    !type->getOptionalObjectType()->isAny());
+        };
+
+        auto joinType =
+            Type::join(existing.BindingType, binding.BindingType);
+
+        if (joinType && isAcceptableJoin(*joinType)) {
+          // Result of the join has to use new binding because it refers
+          // to the constraint that triggered the join that replaced the
+          // existing binding.
+          //
+          // For "join" to be transitive, both bindings have to be as
+          // well, otherwise we consider it a refinement of a direct
+          // binding.
+          auto *originator =
+              binding.isTransitive() && existing.isTransitive()
+                  ? binding.Originator
+                  : nullptr;
+
+          binding = PotentialBinding(*joinType, binding.Kind,
+                                     binding.BindingSource,
+                                     originator);
+          return true;
+        }
       }
     }
   }
 
-  return true;
+  // (Supertypes, Subtypes)
+  if (existing.Kind == AllowedBindingKind::Supertypes &&
+      binding.Kind == AllowedBindingKind::Subtypes) {
+    // FIXME: Do this in diagnostic mode also
+    if (!CS.shouldAttemptFixes()) {
+      // The existing lower bound should be a subtype of the new upper bound.
+      if (canPossiblyConvertTo(CS, existing.BindingType, binding.BindingType,
+                               GenericSignature())) {
+        binding.Kind = AllowedBindingKind::Exact;
+        markConflicting();
+        return true;
+      }
+    }
+
+    // FIXME: Dubious.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && *result) {
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      ASSERT(existing.BindingType->hasTypeVariable());
+      return true;
+    }
+  }
+
+  // (Supertypes, Fallback)
+  if (existing.Kind == AllowedBindingKind::Supertypes &&
+      binding.Kind == AllowedBindingKind::Fallback) {
+    // If both have the same type, prefer the supertype binding.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && *result) {
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      ASSERT(existing.BindingType->hasTypeVariable());
+      return true;
+    }
+  }
+
+  // (Subtypes, Exact)
+  if (existing.Kind == AllowedBindingKind::Subtypes &&
+      binding.Kind == AllowedBindingKind::Exact) {
+    // FIXME: Do this in diagnostic mode also
+    if (!CS.shouldAttemptFixes()) {
+      // The new exact binding should be a subtype of the existing upper bound.
+      if (canPossiblyConvertTo(CS, binding.BindingType, existing.BindingType,
+                               GenericSignature())) {
+        markConflicting();
+      }
+
+      return true;
+    }
+
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && *result) {
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      return true;
+    }
+  }
+
+  // (Subtypes, Supertypes)
+  if (existing.Kind == AllowedBindingKind::Subtypes &&
+      binding.Kind == AllowedBindingKind::Supertypes) {
+    // FIXME: Do this in diagnostic mode also
+    if (!CS.shouldAttemptFixes()) {
+      // The new lower bound should be a subtype of the existing upper bound.
+      if (canPossiblyConvertTo(CS, binding.BindingType, existing.BindingType,
+                               GenericSignature())) {
+        binding.Kind = AllowedBindingKind::Exact;
+        markConflicting();
+        return true;
+      }
+    }
+
+    // FIXME: Dubious.
+    if (binding.BindingType->isEqual(existing.BindingType)) {
+      binding.Kind = AllowedBindingKind::Subtypes;
+      return true;
+    }
+  }
+
+  // (Subtypes, Subtypes)
+  if (existing.Kind == AllowedBindingKind::Subtypes &&
+      binding.Kind == AllowedBindingKind::Subtypes) {
+    // Drop duplicate subtype bindings.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+
+    // FIXME: Implement meet of two types
+  }
+
+  // (Subtypes, Fallback)
+  if (existing.Kind == AllowedBindingKind::Subtypes &&
+      binding.Kind == AllowedBindingKind::Fallback) {
+    // If both have the same type, prefer the subtype binding.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return false;
+  }
+
+  // (Fallback, Exact)
+  if (existing.Kind == AllowedBindingKind::Fallback &&
+      binding.Kind == AllowedBindingKind::Exact) {
+    // If both have the same type, prefer the exact binding.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+
+    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    if (result.has_value() && *result) {
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      return true;
+    }
+  }
+
+  // (Fallback, Supertypes)
+  if (existing.Kind == AllowedBindingKind::Fallback &&
+      binding.Kind == AllowedBindingKind::Supertypes) {
+    // If both have the same type, prefer the supertype binding.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+  }
+
+  // (Fallback, Subtypes)
+  if (existing.Kind == AllowedBindingKind::Fallback &&
+      binding.Kind == AllowedBindingKind::Subtypes) {
+    // If both have the same type, prefer the subtype binding.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+  }
+
+  // (Fallback, Fallback)
+  if (existing.Kind == AllowedBindingKind::Fallback &&
+      binding.Kind == AllowedBindingKind::Fallback) {
+    // Drop duplicate Fallback bindings.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return true;
+  }
+
+  // FIXME: Refactor or remove this
+  if (!TypeVar->getImpl().isClosureParameterType()) {
+    // Since Double and CGFloat are effectively the same type due to an
+    // implicit conversion between them, always prefer Double over CGFloat
+    // when possible.
+    //
+    // Note: This optimization can't be performed for closure parameters
+    //       because their type could be converted only at the point of
+    //       use in the closure body.
+    if (binding.BindingType->isCGFloat() && existing.BindingType->isDouble())
+      return false;
+
+    if (binding.BindingType->isDouble() && existing.BindingType->isCGFloat())
+      return true;
+  }
+
+  return std::nullopt;
 }
 
-void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
-  if (Bindings.count(binding))
-    return;
+void BindingSet::reduceBinding(PotentialBinding &binding) {
+  bool checkConformanceConstraints =
+      !CS.shouldAttemptFixes() &&
+      CS.getASTContext().TypeCheckerOpts.SolverEnableBindingOptimizations &&
+      !Protocols.empty() &&
+      !canBeNil();
 
-  if (!isViable(binding, isTransitive))
+  switch (binding.Kind) {
+  case AllowedBindingKind::Exact: {
+    // If an exact binding type doesn't conform to a protocol, our type
+    // variable's adjacent constraints are mutually unsatisfiable, and
+    // our partial solution so far is contradictory.
+    auto type = binding.BindingType->getWithoutSpecifierType();
+    bool conforms = llvm::all_of(Protocols,
+        [&](ProtocolDecl *proto) -> bool {
+          return !CS.lookupConformance(type, proto).isInvalid();
+        });
+    if (!conforms) {
+      // Our partial solution so far is contradictory. Promote this
+      // binding to attempt immediately.
+      markConflicting();
+
+      // Preserve the binding kind, which is Exact.
+      break;
+    }
+    break;
+  }
+
+  case AllowedBindingKind::Subtypes: {
+    // Binding something that is not a function type to a type variable
+    // that represents a closure is always invalid, but this is not
+    // directly encoded in the constraint system. Handle this case
+    // specially.
+    if (TypeVar->getImpl().isClosureType()) {
+      if (!isPossibleSupertypeOfFunctionType(binding.BindingType)) {
+        // Our partial solution so far is contradictory. Promote this
+        // binding to attempt immediately.
+        markConflicting();
+        binding.Kind = AllowedBindingKind::Exact;
+        break;
+      }
+    }
+
+    if (checkConformanceConstraints) {
+      // If we have $T0 conv X?, $T0 conv P, and X? does not conform to P
+      // but X does, reduce the binding type to X.
+      if (auto objectType = binding.BindingType->getOptionalObjectType()) {
+        bool objectConforms = llvm::any_of(Protocols,
+            [&](ProtocolDecl *proto) -> bool {
+              return (!CS.lookupConformance(objectType, proto).isInvalid() &&
+                      CS.lookupConformance(binding.BindingType, proto).isInvalid());
+            });
+        if (objectConforms) {
+          binding.BindingType = objectType;
+          // Preserve the binding kind of Subtypes. However, we might
+          // upgrade it to Exact below if the object type has no
+          // proper subtypes.
+        }
+      }
+    }
+
+    // Optimization. If the type has no proper subtypes, and the lvalue
+    // state of the type variable is known, we can rewrite a subtype
+    // binding into an exact binding. If the lvalue state isn't known,
+    // then every type T still has @lvalue T as a subtype, so this
+    // isn't sound in that case.
+    if (!hasProperSubtypes(binding.BindingType)) {
+      switch (getLValueState()) {
+      case KnownLValueKind::Unknown:
+        // Can't do anything.
+        break;
+
+      case KnownLValueKind::LValue:
+        if (!binding.BindingType->is<LValueType>())
+          binding.BindingType = LValueType::get(binding.BindingType);
+        LLVM_FALLTHROUGH;
+
+      case KnownLValueKind::RValue:
+        binding.Kind = AllowedBindingKind::Exact;
+        break;
+      }
+    }
+
+    // If we have $T0 conv X, $T0 conforms P, we can check if X itself
+    // or any of its proper subtypes conform to P, by performing the
+    // subtype transitive conformance check. If the answer is negative,
+    // then this type variable's adjacent constraints are mutually
+    // unsatisfiable.
+    if (checkConformanceConstraints) {
+      bool conforms = llvm::all_of(Protocols,
+          [&](ProtocolDecl *proto) -> bool {
+            return checkTransitiveSubtypeConformance(
+                  CS, binding.BindingType, proto);
+          });
+
+      if (!conforms) {
+        // Our partial solution so far is contradictory. Promote this
+        // binding to attempt immediately.
+        markConflicting();
+        binding.Kind = AllowedBindingKind::Exact;
+        break;
+      }
+    }
+
+    break;
+  }
+  case AllowedBindingKind::Supertypes: {
+    // If we have X conv $T0, $T0 conforms P, we can check if X itself
+    // or any of its proper supertypes conform to P, by performing the
+    // supertype transitive conformance check. If the answer is negative,
+    // then this type variable's adjacent constraints are mutually
+    // unsatisfiable.
+    if (checkConformanceConstraints) {
+      bool conforms = llvm::all_of(Protocols,
+          [&](ProtocolDecl *proto) -> bool {
+            return checkTransitiveSupertypeConformance(
+                  CS, binding.BindingType, proto);
+          });
+
+      if (!conforms) {
+        // Our partial solution so far is contradictory. Promote this
+        // binding to attempt immediately.
+        markConflicting();
+        binding.Kind = AllowedBindingKind::Exact;
+        break;
+      }
+    }
+    
+    // If we again have X conv $T0, $T0 conforms P, except now X conforms to P,
+    // and X has no proper supertypes that conform to P, we can promote the
+    // binding to an exact binding.
+    if (!hasProperSupertypes(binding.BindingType)) {
+      bool condition = llvm::any_of(Protocols,
+          [&](ProtocolDecl *proto) {
+        return (!proto->existentialConformsToSelf() &&
+                CS.isConformanceTransitiveForSupertype(
+                  ConversionBehavior::None, proto));
+      });
+
+      if (condition) {
+        binding.Kind = AllowedBindingKind::Exact;
+        break;
+      }
+    }
+    break;
+  }
+  case AllowedBindingKind::Fallback:
+    // FIXME: Figure out what to do here.
+    break;
+  }
+}
+
+void BindingSet::addBinding(PotentialBinding binding) {
+  if (binding.isTransitive() &&
+      !checkTypeOfBinding(TypeVar, binding.BindingType))
     return;
 
   SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
@@ -794,80 +1618,68 @@ void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
     }
   }
 
-  // Since Double and CGFloat are effectively the same type due to an
-  // implicit conversion between them, always prefer Double over CGFloat
-  // when possible.
-  //
-  // Note: This optimization can't be performed for closure parameters
-  //       because their type could be converted only at the point of
-  //       use in the closure body.
-  if (!TypeVar->getImpl().isClosureParameterType()) {
-    auto type = binding.BindingType;
+  reduceBinding(binding);
 
-    if (type->isCGFloat() &&
-        llvm::any_of(Bindings, [](const PotentialBinding &binding) {
-          return binding.BindingType->isDouble();
-        }))
-      return;
+  llvm::SmallSetVector<PotentialBinding, 1> joined;
 
-    if (type->isDouble()) {
-      auto inferredCGFloat =
-          llvm::find_if(Bindings, [](const PotentialBinding &binding) {
-            return binding.BindingType->isCGFloat();
-          });
-
-      if (inferredCGFloat != Bindings.end()) {
-        Bindings.erase(inferredCGFloat);
-        Bindings.insert(inferredCGFloat->withType(type));
-        return;
+  // Prevent against checking against the same opened nominal type
+  // over and over again. Doing so means redundant work in the best
+  // case. In the worst case, we'll produce lots of duplicate solutions
+  // for this constraint system, which is problematic for overload
+  // resolution.
+  auto existing = Bindings.begin();
+  while (existing != Bindings.end()) {
+    auto result = subsumeBinding(binding, *existing);
+    if (result == std::nullopt) {
+      // Record a new binding, unless it subsumed by something else.
+       ++existing;
+      continue;
+    } else if (*result) {
+      // First, remove all of the adjacent type variables associated
+      // with the existing binding.
+      //
+      // FIXME: This is wrong, because we don't maintain a "reference
+      // count" for each adjacent variable, so we might remove one
+      // prematurely.
+      {
+        SmallPtrSet<TypeVariableType *, 4> referencedVars;
+        existing->BindingType->getTypeVariables(referencedVars);
+        for (auto *var : referencedVars)
+          AdjacentVars.erase(var);
       }
+
+      // Remove the existing binding.
+      existing = Bindings.erase(existing);
+
+      // Insert the possibly updated binding.
+      for (auto *adjacentVar : referencedTypeVars)
+        AdjacentVars.insert(adjacentVar);
+
+      joined.insert(binding);
+      continue;
+    } else {
+      // Drop the new binding.
+      return;
     }
   }
 
-  // If this is a non-defaulted supertype binding,
-  // check whether we can combine it with another
-  // supertype binding by computing the 'join' of the types.
-  if (binding.isViableForJoin()) {
-    auto isAcceptableJoin = [](Type type) {
-      return !type->isAny() && (!type->getOptionalObjectType() ||
-                                !type->getOptionalObjectType()->isAny());
-    };
-
-    SmallVector<PotentialBinding, 4> joined;
-    for (auto existingBinding = Bindings.begin();
-         existingBinding != Bindings.end();) {
-      if (existingBinding->isViableForJoin()) {
-        auto join =
-            Type::join(existingBinding->BindingType, binding.BindingType);
-
-        if (join && isAcceptableJoin(*join)) {
-          // Result of the join has to use new binding because it refers
-          // to the constraint that triggered the join that replaced the
-          // existing binding.
-          joined.push_back(binding.withType(*join));
-          // Remove existing binding from the set.
-          // It has to be re-introduced later, since its type has been changed.
-          existingBinding = Bindings.erase(existingBinding);
-          continue;
-        }
-      }
-
-      ++existingBinding;
-    }
-
-    for (const auto &binding : joined)
-      (void)Bindings.insert(binding);
-
-    // If new binding has been joined with at least one of existing
-    // bindings, there is no reason to include it into the set.
-    if (!joined.empty())
-      return;
+  for (const auto &binding : joined) {
+    DEBUG_ASSERT(std::find(Bindings.begin(), Bindings.end(), binding)
+                 == Bindings.end());
+    Bindings.push_back(binding);
   }
+
+  // If new binding has been joined with at least one of existing
+  // bindings, there is no reason to include it into the set.
+  if (!joined.empty())
+    return;
 
   for (auto *adjacentVar : referencedTypeVars)
     AdjacentVars.insert(adjacentVar);
 
-  (void)Bindings.insert(std::move(binding));
+  DEBUG_ASSERT(std::find(Bindings.begin(), Bindings.end(), binding)
+               == Bindings.end());
+  Bindings.push_back(std::move(binding));
 }
 
 void BindingSet::determineLiteralCoverage() {
@@ -876,9 +1688,7 @@ void BindingSet::determineLiteralCoverage() {
 
   bool allowsNil = canBeNil();
 
-  for (auto &entry : Literals) {
-    auto &literal = entry.second;
-
+  for (auto &literal : Literals) {
     if (!literal.viableAsBinding())
       continue;
 
@@ -896,8 +1706,13 @@ void BindingSet::determineLiteralCoverage() {
       literal.setCoveredBy(binding->getSource());
 
       if (adjustedTy) {
-        Bindings.erase(binding);
-        Bindings.insert(binding->withType(adjustedTy));
+        auto newBinding = binding->withType(adjustedTy);
+        (void)Bindings.erase(binding);
+
+        addBinding(newBinding);
+
+        // Note the fact that we modified the binding set.
+        markDirty();
       }
 
       break;
@@ -905,69 +1720,65 @@ void BindingSet::determineLiteralCoverage() {
   }
 }
 
-void BindingSet::addLiteralRequirement(Constraint *constraint) {
-  auto isDirectRequirement = [&](Constraint *constraint) -> bool {
-    if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
-      auto *repr = CS.getRepresentative(typeVar);
-      return repr == TypeVar;
-    }
+void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
+  decltype(Literals)::iterator intLiteral = Literals.end();
+  decltype(Literals)::iterator floatLiteral = Literals.end();
 
-    return false;
-  };
+  for (auto iter = Literals.begin(); iter != Literals.end(); ++iter) {
+    auto *protocol = iter->getProtocol();
 
-  auto *protocol = constraint->getProtocol();
-
-  // Let's try to coalesce integer and floating point literal protocols
-  // if they appear together because the only possible default type that
-  // could satisfy both requirements is `Double`.
-  {
     if (protocol->isSpecificProtocol(
             KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-      auto *floatLiteral = CS.getASTContext().getProtocol(
-          KnownProtocolKind::ExpressibleByFloatLiteral);
-      if (Literals.count(floatLiteral))
-        return;
+      intLiteral = iter;
     }
 
     if (protocol->isSpecificProtocol(
             KnownProtocolKind::ExpressibleByFloatLiteral)) {
-      auto *intLiteral = CS.getASTContext().getProtocol(
-          KnownProtocolKind::ExpressibleByIntegerLiteral);
-      Literals.erase(intLiteral);
+      floatLiteral = iter;
     }
   }
 
-  if (Literals.count(protocol) > 0)
-    return;
-
-  bool isDirect = isDirectRequirement(constraint);
-
-  // Coverage is not applicable to `ExpressibleByNilLiteral` since it
-  // doesn't have a default type.
-  if (protocol->isSpecificProtocol(
-          KnownProtocolKind::ExpressibleByNilLiteral)) {
-    Literals.insert(
-        {protocol, LiteralRequirement(constraint,
-                                      /*DefaultType=*/Type(), isDirect)});
-    return;
+  if (intLiteral != Literals.end() &&
+      floatLiteral != Literals.end()) {
+    Literals.erase(intLiteral);
   }
-
-  // Check whether any of the existing bindings covers this literal
-  // protocol.
-  LiteralRequirement literal(
-      constraint, TypeChecker::getDefaultType(protocol, CS.DC), isDirect);
-
-  Literals.insert({protocol, std::move(literal)});
 }
 
-bool BindingSet::operator==(const BindingSet &other) {
+void PotentialBindings::inferFromLiteral(Constraint *constraint) {
+  ASSERT(TypeVar);
+  ASSERT(isDirectRequirement(CS, TypeVar, constraint));
+
+  auto *protocol = constraint->getProtocol();
+
+  for (const auto &literal : Literals) {
+    if (literal.getProtocol() == protocol)
+      return;
+  }
+  
+  Type defaultType;
+  // `ExpressibleByNilLiteral` doesn't have a default type.
+  if (!protocol->isSpecificProtocol(
+          KnownProtocolKind::ExpressibleByNilLiteral)) {
+    defaultType = TypeChecker::getDefaultType(protocol, CS.DC);
+  }
+
+  // "undo" check is necessary here because this method is called
+  // from `Change::undo`, that's necessary because we only record
+  // a constraint.
+  if (CS.solverState && !CS.solverState->Trail.isUndoActive())
+    CS.recordChange(SolverTrail::Change::AddedLiteral(TypeVar, constraint));
+
+  Literals.emplace_back(protocol, constraint, defaultType, /*isDirect=*/true);
+}
+
+bool BindingSet::operator==(const BindingSet &other) const {
   if (AdjacentVars != other.AdjacentVars)
     return false;
 
   if (Bindings.size() != other.Bindings.size())
     return false;
 
-  for (auto i : indices(Bindings)) {
+  for (unsigned i : indices(Bindings)) {
     const auto &x = Bindings[i];
     const auto &y = other.Bindings[i];
 
@@ -979,13 +1790,9 @@ bool BindingSet::operator==(const BindingSet &other) {
   if (Literals.size() != other.Literals.size())
     return false;
 
-  for (auto pair : Literals) {
-    auto found = other.Literals.find(pair.first);
-    if (found == other.Literals.end())
-      return false;
-
-    const auto &x = pair.second;
-    const auto &y = found->second;
+  for (unsigned i : indices(Literals)) {
+    auto &x = Literals[i];
+    auto &y = other.Literals[i];
 
     if (x.Source != y.Source ||
         x.DefaultType.getPointer() != y.DefaultType.getPointer() ||
@@ -997,15 +1804,12 @@ bool BindingSet::operator==(const BindingSet &other) {
   if (Defaults.size() != other.Defaults.size())
     return false;
 
-  for (auto pair : Defaults) {
-    auto found = other.Defaults.find(pair.first);
-    if (found == other.Defaults.end() ||
-        pair.second != found->second)
+  for (auto i : indices(Defaults)) {
+    auto *x = Defaults[i];
+    auto *y = other.Defaults[i];
+    if (x != y)
       return false;
   }
-
-  if (TransitiveProtocols != other.TransitiveProtocols)
-    return false;
 
   return true;
 }
@@ -1031,6 +1835,30 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
 }
 
 bool BindingSet::operator<(const BindingSet &other) {
+  if (CS.getASTContext().TypeCheckerOpts.SolverEnableBindingOptimizations &&
+      !CS.shouldAttemptFixes()) {
+    if (isConflicting() != other.isConflicting())
+      return isConflicting();
+
+    unsigned xExactBindings = getNumExactBindings();
+    unsigned yExactBindings = other.getNumExactBindings();
+
+    // Always prefer a binding set with one exact binding over anything else.
+    if (xExactBindings == 1 && yExactBindings != 1)
+      return true;
+
+    // Anything else is worse than a binding set with one exact binding.
+    if (xExactBindings != 1 && yExactBindings == 1)
+      return false;
+
+    // If both have one exact binding, it shouldn't matter which one we pick,
+    // so intentionally skip the rest of the ranking logic.
+    if (xExactBindings == 1 && yExactBindings == 1)
+      return false;
+
+    // For any other combination, do the old ranking.
+  }
+
   auto xScore = formBindingScore(*this);
   auto yScore = formBindingScore(other);
 
@@ -1067,58 +1895,97 @@ bool BindingSet::operator<(const BindingSet &other) {
   return isPotentiallyIncomplete() < other.isPotentiallyIncomplete();
 }
 
-std::optional<BindingSet> ConstraintSystem::determineBestBindings(
-    llvm::function_ref<void(const BindingSet &)> onCandidate) {
+#define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
+  void PotentialBindings::record##PropertyName(Constraint *constraint) {       \
+    if (CS.solverState)                                                        \
+      CS.recordChange(                                                         \
+          SolverTrail::Change::Added##PropertyName(TypeVar, constraint));      \
+    Storage.push_back(constraint);                                             \
+  }
+#define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
+  void PotentialBindings::record##RelationName(TypeVariableType *typeVar,      \
+                                               Constraint *originator) {       \
+    if (CS.solverState)                                                        \
+      CS.recordChange(SolverTrail::Change::Added##RelationName(                \
+          TypeVar, typeVar, originator));                                      \
+    Storage.emplace_back(typeVar, originator);                                 \
+  }
+#include "swift/Sema/CSTrail.def"
+
+const BindingSet *ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
   BindingSet *bestBindings = nullptr;
 
-  // First, let's collect all of the possible bindings.
+  // First, let's construct a BindingSet for each type variable,
+  // from its PotentialBindings.
   for (auto *typeVar : getTypeVariables()) {
     auto &node = CG[typeVar];
-    node.resetBindingSet();
-    if (!typeVar->getImpl().hasRepresentativeOrFixed())
-      node.initBindingSet();
-  }
 
-  // Determine whether given type variable with its set of bindings is
-  // viable to be attempted on the next step of the solver. If type variable
-  // has no "direct" bindings of any kind e.g. direct bindings to concrete
-  // types, default types from "defaultable" constraints or literal
-  // conformances, such type variable is not viable to be evaluated to be
-  // attempted next.
-  auto isViableForRanking = [this](const BindingSet &bindings) -> bool {
-    auto *typeVar = bindings.getTypeVariable();
-
-    // Key path root type variable is always viable because it can be
-    // transitively inferred from key path type during binding set
-    // finalization.
-    if (typeVar->getImpl().isKeyPathRoot())
-      return true;
-
-    // Type variable representing a base of unresolved member chain should
-    // always be considered viable for ranking since it's allow to infer
-    // types from transitive protocol requirements.
-    if (auto *locator = typeVar->getImpl().getLocator()) {
-      if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
-        return true;
+    // If the type variable has been bound to a fixed type, we won't
+    // be considering it any further. Clear its binding set if it
+    // has one and move on.
+    if (typeVar->getImpl().hasRepresentativeOrFixed()) {
+      node.resetBindingSet();
+      continue;
     }
 
-    // If type variable is marked as a potential hole there is always going
-    // to be at least one binding available for it.
-    if (shouldAttemptFixes() && typeVar->getImpl().canBindToHole())
-      return true;
+    // If we don't have a binding set yet, compute one.
+    if (!node.hasBindingSet()) {
+      node.initBindingSet();
+      continue;
+    }
 
-    return bool(bindings);
-  };
+    // If the node has a binding set already, check if it needs to
+    // be recomputed. This is the case if the PotentialBindings
+    // changed since last time, or if any of the "transitive inference"
+    // steps below changed the BindingSet for any reason.
+    if (!node.getBindingSet().isUpToDate()) {
+      ++NumBindingSetsRecomputed;
+      node.resetBindingSet();
+      node.initBindingSet();
+    } else {
+      ++NumBindingSetsSkipped;
+      node.getBindingSet().resetTransitiveProtocols();
+    }
+  }
 
-  // Now let's see if we could infer something for related type
-  // variables based on other bindings.
+  // Now let's perform transitive inference and ranking.
   for (auto *typeVar : getTypeVariables()) {
     auto &node = CG[typeVar];
     if (!node.hasBindingSet())
       continue;
 
     auto &bindings = node.getBindingSet();
+
+    // ****
+    // If any of the below change the binding set, they must also call
+    // markDirty().
+    // ****
+
+#define EXPENSIVE_CHECK 0
+#if EXPENSIVE_CHECK
+    BindingSet saved(*this, typeVar, node.getPotentialBindings());
+    ASSERT(bindings.getGenerationNumber() == saved.getGenerationNumber());
+    if (bindings != saved) {
+      ABORT([&](auto &out) {
+        out << "Binding set differs from freshly-recomputed one\n";
+        out << "\nold: ";
+        bindings.dump(out, 0);
+        out << "\nnew: ";
+        saved.dump(out, 0);
+      });
+    }
+#endif
+
+    // Special handling for key paths.
+    bindings.inferTransitiveKeyPathBindings();
+    if (!bindings.finalizeKeyPathBindings())
+      continue;
+
+    // Special handling for "leading-dot" unresolved member references,
+    // like .foo.
+    bindings.inferTransitiveUnresolvedMemberRefBindings();
+    bindings.finalizeUnresolvedMemberChainResult();
 
     // Before attempting to infer transitive bindings let's check
     // whether there are any viable "direct" bindings associated with
@@ -1130,15 +1997,25 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
     // associated with given type variable, any default constraints,
     // or any conformance requirements to literal protocols with can
     // produce a default type.
-    bool isViable = isViableForRanking(bindings);
+    bool isViable = bindings.isViable();
 
-    if (!bindings.finalize(true))
+    bindings.inferTransitiveSupertypeBindings();
+    bindings.determineLiteralCoverage();
+
+#if EXPENSIVE_CHECK
+    if (!bindings.isDirty() && saved != bindings) {
+      ABORT([&](auto &out) {
+        out << "Binding set changed but wasn't dirty\n";
+        out << "\nold: ";
+        saved.dump(out, 0);
+        out << "\nnew: ";
+        bindings.dump(out, 0);
+      });
+    }
+#endif
+
+    if (!isViable)
       continue;
-
-    if (!bindings || !isViable)
-      continue;
-
-    onCandidate(bindings);
 
     // If these are the first bindings, or they are better than what
     // we saw before, use them instead.
@@ -1146,10 +2023,38 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
       bestBindings = &bindings;
   }
 
-  if (!bestBindings)
-    return std::nullopt;
+  if (isDebugMode()) {
+    bool first = true;
 
-  return std::optional(*bestBindings);
+    for (auto *typeVar : getTypeVariables()) {
+      auto &node = CG[typeVar];
+      if (!node.hasBindingSet())
+        continue;
+
+      const auto &bindings = node.getBindingSet();
+
+      if (bindings.hasViableBindings()) {
+        if (first) {
+          llvm::errs().indent(solverState->getCurrentIndent())
+              << "(Potential Binding(s)\n";
+          first = false;
+        }
+        auto &log = llvm::errs().indent(solverState->getCurrentIndent() + 2);
+        bindings.dump(log, solverState->getCurrentIndent() + 2);
+        log << "\n";
+      }
+    }
+
+    if (!first) {
+      auto &log = llvm::errs().indent(solverState->getCurrentIndent());
+      log << ")\n";
+    }
+  }
+
+  if (bestBindings)
+    bestBindings->coalesceIntegerAndFloatLiteralRequirements();
+
+  return bestBindings;
 }
 
 /// Find the set of type variables that are inferable from the given type.
@@ -1185,13 +2090,13 @@ findInferableTypeVars(Type type,
   type.walk(Walker(typeVars));
 }
 
-void PotentialBindings::addDefault(Constraint *constraint) {
-  Defaults.insert(constraint);
-}
-
 void BindingSet::addDefault(Constraint *constraint) {
-  auto defaultTy = constraint->getSecondType();
-  Defaults.insert({defaultTy->getCanonicalType(), constraint});
+  if (CONDITIONAL_ASSERT_enabled()) {
+    for (auto *other : Defaults) {
+      ASSERT(other != constraint);
+    }
+  }
+  Defaults.push_back(constraint);
 }
 
 bool LiteralRequirement::isCoveredBy(Type type, ConstraintSystem &CS) const {
@@ -1222,6 +2127,9 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
                                 ConstraintSystem &CS) const {
   auto type = binding.BindingType;
   switch (binding.Kind) {
+  case AllowedBindingKind::Fallback:
+    return std::make_pair(false, Type());
+
   case AllowedBindingKind::Exact:
     type = binding.BindingType;
     break;
@@ -1240,7 +2148,7 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
       return std::make_pair(false, Type());
 
     if (isCoveredBy(type, CS)) {
-      return std::make_pair(true, requiresUnwrap ? type : binding.BindingType);
+      return std::make_pair(true, requiresUnwrap ? type : Type());
     }
 
     // Can't unwrap optionals if there is `ExpressibleByNilLiteral`
@@ -1269,8 +2177,8 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
   } while (true);
 }
 
-void PotentialBindings::addPotentialBinding(TypeVariableType *TypeVar,
-                                            PotentialBinding binding) {
+void PotentialBindings::addPotentialBinding(PotentialBinding binding) {
+  ASSERT(TypeVar);
   assert(!binding.BindingType->is<ErrorType>());
 
   // If the type variable can't bind to an lvalue, make sure the
@@ -1280,138 +2188,65 @@ void PotentialBindings::addPotentialBinding(TypeVariableType *TypeVar,
     binding = binding.withType(binding.BindingType->getRValueType());
   }
 
+  LLVM_DEBUG(
+    PrintOptions PO = PrintOptions::forDebugging();
+    llvm::dbgs() << "Recording ";
+    TypeVar->print(llvm::dbgs(), PO);
+    llvm::dbgs() << " ";
+    binding.print(llvm::dbgs(), PO);
+    llvm::dbgs() << " from ";
+    if (auto *constraint = dyn_cast<Constraint *>(binding.BindingSource)) {
+      constraint->print(llvm::dbgs(), &TypeVar->getASTContext().SourceMgr, 0);
+    } else {
+      auto *locator = cast<ConstraintLocator *>(binding.BindingSource);
+      locator->dump(&TypeVar->getASTContext().SourceMgr, llvm::dbgs());
+    }
+    llvm::dbgs() << "\n");
+
+  if (CS.solverState)
+    CS.recordChange(SolverTrail::Change::AddedBinding(TypeVar, binding));
+
   Bindings.push_back(std::move(binding));
 }
 
-void PotentialBindings::addLiteral(Constraint *constraint) {
-  Literals.insert(constraint);
-}
+/// Check whether the given type can be used as a binding for the given
+/// type variable.
+///
+/// \returns true if the binding is okay.
+bool swift::constraints::inference::checkTypeOfBinding(
+    TypeVariableType *typeVar, Type type) {
+  // If the type references the type variable, don't permit the binding.
+  if (type->hasTypeVariable()) {
+    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+    type->getTypeVariables(referencedTypeVars);
+    if (referencedTypeVars.count(typeVar))
+      return false;
+  }
 
-bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
-  // Prevent against checking against the same opened nominal type
-  // over and over again. Doing so means redundant work in the best
-  // case. In the worst case, we'll produce lots of duplicate solutions
-  // for this constraint system, which is problematic for overload
-  // resolution.
-  auto type = binding.BindingType;
+  {
+    auto objType = type->getWithoutSpecifierType();
 
-  if (isTransitive && !checkTypeOfBinding(TypeVar, type))
-    return false;
-
-  auto *NTD = type->getAnyNominal();
-  if (!NTD)
-    return true;
-
-  for (auto existing = Bindings.begin(); existing != Bindings.end();
-       ++existing) {
-    auto existingType = existing->BindingType;
-
-    auto *existingNTD = existingType->getAnyNominal();
-    if (!existingNTD || NTD != existingNTD)
-      continue;
-
-    // What is going on in this method needs to be thoroughly re-evaluated!
-    //
-    // This logic aims to skip dropping bindings if
-    // collection type has conversions i.e. in situations like:
-    //
-    // [$T1] conv $T2
-    // $T2 conv [(Int, String)]
-    // $T2.Element equal $T5.Element
-    //
-    // `$T1` could be bound to `(i: Int, v: String)` after
-    // `$T2` is bound to `[(Int, String)]` which is is a problem
-    // because it means that `$T2` was attempted to early
-    // before the solver had a chance to discover all viable
-    // bindings.
-    //
-    // Let's say existing binding is `[(Int, String)]` and
-    // relation is "exact", in this case there is no point
-    // tracking `[$T1]` because upcasts are only allowed for
-    // subtype and other conversions.
-    if (existing->Kind != AllowedBindingKind::Exact) {
-      if (existingType->isKnownStdlibCollectionType() &&
-          hasConversions(existingType)) {
-        continue;
-      }
-    }
-
-    // If new type has a type variable it shouldn't
-    // be considered  viable.
-    if (type->hasTypeVariable())
+    // If the type is a type variable itself, don't permit the binding.
+    if (objType->is<TypeVariableType>())
       return false;
 
-    // If new type doesn't have any type variables,
-    // but existing binding does, let's replace existing
-    // binding with new one.
-    if (existingType->hasTypeVariable()) {
-      // First, let's remove all of the adjacent type
-      // variables associated with this binding.
-      {
-        SmallPtrSet<TypeVariableType *, 4> referencedVars;
-        existingType->getTypeVariables(referencedVars);
-        for (auto *var : referencedVars)
-          AdjacentVars.erase(var);
-      }
-
-      // And now let's remove the binding itself.
-      Bindings.erase(existing);
-      break;
-    }
+    // Don't bind to a dependent member type, even if it's currently
+    // wrapped in any number of optionals, because binding producer
+    // might unwrap and try to attempt it directly later.
+    if (objType->lookThroughAllOptionalTypes()->is<DependentMemberType>())
+      return false;
   }
 
+  // Okay, allow the binding.
   return true;
-}
-
-static bool hasConversions(Type type) {
-  if (type->isAnyHashable() || type->isDouble() || type->isCGFloat())
-    return true;
-
-  if (type->getAnyPointerElementType())
-    return true;
-
-  if (auto *structTy = type->getAs<BoundGenericStructType>()) {
-    if (auto eltTy = structTy->isArrayType()) {
-      return hasConversions(eltTy);
-    } else if (auto pair = ConstraintSystem::isDictionaryType(structTy)) {
-      return hasConversions(pair->second);
-    } else if (auto eltTy = ConstraintSystem::isSetType(structTy)) {
-      return hasConversions(*eltTy);
-    }
-
-    return false;
-  }
-
-  if (auto *enumTy = type->getAs<BoundGenericEnumType>()) {
-    if (enumTy->getOptionalObjectType())
-      return true;
-
-    return false;
-  }
-
-  return !(type->is<StructType>() || type->is<EnumType>() ||
-           type->is<BuiltinType>() || type->is<ArchetypeType>());
 }
 
 bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
   if (isHole())
     return false;
 
-  if (llvm::any_of(Bindings, [&](const PotentialBinding &binding) {
-        if (binding.Kind == AllowedBindingKind::Supertypes)
-          return false;
-
-        if (CS.shouldAttemptFixes())
-          return false;
-
-        return !hasConversions(binding.BindingType);
-      })) {
-    // Result type of subscript could be l-value so we can't bind it early.
-    if (!TypeVar->getImpl().isSubscriptResultType() &&
-        llvm::none_of(Info.DelayedBy, [](const Constraint *constraint) {
-          return constraint->getKind() == ConstraintKind::Disjunction ||
-                 constraint->getKind() == ConstraintKind::ValueMember;
-        }))
+  if (!CS.shouldAttemptFixes()) {
+    if (getNumExactBindings() == 1)
       return true;
   }
 
@@ -1465,6 +2300,11 @@ bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
       return false;
   }
 
+  if (!CS.shouldAttemptFixes()) {
+    if (getNumExactBindings() == 1)
+      return true;
+  }
+
   auto *locator = conjunction->getLocator();
   if (locator->directlyAt<ClosureExpr>()) {
     auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
@@ -1514,7 +2354,8 @@ bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
       auto *closureType = CS.getType(closure)->castTo<TypeVariableType>();
       return llvm::any_of(
           conjunction->getTypeVariables(), [&](TypeVariableType *typeVar) {
-            return !(typeVar == closureType || CS.getFixedType(typeVar));
+            return (typeVar != closureType &&
+                    CS.simplifyType(typeVar)->hasTypeVariable());
           });
     }
   }
@@ -1536,56 +2377,45 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
 
   BindingSet bindings(*this, typeVar, CG[typeVar].getPotentialBindings());
-  bindings.finalize(false);
+
+  (void) bindings.finalizeKeyPathBindings();
+  bindings.finalizeUnresolvedMemberChainResult();
+  bindings.determineLiteralCoverage();
+  bindings.coalesceIntegerAndFloatLiteralRequirements();
 
   return bindings;
 }
 
-/// Check whether the given type can be used as a binding for the given
-/// type variable.
-///
-/// \returns the type to bind to, if the binding is okay.
-static std::optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
-                                              Type type) {
-  // If the type references the type variable, don't permit the binding.
-  if (type->hasTypeVariable()) {
-    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
-    type->getTypeVariables(referencedTypeVars);
-    if (referencedTypeVars.count(typeVar))
-      return std::nullopt;
-  }
-
-  {
-    auto objType = type->getWithoutSpecifierType();
-
-    // If the type is a type variable itself, don't permit the binding.
-    if (objType->is<TypeVariableType>())
-      return std::nullopt;
-
-    // Don't bind to a dependent member type, even if it's currently
-    // wrapped in any number of optionals, because binding producer
-    // might unwrap and try to attempt it directly later.
-    if (objType->lookThroughAllOptionalTypes()->is<DependentMemberType>())
-      return std::nullopt;
-  }
-
-  // Okay, allow the binding (with the simplified type).
-  return type;
-}
-
 std::optional<PotentialBinding>
-PotentialBindings::inferFromRelational(ConstraintSystem &CS,
-                                       TypeVariableType *TypeVar,
-                                       Constraint *constraint) {
+PotentialBindings::inferFromRelational(Constraint *constraint) {
+  ASSERT(TypeVar);
   assert(constraint->getClassification() ==
              ConstraintClassification::Relational &&
          "only relational constraints handled here");
 
+  LLVM_DEBUG(
+      llvm::dbgs() << "inferFromRelational(";
+      TypeVar->print(llvm::dbgs(), PrintOptions::forDebugging());
+      llvm::dbgs() << ", ";
+      constraint->print(llvm::dbgs(), &CS.getASTContext().SourceMgr, 0);
+      llvm::dbgs() << ")\n");
+
   auto first = CS.simplifyType(constraint->getFirstType());
   auto second = CS.simplifyType(constraint->getSecondType());
 
-  if (first->is<TypeVariableType>() && first->isEqual(second))
+#define DEBUG_BAILOUT(msg)                                              \
+  LLVM_DEBUG(                                                           \
+      PrintOptions PO = PrintOptions::forDebugging();                   \
+      llvm::dbgs() << msg << " ";                                       \
+      TypeVar->print(llvm::dbgs(), PO);                                 \
+      llvm::dbgs() << " from ";                                         \
+      constraint->print(llvm::dbgs(), &CS.getASTContext().SourceMgr);   \
+      llvm::dbgs() << "\n");
+
+  if (first->is<TypeVariableType>() && first->isEqual(second)) {
+    DEBUG_BAILOUT("First is second");
     return std::nullopt;
+  }
 
   Type type;
   AllowedBindingKind kind;
@@ -1606,7 +2436,8 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     // of bindings for them until closure's body is opened.
     if (auto *typeVar = first->getAs<TypeVariableType>()) {
       if (typeVar->getImpl().isClosureType()) {
-        DelayedBy.push_back(constraint);
+        DEBUG_BAILOUT("Delayed (1)");
+        recordDelayedBy(constraint);
         return std::nullopt;
       }
     }
@@ -1618,17 +2449,21 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     findInferableTypeVars(second, typeVars);
 
     if (typeVars.erase(TypeVar)) {
-      for (auto *typeVar : typeVars)
-        AdjacentVars.insert({typeVar, constraint});
+      for (auto *typeVar : typeVars) {
+        recordAdjacentVar(typeVar, constraint);
+      }
     }
 
     // Infer a binding from `inout $T <convertible to> Unsafe*Pointer<...>?`.
+    //
+    // This has to be a Fallback binding, because if $T is later bound to
+    // an Array type, more conversion possibilities appear.
     if (first->is<InOutType>() &&
         first->getInOutObjectType()->isEqual(TypeVar)) {
       if (auto pointeeTy = second->lookThroughAllOptionalTypes()
                                ->getAnyPointerElementType()) {
         if (!pointeeTy->isTypeVariableOrMember()) {
-          return PotentialBinding(pointeeTy, AllowedBindingKind::Exact,
+          return PotentialBinding(pointeeTy, AllowedBindingKind::Fallback,
                                   constraint);
         }
       }
@@ -1638,8 +2473,10 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
   }
 
   // Do not attempt to bind to ErrorType.
-  if (type->hasError())
+  if (type->hasError()) {
+    DEBUG_BAILOUT("Has error");
     return std::nullopt;
+  }
 
   if (TypeVar->getImpl().isKeyPathType()) {
     auto objectTy = type->lookThroughAllOptionalTypes();
@@ -1650,7 +2487,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       if (type->isExistentialType()) {
         auto layout = type->getExistentialLayout();
         if (auto superclass = layout.explicitSuperclass) {
-          if (isKnownKeyPathType(superclass)) {
+          if (superclass->isKnownKeyPathType()) {
             type = superclass;
             objectTy = superclass;
           }
@@ -1658,8 +2495,10 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       }
     }
 
-    if (!(isKnownKeyPathType(objectTy) || objectTy->is<AnyFunctionType>()))
+    if (!(objectTy->isKnownKeyPathType() || objectTy->is<AnyFunctionType>())) {
+      DEBUG_BAILOUT("Bad key path type (1)");
       return std::nullopt;
+    }
   }
 
   if (TypeVar->getImpl().isKeyPathSubscriptIndex()) {
@@ -1677,6 +2516,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
         if (auto superclass = layout.explicitSuperclass) {
           type = superclass;
         } else if (!CS.shouldAttemptFixes()) {
+          DEBUG_BAILOUT("Bad key path type (2)");
           return std::nullopt;
         }
       }
@@ -1691,17 +2531,20 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       kind == AllowedBindingKind::Subtypes) {
     if (type->isTypeVariableOrMember() &&
         constraint->getLocator()->directlyAt<AssignExpr>()) {
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
     }
   }
 
-  if (auto *locator = TypeVar->getImpl().getLocator()) {
+  if (TypeVar->getImpl().getLocator()) {
     // Don't allow a protocol type to get propagated from the base to the result
     // type of a chain, Result should always be a concrete type which conforms
     // to the protocol inferred for the base.
     if (constraint->getKind() == ConstraintKind::UnresolvedMemberChainBase &&
-        kind == AllowedBindingKind::Subtypes && type->is<ProtocolType>())
+        kind == AllowedBindingKind::Subtypes &&
+        type->is<ProtocolType, ProtocolCompositionType>()) {
+      DEBUG_BAILOUT("Unresolved member chain base");
       return std::nullopt;
+    }
   }
 
   if (constraint->getKind() == ConstraintKind::LValueObject) {
@@ -1709,15 +2552,24 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     // not the other way around, that would be handled by constraint
     // simplification.
     if (kind == AllowedBindingKind::Subtypes) {
-      if (type->isTypeVariableOrMember())
+      if (type->isTypeVariableOrMember()) {
+        if (type->is<TypeVariableType>()) {
+          DEBUG_BAILOUT("Unsolved l-value object");
+          recordLValueOf(constraint);
+          return std::nullopt;
+        }
+
+        DEBUG_BAILOUT("Disallowed l-value inference");
         return std::nullopt;
+      }
 
       type = LValueType::get(type);
     } else {
       // Right-hand side of the l-value object constraint can only
       // be bound via constraint simplification when l-value type
       // is inferred or contextually from other constraints.
-      DelayedBy.push_back(constraint);
+      DEBUG_BAILOUT("Delayed (2)");
+      recordDelayedBy(constraint);
       return std::nullopt;
     }
   }
@@ -1744,7 +2596,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       // Add all type variables encountered in the type except
       // to the current type variable.
       if (var != TypeVar) {
-        AdjacentVars.insert({var, constraint});
+        recordAdjacentVar(var, constraint);
         continue;
       }
 
@@ -1755,8 +2607,9 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     // let's mark bindings as delayed until dependent member type
     // is resolved.
     if (!containsSelf)
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
 
+    DEBUG_BAILOUT("Dependent member");
     return std::nullopt;
   }
 
@@ -1772,21 +2625,19 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     // Since inference now happens during constraint generation,
     // this hack should be allowed in both `Solving`
     // (during non-diagnostic mode) and `ConstraintGeneration` phases.
-    if (isGenericParameter(TypeVar) &&
-        (!CS.shouldAttemptFixes() ||
-         CS.getPhase() == ConstraintSystemPhase::ConstraintGeneration)) {
+    if (isGenericParameter(TypeVar) && !CS.inSalvageMode()) {
       type = fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape(false));
     }
   }
 
   // Check whether we can perform this binding.
-  if (auto boundType = checkTypeOfBinding(TypeVar, type)) {
-    type = *boundType;
-  } else {
+  if (!checkTypeOfBinding(TypeVar, type)) {
     auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
 
-    if (!bindingTypeVar)
+    if (!bindingTypeVar) {
+      DEBUG_BAILOUT("Not a type variable");
       return std::nullopt;
+    }
 
     // If current type variable is associated with a code completion token
     // it's possible that it doesn't have enough contextual information
@@ -1805,26 +2656,26 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion: {
       if (kind == AllowedBindingKind::Subtypes) {
-        SubtypeOf.insert({bindingTypeVar, constraint});
+        recordSubtypeOf(bindingTypeVar, constraint);
       } else {
         assert(kind == AllowedBindingKind::Supertypes);
-        SupertypeOf.insert({bindingTypeVar, constraint});
+        recordSupertypeOf(bindingTypeVar, constraint);
       }
 
-      AdjacentVars.insert({bindingTypeVar, constraint});
+      recordAdjacentVar(bindingTypeVar, constraint);
       break;
     }
 
     case ConstraintKind::Bind:
     case ConstraintKind::BindParam:
     case ConstraintKind::Equal: {
-      EquivalentTo.insert({bindingTypeVar, constraint});
-      AdjacentVars.insert({bindingTypeVar, constraint});
+      recordEquivalentTo(bindingTypeVar, constraint);
+      recordAdjacentVar(bindingTypeVar, constraint);
       break;
     }
 
     case ConstraintKind::UnresolvedMemberChainBase: {
-      EquivalentTo.insert({bindingTypeVar, constraint});
+      recordEquivalentTo(bindingTypeVar, constraint);
 
       // Don't record adjacency between base and result types,
       // this is just an auxiliary constraint to enforce ordering.
@@ -1836,8 +2687,15 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       // an un-inferred optional is adjacent to a type
       // variable that presents such optional (`bindingTypeVar`
       // in this case).
-      if (kind == AllowedBindingKind::Supertypes)
-        AdjacentVars.insert({bindingTypeVar, constraint});
+      if (kind == AllowedBindingKind::Supertypes) {
+        recordAdjacentVar(bindingTypeVar, constraint);
+
+        // If we don't know the lvalue status of the left-hand
+        // side yet, our type variable might still become an
+        // lvalue type.
+        if (bindingTypeVar->getImpl().canBindToLValue())
+          recordDelayedBy(constraint);
+      }
       break;
     }
 
@@ -1852,8 +2710,10 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
   // lvalue-binding rules.
   if (auto otherTypeVar = type->getAs<TypeVariableType>()) {
     if (TypeVar->getImpl().canBindToLValue() !=
-        otherTypeVar->getImpl().canBindToLValue())
+        otherTypeVar->getImpl().canBindToLValue()) {
+      DEBUG_BAILOUT("LValue mismatch");
       return std::nullopt;
+    }
   }
 
   if (type->is<InOutType>() && !TypeVar->getImpl().canBindToInOut())
@@ -1863,33 +2723,58 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
 
   // BindParam constraints are not reflexive and must be treated specially.
   if (constraint->getKind() == ConstraintKind::BindParam) {
-    if (kind == AllowedBindingKind::Subtypes) {
+    switch (kind) {
+    case AllowedBindingKind::Subtypes: {
       if (auto *lvt = type->getAs<LValueType>()) {
         type = InOutType::get(lvt->getObjectType());
       }
-    } else if (kind == AllowedBindingKind::Supertypes) {
+      kind = AllowedBindingKind::Exact;
+      break;
+    }
+    case AllowedBindingKind::Supertypes: {
       if (auto *iot = type->getAs<InOutType>()) {
         type = LValueType::get(iot->getObjectType());
       }
+      kind = AllowedBindingKind::Exact;
+      break;
     }
-    kind = AllowedBindingKind::Exact;
+    case AllowedBindingKind::Exact:
+    case AllowedBindingKind::Fallback:
+      break;
+    }
+  }
+
+  // We allow a funny function conversion (...) -> T conv (...) -> Void
+  // in certain positions. To handle this correctly, we must not attempt
+  // a Void binding too soon in this situation. Handle it like a fallback
+  // instead of a real subtype relationship, since it isn't one.
+  if (kind == AllowedBindingKind::Subtypes && type->isVoid()) {
+    auto subkind = CS.getImpliedResultConversionKind(constraint->getLocator());
+    if (subkind == ConstraintSystem::ImpliedResultConversionKind::ToVoid) {
+      kind = AllowedBindingKind::Fallback;
+    }
   }
 
   return PotentialBinding{type, kind, constraint};
 }
 
+#undef DEBUG_BAILOUT
+
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
-void PotentialBindings::infer(ConstraintSystem &CS,
-                              TypeVariableType *TypeVar,
-                              Constraint *constraint) {
-  if (!Constraints.insert(constraint).second)
+void PotentialBindings::infer(Constraint *constraint) {
+  ASSERT(TypeVar);
+
+  if (!Constraints.insert(constraint))
     return;
 
+  ++GenerationNumber;
+
   // Record the change, if there are active scopes.
-  if (CS.solverState && !CS.solverState->Trail.isUndoActive())
-    CS.recordChange(SolverTrail::Change::InferredBindings(TypeVar, constraint));
+  if (CS.solverState)
+    CS.recordChange(
+        SolverTrail::Change::AddedConstraintToInference(TypeVar, constraint));
 
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
@@ -1904,11 +2789,11 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::LValueObject: {
-    auto binding = inferFromRelational(CS, TypeVar, constraint);
+    auto binding = inferFromRelational(constraint);
     if (!binding)
       break;
 
-    addPotentialBinding(TypeVar, *binding);
+    addPotentialBinding(*binding);
     break;
   }
   case ConstraintKind::KeyPathApplication: {
@@ -1921,11 +2806,23 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     findInferableTypeVars(CS.simplifyType(constraint->getThirdType()),
                           typeVars);
     if (typeVars.count(TypeVar)) {
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
     }
 
     break;
   }
+
+  case ConstraintKind::NonisolatedConformsTo:
+  case ConstraintKind::ConformsTo:
+    // Conformances are applicable only to the types they are
+    // placed on. They could be transferred to supertypes
+    // but that happens separately.
+    if (!isDirectRequirement(CS, TypeVar, constraint))
+      break;
+
+    if (constraint->getSecondType()->is<ProtocolType>())
+      recordProtocol(constraint);
+    break;
 
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::CheckedCast:
@@ -1940,8 +2837,39 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::PackElementOf:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::ForEachElement:
     // Constraints from which we can't do anything.
     break;
+
+  case ConstraintKind::LiteralConformsTo: {
+    // Literal conformances are applicable only to the types they
+    // are placed on. They could be transferred to supertypes
+    // but that happens separately.
+    if (!isDirectRequirement(CS, TypeVar, constraint))
+      break;
+
+    inferFromLiteral(constraint);
+    break;
+  }
+
+  case ConstraintKind::Defaultable:
+  case ConstraintKind::FallbackType: {
+    // Defaults and fallbacks are applicable only to the types
+    // they are associated with. Defaults could be transferred
+    // to supertypes but that happens separately.
+    if (!isDirectRequirement(CS, TypeVar, constraint))
+      break;
+
+    auto newDefault = constraint->getSecondType();
+    // Don't record duplicate default types.
+    if (llvm::any_of(Defaults, [&](Constraint *existingDefault) {
+          return existingDefault->getSecondType()->isEqual(newDefault);
+        }))
+      break;
+
+    recordDefault(constraint);
+    break;
+  }
 
   // For now let's avoid inferring protocol requirements from
   // this constraint, but in the future we could do that to
@@ -1958,7 +2886,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     auto dynamicType = constraint->getFirstType();
     if (auto *tv = dynamicType->getAs<TypeVariableType>()) {
       if (tv->getImpl().getRepresentative(nullptr) == TypeVar) {
-        DelayedBy.push_back(constraint);
+        recordDelayedBy(constraint);
         break;
       }
     }
@@ -1967,32 +2895,9 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     break;
   }
 
-  case ConstraintKind::Defaultable:
-  case ConstraintKind::FallbackType:
-    // Do these in a separate pass.
-    if (CS.getFixedTypeRecursive(constraint->getFirstType(), true)
-            ->getAs<TypeVariableType>() == TypeVar) {
-      addDefault(constraint);
-    }
-    break;
-
   case ConstraintKind::Disjunction:
-    DelayedBy.push_back(constraint);
+    recordDelayedBy(constraint);
     break;
-
-  case ConstraintKind::ConformsTo: {
-    auto protocolTy = constraint->getSecondType();
-    if (protocolTy->is<ProtocolType>())
-      Protocols.push_back(constraint);
-    break;
-  }
-
-  case ConstraintKind::LiteralConformsTo: {
-    // Record constraint where protocol requirement originated
-    // this is useful to use for the binding later.
-    addLiteral(constraint);
-    break;
-  }
 
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction: {
@@ -2008,13 +2913,12 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   }
 
   case ConstraintKind::BindOverload: {
-    DelayedBy.push_back(constraint);
+    recordDelayedBy(constraint);
     break;
   }
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::ValueWitness:
   case ConstraintKind::PropertyWrapper: {
     // If current type variable represents a member type of some reference,
     // it would be bound once member is resolved either to a actual member
@@ -2026,7 +2930,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
         // It's possible that member has been bound to some other type variable
         // instead of merged with it because it's wrapped in an l-value type.
         if (type->getWithoutSpecifierType()->isEqual(TypeVar)) {
-          DelayedBy.push_back(constraint);
+          recordDelayedBy(constraint);
           break;
         }
       } else {
@@ -2035,121 +2939,143 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     }
 
     if (memberTy == TypeVar)
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
+
+    break;
+  }
+
+  case ConstraintKind::OneWayEqual:{
+    // Don't produce any bindings if this type variable is on the left-hand
+    // side of a one-way binding.
+    auto firstType = constraint->getFirstType();
+    if (auto *tv = firstType->getAs<TypeVariableType>()) {
+      if (tv->getImpl().getRepresentative(nullptr) == TypeVar) {
+        recordDelayedBy(constraint);
+        break;
+      }
+    }
 
     break;
   }
   }
 }
 
-void PotentialBindings::retract(ConstraintSystem &CS,
-                                TypeVariableType *TypeVar,
-                                Constraint *constraint) {
-  if (!Constraints.erase(constraint))
+void PotentialBindings::retract(Constraint *constraint) {
+  ASSERT(TypeVar);
+
+  if (!Constraints.remove(constraint))
     return;
 
+  ++GenerationNumber;
+
   // Record the change, if there are active scopes.
-  if (CS.solverState && !CS.solverState->Trail.isUndoActive())
-    CS.recordChange(SolverTrail::Change::RetractedBindings(TypeVar, constraint));
+  if (CS.solverState)
+    CS.recordChange(SolverTrail::Change::RetractedConstraintFromInference(
+        TypeVar, constraint));
 
   LLVM_DEBUG(
     llvm::dbgs() << Constraints.size() << " " << Bindings.size() << " "
-                 << Protocols.size() << " " << Literals.size() << " "
                  << AdjacentVars.size() << " " << DelayedBy.size() << " "
-                 << SubtypeOf.size() << " " << SupertypeOf.size() << " "
-                 << EquivalentTo.size() << "\n");
+                 << LValueOf.size() << " " << SubtypeOf.size() << " "
+                 << SupertypeOf.size() << " " << EquivalentTo.size() << "\n");
 
   Bindings.erase(
       llvm::remove_if(Bindings,
-                      [&constraint](const PotentialBinding &binding) {
-                        return binding.getSource() == constraint;
+                      [&](const PotentialBinding &binding) {
+                        if (binding.getSource() == constraint) {
+                          if (CS.solverState) {
+                            CS.recordChange(SolverTrail::Change::RetractedBinding(
+                                TypeVar, binding));
+                          }
+                          return true;
+                        }
+                        return false;
                       }),
       Bindings.end());
 
-  auto isMatchingConstraint = [&constraint](Constraint *existing) {
-    return existing == constraint;
-  };
+  Literals.erase(
+      llvm::remove_if(Literals,
+                      [&](const LiteralRequirement &literal) {
+                        if (literal.getSource() == constraint) {
+                          if (CS.solverState) {
+                            CS.recordChange(SolverTrail::Change::RetractedLiteral(
+                                TypeVar, constraint));
+                          }
+                          return true;
+                        }
+                        return false;
+                      }),
+      Literals.end());
 
-  auto hasMatchingSource =
-      [&constraint](
-          const std::pair<TypeVariableType *, Constraint *> &adjacency) {
-        return adjacency.second == constraint;
-      };
+#define COMMON_BINDING_INFORMATION_RETRACTION(PropertyName, Storage)           \
+  Storage.erase(                                                               \
+      llvm::remove_if(Storage,                                                 \
+                      [&](Constraint *other) {                                 \
+                        if (other == constraint) {                             \
+                          if (CS.solverState) {                                \
+                            CS.recordChange(                                   \
+                                SolverTrail::Change::Retracted##PropertyName(  \
+                                    TypeVar, constraint));                     \
+                          }                                                    \
+                          return true;                                         \
+                        }                                                      \
+                        return false;                                          \
+                      }),                                                      \
+      Storage.end());
 
-  switch (constraint->getKind()) {
-  case ConstraintKind::ConformsTo:
-    Protocols.erase(llvm::remove_if(Protocols, isMatchingConstraint),
-                    Protocols.end());
-    break;
-
-  case ConstraintKind::LiteralConformsTo:
-    Literals.erase(constraint);
-    break;
-
-  case ConstraintKind::Defaultable:
-  case ConstraintKind::FallbackType: {
-    Defaults.erase(constraint);
-    break;
-  }
-
-  default:
-    break;
-  }
-
-  {
-    llvm::SmallPtrSet<TypeVariableType *, 2> unviable;
-    for (const auto &adjacent : AdjacentVars) {
-      if (adjacent.second == constraint)
-        unviable.insert(adjacent.first);
-    }
-
-    for (auto *adjacentVar : unviable)
-      AdjacentVars.erase(std::make_pair(adjacentVar, constraint));
-  }
-
-  DelayedBy.erase(llvm::remove_if(DelayedBy, isMatchingConstraint),
-                  DelayedBy.end());
-
-  SubtypeOf.remove_if(hasMatchingSource);
-  SupertypeOf.remove_if(hasMatchingSource);
-  EquivalentTo.remove_if(hasMatchingSource);
+#define BINDING_RELATION_RETRACTION(RelationName, Storage)                     \
+  Storage.erase(                                                               \
+      llvm::remove_if(Storage,                                                 \
+                      [&](std::pair<TypeVariableType *, Constraint *> pair) {  \
+                        if (pair.second == constraint) {                       \
+                          if (CS.solverState) {                                \
+                            CS.recordChange(                                   \
+                                SolverTrail::Change::Retracted##RelationName(  \
+                                    TypeVar, pair.first, pair.second));        \
+                          }                                                    \
+                          return true;                                         \
+                        }                                                      \
+                        return false;                                          \
+                      }),                                                      \
+      Storage.end());
+#include "swift/Sema/CSTrail.def"
 }
 
 void PotentialBindings::reset() {
   if (CONDITIONAL_ASSERT_enabled()) {
     ASSERT(Constraints.empty());
     ASSERT(Bindings.empty());
-    ASSERT(Protocols.empty());
-    ASSERT(Literals.empty());
-    ASSERT(Defaults.empty());
     ASSERT(DelayedBy.empty());
     ASSERT(AdjacentVars.empty());
+    ASSERT(LValueOf.empty());
     ASSERT(SubtypeOf.empty());
     ASSERT(SupertypeOf.empty());
     ASSERT(EquivalentTo.empty());
   }
 
+  TypeVar = nullptr;
   AssociatedCodeCompletionToken = ASTNode();
 }
 
-void PotentialBindings::dump(ConstraintSystem &cs,
-                             TypeVariableType *typeVar,
-                             llvm::raw_ostream &out,
-                             unsigned indent) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+void PotentialBindings::dump(llvm::raw_ostream &out, unsigned indent) const {
+  if (TypeVar) {
+    out << "Potential bindings for ";
+    TypeVar->getImpl().print(out);
+    out << "\n";
+  } else {
+    out << "<<No type variable assigned>>\n";
+  }
 
-  out << "Potential bindings for ";
-  typeVar->getImpl().print(out);
-  out << "\n";
+  out << "generation: " << GenerationNumber << " ";
 
   out << "[constraints: ";
-  interleave(Constraints,
-             [&](Constraint *constraint) {
-               constraint->print(out, &cs.getASTContext().SourceMgr, indent,
-                                 /*skipLocator=*/true);
-             },
-             [&out]() { out << ", "; });
+  interleave(
+      Constraints,
+      [&](Constraint *constraint) {
+        constraint->print(out, &CS.getASTContext().SourceMgr, indent,
+                          /*skipLocator=*/true);
+      },
+      [&out]() { out << ", "; });
   out << "] ";
 
   if (!AdjacentVars.empty()) {
@@ -2160,31 +3086,29 @@ void PotentialBindings::dump(ConstraintSystem &cs,
                [](auto lhs, auto rhs) {
                    return lhs.first->getID() < rhs.first->getID();
                });
-    interleave(adjacentVars,
-               [&](std::pair<TypeVariableType *, Constraint *> pair) {
-                 out << pair.first->getString(PO);
-                 if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
-                   out << " (fixed)";
-                 out << " via ";
-                 pair.second->print(out, &cs.getASTContext().SourceMgr, indent,
-                                    /*skipLocator=*/true);
-               },
-               [&out]() { out << ", "; });
+    interleave(
+        adjacentVars,
+        [&](std::pair<TypeVariableType *, Constraint *> pair) {
+          out << pair.first->getString(PrintOptions::forDebugging());
+          if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
+            out << " (fixed)";
+          out << " via ";
+          pair.second->print(out, &CS.getASTContext().SourceMgr, indent,
+                             /*skipLocator=*/true);
+        },
+        [&out]() { out << ", "; });
     out << "] ";
   }
 }
 
 void BindingSet::forEachLiteralRequirement(
     llvm::function_ref<void(KnownProtocolKind)> callback) const {
-  for (const auto &literal : Literals) {
-    auto *protocol = literal.first;
-    const auto &info = literal.second;
-
+  for (const auto &info : Literals) {
     // Only uncovered defaultable literal protocols participate.
     if (!info.viableAsBinding())
       continue;
     
-    if (auto protocolKind = protocol->getKnownProtocolKind())
+    if (auto protocolKind = info.getProtocol()->getKnownProtocolKind())
       callback(*protocolKind);
   }
 }
@@ -2215,7 +3139,7 @@ LiteralBindingKind BindingSet::getLiteralForScore() const {
 
 unsigned BindingSet::getNumViableLiteralBindings() const {
   return llvm::count_if(Literals, [&](const auto &literal) {
-    return literal.second.viableAsBinding();
+    return literal.viableAsBinding();
   });
 }
 
@@ -2253,8 +3177,7 @@ static std::string getCollectionLiteralAsString(KnownProtocolKind KPK) {
 }
 
 void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   if (auto typeVar = getTypeVariable()) {
     typeVar->getImpl().print(out);
@@ -2264,12 +3187,27 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   std::vector<std::string> attributes;
   if (isDirectHole())
     attributes.push_back("hole");
+  switch (getLValueState()) {
+  case KnownLValueKind::Unknown:
+    attributes.push_back("maybe_lvalue");
+    break;
+  case KnownLValueKind::LValue:
+    attributes.push_back("definitely_lvalue");
+    break;
+  case KnownLValueKind::RValue:
+    break;
+  }
+
   if (isPotentiallyIncomplete())
     attributes.push_back("potentially_incomplete");
   if (isDelayed())
     attributes.push_back("delayed");
   if (isSubtypeOfExistentialType())
     attributes.push_back("subtype_of_existential");
+  if (isDirty())
+    attributes.push_back("dirty");
+  if (isConflicting())
+    attributes.push_back("conflicting");
   if (!attributes.empty()) {
     out << "[attributes: ";
     interleave(attributes, out, ", ");
@@ -2335,60 +3273,13 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   if (numDefaultable > 0)
     out << "[defaultable bindings: " << numDefaultable << "] ";
 
-  struct PrintableBinding {
-  private:
-    enum class BindingKind { Exact, Subtypes, Supertypes, Literal };
-    BindingKind Kind;
-    Type BindingType;
-    bool Viable;
-    PrintableBinding(BindingKind kind, Type bindingType, bool viable)
-        : Kind(kind), BindingType(bindingType), Viable(viable) {}
-
-  public:
-    static PrintableBinding supertypesOf(Type binding) {
-      return PrintableBinding{BindingKind::Supertypes, binding, true};
-    }
-    
-    static PrintableBinding subtypesOf(Type binding) {
-      return PrintableBinding{BindingKind::Subtypes, binding, true};
-    }
-    
-    static PrintableBinding exact(Type binding) {
-      return PrintableBinding{BindingKind::Exact, binding, true};
-    }
-    
-    static PrintableBinding literalDefaultType(Type binding, bool viable) {
-      return PrintableBinding{BindingKind::Literal, binding, viable};
-    }
-
-    void print(llvm::raw_ostream &out, const PrintOptions &PO,
-               unsigned indent = 0) const {
-      switch (Kind) {
-      case BindingKind::Exact:
-        break;
-      case BindingKind::Subtypes:
-        out << "(subtypes of) ";
-        break;
-      case BindingKind::Supertypes:
-        out << "(supertypes of) ";
-        break;
-      case BindingKind::Literal:
-        out << "(default type of literal) ";
-        break;
-      }
-      if (BindingType)
-        BindingType.print(out, PO);
-      if (!Viable)
-        out << " [literal not viable]";
-    }
-  };
-
   out << "[potential bindings: ";
   SmallVector<PrintableBinding, 2> potentialBindings;
   for (const auto &binding : Bindings) {
     switch (binding.Kind) {
     case AllowedBindingKind::Exact:
-      potentialBindings.push_back(PrintableBinding::exact(binding.BindingType));
+      potentialBindings.push_back(
+          PrintableBinding::exact(binding.BindingType));
       break;
     case AllowedBindingKind::Supertypes:
       potentialBindings.push_back(
@@ -2398,14 +3289,18 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
       potentialBindings.push_back(
           PrintableBinding::subtypesOf(binding.BindingType));
       break;
+    case AllowedBindingKind::Fallback:
+      potentialBindings.push_back(
+          PrintableBinding::fallback(binding.BindingType));
+      break;
     }
   }
   for (const auto &literal : Literals) {
     potentialBindings.push_back(PrintableBinding::literalDefaultType(
-        literal.second.hasDefaultType()
-        ? literal.second.getDefaultType()
+        literal.hasDefaultType()
+        ? literal.getDefaultType()
         : Type(),
-        literal.second.viableAsBinding()));
+        literal.viableAsBinding()));
   }
   if (potentialBindings.empty()) {
     out << "<none>";
@@ -2421,8 +3316,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     out << " [defaults: ";
     interleave(
         Defaults,
-        [&](const auto &entry) {
-          auto *constraint = entry.second;
+        [&](Constraint *constraint) {
           auto defaultBinding =
               PrintableBinding::exact(constraint->getSecondType());
           defaultBinding.print(out, PO);
@@ -2431,535 +3325,4 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     out << "]";
   }
   
-}
-
-// Given a possibly-Optional type, return the direct superclass of the
-// (underlying) type wrapped in the same number of optional levels as
-// type.
-static Type getOptionalSuperclass(Type type) {
-  int optionalLevels = 0;
-  while (auto underlying = type->getOptionalObjectType()) {
-    ++optionalLevels;
-    type = underlying;
-  }
-
-  Type superclass;
-  if (auto *existential = type->getAs<ExistentialType>()) {
-    auto constraintTy = existential->getConstraintType();
-    if (auto *compositionTy = constraintTy->getAs<ProtocolCompositionType>()) {
-      SmallVector<Type, 2> members;
-      bool found = false;
-      // Preserve all of the protocol requirements of the type i.e.
-      // if the type was `any B & P` where `B : A` the supertype is
-      // going to be `any A & P`.
-      //
-      // This is especially important for Sendable key paths because
-      // to reserve sendability of the original type.
-      for (auto member : compositionTy->getMembers()) {
-        if (member->getClassOrBoundGenericClass()) {
-          member = member->getSuperclass();
-          if (!member)
-            return Type();
-          found = true;
-        }
-        members.push_back(member);
-      }
-
-      if (!found)
-        return Type();
-
-      superclass = ExistentialType::get(
-          ProtocolCompositionType::get(type->getASTContext(), members,
-                                       compositionTy->getInverses(),
-                                       compositionTy->hasExplicitAnyObject()));
-    } else {
-      // Avoid producing superclass for situations like `any P` where `P` is
-      // `protocol P : C`.
-      return Type();
-    }
-  } else {
-    superclass = type->getSuperclass();
-  }
-
-  if (!superclass)
-    return Type();
-
-  while (optionalLevels--)
-    superclass = OptionalType::get(superclass);
-
-  return superclass;
-}
-
-/// Enumerates all of the 'direct' supertypes of the given type.
-///
-/// The direct supertype S of a type T is a supertype of T (e.g., T < S)
-/// such that there is no type U where T < U and U < S.
-static SmallVector<Type, 4> enumerateDirectSupertypes(Type type) {
-  SmallVector<Type, 4> result;
-
-  if (type->is<InOutType>() || type->is<LValueType>()) {
-    type = type->getWithoutSpecifierType();
-    result.push_back(type);
-  }
-
-  if (auto superclass = getOptionalSuperclass(type)) {
-    // FIXME: Can also weaken to the set of protocol constraints, but only
-    // if there are any protocols that the type conforms to but the superclass
-    // does not.
-
-    result.push_back(superclass);
-  }
-
-  // FIXME: lots of other cases to consider!
-  return result;
-}
-
-bool TypeVarBindingProducer::computeNext() {
-  SmallVector<Binding, 4> newBindings;
-  auto addNewBinding = [&](Binding binding) {
-    auto type = binding.BindingType;
-
-    // If we've already tried this binding, move on.
-    if (!BoundTypes.insert(type.getPointer()).second)
-      return;
-
-    if (!ExploredTypes.insert(type->getCanonicalType()).second)
-      return;
-
-    newBindings.push_back(std::move(binding));
-  };
-
-  // Let's attempt only directly inferrable bindings for
-  // a type variable representing a closure type because
-  // such type variables are handled specially and only
-  // bound to a type inferred from their expression, having
-  // contextual bindings is just a trigger for that to
-  // happen.
-  if (TypeVar->getImpl().isClosureType())
-    return false;
-
-  for (auto &binding : Bindings) {
-    const auto type = binding.BindingType;
-    assert(!type->hasError());
-
-    // If we have a protocol with a default type, look for alternative
-    // types to the default.
-    if (NumTries == 0 && binding.hasDefaultedLiteralProtocol()) {
-      auto knownKind =
-          *(binding.getDefaultedLiteralProtocol()->getKnownProtocolKind());
-      SmallVector<Type, 2> scratch;
-      for (auto altType : CS.getAlternativeLiteralTypes(knownKind, scratch)) {
-        addNewBinding(binding.withSameSource(altType, BindingKind::Subtypes));
-      }
-    }
-
-    if (getLocator()->directlyAt<ForceValueExpr>() &&
-        TypeVar->getImpl().canBindToLValue() &&
-        !binding.BindingType->is<LValueType>()) {
-      // Result of force unwrap is always connected to its base
-      // optional type via `OptionalObject` constraint which
-      // preserves l-valueness, so in case where object type got
-      // inferred before optional type (because it got the
-      // type from context e.g. parameter type of a function call),
-      // we need to test type with and without l-value after
-      // delaying bindings for as long as possible.
-      addNewBinding(binding.withType(LValueType::get(binding.BindingType)));
-    }
-
-    // There is a tailored fix for optional key path root references,
-    // let's not create ambiguity by attempting unwrap when it's
-    // not allowed.
-    if (binding.Kind != BindingKind::Subtypes &&
-        getLocator()->isKeyPathRoot() && type->getOptionalObjectType())
-      continue;
-
-    // Allow solving for T even for a binding kind where that's invalid
-    // if fixes are allowed, because that gives us the opportunity to
-    // match T? values to the T binding by adding an unwrap fix.
-    if (binding.Kind == BindingKind::Subtypes || CS.shouldAttemptFixes()) {
-      // If we were unsuccessful solving for T?, try solving for T.
-      if (auto objTy = type->getOptionalObjectType()) {
-        // TODO: This could be generalized in the future to cover all patterns
-        // that have an intermediate type variable in subtype/conversion chain.
-        //
-        // Let's not perform $T? -> $T for closure result types to avoid having
-        // to re-discover solutions that differ only in location of optional
-        // injection.
-        //
-        // The pattern with such type variables is:
-        //
-        // $T_body <conv/subtype> $T_result <conv/subtype> $T_contextual_result
-        //
-        // When $T_contextual_result is Optional<$U>, the optional injection
-        // can either happen from $T_body or from $T_result (if `return`
-        // expression is non-optional), if we allow  both the solver would
-        // find two solutions that differ only in location of optional
-        // injection.
-        if (!TypeVar->getImpl().isClosureResultType()) {
-          // If T is a type variable, only attempt this if both the
-          // type variable we are trying bindings for, and the type
-          // variable we will attempt to bind, both have the same
-          // polarity with respect to being able to bind lvalues.
-          if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
-            if (TypeVar->getImpl().canBindToLValue() ==
-                otherTypeVar->getImpl().canBindToLValue()) {
-              addNewBinding(binding.withType(objTy));
-            }
-          } else {
-            addNewBinding(binding.withType(objTy));
-          }
-        }
-      }
-    }
-
-    auto srcLocator = binding.getLocator();
-    if (srcLocator &&
-        (srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
-         srcLocator->isLastElement<LocatorPathElt::AutoclosureResult>()) &&
-        !type->hasTypeVariable() && type->isKnownStdlibCollectionType()) {
-      // If the type binding comes from the argument conversion, let's
-      // instead of binding collection types directly, try to bind
-      // using temporary type variables substituted for element
-      // types, that's going to ensure that subtype relationship is
-      // always preserved.
-      auto *BGT = type->castTo<BoundGenericType>();
-      auto dstLocator = TypeVar->getImpl().getLocator();
-      auto newType =
-          CS.openUnboundGenericType(BGT->getDecl(), BGT->getParent(),
-                                    dstLocator, /*isTypeResolution=*/false)
-              ->reconstituteSugar(/*recursive=*/false);
-      addNewBinding(binding.withType(newType));
-    }
-
-    if (binding.Kind == BindingKind::Supertypes) {
-      // If this is a type variable representing closure result,
-      // which is on the right-side of some relational constraint
-      // let's have it try `Void` as well because there is an
-      // implicit conversion `() -> T` to `() -> Void` and this
-      // helps to avoid creating a thunk to support it.
-      if (getLocator()->isLastElement<LocatorPathElt::ClosureResult>() &&
-          binding.Kind == AllowedBindingKind::Supertypes) {
-        auto voidType = CS.getASTContext().TheEmptyTupleType;
-        addNewBinding(binding.withSameSource(voidType, BindingKind::Exact));
-      }
-
-      for (auto supertype : enumerateDirectSupertypes(type)) {
-        // If we're not allowed to try this binding, skip it.
-        if (auto simplifiedSuper = checkTypeOfBinding(TypeVar, supertype)) {
-          auto supertype = *simplifiedSuper;
-          // A key path type cannot be bound to type-erased key path variants.
-          if (TypeVar->getImpl().isKeyPathType() &&
-              isTypeErasedKeyPathType(supertype))
-            continue;
-
-          addNewBinding(binding.withType(supertype));
-        }
-      }
-    }
-  }
-
-  if (newBindings.empty()) {
-    // If key path type had contextual types, let's not attempt fallback.
-    if (TypeVar->getImpl().isKeyPathType() && !ExploredTypes.empty())
-      return false;
-
-    // Add defaultable constraints (if any).
-    for (auto *constraint : DelayedDefaults) {
-      if (constraint->getKind() == ConstraintKind::FallbackType) {
-        // If there are no other possible bindings for this variable
-        // let's default it to the fallback type, otherwise we should
-        // only attempt contextual types.
-        if (!ExploredTypes.empty())
-          continue;
-      }
-
-      addNewBinding(getDefaultBinding(constraint));
-    }
-
-    // Drop all of the default since we have converted them into bindings.
-    DelayedDefaults.clear();
-  }
-
-  if (newBindings.empty())
-    return false;
-
-  Index = 0;
-  ++NumTries;
-  Bindings = std::move(newBindings);
-  return true;
-}
-
-std::optional<std::pair<ConstraintFix *, unsigned>>
-TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
-  auto *dstLocator = TypeVar->getImpl().getLocator();
-  auto *srcLocator = Binding.getLocator();
-
-  // FIXME: This check could be turned into an assert once
-  // all code completion kinds are ported to use
-  // `TypeChecker::typeCheckForCodeCompletion` API.
-  if (cs.isForCodeCompletion()) {
-    // If the hole is originated from code completion expression
-    // let's not try to fix this, anything connected to a
-    // code completion is allowed to be a hole because presence
-    // of a code completion token makes constraint system
-    // under-constrained due to e.g. lack of expressions on the
-    // right-hand side of the token, which are required for a
-    // regular type-check.
-    if (dstLocator->directlyAt<CodeCompletionExpr>() ||
-        srcLocator->directlyAt<CodeCompletionExpr>())
-      return std::nullopt;
-  }
-
-  unsigned defaultImpact = 1;
-
-  if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
-    // If it is representative for a key path root, let's emit a more
-    // specific diagnostic.
-    auto *keyPathRoot =
-        cs.isRepresentativeFor(TypeVar, ConstraintLocator::KeyPathRoot);
-    if (keyPathRoot) {
-      ConstraintFix *fix = SpecifyKeyPathRootType::create(
-          cs, keyPathRoot->getImpl().getLocator());
-      return std::make_pair(fix, defaultImpact);
-    } else {
-      auto path = dstLocator->getPath();
-      // Drop `generic parameter` locator element so that all missing
-      // generic parameters related to the same path can be coalesced later.
-      ConstraintFix *fix = DefaultGenericArgument::create(
-          cs, GP,
-          cs.getConstraintLocator(dstLocator->getAnchor(), path.drop_back()));
-      return std::make_pair(fix, defaultImpact);
-    }
-  }
-
-  if (TypeVar->getImpl().isClosureParameterType()) {
-    ConstraintFix *fix = SpecifyClosureParameterType::create(cs, dstLocator);
-    return std::make_pair(fix, defaultImpact);
-  }
-
-  if (TypeVar->getImpl().isClosureResultType()) {
-    auto *closure = castToExpr<ClosureExpr>(dstLocator->getAnchor());
-    // If the whole body is being ignored due to a pre-check failure,
-    // let's not record a fix about result type since there is
-    // just not enough context to infer it without a body.
-    auto *closureLoc = cs.getConstraintLocator(closure);
-    if (cs.hasFixFor(closureLoc, FixKind::IgnoreInvalidResultBuilderBody) ||
-        cs.hasFixFor(closureLoc, FixKind::IgnoreResultBuilderWithReturnStmts))
-      return std::nullopt;
-
-    ConstraintFix *fix = SpecifyClosureReturnType::create(cs, dstLocator);
-    return std::make_pair(fix, defaultImpact);
-  }
-
-  if (srcLocator->directlyAt<ObjectLiteralExpr>()) {
-    ConstraintFix *fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
-    return std::make_pair(fix, defaultImpact);
-  }
-
-  if (srcLocator->isKeyPathRoot()) {
-    // If we recorded an invalid key path fix, let's skip this specify root
-    // type fix because it wouldn't produce a useful diagnostic.
-    auto *kpLocator = cs.getConstraintLocator(srcLocator->getAnchor());
-    if (cs.hasFixFor(kpLocator, FixKind::AllowKeyPathWithoutComponents))
-      return std::nullopt;
-
-    // If key path has any invalid component, let's just skip fix because the
-    // invalid component would be already diagnosed.
-    auto keyPath = castToExpr<KeyPathExpr>(srcLocator->getAnchor());
-    if (llvm::any_of(keyPath->getComponents(),
-                     [](KeyPathExpr::Component component) {
-                       return !component.isValid();
-                     }))
-      return std::nullopt;
-
-    ConstraintFix *fix = SpecifyKeyPathRootType::create(cs, dstLocator);
-    return std::make_pair(fix, defaultImpact);
-  }
-
-  if (srcLocator->isLastElement<LocatorPathElt::PlaceholderType>()) {
-    // When a 'nil' has a placeholder as contextual type there is not enough
-    // information to resolve it, so let's record a specify contextual type for
-    // nil fix.
-    if (isExpr<NilLiteralExpr>(srcLocator->getAnchor())) {
-      ConstraintFix *fix = SpecifyContextualTypeForNil::create(cs, dstLocator);
-      return std::make_pair(fix, /*impact=*/(unsigned)10);
-    }
-
-    // If the placeholder is in an invalid position, we'll have already
-    // recorded a fix, and can skip recording another.
-    if (cs.hasFixFor(dstLocator, FixKind::IgnoreInvalidPlaceholder))
-      return std::nullopt;
-
-    ConstraintFix *fix = SpecifyTypeForPlaceholder::create(cs, srcLocator);
-    return std::make_pair(fix, defaultImpact);
-  }
-
-  if (dstLocator->directlyAt<NilLiteralExpr>()) {
-    // This is a dramatic event, it means that there is absolutely
-    // no contextual information to resolve type of `nil`.
-    ConstraintFix *fix = SpecifyContextualTypeForNil::create(cs, dstLocator);
-    return std::make_pair(fix, /*impact=*/(unsigned)10);
-  }
-
-  if (auto pattern = dstLocator->getPatternMatch()) {
-    if (dstLocator->isLastElement<LocatorPathElt::PatternDecl>()) {
-      // If this is the pattern in a for loop, and we have a mismatch of the
-      // element type, then we don't have any useful contextual information
-      // for the pattern, and can just bind to a hole without needing to penalize
-      // the solution further.
-      auto *seqLoc = cs.getConstraintLocator(
-          dstLocator->getAnchor(), ConstraintLocator::SequenceElementType);
-      if (cs.hasFixFor(seqLoc,
-                       FixKind::IgnoreCollectionElementContextualMismatch)) {
-        return std::nullopt;
-      }
-      if (dstLocator->getAnchor().isExpr(ExprKind::CodeCompletion)) {
-        // Ignore the hole if it is because the right-hand-side of the pattern
-        // match is a code completion token. Assigning a high fix score to this
-        // mismatch won't help. In fact, it can harm because we might have a
-        // different exploration path in the constraint system that gives up
-        // earlier (eg. because code completion is in a closure that doesn't
-        // match the expected parameter of a function call) and might thus get a
-        // better score, despite not having any information about the code
-        // completion token at all.
-        return std::nullopt;
-      }
-      // Not being able to infer the type of a variable in a pattern binding
-      // decl is more dramatic than anything that could happen inside the
-      // expression because we want to preferrably point the diagnostic to a
-      // part of the expression that caused us to be unable to infer the
-      // variable's type.
-      ConstraintFix *fix =
-          IgnoreUnresolvedPatternVar::create(cs, pattern.get(), dstLocator);
-      return std::make_pair(fix, /*impact=*/(unsigned)100);
-    }
-  }
-
-  if (srcLocator->isLastElement<LocatorPathElt::MemberRefBase>()) {
-    auto *baseExpr = castToExpr<UnresolvedMemberExpr>(srcLocator->getAnchor());
-    ConstraintFix *fix = SpecifyBaseTypeForContextualMember::create(
-        cs, baseExpr->getName(), srcLocator);
-    return std::make_pair(fix, defaultImpact);
-  }
-
-  if (dstLocator->isLastElement<LocatorPathElt::PackElement>()) {
-    // A hole appears as an element of generic pack params
-    ConstraintFix *Fix = SpecifyPackElementType::create(cs, dstLocator);
-    return std::make_pair(Fix, defaultImpact);
-  }
-
-  return std::nullopt;
-}
-
-bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
-  auto type = Binding.BindingType;
-  auto *srcLocator = Binding.getLocator();
-  auto *dstLocator = TypeVar->getImpl().getLocator();
-
-  if (Binding.hasDefaultedLiteralProtocol()) {
-    type = cs.replaceInferableTypesWithTypeVars(type, dstLocator);
-    type = type->reconstituteSugar(/*recursive=*/false);
-  }
-
-  // If type variable has been marked as a possible hole due to
-  // e.g. reference to a missing member. Let's propagate that
-  // information to the object type of the optional type it's
-  // about to be bound to.
-  //
-  // In some situations like pattern bindings e.g. `if let x = base?.member`
-  // - if `member` doesn't exist, `x` cannot be determined either, which
-  // leaves `OptionalEvaluationExpr` representing outer type of `base?.member`
-  // without any contextual information, so even though `x` would get
-  // bound to result type of the chain, underlying type variable wouldn't
-  // be resolved, so we need to propagate holes up the conversion chain.
-  // Also propagate in code completion mode because in some cases code
-  // completion relies on type variable being a potential hole.
-  if (TypeVar->getImpl().canBindToHole()) {
-    if (srcLocator->directlyAt<OptionalEvaluationExpr>() ||
-        cs.isForCodeCompletion()) {
-      if (auto objectTy = type->getOptionalObjectType()) {
-        if (auto *typeVar = objectTy->getAs<TypeVariableType>()) {
-          cs.recordPotentialHole(typeVar);
-        }
-      }
-    }
-  }
-
-  ConstraintSystem::TypeMatchOptions options;
-
-  options |= ConstraintSystem::TMF_GenerateConstraints;
-  options |= ConstraintSystem::TMF_BindingTypeVariable;
-
-  auto result =
-      cs.matchTypes(TypeVar, type, ConstraintKind::Bind, options, srcLocator);
-
-  if (result.isFailure()) {
-    if (cs.isDebugMode()) {
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
-
-      llvm::errs().indent(cs.solverState->getCurrentIndent())
-          << "(failed to establish binding " << TypeVar->getString(PO)
-          << " := " << type->getString(PO) << ")\n";
-    }
-    return false;
-  }
-
-  auto reportHole = [&]() {
-    if (cs.isForCodeCompletion()) {
-      // Don't penalize solutions with unresolved generics.
-      if (TypeVar->getImpl().getGenericParameter())
-        return false;
-
-      // Don't penalize solutions if we couldn't determine the type of the code
-      // completion token. We still want to examine the surrounding types in
-      // that case.
-      if (TypeVar->getImpl().isCodeCompletionToken())
-        return false;
-
-      // Don't penalize solutions with holes due to missing arguments after the
-      // code completion position.
-      auto argLoc = srcLocator->findLast<LocatorPathElt::SynthesizedArgument>();
-      if (argLoc && argLoc->isAfterCodeCompletionLoc())
-        return false;
-
-      // Don't penalize solutions that have holes for ignored arguments.
-      if (cs.hasArgumentsIgnoredForCodeCompletion()) {
-        // Avoid simplifying the locator if the constraint system didn't ignore
-        // any arguments.
-        auto argExpr = simplifyLocatorToAnchor(TypeVar->getImpl().getLocator());
-        if (cs.isArgumentIgnoredForCodeCompletion(argExpr.dyn_cast<Expr *>())) {
-          return false;
-        }
-      }
-    }
-    // Reflect in the score that this type variable couldn't be
-    // resolved and had to be bound to a placeholder "hole" type.
-    cs.increaseScore(SK_Hole, srcLocator);
-
-    if (auto fix = fixForHole(cs)) {
-      if (cs.recordFix(/*fix=*/fix->first, /*impact=*/fix->second))
-        return true;
-    }
-    return false;
-  };
-
-  // If this was from a defaultable binding note that.
-  if (Binding.isDefaultableBinding()) {
-    cs.recordDefaultedConstraint(srcLocator);
-
-    // Fail if hole reporting fails.
-    if (type->isPlaceholder() && reportHole())
-      return false;
-  }
-
-  if (cs.simplify())
-    return false;
-
-  // If all of the re-activated constraints where simplified,
-  // let's notify binding inference about the fact that type
-  // variable has been bound successfully.
-  cs.getConstraintGraph().introduceToInference(TypeVar, type);
-
-  return true;
 }

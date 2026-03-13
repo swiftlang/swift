@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h -target %target-stable-abi-triple
-// RUN: %target-typecheck-verify-swift -DPRIVATE_MODULE -Xcc -fmodule-map-file=%S/Inputs/objc_implementation_private.modulemap -target %target-stable-abi-triple
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -import-objc-header %S/Inputs/objc_implementation.h -target %target-stable-abi-triple
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -DPRIVATE_MODULE -Xcc -fmodule-map-file=%S/Inputs/objc_implementation_private.modulemap -target %target-stable-abi-triple
 
 // REQUIRES: objc_interop
 
@@ -107,6 +107,8 @@ import objc_implementation_private
     // OK, provides an implementation with a computed read-only property
     get { return 1 }
   }
+
+  @objc let readonlyPropertyFromHeader7: CInt
 
   @objc fileprivate var propertyNotFromHeader2: CInt
   // OK, provides a nonpublic but ObjC-compatible stored property
@@ -228,6 +230,17 @@ import objc_implementation_private
     // OK, provides an implementation with a computed property
     get { return 1 }
     set {}
+  }
+
+  @objc var categoryPropertyFromHeader5: CInt {
+    // OK, provides an implementation with a computed property
+    get { return 1 }
+    set {}
+  }
+
+  @objc var categoryReadonlyPropertyFromHeader1: CInt {
+    // OK, provides an implementation with a computed property
+    get { return 1 }
   }
 }
 

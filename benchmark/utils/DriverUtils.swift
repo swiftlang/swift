@@ -23,6 +23,12 @@ import LibProc
 
 import TestsUtils
 
+/// Sorry.
+private func ??<T>(_ x: T?, _ y: @autoclosure () async -> T) async -> T {
+  if let x { return x }
+  return await y()
+}
+
 struct MeasurementMetadata {
   // Note: maxRSS and pages subtract the RSS measured
   // after the benchmark driver setup has finished.
@@ -198,10 +204,16 @@ struct TestConfig {
     action = c.action ?? .run
     allowNondeterministicHashing = c.allowNondeterministicHashing ?? false
     jsonOutput = c.jsonOutput ?? false
+
+    var skipTags: Set<BenchmarkCategory>
+    skipTags = c.tags ?? [.unstable, .skip]
+#if DEBUG
+    skipTags.insert(.long)
+#endif
     tests = TestConfig.filterTests(registeredBenchmarks,
                                     tests: c.tests ?? [],
                                     tags: c.tags ?? [],
-                                    skipTags: c.skipTags ?? [.unstable, .skip])
+                                    skipTags: skipTags)
 
     if tests.count > 0 {
       testNameLength = tests.map{$0.info.name.count}.sorted().reversed().first!
@@ -481,13 +493,13 @@ final class TestRunner {
   }
 
   /// Measure the `fn` and return the average sample time per iteration (μs).
-  func measure(_ name: String, fn: (Int) -> Void, numIters: Int) -> Double {
+  func measure(_ name: String, fn: (Int) async -> Void, numIters: Int) async -> Double {
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     name.withCString { p in startTrackingObjects(p) }
 #endif
 
     startMeasurement()
-    fn(numIters)
+    await fn(numIters)
     stopMeasurement()
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
@@ -502,7 +514,7 @@ final class TestRunner {
   }
 
   /// Run the benchmark and return the measured results.
-  func run(_ test: BenchmarkInfo) -> BenchResults? {
+  func run(_ test: BenchmarkInfo) async -> BenchResults? {
     // Before we do anything, check that we actually have a function to
     // run. If we don't it is because the benchmark is not supported on
     // the platform and we should skip it.
@@ -528,8 +540,8 @@ final class TestRunner {
     }
 
     // Determine number of iterations for testFn to run for desired time.
-    func iterationsPerSampleTime() -> (numIters: Int, oneIter: Double) {
-      let oneIter = measure(test.name, fn: testFn, numIters: 1)
+    func iterationsPerSampleTime() async -> (numIters: Int, oneIter: Double) {
+      let oneIter = await measure(test.name, fn: testFn, numIters: 1)
       if oneIter > 0 {
         let timePerSample = c.sampleTime * 1_000_000.0 // microseconds (μs)
         return (max(Int(timePerSample / oneIter), 1), oneIter)
@@ -540,8 +552,8 @@ final class TestRunner {
 
     // Determine the scale of measurements. Re-use the calibration result if
     // it is just one measurement.
-    func calibrateMeasurements() -> Int {
-      let (numIters, oneIter) = iterationsPerSampleTime()
+    func calibrateMeasurements() async -> Int {
+      let (numIters, oneIter) = await iterationsPerSampleTime()
       if numIters == 1 { addSample(oneIter) }
       else { resetMeasurements() } // for accurate yielding reports
       return numIters
@@ -549,19 +561,19 @@ final class TestRunner {
 
     let numIters = min( // Cap to prevent overflow on 32-bit systems when scaled
       Int.max / 10_000, // by the inner loop multiplier inside the `testFn`.
-      c.numIters ?? calibrateMeasurements())
+      await c.numIters ?? (await calibrateMeasurements()))
 
-    let numSamples = c.numSamples ??
+    let numSamples = await c.numSamples ??
       // Compute the number of samples to measure for `sample-time`,
       // clamped in (`min-samples`, 200) range, if the `num-iters` are fixed.
-      max(c.minSamples ?? 1, min(200, c.numIters == nil ? 1 :
-        calibrateMeasurements()))
+      (max(await c.minSamples ?? 1, min(200, c.numIters == nil ? 1 :
+        await calibrateMeasurements())))
 
     samples.reserveCapacity(numSamples)
     logVerbose("    Collecting \(numSamples) samples.")
     logVerbose("    Measuring with scale \(numIters).")
     for _ in samples.count..<numSamples {
-      addSample(measure(test.name, fn: testFn, numIters: numIters))
+      addSample(await measure(test.name, fn: testFn, numIters: numIters))
     }
 
     test.tearDownFunction?()
@@ -681,16 +693,16 @@ final class TestRunner {
   }
 
   /// Run each benchmark and emit the results in JSON
-  func runBenchmarks() {
+  func runBenchmarks() async {
     var testCount = 0
     if !c.jsonOutput {
       printTextHeading()
     }
     for (index, info) in c.tests {
       if c.jsonOutput {
-	printJSON(index: index, info: info, results: run(info))
+	printJSON(index: index, info: info, results: await run(info))
       } else {
-	printText(index: index, info: info, results: run(info))
+	printText(index: index, info: info, results: await run(info))
       }
       testCount += 1
     }
@@ -712,7 +724,7 @@ extension Hasher {
   }
 }
 
-public func main() {
+public func main() async {
   let config = TestConfig(registeredBenchmarks)
   switch (config.action) {
   case .listTests:
@@ -742,7 +754,7 @@ public func main() {
         the option '--allow-nondeterministic-hashing to the benchmarking executable.
         """)
     }
-    TestRunner(config).runBenchmarks()
+    await TestRunner(config).runBenchmarks()
     if let x = config.afterRunSleep {
       sleep(x)
     }

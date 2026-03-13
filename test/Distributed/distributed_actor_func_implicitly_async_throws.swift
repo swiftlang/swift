@@ -25,66 +25,55 @@ distributed actor D {
 func test_not_distributed_funcs(distributed: D) async {
   distributed.hello() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   distributed.helloAsync() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
-  // expected-error@-1{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-2{{call is 'async'}}
-  // {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  // expected-error@-1{{actor-isolated instance method 'helloAsync()' cannot be called from outside of the actor}} {{3-3=await }}
   distributed.helloAsyncThrows() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
-  // expected-error@-1{{expression is 'async' but is not marked with 'await'}} // TODO: no need to diagnose this, it is impossible to call anyway
-  // expected-note@-2{{call is 'async'}}
-  // expected-error@-3{{call can throw, but it is not marked with 'try' and the error is not handled}} // TODO: no need to diagnose this, it is impossible to call anyway
+  // expected-error@-1{{actor-isolated instance method 'helloAsyncThrows()' cannot be called from outside of the actor}} // TODO: no need to diagnose this, it is impossible to call anyway
+  // expected-error@-2{{call can throw, but it is not marked with 'try' and the error is not handled}} // TODO: no need to diagnose this, it is impossible to call anyway
 }
 
 func test_outside(distributed: D) async throws {
-  distributed.distHello() // expected-error{{expression is 'async' but is not marked with 'await'}}
+  distributed.distHello() // expected-error{{actor-isolated distributed instance method 'distHello()' cannot be called from outside of the actor}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}
-  // expected-note@-2{{calls to distributed instance method 'distHello()' from outside of its actor context are implicitly asynchronous}}
-  // expected-note@-3{{did you mean to use 'try'?}}
-  // expected-note@-4{{did you mean to disable error propagation?}}
-  // expected-note@-5{{did you mean to handle error as optional value?}}
-  try distributed.distHello() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to distributed instance method 'distHello()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2{{did you mean to use 'try'?}}
+  // expected-note@-3{{did you mean to disable error propagation?}}
+  // expected-note@-4{{did you mean to handle error as optional value?}}
+  try distributed.distHello() // expected-error{{ctor-isolated distributed instance method 'distHello()' cannot be called from outside of the actor}}
   await distributed.distHello() // expected-error{{call can throw but is not marked with 'try'}}
   // expected-note@-1{{did you mean to use 'try'?}}
   // expected-note@-2{{did you mean to disable error propagation?}}
   // expected-note@-3{{did you mean to handle error as optional value?}}
   try await distributed.distHello() // ok
 
-  distributed.distHelloAsync()// expected-error{{expression is 'async' but is not marked with 'await'}}
+  distributed.distHelloAsync()// expected-error{{actor-isolated distributed instance method 'distHelloAsync()' cannot be called from outside of the actor}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}
-  // expected-note@-2{{calls to distributed instance method 'distHelloAsync()' from outside of its actor context are implicitly asynchronous}}
-  // expected-note@-3{{did you mean to use 'try'?}}
-  // expected-note@-4{{did you mean to disable error propagation?}}
-  // expected-note@-5{{did you mean to handle error as optional value?}}
-  try distributed.distHelloAsync() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to distributed instance method 'distHelloAsync()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2{{did you mean to use 'try'?}}
+  // expected-note@-3{{did you mean to disable error propagation?}}
+  // expected-note@-4{{did you mean to handle error as optional value?}}
+  try distributed.distHelloAsync() // expected-error{{actor-isolated distributed instance method 'distHelloAsync()' cannot be called from outside of the actor}}
   await distributed.distHelloAsync() // expected-error{{call can throw but is not marked with 'try'}}
   // expected-note@-1{{did you mean to use 'try'?}}
   // expected-note@-2{{did you mean to disable error propagation?}}
   // expected-note@-3{{did you mean to handle error as optional value?}}
   try await distributed.distHelloAsync() // ok
 
-  distributed.distHelloThrows() // expected-error{{expression is 'async' but is not marked with 'await'}}
+  distributed.distHelloThrows() // expected-error{{actor-isolated distributed instance method 'distHelloThrows()' cannot be called from outside of the actor}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}
-  // expected-note@-2{{calls to distributed instance method 'distHelloThrows()' from outside of its actor context are implicitly asynchronous}}
-  // expected-note@-3{{did you mean to use 'try'?}}
-  // expected-note@-4{{did you mean to disable error propagation?}}
-  // expected-note@-5{{did you mean to handle error as optional value?}}
-  try distributed.distHelloThrows() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to distributed instance method 'distHelloThrows()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2{{did you mean to use 'try'?}}
+  // expected-note@-3{{did you mean to disable error propagation?}}
+  // expected-note@-4{{did you mean to handle error as optional value?}}
+  try distributed.distHelloThrows() // expected-error{{actor-isolated distributed instance method 'distHelloThrows()' cannot be called from outside of the actor}}
   await distributed.distHelloThrows() // expected-error{{call can throw but is not marked with 'try'}}
   // expected-note@-1{{did you mean to use 'try'?}}
   // expected-note@-2{{did you mean to disable error propagation?}}
   // expected-note@-3{{did you mean to handle error as optional value?}}
   try await distributed.distHelloThrows() // ok
 
-  distributed.distHelloAsyncThrows() // expected-error{{expression is 'async' but is not marked with 'await'}}
+  distributed.distHelloAsyncThrows() // expected-error{{actor-isolated distributed instance method 'distHelloAsyncThrows()' cannot be called from outside of the actor}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}
-  // expected-note@-2{{calls to distributed instance method 'distHelloAsyncThrows()' from outside of its actor context are implicitly asynchronous}}
-  // expected-note@-3{{did you mean to use 'try'?}}
-  // expected-note@-4{{did you mean to disable error propagation?}}
-  // expected-note@-5{{did you mean to handle error as optional value?}}
-  try distributed.distHelloAsyncThrows() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to distributed instance method 'distHelloAsyncThrows()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2{{did you mean to use 'try'?}}
+  // expected-note@-3{{did you mean to disable error propagation?}}
+  // expected-note@-4{{did you mean to handle error as optional value?}}
+  try distributed.distHelloAsyncThrows() // expected-error{{actor-isolated distributed instance method 'distHelloAsyncThrows()' cannot be called from outside of the actor}}
   await distributed.distHelloAsyncThrows() // expected-error{{call can throw but is not marked with 'try'}}
   // expected-note@-1{{did you mean to use 'try'?}}
   // expected-note@-2{{did you mean to disable error propagation?}}

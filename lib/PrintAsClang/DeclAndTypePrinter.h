@@ -15,10 +15,12 @@
 
 #include "OutputLanguageMode.h"
 
+#include "PrintClangFunction.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 // for OptionalTypeKind
+#include "swift/AST/TypeRepr.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/StringSet.h"
 
@@ -56,6 +58,7 @@ public:
 private:
   class Implementation;
   friend class Implementation;
+  friend class DeclAndTypeClangFunctionPrinter;
 
   ModuleDecl &M;
   raw_ostream &os;
@@ -69,6 +72,7 @@ private:
   bool requiresExposedAttribute;
   llvm::StringSet<> &exposedModules;
   OutputLanguageMode outputLang;
+  llvm::DenseMap<Type, std::optional<ClangRepresentation>> typeRepresentations;
 
   /// The name 'CFTypeRef'.
   ///
@@ -159,6 +163,8 @@ public:
 };
 
 bool isStringNestedType(const ValueDecl *VD, StringRef Typename);
+
+bool hasExposeNotCxxAttr(const ValueDecl *VD);
 
 } // end namespace swift
 

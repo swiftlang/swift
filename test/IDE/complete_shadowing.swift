@@ -180,7 +180,7 @@ func test_Local_GenericParamType() {
   }
 }
 
-func test_Local_GenericParamType() {
+func test_Local_GenericParam() {
   var testValue: String = ""
   func test<testValue>(_: testValue) {
     #^Local_GenericParam?check=GENERICPARAM_TESTVALUE^#

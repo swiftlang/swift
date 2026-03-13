@@ -66,11 +66,13 @@ func testProtocolNamingConflict() {
   let a: ConflictingName1?
   var b: ConflictingName1Protocol?
   b = a // expected-error {{cannot assign value of type 'ConflictingName1?' to type '(any ConflictingName1Protocol)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('ConflictingName1' and 'any ConflictingName1Protocol') are expected to be equal}}
   _ = b
 
   let c: ConflictingName2?
   var d: ConflictingName2Protocol?
   d = c // expected-error {{cannot assign value of type 'ConflictingName2?' to type '(any ConflictingName2Protocol)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('ConflictingName2' and 'any ConflictingName2Protocol') are expected to be equal}}
   _ = d
 }
 

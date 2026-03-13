@@ -38,7 +38,7 @@
 // - ExtraStruct.Inner
 // (ExtraStruct.Inner will have two sourceOrigins because it has two relationships: a memberOf and a
 // conformsTo)
-// COUNT-COUNT-3: sourceOrigin
+// COUNT-COUNT-4: sourceOrigin
 // COUNT-NOT: sourceOrigin
 
 public protocol SomeProtocol {

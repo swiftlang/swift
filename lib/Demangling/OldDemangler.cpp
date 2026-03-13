@@ -528,7 +528,8 @@ private:
       if (!name || !Mangled.nextIf('_'))
         return false;
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropFunction), Factory);
-      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(name->getText()), Factory);
+      NodePointer pl = Factory.createNode(Node::Kind::Identifier, name->getText());
+      parent->addChild(pl, Factory);
       return true;
     }
 
@@ -537,7 +538,8 @@ private:
       if (!name || !Mangled.nextIf('_'))
         return false;
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropGlobal), Factory);
-      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(name->getText()), Factory);
+      NodePointer pl = Factory.createNode(Node::Kind::Identifier, name->getText());
+      parent->addChild(pl, Factory);
       return true;
     }
 
@@ -583,7 +585,8 @@ private:
 
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropString), Factory);
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(encodingStr), Factory);
-      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(str->getText()), Factory);
+      NodePointer pl = Factory.createNode(Node::Kind::Identifier, str->getText());
+      parent->addChild(pl, Factory);
       return true;
     }
 
@@ -2251,9 +2254,6 @@ private:
 
     if (Mangled.nextIf('H'))
       addImplFunctionAttribute(type, "@async");
-
-    if (Mangled.nextIf('T'))
-      addImplFunctionAttribute(type, "sending-result");
 
     // Enter a new generic context if this type is generic.
     // FIXME: replace with std::optional, when we have it.

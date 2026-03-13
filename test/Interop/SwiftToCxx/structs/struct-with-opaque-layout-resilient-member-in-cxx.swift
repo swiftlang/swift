@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/resilient-struct-in-cxx.swift -enable-library-evolution -module-name Structs -emit-module -emit-module-path %t/Structs.swiftmodule
 
-// RUN: %target-swift-frontend %s -typecheck -module-name UseStructs -clang-header-expose-decls=all-public -emit-clang-header-path %t/useStructs.h -I %t
+// RUN: %target-swift-frontend %s -module-name UseStructs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/useStructs.h -I %t
 // RUN: %FileCheck %s < %t/useStructs.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/useStructs.h)

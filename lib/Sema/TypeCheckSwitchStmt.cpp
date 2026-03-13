@@ -1154,13 +1154,34 @@ namespace {
         assert(defaultReason == RequiresDefault::No);
         Type subjectType = Switch->getSubjectExpr()->getType();
         bool shouldIncludeFutureVersionComment = false;
-        if (auto *theEnum = subjectType->getEnumOrBoundGenericEnum()) {
+        auto *theEnum = subjectType->getEnumOrBoundGenericEnum();
+
+        if (theEnum) {
+          auto *enumModule = theEnum->getParentModule();
           shouldIncludeFutureVersionComment =
-              theEnum->getParentModule()->isSystemModule();
+              enumModule->isSystemModule() ||
+              theEnum->getAttrs().hasAttribute<NonexhaustiveAttr>();
         }
-        DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
-                    subjectType, shouldIncludeFutureVersionComment)
-          .warnUntilSwiftVersion(6);
+
+        auto diag =
+            DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
+                        subjectType, shouldIncludeFutureVersionComment);
+
+        auto languageModeForError = [&theEnum]() -> LanguageMode {
+          if (theEnum) {
+            // Presence of `@nonexhaustive(warn)` pushes the warning farther,
+            // into the future.
+            if (auto *nonexhaustive =
+                    theEnum->getAttrs().getAttribute<NonexhaustiveAttr>()) {
+              if (nonexhaustive->getMode() == NonexhaustiveMode::Warning)
+                return LanguageMode::future;
+            }
+          }
+          return LanguageMode::v6;
+        };
+
+        diag.warnUntilLanguageMode(languageModeForError());
+
         mainDiagType = std::nullopt;
       }
         break;
@@ -1461,6 +1482,10 @@ namespace {
         auto *PP = cast<ParenPattern>(item);
         return projectPattern(PP->getSubPattern());
       }
+      case PatternKind::Opaque: {
+        auto *opaque = cast<OpaquePattern>(item);
+        return projectPattern(opaque->getSubPattern());
+      }
       case PatternKind::OptionalSome: {
         auto *OSP = cast<OptionalSomePattern>(item);
         const Identifier name = OSP->getElementDecl()->getBaseIdentifier();
@@ -1482,8 +1507,9 @@ namespace {
           // If there's no sub-pattern then there's no further recursive
           // structure here.  Yield the constructor space.
           // FIXME: Compound names.
-          return Space::forConstructor(
-              item->getType(), VP->getName().getBaseIdentifier(), std::nullopt);
+          return Space::forConstructor(item->getType(),
+                                       VP->getName().getBaseIdentifier(),
+                                       ArrayRef<Space>());
         }
 
         SmallVector<Space, 4> conArgSpace;

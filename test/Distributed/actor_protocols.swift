@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -95,7 +95,7 @@ actor A3: AnyActor {} // expected-warning {{'AnyActor' is deprecated: Use 'any A
 distributed actor DA3: AnyActor {} // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
 
 class C3: AnyActor { // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
-  // expected-warning@-1 {{non-final class 'C3' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+  // expected-warning@-1 {{non-final class 'C3' cannot conform to the 'Sendable' protocol}}
 }
 
 struct S3: AnyActor { // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}

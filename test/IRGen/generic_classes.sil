@@ -274,7 +274,7 @@ entry:
 
 // RootGeneric.x has fixed layout
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @RootGeneric_concrete_fragile_dependent_member_access_x
-// CHECK:   getelementptr inbounds [[ROOTGENERIC]], ptr %0, i32 0, i32 1
+// CHECK:   getelementptr inbounds{{.*}} [[ROOTGENERIC]], ptr %0, i32 0, i32 1
 sil @RootGeneric_concrete_fragile_dependent_member_access_x : $<F> (RootGeneric<F>) -> UInt8 {
 entry(%c : $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.x
@@ -321,7 +321,7 @@ entry(%c : $RootGeneric<F>):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @RootGeneric_subst_concrete_fragile_dependent_member_access_z
 // CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds {{.*}}, ptr %0, i32 0, i32 4
-// CHECK:   [[T0:%.*]] = getelementptr inbounds %Ts5UInt8V, ptr [[Z_ADDR]], i32 0, i32 0
+// CHECK:   [[T0:%.*]] = getelementptr inbounds{{.*}} %Ts5UInt8V, ptr [[Z_ADDR]], i32 0, i32 0
 // CHECK:   load i8, ptr [[T0]], align
 sil @RootGeneric_subst_concrete_fragile_dependent_member_access_z : $(RootGeneric<Int>) -> UInt8 {
 entry(%c : $RootGeneric<Int>):
@@ -377,7 +377,7 @@ entry(%c : $RootGeneric<Int32>):
 //   Initialize our own dependent field offsets.
 // CHECK-objc:   [[OFFSETS:%.*]] = getelementptr inbounds i64, ptr [[METADATA]], i64 20
 // CHECK-native: [[OFFSETS:%.*]] = getelementptr inbounds i64, ptr [[METADATA]], i64 17
-// CHECK:   [[FIELDS_ADDR:%.*]] = getelementptr inbounds [1 x ptr], ptr %classFields, i32 0, i32 0
+// CHECK:   [[FIELDS_ADDR:%.*]] = getelementptr inbounds{{.*}} [1 x ptr], ptr %classFields, i32 0, i32 0
 // CHECK:   [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState(i64 319, ptr %B)
 // CHECK:   [[B_CHECKED:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:   [[B_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1

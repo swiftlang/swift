@@ -68,8 +68,7 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   if (actualSF != sourceFile)
     fileScope = actualSF->getScope().impl;
 
-  const auto *innermost = fileScope->findInnermostEnclosingScope(
-      sourceFile->getParentModule(), loc, nullptr);
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
   ASTScopeAssert(innermost->getWasExpanded(),
                  "If looking in a scope, it must have been expanded.");
 
@@ -77,23 +76,22 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
 }
 
 ASTScopeImpl *
-ASTScopeImpl::findInnermostEnclosingScope(ModuleDecl *parentModule,
-                                          SourceLoc loc,
+ASTScopeImpl::findInnermostEnclosingScope(SourceLoc loc,
                                           NullablePtr<raw_ostream> os) {
-  return findInnermostEnclosingScopeImpl(parentModule, loc, os,
-                                         getSourceManager(), getScopeCreator());
+  return findInnermostEnclosingScopeImpl(loc, os, getSourceManager(),
+                                         getScopeCreator());
 }
 
 ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
-    ModuleDecl *parentModule, SourceLoc loc, NullablePtr<raw_ostream> os,
-    SourceManager &sourceMgr, ScopeCreator &scopeCreator) {
+    SourceLoc loc, NullablePtr<raw_ostream> os, SourceManager &sourceMgr,
+    ScopeCreator &scopeCreator) {
   if (!getWasExpanded())
     expandAndBeCurrent(scopeCreator);
-  auto child = findChildContaining(parentModule, loc, sourceMgr);
+  auto child = findChildContaining(loc, sourceMgr);
   if (!child)
     return this;
-  return child.get()->findInnermostEnclosingScopeImpl(parentModule, loc, os,
-                                                      sourceMgr, scopeCreator);
+  return child.get()->findInnermostEnclosingScopeImpl(loc, os, sourceMgr,
+                                                      scopeCreator);
 }
 
 /// If the \p loc is in a new buffer but \p range is not, consider the location
@@ -111,8 +109,7 @@ static SourceLoc translateLocForReplacedRange(SourceManager &sourceMgr,
 }
 
 NullablePtr<ASTScopeImpl>
-ASTScopeImpl::findChildContaining(ModuleDecl *parentModule,
-                                  SourceLoc loc,
+ASTScopeImpl::findChildContaining(SourceLoc loc,
                                   SourceManager &sourceMgr) const {
   if (loc.isInvalid())
     return nullptr;
@@ -378,10 +375,10 @@ bool CaseLabelItemScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
 }
 
 bool CaseStmtBodyScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  for (auto *var : stmt->getCaseBodyVariablesOrEmptyArray())
+  for (auto *var : stmt->getCaseBodyVariables()) {
     if (consumer.consume({var}))
-        return true;
-
+      return true;
+  }
   return false;
 }
 
@@ -596,8 +593,7 @@ llvm::SmallVector<LabeledStmt *, 4>
 ASTScopeImpl::lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc) {
   // Find the innermost scope from which to start our search.
   auto *const fileScope = sourceFile->getScope().impl;
-  const auto *innermost = fileScope->findInnermostEnclosingScope(
-      sourceFile->getParentModule(), loc, nullptr);
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
   ASTScopeAssert(innermost->getWasExpanded(),
                  "If looking in a scope, it must have been expanded.");
 
@@ -625,8 +621,7 @@ std::pair<CaseStmt *, CaseStmt *> ASTScopeImpl::lookupFallthroughSourceAndDest(
     SourceFile *sourceFile, SourceLoc loc) {
   // Find the innermost scope from which to start our search.
   auto *const fileScope = sourceFile->getScope().impl;
-  const auto *innermost = fileScope->findInnermostEnclosingScope(
-      sourceFile->getParentModule(), loc, nullptr);
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
   ASTScopeAssert(innermost->getWasExpanded(),
                  "If looking in a scope, it must have been expanded.");
 
@@ -660,8 +655,7 @@ void ASTScopeImpl::lookupEnclosingMacroScope(
     return;
 
   auto *fileScope = sourceFile->getScope().impl;
-  auto *scope = fileScope->findInnermostEnclosingScope(
-      sourceFile->getParentModule(), loc, nullptr);
+  auto *scope = fileScope->findInnermostEnclosingScope(loc, nullptr);
   do {
     if (auto expansionScope = dyn_cast<MacroExpansionDeclScope>(scope)) {
       auto *expansionDecl = expansionScope->decl;
@@ -692,8 +686,7 @@ lookupEnclosingABIAttributeScope(SourceFile *sourceFile, SourceLoc loc) {
     return nullptr;
 
   auto *fileScope = sourceFile->getScope().impl;
-  auto *scope = fileScope->findInnermostEnclosingScope(
-      sourceFile->getParentModule(), loc, nullptr);
+  auto *scope = fileScope->findInnermostEnclosingScope(loc, nullptr);
   do {
     if (auto abiAttrScope = dyn_cast<ABIAttributeScope>(scope)) {
       return abiAttrScope->attr;
@@ -703,42 +696,24 @@ lookupEnclosingABIAttributeScope(SourceFile *sourceFile, SourceLoc loc) {
   return nullptr;
 }
 
-static std::pair<CatchNode, const BraceStmtScope *>
-getCatchNodeBody(const ASTScopeImpl *scope, CatchNode node) {
-  const auto &children = scope->getChildren();
-  if (children.empty())
-    return { CatchNode(), nullptr };
-
-  auto stmt = dyn_cast<BraceStmtScope>(children[0]);
-  if (!stmt || stmt->getStmt()->empty())
-    return { CatchNode(), nullptr };
-
-  return std::make_pair(node, stmt);
-}
-
 /// Retrieve the catch node associated with this scope, if any.
-static std::pair<CatchNode, const BraceStmtScope *>
-getCatchNode(const ASTScopeImpl *scope) {
+static CatchNode getCatchNode(const ASTScopeImpl *scope) {
   // Closures introduce a catch scope for errors initiated in their body.
   if (auto closureParams = dyn_cast<ClosureParametersScope>(scope)) {
-    if (auto closure = dyn_cast<ClosureExpr>(closureParams->closureExpr)) {
-      return getCatchNodeBody(scope, const_cast<ClosureExpr *>(closure));
-    }
+    if (auto closure = dyn_cast<ClosureExpr>(closureParams->closureExpr))
+      return closure;
   }
 
   // Functions introduce a catch scope for errors initiated in their body.
-  if (auto function = dyn_cast<FunctionBodyScope>(scope)) {
-    return getCatchNodeBody(
-        scope, const_cast<AbstractFunctionDecl *>(function->decl));
-  }
+  if (auto function = dyn_cast<FunctionBodyScope>(scope))
+    return function->decl;
 
   // Do..catch blocks introduce a catch scope for errors initiated in the `do`
   // body.
-  if (auto doCatch = dyn_cast<DoCatchStmtScope>(scope)) {
-    return getCatchNodeBody(scope, const_cast<DoCatchStmt *>(doCatch->stmt));
-  }
+  if (auto doCatch = dyn_cast<DoCatchStmtScope>(scope))
+    return doCatch->stmt;
 
-  return { CatchNode(), nullptr };
+  return CatchNode();
 }
 
 /// Check whether the given location precedes the start of the catch location
@@ -762,20 +737,26 @@ CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
     return nullptr;
 
   auto *fileScope = sourceFile->getScope().impl;
-  const auto *innermost = fileScope->findInnermostEnclosingScope(
-      module, loc, nullptr);
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
   ASTScopeAssert(innermost->getWasExpanded(),
                  "If looking in a scope, it must have been expanded.");
 
-  // Look for a body scope that's the
+  // Look for a body scope that's the direct descendent of a catch node.
   const BraceStmtScope *innerBodyScope = nullptr;
   for (auto scope = innermost; scope; scope = scope->getParent().getPtrOrNull()) {
     // If we are at a catch node and in the body of the region from which that
     // node catches thrown errors, we have our result.
-    auto caught = getCatchNode(scope);
-    if (caught.first && caught.second == innerBodyScope &&
-        !locationIsPriorToStartOfCatchScope(loc, caught.first)) {
-      return caught.first;
+    if (innerBodyScope && innerBodyScope->getParent() == scope) {
+      // For a macro expansion, we may have an intermediate source file scope,
+      // we can look through it.
+      auto catchScope = scope;
+      if (auto *sfScope = dyn_cast<ASTSourceFileScope>(catchScope)) {
+        if (auto parent = sfScope->getParent())
+          catchScope = parent.get();
+      }
+      auto caught = getCatchNode(catchScope);
+      if (caught && !locationIsPriorToStartOfCatchScope(loc, caught))
+          return caught;
     }
 
     // If this is a try scope for a try! or try?, it catches the error.

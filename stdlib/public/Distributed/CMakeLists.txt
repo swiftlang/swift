@@ -10,17 +10,22 @@
 #
 #===----------------------------------------------------------------------===#
 
-if(SWIFT_BUILD_SDK_OVERLAY)
-set(swift_distributed_darwin_dependencies Darwin)
-else()
 set(swift_distributed_darwin_dependencies)
+
+if((SWIFT_BUILD_CLANG_OVERLAYS
+    OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+   AND (NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT
+        OR NOT SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT))
+  # This library imports Darwin from the SDK, which re-exports
+  # _Builtin_float which is part of this build.
+  list(APPEND swift_distributed_darwin_dependencies _Builtin_float)
 endif()
 
 set(swift_distributed_link_libraries
   swiftCore)
 
 
-add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IMPORTS_NON_OSSA 
+add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   DistributedActor.cpp
   DistributedActor.swift
   DistributedActorSystem.swift
@@ -52,6 +57,8 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
+    -enable-experimental-feature AllowUnsafeAttribute
+    -strict-memory-safety
 
   LINK_FLAGS
     "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"

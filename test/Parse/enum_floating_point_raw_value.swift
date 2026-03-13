@@ -1,12 +1,12 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // FIXME: this test only passes on platforms which have Float80.
 // <rdar://problem/19508460> Floating point enum raw values are not portable
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
-// Windows does not support FP80
-// XFAIL: OS=windows-msvc
+// Windows and Android do not support FP80
+// UNSUPPORTED: OS=windows-msvc, OS=linux-android
 
 enum RawTypeWithFloatValues : Float { // expected-error {{'RawTypeWithFloatValues' declares raw type 'Float', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case Northrup = 1.5

@@ -3,29 +3,29 @@
 // RUN: %empty-directory(%t)
 
 /// Using the flag directly raises warnings and fixits.
-// RUN: %swiftc_driver -typecheck -parse-as-library -Xfrontend -verify %s \
-// RUN:   -target %target-cpu-apple-macosx10.10 -require-explicit-availability \
-// RUN:   -require-explicit-availability-target "macOS 10.10"
-// RUN: %swiftc_driver -typecheck -parse-as-library -Xfrontend -verify %s \
-// RUN:   -target %target-cpu-apple-macosx10.10 -require-explicit-availability=warn \
-// RUN:   -require-explicit-availability-target "macOS 10.10"
+// RUN: %target-swift-frontend -typecheck -parse-as-library -verify %s \
+// RUN:   -target %target-cpu-apple-macosx10.10 -package-name Foo \
+// RUN:   -require-explicit-availability -require-explicit-availability-target "macOS 10.10"
+// RUN: %target-swift-frontend -typecheck -parse-as-library -verify %s \
+// RUN:   -target %target-cpu-apple-macosx10.10 -package-name Foo \
+// RUN:   -require-explicit-availability=warn -require-explicit-availability-target "macOS 10.10"
 
 /// Using -library-level api defaults to enabling warnings, without fixits.
 // RUN: sed -e "s/}} {{.*/}}/" < %s > %t/NoFixits.swift
 // RUN: %target-swift-frontend -typecheck -parse-as-library -verify %t/NoFixits.swift \
-// RUN:   -target %target-cpu-apple-macosx10.10 -library-level api
+// RUN:   -target %target-cpu-apple-macosx10.10 -package-name Foo -library-level api
 
 /// Explicitly disable the diagnostic.
 // RUN: sed -e 's/xpected-warning/not-something-expected/' < %s > %t/None.swift
 // RUN: %target-swift-frontend -typecheck -parse-as-library -verify %t/None.swift \
-// RUN:   -target %target-cpu-apple-macosx10.10 -require-explicit-availability=ignore \
-// RUN:   -require-explicit-availability-target "macOS 10.10" -library-level api
+// RUN:   -target %target-cpu-apple-macosx10.10 -package-name Foo -library-level api \
+// RUN:   -require-explicit-availability=ignore -require-explicit-availability-target "macOS 10.10"
 
 /// Upgrade the diagnostic to an error.
 // RUN: sed -e "s/xpected-warning/xpected-error/" < %s > %t/Errors.swift
 // RUN: %target-swift-frontend -typecheck -parse-as-library -verify %t/Errors.swift \
-// RUN:   -target %target-cpu-apple-macosx10.10 -require-explicit-availability=error \
-// RUN:   -require-explicit-availability-target "macOS 10.10"
+// RUN:   -target %target-cpu-apple-macosx10.10 -package-name Foo \
+// RUN:   -require-explicit-availability=error -require-explicit-availability-target "macOS 10.10"
 
 /// Error on an invalid argument.
 // RUN: not %target-swift-frontend -typecheck %s -require-explicit-availability=NotIt 2>&1 \
@@ -58,7 +58,9 @@ public func missingIntro() { } // expected-warning {{public declarations should 
 @available(iOS 9.0, *)
 public func missingTargetPlatform() { } // expected-warning {{public declarations should have an availability attribute with an introduction version}} {{-1:1-1=@available(macOS 10.10, *)\n}}
 
-func privateFunc() { }
+private func privateFunc() { }
+internal func internalFunc() { }
+package func packageFunc() { }
 
 @_alwaysEmitIntoClient
 public func alwaysEmitted() { }
@@ -113,6 +115,18 @@ extension S {
 extension S {
   internal func dontWarnWithoutPublicMembers() { }
   private func dontWarnWithoutPublicMembers1() { }
+  package func dontWarnWithoutPublicMembers2() { }
+}
+
+extension S {
+  @_spi(SPIsAreOK)
+  public func dontWarnWithSPIMembers() {}
+
+  @available(macOS, unavailable)
+  public func dontWarnWithUnavailableMembers() { }
+
+  @_alwaysEmitIntoClient
+  public func dontWarnWithAEICMembers() { }
 }
 
 // An empty extension should be ok.
@@ -129,6 +143,8 @@ open class OpenClass { } // expected-warning {{public declarations should have a
 private class PrivateClass { }
 
 extension PrivateClass { }
+
+extension PrivateClass : P { }
 
 @available(macOS 10.1, *)
 public protocol PublicProtocol { }
@@ -147,6 +163,8 @@ public struct spiStruct {
 extension spiStruct {
   public func spiExtensionMethod() {}
 }
+
+extension spiStruct : P { }
 
 public var publicVar = S() // expected-warning {{public declarations should have an availability attribute with an introduction version}} {{1-1=@available(macOS 10.10, *)\n}}
 
@@ -234,7 +252,7 @@ extension SomeClass { // expected-warning {{public declarations should have an a
 public struct StructWithImplicitMembers { }
 
 extension StructWithImplicitMembers: Hashable { }
-// expected-note @-1 {{add @available attribute to enclosing extension}}
+// expected-note @-1 {{add '@available' attribute to enclosing extension}}
 // expected-warning @-2 {{public declarations should have an availability attribute with an introduction version}}
 // expected-error @-3 {{'StructWithImplicitMembers' is only available in macOS 10.15 or newer}}
 

@@ -162,7 +162,7 @@ static int getSpecializationLevelRecursive(StringRef funcName,
       continue;
     Node *payload = param->getChild(1);
     if (payload->getKind() !=
-        Node::Kind::FunctionSignatureSpecializationParamPayload) {
+        Node::Kind::Identifier) {
       return SpecializationLevelLimit + 1; // unrecognized format
     }
     // Check if the specialized function is a specialization itself.
@@ -337,11 +337,14 @@ public:
   SingleValueInstruction *
   createNewClosure(SILBuilder &B, SILValue V,
                    llvm::SmallVectorImpl<SILValue> &Args) const {
-    if (auto *PA = dyn_cast<PartialApplyInst>(getClosure()))
-      return B.createPartialApply(getClosure()->getLoc(), V, {}, Args,
-                                  PA->getCalleeConvention(),
-                                  PA->getResultIsolation(),
-                                  PA->isOnStack());
+    if (auto *PA = dyn_cast<PartialApplyInst>(getClosure())) {
+      auto NPA = B.createPartialApply(getClosure()->getLoc(), V, {}, Args,
+                                      PA->getCalleeConvention(),
+                                      PA->getResultIsolation(),
+                                      PA->isOnStack());
+      NPA->setStackAllocationIsNested(PA->isStackAllocationNested());
+      return NPA;
+    }
 
     assert(isa<ThinToThickFunctionInst>(getClosure()) &&
            "We only support partial_apply and thin_to_thick_function");
@@ -694,6 +697,19 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
         return false;
       }
 
+      // Bail if it's an ObjectiveC block which might _not_ be copied onto the heap, i.e
+      // optimized by SimplifyCopyBlock. We can't do this because the optimization inserts
+      // retains+releases for captured arguments. That's not possible for stack-allocated blocks.
+      // TODO: avoid inserting retains+releases at all for captures of `partial_apply [on_stack]`
+      if (ArgTy.is<SILFunctionType>() &&
+          ArgTy.getFunctionRepresentation() == SILFunctionTypeRepresentation::Block &&
+          // A `copy_block` ensures that the block is copied onto the heap.
+          !isa<CopyBlockInst>(Arg) &&
+          // SimplifyCopyBlock only works for `partial_apply [on_stack]`.
+          PAI->isOnStack()) {
+        return false;
+      }
+
       // Only @inout/@inout_aliasable addresses are (currently) supported.
       // If our argument is an object, continue...
       if (ArgTy.isObject()) {
@@ -870,6 +886,7 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
         CallSiteDesc.getLoc(), FunRef, {}, {calleeValue},
         PAI->getCalleeConvention(), PAI->getResultIsolation(),
         PAI->isOnStack());
+    NewPA->setStackAllocationIsNested(PAI->isStackAllocationNested());
     // If the partial_apply is on stack we will emit a dealloc_stack in the
     // epilog.
     NeedsRelease.push_back(NewPA);

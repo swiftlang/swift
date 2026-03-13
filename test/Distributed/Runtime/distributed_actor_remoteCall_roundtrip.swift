@@ -4,8 +4,6 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --enable-var-scope
 
-// X: %target-run-simple-swift( -Xfrontend -module-name=main -target %target-swift-5.7-abi-triple  -parse-as-library -Xfrontend -I -Xfrontend %t ) | %FileCheck %s
-
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed

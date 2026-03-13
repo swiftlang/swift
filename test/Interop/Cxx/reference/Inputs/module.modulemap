@@ -3,6 +3,11 @@ module Reference {
   requires cplusplus
 }
 
+module SpecialMembers {
+  header "print-special-members.h"
+  requires cplusplus
+}
+
 module Closures {
   header "closures.h"
   requires cplusplus

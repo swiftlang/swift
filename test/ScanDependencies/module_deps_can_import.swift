@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/unversionedInputs)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %t/main.swift -module-name Test -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -I %t/include -swift-version 4
+
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/unversionedUnputs/Foo.swiftmodule %t/Foo.swift -module-name Foo -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import
+
+// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %t/main.swift -module-name Test -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -I %t/include -I %t/unversionedUnputs
 
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps.json Test directDependencies | %FileCheck %s
 
@@ -17,12 +21,23 @@
 // CMD-NEXT: "ClangTest.Sub"
 // CMD-NEXT: "-module-can-import"
 // CMD-NEXT: "F"
+// CMD-NEXT: "-module-can-import"
+// CMD-NEXT: "Foo"
 // CMD-NEXT: "-module-can-import-version"
 // CMD-NEXT: "Version"
 // CMD-NEXT: "100.1"
 // CMD-NEXT: "0"
 
+//--- Foo.swift
+public func Foo() {
+    print("foo")
+}
+
 //--- main.swift
+
+#if canImport(Foo, _version: 44)
+import Foo
+#endif
 
 #if canImport(Missing)
 import G

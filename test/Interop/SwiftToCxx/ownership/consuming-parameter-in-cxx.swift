@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Init -clang-header-expose-decls=all-public -emit-clang-header-path %t/inits.h
+// RUN: %target-swift-frontend %s -module-name Init -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/inits.h
 // RUN: %FileCheck --check-prefixes=CHECK,CHECK-NON_EVO %s < %t/inits.h
 // RUN: %check-interop-cxx-header-in-clang(%t/inits.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
-// RUN: %target-swift-frontend %s -typecheck -module-name Init -clang-header-expose-decls=all-public -emit-clang-header-path %t/inits-evo.h -enable-library-evolution
+// RUN: %target-swift-frontend %s -module-name Init -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/inits-evo.h -enable-library-evolution
 // RUN: %FileCheck %s < %t/inits-evo.h
 // RUN: %check-interop-cxx-header-in-clang(%t/inits-evo.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 

@@ -25,12 +25,12 @@ enum Either {
 // DWARF: DIDerivedType(tag: DW_TAG_member, name: "Neither",
 // DWARF-SAME:          baseType: null)
 }
-// CHECK: ![[EMPTY:.*]] = !{}
 let E : Either = .Neither;
 
 // CHECK: !DICompositeType({{.*}}name: "Color",
 // CHECK-SAME:             size: 8,
 // CHECK-SAME:             identifier: "$s4enum5ColorOD"
+
 enum Color : UInt64 {
 // This is effectively a 2-bit bitfield:
 // DWARF: DICompositeType(tag: DW_TAG_enumeration_type, name: "Color",
@@ -72,8 +72,7 @@ let movie : Maybe<Color> = .none
 
 public enum Nothing { }
 public func foo(_ empty : Nothing) { }
-// CHECK: !DICompositeType({{.*}}name: "Nothing", {{.*}}elements: ![[EMPTY]]
-
+// CHECK: !DICompositeType({{.*}}name: "Nothing"
 // CHECK: !DICompositeType({{.*}}name: "$s4enum4RoseOyxG{{z?}}D"
 enum Rose<A> {
 	case MkRose(() -> A, () -> [Rose<A>])

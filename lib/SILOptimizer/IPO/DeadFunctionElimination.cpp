@@ -90,6 +90,7 @@ class DeadFunctionAndGlobalElimination {
   llvm::SmallPtrSet<void *, 32> AliveFunctionsAndTables;
 
   bool keepExternalWitnessTablesAlive;
+  bool keepStringSwitchIntrinsicAlive;
 
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
@@ -122,6 +123,15 @@ class DeadFunctionAndGlobalElimination {
     // ObjC functions are called through the runtime and are therefore alive
     // even if not referenced inside SIL.
     if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
+      return true;
+
+    // To support ObjectOutliner's replacing of calls to findStringSwitchCase
+    // with _findStringSwitchCaseWithCache. In Embedded Swift, we have to load
+    // the body of this function early and specialize it, so that ObjectOutliner
+    // can reference it later. To make this work we have to avoid DFE'ing it in
+    // the early DFE pass. Late DFE will take care of it if actually unused.
+    if (keepStringSwitchIntrinsicAlive &&
+        F->hasSemanticsAttr("findStringSwitchCaseWithCache"))
       return true;
 
     return false;
@@ -191,26 +201,12 @@ class DeadFunctionAndGlobalElimination {
           }
         } break;
 
-        case SILWitnessTable::AssociatedConformance: {
-          ProtocolConformanceRef CRef =
-             entry.getAssociatedConformanceWitness().Witness;
-          if (CRef.isConcrete())
-            ensureAliveConformance(CRef.getConcrete());
-          break;
-        }
+        case SILWitnessTable::AssociatedConformance:
         case SILWitnessTable::BaseProtocol:
-          ensureAliveConformance(entry.getBaseProtocolWitness().Witness);
-          break;
-
         case SILWitnessTable::Invalid:
         case SILWitnessTable::AssociatedType:
           break;
       }
-    }
-
-    for (const auto &conf : WT->getConditionalConformances()) {
-      if (conf.Conformance.isConcrete())
-        ensureAliveConformance(conf.Conformance.getConcrete());
     }
   }
 
@@ -269,14 +265,6 @@ class DeadFunctionAndGlobalElimination {
       makeAlive(global);
   }
 
-  /// Marks a witness table as alive if it is not alive yet.
-  void ensureAliveConformance(const ProtocolConformance *C) {
-    SILWitnessTable *WT = Module->lookUpWitnessTable(C);
-    if (!WT || isAlive(WT))
-      return;
-    makeAlive(WT);
-  }
-
   /// Returns true if the implementation of method \p FD in class \p ImplCl
   /// may be called when the type of the class_method's operand is \p MethodCl.
   /// Both, \p MethodCl and \p ImplCl, may by null if not known or if it's a
@@ -311,8 +299,8 @@ class DeadFunctionAndGlobalElimination {
     for (FuncImpl &FImpl : mi->implementingFunctions) {
       if (!isAlive(FImpl.F) &&
           canHaveSameImplementation(FD, MethodCl,
-                                    FImpl.Impl.get<ClassDecl *>())) {
-        makeAlive(FImpl.F);
+                                    cast<ClassDecl *>(FImpl.Impl))) {
+        ensureAlive(FImpl.F);
       } else {
         allImplsAreCalled = false;
       }
@@ -331,9 +319,9 @@ class DeadFunctionAndGlobalElimination {
       if (auto Conf = FImpl.Impl.dyn_cast<ProtocolConformance *>()) {
         SILWitnessTable *WT = Module->lookUpWitnessTable(Conf);
         if (!WT || isAlive(WT))
-          makeAlive(FImpl.F);
+          ensureAlive(FImpl.F);
       } else {
-        makeAlive(FImpl.F);
+        ensureAlive(FImpl.F);
       }
     }
   }
@@ -633,6 +621,14 @@ class DeadFunctionAndGlobalElimination {
         }
       }
     }
+
+    // Check default override tables.
+    for (auto &table : Module->getDefaultOverrideTableList()) {
+      for (auto &entry : table.getEntries()) {
+        ensureAlive(entry.impl);
+      }
+    }
+
     // Check property descriptor implementations.
     for (SILProperty &P : Module->getPropertyList()) {
       if (auto component = P.getComponent()) {
@@ -713,9 +709,11 @@ class DeadFunctionAndGlobalElimination {
 
 public:
   DeadFunctionAndGlobalElimination(SILModule *module,
-                                   bool keepExternalWitnessTablesAlive) :
+                                   bool keepExternalWitnessTablesAlive,
+                                   bool keepStringSwitchIntrinsicAlive) :
     Module(module),
-    keepExternalWitnessTablesAlive(keepExternalWitnessTablesAlive) {}
+    keepExternalWitnessTablesAlive(keepExternalWitnessTablesAlive),
+    keepStringSwitchIntrinsicAlive(keepStringSwitchIntrinsicAlive) {}
 
   /// The main entry point of the optimization.
   void eliminateFunctionsAndGlobals(SILModuleTransform *DFEPass) {
@@ -799,8 +797,10 @@ public:
     // can eliminate such functions.
     getModule()->invalidateSILLoaderCaches();
 
-    DeadFunctionAndGlobalElimination deadFunctionElimination(getModule(),
-                                /*keepExternalWitnessTablesAlive*/ !isLateDFE);
+    DeadFunctionAndGlobalElimination deadFunctionElimination(
+        getModule(),
+        /*keepExternalWitnessTablesAlive*/ !isLateDFE,
+        /*keepStringSwitchIntrinsicAlive*/ !isLateDFE);
     deadFunctionElimination.eliminateFunctionsAndGlobals(this);
   }
 };

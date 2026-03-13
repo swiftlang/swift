@@ -14,7 +14,7 @@ import Closure
 // CHECK: %[[V6:.*]] = init_block_storage_header %[[V2]] : $*@block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> (), invoke %[[V7]] : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> (), @in ARCWeak) -> (), type $@convention(block) (@in ARCWeak) -> ()
 // CHECK: %[[V8:.*]] = copy_block %[[V6]] : $@convention(block) (@in ARCWeak) -> ()
 // CHECK: dealloc_stack %[[V2]] : $*@block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> ()
-// CHECK: %[[V11:.*]] = function_ref @_Z12cfuncARCWeakU13block_pointerFv7ARCWeakE : $@convention(c) (@convention(block) (@in ARCWeak) -> ()) -> ()
+// CHECK: %[[V11:.*]] = function_ref @$sSo12cfuncARCWeakyyySo0B0VcFTo : $@convention(c) (@convention(block) (@in ARCWeak) -> ()) -> ()
 // CHECK: apply %[[V11]](%[[V8]]) : $@convention(c) (@convention(block) (@in ARCWeak) -> ()) -> ()
 // CHECK: strong_release %[[V8]] : $@convention(block) (@in ARCWeak) -> ()
 // CHECK: %[[V12:.*]] = tuple ()
@@ -28,7 +28,6 @@ import Closure
 // CHECK: apply %[[V3]](%[[V1]]) : $@callee_guaranteed (@in_guaranteed ARCWeak) -> ()
 // CHECK: %[[V6:.*]] = tuple ()
 // CHECK: destroy_addr %[[V1]] : $*ARCWeak
-// CHECK: strong_release %[[V3]] : $@callee_guaranteed (@in_guaranteed ARCWeak) -> ()
 // CHECK: return %[[V6]] : $()
 
 // ARCWeak is destroyed by the callee.

@@ -30,6 +30,7 @@ namespace llvm {
 }
 
 namespace swift {
+  enum class BuiltinValueKind : unsigned;
 
 namespace irgen {
   class Callee;
@@ -172,7 +173,8 @@ namespace irgen {
   public:
     enum class BasicKind {
       Function,
-      AsyncFunctionPointer
+      AsyncFunctionPointer,
+      CoroFunctionPointer,
     };
 
     enum class SpecialKind {
@@ -190,22 +192,26 @@ namespace irgen {
     };
 
   private:
-    static constexpr unsigned SpecialOffset = 2;
+    static constexpr unsigned SpecialOffset = 3;
     unsigned value;
   public:
     static constexpr BasicKind Function =
       BasicKind::Function;
     static constexpr BasicKind AsyncFunctionPointer =
       BasicKind::AsyncFunctionPointer;
+    static constexpr BasicKind CoroFunctionPointer =
+        BasicKind::CoroFunctionPointer;
 
     FunctionPointerKind(BasicKind kind)
       : value(unsigned(kind)) {}
     FunctionPointerKind(SpecialKind kind)
       : value(unsigned(kind) + SpecialOffset) {}
     FunctionPointerKind(CanSILFunctionType fnType)
-      : FunctionPointerKind(fnType->isAsync()
-                              ? BasicKind::AsyncFunctionPointer
-                              : BasicKind::Function) {}
+        : FunctionPointerKind(fnType->isAsync()
+                                  ? BasicKind::AsyncFunctionPointer
+                              : fnType->isCalleeAllocatedCoroutine()
+                                  ? BasicKind::CoroFunctionPointer
+                                  : BasicKind::Function) {}
 
     static FunctionPointerKind defaultSync() {
       return BasicKind::Function;
@@ -219,6 +225,9 @@ namespace irgen {
     }
     bool isAsyncFunctionPointer() const {
       return value == unsigned(BasicKind::AsyncFunctionPointer);
+    }
+    bool isCoroFunctionPointer() const {
+      return value == unsigned(BasicKind::CoroFunctionPointer);
     }
 
     bool isSpecial() const {
@@ -325,7 +334,10 @@ namespace irgen {
     /// An additional value whose meaning varies by the FunctionPointer's Kind:
     /// - Kind::AsyncFunctionPointer -> pointer to the corresponding function
     ///                                 if the FunctionPointer was created via
-    ///                                 forDirect; nullptr otherwise. 
+    ///                                 forDirect; nullptr otherwise.
+    /// - Kind::CoroFunctionPointer - pointer to the corresponding function
+    ///                               if the FunctionPointer was created via
+    ///                               forDirect; nullptr otherwise.
     llvm::Value *SecondaryValue;
 
     PointerAuthInfo AuthInfo;
@@ -464,6 +476,13 @@ namespace irgen {
       return SecondaryValue;
     }
 
+    /// Assuming that the receiver is of kind CoroFunctionPointer, returns the
+    /// pointer to the corresponding function if available.
+    llvm::Value *getRawCoroFunction() const {
+      assert(kind.isCoroFunctionPointer());
+      return SecondaryValue;
+    }
+
     /// Given that this value is known to have been constructed from
     /// a direct function, return the function pointer.
     llvm::Constant *getDirectPointer() const {
@@ -552,6 +571,13 @@ namespace irgen {
     Callee(CalleeInfo &&info, const FunctionPointer &fn,
            llvm::Value *firstData = nullptr,
            llvm::Value *secondData = nullptr);
+
+    static Callee forBuiltinRuntimeFunction(IRGenModule &IGM,
+                                            llvm::Constant *fnPtr,
+                                            BuiltinValueKind builtin,
+                                            SubstitutionMap subs,
+                                            FunctionPointerKind fpKind =
+                                              FunctionPointerKind::Function);
 
     SILFunctionTypeRepresentation getRepresentation() const {
       return Info.OrigFnType->getRepresentation();

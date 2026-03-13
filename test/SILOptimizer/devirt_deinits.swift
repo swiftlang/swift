@@ -51,6 +51,16 @@ struct S3: ~Copyable {
   }
 }
 
+struct S4: ~Copyable {
+  var x: Int
+
+  @inline(never)
+  deinit {
+    print(x)
+  }
+}
+
+
 enum EnumWithDeinit: ~Copyable {
   case A(Int)
   case B
@@ -136,6 +146,18 @@ func testNestedDeinit(_ s: consuming S3) {
   log("### testNestedDeinit")
 }
 
+// CHECK-LABEL: sil hidden [noinline] @$s4test0A12DestroyArrayyySryAA2S4VGF :
+// CHECK-NOT:     "destroyArray"
+// CHECK:         [[D:%.*]] = function_ref @$s4test2S4VfD :
+// CHECK:         apply [[D]]
+// CHECK-NOT:     "destroyArray"
+// CHECK:       } // end sil function '$s4test0A12DestroyArrayyySryAA2S4VGF'
+@inline(never)
+func testDestroyArray(_ p: UnsafeMutableBufferPointer<S4>) {
+  p.deinitialize()
+}
+
+
 @main
 struct Main {
   static func main() {
@@ -181,6 +203,21 @@ struct Main {
     // CHECK-OUTPUT-NEXT:  deinit S1
     // CHECK-OUTPUT-NEXT:  ---
     testNestedDeinit(S3())
+    log("---")
+
+    let b = UnsafeMutableBufferPointer<S4>.allocate(capacity: 3)
+    for i in 0..<3 {
+      b.initializeElement(at: i, to: S4(x: i))
+    }
+
+    // CHECK-OUTPUT-LABEL: ### testDestroyArray
+    // CHECK-OUTPUT-NEXT:  0
+    // CHECK-OUTPUT-NEXT:  1
+    // CHECK-OUTPUT-NEXT:  2
+    // CHECK-OUTPUT-NEXT:  ---
+    log("### testDestroyArray")
+    testDestroyArray(b)
+    b.deallocate()
     log("---")
   }
 }

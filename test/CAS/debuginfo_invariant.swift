@@ -11,7 +11,7 @@
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 
 // RUN: echo %t/main.swift > %t/inputs.FileList
-// RUN: %target-swift-frontend -emit-ir -o %t/main.ll -g -O \
+// RUN: %target-swift-frontend-plain -emit-ir -o %t/main.ll -g -O \
 // RUN:   -cache-compile-job -cas-path %t/cas -swift-version 5 \
 // RUN:   -disable-implicit-swift-modules -swift-version 5 -enable-cross-import-overlays \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \

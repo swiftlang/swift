@@ -11,4 +11,4 @@ let _ = testGetX()
 
 // CHECK: define {{.*}}linkonce_odr{{.*}} i32 @{{(.*)(30CopyTrackedDerivedDerivedClass33__synthesizedBaseGetterAccessor_x|__synthesizedBaseGetterAccessor_x@CopyTrackedDerivedDerivedClass)(.*)}}(ptr {{.*}} %[[THIS_PTR:.*]])
 // CHECK: %[[ADD_PTR:.*]] = getelementptr inbounds i8, ptr %{{.*}}, i{{32|64}} 4
-// CHECK: %[[X:.*]] = getelementptr inbounds %class.CopyTrackedBaseClass, ptr %[[ADD_PTR]], i32 0, i32 0
+// CHECK: %[[X:.*]] = getelementptr inbounds{{.*}} %class.CopyTrackedBaseClass, ptr %[[ADD_PTR]], i32 0, i32 0

@@ -12,7 +12,7 @@
 
 import SIL
 
-extension StructExtractInst : OnoneSimplifyable {
+extension StructExtractInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     guard let structInst = self.struct as? StructInst else {
       return

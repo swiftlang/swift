@@ -12,9 +12,10 @@
 
 #define DEBUG_TYPE "sil-verifier"
 
+#include "FlowSensitiveVerifier.h"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -35,10 +36,10 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -53,7 +54,6 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -61,6 +61,7 @@
 #include <memory>
 
 using namespace swift;
+using namespace swift::silverifier;
 
 using Lowering::AbstractionPattern;
 
@@ -94,46 +95,36 @@ static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
                                               llvm::cl::init(true));
 extern llvm::cl::opt<bool> SILPrintDebugInfo;
 
-void swift::verificationFailure(const Twine &complaint,
-              const SILInstruction *atInstruction,
-              const SILArgument *atArgument,
-              const std::function<void()> &extraContext) {
-  const SILFunction *f = nullptr;
-  StringRef funcName = "?";
-  if (atInstruction) {
-    f = atInstruction->getFunction();
-    funcName = f->getName();
-  } else if (atArgument) {
-    f = atArgument->getFunction();
-    funcName = f->getName();
-  }
+void swift::verificationFailure(
+    const Twine &complaint, const SILInstruction *atInstruction,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  auto *f = atInstruction->getFunction();
+  StringRef funcName = f->getName();
   if (ContinueOnFailure) {
-    llvm::dbgs() << "Begin Error in function " << funcName << "\n";
+    out << "Begin Error in function " << funcName << "\n";
   }
 
-  llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+  out << "SIL verification failed: " << complaint << "\n";
   if (extraContext)
-    extraContext();
+    extraContext(ctx);
 
-  if (atInstruction) {
-    llvm::dbgs() << "Verifying instruction:\n";
-    atInstruction->printInContext(llvm::dbgs());
-  } else if (atArgument) {
-    llvm::dbgs() << "Verifying argument:\n";
-    atArgument->printInContext(llvm::dbgs());
-  }
+  out << "Verifying instruction:\n";
+  atInstruction->printInContext(ctx);
   if (ContinueOnFailure) {
-    llvm::dbgs() << "End Error in function " << funcName << "\n";
+    out << "End Error in function " << funcName << "\n";
     return;
   }
 
   if (f) {
-    llvm::dbgs() << "In function:\n";
-    f->print(llvm::dbgs());
+    out << "In function:\n";
+    f->print(out);
     if (DumpModuleOnFailure) {
       // Don't do this by default because modules can be _very_ large.
-      llvm::dbgs() << "In module:\n";
-      f->getModule().print(llvm::dbgs());
+      out << "In module:\n";
+      f->getModule().print(out);
     }
   }
 
@@ -145,6 +136,153 @@ void swift::verificationFailure(const Twine &complaint,
     exit(1);
 }
 
+void swift::verificationFailure(
+    const Twine &complaint, const SILArgument *atArgument,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  auto *f = atArgument->getFunction();
+  StringRef funcName = f->getName();
+
+  if (ContinueOnFailure) {
+    out << "Begin Error in function " << funcName << "\n";
+  }
+
+  out << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext(ctx);
+
+  out << "Verifying argument:\n";
+  atArgument->printInContext(ctx);
+
+  if (ContinueOnFailure) {
+    out << "End Error in function " << funcName << "\n";
+    return;
+  }
+
+  if (f) {
+    out << "In function:\n";
+    f->print(out);
+    if (DumpModuleOnFailure) {
+      // Don't do this by default because modules can be _very_ large.
+      out << "In module:\n";
+      f->getModule().print(out);
+    }
+  }
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
+
+void swift::verificationFailure(
+    const Twine &complaint, SILValue atValue,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  const SILFunction *f = atValue->getFunction();
+  StringRef funcName = f->getName();
+  if (ContinueOnFailure) {
+    out << "Begin Error in function " << funcName << "\n";
+  }
+
+  out << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext(ctx);
+
+  out << "Verifying value:\n";
+  atValue->printInContext(ctx);
+
+  if (ContinueOnFailure) {
+    out << "End Error in function " << funcName << "\n";
+    return;
+  }
+
+  if (f) {
+    out << "In function:\n";
+    f->print(out);
+    if (DumpModuleOnFailure) {
+      // Don't do this by default because modules can be _very_ large.
+      out << "In module:\n";
+      f->getModule().print(out);
+    }
+  }
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
+
+void swift::verificationFailure(
+    const Twine &complaint, const SILFunction *f,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  StringRef funcName = f->getName();
+
+  if (ContinueOnFailure) {
+    out << "Begin Error in function " << funcName << "\n";
+  }
+
+  out << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext(ctx);
+
+  if (ContinueOnFailure) {
+    out << "End Error in function " << funcName << "\n";
+    return;
+  }
+
+  if (f) {
+    out << "In function:\n";
+    f->print(out);
+    if (DumpModuleOnFailure) {
+      // Don't do this by default because modules can be _very_ large.
+      out << "In module:\n";
+      f->getModule().print(out);
+    }
+  }
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
+
+void swift::verificationFailure(
+    const Twine &complaint, const SILWitnessTable *wtable,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  if (ContinueOnFailure) {
+    out << "Begin Error in witness table ";
+    wtable->getConformance()->printName(out);
+    out << "\n";
+  }
+
+  out << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext(ctx);
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
@@ -254,11 +392,13 @@ class SILVerifierBase : public SILInstructionVisitor<Impl> {
 public:
   // visitCLASS calls visitPARENT and checkCLASS.
   // checkCLASS does nothing by default.
-#define INST(CLASS, PARENT)                                     \
-  void visit##CLASS(CLASS *I) {                                 \
-    static_cast<Impl*>(this)->visit##PARENT(I);                 \
-    static_cast<Impl*>(this)->check##CLASS(I);                  \
-  }                                                             \
+#define INST(CLASS, PARENT)                                                    \
+  void visit##CLASS(CLASS *I) {                                                \
+    typename Impl::VerifierErrorEmitterGuard guard(static_cast<Impl *>(this),  \
+                                                   I);                         \
+    static_cast<Impl *>(this)->visit##PARENT(I);                               \
+    static_cast<Impl *>(this)->check##CLASS(I);                                \
+  }                                                                            \
   void check##CLASS(CLASS *I) {}
 #include "swift/SIL/SILNodes.def"
 
@@ -295,12 +435,12 @@ void verifyKeyPathComponent(SILModule &M,
   auto getTypeInExpansionContext = [&](CanType ty) -> CanType {
     return M.Types.getLoweredType(opaque, ty, typeExpansionContext).getASTType();
   };
-  auto checkIndexEqualsAndHash = [&]{
-    if (!component.getSubscriptIndices().empty()) {
+  auto checkIndexEqualsAndHash = [&] {
+    if (!component.getArguments().empty()) {
       // Equals should be
       // <Sig...> @convention(thin) (RawPointer, RawPointer) -> Bool
       {
-        auto equals = component.getSubscriptIndexEquals();
+        auto equals = component.getIndexEquals();
         require(equals, "key path pattern with indexes must have equals "
                         "operator");
         
@@ -332,7 +472,7 @@ void verifyKeyPathComponent(SILModule &M,
       {
         // Hash should be
         // <Sig...> @convention(thin) (RawPointer) -> Int
-        auto hash = component.getSubscriptIndexHash();
+        auto hash = component.getIndexHash();
         require(hash, "key path pattern with indexes must have hash "
                       "operator");
         
@@ -359,8 +499,7 @@ void verifyKeyPathComponent(SILModule &M,
                 "result should be Int");
       }
     } else {
-      require(!component.getSubscriptIndexEquals()
-              && !component.getSubscriptIndexHash(),
+      require(!component.getIndexEquals() && !component.getIndexHash(),
               "component without indexes must not have equals/hash");
     }
   };
@@ -395,18 +534,18 @@ void verifyKeyPathComponent(SILModule &M,
   }
     
   case KeyPathPatternComponent::Kind::GettableProperty:
-  case KeyPathPatternComponent::Kind::SettableProperty: {
+  case KeyPathPatternComponent::Kind::SettableProperty:
+  case KeyPathPatternComponent::Kind::Method: {
     if (forPropertyDescriptor) {
-      require(component.getSubscriptIndices().empty()
-              && !component.getSubscriptIndexEquals()
-              && !component.getSubscriptIndexHash(),
+      require(component.getArguments().empty() && !component.getIndexEquals() &&
+                  !component.getIndexHash(),
               "property descriptor should not have index information");
-      
+
       require(component.getExternalDecl() == nullptr
               && component.getExternalSubstitutions().empty(),
               "property descriptor should not refer to another external decl");
     } else {
-      require(hasIndices == !component.getSubscriptIndices().empty(),
+      require(hasIndices == !component.getArguments().empty(),
               "component for subscript should have indices");
     }
     
@@ -414,7 +553,7 @@ void verifyKeyPathComponent(SILModule &M,
   
     // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
     {
-      auto getter = component.getComputedPropertyGetter();
+      auto getter = component.getComputedPropertyForGettable();
       if (expansion == ResilienceExpansion::Minimal) {
         require(serializedKind != IsNotSerialized &&
                 getter->hasValidLinkageForFragileRef(serializedKind),
@@ -460,8 +599,8 @@ void verifyKeyPathComponent(SILModule &M,
     if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
       // Setter should be
       // <Sig...> @convention(thin) (@in_guaranteed Result, @in Base) -> ()
-      
-      auto setter = component.getComputedPropertySetter();
+
+      auto setter = component.getComputedPropertyForSettable();
       if (expansion == ResilienceExpansion::Minimal) {
         require(serializedKind != IsNotSerialized &&
                 setter->hasValidLinkageForFragileRef(serializedKind),
@@ -510,7 +649,7 @@ void verifyKeyPathComponent(SILModule &M,
     }
     
     if (!forPropertyDescriptor) {
-      for (auto &index : component.getSubscriptIndices()) {
+      for (auto &index : component.getArguments()) {
         auto opIndex = index.Operand;
         auto contextType =
           index.LoweredType.subst(M, patternSubs);
@@ -573,6 +712,11 @@ void verifyKeyPathComponent(SILModule &M,
 /// open_existential_addr. We should expand it as needed.
 struct ImmutableAddressUseVerifier {
   SmallVector<Operand *, 32> worklist;
+  bool ignoreDestroys;
+  bool defaultIsMutating;
+
+  ImmutableAddressUseVerifier(bool ignoreDestroys = false, bool defaultIsMutating = false)
+    : ignoreDestroys(ignoreDestroys), defaultIsMutating(defaultIsMutating) {}
 
   bool isConsumingOrMutatingArgumentConvention(SILArgumentConvention conv) {
     switch (conv) {
@@ -705,13 +849,13 @@ struct ImmutableAddressUseVerifier {
           }
         }
 
-        // Otherwise this is a builtin that we are not expecting to see, so bail
-        // and assert.
-        llvm::errs() << "Unhandled, unexpected builtin instruction: " << *inst;
-        llvm_unreachable("invoking standard assertion failure");
+        // Otherwise this is a builtin that we are not expecting to see.
+        if (defaultIsMutating)
+          return true;
         break;
       }
       case SILInstructionKind::MarkDependenceInst:
+      case SILInstructionKind::MarkDependenceAddrInst:
       case SILInstructionKind::LoadBorrowInst:
       case SILInstructionKind::ExistentialMetatypeInst:
       case SILInstructionKind::ValueMetatypeInst:
@@ -775,7 +919,9 @@ struct ImmutableAddressUseVerifier {
         else
           break;
       case SILInstructionKind::DestroyAddrInst:
-        return true;
+        if (!ignoreDestroys)
+          return true;
+        break;
       case SILInstructionKind::UpcastInst:
       case SILInstructionKind::UncheckedAddrCastInst: {
         if (isAddrCastToNonConsuming(cast<SingleValueInstruction>(inst))) {
@@ -821,6 +967,7 @@ struct ImmutableAddressUseVerifier {
         LLVM_FALLTHROUGH;
       case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
       case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+      case SILInstructionKind::VectorBaseAddrInst:
       case SILInstructionKind::StructElementAddrInst:
       case SILInstructionKind::TupleElementAddrInst:
       case SILInstructionKind::IndexAddrInst:
@@ -841,9 +988,7 @@ struct ImmutableAddressUseVerifier {
           }
           break;
         }
-        llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
-        llvm_unreachable("invoking standard assertion failure");
-        break;
+        return true;
       }
       case SILInstructionKind::TuplePackElementAddrInst: {
         if (&cast<TuplePackElementAddrInst>(inst)->getOperandRef(
@@ -865,8 +1010,8 @@ struct ImmutableAddressUseVerifier {
         return false;
       }
       default:
-        llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
-        llvm_unreachable("invoking standard assertion failure");
+        if (defaultIsMutating)
+          return true;
         break;
       }
     }
@@ -910,17 +1055,100 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   CalleeCache *calleeCache;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
+  InstructionIndices instIndices;
 
   bool SingleFunction = true;
   bool checkLinearLifetime = false;
 
   SmallVector<std::pair<StringRef, SILType>, 16> DebugVars;
-  const SILInstruction *CurInstruction = nullptr;
-  const SILArgument *CurArgument = nullptr;
-  std::unique_ptr<DominanceInfo> Dominance;
 
-  // Used for dominance checking within a basic block.
-  llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
+public:
+  class VerifierErrorEmitter {
+    std::optional<std::variant<const SILInstruction *, const SILArgument *,
+                               const SILFunction *, const SILWitnessTable *>>
+        value;
+
+  public:
+    class VerifierErrorEmitterGuard {
+      SILVerifier *verifier;
+
+      VerifierErrorEmitter &getEmitter() const {
+        return verifier->ErrorEmitter;
+      }
+
+    public:
+      VerifierErrorEmitterGuard(SILVerifier *verifier,
+                                const SILInstruction *inst)
+          : verifier(verifier) {
+        assert(!bool(getEmitter().value) &&
+               "Cannot emit errors for two different "
+               "constructs at the same time?!");
+        getEmitter().value = inst;
+      }
+
+      VerifierErrorEmitterGuard(SILVerifier *verifier, const SILFunction *f)
+          : verifier(verifier) {
+        assert(!bool(getEmitter().value) &&
+               "Cannot emit errors for two different "
+               "constructs at the same time?!");
+        getEmitter().value = f;
+      }
+
+      VerifierErrorEmitterGuard(SILVerifier *verifier, const SILArgument *arg)
+          : verifier(verifier) {
+        assert(!bool(getEmitter().value) &&
+               "Cannot emit errors for two different "
+               "constructs at the same time?!");
+        getEmitter().value = arg;
+      }
+
+      VerifierErrorEmitterGuard(SILVerifier *verifier, const SILWitnessTable *wtable)
+          : verifier(verifier) {
+        assert(!bool(getEmitter().value) &&
+               "Cannot emit errors for two different "
+               "constructs at the same time?!");
+        getEmitter().value = wtable;
+      }
+
+      ~VerifierErrorEmitterGuard() { getEmitter().value = {}; }
+    };
+
+    void emitError(const Twine &complaint,
+                   llvm::function_ref<void(SILPrintContext &)> extraContext) {
+      if (!value.has_value()) {
+        llvm::report_fatal_error("Must have a construct to emit for");
+      }
+
+      auto v = *value;
+      if (std::holds_alternative<const SILInstruction *>(v)) {
+        return verificationFailure(
+            complaint, std::get<const SILInstruction *>(v), extraContext);
+      }
+
+      if (std::holds_alternative<const SILArgument *>(v)) {
+        return verificationFailure(complaint, std::get<const SILArgument *>(v),
+                                   extraContext);
+      }
+
+      if (std::holds_alternative<const SILFunction *>(v)) {
+        return verificationFailure(complaint, std::get<const SILFunction *>(v),
+                                   extraContext);
+      }
+
+      if (std::holds_alternative<const SILWitnessTable *>(v)) {
+        return verificationFailure(complaint, std::get<const SILWitnessTable *>(v),
+                                   extraContext);
+      }
+
+      llvm::report_fatal_error("Unhandled case?!");
+    }
+  };
+  using VerifierErrorEmitterGuard =
+      VerifierErrorEmitter::VerifierErrorEmitterGuard;
+
+private:
+  VerifierErrorEmitter ErrorEmitter;
+  std::unique_ptr<DominanceInfo> Dominance;
 
   /// TODO: LifetimeCompletion: Remove.
   std::shared_ptr<DeadEndBlocks> DEBlocks;
@@ -970,10 +1198,11 @@ public:
   }
 
   void _require(bool condition, const Twine &complaint,
-                const std::function<void()> &extraContext = nullptr) {
+                llvm::function_ref<void(SILPrintContext &)> extraContext
+                  = nullptr) {
     if (condition) return;
 
-    verificationFailure(complaint, CurInstruction, CurArgument, extraContext);
+    ErrorEmitter.emitError(complaint, extraContext);
   }
 #define require(condition, complaint) \
   _require(bool(condition), complaint ": " #condition)
@@ -1009,6 +1238,11 @@ public:
   }
 #define requireAddressType(type, value, valueDescription) \
   _requireAddressType<type>(value, valueDescription, #type)
+
+  void requireVoidObjectType(SILType type, const Twine &valueDescription) {
+    _require(type.isObject() && type.isVoid(),
+             valueDescription + " must be a scalar of type ()");
+  }
 
   template <class T>
   typename CanTypeWrapperTraits<T>::type
@@ -1048,7 +1282,13 @@ public:
     
     auto objectTy = value->getType().unwrapOptionalType();
     
-    require(objectTy.isReferenceCounted(F.getModule()),
+    // Immortal C++ foreign reference types are represented as trivially lowered
+    // types since they do not require retain/release calls.
+    bool isImmortalFRT = objectTy.isForeignReferenceType() &&
+                         objectTy.getASTType()->getReferenceCounting() ==
+                             ReferenceCounting::None;
+
+    require(objectTy.isReferenceCounted(F.getModule()) || isImmortalFRT,
             valueDescription + " must have reference semantics");
   }
   
@@ -1070,10 +1310,10 @@ public:
             what + " must be Optional<Builtin.Executor>");
   }
 
-  /// Require the operand to be an object of some type that conforms to
-  /// Actor or DistributedActor.
-  void requireAnyActorType(SILValue value, bool allowOptional,
-                           bool allowExecutor, const Twine &what) {
+  /// Require the operand to be an object of some type that can be used to hop
+  /// since we can extract an executor from it.
+  void canExtractExecutorFrom(SILValue value, bool allowOptional,
+                              bool allowExecutor, const Twine &what) {
     auto type = value->getType();
     require(type.isObject(), what + " must be an object type");
 
@@ -1084,20 +1324,24 @@ public:
     }
     if (allowExecutor && isa<BuiltinExecutorType>(actorType))
       return;
-    require(actorType->isAnyActorType(),
+    require(actorType->canBeIsolatedTo(),
             what + " must be some kind of actor type");
   }
 
   /// Assert that two types are equal.
   void requireSameType(Type type1, Type type2, const Twine &complaint) {
     _require(type1->isEqual(type2), complaint,
-             [&] { llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n'; });
+             [&](SILPrintContext &ctx) {
+      ctx.OS() << "  " << type1 << "\n  " << type2 << '\n';
+    });
   }
 
   /// Assert that two types are equal.
   void requireSameType(SILType type1, SILType type2, const Twine &complaint) {
     _require(type1 == type2, complaint,
-             [&] { llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n'; });
+             [&](SILPrintContext &ctx) {
+      ctx.OS() << "  " << type1 << "\n  " << type2 << '\n';
+    });
   }
 
   SynthesisContext getSynthesisContext() {
@@ -1128,32 +1372,22 @@ public:
                                          CanSILFunctionType type2,
                                          const Twine &what,
                                          SILFunction &inFunction) {
-    auto complain = [=](const char *msg) -> std::function<void()> {
-      return [=]{
-        llvm::dbgs() << "  " << msg << '\n'
-                     << "  " << type1 << "\n  " << type2 << '\n';
-      };
-    };
-    auto complainBy = [=](std::function<void()> msg) -> std::function<void()> {
-      return [=]{
-        msg();
-        llvm::dbgs() << '\n';
-        llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n';
-      };
-    };
-
     // If we didn't have a failure, return.
     auto Result = type1->isABICompatibleWith(type2, inFunction);
     if (Result.isCompatible())
       return;
 
     if (!Result.hasPayload()) {
-      _require(false, what, complain(Result.getMessage().data()));
+      _require(false, what, [&](SILPrintContext &ctx) {
+        ctx.OS() << "  " << Result.getMessage().data() << '\n'
+                 << "  " << type1 << "\n  " << type2 << '\n';
+      });
     } else {
-      _require(false, what, complainBy([=] {
-                 llvm::dbgs() << " " << Result.getMessage().data()
-                              << ".\nParameter: " << Result.getPayload();
-               }));
+      _require(false, what, [&](SILPrintContext &ctx) {
+        ctx.OS() << " " << Result.getMessage().data()
+                 << ".\nParameter: " << Result.getPayload()
+                 << "\n  " << type1 << "\n  " << type2 << '\n';
+      });
     }
   }
 
@@ -1179,16 +1413,10 @@ public:
   template <class T>
   T *requireValueKind(SILValue value, const Twine &what) {
     auto match = dyn_cast<T>(value);
-    _require(match != nullptr, what, [=] { llvm::dbgs() << value; });
+    _require(match != nullptr, what, [=](SILPrintContext &ctx) {
+      value->print(ctx);
+    });
     return match;
-  }
-
-  static unsigned numInstsInFunction(const SILFunction &F) {
-    unsigned numInsts = 0;
-    for (auto &BB : F) {
-      numInsts += std::distance(BB.begin(), BB.end());
-    }
-    return numInsts;
   }
 
   SILVerifier(const SILFunction &F, CalleeCache *calleeCache,
@@ -1196,29 +1424,26 @@ public:
       : M(F.getModule().getSwiftModule()), F(F),
         calleeCache(calleeCache),
         fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
+        instIndices(const_cast<SILFunction *>(&F)),
         SingleFunction(SingleFunction),
         checkLinearLifetime(checkLinearLifetime),
-        Dominance(nullptr),
-        InstNumbers(numInstsInFunction(F)) {
+        Dominance(nullptr) {
     if (F.isExternalDeclaration())
       return;
 
     // Check to make sure that all blocks are well formed.  If not, the
     // SILVerifier object will explode trying to compute dominance info.
-    unsigned InstIdx = 0;
     for (auto &BB : F) {
       require(!BB.empty(), "Basic blocks cannot be empty");
       require(isa<TermInst>(BB.back()),
               "Basic blocks must end with a terminator instruction");
-      for (auto &I : BB)
-        InstNumbers[&I] = InstIdx++;
     }
 
     Dominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
-    require(DebugScope->Parent.get<SILFunction *>() == &F,
+    require(cast<SILFunction *>(DebugScope->Parent) == &F,
             "Scope of SIL function points to different function");
   }
 
@@ -1235,7 +1460,10 @@ public:
     if (aBlock != bBlock)
       return Dominance->properlyDominates(aBlock, bBlock);
 
-    return InstNumbers[a] < InstNumbers[b];
+    // Note that it might happen that for absurdly large basic blocks, the instruction
+    // indices are "maxed out". In this case we cannot compute the before-after
+    // relation efficiently and we conservatively return true.
+    return a != b && instIndices.get(a) <= instIndices.get(b);
   }
 
   void visitSILPhiArgument(SILPhiArgument *arg) {
@@ -1275,7 +1503,7 @@ public:
   }
 
   void visitSILArgument(SILArgument *arg) {
-    CurArgument = arg;
+    VerifierErrorEmitterGuard guard(this, arg);
     checkLegalType(arg->getFunction(), arg, nullptr);
 
     if (checkLinearLifetime) {
@@ -1310,7 +1538,6 @@ public:
   }
 
   void visitSILInstruction(SILInstruction *I) {
-    CurInstruction = I;
     checkSILInstruction(I);
 
     // Check the SILLLocation attached to the instruction,
@@ -1343,7 +1570,7 @@ public:
               "Once ownership is gone, all values should have none ownership");
       return;
     }
-    SILValue(V).verifyOwnership(DEBlocks.get());
+    SILValue(V).verifyOwnership(DEBlocks.get(), &instIndices);
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -1458,12 +1685,16 @@ public:
                 "kind since guaranteed and owned values can always be passed "
                 "in unowned positions");
 
-        require(operand.getOperandOwnership() !=
-                        OperandOwnership::InteriorPointer ||
-                    InteriorPointerOperandKind::get(&operand) !=
-                        InteriorPointerOperandKind::Invalid,
-                "All operands with InteriorPointer operand ownership should be "
-                "added to the InteriorPointerOperand utility");
+        switch (operand.getOperandOwnership()) {
+        default:
+          break;
+        case OperandOwnership::InteriorPointer:
+        case OperandOwnership::AnyInteriorPointer:
+          require(InteriorPointerOperandKind::get(&operand) !=
+                  InteriorPointerOperandKind::Invalid,
+                  "All operands with InteriorPointer operand ownership should be "
+                  "added to the InteriorPointerOperand utility");
+        }
       }
     }
 
@@ -1636,9 +1867,49 @@ public:
 
       require(lhs == rhs ||
               (lhs.isAddress() && lhs.getObjectType() == rhs) ||
-              (DebugVarTy.isAddress() && lhs == rhs.getObjectType()),
-              "Two variables with different type but same scope!");
+              (DebugVarTy.isAddress() && lhs == rhs.getObjectType()) ||
+              // When cloning SIL (e.g. in LoopUnroll) local archetypes are uniqued
+              // and therefore distinct in cloned instructions.
+              (lhs.hasLocalArchetype() && rhs.hasLocalArchetype()),
+              "Two variables with different type but same scope");
     }
+
+    // Check that all inlined function arguments agree on their types.
+#ifdef EXPENSIVE_VERIFIER_CHECKS
+    if (unsigned ArgNo = varInfo->ArgNo)
+      if (varInfo->Scope)
+        if (SILFunction *Fn = varInfo->Scope->getInlinedFunction()) {
+          using ArgMap = llvm::StringMap<llvm::SmallVector<SILType, 8>>;
+          static ArgMap DebugArgs;
+          llvm::StringRef Key = Fn->getName();
+          if (!Key.empty()) {
+            auto [It, Inserted] = DebugArgs.insert({Key, {}});
+            auto &CachedArgs = It->second;
+            if (Inserted || (!Inserted && (CachedArgs.size() < ArgNo)) ||
+                (!Inserted && !CachedArgs[ArgNo - 1])) {
+              if (CachedArgs.size() < ArgNo)
+                CachedArgs.resize(ArgNo);
+              CachedArgs[ArgNo - 1] = DebugVarTy;
+            } else {
+              SILType CachedArg = CachedArgs[ArgNo - 1];
+              auto lhs = CachedArg.removingMoveOnlyWrapper();
+              auto rhs = DebugVarTy.removingMoveOnlyWrapper();
+              if (lhs != rhs) {
+                llvm::errs() << "***** " << varInfo->Name << "\n";
+                lhs.dump();
+                rhs.dump();
+                Fn->dump();
+              }
+              require(
+                  lhs == rhs ||
+                      (lhs.isAddress() && lhs.getObjectType() == rhs) ||
+                      (DebugVarTy.isAddress() && lhs == rhs.getObjectType()) ||
+                      (lhs.hasLocalArchetype() && rhs.hasLocalArchetype()),
+                  "Conflicting types for function argument!");
+            }
+          }
+        }
+#endif
 
     // Check debug info expression
     if (const auto &DIExpr = varInfo->DIExpr) {
@@ -1797,13 +2068,6 @@ public:
     // It's illegal code but the compiler should not crash on it.
   }
 
-  void checkAllocVectorInst(AllocVectorInst *AI) {
-    require(AI->getType().isAddress(),
-            "result of alloc_vector must be an address type");
-    require(AI->getOperand()->getType().is<BuiltinIntegerType>(),
-            "capacity needs integer type");
-  }
-
   void checkAllocPackInst(AllocPackInst *AI) {
     requireAddressType(SILPackType, AI->getType(),
                        "result of alloc_pack must be an address of "
@@ -1879,14 +2143,16 @@ public:
 
     if (subs.getGenericSignature().getCanonicalSignature() !=
           fnTy->getInvocationGenericSignature().getCanonicalSignature()) {
-      llvm::dbgs() << "substitution map's generic signature: ";
-      subs.getGenericSignature()->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
-      llvm::dbgs() << "callee's generic signature: ";
-      fnTy->getInvocationGenericSignature()->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
-      require(false,
-              "Substitution map does not match callee in apply instruction");
+      _require(false, "Substitution map does not match callee in apply instruction",
+               [&](SILPrintContext &ctx) {
+        auto &out = ctx.OS();
+        out << "substitution map's generic signature: ";
+        subs.getGenericSignature()->print(out);
+        out << "\n";
+        out << "callee's generic signature: ";
+        fnTy->getInvocationGenericSignature()->print(out);
+        out << "\n";
+      });
     }
     // Apply the substitutions.
     return fnTy->substGenericArgs(F.getModule(), subs, F.getTypeExpansionContext());
@@ -2136,9 +2402,9 @@ public:
             "operand of abort_apply must be a begin_apply");
     auto *mvi = getAsResultOf<BeginApplyInst>(AI->getOperand());
     auto *bai = cast<BeginApplyInst>(mvi->getParent());
-    require(!bai->getSubstCalleeType()->isCalleeAllocatedCoroutine() ||
-                AI->getFunction()->getASTContext().LangOpts.hasFeature(
-                    Feature::CoroutineAccessorsUnwindOnCallerError),
+    // `abort_apply` is valid for legacy `_read`/`_modify` accessors
+    // It is never valid for `yielding borrow`/`yielding mutate`
+    require(!bai->getSubstCalleeType()->isCalleeAllocatedCoroutine(),
             "abort_apply of callee-allocated yield-once coroutine!?");
   }
 
@@ -2197,13 +2463,16 @@ public:
               "mark_dependence [nonescaping] must be an owned value");
     }
   }
-  
+
   void checkPartialApplyInst(PartialApplyInst *PAI) {
     auto resultInfo = requireObjectType(SILFunctionType, PAI,
                                         "result of partial_apply");
     verifySILFunctionType(resultInfo);
     require(resultInfo->getExtInfo().hasContext(),
             "result of closure cannot have a thin function type");
+
+    require(PAI->getType().isNoEscapeFunction() == PAI->isOnStack(),
+            "closure must be on stack to have a noescape function type");
 
     // We rely on all indirect captures to be in the argument list.
     require(PAI->getCallee()->getType().isObject(),
@@ -2376,6 +2645,24 @@ public:
     auto builtinKind = BI->getBuiltinKind();
     auto arguments = BI->getArguments();
 
+    if (builtinKind == BuiltinValueKind::ZeroInitializer ||
+        builtinKind == BuiltinValueKind::PrepareInitialization) {
+      require(!BI->getSubstitutions(),
+              "zeroInitializer has no generic arguments as a SIL builtin");
+      if (arguments.size() == 0) {
+        require(!fnConv.useLoweredAddresses()
+                || BI->getType().isLoadable(*BI->getFunction()),
+                "scalar zeroInitializer must have a loadable result type");
+      } else {
+        require(arguments.size() == 1,
+                "zeroInitializer cannot have multiple arguments");
+        require(arguments[0]->getType().isAddress(),
+                "zeroInitializer argument must have address type");
+        requireVoidObjectType(BI->getType(),
+                              "result of zeroInitializer");
+      }
+    }
+
     // Check that 'getCurrentAsyncTask' only occurs within an async function.
     if (builtinKind == BuiltinValueKind::GetCurrentAsyncTask) {
       require(F.isAsync(),
@@ -2430,8 +2717,8 @@ public:
     if (builtinKind == BuiltinValueKind::CreateAsyncTask) {
       requireType(BI->getType(), _object(_tuple(_nativeObject, _rawPointer)),
                   "result of createAsyncTask");
-      require(arguments.size() == 6,
-              "createAsyncTask expects six arguments");
+      require(arguments.size() == 7,
+              "createAsyncTask expects seven arguments");
       requireType(arguments[0]->getType(), _object(_swiftInt),
                   "first argument of createAsyncTask");
       requireType(arguments[1]->getType(), _object(_optional(_executor)),
@@ -2451,7 +2738,9 @@ public:
                     _object(_optional(_executor)),
                     "fifth argument of createAsyncTask");
       }
-      auto fnType = requireObjectType(SILFunctionType, arguments[5],
+      requireType(arguments[5]->getType(), _object(_optional(_rawPointer)),
+                  "sixth argument of createAsyncTask");
+      auto fnType = requireObjectType(SILFunctionType, arguments[6],
                                       "result of createAsyncTask");
       bool haveSending =
           F.getASTContext().LangOpts.hasFeature(Feature::SendingArgsAndResults);
@@ -2496,8 +2785,40 @@ public:
     if (builtinKind == BuiltinValueKind::ExtractFunctionIsolation) {
       require(false, "this builtin is pre-SIL-only");
     }
+
+    if (builtinKind == BuiltinValueKind::FinishAsyncLet) {
+      requireType(BI->getType(), _object(_tuple()),
+                  "result of finishAsyncLet");
+      require(arguments.size() == 2, "finishAsyncLet requires two arguments");
+      requireType(arguments[0]->getType(), _object(_rawPointer),
+                  "first argument of finishAsyncLet");
+      requireType(arguments[1]->getType(), _object(_rawPointer),
+                  "second argument of finishAsyncLet");
+
+      require((bool)isBuiltinInst(arguments[0],
+                              BuiltinValueKind::StartAsyncLetWithLocalBuffer),
+              "first argument of finishAsyncLet must be a startAsyncLet");
+    }
+
+    // Validate all "SIL builtins" never show up as BuiltinInst since they
+    // should just result in sequences of non-builtin inst SIL instructions
+    // being emitted and should never show up as a BuiltinInst.
+    switch (*builtinKind) {
+    case BuiltinValueKind::None:
+      break;
+#define BUILTIN_SIL_OPERATION(id, name, overload)                              \
+  case BuiltinValueKind::id:                                                   \
+    require(false,                                                             \
+            "this builtin should never show up as builtin inst. It should "    \
+            "only result in other SIL instructions being emitted by SILGen");  \
+    break;
+#define BUILTIN(ID, Name, Attrs)                                               \
+  case BuiltinValueKind::ID:                                                   \
+    break;
+#include "swift/AST/Builtins.def"
+    }
   }
-  
+
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
@@ -2685,6 +3006,8 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
+    require(F.getModule().getStage() == SILStage::Raw || !LBI->isUnchecked(),
+            "load_borrow's unchecked bit is on");
   }
 
   void checkBeginBorrowInst(BeginBorrowInst *bbi) {
@@ -2804,6 +3127,27 @@ public:
             "cannot convert ownership of an address");
     require(uoci->getType() == uoci->getOperand()->getType(),
             "converting ownership does not affect the type");
+  }
+
+  void checkImplicitActorToOpaqueIsolationCastInst(
+      ImplicitActorToOpaqueIsolationCastInst *igi) {
+    if (F.hasOwnership()) {
+      require(igi->getValue()->getOwnershipKind().isCompatibleWith(
+                  OwnershipKind::Guaranteed),
+              "implicitactor_to_optionalactor_cast's operand should have "
+              "guaranteed ownership");
+      require(
+          igi->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed),
+          "result value should have guaranteed ownership");
+    }
+
+    require(igi->getValue()->getType() ==
+                SILType::getBuiltinImplicitActorType(
+                    igi->getFunction()->getASTContext()),
+            "operand should be an implicit actor type");
+    require(igi->getType() == SILType::getOpaqueIsolationType(
+                                  igi->getFunction()->getASTContext()),
+            "result must be Optional<any Actor>");
   }
 
   template <class AI>
@@ -3104,47 +3448,6 @@ public:
             "initializer or setter has too many arguments");
   }
 
-  void checkAssignByWrapperInst(AssignByWrapperInst *AI) {
-    SILValue Src = AI->getSrc(), Dest = AI->getDest();
-    require(AI->getModule().getStage() == SILStage::Raw,
-            "assign instruction can only exist in raw SIL");
-    require(Dest->getType().isAddress(), "Must store to an address dest");
-
-    SILValue initFn = AI->getInitializer();
-    CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
-    SILFunctionConventions initConv(initTy, AI->getModule());
-    checkAssignByWrapperArgs(Src->getType(), initConv);
-    switch (initConv.getNumIndirectSILResults()) {
-      case 0:
-        require(initConv.getNumDirectSILResults() == 1,
-                "wrong number of init function results");
-        requireSameType(
-            Dest->getType().getObjectType(),
-            *initConv.getDirectSILResultTypes(F.getTypeExpansionContext())
-                 .begin(),
-            "wrong init function result type");
-        break;
-      case 1:
-        require(initConv.getNumDirectSILResults() == 0,
-                "wrong number of init function results");
-        requireSameType(
-            Dest->getType(),
-            *initConv.getIndirectSILResultTypes(F.getTypeExpansionContext())
-                 .begin(),
-            "wrong indirect init function result type");
-        break;
-      default:
-        require(false, "wrong number of indirect init function results");
-    }
-
-    SILValue setterFn = AI->getSetter();
-    CanSILFunctionType setterTy = setterFn->getType().castTo<SILFunctionType>();
-    SILFunctionConventions setterConv(setterTy, AI->getModule());
-    require(setterConv.getNumIndirectSILResults() == 0,
-            "set function has indirect results");
-    checkAssignByWrapperArgs(Src->getType(), setterConv);
-  }
-
   void checkAssigOrInitInstAccessorArgs(SILType argTy,
                                         SILFunctionConventions &conv) {
     unsigned argIdx = conv.getSILArgIndexOfFirstParam();
@@ -3168,9 +3471,9 @@ public:
       CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions initConv(initTy, AI->getModule());
 
-      require(initConv.getNumIndirectSILResults() ==
+      require(initConv.getResults().size() ==
                   AI->getNumInitializedProperties(),
-              "init function has invalid number of indirect results");
+              "init function has invalid number of results");
       checkAssigOrInitInstAccessorArgs(Src->getType(), initConv);
     }
 
@@ -3554,7 +3857,7 @@ public:
     if (auto *AEBI = dyn_cast<AllocExistentialBoxInst>(PEBI->getOperand())) {
       // The lowered type must be the properly-abstracted form of the AST type.
       SILType exType = AEBI->getExistentialType();
-      auto archetype = OpenedArchetypeType::get(exType.getASTType());
+      auto archetype = ExistentialArchetypeType::get(exType.getASTType());
 
       auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
                                         AEBI->getFormalConcreteType())
@@ -3800,13 +4103,10 @@ public:
     };
     require(isa<SILUndef>(DI->getOperand()) ||
                 isa<AllocStackInst>(DI->getOperand()) ||
-                isa<AllocVectorInst>(DI->getOperand()) ||
                 (isa<PartialApplyInst>(DI->getOperand()) &&
                  cast<PartialApplyInst>(DI->getOperand())->isOnStack()) ||
                 (isTokenFromCalleeAllocatedBeginApply(DI->getOperand())),
-            "Operand of dealloc_stack must be an alloc_stack, alloc_vector or "
-            "partial_apply "
-            "[stack]");
+            "Operand of dealloc_stack must be an alloc_stack or partial_apply [stack]");
   }
   void checkDeallocPackInst(DeallocPackInst *DI) {
     require(isa<SILUndef>(DI->getOperand()) ||
@@ -4174,8 +4474,9 @@ public:
 
     auto lookupType = AMI->getLookupType();
     if (getLocalArchetypeOf(lookupType) || lookupType->hasDynamicSelfType()) {
-      require(AMI->getTypeDependentOperands().size() == 1,
-              "Must have a type dependent operand for the opened archetype");
+      require(!AMI->getTypeDependentOperands().empty(),
+              "Must have at least one type-dependent operand when there's a "
+              "local archetype or dynamic self.");
       verifyLocalArchetype(AMI, lookupType);
     } else {
       require(AMI->getTypeDependentOperands().empty() || lookupType->hasLocalArchetype(),
@@ -4249,16 +4550,19 @@ public:
     // If the method returns dynamic Self, substitute AnyObject for the
     // result type.
     if (auto fnDecl = dyn_cast<FuncDecl>(method.getDecl())) {
-      if (fnDecl->hasDynamicSelfResult()) {
+      if (fnDecl->getResultInterfaceType()->hasDynamicSelfType()) {
         auto anyObjectTy = C.getAnyObjectType();
         for (auto &result : results) {
-          auto newResultTy =
+          auto resultTy =
               result
                   .getReturnValueType(F.getModule(), methodTy,
-                                      F.getTypeExpansionContext())
-                  ->replaceCovariantResultType(anyObjectTy, 0);
-          result = SILResultInfo(newResultTy->getCanonicalType(),
-                                 result.getConvention());
+                                      F.getTypeExpansionContext());
+          if (resultTy->getOptionalObjectType())
+            resultTy = OptionalType::get(anyObjectTy)->getCanonicalType();
+          else
+            resultTy = anyObjectTy;
+
+          result = SILResultInfo(resultTy, result.getConvention());
         }
       }
     }
@@ -4641,7 +4945,7 @@ public:
             "existential type");
     
     // The lowered type must be the properly-abstracted form of the AST type.
-    auto archetype = OpenedArchetypeType::get(exType.getASTType());
+    auto archetype = ExistentialArchetypeType::get(exType.getASTType());
 
     auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
                                       AEI->getFormalConcreteType())
@@ -4670,7 +4974,7 @@ public:
             "init_existential_value result must not be an address");
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
-    auto archetype = OpenedArchetypeType::get(exType.getASTType());
+    auto archetype = ExistentialArchetypeType::get(exType.getASTType());
     auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
                                       IEI->getFormalConcreteType());
     requireSameType(
@@ -4702,7 +5006,7 @@ public:
     
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
-    auto archetype = OpenedArchetypeType::get(exType.getASTType());
+    auto archetype = ExistentialArchetypeType::get(exType.getASTType());
     auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
                                       IEI->getFormalConcreteType());
     requireSameType(concreteType, loweredTy,
@@ -4809,7 +5113,7 @@ public:
     }
 
     for (auto i : indices(conformances)) {
-      require(conformances[i].getRequirement() == protocols[i]->getDecl(),
+      require(conformances[i].getProtocol() == protocols[i]->getDecl(),
               "init_existential instruction must have conformances in "
               "proper order");
     }
@@ -5252,27 +5556,6 @@ public:
     require(resTI == ti->getThunkKind().getDerivedFunctionType(
                          ti->getFunction(), objTI, ti->getSubstitutionMap()),
             "resTI is not the thunk kind assigned derived function type");
-
-    auto originalCalleeFuncType =
-        ti->getOperand()->getType().castTo<SILFunctionType>();
-
-    switch (ti->getThunkKind()) {
-    case ThunkInst::Kind::Invalid:
-      break;
-    case ThunkInst::Kind::Identity:
-      break;
-    case ThunkInst::Kind::HopToMainActorIfNeeded:
-      require(originalCalleeFuncType->getParameters().empty(),
-              "Hop To Main Actor If Needed cannot have any parameters");
-      require(originalCalleeFuncType->getResults().empty(),
-              "Hop To Main Actor If Needed cannot have any results");
-      // We require that hop_to_main_actor inputs do not an error since we
-      // have to have no results.
-      require(!originalCalleeFuncType->hasErrorResult(),
-              "HopToMainActorIfNeeded thunks cannot have input without an "
-              "error result");
-      break;
-    }
   }
 
   void checkConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *ICI) {
@@ -5311,7 +5594,7 @@ public:
     LLVM_DEBUG(RI->print(llvm::dbgs()));
 
     SILType functionResultType =
-        F.getLoweredType(F.mapTypeIntoContext(fnConv.getSILResultType(
+        F.getLoweredType(F.mapTypeIntoEnvironment(fnConv.getSILResultType(
                                                   F.getTypeExpansionContext()))
                              .getASTType())
             .getCategoryType(
@@ -5324,6 +5607,22 @@ public:
                instResultType.dump(););
     requireSameType(functionResultType, instResultType,
                     "return value type does not match return type of function");
+
+    // If the result type is an address, ensure its base address is from a
+    // function argument or Builtin.Borrow.
+    if (F.getModule().getStage() >= SILStage::Canonical &&
+        functionResultType.isAddress()) {
+      auto base = AccessBase::compute(RI->getOperand());
+      auto root = base ? base.isReference() ? base.getOwnershipReferenceRoot()
+                                            : base.getBaseAddress()
+                       : SILValue();
+      require(!root || !root->getType().isAddress() ||
+                  isa<SILFunctionArgument>(root) ||
+                  (isa<ApplyInst>(root) &&
+                       cast<ApplyInst>(root)->hasAddressResult() ||
+                   isa<GlobalAddrInst>(root)),
+              "unidentified address return");
+    }
   }
 
   void checkThrowInst(ThrowInst *TI) {
@@ -5333,7 +5632,7 @@ public:
             "throw in function that doesn't have an error result");
 
     SILType functionResultType =
-        F.getLoweredType(F.mapTypeIntoContext(fnConv.getSILErrorType(
+        F.getLoweredType(F.mapTypeIntoEnvironment(fnConv.getSILErrorType(
                                                   F.getTypeExpansionContext()))
                              .getASTType())
             .getCategoryType(fnConv.getSILErrorType(F.getTypeExpansionContext())
@@ -5362,7 +5661,7 @@ public:
     require(yieldedValues.size() == yieldInfos.size(),
             "wrong number of yielded values for function");
     for (auto i : indices(yieldedValues)) {
-      SILType yieldType = F.mapTypeIntoContext(
+      SILType yieldType = F.mapTypeIntoEnvironment(
           fnConv.getSILType(yieldInfos[i], F.getTypeExpansionContext()));
       requireSameType(yieldedValues[i]->getType(), yieldType,
                       "yielded value does not match yield type of coroutine");
@@ -5828,20 +6127,20 @@ public:
       requireOptionalExecutorType(executor,
                                   "hop_to_executor operand in lowered SIL");
     } else {
-      requireAnyActorType(executor,
-                          /*allow optional*/ true,
-                          /*allow executor*/ true,
-                          "hop_to_executor operand");
+      canExtractExecutorFrom(executor,
+                             /*allow optional*/ true,
+                             /*allow executor*/ true,
+                             "hop_to_executor operand");
     }
   }
 
   void checkExtractExecutorInst(ExtractExecutorInst *EEI) {
     requireObjectType(BuiltinExecutorType, EEI,
                       "extract_executor result");
-    requireAnyActorType(EEI->getExpectedExecutor(),
-                        /*allow optional*/ false,
-                        /*allow executor*/ false,
-                        "extract_executor operand");
+    canExtractExecutorFrom(EEI->getExpectedExecutor(),
+                           /*allow optional*/ false,
+                           /*allow executor*/ false,
+                           "extract_executor operand");
     if (EEI->getModule().getStage() == SILStage::Lowered) {
       require(false,
               "extract_executor instruction should have been lowered away");
@@ -5925,7 +6224,8 @@ public:
         switch (component.getKind()) {
         case KeyPathPatternComponent::Kind::GettableProperty:
         case KeyPathPatternComponent::Kind::SettableProperty:
-          hasIndices = !component.getSubscriptIndices().empty();
+        case KeyPathPatternComponent::Kind::Method:
+          hasIndices = !component.getArguments().empty();
           break;
         
         case KeyPathPatternComponent::Kind::StoredProperty:
@@ -5957,7 +6257,7 @@ public:
         "final component should match leaf value type of key path type");
   }
 
-  void checkIsEscapingClosureInst(IsEscapingClosureInst *IEC) {
+  void checkDestroyNotEscapedClosureInst(DestroyNotEscapedClosureInst *IEC) {
     // The closure operand is allowed to be an optional closure.
     auto operandType = IEC->getOperand()->getType();
     if (operandType.getOptionalObjectType())
@@ -5968,11 +6268,11 @@ public:
                 !fnType->isNoEscape() &&
                 fnType->getExtInfo().getRepresentation() ==
                     SILFunctionTypeRepresentation::Thick,
-            "is_escaping_closure must have a thick "
+            "destroy_not_escaped_closure must have a thick "
             "function operand");
-    require(IEC->getVerificationType() == IsEscapingClosureInst::ObjCEscaping ||
+    require(IEC->getVerificationType() == DestroyNotEscapedClosureInst::ObjCEscaping ||
                 IEC->getVerificationType() ==
-                    IsEscapingClosureInst::WithoutActuallyEscaping,
+                    DestroyNotEscapedClosureInst::WithoutActuallyEscaping,
             "unknown verification type");
   }
 
@@ -6363,7 +6663,7 @@ public:
         auto interfaceTy = archetype->getInterfaceType();
         auto rootParamTy = interfaceTy->getRootGenericParam();
 
-        auto root = genericEnv->mapTypeIntoContext(
+        auto root = genericEnv->mapTypeIntoEnvironment(
             rootParamTy)->castTo<ElementArchetypeType>();
         auto it = allOpened.find(root->getCanonicalType());
         assert(it != allOpened.end());
@@ -6512,6 +6812,7 @@ public:
   // This verifies that the entry block of a SIL function doesn't have
   // any predecessors and also verifies the entry point arguments.
   void verifyEntryBlock(SILBasicBlock *entry) {
+    VerifierErrorEmitterGuard guard(this, entry->getParent());
     require(entry->pred_empty(), "entry block cannot have predecessors");
 
     LLVM_DEBUG(
@@ -6536,7 +6837,7 @@ public:
     auto argI = entry->args_begin();
 
     auto check = [&](const char *what, SILType ty) {
-      auto mappedTy = F.mapTypeIntoContext(ty);
+      auto mappedTy = F.mapTypeIntoEnvironment(ty);
       SILArgument *bbarg = *argI;
       ++argI;
       if (bbarg->getType() != mappedTy &&
@@ -6707,6 +7008,11 @@ public:
             "Result and operand must have the same type, today.");
   }
 
+  void checkUncheckedOwnershipInst(UncheckedOwnershipInst *uoi) {
+    require(F.getModule().getStage() == SILStage::Raw,
+            "unchecked_ownership is valid only in raw SIL");
+  }
+
   void checkAllocPackMetadataInst(AllocPackMetadataInst *apmi) {
     require(apmi->getIntroducer()->mayRequirePackMetadata(*apmi->getFunction()),
             "Introduces instruction of kind which cannot emit on-stack pack "
@@ -6745,14 +7051,65 @@ public:
             "move only wrappedness.");
   }
 
+  void checkMakeBorrowInst(MakeBorrowInst *mb) {
+    require(mb->getOperand()->getType().isObject(), "input should be object");
+    require(mb->getType().isObject(), "output should be object");
+    require(mb->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getOperand()->getType().getASTType(),
+            "output should be a Builtin.Borrow of the input");
+  }
+
+  void checkDereferenceBorrowInst(DereferenceBorrowInst *mb) {
+    require(mb->getOperand()->getType().isObject(), "input should be object");
+    require(mb->getType().isObject(), "output should be object");
+    require(mb->getOperand()->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getType().getASTType(),
+            "input should be a Builtin.Borrow of the output");
+  }
+
+  void checkMakeAddrBorrowInst(MakeAddrBorrowInst *mb) {
+    require(mb->getOperand()->getType().isAddress(), "input should be address");
+    require(mb->getType().isObject(), "output should be object");
+    require(mb->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getOperand()->getType().getASTType(),
+            "output should be a Builtin.Borrow of the input");
+  }
+
+  void checkDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *mb) {
+    // TODO: Only allow this operation on types with address borrow
+    // representation.
+    require(mb->getOperand()->getType().isObject(), "input should be object");
+    require(mb->getType().isAddress(), "output should be address");
+    require(mb->getOperand()->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getType().getASTType(),
+            "input should be a Builtin.Borrow of the output");
+  }
+
+  void checkInitBorrowAddrInst(InitBorrowAddrInst *mb) {
+    require(mb->getDest()->getType().isAddress(), "dest should be address");
+    require(mb->getReferent()->getType().isAddress(), "referent should be address");
+    require(mb->getDest()->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getReferent()->getType().getASTType(),
+            "dest should be a Builtin.Borrow of the referent");
+  }
+
+  void checkDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *mb) {
+    require(mb->getOperand()->getType().isAddress(), "input should be address");
+    require(mb->getType().isAddress(), "output should be address");
+    require(mb->getOperand()->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getType().getASTType(),
+            "input should be a Builtin.Borrow of the output");
+  }
+
   void verifyEpilogBlocks(SILFunction *F) {
+    VerifierErrorEmitterGuard guard(this, F);
     bool FoundReturnBlock = false;
     bool FoundThrowBlock = false;
     bool FoundUnwindBlock = false;
     for (auto &BB : *F) {
-      if (isa<ReturnInst>(BB.getTerminator())) {
-        require(!FoundReturnBlock,
-                "more than one return block in function");
+      if (isa<ReturnInst>(BB.getTerminator()) ||
+          isa<ReturnBorrowInst>(BB.getTerminator())) {
+        require(!FoundReturnBlock, "more than one return block in function");
         FoundReturnBlock = true;
       } else if (isa<ThrowInst>(BB.getTerminator()) ||
                  isa<ThrowAddrInst>(BB.getTerminator())) {
@@ -6767,25 +7124,6 @@ public:
         assert(!BB.getTerminator()->isFunctionExiting());
       }
     }
-  }
-
-  bool isUnreachableAlongAllPathsStartingAt(
-      SILBasicBlock *StartBlock, BasicBlockSet &Visited) {
-    if (isa<UnreachableInst>(StartBlock->getTerminator()))
-      return true;
-    else if (isa<ReturnInst>(StartBlock->getTerminator()))
-      return false;
-    else if (isa<ThrowInst>(StartBlock->getTerminator()) ||
-             isa<ThrowAddrInst>(StartBlock->getTerminator()))
-      return false;
-
-    // Recursively check all successors.
-    for (auto *SuccBB : StartBlock->getSuccessorBlocks())
-      if (!Visited.insert(SuccBB))
-        if (!isUnreachableAlongAllPathsStartingAt(SuccBB, Visited))
-          return false;
-
-    return true;
   }
 
   void verifySILFunctionType(CanSILFunctionType FTy) {
@@ -6817,216 +7155,6 @@ public:
             "Should only ever be isolated to a single parameter");
   }
 
-  struct VerifyFlowSensitiveRulesDetails {
-    enum CFGState {
-      /// No special rules are in play.
-      Normal,
-      /// We've followed the resume edge of a yield in a yield_once coroutine.
-      YieldOnceResume,
-      /// We've followed the unwind edge of a yield.
-      YieldUnwind
-    };
-
-    struct BBState {
-      std::vector<SILValue> Stack;
-
-      /// Contents: BeginAccessInst*, BeginApplyInst*.
-      std::set<SILInstruction*> ActiveOps;
-
-      CFGState CFG = Normal;
-      
-      GetAsyncContinuationInstBase *GotAsyncContinuation = nullptr;
-    };
-  };
-
-  /// Verify the various control-flow-sensitive rules of SIL:
-  ///
-  /// - stack allocations and deallocations must obey a stack discipline
-  /// - accesses must be uniquely ended
-  /// - async continuations must be awaited before getting the continuation again, suspending
-  ///  the task, or exiting the function
-  /// - flow-sensitive states must be equivalent on all paths into a block
-  void verifyFlowSensitiveRules(SILFunction *F) {
-    if (F->getASTContext().hadError())
-      return;
-
-    // Do a traversal of the basic blocks.
-    // Note that we intentionally don't verify these properties in blocks
-    // that can't be reached from the entry block.
-    llvm::DenseMap<SILBasicBlock*, VerifyFlowSensitiveRulesDetails::BBState> visitedBBs;
-    SmallVector<SILBasicBlock*, 16> Worklist;
-    visitedBBs.try_emplace(&*F->begin());
-    Worklist.push_back(&*F->begin());
-    while (!Worklist.empty()) {
-      SILBasicBlock *BB = Worklist.pop_back_val();
-      VerifyFlowSensitiveRulesDetails::BBState state = visitedBBs[BB];
-      for (SILInstruction &i : *BB) {
-        CurInstruction = &i;
-
-        if (i.maySuspend()) {
-          // Instructions that may suspend an async context must not happen
-          // while the continuation is being accessed, with the exception of
-          // the AwaitAsyncContinuationInst that completes suspending the task.
-          if (auto aaci = dyn_cast<AwaitAsyncContinuationInst>(&i)) {
-            require(state.GotAsyncContinuation == aaci->getOperand(),
-                    "encountered await_async_continuation that doesn't match active gotten continuation");
-            state.GotAsyncContinuation = nullptr;
-          } else {
-            require(!state.GotAsyncContinuation,
-                    "cannot suspend async task while unawaited continuation is active");
-          }
-        }
-          
-        if (i.isAllocatingStack()) {
-          if (auto *BAI = dyn_cast<BeginApplyInst>(&i)) {
-            state.Stack.push_back(BAI->getCalleeAllocationResult());
-          } else {
-            state.Stack.push_back(cast<SingleValueInstruction>(&i));
-          }
-          // Not "else if": begin_apply both allocates stack and begins an
-          // operation.
-        }
-        if (i.isDeallocatingStack()) {
-          SILValue op = i.getOperand(0);
-          while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
-            op = mvi->getOperand();
-          }
-          require(!state.Stack.empty(),
-                  "stack dealloc with empty stack");
-          if (op != state.Stack.back()) {
-            llvm::errs() << "Recent stack alloc: " << *state.Stack.back();
-            llvm::errs() << "Matching stack alloc: " << *op;
-            require(op == state.Stack.back(),
-                    "stack dealloc does not match most recent stack alloc");
-          }
-          state.Stack.pop_back();
-
-        } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i) ||
-                   isa<StoreBorrowInst>(i)) {
-          bool notAlreadyPresent = state.ActiveOps.insert(&i).second;
-          require(notAlreadyPresent,
-                  "operation was not ended before re-beginning it");
-
-        } else if (isa<EndAccessInst>(i) || isa<AbortApplyInst>(i) ||
-                   isa<EndApplyInst>(i)) {
-          if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
-            bool present = state.ActiveOps.erase(beginOp);
-            require(present, "operation has already been ended");
-          }
-        } else if (auto *endBorrow = dyn_cast<EndBorrowInst>(&i)) {
-          if (isa<StoreBorrowInst>(endBorrow->getOperand())) {
-            if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
-              bool present = state.ActiveOps.erase(beginOp);
-              require(present, "operation has already been ended");
-            }
-          }
-        } else if (auto gaci = dyn_cast<GetAsyncContinuationInstBase>(&i)) {
-          require(!state.GotAsyncContinuation,
-                  "get_async_continuation while unawaited continuation is already active");
-          state.GotAsyncContinuation = gaci;
-        } else if (auto term = dyn_cast<TermInst>(&i)) {
-          if (term->isFunctionExiting()) {
-            require(state.Stack.empty(),
-                    "return with stack allocs that haven't been deallocated");
-            require(state.ActiveOps.empty(),
-                    "return with operations still active");
-            require(!state.GotAsyncContinuation,
-                    "return with unawaited async continuation");
-
-            if (isa<UnwindInst>(term)) {
-              require(state.CFG == VerifyFlowSensitiveRulesDetails::YieldUnwind,
-                      "encountered 'unwind' when not on unwind path");
-            } else {
-              require(state.CFG != VerifyFlowSensitiveRulesDetails::YieldUnwind,
-                      "encountered 'return' or 'throw' when on unwind path");
-              if (isa<ReturnInst>(term) &&
-                  F->getLoweredFunctionType()->getCoroutineKind() ==
-                    SILCoroutineKind::YieldOnce &&
-                  F->getModule().getStage() != SILStage::Raw) {
-                require(state.CFG == VerifyFlowSensitiveRulesDetails::YieldOnceResume,
-                        "encountered 'return' before yielding a value in "
-                        "yield_once coroutine");
-              }
-            }
-          }
-          
-          if (isa<YieldInst>(term)) {
-            require(state.CFG != VerifyFlowSensitiveRulesDetails::YieldOnceResume,
-                    "encountered multiple 'yield's along single path");
-            require(state.CFG == VerifyFlowSensitiveRulesDetails::Normal,
-                    "encountered 'yield' on abnormal CFG path");
-            require(!state.GotAsyncContinuation,
-                    "encountered 'yield' while an unawaited continuation is active");
-          }
-
-          auto successors = term->getSuccessors();
-          for (auto i : indices(successors)) {
-            SILBasicBlock *succBB = successors[i].getBB();
-
-            // Optimistically try to set our current state as the state
-            // of the successor.  We can use a move on the final successor;
-            // note that if the insertion fails, the move won't actually
-            // happen, which is important because we'll still need it
-            // to compare against the already-recorded state for the block.
-            auto insertResult =
-              i + 1 == successors.size()
-                ? visitedBBs.try_emplace(succBB, std::move(state))
-                : visitedBBs.try_emplace(succBB, state);
-
-            // If the insertion was successful, add the successor to the
-            // worklist and continue.
-            if (insertResult.second) {
-              Worklist.push_back(succBB);
-
-              // If we're following a 'yield', update the CFG state:
-              if (isa<YieldInst>(term)) {
-                // Enforce that the unwind logic is segregated in all stages.
-                if (i == 1) {
-                  insertResult.first->second.CFG = VerifyFlowSensitiveRulesDetails::YieldUnwind;
-
-                // We check the yield_once rule in the mandatory analyses,
-                // so we can't assert it yet in the raw stage.
-                } else if (F->getLoweredFunctionType()->getCoroutineKind()
-                             == SILCoroutineKind::YieldOnce && 
-                           F->getModule().getStage() != SILStage::Raw) {
-                  insertResult.first->second.CFG = VerifyFlowSensitiveRulesDetails::YieldOnceResume;
-                }
-              }
-
-              continue;
-            }
-
-            // This rule is checked elsewhere, but we'd want to assert it
-            // here anyway.
-            require(!isa<YieldInst>(term),
-                    "successor of 'yield' should not be encountered twice");
-
-            // Check that the stack height is consistent coming from all entry
-            // points into this BB. We only care about consistency if there is
-            // a possible return from this function along the path starting at
-            // this successor bb.  (FIXME: Why? Infinite loops should still
-            // preserve consistency...)
-            auto isUnreachable = [&] {
-              BasicBlockSet visited(F);
-              return isUnreachableAlongAllPathsStartingAt(succBB, visited);
-            };
-            
-            const auto &foundState = insertResult.first->second;
-            require(state.Stack == foundState.Stack || isUnreachable(),
-                    "inconsistent stack heights entering basic block");
-
-            require(state.ActiveOps == foundState.ActiveOps || isUnreachable(),
-                    "inconsistent active-operations sets entering basic block");
-            require(state.CFG == foundState.CFG,
-                    "inconsistent coroutine states entering basic block");
-            require(state.GotAsyncContinuation == foundState.GotAsyncContinuation,
-                    "inconsistent active async continuations entering basic block");
-          }
-        }
-      }
-    }
-  }
-
   void verifyBranches(const SILFunction *F) {
     // Verify no critical edge.
     auto requireNonCriticalSucc = [this](const TermInst *termInst,
@@ -7045,7 +7173,7 @@ public:
 
     for (auto &bb : *F) {
       const TermInst *termInst = bb.getTerminator();
-      CurInstruction = termInst;
+      VerifierErrorEmitterGuard guard(this, termInst);
 
       if (isSILOwnershipEnabled() && F->hasOwnership()) {
         requireNonCriticalSucc(termInst, "critical edges not allowed in OSSA");
@@ -7059,6 +7187,7 @@ public:
 
   /// This pass verifies that there are no hole in debug scopes at -Onone.
   void verifyDebugScopeHoles(SILBasicBlock *BB) {
+    VerifierErrorEmitterGuard guard(this, BB->getParent());
     if (!VerifyDIHoles)
       return;
 
@@ -7175,7 +7304,6 @@ public:
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {
-    CurInstruction = nullptr;
     for (auto argI = BB->args_begin(), argEnd = BB->args_end(); argI != argEnd;
          ++argI)
       visitSILArgument(*argI);
@@ -7252,10 +7380,12 @@ public:
         auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
         auto *distributedProtocol =
             ctx.getProtocol(KnownProtocolKind::DistributedActor);
-        require(argType->isAnyActorType() ||
-                    genericSig->requiresProtocol(argType, actorProtocol) ||
-                    genericSig->requiresProtocol(argType, distributedProtocol),
-                "Only any actor types can be isolated");
+        require(
+            argType->canBeIsolatedTo() ||
+                (genericSig &&
+                 (genericSig->requiresProtocol(argType, actorProtocol) ||
+                  genericSig->requiresProtocol(argType, distributedProtocol))),
+            "Only any actor types can be isolated");
         require(!foundIsolatedParameter, "Two isolated parameters");
         foundIsolatedParameter = true;
       }
@@ -7265,92 +7395,95 @@ public:
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
-    CanSILFunctionType FTy = F->getLoweredFunctionType();
-    verifySILFunctionType(FTy);
-    verifyParentFunctionSILFunctionType(FTy);
-
     SILModule &mod = F->getModule();
-    bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
+    {
+      VerifierErrorEmitterGuard functionTypeErrorGuard(this, F);
+      CanSILFunctionType FTy = F->getLoweredFunctionType();
+      verifySILFunctionType(FTy);
+      verifyParentFunctionSILFunctionType(FTy);
 
-    require(!F->isAnySerialized() || !mod.isSerialized() || mod.isParsedAsSerializedSIL(),
-            "cannot have a serialized function after the module has been serialized");
+      bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
-    switch (F->getLinkage()) {
-    case SILLinkage::Public:
-    case SILLinkage::Package:
-    case SILLinkage::Shared:
-      require(F->isDefinition() || F->hasForeignBody(),
-              "public/package/shared function must have a body");
-      break;
-    case SILLinkage::PublicNonABI:
-    case SILLinkage::PackageNonABI:
-      require(F->isDefinition(),
-              "alwaysEmitIntoClient function must have a body");
-      require(F->isAnySerialized() || mod.isSerialized(),
-              "alwaysEmitIntoClient function must be serialized");
-      break;
-    case SILLinkage::Hidden:
-    case SILLinkage::Private:
-      require(F->isDefinition() || F->hasForeignBody(),
-              "internal/private function must have a body");
-      require(!F->isAnySerialized() || embedded,
-              "internal/private function cannot be serialized or serializable");
-      break;
-    case SILLinkage::PublicExternal:
-      require(F->isExternalDeclaration() ||
-              F->isAnySerialized() ||
-              mod.isSerialized(),
-            "public-external function definition must be serialized");
-      break;
-    case SILLinkage::PackageExternal:
-      require(F->isExternalDeclaration() ||
-              F->isAnySerialized() ||
-              mod.isSerialized(),
-              "package-external function definition must be serialized");
-      break;
-    case SILLinkage::HiddenExternal:
-      require(F->isExternalDeclaration() || embedded,
-              "hidden-external function cannot have a body");
-      break;
-    }
+      require(!F->isAnySerialized() || !mod.isSerialized() || mod.isParsedAsSerializedSIL(),
+              "cannot have a serialized function after the module has been serialized");
 
-    // Don't verify functions that were skipped. We are likely to see them in
-    // FunctionBodySkipping::NonInlinableWithoutTypes mode.
-    auto Ctx = F->getDeclContext();
-    if (Ctx) {
-      if (auto AFD = dyn_cast<AbstractFunctionDecl>(Ctx)) {
-        if (AFD->isBodySkipped())
-          return;
+      switch (F->getLinkage()) {
+      case SILLinkage::Public:
+      case SILLinkage::Package:
+      case SILLinkage::Shared:
+        require(F->isDefinition() || F->hasForeignBody(),
+                "public/package/shared function must have a body");
+        break;
+      case SILLinkage::PublicNonABI:
+      case SILLinkage::PackageNonABI:
+        require(F->isDefinition(),
+                "alwaysEmitIntoClient function must have a body");
+        require(F->isAnySerialized() || mod.isSerialized(),
+                "alwaysEmitIntoClient function must be serialized");
+        break;
+      case SILLinkage::Hidden:
+      case SILLinkage::Private:
+        require(F->isDefinition() || F->hasForeignBody(),
+                "internal/private function must have a body");
+        require(!F->isAnySerialized() || embedded,
+                "internal/private function cannot be serialized or serializable");
+        break;
+      case SILLinkage::PublicExternal:
+        require(F->isExternalDeclaration() ||
+                F->isAnySerialized() ||
+                mod.isSerialized(),
+              "public-external function definition must be serialized");
+        break;
+      case SILLinkage::PackageExternal:
+        require(F->isExternalDeclaration() ||
+                F->isAnySerialized() ||
+                mod.isSerialized(),
+                "package-external function definition must be serialized");
+        break;
+      case SILLinkage::HiddenExternal:
+        require(F->isExternalDeclaration() || embedded,
+                "hidden-external function cannot have a body");
+        break;
       }
-    }
 
-    if (F->isExternalDeclaration()) {
-      if (F->hasForeignBody())
+      // Don't verify functions that were skipped. We are likely to see them in
+      // FunctionBodySkipping::NonInlinableWithoutTypes mode.
+      auto Ctx = F->getDeclContext();
+      if (Ctx) {
+        if (auto AFD = dyn_cast<AbstractFunctionDecl>(Ctx)) {
+          if (AFD->isBodySkipped())
+            return;
+        }
+      }
+
+      if (F->isExternalDeclaration()) {
+        if (F->hasForeignBody())
+          return;
+
+        require(F->isAvailableExternally(),
+                "external declaration of internal SILFunction not allowed");
+        // If F is an external declaration, there is nothing further to do,
+        // return.
         return;
+      }
 
-      require(F->isAvailableExternally(),
-              "external declaration of internal SILFunction not allowed");
-      // If F is an external declaration, there is nothing further to do,
-      // return.
-      return;
-    }
+      require(!FTy->hasErasedIsolation(),
+              "function declarations cannot have erased isolation");
 
-    require(!FTy->hasErasedIsolation(),
-            "function declarations cannot have erased isolation");
+      assert(!F->hasForeignBody());
 
-    assert(!F->hasForeignBody());
-
-    // Make sure that our SILFunction only has context generic params if our
-    // SILFunctionType is non-polymorphic.
-    if (F->getGenericEnvironment() &&
-        !F->getGenericEnvironment()->getGenericSignature()
-            ->areAllParamsConcrete()) {
-      require(FTy->isPolymorphic(),
-              "non-generic function definitions cannot have a "
-              "generic environment");
-    } else {
-      require(!FTy->isPolymorphic(),
-              "generic function definition must have a generic environment");
+      // Make sure that our SILFunction only has context generic params if our
+      // SILFunctionType is non-polymorphic.
+      if (F->getGenericEnvironment() &&
+          !F->getGenericEnvironment()->getGenericSignature()
+              ->areAllParamsConcrete()) {
+        require(FTy->isPolymorphic(),
+                "non-generic function definitions cannot have a "
+                "generic environment");
+      } else {
+        require(!FTy->isPolymorphic(),
+                "generic function definition must have a generic environment");
+      }
     }
 
     // Before verifying the body of the function, validate the SILUndef map to
@@ -7368,12 +7501,12 @@ public:
 
     if (F->hasOwnership() && F->shouldVerifyOwnership() &&
         !mod.getASTContext().hadError()) {
-      F->verifyMemoryLifetime(calleeCache);
+      F->verifyMemoryLifetime(calleeCache, &getDeadEndBlocks());
     }
   }
 
   void verify(bool isCompleteOSSA) {
-    if (!isCompleteOSSA || !F.getModule().getOptions().OSSAVerifyComplete) {
+    if (!isCompleteOSSA) {
       DEBlocks = std::make_shared<DeadEndBlocks>(const_cast<SILFunction *>(&F));
     }
     visitSILFunction(const_cast<SILFunction*>(&F));
@@ -7383,6 +7516,11 @@ public:
 
 #undef require
 #undef requireObjectType
+
+bool swift::isIndirectArgumentMutated(SILFunctionArgument *arg, bool ignoreDestroys,
+                                      bool defaultIsMutating) {
+  return ImmutableAddressUseVerifier(ignoreDestroys, defaultIsMutating).isMutatingOrConsuming(arg);
+}
 
 //===----------------------------------------------------------------------===//
 //                     Out of Line Verifier Run Functions
@@ -7417,6 +7555,10 @@ void SILFunction::verify(CalleeCache *calleeCache,
                          bool checkLinearLifetime) const {
   if (!verificationEnabled(getModule()))
     return;
+
+  if (hasSemanticsAttr(semantics::NO_SIL_VERIFICATION)) {
+    return;
+  }
 
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
@@ -7457,7 +7599,7 @@ CanType SILProperty::getBaseType() const {
 
   if (sig) {
     auto env = dc->getGenericEnvironmentOfContext();
-    baseTy = env->mapTypeIntoContext(baseTy)->getCanonicalType();
+    baseTy = env->mapTypeIntoEnvironment(baseTy)->getCanonicalType();
   }
 
   return baseTy;
@@ -7476,7 +7618,7 @@ void SILProperty::verify(const SILModule &M) const {
     auto env =
         decl->getInnermostDeclContext()->getGenericEnvironmentOfContext();
     subs = env->getForwardingSubstitutionMap();
-    leafTy = env->mapTypeIntoContext(leafTy)->getCanonicalType();
+    leafTy = env->mapTypeIntoEnvironment(leafTy)->getCanonicalType();
   }
   bool hasIndices = false;
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
@@ -7647,57 +7789,112 @@ void SILVTable::verify(const SILModule &M) const {
 }
 
 /// Verify that a witness table follows invariants.
-void SILWitnessTable::verify(const SILModule &M) const {
-  if (!verificationEnabled(M))
+void SILWitnessTable::verify(const SILModule &mod) const {
+  if (!verificationEnabled(mod))
     return;
 
   if (isDeclaration())
     assert(getEntries().empty() &&
            "A witness table declaration should not have any entries.");
 
-  for (const Entry &E : getEntries())
-    if (E.getKind() == SILWitnessTable::WitnessKind::Method) {
-      SILFunction *F = E.getMethodWitness().Witness;
-      if (F) {
-        // If a SILWitnessTable is going to be serialized, it must only
-        // reference public or serializable functions.
-        if (isAnySerialized()) {
-          assert(F->hasValidLinkageForFragileRef(getSerializedKind()) &&
-                 "Fragile witness tables should not reference "
-                 "less visible functions.");
-        }
+  for (const Entry &entry : getEntries()) {
+    if (entry.getKind() != SILWitnessTable::WitnessKind::Method)
+      continue;
 
-        assert(F->getLoweredFunctionType()->getRepresentation() ==
-               SILFunctionTypeRepresentation::WitnessMethod &&
-               "Witnesses must have witness_method representation.");
-      }
+    auto *witnessFunction = entry.getMethodWitness().Witness;
+    if (!witnessFunction)
+      continue;
+
+    // If a SILWitnessTable is going to be serialized, it must only
+    // reference public or serializable functions.
+    if (isAnySerialized()) {
+      assert(
+          witnessFunction->hasValidLinkageForFragileRef(getSerializedKind()) &&
+          "Fragile witness tables should not reference "
+          "less visible functions.");
     }
+
+    assert(witnessFunction->getLoweredFunctionType()->getRepresentation() ==
+               SILFunctionTypeRepresentation::WitnessMethod &&
+           "Witnesses must have witness_method representation.");
+
+    if (mod.getStage() != SILStage::Lowered &&
+        !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // Note the direction of the compatibility check: the witness
+      // function must be compatible with being used as the requirement
+      // type.
+      auto baseInfo = witnessFunction->getModule().Types.getConstantInfo(
+          TypeExpansionContext::minimal(),
+          entry.getMethodWitness().Requirement);
+      SmallString<32> baseName;
+      {
+        llvm::raw_svector_ostream os(baseName);
+        entry.getMethodWitness().Requirement.print(os);
+      }
+
+      SILVerifier verifier(*witnessFunction, /*calleeCache=*/nullptr,
+                           /*SingleFunction=*/true,
+                           /*checkLinearLifetime=*/false);
+      SILVerifier::VerifierErrorEmitterGuard guard(&verifier, this);
+      verifier.requireABICompatibleFunctionTypes(
+              witnessFunction->getLoweredFunctionType(),
+              baseInfo.getSILType().castTo<SILFunctionType>(),
+              "witness table entry for " + baseName + " must be ABI-compatible",
+              *witnessFunction);
+    }
+  }
 }
 
 /// Verify that a default witness table follows invariants.
-void SILDefaultWitnessTable::verify(const SILModule &M) const {
-#ifndef NDEBUG
-  for (const Entry &E : getEntries()) {
+void SILDefaultWitnessTable::verify(const SILModule &mod) const {
+  if (!verificationEnabled(mod))
+    return;
+
+  for (const Entry &entry : getEntries()) {
     // FIXME: associated type witnesses.
-    if (!E.isValid() || E.getKind() != SILWitnessTable::Method)
+    if (!entry.isValid() || entry.getKind() != SILWitnessTable::Method)
       continue;
 
-    SILFunction *F = E.getMethodWitness().Witness;
-    if (!F)
+    auto *witnessFunction = entry.getMethodWitness().Witness;
+    if (!witnessFunction)
       continue;
 
 #if 0
     // FIXME: For now, all default witnesses are private.
-    assert(F->hasValidLinkageForFragileRef(IsSerialized) &&
+    assert(witnessFunction->hasValidLinkageForFragileRef(IsSerialized) &&
            "Default witness tables should not reference "
            "less visible functions.");
 #endif
 
-    assert(F->getLoweredFunctionType()->getRepresentation() ==
-           SILFunctionTypeRepresentation::WitnessMethod &&
+    assert(witnessFunction->getLoweredFunctionType()->getRepresentation() ==
+               SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
+
+    if (mod.getStage() != SILStage::Lowered &&
+        !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // Note the direction of the compatibility check: the witness
+      // function must be compatible with being used as the requirement
+      // type.
+      auto baseInfo = witnessFunction->getModule().Types.getConstantInfo(
+          TypeExpansionContext::minimal(),
+          entry.getMethodWitness().Requirement);
+      SmallString<32> baseName;
+      {
+        llvm::raw_svector_ostream os(baseName);
+        entry.getMethodWitness().Requirement.print(os);
+      }
+
+      SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
+                  /*SingleFunction=*/true,
+                  /*checkLinearLifetime=*/false)
+          .requireABICompatibleFunctionTypes(
+              witnessFunction->getLoweredFunctionType(),
+              baseInfo.getSILType().castTo<SILFunctionType>(),
+              "default witness table entry for " + baseName +
+                  " must be ABI-compatible",
+              *witnessFunction);
+    }
   }
-#endif
 }
 
 /// Verify that a global variable follows invariants.
@@ -7723,8 +7920,6 @@ void SILGlobalVariable::verify() const {
       assert(!init->use_empty() && "dead instruction in static initializer");
       assert(!isa<ObjectInst>(init) &&
              "object instruction is only allowed for final initial value");
-      assert(!isa<VectorInst>(init) &&
-             "vector instruction is only allowed for final initial value");
     }
     assert(I.getParent() == &StaticInitializerBlock);
   }
@@ -7788,14 +7983,20 @@ void SILModule::verify(CalleeCache *calleeCache,
 
   // Check all witness tables.
   LLVM_DEBUG(llvm::dbgs() <<"*** Checking witness tables for duplicates ***\n");
-  llvm::DenseSet<ProtocolConformance*> wtableConformances;
+  llvm::DenseSet<llvm::PointerIntPair<ProtocolConformance *, 1, bool>> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
     auto conformance = wt.getConformance();
-    if (!wtableConformances.insert(conformance).second) {
+    if (!wtableConformances.insert({conformance, wt.isSpecialized()}).second) {
       llvm::errs() << "Witness table redefined: ";
       conformance->printName(llvm::errs());
       assert(false && "triggering standard assertion failure routine");
+    }
+    if (wt.isSpecialized()) {
+      ASSERT(specializedWitnessTableMap.find(conformance) != specializedWitnessTableMap.end());
+    } else {
+      auto *rootConf= cast<RootProtocolConformance>(conformance);
+      ASSERT(WitnessTableMap.find(rootConf) != WitnessTableMap.end());
     }
     wt.verify(*this);
   }

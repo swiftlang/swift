@@ -4,6 +4,7 @@
 
 # RUN: %empty-directory(%t)
 # RUN: %empty-directory(%t/build)
+# RUN: %empty-directory(%t/ninja)
 
 # Set up a local clone of swift in a temporary workspace and add a sibling
 # linked worktree to the clone.
@@ -11,7 +12,7 @@
 # RUN: git -C %t/swift worktree add --detach %t/swift-worktree
 
 # Invoke the build script from the worktree.
-# RUN: %t/swift-worktree/utils/build-script --dry-run | %FileCheck -DARCH=%target-arch %s
+# RUN: %t/swift-worktree/utils/build-script --dry-run --cmake %cmake | %FileCheck -DARCH=%target-arch %s
 
 # We should generate a build system for the linked worktree, not the main
 # worktree.

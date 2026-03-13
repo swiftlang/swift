@@ -112,7 +112,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_PackageSwiftModuleInterfaceFile:
   case file_types::TY_SwiftOverlayFile:
   case file_types::TY_JSONDependencies:
-  case file_types::TY_JSONFeatures:
+  case file_types::TY_JSONArguments:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_SwiftAPIDescriptor:
   case file_types::TY_ConstValues:
@@ -195,7 +195,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
   case file_types::TY_PackageSwiftModuleInterfaceFile:
   case file_types::TY_JSONDependencies:
-  case file_types::TY_JSONFeatures:
+  case file_types::TY_JSONArguments:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_SwiftAPIDescriptor:
@@ -257,7 +257,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_JSONDependencies:
-  case file_types::TY_JSONFeatures:
+  case file_types::TY_JSONArguments:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_SwiftAPIDescriptor:
@@ -321,7 +321,7 @@ bool file_types::isProducedFromDiagnostics(ID Id) {
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_JSONDependencies:
-  case file_types::TY_JSONFeatures:
+  case file_types::TY_JSONArguments:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_SwiftAPIDescriptor:

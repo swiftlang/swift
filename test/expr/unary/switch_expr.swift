@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -disable-availability-checking
 
 // MARK: Functions
 
@@ -670,7 +670,7 @@ do {
 
   // FIXME: The type error is likely due to not solving the conjunction before attempting default type var bindings.
   let _ = (switch Bool.random() { case true: Int?.none case false: 1 })?.bitWidth
-  // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
+  // expected-error@-1 {{failed to produce diagnostic for expression}}
   // expected-error@-2 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 }
 do {
@@ -1552,42 +1552,42 @@ func trySwitch29(_ fn: () throws -> Int) rethrows -> Int {
 
 func awaitSwitch1() async -> Int {
   await switch Bool.random() { case true: 0 case false: 1 }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{3-9=}}
 }
 
 func awaitSwitch2() async -> Int {
   let x = await switch Bool.random() { case true: 0 case false: 1 }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{11-17=}}
   return x
 }
 
 func awaitSwitch3() async -> Int {
   return await switch Bool.random() { case true: 0 case false: 1 }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{10-16=}}
 }
 
 func awaitSwitch4() async -> Int {
   return await switch Bool.random() { case true: 0 case false: 1 }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{10-16=}}
 }
 
 func awaitSwitch5() async -> Int {
   return await switch Bool.random() { case true: awaitSwitch4() case false: 1 }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{10-16=}}
   // expected-warning@-2 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-3 {{call is 'async'}}
 }
 
 func awaitSwitch6() async -> Int {
   await switch Bool.random() { case true: awaitSwitch4() case false: 1 }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{3-9=}}
   // expected-warning@-2 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-3 {{call is 'async'}}
 }
 
 func awaitSwitch7() async -> Int {
   let x = await switch Bool.random() { case true: awaitSwitch4() case false: 1 }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{11-17=}}
   // expected-warning@-2 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-3 {{call is 'async'}}
   return x
@@ -1595,23 +1595,23 @@ func awaitSwitch7() async -> Int {
 
 func awaitSwitch8() async -> Int {
   return await switch Bool.random() { case true: await awaitSwitch4() case false: 1 }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{10-16=}}
 }
 
 func awaitSwitch9() async -> Int {
   await switch Bool.random() { case true: await awaitSwitch4() case false: 1 }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{3-9=}}
 }
 
 func awaitSwitch10() async -> Int {
   let x = await switch Bool.random() { case true: await awaitSwitch4() case false: 1 }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{11-17=}}
   return x
 }
 
 func awaitSwitch11() async -> Int {
   let x = await switch Bool.random() { case true: await awaitSwitch4() case false: awaitSwitch4() }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{11-17=}}
   // expected-warning@-2 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-3 {{call is 'async'}}
   return x
@@ -1619,14 +1619,14 @@ func awaitSwitch11() async -> Int {
 
 func awaitSwitch12() async -> Int {
   let x = await switch Bool.random() { case true: awaitSwitch4() case false: awaitSwitch4() }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{11-17=}}
   // expected-warning@-2 2{{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-3 2{{call is 'async'}}
   return x
 }
 
 func awaitSwitch13() async throws -> Int {
-  let x = await switch Bool.random() { // expected-warning {{'await' has no effect on 'switch' expression}}
+  let x = await switch Bool.random() { // expected-warning {{'await' has no effect on 'switch' expression}}{{11-17=}}
   case true:
     awaitSwitch4() // expected-warning {{result of call to 'awaitSwitch4()' is unused}}
     // expected-warning@-1 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
@@ -1655,14 +1655,14 @@ func asyncBool() async -> Bool { true }
 
 func awaitSwitch14() async -> Int {
   await switch asyncBool() { case true: 0 case false: 1 }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{3-9=}}
   // expected-warning@-2 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-3 {{call is 'async'}}
 }
 
 func awaitSwitch15() async -> Int {
   await switch await asyncBool() { case true: 0 case false: 1 }
-  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'switch' expression}}{{3-9=}}
 }
 
 func awaitSwitch16() async -> Int {
@@ -1695,19 +1695,19 @@ func awaitSwitch20() async -> Int {
 func tryAwaitSwitch1() async throws -> Int {
   try await switch Bool.random() { case true: 0 case false: 1 }
   // expected-warning@-1 {{'try' has no effect on 'switch' expression}}
-  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}{{7-13=}}
 }
 
 func tryAwaitSwitch2() async throws -> Int {
   try await switch Bool.random() { case true: 0 case false: 1 } as Int
   // expected-warning@-1 {{'try' has no effect on 'switch' expression}}
-  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}{{7-13=}}
 }
 
 func tryAwaitSwitch3() async throws -> Int {
   try await switch Bool.random() { case true: tryAwaitSwitch2() case false: 1 } as Int
   // expected-warning@-1 {{'try' has no effect on 'switch' expression}}
-  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}{{7-13=}}
   // expected-warning@-3 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
   // expected-note@-4 {{did you mean to use 'try'?}}
   // expected-note@-5 {{did you mean to handle error as optional value?}}
@@ -1719,7 +1719,7 @@ func tryAwaitSwitch3() async throws -> Int {
 func tryAwaitSwitch4() async throws -> Int {
   try await switch Bool.random() { case true: try tryAwaitSwitch2() case false: 1 } as Int
   // expected-warning@-1 {{'try' has no effect on 'switch' expression}}
-  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}{{7-13=}}
   // expected-warning@-3 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-4 {{call is 'async'}}
 }
@@ -1727,7 +1727,7 @@ func tryAwaitSwitch4() async throws -> Int {
 func tryAwaitSwitch5() async throws -> Int {
   try await switch Bool.random() { case true: await tryAwaitSwitch2() case false: 1 } as Int
   // expected-warning@-1 {{'try' has no effect on 'switch' expression}}
-  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}{{7-13=}}
   // expected-warning@-3 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
   // expected-note@-4 {{did you mean to use 'try'?}}
   // expected-note@-5 {{did you mean to handle error as optional value?}}
@@ -1737,13 +1737,13 @@ func tryAwaitSwitch5() async throws -> Int {
 func tryAwaitSwitch6() async throws -> Int {
   try await switch Bool.random() { case true: try await tryAwaitSwitch2() case false: 1 } as Int
   // expected-warning@-1 {{'try' has no effect on 'switch' expression}}
-  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}{{7-13=}}
 }
 
 func tryAwaitSwitch7() async throws -> Int {
   try await switch Bool.random() { case true: tryAwaitSwitch2() case false: 1 }
   // expected-warning@-1 {{'try' has no effect on 'switch' expression}}
-  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}{{7-13=}}
   // expected-warning@-3 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
   // expected-note@-4 {{did you mean to use 'try'?}}
   // expected-note@-5 {{did you mean to handle error as optional value?}}
@@ -1755,7 +1755,7 @@ func tryAwaitSwitch7() async throws -> Int {
 func tryAwaitSwitch8() async throws -> Int {
   try await switch Bool.random() { case true: try tryAwaitSwitch2() case false: 1 }
   // expected-warning@-1 {{'try' has no effect on 'switch' expression}}
-  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}{{7-13=}}
   // expected-warning@-3 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-4 {{call is 'async'}}
 }
@@ -1763,7 +1763,7 @@ func tryAwaitSwitch8() async throws -> Int {
 func tryAwaitSwitch9() async throws -> Int {
   try await switch Bool.random() { case true: await tryAwaitSwitch2() case false: 1 }
   // expected-warning@-1 {{'try' has no effect on 'switch' expression}}
-  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}{{7-13=}}
   // expected-warning@-3 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
   // expected-note@-4 {{did you mean to use 'try'?}}
   // expected-note@-5 {{did you mean to handle error as optional value?}}
@@ -1773,7 +1773,7 @@ func tryAwaitSwitch9() async throws -> Int {
 func tryAwaitSwitch10() async throws -> Int {
   try await switch Bool.random() { case true: try await tryAwaitSwitch2() case false: 1 }
   // expected-warning@-1 {{'try' has no effect on 'switch' expression}}
-  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'switch' expression}}{{7-13=}}
 }
 
 func tryAwaitSwitch11(_ fn: () async throws -> Int) async rethrows -> Int {

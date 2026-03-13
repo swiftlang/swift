@@ -1,11 +1,11 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=T1 | %FileCheck %s -check-prefix=T1
+// FIXME: Reenable USR verification (rdar://159844268)
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=T1 -code-completion-verify-usr-to-decl=false | %FileCheck %s -check-prefix=T1
 
 // REQUIRES: objc_interop
 // REQUIRES: no_asan
 
 // FIXME: iOS has no Cocoa.framework
 // REQUIRES: OS=macosx
-
 // A smoketest for code completion in Cocoa.
 
 import Cocoa

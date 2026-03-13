@@ -45,8 +45,8 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -205,6 +205,9 @@ bool noncopyable::memInstMustInitialize(Operand *memOper) {
   case SILInstructionKind::InjectEnumAddrInst:
     return true;
 
+  case SILInstructionKind::InitBorrowAddrInst:
+    return cast<InitBorrowAddrInst>(memInst)->getDest() == address;
+
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::ApplyInst: {
@@ -218,7 +221,8 @@ bool noncopyable::memInstMustInitialize(Operand *memOper) {
   }
   case SILInstructionKind::BuiltinInst: {
     auto bi = cast<BuiltinInst>(memInst);
-    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer) {
+    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer ||
+        bi->getBuiltinKind() == BuiltinValueKind::PrepareInitialization) {
       // `zeroInitializer` with an address operand zeroes out the address operand
       return true;
     }
@@ -251,6 +255,9 @@ bool noncopyable::memInstMustReinitialize(Operand *memOper) {
   case SILInstructionKind::ExplicitCopyAddrInst: {
     auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
     return CAI->getDest() == address && !CAI->isInitializationOfDest();
+  }
+  case SILInstructionKind::MarkDependenceAddrInst: {
+    return true;
   }
   case SILInstructionKind::YieldInst: {
     auto *yield = cast<YieldInst>(memInst);
@@ -297,6 +304,7 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
            (CAI->getDest() == address && !CAI->isInitializationOfDest());
   }
   case SILInstructionKind::DestroyAddrInst:
+  case SILInstructionKind::EndLifetimeInst:
     return true;
   case SILInstructionKind::DropDeinitInst:
     assert(memOper->get()->getType().isValueTypeWithDeinit());
@@ -583,6 +591,7 @@ bool siloptimizer::eliminateTemporaryAllocationsFromLet(
   };
   FindCopyAddrWalker walker(copiesToVisit);
   std::move(walker).walk(markedInst);
+  // FIXME: should check walk() == AddressUseKind::NonEscaping.
 
   bool madeChange = false;
 
@@ -612,6 +621,8 @@ bool siloptimizer::eliminateTemporaryAllocationsFromLet(
       nextCAI = nullptr;
       SimpleTemporaryAllocStackElimVisitor visitor(state, cai, nextCAI);
 
+      // FIXME: should check AddressUseKind::NonEscaping != walk() to handle
+      // PointerEscape.
       if (AddressUseKind::Unknown == std::move(visitor).walk(cai->getDest()))
         return false;
 

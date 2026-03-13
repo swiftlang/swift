@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5
 
 ////
 // Members of structs
@@ -846,4 +846,11 @@ func testCompoundLeadingDot() {
   // Make sure we correctly strip the argument label.
   let _: S = .foo(x:)(0)
   let _: S = .foo(x:)(x: 0) // expected-error {{extraneous argument label 'x:' in call}}
+}
+
+/// Make sure that anyObject is handled correctly on .init member lookup
+class E {}
+
+func foofoo() -> some E {
+  return .init() //ok
 }

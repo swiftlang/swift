@@ -250,7 +250,12 @@ void TaskLocal::Storage::initializeLinkParent(AsyncTask* task,
 TaskLocal::MarkerItem *TaskLocal::MarkerItem::create(AsyncTask *task,
                                                      Item *next, Kind kind) {
   size_t amountToAllocate = sizeof(MarkerItem);
-  void *allocation = _swift_task_alloc_specific(task, amountToAllocate);
+  void *allocation;
+
+  // If we have a task, allocate from that task. If not, use malloc. This must
+  // mirror the corresponding dealloc/free call in Item::destroy.
+  if (task) allocation = _swift_task_alloc_specific(task, amountToAllocate);
+  else allocation = malloc(amountToAllocate);
   return new (allocation) MarkerItem(next, kind);
 }
 
@@ -338,6 +343,13 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
         .errorType = "task-local-violation",
         .currentStackDescription = "Task-local bound in illegal context",
         .framesToSkip = 1,
+        .memoryAddress = nullptr,
+        .numExtraThreads = 0,
+        .threads = nullptr,
+        .numFixIts = 0,
+        .fixIts = nullptr,
+        .numNotes = 0,
+        .notes = nullptr,
     };
     _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
   }

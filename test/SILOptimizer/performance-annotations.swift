@@ -22,7 +22,7 @@ struct Str : P {
     return a + x
   }
 
-  static let s = 27
+  static let s = 27 << 0
   static var s2 = 10 + s
   static var s3 = initFunc() // expected-error {{global/static variable initialization can cause locking}}
 }
@@ -485,7 +485,7 @@ func dynamicCastNoExistential(_ a: AnyObject) -> Cl? {
 
 @_noExistentials
 func useOfExistential() -> P {
-  Str(x: 1) // expected-error {{cannot use a value of protocol type 'any P' in @_noExistential function}}
+  Str(x: 1) // expected-error {{cannot use a value of protocol type 'any P' in '@_noExistential' function}}
 }
 
 @_noExistentials

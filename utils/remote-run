@@ -203,7 +203,7 @@ class RemoteCommandRunner(CommandRunner):
                 [quote(arg) for arg in command])
 
     def rsync_invocation(self, source, dest):
-        return ['/usr/bin/rsync', '-arRz', '--files-from=-',
+        return ['rsync', '-arRz', '--files-from=-',
                 '-e', ' '.join([quote(x) for x in
                                 ['/usr/bin/ssh'] +
                                 self.common_options(port_flag='-p')]),
@@ -221,7 +221,7 @@ class LocalCommandRunner(CommandRunner):
         return command
 
     def rsync_invocation(self, source, dest):
-        return ['/usr/bin/rsync', '-arz', '--files-from=-', source, dest]
+        return ['rsync', '-arz', '--files-from=-', source, dest]
 
     def rsync_from_invocation(self, source, dest):
         return self.rsync_invocation(source, dest)

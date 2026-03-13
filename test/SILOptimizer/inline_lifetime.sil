@@ -68,166 +68,166 @@ struct S {}
 
 // declarations
 
-sil [ossa] [always_inline] @callee_owned : $@convention(thin) (@owned C) -> () {
+sil [ossa] [heuristic_always_inline] @callee_owned : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):
     destroy_value %instance : $C
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_owned_eager_move : $@convention(thin) (@owned C) -> () {
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move : $@convention(thin) (@owned C) -> () {
 entry(%instance : @_eagerMove @owned $C):
     destroy_value %instance : $C
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_owned_eager_move__type_annotation : $@convention(thin) (@owned EagerC) -> () {
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move__type_annotation : $@convention(thin) (@owned EagerC) -> () {
 entry(%instance : @owned $EagerC):
     destroy_value %instance : $EagerC
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_owned_eager_move__type_inferred_d1_s1 : $@convention(thin) (@owned InferredEagerD1S1) -> () {
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move__type_inferred_d1_s1 : $@convention(thin) (@owned InferredEagerD1S1) -> () {
 entry(%instance : @owned $InferredEagerD1S1):
     destroy_value %instance : $InferredEagerD1S1
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_owned_eager_move__type_inferred_d1_s2 : $@convention(thin) (@owned InferredEagerD1S2) -> () {
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move__type_inferred_d1_s2 : $@convention(thin) (@owned InferredEagerD1S2) -> () {
 entry(%instance : @owned $InferredEagerD1S2):
     destroy_value %instance : $InferredEagerD1S2
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_owned_eager_move__type_inferred_d1_s3 : $@convention(thin) (@owned InferredEagerD1S3) -> () {
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move__type_inferred_d1_s3 : $@convention(thin) (@owned InferredEagerD1S3) -> () {
 entry(%instance : @owned $InferredEagerD1S3):
     destroy_value %instance : $InferredEagerD1S3
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_owned_eager_move__type_inferred_d1_s4 : $@convention(thin) (@owned InferredEagerD1S4) -> () {
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move__type_inferred_d1_s4 : $@convention(thin) (@owned InferredEagerD1S4) -> () {
 entry(%instance : @owned $InferredEagerD1S4):
     destroy_value %instance : $InferredEagerD1S4
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_owned_eager_move__type_inferred_d2_s1 : $@convention(thin) (@owned InferredEagerD2S1) -> () {
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move__type_inferred_d2_s1 : $@convention(thin) (@owned InferredEagerD2S1) -> () {
 entry(%instance : @owned $InferredEagerD2S1):
     destroy_value %instance : $InferredEagerD2S1
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_owned_lexical : $@convention(thin) (@owned InferredEagerD2S1) -> () {
+sil [ossa] [heuristic_always_inline] @callee_owned_lexical : $@convention(thin) (@owned InferredEagerD2S1) -> () {
 entry(%instance : @_lexical @owned $InferredEagerD2S1):
     destroy_value %instance : $InferredEagerD2S1
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed : $@convention(thin) (@guaranteed C) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 entry(%instance : @guaranteed $C):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed_eager_move : $@convention(thin) (@guaranteed C) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move : $@convention(thin) (@guaranteed C) -> () {
 entry(%instance : @_eagerMove @guaranteed $C):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed_eager_move__type_annotation : $@convention(thin) (@guaranteed EagerC) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move__type_annotation : $@convention(thin) (@guaranteed EagerC) -> () {
 entry(%instance : @guaranteed $EagerC):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed_eager_move__type_inferred_d1_s1 : $@convention(thin) (@guaranteed InferredEagerD1S1) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move__type_inferred_d1_s1 : $@convention(thin) (@guaranteed InferredEagerD1S1) -> () {
 entry(%instance : @guaranteed $InferredEagerD1S1):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed_eager_move__type_inferred_d1_s2 : $@convention(thin) (@guaranteed InferredEagerD1S2) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move__type_inferred_d1_s2 : $@convention(thin) (@guaranteed InferredEagerD1S2) -> () {
 entry(%instance : @guaranteed $InferredEagerD1S2):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed_eager_move__type_inferred_d1_s3 : $@convention(thin) (@guaranteed InferredEagerD1S3) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move__type_inferred_d1_s3 : $@convention(thin) (@guaranteed InferredEagerD1S3) -> () {
 entry(%instance : @guaranteed $InferredEagerD1S3):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed_eager_move__type_inferred_d1_s4 : $@convention(thin) (@guaranteed InferredEagerD1S4) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move__type_inferred_d1_s4 : $@convention(thin) (@guaranteed InferredEagerD1S4) -> () {
 entry(%instance : @guaranteed $InferredEagerD1S4):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed_eager_move__type_inferred_d2_s1 : $@convention(thin) (@guaranteed InferredEagerD2S1) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move__type_inferred_d2_s1 : $@convention(thin) (@guaranteed InferredEagerD2S1) -> () {
 entry(%instance : @guaranteed $InferredEagerD2S1):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed_lexical : $@convention(thin) (@guaranteed InferredEagerD2S1) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_lexical : $@convention(thin) (@guaranteed InferredEagerD2S1) -> () {
 entry(%instance : @_lexical @guaranteed $InferredEagerD2S1):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed_lexical__type_annotation : $@convention(thin) (@guaranteed LexicalS) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_lexical__type_annotation : $@convention(thin) (@guaranteed LexicalS) -> () {
 entry(%instance : @guaranteed $LexicalS):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed_lexical__type_inferred_d1_s1 : $@convention(thin) (@guaranteed InferredLexicalD1S1) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_lexical__type_inferred_d1_s1 : $@convention(thin) (@guaranteed InferredLexicalD1S1) -> () {
 entry(%instance : @guaranteed $InferredLexicalD1S1):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed_lexical__type_inferred_d1_s2 : $@convention(thin) (@guaranteed InferredLexicalD1S2) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_lexical__type_inferred_d1_s2 : $@convention(thin) (@guaranteed InferredLexicalD1S2) -> () {
 entry(%instance : @guaranteed $InferredLexicalD1S2):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed_lexical__type_inferred_d1_s3 : $@convention(thin) (@guaranteed InferredLexicalD1S3) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_lexical__type_inferred_d1_s3 : $@convention(thin) (@guaranteed InferredLexicalD1S3) -> () {
 entry(%instance : @guaranteed $InferredLexicalD1S3):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed_lexical__type_inferred_d1_s4 : $@convention(thin) (@guaranteed InferredLexicalD1S4) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_lexical__type_inferred_d1_s4 : $@convention(thin) (@guaranteed InferredLexicalD1S4) -> () {
 entry(%instance : @guaranteed $InferredLexicalD1S4):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_trivial : $@convention(thin) (S) -> () {
+sil [ossa] [heuristic_always_inline] @callee_trivial : $@convention(thin) (S) -> () {
 entry(%instance : $S):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_in : $@convention(thin) (@in S) -> () {
+sil [ossa] [heuristic_always_inline] @callee_in : $@convention(thin) (@in S) -> () {
 entry(%instance : $*S):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [always_inline] [ossa] @callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+sil [heuristic_always_inline] [ossa] @callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
 entry(%arg : $*T):
   %retval = tuple ()
   return %retval : $()
@@ -584,7 +584,7 @@ bb0:
 
 // declarations
 
-sil [ossa] [always_inline] @callee_coro_owned : $@yield_once @convention(thin) (@owned C) -> @yields @inout C {
+sil [ossa] [heuristic_always_inline] @callee_coro_owned : $@yield_once @convention(thin) (@owned C) -> @yields @inout C {
 bb0(%instance : @owned $C):
   %addr = alloc_stack $C
   store %instance to [init] %addr : $*C
@@ -600,7 +600,7 @@ bb2:
   unwind
 }
 
-sil [ossa] [always_inline] @callee_coro_guaranteed : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C {
+sil [ossa] [heuristic_always_inline] @callee_coro_guaranteed : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C {
 bb0(%instance : @guaranteed $C):
   %copy = copy_value %instance : $C
   %addr = alloc_stack $C
@@ -617,7 +617,7 @@ bb2:
   unwind
 }
 
-sil hidden [ossa] [always_inline] @callee_coro_trivial : $@yield_once @convention(thin) (S) -> @yields @inout S {
+sil hidden [ossa] [heuristic_always_inline] @callee_coro_trivial : $@yield_once @convention(thin) (S) -> @yields @inout S {
 bb0(%instance : $S):
   %addr = alloc_stack $S
   store %instance to [trivial] %addr : $*S
@@ -631,7 +631,7 @@ bb2:
   unwind
 }
 
-sil hidden [ossa] [always_inline] @callee_coro_in : $@yield_once @convention(thin) (@in S) -> @yields @inout S {
+sil hidden [ossa] [heuristic_always_inline] @callee_coro_in : $@yield_once @convention(thin) (@in S) -> @yields @inout S {
 bb0(%instance : $*S):
   yield %instance : $*S, resume bb1, unwind bb2
 bb1:
@@ -641,7 +641,7 @@ bb2:
   unwind
 }
 
-sil hidden [ossa] [always_inline] @callee_coro_inguaranteed : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T {
+sil hidden [ossa] [heuristic_always_inline] @callee_coro_inguaranteed : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T {
 bb0(%instance : $*T):
   %addr = alloc_stack $T
   copy_addr %instance to [init] %addr : $*T
@@ -781,7 +781,7 @@ bb0(%instance : $*T):
 
 // declarations
 
-sil [ossa] [always_inline] @callee_error_owned : $@convention(thin) (@owned C) -> @error Error {
+sil [ossa] [heuristic_always_inline] @callee_error_owned : $@convention(thin) (@owned C) -> @error Error {
 bb0(%instance : @owned $C):
   cond_br undef, bb1, bb2
 bb1:
@@ -793,7 +793,7 @@ bb2:
   return %18 : $()
 }
 
-sil [ossa] [always_inline] @callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error Error {
+sil [ossa] [heuristic_always_inline] @callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error Error {
 bb0(%0 : @guaranteed $C):
   cond_br undef, bb1, bb2
 bb1:

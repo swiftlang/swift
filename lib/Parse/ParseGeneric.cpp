@@ -56,7 +56,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
 
     // Parse attributes.
     DeclAttributes attributes;
-    if (Tok.hasComment())
+    if (Tok.hasComment() && shouldAttachCommentToDecl())
       attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
     parseDeclAttributeList(attributes);
 
@@ -351,6 +351,8 @@ ParserStatus Parser::parseGenericWhereClause(
         if (!AllowLayoutConstraints && !isInSILMode()) {
           diagnose(LayoutLoc,
                    diag::layout_constraints_only_inside_specialize_attr);
+          Status.setIsParseError();
+          break;
         } else {
           // Add the layout requirement.
           Requirements.push_back(RequirementRepr::getLayoutConstraint(

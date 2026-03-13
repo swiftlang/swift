@@ -31,6 +31,9 @@ class DiagnosticBridge {
   /// A queued up source file known to the queued diagnostics.
   using QueuedBuffer = void *;
 
+  /// Per-frontend state maintained on the Swift side.
+  void *perFrontendState = nullptr;
+
   /// The queued diagnostics structure.
   void *queuedDiagnostics = nullptr;
   llvm::DenseMap<unsigned, QueuedBuffer> queuedBuffers;
@@ -42,6 +45,10 @@ public:
   /// Enqueue diagnostics.
   void enqueueDiagnostic(SourceManager &SM, const DiagnosticInfo &Info,
                          unsigned innermostBufferID);
+
+  /// Emit a single diagnostic without location information.
+  void emitDiagnosticWithoutLocation(
+      const DiagnosticInfo &Info, llvm::raw_ostream &out, bool forceColors);
 
   /// Flush all enqueued diagnostics.
   void flush(llvm::raw_ostream &OS, bool includeTrailingBreak,
@@ -55,6 +62,9 @@ public:
   /// initial location is invalid, the result will be empty.
   static SmallVector<unsigned, 1> getSourceBufferStack(SourceManager &sourceMgr,
                                                        SourceLoc loc);
+
+  /// Print the category footnotes as part of teardown.
+  void printCategoryFootnotes(llvm::raw_ostream &os, bool forceColors);
 
   DiagnosticBridge() = default;
   ~DiagnosticBridge();

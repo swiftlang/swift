@@ -27,9 +27,11 @@ namespace swift {
 class ModuleFile;
 class PathObfuscator;
 class ModuleFileSharedCore;
+struct ExplicitSwiftModuleMap;
+struct ExplicitClangModuleMap;
 enum class ModuleLoadingBehavior;
 namespace file_types {
-  enum ID : uint8_t;
+enum ID : uint8_t;
 }
 
 /// How a dependency should be loaded.
@@ -103,8 +105,8 @@ protected:
       std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-      bool skipBuildingInterface, bool isTestableDependencyLookup,
-      bool &isFramework, bool &isSystemModule);
+      std::string *CacheKey, bool isCanImportLookup,
+      bool isTestableDependencyLookup, bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
   /// .swiftmodule with the provided `ModuleFilename`. Subclasses must
@@ -125,8 +127,8 @@ protected:
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool SkipBuildingInterface, bool IsFramework,
-      bool isTestableDependencyLookup = false) = 0;
+      bool IsCanImportLookup, bool IsFramework,
+      bool IsTestableDependencyLookup = false) = 0;
 
   std::error_code
   openModuleFile(
@@ -151,12 +153,22 @@ protected:
   /// to list the architectures that \e are present.
   ///
   /// \returns true if an error diagnostic was emitted
-  virtual bool maybeDiagnoseTargetMismatch(
+  virtual bool handlePossibleTargetMismatch(
       SourceLoc sourceLocation,
       StringRef moduleName,
-      const SerializedModuleBaseName &BaseName) {
+      const SerializedModuleBaseName &baseName,
+      bool isCanImportLookup) {
     return false;
   }
+
+  /// Assuming the \c baseName is a target-specific Swift module path,
+  /// for a missing target variant, collect all adjacent binary module
+  /// files to build a list of discovered modules for incompatible
+  /// architectures.
+  static void identifyArchitectureVariants(
+       ASTContext &Ctx,
+       const SerializedModuleBaseName &baseName,
+       std::vector<std::string> &incompatibleArchModules);
 
   /// Determines if the provided path is a cached artifact for dependency
   /// tracking purposes.
@@ -164,13 +176,8 @@ protected:
     return false;
   }
 
-  /// Scan the given serialized module file to determine dependencies.
-  llvm::ErrorOr<ModuleDependencyInfo>
-  scanModuleFile(Twine modulePath, bool isFramework,
-                 bool isTestableImport, bool isCandidateForTextualModule);
-
   struct BinaryModuleImports {
-    llvm::StringSet<> moduleImports;
+    std::vector<ScannerImportStatementInfo> moduleImports;
     std::string headerImport;
   };
 
@@ -185,11 +192,11 @@ protected:
 
   /// If the module has a package name matching the one
   /// specified, return a set of package-only imports for this module.
-  static llvm::ErrorOr<llvm::StringSet<>>
+  static llvm::ErrorOr<std::vector<ScannerImportStatementInfo>>
   getMatchingPackageOnlyImportsOfModule(Twine modulePath,
                                         bool isFramework,
-                                        bool isRequiredOSSAModules,
                                         StringRef SDKName,
+                                        const llvm::Triple &target,
                                         StringRef packageName,
                                         llvm::vfs::FileSystem *fileSystem,
                                         PathObfuscator &recoverer);
@@ -215,8 +222,6 @@ public:
           std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
           std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
           bool isFramework);
-
-  bool isRequiredOSSAModules() const;
 
   /// Check whether the module with a given name can be imported without
   /// importing it.
@@ -262,17 +267,16 @@ public:
 
   virtual void verifyAllModules() override;
 
-  virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath,
-                        const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-                        InterfaceSubContextDelegate &delegate,
-                        llvm::PrefixMapper *mapper,
-                        bool isTestableImport) override;
-
   /// A textual reason why the compiler rejected a binary module load
   /// attempt with a given status, to be used for diagnostic output.
   static std::optional<std::string> invalidModuleReason(serialization::Status status);
+
+  virtual ExplicitSwiftModuleMap *getExplicitSwiftModuleMap() {
+    return nullptr;
+  }
+  virtual ExplicitClangModuleMap *getExplicitClangModuleMap() {
+    return nullptr;
+  }
 };
 
 /// Imports serialized Swift modules into an ASTContext.
@@ -290,13 +294,14 @@ class ImplicitSerializedModuleLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool SkipBuildingInterface, bool IsFramework,
-      bool isTestableDependencyLookup = false) override;
+      bool IsCanImportLookup, bool IsFramework,
+      bool IsTestableDependencyLookup = false) override;
 
-  bool maybeDiagnoseTargetMismatch(
+  bool handlePossibleTargetMismatch(
       SourceLoc sourceLocation,
       StringRef moduleName,
-      const SerializedModuleBaseName &BaseName) override;
+      const SerializedModuleBaseName &BaseName,
+      bool isCanImportLookup) override;
 
 public:
   virtual ~ImplicitSerializedModuleLoader();
@@ -348,13 +353,8 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool SkipBuildingInterface, bool IsFramework,
+      bool IsCanImportLookup, bool IsFramework,
       bool IsTestableDependencyLookup = false) override;
-
-  bool maybeDiagnoseTargetMismatch(
-      SourceLoc sourceLocation,
-      StringRef moduleName,
-      const SerializedModuleBaseName &BaseName) override;
 
   bool BypassResilience;
 public:
@@ -380,11 +380,14 @@ public:
   /// FIXME: make this an actual import *path* once submodules are designed.
   bool registerMemoryBuffer(StringRef importPath,
                             std::unique_ptr<llvm::MemoryBuffer> input,
-                            llvm::VersionTuple version) {
-    return MemoryBuffers
-        .insert({importPath, MemoryBufferInfo(std::move(input), version)})
-        .second;
-  }
+                            llvm::VersionTuple version);
+
+  /// During the transtion to explicitly tracked module dependencies LLDB may
+  /// instruct this loader to forget one of the (now redundant) MemoryBuffers
+  /// because it found an explicit module file on disk.
+  ///
+  /// \return true if the importPath existed.
+  bool unregisterMemoryBuffer(StringRef importPath);
 
   void collectVisibleTopLevelModuleNames(
       SmallVectorImpl<Identifier> &names) const override {}
@@ -436,7 +439,7 @@ public:
   getFilenameForPrivateDecl(const Decl *decl) const override;
 
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
-  
+
   virtual OpaqueTypeDecl *
   lookupOpaqueResultType(StringRef MangledName) override;
 
@@ -477,6 +480,9 @@ public:
   lookupImportedSPIGroups(
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
+
+  virtual bool isModuleImportedPreconcurrency(
+      const ModuleDecl *importedModule) const override;
 
   std::optional<CommentInfo> getCommentForDecl(const Decl *D) const override;
 
@@ -579,10 +585,16 @@ public:
 bool extractCompilerFlagsFromInterface(
     StringRef interfacePath, StringRef buffer, llvm::StringSaver &ArgSaver,
     SmallVectorImpl<const char *> &SubArgs,
-    std::optional<llvm::Triple> PreferredTarget = std::nullopt);
+    std::optional<llvm::Triple> PreferredTarget = std::nullopt,
+    DiagnosticEngine *diagEngine = nullptr);
 
 /// Extract the user module version number from an interface file.
 llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);
+
+/// Extract embedded bridging header from binary module.
+std::unique_ptr<llvm::MemoryBuffer>
+extractEmbeddedBridgingHeaderContent(std::unique_ptr<llvm::MemoryBuffer> file,
+                                     StringRef headerPath, ASTContext &Context);
 } // end namespace swift
 
 #endif

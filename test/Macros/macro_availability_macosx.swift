@@ -10,7 +10,7 @@ struct X { }
 
 @freestanding(expression) macro m1() -> X = #externalMacro(module: "A", type: "B") // expected-error{{'X' is only available in macOS 12.0 or newer}}
 // expected-warning@-1{{external macro implementation type 'A.B' could not be found for macro 'm1()'}}
-// expected-note@-2{{add @available attribute to enclosing macro}}
+// expected-note@-2{{add '@available' attribute to enclosing macro}}
 
 @available(macOS 12.0, *)
 @freestanding(expression) macro m2() -> X = #externalMacro(module: "A", type: "B")

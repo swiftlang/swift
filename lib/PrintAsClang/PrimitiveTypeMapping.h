@@ -13,7 +13,7 @@
 #ifndef SWIFT_PRINTASCLANG_PRIMITIVETYPEMAPPING_H
 #define SWIFT_PRINTASCLANG_PRIMITIVETYPEMAPPING_H
 
-#include "swift/AST/Identifier.h"
+#include "swift/AST/Decl.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -21,18 +21,21 @@ namespace swift {
 
 class ASTContext;
 class TypeDecl;
+class Type;
 
 /// Provides a mapping from Swift's primitive types to C / Objective-C / C++
 /// primitive types.
 ///
 /// Certain types have mappings that differ in different language modes.
-/// For example, Swift's `Int` maps to `NSInteger` for Objective-C declarations,
-/// but to something like `intptr_t` or `swift::Int` for C and C++ declarations.
+/// For example, Swift's `Int` maps to `NSInteger` for Objective-C
+/// declarations, but to something like `intptr_t` or `swift::Int` for C and
+/// C++ declarations.
 class PrimitiveTypeMapping {
 public:
   struct ClangTypeInfo {
     StringRef name;
     bool canBeNullable;
+    bool simd;
   };
 
   /// Returns the Objective-C type name and nullability for the given Swift
@@ -47,6 +50,8 @@ public:
   /// primitive type declaration, or \c None if no such type name exists.
   std::optional<ClangTypeInfo> getKnownCxxTypeInfo(const TypeDecl *typeDecl);
 
+  std::optional<ClangTypeInfo> getKnownSIMDTypeInfo(Type t, ASTContext &ctx);
+
 private:
   void initialize(ASTContext &ctx);
 
@@ -58,18 +63,19 @@ private:
     // The C++ name of the Swift type.
     std::optional<StringRef> cxxName;
     bool canBeNullable;
+    bool simd = false;
   };
 
   FullClangTypeInfo *getMappedTypeInfoOrNull(const TypeDecl *typeDecl);
 
-  /// A map from {Module, TypeName} pairs to {C name, C nullability} pairs.
+  /// Associate Swift types to their {name, nullability} in foreign languages.
   ///
   /// This is populated on first use with a list of known Swift types that are
   /// translated directly by the ObjC printer instead of structurally, allowing
   /// it to do things like map 'Int' to 'NSInteger' and 'Float' to 'float'.
   /// In some sense it's the reverse of the ClangImporter's MappedTypes.def.
-  llvm::DenseMap<std::pair<Identifier, Identifier>, FullClangTypeInfo>
-      mappedTypeNames;
+  /// Must be kept aligned with BuiltinMappedTypes.def.
+  llvm::DenseMap<TypeDecl*, FullClangTypeInfo> mappedTypeNames;
 };
 
 } // end namespace swift

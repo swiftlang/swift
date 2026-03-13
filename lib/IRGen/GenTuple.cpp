@@ -26,6 +26,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Mangler.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -645,8 +646,7 @@ Address irgen::projectTupleElementAddressByDynamicIndex(IRGenFunction &IGF,
     result = tupleOffset;
   }
 
-  auto *gep =
-      IGF.emitByteOffsetGEP(tuple.getAddress(), result, IGF.IGM.OpaqueTy);
+  auto *gep = IGF.emitByteOffsetGEP(tuple.getAddress(), result);
   auto elementAddress = Address(gep, IGF.IGM.OpaqueTy,
                                 IGF.IGM.getPointerAlignment());
   return IGF.Builder.CreateElementBitCast(elementAddress,
@@ -674,7 +674,12 @@ llvm::Constant *irgen::getTupleLabelsString(IRGenModule &IGM,
   for (auto &elt : type->getElements()) {
     if (elt.hasName()) {
       hasLabels = true;
-      buffer.append(elt.getName().str());
+      Identifier name = elt.getName();
+      if (name.mustAlwaysBeEscaped()) {
+        Mangle::Mangler::appendRawIdentifierForRuntime(name.str(), buffer);
+      } else {
+        buffer.append(name.str());
+      }
     }
 
     // Each label is space-terminated.

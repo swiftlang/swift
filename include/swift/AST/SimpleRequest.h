@@ -57,7 +57,7 @@ enum class RequestFlags {
   /// incremental dependency pair and defines a new dependency scope.
   ///
   /// This bit is optional.  High-level requests
-  /// (e.g. \c TypeCheckSourceFileRequest) will require it.
+  /// (e.g. \c TypeCheckPrimaryFileRequest) will require it.
   ///
   /// For further discussion on incremental dependencies
   /// see DependencyAnalysis.md.

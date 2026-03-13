@@ -1,0 +1,23 @@
+// Missing file
+// RUN: %target-swift-frontend -ir-profile-use=missing.profdata -emit-ir %s 2>&1 | %FileCheck --ignore-case --check-prefix=CHECK-NOFILE %s
+// CHECK-NOFILE: error reading profile
+// CHECK-NOFILE: .profdata
+// CHECK-NOFILE: No such file or directory
+
+
+// Invalid IR file
+// RUN: %empty-directory(%t)
+// RUN: echo "" > %t.invalid.profdata
+// RUN: %target-swift-frontend -ir-profile-use=%t.invalid.profdata -emit-ir %s 2>&1 | %FileCheck --ignore-case --check-prefix=CHECK-INVALIDFILE %s
+// CHECK-INVALIDFILE: error reading profile
+// CHECK-INVALIDFILE: invalid.profdata
+// CHECK-INVALIDFILE: invalid instrumentation profile data
+
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public func foo() {}

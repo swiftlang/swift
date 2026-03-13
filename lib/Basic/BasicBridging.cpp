@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BasicBridging.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/raw_ostream.h"
 
 #ifdef PURE_BRIDGING_MODE
@@ -74,13 +75,13 @@ void BridgedOwnedString::destroy() const {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: Data
+// MARK: BridgedData
 //===----------------------------------------------------------------------===//
 
-void BridgedData_free(BridgedData data) {
-  if (data.BaseAddress == nullptr)
+void BridgedData::free() const {
+  if (BaseAddress == nullptr)
     return;
-  free(const_cast<char *>(data.BaseAddress));
+  ::free(const_cast<char *>(BaseAddress));
 }
 
 //===----------------------------------------------------------------------===//
@@ -90,7 +91,33 @@ void BridgedData_free(BridgedData data) {
 BridgedCharSourceRangeVector::BridgedCharSourceRangeVector()
     : vector(new std::vector<CharSourceRange>()) {}
 
-void BridgedCharSourceRangeVector::push_back(BridgedCharSourceRange range) {
-  static_cast<std::vector<CharSourceRange> *>(vector)->push_back(
-      range.unbridged());
+void BridgedCharSourceRangeVector::push_back(swift::CharSourceRange range) {
+  static_cast<std::vector<CharSourceRange> *>(vector)->push_back(range);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedVersionTuple
+//===----------------------------------------------------------------------===//
+
+BridgedVersionTuple::BridgedVersionTuple(llvm::VersionTuple version) {
+  if (version.getBuild())
+    *this = BridgedVersionTuple(version.getMajor(), *version.getMinor(),
+                                *version.getSubminor(), *version.getBuild());
+  else if (version.getSubminor())
+    *this = BridgedVersionTuple(version.getMajor(), *version.getMinor(),
+                                *version.getSubminor());
+  else if (version.getMinor())
+    *this = BridgedVersionTuple(version.getMajor(), *version.getMinor());
+  else
+    *this = BridgedVersionTuple(version.getMajor());
+}
+
+llvm::VersionTuple BridgedVersionTuple::unbridged() const {
+  if (HasBuild)
+    return llvm::VersionTuple(Major, Minor, Subminor, Build);
+  if (HasSubminor)
+    return llvm::VersionTuple(Major, Minor, Subminor);
+  if (HasMinor)
+    return llvm::VersionTuple(Major, Minor);
+  return llvm::VersionTuple(Major);
 }

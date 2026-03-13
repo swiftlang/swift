@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables %S/Inputs/GlobalVariables.swift -disable-availability-checking -parse-as-library
 
-// RUN: %target-swift-frontend -I %t -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -I %t -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -verify-ignore-unrelated
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -17,7 +17,7 @@ let rs = GlobalCounter() // expected-warning {{let 'rs' is not concurrency-safe 
 
 import GlobalVariables
 
-class MyError: Error { // expected-warning{{non-final class 'MyError' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+class MyError: Error { // expected-warning{{non-final class 'MyError' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
   var storage = 0 // expected-warning{{stored property 'storage' of 'Sendable'-conforming class 'MyError' is mutable}}
 }
 

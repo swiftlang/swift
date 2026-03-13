@@ -23,7 +23,9 @@ add_swift_unittest(SwiftBasicTests
   FrozenMultiMapTest.cpp
   ImmutablePointerSetTest.cpp
   JSONSerialization.cpp
+  LanguageModeTest.cpp
   OptionSetTest.cpp
+  Options.cpp
   OwnedStringTest.cpp
   MultiMapCacheTest.cpp
   PointerIntEnumTest.cpp
@@ -36,10 +38,12 @@ add_swift_unittest(SwiftBasicTests
   StringExtrasTest.cpp
   SuccessorMapTest.cpp
   TaggedUnionTest.cpp
+  TaskQueueTest.cpp
   ThreadSafeRefCntPointerTest.cpp
   TransformRangeTest.cpp
   TypeLookupError.cpp
   UnicodeTest.cpp
+  SwiftVersionTest.cpp
   ${generated_tests}
   )
 
@@ -48,8 +52,10 @@ add_dependencies(SwiftBasicTests "${gyb_dependency_targets}")
 target_link_libraries(SwiftBasicTests
   PRIVATE
   swiftBasic
+  swiftOption
   swiftThreading
   clangBasic
+  LLVMOption
   LLVMTestingSupport
   )
 

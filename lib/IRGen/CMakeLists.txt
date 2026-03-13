@@ -9,6 +9,7 @@ add_swift_host_library(swiftIRGen STATIC
   Fulfillment.cpp
   GenArchetype.cpp
   GenArray.cpp
+  GenBorrow.cpp
   GenBuiltin.cpp
   GenCall.cpp
   GenCast.cpp
@@ -17,6 +18,7 @@ add_swift_host_library(swiftIRGen STATIC
   GenClass.cpp
   GenConstant.cpp
   GenControl.cpp
+  GenCoro.cpp
   GenCoverage.cpp
   GenConcurrency.cpp
   GenDistributed.cpp

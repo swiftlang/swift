@@ -266,6 +266,9 @@ SimpleMathTests.test("TupleMutation") {
 }
 
 // Tests TF-321.
+
+/* Temporary disabled until https://github.com/swiftlang/swift/issues/84840 is fixed
+   We cannot use `Tracked<T>` :(
 SimpleMathTests.test("TupleNonDifferentiableElements") {
   // TF-964: Test tuple with non-tuple-typed adjoint value.
   func tupleLet(_ x: Tracked<Float>) -> Tracked<Float> {
@@ -305,6 +308,51 @@ SimpleMathTests.test("TupleNonDifferentiableElements") {
   }
   func wrapper(_ x: Tracked<Float>) -> Tracked<Float> {
     let w = Wrapper<Tracked<Float>>()
+    return w.baz(x)
+  }
+  expectEqual((3, 1), valueWithGradient(at: 3, of: wrapper))
+}
+*/
+
+SimpleMathTests.test("TupleNonDifferentiableElementsNotTracked") {
+  // TF-964: Test tuple with non-tuple-typed adjoint value.
+  func tupleLet(_ x: Float) -> Float {
+    let tuple = (2 * x, 1)
+    return tuple.0
+  }
+  expectEqual((8, 2), valueWithGradient(at: 4, of: tupleLet))
+
+  func tupleVar(_ x: Float) -> Float {
+    var tuple = (x, 1)
+    tuple.0 = x
+    tuple.1 = 1
+    return tuple.0
+  }
+  expectEqual((3, 1), valueWithGradient(at: 3, of: tupleVar))
+
+  func nested(_ x: Float) -> Float {
+    // Convoluted function computing `x * x`.
+    var tuple: (Int, (Int, Float), Float) = (1, (1, 0), 0)
+    tuple.0 = 1
+    tuple.1.0 = 1
+    tuple.1.1 = x
+    tuple.2 = x
+    return tuple.1.1 * tuple.2
+  }
+  expectEqual((16, 8), valueWithGradient(at: 4, of: nested))
+
+  struct Wrapper<T> {
+    @differentiable(reverse where T : Differentiable)
+    func baz(_ x: T) -> T {
+      var tuple = (1, 1, x, 1)
+      tuple.0 = 1
+      tuple.2 = x
+      tuple.3 = 1
+      return tuple.2
+    }
+  }
+  func wrapper(_ x: Float) -> Float {
+    let w = Wrapper<Float>()
     return w.baz(x)
   }
   expectEqual((3, 1), valueWithGradient(at: 3, of: wrapper))

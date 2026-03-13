@@ -111,10 +111,12 @@ struct DoesNotConform : Up {
 
 // Circular protocols
 
+protocol CircleStart : CircleEnd { func circle_start() } // expected-error {{protocol 'CircleStart' refines itself}}
+// expected-note@-1 {{through protocol 'CircleStart' declared here}}
 protocol CircleMiddle : CircleStart { func circle_middle() }
-// expected-note@-1 3 {{protocol 'CircleMiddle' declared here}}
-protocol CircleStart : CircleEnd { func circle_start() } // expected-error 3 {{protocol 'CircleStart' refines itself}}
-protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 3 {{protocol 'CircleEnd' declared here}}
+// expected-note@-1 2 {{through protocol 'CircleMiddle' declared here}}
+protocol CircleEnd : CircleMiddle { func circle_end()} // expected-error {{protocol 'CircleEnd' refines itself}}
+// expected-note@-1 {{through protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }
 protocol CircleTrivial : CircleTrivial { } // expected-error {{protocol 'CircleTrivial' refines itself}}
@@ -412,7 +414,7 @@ class DoesntConformToObjCProtocol : ObjCProtocol {
 
 @objc protocol ObjCProtocolRefinement : ObjCProtocol { }
 
-@objc protocol ObjCNonObjCProtocolRefinement : NonObjCProtocol { } //expected-error{{@objc protocol 'ObjCNonObjCProtocolRefinement' cannot refine non-@objc protocol 'NonObjCProtocol'}}
+@objc protocol ObjCNonObjCProtocolRefinement : NonObjCProtocol { } //expected-error{{'@objc' protocol 'ObjCNonObjCProtocolRefinement' cannot refine non-'@objc' protocol 'NonObjCProtocol'}}
 
 
 // <rdar://problem/16079878>
@@ -475,7 +477,7 @@ func i<T : C3>(_ x : T?) -> Bool {
   // expected-warning@-1 {{checking a value with optional type 'T?' against type 'any P1' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
 }
 func j(_ x : C1) -> Bool {
-  return x is P1 // expected-error {{use of protocol 'P1' as a type must be written 'any P1'}}
+  return x is P1 // expected-warning {{use of protocol 'P1' as a type must be written 'any P1'}}
 }
 func k(_ x : C1?) -> Bool {
   return x is any P1

@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Decls -verify -clang-header-expose-decls=has-expose-attr -disable-availability-checking -emit-clang-header-path %t/decls.h
+// RUN: %target-swift-frontend %s -module-name Decls -verify -clang-header-expose-decls=has-expose-attr -disable-availability-checking -typecheck -verify -emit-clang-header-path %t/decls.h
 
 // RUN: cat %s | grep -v _expose > %t/clean.swift
-// RUN: %target-swift-frontend %t/clean.swift -typecheck -module-name Decls -clang-header-expose-decls=all-public -disable-availability-checking -emit-clang-header-path %t/decls.h
+// RUN: %target-swift-frontend %t/clean.swift -module-name Decls -clang-header-expose-decls=all-public -disable-availability-checking -typecheck -verify -emit-clang-header-path %t/decls.h
 // RUN: %FileCheck %s < %t/decls.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/decls.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)

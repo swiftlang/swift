@@ -14,7 +14,7 @@
 public actor TestActor {
   private var x: Int
 
-  // CHECK: public convenience init(convenience x: Swift.Int)
+  // CHECK: public convenience init(convenience x: Swift::Int)
   public init(convenience x: Int) {
     self.init(designated: x)
   }
@@ -24,16 +24,16 @@ public actor TestActor {
     self.x = 0
   }
 
-  // CHECK: public init(designated x: Swift.Int)
+  // CHECK: public init(designated x: Swift::Int)
   public init(designated x: Int) {
     self.x = x
   }
 }
 
-// CHECK-LABEL: extension Library.TestActor {
+// CHECK-LABEL: extension Library::TestActor {
 @available(SwiftStdlib 5.5, *)
 extension TestActor {
-  // CHECK: public convenience init(convenienceInExtension x: Swift.Int)
+  // CHECK: public convenience init(convenienceInExtension x: Swift::Int)
   public init(convenienceInExtension x: Int) {
     self.init(designated: x)
   }

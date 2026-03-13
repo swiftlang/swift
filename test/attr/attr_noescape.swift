@@ -32,16 +32,16 @@ func takesNoEscapeClosure(_ fn : () -> Int) { // expected-note 1 {{parameter 'fn
   // This is ok, because the closure itself is noescape.
   takesNoEscapeClosure { fn() }
 
-  doesEscape(fn)                   // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  doesEscape(fn)                   // expected-error {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
   takesGenericClosure(4, fn)       // ok
   takesGenericClosure(4) { fn() }  // ok.
 
-  _ = [fn] // expected-error {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
-  _ = [doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
-  _ = [1 : fn] // expected-error {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
-  _ = [1 : doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
-  _ = "\(doesEscape(fn))" // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
-  _ = "\(takesArray([fn]))" // expected-error {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
+  _ = [fn] // expected-error {{using non-escaping parameter 'fn' in a context expecting an '@escaping' closure}}
+  _ = [doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
+  _ = [1 : fn] // expected-error {{using non-escaping parameter 'fn' in a context expecting an '@escaping' closure}}
+  _ = [1 : doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
+  _ = "\(doesEscape(fn))" // expected-error {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
+  _ = "\(takesArray([fn]))" // expected-error {{using non-escaping parameter 'fn' in a context expecting an '@escaping' closure}}
 
   assignToGlobal(fn) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
   assignToGlobal((fn, fn)) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
@@ -190,7 +190,7 @@ func takeNoEscapeTest2(_ fn : @noescape () -> ()) {  // expected-error{{unknown 
 
 // Autoclosure implies noescape..
 func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly non-escaping}}
-  doesEscape(a)  // expected-error {{passing non-escaping parameter 'a' to function expecting an @escaping closure}}
+  doesEscape(a)  // expected-error {{passing non-escaping parameter 'a' to function expecting an '@escaping' closure}}
 }
 
 
@@ -212,7 +212,7 @@ func overloadedEach<P: P2, T>(_ source: P, _ transform: @escaping (P.Element) ->
 struct S : P2 {
   typealias Element = Int
   func each(_ transform: @noescape (Int) -> ()) { // expected-error{{unknown attribute 'noescape'}} expected-note {{parameter 'transform' is implicitly non-escaping}}
-    overloadedEach(self, transform, 1) // expected-error {{passing non-escaping parameter 'transform' to function expecting an @escaping closure}}
+    overloadedEach(self, transform, 1) // expected-error {{passing non-escaping parameter 'transform' to function expecting an '@escaping' closure}}
   }
 }
 
@@ -273,7 +273,7 @@ func curriedFlatMap2<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] { // expec
 func bad(_ a : @escaping (Int)-> Int) -> Int { return 42 }
 func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int { // expected-error{{unknown attribute 'noescape'}}
   return { f in // expected-note {{parameter 'f' is implicitly non-escaping}} 
-    bad(f) // expected-error {{passing non-escaping parameter 'f' to function expecting an @escaping closure}}
+    bad(f) // expected-error {{passing non-escaping parameter 'f' to function expecting an '@escaping' closure}}
   }
 }
 
@@ -285,7 +285,7 @@ func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int { // ex
 typealias CompletionHandlerNE = @noescape (_ success: Bool) -> () // expected-error{{unknown attribute 'noescape'}}
 
 // Explicit @escaping is not allowed here
-typealias CompletionHandlerE = @escaping (_ success: Bool) -> () // expected-error{{@escaping attribute may only be used in function parameter position}} {{32-42=}}
+typealias CompletionHandlerE = @escaping (_ success: Bool) -> () // expected-error{{'@escaping' may only be used in function parameter position}} {{32-42=}}
 
 // No @escaping -- it's implicit from context
 typealias CompletionHandler = (_ success: Bool) -> ()
@@ -293,13 +293,13 @@ typealias CompletionHandler = (_ success: Bool) -> ()
 var escape : CompletionHandlerNE
 var escapeOther : CompletionHandler
 func doThing1(_ completion: (_ success: Bool) -> ()) { // expected-note {{parameter 'completion' is implicitly non-escaping}}
-  escape = completion // expected-error {{assigning non-escaping parameter 'completion' to an @escaping closure}}
+  escape = completion // expected-error {{assigning non-escaping parameter 'completion' to an '@escaping' closure}}
 }
 func doThing2(_ completion: CompletionHandlerNE) { // expected-note {{parameter 'completion' is implicitly non-escaping}} 
-  escape = completion // expected-error {{assigning non-escaping parameter 'completion' to an @escaping closure}}
+  escape = completion // expected-error {{assigning non-escaping parameter 'completion' to an '@escaping' closure}}
 }
 func doThing3(_ completion: CompletionHandler) { // expected-note {{parameter 'completion' is implicitly non-escaping}}
-  escape = completion // expected-error {{assigning non-escaping parameter 'completion' to an @escaping closure}}
+  escape = completion // expected-error {{assigning non-escaping parameter 'completion' to an '@escaping' closure}}
 }
 func doThing4(_ completion: @escaping CompletionHandler) {
   escapeOther = completion

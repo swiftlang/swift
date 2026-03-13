@@ -24,11 +24,11 @@
 public struct Inlinable {
   var _x: Int
 
-// CHECK:      public var x: Swift.Int {
+// CHECK:      public var x: Swift::Int {
 // CHECK-NEXT:    @usableFromInline
 // CHECK-NEXT:    @storageRestrictions(initializes: _x) init
 // CHECK-NEXT:    get
-// CHECK-NEXT  }
+// CHECK-NEXT:  }
 
   public var x: Int {
     @usableFromInline
@@ -49,7 +49,7 @@ public struct Inlinable {
 }
 
 public struct Internal {
-// CHECK:      public var y: Swift.Int {
+// CHECK:      public var y: Swift::Int {
 // CHECK-NEXT:   get
 // CHECK-NEXT: }
 
@@ -70,12 +70,12 @@ public struct Transparent {
    @usableFromInline
    var _x: Int
 
-// CHECK:      public var x: Swift.Int {
+// CHECK:      public var x: Swift::Int {
 // CHECK-NEXT:   @_alwaysEmitIntoClient @storageRestrictions(initializes: _x) init {
 // CHECK-NEXT:     self._x = newValue
 // CHECK-NEXT:   }
 // CHECK-NEXT:   get
-// CHECK-NEXT  }
+// CHECK-NEXT:  }
 
   public var x: Int {
     @_alwaysEmitIntoClient

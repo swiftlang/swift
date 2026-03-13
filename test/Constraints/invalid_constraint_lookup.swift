@@ -27,4 +27,5 @@ protocol Collection : _Collection, Sequence {
 }
 func insertionSort<C: Mutable> (_ elements: inout C, i: C.Index) { // expected-error {{cannot find type 'Mutable' in scope}} expected-error {{'Index' is not a member type of type 'C'}}
   var x: C.Iterator.Element = elements[i] // expected-error {{'Iterator' is not a member type of type 'C'}}
+  // expected-error@-1 {{value of type 'C' has no subscripts}}
 }

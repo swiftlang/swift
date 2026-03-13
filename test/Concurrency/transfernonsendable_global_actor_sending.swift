@@ -1,8 +1,12 @@
 // RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -parse-as-library
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -parse-as-library -enable-upcoming-feature NonisolatedNonsendingByDefault
+
 
 // README: Once we loosen the parser so that sending is rejected in Sema
 // instead of the parser, move into the normal
 // transfernonsendable_global_actor.swift
+
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 ////////////////////////
 // MARK: Declarations //
@@ -30,9 +34,8 @@ func useValue<T>(_ t: T) {}
 @MainActor func testGlobalFakeInit() {
   let ns = NonSendableKlass()
 
-  // Will be resolved once @MainActor is @Sendable.
-  Task.fakeInit { @MainActor in // expected-error {{passing closure as a 'sending' parameter risks causing data races between main actor-isolated code and concurrent execution of the closure}}
-    print(ns) // expected-note {{closure captures 'ns' which is accessible to main actor-isolated code}}
+  Task.fakeInit { @MainActor in
+    print(ns)
   }
 
   useValue(ns)

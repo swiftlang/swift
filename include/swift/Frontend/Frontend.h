@@ -43,6 +43,7 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "clang/Basic/FileManager.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
@@ -95,6 +96,7 @@ class CompilerInvocation {
   FrontendOptions FrontendOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
   SearchPathOptions SearchPathOpts;
   DiagnosticOptions DiagnosticOpts;
   MigratorOptions MigratorOpts;
@@ -176,7 +178,8 @@ public:
   }
 
   bool requiresCAS() const {
-    return CASOpts.EnableCaching || IRGenOpts.UseCASBackend;
+    return CASOpts.EnableCaching || IRGenOpts.UseCASBackend ||
+           CASOpts.ImportModuleFromCAS;
   }
 
   void setClangModuleCachePath(StringRef Path) {
@@ -222,6 +225,10 @@ public:
     SearchPathOpts.VFSOverlayFiles = Overlays;
   }
 
+  void setSysRoot(StringRef SysRoot) {
+    SearchPathOpts.setSysRoot(SysRoot);
+  }
+
   void setExtraClangArgs(const std::vector<std::string> &Args) {
     ClangImporterOpts.ExtraArgs = Args;
   }
@@ -230,8 +237,8 @@ public:
     return ClangImporterOpts.ExtraArgs;
   }
 
-  void addLinkLibrary(StringRef name, LibraryKind kind) {
-    IRGenOpts.LinkLibraries.push_back({name, kind});
+  void addLinkLibrary(StringRef name, LibraryKind kind, bool isStaticLibrary) {
+    IRGenOpts.LinkLibraries.emplace_back(name, kind, isStaticLibrary);
   }
 
   ArrayRef<LinkLibrary> getLinkLibraries() const {
@@ -241,8 +248,6 @@ public:
   void setMainExecutablePath(StringRef Path);
 
   void setRuntimeResourcePath(StringRef Path);
-
-  void setPlatformAvailabilityInheritanceMapPath(StringRef Path);
 
   /// Compute the default prebuilt module cache path for a given resource path
   /// and SDK version. This function is also used by LLDB.
@@ -268,6 +273,9 @@ public:
   /// Determine which C++ stdlib should be used for this compilation, and which
   /// C++ stdlib is the default for the specified target.
   void computeCXXStdlibOptions();
+
+  /// Compute whether or not we support aarch64TBI
+  void computeAArch64TBIOptions();
 
   /// Computes the runtime resource path relative to the given Swift
   /// executable.
@@ -425,10 +433,6 @@ public:
   /// imported.
   bool shouldImportSwiftStringProcessing() const;
 
-  /// Whether the Swift Backtracing support library should be implicitly
-  /// imported.
-  bool shouldImportSwiftBacktracing() const;
-
   /// Whether the CXX module should be implicitly imported.
   bool shouldImportCxx() const;
 
@@ -502,6 +506,7 @@ class CompilerInstance {
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
   std::shared_ptr<llvm::cas::ActionCache> ResultCache;
   std::optional<llvm::cas::ObjectRef> CompileJobBaseKey;
+  std::string CASIDForPCH;
 
   SourceManager SourceMgr;
   DiagnosticEngine Diagnostics{SourceMgr};
@@ -679,14 +684,6 @@ public:
   /// i.e. if it can be found.
   bool canImportSwiftStringProcessing() const;
 
-  /// Verify that if an implicit import of the `Backtracing` module if
-  /// expected, it can actually be imported. Emit a warning, otherwise.
-  void verifyImplicitBacktracingImport();
-
-  /// Whether the Swift Backtracing support library can be imported
-  /// i.e. if it can be found.
-  bool canImportSwiftBacktracing() const;
-
   /// Whether the Cxx library can be imported
   bool canImportCxx() const;
 
@@ -715,6 +712,12 @@ public:
       assert(primaries.size() == 1);
       return *primaries.begin();
     }
+  }
+
+  SourceFile &getPrimaryOrMainSourceFile() const {
+    if (SourceFile *SF = getPrimarySourceFile())
+      return *SF;
+    return getMainModule()->getMainSourceFile();
   }
 
   /// Returns true if there was an error during setup.
@@ -798,6 +801,9 @@ public:
   /// \param silModule The SIL module that was generated during SILGen.
   /// \returns true if any errors occurred.
   bool performSILProcessing(SILModule *silModule);
+
+  /// Dumps any debugging output for the compilation, if requested.
+  void emitEndOfPipelineDebuggingOutput();
 
 private:
   /// Creates a new source file for the main module.

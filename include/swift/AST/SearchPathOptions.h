@@ -35,7 +35,7 @@ namespace swift {
 enum class ModuleSearchPathKind {
   Import,
   Framework,
-  DarwinImplicitFramework,
+  ImplicitFramework,
   RuntimeLibrary,
 };
 
@@ -45,7 +45,7 @@ enum class ModuleLoadingMode {
   PreferInterface,
   PreferSerialized,
   OnlyInterface,
-  OnlySerialized
+  OnlySerialized,
 };
 
 /// A single module search path that can come from different sources, e.g.
@@ -323,6 +323,10 @@ public:
     friend bool operator!=(const SearchPath &LHS, const SearchPath &RHS) {
       return !(LHS == RHS);
     }
+    friend llvm::hash_code
+    hash_value(const SearchPath &searchPath) {
+      return llvm::hash_combine(searchPath.Path, searchPath.IsSystem);
+    }
   };
 
 private:
@@ -352,12 +356,8 @@ private:
   /// When on Darwin the framework paths that are implicitly imported.
   /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
   ///
-  /// On non-Darwin platforms these are populated, but ignored.
-  ///
-  /// Computed when the SDK path is set and cached so we can reference the
-  /// Darwin implicit framework search paths as \c StringRef from
-  /// \c ModuleSearchPath.
-  std::vector<std::string> DarwinImplicitFrameworkSearchPaths;
+  /// Must be modified through setter to keep \c Lookup in sync.
+  std::vector<std::string> ImplicitFrameworkSearchPaths;
 
   /// Compiler plugin library search paths.
   std::vector<std::string> CompilerPluginLibraryPaths;
@@ -397,21 +397,6 @@ public:
 
   void setSDKPath(std::string NewSDKPath) {
     SDKPath = NewSDKPath;
-
-    // Compute Darwin implicit framework search paths.
-    SmallString<128> systemFrameworksScratch(NewSDKPath);
-    llvm::sys::path::append(systemFrameworksScratch, "System", "Library",
-                            "Frameworks");
-    SmallString<128> systemSubFrameworksScratch(NewSDKPath);
-    llvm::sys::path::append(systemSubFrameworksScratch, "System", "Library",
-                            "SubFrameworks");
-    SmallString<128> frameworksScratch(NewSDKPath);
-    llvm::sys::path::append(frameworksScratch, "Library", "Frameworks");
-    DarwinImplicitFrameworkSearchPaths = {systemFrameworksScratch.str().str(),
-                                          systemSubFrameworksScratch.str().str(),
-                                          frameworksScratch.str().str()};
-
-    Lookup.searchPathsDidChange();
   }
 
   /// Retrieves the corresponding parent platform path for the SDK, or
@@ -466,8 +451,14 @@ public:
 
   /// The extra implicit framework search paths on Apple platforms:
   /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
-  ArrayRef<std::string> getDarwinImplicitFrameworkSearchPaths() const {
-    return DarwinImplicitFrameworkSearchPaths;
+  ArrayRef<std::string> getImplicitFrameworkSearchPaths() const {
+    return ImplicitFrameworkSearchPaths;
+  }
+
+  void setImplicitFrameworkSearchPaths(
+      std::vector<std::string> NewImplicitFrameworkSearchPaths) {
+    ImplicitFrameworkSearchPaths = NewImplicitFrameworkSearchPaths;
+    Lookup.searchPathsDidChange();
   }
 
   ArrayRef<std::string> getRuntimeLibraryImportPaths() const {
@@ -501,14 +492,17 @@ public:
   /// Path to in-process plugin server shared library.
   std::string InProcessPluginServerPath;
 
-  /// Don't look in for compiler-provided modules.
-  bool SkipRuntimeLibraryImportPaths = false;
+  /// Don't automatically add any import paths.
+  bool SkipAllImplicitImportPaths = false;
 
-  /// Don't include SDK paths in the RuntimeLibraryImportPaths
-  bool ExcludeSDKPathsFromRuntimeLibraryImportPaths = false;
+  /// Don't automatically add any import paths from the SDK.
+  bool SkipSDKImportPaths = false;
 
   /// Scanner Prefix Mapper.
-  std::vector<std::string> ScannerPrefixMapper;
+  std::vector<std::pair<std::string, std::string>> ScannerPrefixMapper;
+
+  /// Verify resolved plugin is not changed.
+  bool ResolvedPluginVerification = false;
 
   /// When set, don't validate module system dependencies.
   ///
@@ -524,21 +518,11 @@ public:
   std::string ExplicitSwiftModuleMapPath;
 
   /// Module inputs specified with -swift-module-input,
-  /// <ModuleName, Path to .swiftmodule file>
-  std::vector<std::pair<std::string, std::string>> ExplicitSwiftModuleInputs;
-
-  /// A map of placeholder Swift module dependency information.
-  std::string PlaceholderDependencyModuleMap;
-
-  /// A file containing modules we should perform batch scanning.
-  std::string BatchScanInputFilePath;
+  /// ModuleName: Path to .swiftmodule file
+  llvm::StringMap<std::string> ExplicitSwiftModuleInputs;
 
   /// A file containing a list of protocols whose conformances require const value extraction.
   std::string ConstGatherProtocolListFilePath;
-
-  /// Path to the file that defines platform mapping for availability
-  /// version inheritance.
-  std::optional<std::string> PlatformAvailabilityInheritanceMapPath;
 
   /// Cross import module information. Map from module name to the list of cross
   /// import overlay files that associate with that module.
@@ -580,6 +564,12 @@ public:
   /// "in-package", must not require package-only module dependencies.
   bool ResolveInPackageModuleDependencies = false;
 
+  /// Enable auto bridging header chaining.
+  bool BridgingHeaderChaining = false;
+
+  /// The module names for dependecy only imports.
+  std::vector<std::string> DependencyOnlyModuleImports;
+
   /// Return all module search paths that (non-recursively) contain a file whose
   /// name is in \p Filenames.
   SmallVector<const ModuleSearchPath *, 4>
@@ -596,38 +586,29 @@ public:
   makeOverlayFileSystem(
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS) const;
 
-private:
-  static StringRef pathStringFromSearchPath(const SearchPath &next) {
-    return next.Path;
-  };
-
 public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
     using llvm::hash_combine;
     using llvm::hash_combine_range;
-
-    using SearchPathView =
-        ArrayRefView<SearchPath, StringRef, pathStringFromSearchPath>;
-    SearchPathView importPathsOnly{ImportSearchPaths};
-    SearchPathView frameworkPathsOnly{FrameworkSearchPaths};
-
-    return hash_combine(SDKPath,
-                        // FIXME: Should we include the system-ness of
-                        // search paths too?
-                        hash_combine_range(importPathsOnly.begin(), importPathsOnly.end()),
-                        hash_combine_range(VFSOverlayFiles.begin(), VFSOverlayFiles.end()),
-                        hash_combine_range(frameworkPathsOnly.begin(),
-                                           frameworkPathsOnly.end()),
-                        hash_combine_range(LibrarySearchPaths.begin(),
-                                           LibrarySearchPaths.end()),
-                        RuntimeResourcePath,
-                        hash_combine_range(RuntimeLibraryImportPaths.begin(),
-                                           RuntimeLibraryImportPaths.end()),
-                        DisableModulesValidateSystemDependencies,
-                        ScannerModuleValidation,
-                        ModuleLoadMode);
+    return hash_combine(
+        SDKPath,
+        hash_combine_range(ImportSearchPaths.begin(), ImportSearchPaths.end()),
+        hash_combine_range(VFSOverlayFiles.begin(), VFSOverlayFiles.end()),
+        hash_combine_range(FrameworkSearchPaths.begin(),
+                           FrameworkSearchPaths.end()),
+        hash_combine_range(LibrarySearchPaths.begin(),
+                           LibrarySearchPaths.end()),
+        RuntimeResourcePath,
+        hash_combine_range(RuntimeLibraryImportPaths.begin(),
+                           RuntimeLibraryImportPaths.end()),
+        hash_combine_range(ImplicitFrameworkSearchPaths.begin(),
+                           ImplicitFrameworkSearchPaths.end()),
+        hash_combine_range(DependencyOnlyModuleImports.begin(),
+                           DependencyOnlyModuleImports.end()),
+        DisableModulesValidateSystemDependencies, ScannerModuleValidation,
+        ModuleLoadMode);
   }
 
   /// Return a hash code of any components from these options that should

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 func markUsed<T>(_ t: T) {}
 
@@ -114,10 +114,11 @@ var x15: Int {
   // For the purpose of this test we need to use an attribute that cannot be
   // applied to the getter.
   weak
-  var foo: SomeClass? = SomeClass()  // expected-warning {{variable 'foo' was written to, but never read}}
-  // expected-warning@-1 {{instance will be immediately deallocated because variable 'foo' is 'weak'}}
-  // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
-  // expected-note@-3 {{'foo' declared here}}
+  var foo: SomeClass? = SomeClass()
+  // expected-warning@-1 {{variable 'foo' was never used; consider replacing with '_' or removing it}}
+  // expected-warning@-2 {{instance will be immediately deallocated because variable 'foo' is 'weak'}}
+  // expected-note@-3 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-4 {{'foo' declared here}}
   return 0
 }
 
@@ -481,6 +482,13 @@ protocol ProtocolWithExtension1 {
 extension ProtocolWithExtension1 {
   var fooExt: Int // expected-error{{extensions must not contain stored properties}}
   static var fooExtStatic = 4 // expected-error{{static stored properties not supported in protocol extensions}}
+}
+
+// https://github.com/swiftlang/swift/issues/83969
+// Make sure we don't crash.
+public struct PublicTypeWithExt {}
+extension PublicTypeWithExt {
+  public var foo: Int? // expected-error {{extensions must not contain stored properties}}
 }
 
 protocol ProtocolWithExtension2 {
@@ -877,20 +885,20 @@ protocol ProtocolGetSet6 {
 }
 
 protocol ProtocolWillSetDidSet1 {
-  var a: Int { willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-25={ get <#set#> \}}} expected-error {{expected get or set in a protocol property}}
+  var a: Int { willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-25={ get <#set#> \}}} expected-error {{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
 }
 protocol ProtocolWillSetDidSet2 {
-  var a: Int { didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-24={ get <#set#> \}}} expected-error {{expected get or set in a protocol property}}
+  var a: Int { didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-24={ get <#set#> \}}} expected-error {{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
 }
 protocol ProtocolWillSetDidSet3 {
-  var a: Int { willSet didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} expected-error 2 {{expected get or set in a protocol property}}
+  var a: Int { willSet didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} expected-error 2 {{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
 
 }
 protocol ProtocolWillSetDidSet4 {
-  var a: Int { didSet willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} expected-error 2 {{expected get or set in a protocol property}}
+  var a: Int { didSet willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} expected-error 2 {{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
 }
 protocol ProtocolWillSetDidSet5 {
-  let a: Int { didSet willSet }  // expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}} {{3-6=var}} {{13-13= { get \}}} {{none}} expected-error 2 {{expected get or set in a protocol property}} expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
+  let a: Int { didSet willSet }  // expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}} {{3-6=var}} {{13-13= { get \}}} {{none}} expected-error 2 {{expected 'get', 'yielding borrow', or 'set' in a protocol property}} expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
 }
 
 var globalDidsetWillSet: Int {  // expected-error {{non-member observing properties require an initializer}}

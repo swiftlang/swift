@@ -51,6 +51,8 @@ public:
     beginMangling();
     appendEntity(func);
     appendOperator("Tj");
+    if (func->isDistributedThunk())
+      appendSymbolKind(SymbolKind::DistributedThunk);
     return finalize();
   }
 
@@ -86,6 +88,8 @@ public:
     beginMangling();
     appendEntity(func);
     appendOperator("Tq");
+    if (func->isDistributedThunk())
+      appendSymbolKind(SymbolKind::DistributedThunk);
     return finalize();
   }
 
@@ -378,8 +382,12 @@ public:
       const ProtocolDecl *requirement) {
     beginMangling();
     appendAnyGenericType(proto);
-    bool isFirstAssociatedTypeIdentifier = true;
-    appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    if (isa<GenericTypeParamType>(subject)) {
+      appendType(subject, nullptr);
+    } else {
+      bool isFirstAssociatedTypeIdentifier = true;
+      appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    }
     appendProtocolName(requirement);
     appendOperator("TN");
     return finalize();
@@ -435,10 +443,10 @@ public:
   }
 
   std::string
-  mangleAssociatedTypeAccessFunctionDiscriminator(AssociatedType association) {
+  mangleAssociatedTypeAccessFunctionDiscriminator(AssociatedTypeDecl *assocDecl) {
     beginMangling();
-    appendAnyGenericType(association.getSourceProtocol());
-    appendIdentifier(association.getAssociation()->getNameStr());
+    appendAnyGenericType(assocDecl->getProtocol());
+    appendIdentifier(assocDecl->getNameStr());
     return finalize();
   }
 
@@ -681,7 +689,8 @@ public:
   std::string mangleSymbolNameForMangledMetadataAccessorString(
                                            const char *kind,
                                            CanGenericSignature genericSig,
-                                           CanType type);
+                                           CanType type,
+                                           MangledTypeRefRole role);
 
   std::string mangleSymbolNameForMangledConformanceAccessorString(
                                            const char *kind,

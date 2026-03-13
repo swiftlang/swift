@@ -1,5 +1,6 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(thing)) \
 // RUN:     %s                                                    \
+// RUN:     -Xfrontend -enable-callee-allocated-coro-abi          \
 // RUN:     -emit-tbd                                             \
 // RUN:     -Xfrontend -validate-tbd-against-ir=all               \
 // RUN:     -enable-library-evolution                             \
@@ -15,9 +16,11 @@ public struct S {}
 public protocol P {
   associatedtype A
 
-  var s: S { read set }
+  var s: S { yielding borrow set }
+  var s2: S { yielding borrow set }
 }
 
 public protocol Q : P {
-  override var s: S { read set }
+  override var s: S { yielding borrow set }
+  var s2: S { yielding borrow set }
 }

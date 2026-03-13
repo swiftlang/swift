@@ -1,0 +1,8 @@
+// RUN: %empty-directory(%t)
+// RUN: cp %S/Inputs/lit-substitutions.txt %t.txt
+
+// Run the update, supplying the %path substitution. %%path in the RUN line is
+// passed to the script as the literal string %path.
+// RUN: %update-generated-tests --subst %%path %S/Inputs/ %t.txt
+
+// RUN: %diff %t.txt %S/Inputs/lit-substitutions.expected

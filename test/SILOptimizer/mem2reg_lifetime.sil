@@ -1366,6 +1366,7 @@ entry(%instance : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance to [init] %addr : $*C
   %instance_loaded = load [take] %addr : $*C
+  destroy_value [dead_end] %instance_loaded
   unreachable
 }
 
@@ -1403,15 +1404,15 @@ exit:
 }
 
 // Bail out if alloc_stack is in unreachable block.
-// CHECK-LABEL: sil [ossa] @unreachable_6 : $@convention(thin) (@owned C) -> () {
+// CHECK-LABEL: sil @unreachable_6 : $@convention(thin) (@owned C) -> () {
 // CHECK:         alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'unreachable_6'
-sil [ossa] @unreachable_6 : $@convention(thin) (@owned C) -> () {
-entry(%instance_1 : @owned $C):
+sil @unreachable_6 : $@convention(thin) (@owned C) -> () {
+entry(%instance_1 : $C):
   br exit
 unr:
   %addr = alloc_stack [lexical] $C
-  store %instance_1 to [init] %addr :$*C
+  store %instance_1 to %addr :$*C
   br die
 die:
   unreachable
@@ -1422,15 +1423,15 @@ exit:
 
 
 // Bail out if alloc_stack is in unreachable block.
-// CHECK-LABEL: sil [ossa] @unreachable_7 : $@convention(thin) (@owned C) -> () {
+// CHECK-LABEL: sil @unreachable_7 : $@convention(thin) (@owned C) -> () {
 // CHECK:         alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'unreachable_7'
-sil [ossa] @unreachable_7 : $@convention(thin) (@owned C) -> () {
-entry(%instance_1 : @owned $C):
+sil @unreachable_7 : $@convention(thin) (@owned C) -> () {
+entry(%instance_1 : $C):
   cond_br undef, exit, die_later
 unr:
   %addr = alloc_stack [lexical] $C
-  store %instance_1 to [init] %addr :$*C
+  store %instance_1 to %addr :$*C
   br die_later_2
 die_later_2:
   br die
@@ -1444,15 +1445,15 @@ exit:
 }
 
 // Bail out if alloc_stack is in unreachable block.
-// CHECK-LABEL: sil [ossa] @unreachable_8 : $@convention(thin) (@owned C) -> () {
+// CHECK-LABEL: sil @unreachable_8 : $@convention(thin) (@owned C) -> () {
 // CHECK:         alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'unreachable_8'
-sil [ossa] @unreachable_8 : $@convention(thin) (@owned C) -> () {
-entry(%instance_1 : @owned $C):
+sil @unreachable_8 : $@convention(thin) (@owned C) -> () {
+entry(%instance_1 : $C):
   cond_br undef, exit, die_later
 unr:
   %addr = alloc_stack [lexical] $C
-  store %instance_1 to [init] %addr : $*C
+  store %instance_1 to %addr : $*C
   cond_br undef, die_later_2_a, die_later_2_b
 die_later_2_a:
   br die_later_2
@@ -1507,17 +1508,17 @@ die:
 }
 
 // Bail out if alloc_stack is in unreachable block.
-// CHECK-LABEL: sil [ossa] @unreachable_loop_2 : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @unreachable_loop_2 : $@convention(thin) () -> () {
 // CHECK:         alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'unreachable_loop_2'
-sil [ossa] @unreachable_loop_2 : $@convention(thin) () -> () {
+sil @unreachable_loop_2 : $@convention(thin) () -> () {
 entry:
   br loop_header
 unr:
   %delegate_var = alloc_stack [lexical] $C
   %getC = function_ref @getC : $@convention(thin) () -> @owned C
   %delegate = apply %getC() : $@convention(thin) () -> @owned C
-  store %delegate to [init] %delegate_var : $*C
+  store %delegate to %delegate_var : $*C
   br loop_header
 loop_header:
   br loop_body
@@ -1532,10 +1533,10 @@ die:
 }
 
 // Bail out if alloc_stack is in unreachable block.
-// CHECK-LABEL: sil [ossa] @unreachable_loop_3 : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @unreachable_loop_3 : $@convention(thin) () -> () {
 // CHECK:         alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'unreachable_loop_3'
-sil [ossa] @unreachable_loop_3 : $@convention(thin) () -> () {
+sil @unreachable_loop_3 : $@convention(thin) () -> () {
 entry:
   br die_entry
 die_entry:
@@ -1544,7 +1545,7 @@ unr:
   %delegate_var = alloc_stack [lexical] $C
   %getC = function_ref @getC : $@convention(thin) () -> @owned C
   %delegate = apply %getC() : $@convention(thin) () -> @owned C
-  store %delegate to [init] %delegate_var : $*C
+  store %delegate to %delegate_var : $*C
   br loop_header
 loop_header:
   br loop_body
@@ -1883,6 +1884,7 @@ bb2:
 bb3:
   br bb5
 bb4:
+  destroy_value [dead_end] %instance
   br bb5
 bb5:
   unreachable

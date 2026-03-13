@@ -4,7 +4,7 @@ protocol P: Sendable {}
 protocol Q: Sendable {}
 
 struct One<T> {  // expected-note {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
-  var t: T  // expected-error {{stored property 't' of 'Sendable'-conforming generic struct 'One' has non-sendable type 'T'}}
+  var t: T  // expected-error {{stored property 't' of 'Sendable'-conforming generic struct 'One' has non-Sendable type 'T'}}
 }
 
 extension One: P where T: P {}
@@ -14,7 +14,7 @@ extension One: P where T: P {}
 // expected-note@-4 {{did you mean to explicitly state the conformance with different bounds?}}
 
 struct Both<T> { // expected-note {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
-  var t: T  // expected-error {{stored property 't' of 'Sendable'-conforming generic struct 'Both' has non-sendable type 'T'}}
+  var t: T  // expected-error {{stored property 't' of 'Sendable'-conforming generic struct 'Both' has non-Sendable type 'T'}}
 }
 
 extension Both: P where T: P {}

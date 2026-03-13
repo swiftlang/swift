@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-async-top-level -strict-concurrency=complete -typecheck -verify %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -typecheck -verify %s
 
 var a = 10 // expected-note{{var declared here}}
 
@@ -10,8 +10,7 @@ func unsafeAccess() { // expected-note{{add '@MainActor' to make global function
 }
 
 func unsafeAsyncAccess() async {
-    print(a) // expected-error@:5{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
-             // expected-note@-1:11{{property access is 'async'}}
+    print(a) // expected-error@:11{{main actor-isolated var 'a' cannot be accessed from outside of the actor}}{{5-5=await }}
 }
 
 @MainActor

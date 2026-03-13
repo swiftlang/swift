@@ -83,39 +83,44 @@ let destroyHoisting = FunctionPass(name: "destroy-hoisting") {
 private func optimize(value: Value, _ context: FunctionPassContext) {
   guard value.ownership == .owned,
         // Avoid all the analysis effort if there are no destroys to hoist.
-        !value.uses.filterUsers(ofType: DestroyValueInst.self).isEmpty
+        !value.uses.filter(usersOfType: DestroyValueInst.self).isEmpty
   else {
     return
   }
 
-  var hoistableDestroys = selectHoistableDestroys(of: value, context)
+  var (foundDestroys, hoistableDestroys) = selectHoistableDestroys(of: value, context)
   defer { hoistableDestroys.deinitialize() }
 
-  var minimalLiverange = InstructionRange(withLiverangeOf: value, ignoring: hoistableDestroys, context)
+  guard foundDestroys else {
+    return
+  }
+
+  guard var minimalLiverange = InstructionRange(withLiverangeOf: value, ignoring: hoistableDestroys, context) else {
+    return
+  }
   defer { minimalLiverange.deinitialize() }
 
   hoistDestroys(of: value, toEndOf: minimalLiverange, restrictingTo: &hoistableDestroys, context)
 }
 
-private func selectHoistableDestroys(of value: Value, _ context: FunctionPassContext) -> InstructionSet {
+private func selectHoistableDestroys(of value: Value, _ context: FunctionPassContext) -> (Bool, InstructionSet) {
   // Also includes liveranges of copied values and values stored to memory.
   var forwardExtendedLiverange = InstructionRange(withForwardExtendedLiverangeOf: value, context)
   defer { forwardExtendedLiverange.deinitialize() }
 
-  let deadEndBlocks = context.deadEndBlocks
+  var foundDestroys = false
   var hoistableDestroys = InstructionSet(context)
 
   for use in value.uses {
     if let destroy = use.instruction as? DestroyValueInst,
        // We can hoist all destroys for which another copy of the value is alive at the destroy.
-       forwardExtendedLiverange.contains(destroy),
-       // TODO: once we have complete OSSA lifetimes we don't need to handle dead-end blocks.
-       !deadEndBlocks.isDeadEnd(destroy.parentBlock)
+       forwardExtendedLiverange.contains(destroy)
     {
+      foundDestroys = true
       hoistableDestroys.insert(destroy)
     }
   }
-  return hoistableDestroys
+  return (foundDestroys, hoistableDestroys)
 }
 
 private func hoistDestroys(of value: Value,
@@ -123,9 +128,17 @@ private func hoistDestroys(of value: Value,
                            restrictingTo hoistableDestroys: inout InstructionSet,
                            _ context: FunctionPassContext)
 {
-  createNewDestroys(for: value, atEndPointsOf: minimalLiverange, reusing: &hoistableDestroys, context)
+  // The liverange, excluding regions which end up in `destroy_value [dead_end]`.
+  var nonDeadEndRange = BasicBlockRange(begin: value.parentBlock, context)
+  defer { nonDeadEndRange.deinitialize() }
+  nonDeadEndRange.insert(contentsOf: value.uses.users(ofType: DestroyValueInst.self)
+                                          .filter{ !$0.isDeadEnd }.map { $0.parentBlock })
 
-  createNewDestroys(for: value, atExitPointsOf: minimalLiverange, reusing: &hoistableDestroys, context)
+  createNewDestroys(for: value, atEndPointsOf: minimalLiverange, reusing: &hoistableDestroys,
+                    nonDeadEndRange: nonDeadEndRange, context)
+
+  createNewDestroys(for: value, atExitPointsOf: minimalLiverange, reusing: &hoistableDestroys,
+                    nonDeadEndRange: nonDeadEndRange, context)
 
   removeDestroys(of: value, restrictingTo: hoistableDestroys, context)
 }
@@ -134,14 +147,13 @@ private func createNewDestroys(
   for value: Value,
   atEndPointsOf liverange: InstructionRange,
   reusing hoistableDestroys: inout InstructionSet,
+  nonDeadEndRange: BasicBlockRange,
   _ context: FunctionPassContext
 ) {
-  let deadEndBlocks = context.deadEndBlocks
-
   for endInst in liverange.ends {
     if !endInst.endsLifetime(of: value) {
       Builder.insert(after: endInst, context) { builder in
-        builder.createDestroy(of: value, reusing: &hoistableDestroys, notIn: deadEndBlocks)
+        builder.createDestroy(of: value, reusing: &hoistableDestroys, nonDeadEndRange: nonDeadEndRange)
       }
     }
   }
@@ -151,13 +163,12 @@ private func createNewDestroys(
   for value: Value,
   atExitPointsOf liverange: InstructionRange,
   reusing hoistableDestroys: inout InstructionSet,
+  nonDeadEndRange: BasicBlockRange,
   _ context: FunctionPassContext
 ) {
-  let deadEndBlocks = context.deadEndBlocks
-
   for exitBlock in liverange.exitBlocks {
     let builder = Builder(atBeginOf: exitBlock, context)
-    builder.createDestroy(of: value, reusing: &hoistableDestroys, notIn: deadEndBlocks)
+    builder.createDestroy(of: value, reusing: &hoistableDestroys, nonDeadEndRange: nonDeadEndRange)
   }
 }
 
@@ -177,10 +188,10 @@ private func removeDestroys(
 
 private extension InstructionRange {
 
-  init(withLiverangeOf initialDef: Value, ignoring ignoreDestroys: InstructionSet, _ context: FunctionPassContext)
+  init?(withLiverangeOf initialDef: Value, ignoring ignoreDestroys: InstructionSet, _ context: FunctionPassContext)
   {
     var liverange = InstructionRange(for: initialDef, context)
-    var visitor = InteriorUseWalker(definingValue: initialDef, ignoreEscape: true, visitInnerUses: false, context) {
+    var visitor = InteriorUseWalker(definingValue: initialDef, ignoreEscape: false, visitInnerUses: true, context) {
       if !ignoreDestroys.contains($0.instruction) {
         liverange.insert($0.instruction)
       }
@@ -188,7 +199,10 @@ private extension InstructionRange {
     }
     defer { visitor.deinitialize() }
 
-    _ = visitor.visitUses()
+    guard visitor.visitUses() == .continueWalk else {
+      liverange.deinitialize()
+      return nil
+    }
     self = liverange
   }
 
@@ -225,12 +239,7 @@ private extension InstructionRange {
           }
 
         default:
-          // We cannot extend a lexical liverange with a non-lexical liverange, because afterwards the
-          // non-lexical liverange could be shrunk over a deinit barrier which would let the original
-          // lexical liverange to be shrunk, too.
-          if !initialDef.isInLexicalLiverange(context) || value.isInLexicalLiverange(context) {
-            self.insert(user)
-          }
+          self.insert(user)
         }
       }
     }
@@ -244,13 +253,6 @@ private extension InstructionRange {
     let domTree = context.dominatorTree
 
     if initialDef.destroyUsers(dominatedBy: store.parentBlock, domTree).isEmpty {
-      return
-    }
-
-    // We have to take care of lexical lifetimes. See comment above.
-    if initialDef.isInLexicalLiverange(context) &&
-       !store.destination.accessBase.isInLexicalOrGlobalLiverange(context)
-    {
       return
     }
 
@@ -295,17 +297,15 @@ private func isTakeOrDestroy(
 private extension Builder {
   func createDestroy(of value: Value,
                      reusing hoistableDestroys: inout InstructionSet,
-                     notIn deadEndBlocks: DeadEndBlocksAnalysis) {
+                     nonDeadEndRange: BasicBlockRange) {
     guard case .before(let insertionPoint) = insertionPoint else {
       fatalError("unexpected kind of insertion point")
-    }
-    if deadEndBlocks.isDeadEnd(insertionPoint.parentBlock) {
-      return
     }
     if hoistableDestroys.contains(insertionPoint) {
       hoistableDestroys.erase(insertionPoint)
     } else {
-      createDestroyValue(operand: value)
+      createDestroyValue(operand: value,
+                         isDeadEnd: !nonDeadEndRange.inclusiveRangeContains(insertionPoint.parentBlock))
     }
   }
 }
@@ -335,27 +335,6 @@ private extension Instruction {
       return false
     default:
       return mayWrite(toAddress: address, aliasAnalysis)
-    }
-  }
-}
-
-private extension AccessBase {
-  func isInLexicalOrGlobalLiverange(_ context: FunctionPassContext) -> Bool {
-    switch self {
-    case .box(let pbi):      return pbi.box.isInLexicalLiverange(context)
-    case .class(let rea):    return rea.instance.isInLexicalLiverange(context)
-    case .tail(let rta):     return rta.instance.isInLexicalLiverange(context)
-    case .stack(let asi):    return asi.isLexical
-    case .global:            return true
-    case .argument(let arg):
-      switch arg.convention {
-      case .indirectIn, .indirectInGuaranteed, .indirectInout, .indirectInoutAliasable:
-        return arg.isLexical
-      default:
-        return false
-      }
-    case .yield, .storeBorrow, .pointer, .index, .unidentified:
-      return false
     }
   }
 }

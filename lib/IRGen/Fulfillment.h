@@ -18,9 +18,9 @@
 #ifndef SWIFT_IRGEN_FULFILLMENT_H
 #define SWIFT_IRGEN_FULFILLMENT_H
 
-#include "llvm/ADT/DenseMap.h"
-#include "swift/AST/Types.h"
+#include "llvm/ADT/MapVector.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Types.h"
 #include "swift/IRGen/GenericRequirement.h"
 #include "MetadataPath.h"
 
@@ -49,7 +49,7 @@ struct Fulfillment {
 };
 
 class FulfillmentMap {
-  llvm::DenseMap<GenericRequirement, Fulfillment> Fulfillments;
+  llvm::MapVector<GenericRequirement, Fulfillment> Fulfillments;
 
 public:
   struct InterestingKeysCallback {
@@ -101,6 +101,14 @@ public:
                           MetadataState metadataState,
                           unsigned sourceIndex, MetadataPath &&path,
                           const InterestingKeysCallback &interestingKeys);
+
+  /// Metadata fulfillment in tuple conformance witness thunks.
+  ///
+  /// \return true if any fulfillments were added by this search.
+  bool searchTupleTypeMetadata(IRGenModule &IGM, CanTupleType type, IsExact_t isExact,
+                               MetadataState metadataState,
+                               unsigned sourceIndex, MetadataPath &&path,
+                               const InterestingKeysCallback &interestingKeys);
 
   /// Search the given type metadata pack for useful fulfillments.
   ///

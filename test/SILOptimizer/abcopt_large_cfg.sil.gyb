@@ -3,7 +3,7 @@
 
 // Check that the optimization does not crash due to a stack overflow.
 
-// RUN: %target-sil-opt -sil-verify-none -abcopts  %t/main.sil | %FileCheck %s
+// RUN: %target-sil-opt -sil-verify-none -bcopts  %t/main.sil | %FileCheck %s
 
 sil_stage canonical
 

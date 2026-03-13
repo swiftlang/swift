@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -83,6 +84,20 @@ static void errnoAndExit(const char *message) {
 #else
 #define DEBUG_LOG(fmt, ...) (void)0
 #endif
+
+#ifdef __clang__
+__attribute((__format__(__printf__, 2, 3)))
+#endif
+static void
+indented_printf(unsigned indentLevel, const char *fmt, ...) {
+  for (unsigned i = 0; i < indentLevel; i++)
+    fputs("  ", stdout);
+
+  va_list args;
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+}
 
 static const size_t ReadEnd = 0;
 static const size_t WriteEnd = 1;
@@ -774,10 +789,40 @@ int reflectEnumValue(SwiftReflectionContextRef RC,
 
 }
 
-int reflectAsyncTask(SwiftReflectionContextRef RC,
-                     const PipeMemoryReader *Reader) {
-  uintptr_t AsyncTaskInstance = PipeMemoryReader_receiveInstanceAddress(Reader);
-  printf("Async task %#" PRIx64 "\n", (uint64_t)AsyncTaskInstance);
+static int reflectAsyncTaskInstance(SwiftReflectionContextRef RC,
+                                    uintptr_t AsyncTaskInstance,
+                                    const PipeMemoryReader *Reader,
+                                    unsigned indentLevel) {
+  indented_printf(indentLevel, "Async task %#" PRIx64 "\n",
+                  (uint64_t)AsyncTaskInstance);
+
+  swift_async_task_info_t TaskInfo =
+      swift_reflection_asyncTaskInfo(RC, AsyncTaskInstance);
+  if (TaskInfo.Error) {
+    printf("swift_reflection_asyncTaskInfo failed: %s\n", TaskInfo.Error);
+  } else {
+    indented_printf(indentLevel, "id %" PRIu64 "\n", TaskInfo.Id);
+    indented_printf(indentLevel, "enqueuePriority %u\n",
+                    TaskInfo.EnqueuePriority);
+    if (TaskInfo.ChildTaskCount > 0) {
+      indented_printf(indentLevel, "children = {\n");
+
+      // The memory for ChildTasks is only valid until the next Remote Mirror
+      // call, so we need to copy it.
+      swift_reflection_ptr_t *ChildTasks =
+          calloc(TaskInfo.ChildTaskCount, sizeof(swift_reflection_ptr_t));
+      memcpy(ChildTasks, TaskInfo.ChildTasks,
+             TaskInfo.ChildTaskCount * sizeof(swift_reflection_ptr_t));
+
+      for (unsigned i = 0; i < TaskInfo.ChildTaskCount; i++)
+        reflectAsyncTaskInstance(RC, ChildTasks[i], Reader, indentLevel + 1);
+
+      free(ChildTasks);
+      indented_printf(indentLevel, "}\n");
+    } else {
+      indented_printf(indentLevel, "children = {}\n");
+    }
+  }
 
   swift_async_task_slab_return_t SlabPtrResult =
       swift_reflection_asyncTaskSlabPointer(RC, AsyncTaskInstance);
@@ -787,33 +832,67 @@ int reflectAsyncTask(SwiftReflectionContextRef RC,
   } else {
     swift_reflection_ptr_t SlabPtr = SlabPtrResult.SlabPtr;
     while (SlabPtr) {
-      printf("  Slab pointer %#" PRIx64 "\n", (uint64_t)SlabPtr);
+      indented_printf(indentLevel, "  Slab pointer %#" PRIx64 "\n",
+                      (uint64_t)SlabPtr);
       swift_async_task_slab_allocations_return_t AllocationsResult =
           swift_reflection_asyncTaskSlabAllocations(RC, SlabPtr);
       if (AllocationsResult.Error) {
-        printf("swift_reflection_asyncTaskSlabAllocations failed: %s\n",
-               AllocationsResult.Error);
+        indented_printf(
+            indentLevel,
+            "swift_reflection_asyncTaskSlabAllocations failed: %s\n",
+            AllocationsResult.Error);
         SlabPtr = 0;
       } else {
-        printf("    Slab size %" PRIu64 "\n",
-               (uint64_t)AllocationsResult.SlabSize);
+        indented_printf(indentLevel, "    Slab size %" PRIu64 "\n",
+                        (uint64_t)AllocationsResult.SlabSize);
         for (unsigned i = 0; i < AllocationsResult.ChunkCount; i++) {
           swift_async_task_allocation_chunk_t Chunk =
               AllocationsResult.Chunks[i];
-          printf("    Chunk at %#" PRIx64 " length %u kind %u\n",
-                 (uint64_t)Chunk.Start, Chunk.Length, Chunk.Kind);
+          indented_printf(indentLevel,
+                          "    Chunk at %#" PRIx64 " length %u kind %u\n",
+                          (uint64_t)Chunk.Start, Chunk.Length, Chunk.Kind);
         }
         SlabPtr = AllocationsResult.NextSlab;
       }
     }
   }
 
-  printf("\n\n");
-  PipeMemoryReader_sendDoneMessage(Reader);
+  if (indentLevel == 0) {
+    printf("\n\n");
+  }
   fflush(stdout);
   return 1;
 }
 
+int reflectAsyncTask(SwiftReflectionContextRef RC,
+                     const PipeMemoryReader *Reader) {
+  uintptr_t AsyncTaskInstance = PipeMemoryReader_receiveInstanceAddress(Reader);
+  int result = reflectAsyncTaskInstance(RC, AsyncTaskInstance, Reader, 0);
+  PipeMemoryReader_sendDoneMessage(Reader);
+  return result;
+}
+
+int logString(SwiftReflectionContextRef RC, const PipeMemoryReader *Reader) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-qual"
+  void *Context = (void *)Reader;
+#pragma clang diagnostic pop
+
+  swift_addr_t StringPointer = PipeMemoryReader_receiveInstanceAddress(Context);
+  uint64_t StringLength =
+      PipeMemoryReader_getStringLength(Context, StringPointer);
+
+  void *FreeContext;
+  // Read length+1 bytes to get the NUL terminator too.
+  const void *String = PipeMemoryReader_readBytes(
+      Context, StringPointer, StringLength + 1, &FreeContext);
+
+  printf("%s\n", (const char *)String);
+  PipeMemoryReader_freeBytes(Context, String, FreeContext);
+
+  PipeMemoryReader_sendDoneMessage(Context);
+  return 1;
+}
 
 int doDumpHeapInstance(const char *BinaryFilename, PipeMemoryReader *Reader) {
 #if defined(_WIN32)
@@ -923,6 +1002,11 @@ int doDumpHeapInstance(const char *BinaryFilename, PipeMemoryReader *Reader) {
         case AsyncTask: {
           printf("Reflecting an async task.\n");
           if (!reflectAsyncTask(RC, Reader))
+            return EXIT_SUCCESS;
+          break;
+        }
+        case LogString: {
+          if (!logString(RC, Reader))
             return EXIT_SUCCESS;
           break;
         }

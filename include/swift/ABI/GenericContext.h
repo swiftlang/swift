@@ -711,6 +711,14 @@ public:
             getGenericValueDescriptors().data()};
   }
 
+  static size_t trailingTypeCount() {
+    return TrailingObjects::trailingTypeCount();
+  }
+
+  size_t sizeWithTrailingTypeCount(size_t n) const {
+    return TrailingObjects::sizeWithTrailingTypeCount(n);
+  }
+
 protected:
   size_t numTrailingObjects(OverloadToken<GenericContextHeaderType>) const {
     return asSelf()->isGeneric() ? 1 : 0;

@@ -13,7 +13,7 @@
 import AST
 import SIL
 
-extension ClassifyBridgeObjectInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension ClassifyBridgeObjectInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     // Constant fold `classify_bridge_object` to `(false, false)` if the operand is known
     // to be a swift class.
@@ -23,7 +23,7 @@ extension ClassifyBridgeObjectInst : OnoneSimplifyable, SILCombineSimplifyable {
     }
 
     let builder = Builder(before: self, context)
-    let falseLiteral = builder.createIntegerLiteral(0, type: context.getBuiltinIntegerType(bitWidth: 1))
+    let falseLiteral = builder.createBoolLiteral(false)
     let tp = builder.createTuple(type: self.type, elements: [falseLiteral, falseLiteral])
     uses.replaceAll(with: tp, context)
     context.erase(instruction: self)

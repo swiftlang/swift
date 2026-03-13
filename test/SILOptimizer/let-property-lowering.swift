@@ -67,7 +67,7 @@ class C {
   // CHECK:         [[A:%.*]] = ref_element_addr %1 : $C, #C.a
   // CHECK:         store {{.*}} to [[A]] : $*Int
   // CHECK:         [[EI:%.*]] = end_init_let_ref %1
-  // CHECK:       bb1:
+  // CHECK:       bb1({{.*}} : $Builtin.Int2):
   // CHECK:         ref_element_addr [[EI]] : $C, #C.b
   // CHECK:         return [[EI]]
   // CHECK:       } // end sil function '$s4test1CC1cACSb_tcfc'
@@ -173,7 +173,7 @@ class D : C {
 
   // CHECK-LABEL: sil hidden @$s4test1DCACycfc :
   // CHECK-NOT:     end_init_let_ref
-  // CHECK:         ref_element_addr %0 : $D, #D.c
+  // CHECK:         ref_element_addr %{{[0-9]+}} : $D, #D.c
   // CHECK-NOT:     end_init_let_ref
   // CHECK:       } // end sil function '$s4test1DCACycfc'
   override init() {

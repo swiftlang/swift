@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -parse-as-library -o %t -module-name=ModuleA %S/Inputs/diag_non_ephemeral_module1.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -parse-as-library -o %t -module-name=ModuleB %S/Inputs/diag_non_ephemeral_module2.swift
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -typecheck -verify -enable-invalid-ephemeralness-as-error -I %t %t/main.swift %S/Inputs/diag_non_ephemeral_globals.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -enable-invalid-ephemeralness-as-error -I %t %t/main.swift %S/Inputs/diag_non_ephemeral_globals.swift
 
 import ModuleA
 import ModuleB
@@ -23,11 +23,11 @@ var optionalArr: [Int8]?
 // We cannot use array-to-pointer and string-to-pointer conversions with
 // non-ephemeral parameters.
 
-takesMutableRaw(&arr, 5) // expected-error {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'takesMutableRaw'}} {{educational-notes=temporary-pointers}}
+takesMutableRaw(&arr, 5) // expected-error {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'takesMutableRaw'}} {{documentation-file=temporary-pointers}}
 // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use the 'withUnsafeMutableBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesConst(str, 5) // expected-error {{cannot pass 'String' to parameter; argument #1 must be a pointer that outlives the call to 'takesConst'}} {{educational-notes=temporary-pointers}}
+takesConst(str, 5) // expected-error {{cannot pass 'String' to parameter; argument #1 must be a pointer that outlives the call to 'takesConst'}} {{documentation-file=temporary-pointers}}
 // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'takesConst'}}
 // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 

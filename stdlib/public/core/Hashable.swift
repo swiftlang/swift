@@ -101,7 +101,7 @@
 ///         print("New tap detected at (\(nextTap.x), \(nextTap.y)).")
 ///     }
 ///     // Prints "New tap detected at (0, 1).")
-public protocol Hashable: Equatable {
+public protocol Hashable: Equatable & ~Copyable {
   /// The hash value.
   ///
   /// Hash values are not guaranteed to be equal across different executions of
@@ -135,9 +135,10 @@ public protocol Hashable: Equatable {
   func _rawHashValue(seed: Int) -> Int
 }
 
-extension Hashable {
+extension Hashable where Self: ~Copyable {
   @inlinable
   @inline(__always)
+  @_preInverseGenerics
   public func _rawHashValue(seed: Int) -> Int {
     var hasher = Hasher(_seed: seed)
     hasher.combine(self)
@@ -148,7 +149,8 @@ extension Hashable {
 // Called by synthesized `hashValue` implementations.
 @inlinable
 @inline(__always)
-public func _hashValue<H: Hashable>(for value: H) -> Int {
+@_preInverseGenerics
+public func _hashValue<H: Hashable & ~Copyable>(for value: borrowing H) -> Int {
   return value._rawHashValue(seed: 0)
 }
 
@@ -158,7 +160,7 @@ internal func Hashable_isEqual_indirect<T: Hashable>(
   _ lhs: UnsafePointer<T>,
   _ rhs: UnsafePointer<T>
 ) -> Bool {
-  return lhs.pointee == rhs.pointee
+  return unsafe lhs.pointee == rhs.pointee
 }
 
 // Called by the SwiftValue implementation.
@@ -166,5 +168,5 @@ internal func Hashable_isEqual_indirect<T: Hashable>(
 internal func Hashable_hashValue_indirect<T: Hashable>(
   _ value: UnsafePointer<T>
 ) -> Int {
-  return value.pointee.hashValue
+  return unsafe value.pointee.hashValue
 }

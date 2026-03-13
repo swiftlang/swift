@@ -296,17 +296,17 @@ func downcasts(
   let _ = baseAndP as! Derived
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $any Base<Int> & P
-  // CHECK-NEXT: checked_cast_br any Base<Int> & P in [[COPIED]] : $any Base<Int> & P to any Derived & R
+  // CHECK-NEXT: checked_cast_br [prohibit_isolated_conformances] any Base<Int> & P in [[COPIED]] : $any Base<Int> & P to any Derived & R
   let _ = baseAndP as? (Derived & R)
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $any Base<Int> & P
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $any Base<Int> & P to any Derived & R
+  // CHECK-NEXT: unconditional_checked_cast [prohibit_isolated_conformances] [[COPIED]] : $any Base<Int> & P to any Derived & R
   let _ = baseAndP as! (Derived & R)
 
-  // CHECK:      checked_cast_br Derived.Type in %3 : $@thick Derived.Type to any (Derived & R).Type
+  // CHECK:      checked_cast_br [prohibit_isolated_conformances] Derived.Type in %3 : $@thick Derived.Type to any (Derived & R).Type
   let _ = derivedType as? (Derived & R).Type
 
-  // CHECK:      unconditional_checked_cast %3 : $@thick Derived.Type to any (Derived & R).Type
+  // CHECK:      unconditional_checked_cast [prohibit_isolated_conformances] %3 : $@thick Derived.Type to any (Derived & R).Type
   let _ = derivedType as! (Derived & R).Type
 
   // CHECK:      checked_cast_br any (Base<Int> & P).Type in %2 : $@thick any (Base<Int> & P).Type to Derived.Type
@@ -315,10 +315,10 @@ func downcasts(
   // CHECK:      unconditional_checked_cast %2 : $@thick any (Base<Int> & P).Type to Derived.Type
   let _ = baseAndPType as! Derived.Type
 
-  // CHECK:      checked_cast_br any (Base<Int> & P).Type in %2 : $@thick any (Base<Int> & P).Type to any (Derived & R).Type
+  // CHECK:      checked_cast_br [prohibit_isolated_conformances] any (Base<Int> & P).Type in %2 : $@thick any (Base<Int> & P).Type to any (Derived & R).Type
   let _ = baseAndPType as? (Derived & R).Type
 
-  // CHECK:      unconditional_checked_cast %2 : $@thick any (Base<Int> & P).Type to any (Derived & R).Type
+  // CHECK:      unconditional_checked_cast [prohibit_isolated_conformances] %2 : $@thick any (Base<Int> & P).Type to any (Derived & R).Type
   let _ = baseAndPType as! (Derived & R).Type
 
   // CHECK:      return
@@ -378,33 +378,33 @@ func archetypeDowncasts<S,
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
   // CHECK-NEXT: copy_addr %0 to [init] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $any Base<T> & P
-  // CHECK-NEXT: checked_cast_addr_br take_always S in [[COPY]] : $*S to any Base<T> & P in [[RESULT]] : $*any Base<T> & P
+  // CHECK-NEXT: checked_cast_addr_br [prohibit_isolated_conformances] take_always S in [[COPY]] : $*S to any Base<T> & P in [[RESULT]] : $*any Base<T> & P
   let _ = s as? (Base<T> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
   // CHECK-NEXT: copy_addr [[ARG0]] to [init] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $any Base<T> & P
-  // CHECK-NEXT: unconditional_checked_cast_addr S in [[COPY]] : $*S to any Base<T> & P in [[RESULT]] : $*any Base<T> & P
+  // CHECK-NEXT: unconditional_checked_cast_addr [prohibit_isolated_conformances] S in [[COPY]] : $*S to any Base<T> & P in [[RESULT]] : $*any Base<T> & P
   let _ = s as! (Base<T> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
   // CHECK-NEXT: copy_addr [[ARG0]] to [init] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $any Base<Int> & P
-  // CHECK-NEXT: checked_cast_addr_br take_always S in [[COPY]] : $*S to any Base<Int> & P in [[RESULT]] : $*any Base<Int> & P
+  // CHECK-NEXT: checked_cast_addr_br [prohibit_isolated_conformances] take_always S in [[COPY]] : $*S to any Base<Int> & P in [[RESULT]] : $*any Base<Int> & P
   let _ = s as? (Base<Int> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
   // CHECK-NEXT: copy_addr [[ARG0]] to [init] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $any Base<Int> & P
-  // CHECK-NEXT: unconditional_checked_cast_addr S in [[COPY]] : $*S to any Base<Int> & P in [[RESULT]] : $*any Base<Int> & P
+  // CHECK-NEXT: unconditional_checked_cast_addr [prohibit_isolated_conformances] S in [[COPY]] : $*S to any Base<Int> & P in [[RESULT]] : $*any Base<Int> & P
   let _ = s as! (Base<Int> & P)
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG5]] : $BaseTAndP
-  // CHECK-NEXT: checked_cast_br BaseTAndP in [[COPIED]] : $BaseTAndP to any Derived & R
+  // CHECK-NEXT: checked_cast_br [prohibit_isolated_conformances] BaseTAndP in [[COPIED]] : $BaseTAndP to any Derived & R
   let _ = baseTAndP_archetype as? (Derived & R)
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG5]] : $BaseTAndP
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $BaseTAndP to any Derived & R
+  // CHECK-NEXT: unconditional_checked_cast [prohibit_isolated_conformances] [[COPIED]] : $BaseTAndP to any Derived & R
   let _ = baseTAndP_archetype as! (Derived & R)
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $any Base<T> & P
@@ -447,11 +447,11 @@ func archetypeDowncasts<S,
   let _ = baseTAndP_concrete as! BaseTAndP
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG6]] : $BaseIntAndP
-  // CHECK-NEXT: checked_cast_br BaseIntAndP in [[COPIED]] : $BaseIntAndP to any Derived & R
+  // CHECK-NEXT: checked_cast_br [prohibit_isolated_conformances] BaseIntAndP in [[COPIED]] : $BaseIntAndP to any Derived & R
   let _ = baseIntAndP_archetype as? (Derived & R)
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG6]] : $BaseIntAndP
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $BaseIntAndP to any Derived & R
+  // CHECK-NEXT: unconditional_checked_cast [prohibit_isolated_conformances] [[COPIED]] : $BaseIntAndP to any Derived & R
   let _ = baseIntAndP_archetype as! (Derived & R)
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $any Base<Int> & P

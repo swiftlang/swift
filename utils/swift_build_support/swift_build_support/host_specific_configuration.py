@@ -215,6 +215,11 @@ class HostSpecificConfiguration(object):
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize_none_with_implicit_dynamic-{}"
                         .format(subset_suffix, name))
+                if args.test_optimize_none_with_opaque_values and \
+                        not test_host_only:
+                    self.swift_test_run_targets.append(
+                        "check-swift{}-optimize_none_with_opaque_values-{}"
+                        .format(subset_suffix, name))
 
             # Only pull in these flags when cross-compiling with
             # --cross-compile-hosts.
@@ -323,9 +328,6 @@ class HostSpecificConfiguration(object):
 
     def __platforms_archs_to_skip_test(self, args, stage_dependent_args, host_target):
         platforms_archs_to_skip_test = set()
-        if not stage_dependent_args.test_watchos_32bit_simulator:
-            platforms_archs_to_skip_test.add(
-                StdlibDeploymentTarget.AppleWatchSimulator.i386)
         if host_target == StdlibDeploymentTarget.OSX.x86_64.name:
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator.arm64)
@@ -341,8 +343,6 @@ class HostSpecificConfiguration(object):
                 StdlibDeploymentTarget.iOSSimulator.x86_64)
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.AppleTVSimulator.x86_64)
-            platforms_archs_to_skip_test.add(
-                StdlibDeploymentTarget.AppleWatchSimulator.i386)
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator.x86_64)
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.7-abi-triple
 
 protocol P<A> {
   associatedtype A
@@ -8,7 +8,7 @@ protocol P<A> {
 
 func f1(x: any P) -> any P<Int> {
   // FIXME: Bad diagnostic
-  return x // expected-error {{type of expression is ambiguous without a type annotation}}
+  return x // expected-error {{failed to produce diagnostic for expression}}
 }
 
 func f2(x: any P<Int>) -> any P {

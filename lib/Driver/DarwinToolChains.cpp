@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,7 +13,7 @@
 #include "ToolChains.h"
 
 #include "swift/AST/DiagnosticsDriver.h"
-#include "swift/AST/PlatformKind.h"
+#include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
@@ -42,6 +42,7 @@
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
+using namespace swift::driver::toolchains;
 
 std::string
 toolchains::Darwin::findProgramRelativeToSwiftImpl(StringRef name) const {
@@ -117,6 +118,8 @@ getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
     return "xros";
   case DarwinPlatformKind::VisionOSSimulator:
     return "xrossim";
+  default:
+    break;
   }
   llvm_unreachable("Unsupported Darwin platform");
 }
@@ -186,7 +189,7 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
     // included with an open-source toolchain.
     const char *args[] = {"-toolchain", "default", "-f", "clang", nullptr};
     sys::TaskQueue queue;
-    queue.addTask(xcrunPath->c_str(), args, /*Env=*/std::nullopt,
+    queue.addTask(xcrunPath->c_str(), args, /*Env=*/{},
                   /*Context=*/nullptr,
                   /*SeparateErrors=*/true);
     queue.execute(nullptr,
@@ -366,6 +369,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
     } else if (value == "6.0") {
       runtimeCompatibilityVersion = llvm::VersionTuple(6, 0);
+    } else if (value == "6.2") {
+      runtimeCompatibilityVersion = llvm::VersionTuple(6, 2);
     } else if (value == "none") {
       runtimeCompatibilityVersion = std::nullopt;
     } else {
@@ -470,7 +475,7 @@ void
 toolchains::Darwin::addProfileGenerationArgs(ArgStringList &Arguments,
                                              const JobContext &context) const {
   const llvm::Triple &Triple = getTriple();
-  if (context.Args.hasArg(options::OPT_profile_generate)) {
+  if (needsInstrProfileRuntime(context.Args)) {
     SmallString<128> LibProfile;
     getClangLibraryPath(context.Args, LibProfile);
 
@@ -551,6 +556,8 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
       case DarwinPlatformKind::VisionOSSimulator:
         platformName = "xros-simulator";
         break;
+      case DarwinPlatformKind::Firmware:
+        return;
       }
     }
 
@@ -611,6 +618,13 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
         }
 
         break;
+      case DarwinPlatformKind::Firmware:
+        osVersion = triple.getOSVersion();
+        // Firmware is not versioned; (always version 1.0.0).
+        if (osVersion.getMajor() == 0) {
+          osVersion = llvm::VersionTuple(/*Major=*/1, /*Minor=*/0);
+        }
+        break;
       }
     }
 
@@ -667,6 +681,8 @@ static unsigned getDWARFVersionForTriple(const llvm::Triple &triple) {
     if (osVersion < llvm::VersionTuple(2))
       return 4;
     return 5;
+  case DarwinPlatformKind::Firmware:
+    return 5;
   }
   llvm_unreachable("unsupported platform kind");
 }
@@ -694,7 +710,7 @@ void toolchains::Darwin::addCommonFrontendArgs(
     llvm::raw_string_ostream os(dwarfVersion);
     os << "-dwarf-version=";
     if (OI.DWARFVersion)
-      os << *OI.DWARFVersion;
+      os << std::to_string(*OI.DWARFVersion);
     else
       os << getDWARFVersionForTriple(getTriple());
   }
@@ -1007,7 +1023,7 @@ toolchains::Darwin::validateOutputInfo(DiagnosticEngine &diags,
   // If we have been provided with an SDK, go read the SDK information.
   if (!outputInfo.SDKPath.empty()) {
     auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
-        *llvm::vfs::getRealFileSystem(), outputInfo.SDKPath);
+        *llvm::vfs::createPhysicalFileSystem(), outputInfo.SDKPath);
     if (SDKInfoOrErr) {
       SDKInfo = *SDKInfoOrErr;
     } else {

@@ -21,11 +21,11 @@ public func g(_ s : S) {
 // CHECK: entry:
 // CHECK:   alloca
 // CHECK:   [[ALLOCA:%[-._0-9a-zA-Z]+]] = alloca %TSo1SV, align 4
-// CHECK:   [[ALLOCA]].f = getelementptr inbounds %TSo1SV, ptr [[ALLOCA]], i32 0, i32 0
-// CHECK:   [[ALLOCA]].f._value = getelementptr inbounds %TSf, ptr [[ALLOCA]].f, i32 0, i32 0
+// CHECK:   [[ALLOCA]].f = getelementptr inbounds{{.*}} %TSo1SV, ptr [[ALLOCA]], i32 0, i32 0
+// CHECK:   [[ALLOCA]].f._value = getelementptr inbounds{{.*}} %TSf, ptr [[ALLOCA]].f, i32 0, i32 0
 // CHECK:   store float %0, ptr [[ALLOCA]].f._value, align 4
-// CHECK:   [[ALLOCA]].g = getelementptr inbounds %TSo1SV, ptr [[ALLOCA]], i32 0, i32 1
-// CHECK:   [[ALLOCA]].g._value = getelementptr inbounds %TSf, ptr [[ALLOCA]].g, i32 0, i32 0
+// CHECK:   [[ALLOCA]].g = getelementptr inbounds{{.*}} %TSo1SV, ptr [[ALLOCA]], i32 0, i32 1
+// CHECK:   [[ALLOCA]].g._value = getelementptr inbounds{{.*}} %TSf, ptr [[ALLOCA]].g, i32 0, i32 0
 // CHECK:   store float %1, ptr [[ALLOCA]].g._value, align 4
 // CHECK:   %[[LOAD:.*]] = load %struct.S, ptr [[ALLOCA]], align 4
 // CHECK:   call void @f(%struct.S %[[LOAD]])

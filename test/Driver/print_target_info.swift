@@ -11,10 +11,13 @@
 // RUN: %swift_driver -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi | %FileCheck -check-prefix CHECK-PRE-CONCURRENCY-ZIPPERED %s
 // RUN: %target-swift-frontend -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi | %FileCheck -check-prefix CHECK-PRE-CONCURRENCY-ZIPPERED %s
 
-// RUN: %swift_driver -print-target-info -target x86_64-apple-macosx12.0 -target-variant x86_64-apple-ios15-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
-// RUN: %target-swift-frontend -print-target-info -target x86_64-apple-macosx12.0 -target-variant x86_64-apple-ios15-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
+// RUN: %swift_driver -print-target-info -target x86_64-apple-macosx26.0 -target-variant x86_64-apple-ios26-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
+// RUN: %target-swift-frontend -print-target-info -target x86_64-apple-macosx26.0 -target-variant x86_64-apple-ios26-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
 
 // RUN: %swift_driver -print-target-info -target x86_64-apple-ios12.0 | %FileCheck -check-prefix CHECK-IOS-SIM %s
+
+// RUN: %swift_frontend_plain -target thumbv7-unknown-windows-msvc -print-target-info | %FileCheck -check-prefix CHECK-PTR-SIZE-32 %s
+// RUN: %swift_frontend_plain -target aarch64-unknown-windows-msvc -print-target-info | %FileCheck -check-prefix CHECK-PTR-SIZE-64 %s
 
 // CHECK-IOS:   "compilerVersion": "{{.*}}Swift version
 
@@ -87,14 +90,14 @@
 // CHECK-PRE-CONCURRENCY-ZIPPERED: }
 
 // CHECK-ZIPPERED: "target": {
-// CHECK-ZIPPERED:   "triple": "x86_64-apple-macosx12.0"
+// CHECK-ZIPPERED:   "triple": "x86_64-apple-macosx26.0"
 // CHECK-ZIPPERED:   "unversionedTriple": "x86_64-apple-macosx"
 // CHECK-ZIPPERED:   "moduleTriple": "x86_64-apple-macos"
 // CHECK-ZIPPERED:   "librariesRequireRPath": false
 // CHECK-ZIPPERED: }
 
 // CHECK-ZIPPERED: "targetVariant": {
-// CHECK-ZIPPERED:   "triple": "x86_64-apple-ios15-macabi"
+// CHECK-ZIPPERED:   "triple": "x86_64-apple-ios26-macabi"
 // CHECK-ZIPPERED:   "unversionedTriple": "x86_64-apple-ios-macabi"
 // CHECK-ZIPPERED:   "moduleTriple": "x86_64-apple-ios-macabi"
 // CHECK-ZIPPERED:   "librariesRequireRPath": false
@@ -107,3 +110,15 @@
 // CHECK-IOS-SIM:     "swiftRuntimeCompatibilityVersion": "5.0",
 // CHECK-IOS-SIM:     "librariesRequireRPath": true
 // CHECK-IOS-SIM:   }
+
+// CHECK-PTR-SIZE-32: "target": {
+// CHECK-PTR-SIZE-32:   "triple": "thumbv7-unknown-windows-msvc",
+// CHECK-PTR-SIZE-32:   "pointerWidthInBits": 32,
+// CHECK-PTR-SIZE-32:   "pointerWidthInBytes": 4,
+// CHECK-PTR-SIZE-32: }
+
+// CHECK-PTR-SIZE-64: "target": {
+// CHECK-PTR-SIZE-64:   "triple": "aarch64-unknown-windows-msvc",
+// CHECK-PTR-SIZE-64:   "pointerWidthInBits": 64,
+// CHECK-PTR-SIZE-64:   "pointerWidthInBytes": 8,
+// CHECK-PTR-SIZE-64: }

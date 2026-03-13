@@ -34,6 +34,7 @@ void diagnoseUnsafeUse(const UnsafeUse &use);
 bool enumerateUnsafeUses(ConcreteDeclRef declRef,
                          SourceLoc loc,
                          bool isCall,
+                         bool skipTypeCheck,
                          llvm::function_ref<bool(UnsafeUse)> fn);
 
 /// Enumerate all of the unsafe uses that occur within this array of protocol
@@ -69,6 +70,9 @@ bool isUnsafeInConformance(const ValueDecl *requirement,
 /// diagnose function with the most specific unsafe type that can be provided.
 void diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
                         llvm::function_ref<void(Type)> diagnose);
+
+/// Check for unsafe storage within this nominal type declaration.
+void checkUnsafeStorage(NominalTypeDecl *nominal);
 
 }
 

@@ -8,6 +8,10 @@
 
 // REQUIRES: concurrency
 
+// Note: Windows uses internal linkage, which puts an extra step symbol before
+// _swift_dead_method_stub.
+// UNSUPPORTED: OS=windows-msvc
+
 //--- A.swift
 open class C {
   private var i: [ObjectIdentifier:Any] = [:]
@@ -15,12 +19,12 @@ open class C {
   private func foo() async {}
 }
 
-// CHECK: @"$s1M1CC3foo33_{{.*}}Tu" = hidden global %swift.async_func_pointer <{ {{.*}} @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvg"
+// CHECK: @"$s1M1CC3foo33_{{.*}}Tu" = hidden global %swift.async_func_pointer <{ {{.*}} @_swift_dead_method_stub
 
-// CHECK: @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvs" = hidden alias void (), ptr @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvg"
-// CHECK: @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvM" = hidden alias void (), ptr @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvg"
+// CHECK: @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvs" = hidden alias void (), ptr @_swift_dead_method_stub
+// CHECK: @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvM" = hidden alias void (), ptr @_swift_dead_method_stub
 
-// CHECK: define hidden void @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvg"()
+// CHECK: define {{(linkonce_odr )?}}hidden void @_swift_dead_method_stub()
 // CHECK: entry:
 // CHECK:   tail call void @swift_deletedMethodError()
 

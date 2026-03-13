@@ -180,7 +180,8 @@ private:
   std::string determineSupplementaryOutputFilename(
       options::ID emitOpt, std::string pathFromArgumentsOrFilelists,
       file_types::ID type, StringRef mainOutputIfUsable,
-      StringRef defaultSupplementaryOutputPathExcludingExtension) const;
+      StringRef defaultSupplementaryOutputPathExcludingExtension,
+      bool forceDefaultSupplementaryOutputPathExcludingExtension = false) const;
 
   void deriveModulePathParameters(StringRef mainOutputFile,
                                   options::ID &emitOption,

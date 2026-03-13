@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(   -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none) | %FileCheck %s
+// RUN: %target-run-simple-swift(   -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
@@ -12,7 +12,7 @@ public struct Box<T>: ~Copyable {
         self.value = UnsafeMutablePointer<T>.allocate(capacity: 1)
     }
 
-    subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> U {
+    public subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> U {
         @_transparent
         get { return self.value.pointer(to: member)!.pointee }
 
@@ -20,6 +20,7 @@ public struct Box<T>: ~Copyable {
         set { self.value.pointer(to: member)!.pointee = newValue }
     }
 
+    @usableFromInline
     var value: UnsafeMutablePointer<T>
 }
 

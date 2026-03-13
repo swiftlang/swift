@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s  -disable-availability-checking -package-name myPkg
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %s  -disable-availability-checking -package-name myPkg
 // REQUIRES: concurrency
 
 actor SomeActor { }
@@ -88,17 +88,19 @@ class SomeClass {
 @GA1 actor ActorInTooManyPlaces { } // expected-error{{actor 'ActorInTooManyPlaces' cannot have a global actor}}
 
 @GA1 @OtherGlobalActor func twoGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('OtherGlobalActor' and 'GA1')}}
+// expected-note@-1{{'GA1' attribute previously declared here}}
 
 struct Container {
   // FIXME: Diagnostic could be improved to show the generic arguments.
 @GenericGlobalActor<Int> @GenericGlobalActor<String> func twoGenericGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('GenericGlobalActor' and 'GenericGlobalActor')}}
+// expected-note@-1{{'GenericGlobalActor' attribute previously declared here}}
 }
 
 // -----------------------------------------------------------------------
 // Redundant attributes
 // -----------------------------------------------------------------------
 extension SomeActor {
-  @GA1 nonisolated func conflict1() { } // expected-error 3{{instance method 'conflict1()' has multiple actor-isolation attributes ('nonisolated' and 'GA1')}}
+  @GA1 nonisolated func conflict1() { } // expected-error {{instance method 'conflict1()' has multiple actor-isolation attributes (@GA1 and 'nonisolated')}}
 }
 
 

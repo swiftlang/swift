@@ -2,6 +2,9 @@
 
 // REQUIRES: swift_in_compiler
 
+// is_same_metatype builtin is no longer used due to rdar://145707064 (Builtin.is_same_metatype should support noncopyable/nonescapable types)
+// XFAIL: rdar145707064
+
 // CHECK-LABEL: sil [transparent] @$s4test9checkTypeySixs17FixedWidthIntegerRzlF
 @_transparent
 public func checkType<A: FixedWidthInteger>(_ a: A) -> Int {

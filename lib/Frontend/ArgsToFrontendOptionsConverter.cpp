@@ -14,7 +14,7 @@
 
 #include "ArgsToFrontendInputsConverter.h"
 #include "ArgsToFrontendOutputsConverter.h"
-#include "clang/Driver/Driver.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
@@ -24,16 +24,19 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
+#include "clang/Driver/Driver.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/TargetParser/Triple.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
-#include "llvm/Support/Process.h"
+#include "llvm/Support/Compression.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/PrefixMapper.h"
+#include "llvm/Support/Process.h"
+#include "llvm/TargetParser/Triple.h"
 
 using namespace swift;
 using namespace llvm::opt;
@@ -80,6 +83,11 @@ bool ArgsToFrontendOptionsConverter::convert(
     clang::driver::Driver::getDefaultModuleCachePath(defaultPath);
     Opts.ExplicitModulesOutputPath = defaultPath.str().str();
   }
+  if (const Arg *A = Args.getLastArg(OPT_sdk_module_cache_path)) {
+    Opts.ExplicitSDKModulesOutputPath = A->getValue();
+  } else {
+    Opts.ExplicitSDKModulesOutputPath = Opts.ExplicitModulesOutputPath;
+  }
   if (const Arg *A = Args.getLastArg(OPT_backup_module_interface_path)) {
     Opts.BackupModuleInterfaceDir = A->getValue();
   }
@@ -90,6 +98,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
   Opts.IndexIgnoreStdlib |= Args.hasArg(OPT_index_ignore_stdlib);
   Opts.IndexIncludeLocals |= Args.hasArg(OPT_index_include_locals);
+  Opts.IndexStoreCompress |= Args.hasArg(OPT_index_store_compress);
   Opts.SerializeDebugInfoSIL |=
       Args.hasArg(OPT_experimental_serialize_debug_info);
 
@@ -100,15 +109,11 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
-  Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_library_evolution);
   Opts.FrontendParseableOutput |= Args.hasArg(OPT_frontend_parseable_output);
   Opts.ExplicitInterfaceBuild |= Args.hasArg(OPT_explicit_interface_module_build);
 
   Opts.EmitClangHeaderWithNonModularIncludes |=
       Args.hasArg(OPT_emit_clang_header_nonmodular_includes);
-
-  // FIXME: Remove this flag
-  Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_resilience);
 
   Opts.EnableImplicitDynamic |= Args.hasArg(OPT_enable_implicit_dynamic);
 
@@ -152,13 +157,23 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.SerializeDependencyScannerCache |= Args.hasArg(OPT_serialize_dependency_scan_cache);
   Opts.ReuseDependencyScannerCache |= Args.hasArg(OPT_reuse_dependency_scan_cache);
-  Opts.EmitDependencyScannerCacheRemarks |= Args.hasArg(OPT_dependency_scan_cache_remarks);
+  Opts.ValidatePriorDependencyScannerCache |= Args.hasArg(OPT_validate_prior_dependency_scan_cache);
+  Opts.EmitDependencyScannerRemarks |= Args.hasArg(OPT_dependency_scan_remarks);
+  Opts.EmitDependencyScannerCacheRemarks |=
+      Args.hasArg(OPT_dependency_scan_cache_remarks) ||
+      Opts.EmitDependencyScannerRemarks;
   Opts.ParallelDependencyScan = Args.hasFlag(OPT_parallel_scan,
                                              OPT_no_parallel_scan,
                                              true);
+  Opts.GenReproducer |= Args.hasArg(OPT_gen_reproducer);
+  Opts.GenReproducerDir = Args.getLastArgValue(OPT_gen_reproducer_dir);
+
   if (const Arg *A = Args.getLastArg(OPT_dependency_scan_cache_path)) {
     Opts.SerializedDependencyScannerCachePath = A->getValue();
   }
+
+  Opts.ScannerOutputDir = Args.getLastArgValue(OPT_scanner_output_dir);
+  Opts.WriteScannerOutput |= Args.hasArg(OPT_scanner_debug_write_output);
 
   Opts.DisableCrossModuleIncrementalBuild |=
       Args.hasArg(OPT_disable_incremental_imports);
@@ -183,7 +198,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeDebugTimeOptions();
   computeTBDOptions();
 
-  Opts.DumpClangLookupTables |= Args.hasArg(OPT_dump_clang_lookup_tables);
+  Opts.CompilerDebuggingOpts.DumpAvailabilityScopes |=
+      Args.hasArg(OPT_dump_availability_scopes);
+
+  Opts.CompilerDebuggingOpts.DumpClangLookupTables |=
+      Args.hasArg(OPT_dump_clang_lookup_tables);
 
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
@@ -196,6 +215,14 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.PrintTargetInfo = true;
   }
 
+  if (Args.hasArg(OPT_print_static_build_config)) {
+    Opts.PrintBuildConfig = true;
+  }
+
+  if (Args.hasArg(OPT_print_supported_features)) {
+    Opts.PrintSupportedFeatures = true;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_verify_generic_signatures)) {
     Opts.VerifyGenericSignaturesInModule = A->getValue();
   }
@@ -203,6 +230,34 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.AllowModuleWithCompilerErrors |= Args.hasArg(OPT_experimental_allow_module_with_compiler_errors);
 
   computeDumpScopeMapLocations();
+
+  // Ensure that the compiler was built with zlib support if it was the
+  // requested AST format.
+  if (const Arg *A = Args.getLastArg(OPT_dump_ast_format)) {
+    auto format = llvm::StringSwitch<std::optional<FrontendOptions::ASTFormat>>(
+                      A->getValue())
+                      .Case("json", FrontendOptions::ASTFormat::JSON)
+                      .Case("json-zlib", FrontendOptions::ASTFormat::JSONZlib)
+                      .Case("default", FrontendOptions::ASTFormat::Default)
+                      .Case("default-with-decl-contexts",
+                            FrontendOptions::ASTFormat::DefaultWithDeclContext)
+                      .Default(std::nullopt);
+    if (!format.has_value()) {
+      Diags.diagnose(SourceLoc(), diag::unknown_dump_ast_format, A->getValue());
+      return true;
+    }
+    if (format != FrontendOptions::ASTFormat::Default &&
+        (!Args.hasArg(OPT_dump_ast) && !Args.hasArg(OPT_dump_parse))) {
+      Diags.diagnose(SourceLoc(), diag::ast_format_requires_dump_ast);
+      return true;
+    }
+    if (Opts.DumpASTFormat == FrontendOptions::ASTFormat::JSONZlib &&
+        !llvm::compression::zlib::isAvailable()) {
+      Diags.diagnose(SourceLoc(), diag::json_zlib_not_supported);
+      return true;
+    }
+    Opts.DumpASTFormat = *format;
+  }
 
   std::optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
@@ -273,7 +328,9 @@ bool ArgsToFrontendOptionsConverter::convert(
     return true;
 
   Opts.DeterministicCheck |= Args.hasArg(OPT_enable_deterministic_check);
-  Opts.CacheReplayPrefixMap = Args.getAllArgValues(OPT_cache_replay_prefix_map);
+  for (const Arg *A : Args.filtered(OPT_cache_replay_prefix_map)) {
+    Opts.CacheReplayPrefixMap.push_back({A->getValue(0), A->getValue(1)});
+  }
 
   if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction)) {
     if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
@@ -320,9 +377,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (!computeModuleAliases())
     return true;
 
-  if (const Arg *A = Args.getLastArg(OPT_access_notes_path))
-    Opts.AccessNotesPath = A->getValue();
-
   if (const Arg *A = Args.getLastArg(OPT_serialize_debugging_options,
                                      OPT_no_serialize_debugging_options)) {
     Opts.SerializeOptionsForDebugging =
@@ -350,6 +404,17 @@ bool ArgsToFrontendOptionsConverter::convert(
                       HasExposeAttrOrImplicitDeps)
             .Default(std::nullopt);
   }
+  if (const Arg *A = Args.getLastArg(OPT_emit_clang_header_min_access)) {
+    Opts.ClangHeaderMinAccess =
+        llvm::StringSwitch<std::optional<AccessLevel>>(A->getValue())
+            .Case("public", AccessLevel::Public)
+            .Case("package", AccessLevel::Package)
+            .Case("internal", AccessLevel::Internal)
+            .Default(std::nullopt);
+    if (!Opts.ClangHeaderMinAccess)
+      Diags.diagnose(SourceLoc(), diag::error_invalid_clang_header_access_level,
+                     A->getValue());
+  }
   for (const auto &arg :
        Args.getAllArgValues(options::OPT_clang_header_expose_module)) {
     auto splitArg = StringRef(arg).split('=');
@@ -370,11 +435,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeLLVMArgs();
 
   Opts.EmitSymbolGraph |= Args.hasArg(OPT_emit_symbol_graph);
-  
+
   if (const Arg *A = Args.getLastArg(OPT_emit_symbol_graph_dir)) {
     Opts.SymbolGraphOutputDir = A->getValue();
   }
-  
+
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbolsInSymbolGraph = Args.hasArg(OPT_include_spi_symbols);
 
@@ -392,6 +457,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
 
   Opts.DisableSandbox = Args.hasArg(OPT_disable_sandbox);
+
+  if (computeAvailabilityDomains())
+    return true;
+
   return false;
 }
 
@@ -419,10 +488,11 @@ void ArgsToFrontendOptionsConverter::handleDebugCrashGroupArguments() {
 void ArgsToFrontendOptionsConverter::computePrintStatsOptions() {
   using namespace options;
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
-  Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
+  Opts.CompilerDebuggingOpts.PrintClangStats |=
+      Args.hasArg(OPT_print_clang_stats);
   Opts.PrintZeroStats |= Args.hasArg(OPT_print_zero_stats);
 #if defined(NDEBUG) && !LLVM_ENABLE_STATS
-  if (Opts.PrintStats || Opts.PrintClangStats)
+  if (Opts.PrintStats || Opts.CompilerDebuggingOpts.PrintClangStats)
     Diags.diagnose(SourceLoc(), diag::stats_disabled);
 #endif
 }
@@ -521,6 +591,42 @@ void ArgsToFrontendOptionsConverter::computeDumpScopeMapLocations() {
     Diags.diagnose(SourceLoc(), diag::error_no_source_location_scope_map);
 }
 
+bool ArgsToFrontendOptionsConverter::computeAvailabilityDomains() {
+  using namespace options;
+
+  bool hadError = false;
+  llvm::SmallSet<std::string, 4> seenDomains;
+
+  for (const Arg *A :
+       Args.filtered_reverse(OPT_define_enabled_availability_domain,
+                             OPT_define_always_enabled_availability_domain,
+                             OPT_define_disabled_availability_domain,
+                             OPT_define_dynamic_availability_domain)) {
+    std::string domain = A->getValue();
+    if (!seenDomains.insert(domain).second)
+      continue;
+
+    if (!Lexer::isIdentifier(domain)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      hadError = true;
+      continue;
+    }
+
+    auto &option = A->getOption();
+    if (option.matches(OPT_define_enabled_availability_domain))
+      Opts.AvailabilityDomains.EnabledDomains.emplace_back(domain);
+    if (option.matches(OPT_define_always_enabled_availability_domain))
+      Opts.AvailabilityDomains.AlwaysEnabledDomains.emplace_back(domain);
+    else if (option.matches(OPT_define_disabled_availability_domain))
+      Opts.AvailabilityDomains.DisabledDomains.emplace_back(domain);
+    else if (option.matches(OPT_define_dynamic_availability_domain))
+      Opts.AvailabilityDomains.DynamicDomains.emplace_back(domain);
+  }
+
+  return hadError;
+}
+
 FrontendOptions::ActionType
 ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
   using namespace options;
@@ -580,8 +686,6 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::MergeModules;
   if (Opt.matches(OPT_dump_scope_maps))
     return FrontendOptions::ActionType::DumpScopeMaps;
-  if (Opt.matches(OPT_dump_availability_scopes))
-    return FrontendOptions::ActionType::DumpAvailabilityScopes;
   if (Opt.matches(OPT_dump_interface_hash))
     return FrontendOptions::ActionType::DumpInterfaceHash;
   if (Opt.matches(OPT_dump_type_info))
@@ -603,8 +707,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::CompileModuleFromInterface;
   if (Opt.matches(OPT_typecheck_module_from_interface))
     return FrontendOptions::ActionType::TypecheckModuleFromInterface;
-  if (Opt.matches(OPT_emit_supported_features))
-    return FrontendOptions::ActionType::PrintFeature;
+  if (Opt.matches(OPT_emit_supported_arguments))
+    return FrontendOptions::ActionType::PrintArguments;
   llvm_unreachable("Unhandled mode option");
 }
 
@@ -818,11 +922,46 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
   return false;
 }
 
+static inline bool isPCHFilenameExtension(StringRef path) {
+  return llvm::sys::path::extension(path)
+    .ends_with(file_types::getExtension(file_types::TY_PCH));
+}
+
 void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
-  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
-    Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaryInputs();
+  bool hadNormalBridgingHeader = false;
+  if (const Arg *A = Args.getLastArgNoClaim(
+          OPT_import_bridging_header,
+          OPT_internal_import_bridging_header)) {
+    // Legacy support for passing PCH file through `-import-bridging-header`.
+    if (isPCHFilenameExtension(A->getValue()))
+      Opts.ImplicitObjCPCHPath = A->getValue();
+    else
+      Opts.ImplicitObjCHeaderPath = A->getValue();
+    // If `-import-bridging-header` is used, it means the module has a direct
+    // bridging header dependency and it can be serialized into binary module.
+    Opts.ModuleHasBridgingHeader |= true;
+
+    Opts.ImportHeaderAsInternal =
+        A->getOption().getID() == OPT_internal_import_bridging_header;
+
+    hadNormalBridgingHeader = true;
+  }
+  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_pch,
+                                            OPT_internal_import_pch)) {
+    Opts.ImplicitObjCPCHPath = A->getValue();
+
+    bool importAsInternal = A->getOption().getID() == OPT_internal_import_pch;
+
+    /// Don't let the bridging-header and precompiled-header options differ in
+    /// whether they are treated as internal or public imports.
+    if (hadNormalBridgingHeader &&
+        importAsInternal != Opts.ImportHeaderAsInternal) {
+      Diags.diagnose(SourceLoc(),
+                     diag::bridging_header_and_pch_internal_mismatch);
+    }
+
+    Opts.ImportHeaderAsInternal = importAsInternal;
   }
 }
 void ArgsToFrontendOptionsConverter::
@@ -852,10 +991,13 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
     // ModuleAliasMap should initially be empty as setting
     // it should be called only once
     options.ModuleAliasMap.clear();
-    
-    auto validate = [&options, &diags](StringRef value, bool allowModuleName) -> bool
-    {
-      if (!allowModuleName) {
+
+    // validatingModuleName should be true if validating the alias target (an
+    // actual module name), or true if validating the alias name (which can be
+    // an escaped identifier).
+    auto validate = [&options, &diags](StringRef value,
+                                       bool validatingModuleName) -> bool {
+      if (!validatingModuleName) {
         if (value == options.ModuleName ||
             value == options.ModuleABIName ||
             value == options.ModuleLinkName ||
@@ -864,20 +1006,21 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
           return false;
         }
       }
-      if (!Lexer::isIdentifier(value)) {
+      if ((validatingModuleName && !Lexer::isIdentifier(value)) ||
+          !Lexer::isValidAsEscapedIdentifier(value)) {
         diags.diagnose(SourceLoc(), diag::error_bad_module_name, value, false);
         return false;
       }
       return true;
     };
-    
+
     for (auto item: args) {
       auto str = StringRef(item);
       // splits to an alias and its real name
       auto pair = str.split('=');
       auto lhs = pair.first;
       auto rhs = pair.second;
-      
+
       if (rhs.empty()) { // '=' is missing
         diags.diagnose(SourceLoc(), diag::error_module_alias_invalid_format, str);
         return false;
@@ -885,16 +1028,15 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
       if (!validate(lhs, false) || !validate(rhs, true)) {
         return false;
       }
-      
+
       // First, add the real name as a key to prevent it from being
       // used as an alias
-      if (!options.ModuleAliasMap.insert({rhs, StringRef()}).second) {
+      if (!options.ModuleAliasMap.insert({rhs, ""}).second) {
         diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, rhs);
         return false;
       }
       // Next, add the alias as a key and the real name as a value to the map
-      auto underlyingName = options.ModuleAliasMap.find(rhs)->first();
-      if (!options.ModuleAliasMap.insert({lhs, underlyingName}).second) {
+      if (!options.ModuleAliasMap.insert({lhs, rhs.str()}).second) {
         diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, lhs);
         return false;
       }

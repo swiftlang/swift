@@ -22,6 +22,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/StackAllocation.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/Support/Debug.h"
 
@@ -218,9 +219,21 @@ bool swift::canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI) {
   return MadeChange;
 }
 
-bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
+bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBlocks *deb) {
   SinkAddressProjections sinkProj;
   for (auto res : I->getResults()) {
+    // If a guaranteed value is used in a dead-end exit block and the enclosing value
+    // is _not_ destroyed in this block, we end up missing the enclosing value as
+    // phi-argument after duplicating the loop.
+    // TODO: once we have complete lifetimes we can remove this check
+    if (res->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      for (Operand *use : res->getUses()) {
+        SILBasicBlock *useBlock = use->getUser()->getParent();
+        if (!L->contains(useBlock) && deb->isDeadEnd(useBlock))
+          return false;
+      }
+    }
+
     if (!res->getType().isAddress()) {
       continue;
     }
@@ -233,7 +246,7 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
   // The deallocation of a stack allocation must be in the loop, otherwise the
   // deallocation will be fed by a phi node of two allocations.
   if (auto allocation = I->getStackAllocation()) {
-    for (auto *UI : allocation->getUses()) {
+    for (auto *UI : allocation->getValue()->getUses()) {
       if (UI->getUser()->isDeallocatingStack()) {
         if (!L->contains(UI->getUser()->getParent()))
           return false;
@@ -241,19 +254,9 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
     }
     return true;
   }
-  if (I->isDeallocatingStack()) {
-    SILInstruction *alloc = nullptr;
-    if (auto *dealloc = dyn_cast<DeallocStackInst>(I)) {
-      SILValue address = dealloc->getOperand();
-      if (isa<AllocStackInst>(address) || isa<PartialApplyInst>(address))
-        alloc = cast<SingleValueInstruction>(address);
-      else if (isaResultOf<BeginApplyInst>(address))
-        alloc = cast<MultipleValueInstructionResult>(address)->getParent();
-    }
-    if (auto *dealloc = dyn_cast<DeallocStackRefInst>(I))
-      alloc = dealloc->getAllocRef();
-
-    return alloc && L->contains(alloc);
+  if (auto deallocation = I->getStackDeallocation()) {
+    SILInstruction *alloc = deallocation->getAllocation().getInstruction();
+    return L->contains(alloc);
   }
   // In OSSA, partial_apply is not considered stack allocating. Nonetheless,
   // prevent it from being cloned so OSSA lowering can directly convert it to a
@@ -264,11 +267,11 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
       return false;
     }
   }
-  // Like partial_apply [onstack], mark_dependence [nonescaping] creates a
-  // borrow scope. We currently assume that a set of dominated scope-ending uses
-  // can be found.
+  // Like partial_apply [onstack], mark_dependence [nonescaping] on values
+  // creates a borrow scope. We currently assume that a set of dominated
+  // scope-ending uses can be found.
   if (auto *MD = dyn_cast<MarkDependenceInst>(I)) {
-    return !MD->isNonEscaping();
+    return !MD->isNonEscaping() || MD->getType().isAddress();
   }
   // CodeGen can't build ssa for objc methods.
   if (auto *Method = dyn_cast<MethodInst>(I)) {

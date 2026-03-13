@@ -1,7 +1,9 @@
 // RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // This test validates behavior of transfernonsendable around nonisolated
 // functions and fields.
@@ -129,4 +131,19 @@ func callMainActorIsolatedFunction() async {
   let x = NonSendable()
   await useValueAsync(x)
   useValueSync(x)
+}
+
+public final class LoggingScope {
+  fileprivate static let _subsystem: TaskLocal<String?>! = nil
+  fileprivate static let _scope: TaskLocal<String?>! = nil
+}
+
+public func withLoggingSubsystemAndScope<Result>(
+  subsystem: String,
+  scope: String?,
+  @_inheritActorContext _ operation: @Sendable @concurrent () async throws -> Result
+) async rethrows -> Result {
+  return try await LoggingScope._subsystem.withValue(subsystem) {
+    return try await LoggingScope._scope.withValue(scope, operation: operation)
+  }
 }

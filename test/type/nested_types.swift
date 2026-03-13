@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -module-name test
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -module-name test
 
 struct X {
   typealias MyInt = Int
@@ -92,20 +92,20 @@ do {
 
     func test() {
       blackHole(Self.E)
-      // expected-warning@-1 {{expected member name or initializer call after type name; this will be an error in Swift 6}}
+      // expected-warning@-1 {{expected member name or initializer call after type name; this is an error in the Swift 6 language mode}}
       // expected-note@-2 {{use '.self' to reference the type object}}
       blackHole((Test).E)
-      // expected-warning@-1 {{expected member name or initializer call after type name; this will be an error in Swift 6}}
+      // expected-warning@-1 {{expected member name or initializer call after type name; this is an error in the Swift 6 language mode}}
       // expected-note@-2 {{use '.self' to reference the type object}}
       blackHole([Test].Element)
-      // expected-warning@-1 {{expected member name or initializer call after type name; this will be an error in Swift 6}}
+      // expected-warning@-1 {{expected member name or initializer call after type name; this is an error in the Swift 6 language mode}}
       // expected-note@-2 {{use '.self' to reference the type object}}
       // expected-note@-3 {{add arguments after the type to construct a value of the type}}
       blackHole([Int : Test].Element)
-      // expected-warning@-1 {{expected member name or initializer call after type name; this will be an error in Swift 6}}
+      // expected-warning@-1 {{expected member name or initializer call after type name; this is an error in the Swift 6 language mode}}
       // expected-note@-2 {{use '.self' to reference the type object}}
       blackHole(Test?.Wrapped)
-      // expected-warning@-1 {{expected member name or initializer call after type name; this will be an error in Swift 6}}
+      // expected-warning@-1 {{expected member name or initializer call after type name; this is an error in the Swift 6 language mode}}
       // expected-note@-2 {{use '.self' to reference the type object}}
       // expected-note@-3 {{add arguments after the type to construct a value of the type}}
     }

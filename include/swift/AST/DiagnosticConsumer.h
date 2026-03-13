@@ -19,6 +19,7 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 #define SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 
+#include "swift/AST/DiagnosticKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/SourceMgr.h"
@@ -29,15 +30,6 @@ namespace swift {
   class DiagnosticEngine;
   class SourceManager;
   enum class DiagID : uint32_t;
-
-/// Describes the kind of diagnostic.
-///
-enum class DiagnosticKind : uint8_t {
-  Error,
-  Warning,
-  Remark,
-  Note
-};
 
 /// Information about a diagnostic passed to DiagnosticConsumers.
 struct DiagnosticInfo {
@@ -59,8 +51,8 @@ struct DiagnosticInfo {
   /// DiagnosticInfo of notes which are children of this diagnostic, if any
   ArrayRef<DiagnosticInfo *> ChildDiagnosticInfo;
 
-  /// Paths to "educational note" diagnostic documentation in the toolchain.
-  ArrayRef<std::string> EducationalNotePaths;
+  /// Path for category documentation.
+  std::string CategoryDocumentationURL;
 
   /// Represents a fix-it, a replacement of one range of text with another.
   class FixIt {

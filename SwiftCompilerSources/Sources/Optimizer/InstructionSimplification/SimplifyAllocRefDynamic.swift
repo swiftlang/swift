@@ -12,7 +12,7 @@
 
 import SIL
 
-extension AllocRefDynamicInst : OnoneSimplifyable {
+extension AllocRefDynamicInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     /// Optimize alloc_ref_dynamic of a known type to alloc_ref:
     ///

@@ -64,10 +64,19 @@ class RequirementMachine final {
   bool Dump = false;
   bool Complete = false;
 
+  /// Whether completion failed, either for this rewrite system, or one of
+  /// its imported protocols. In this case, name lookup might find type
+  /// parameters that are not valid according to the rewrite system, because
+  /// not all conformance requirements will be present. This flag allows
+  /// us to skip certain verification checks in that case.
+  bool Failed = false;
+
   /// Parameters to prevent runaway completion and property map construction.
   unsigned MaxRuleCount;
   unsigned MaxRuleLength;
   unsigned MaxConcreteNesting;
+  unsigned MaxConcreteSize;
+  unsigned MaxTypeDifferences;
 
   UnifiedStatsReporter *Stats;
 
@@ -108,7 +117,9 @@ class RequirementMachine final {
       ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<StructuralRequirement> requirements);
 
-  bool isComplete() const;
+  bool isComplete() const {
+    return Complete;
+  }
 
   std::pair<CompletionResult, unsigned>
   computeCompletion(RewriteSystem::ValidityPolicy policy);
@@ -136,6 +147,10 @@ class RequirementMachine final {
 
 public:
   ~RequirementMachine();
+
+  bool isFailed() const {
+    return Failed;
+  }
 
   // Generic signature queries. Generally you shouldn't have to construct a
   // RequirementMachine instance; instead, call the corresponding methods on

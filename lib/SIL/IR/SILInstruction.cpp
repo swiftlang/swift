@@ -15,19 +15,23 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILInstruction.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/AssertImplements.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/StackAllocation.h"
 #include "swift/SIL/Test.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -296,6 +300,14 @@ Operand *BeginBorrowInst::getSingleNonEndingUse() const {
     singleUse = use;
   }
   return singleUse;
+}
+
+bool BorrowedFromInst::isReborrow() const {
+  // The forwarded operand is either a phi or undef.
+  if (auto *phi = dyn_cast<SILPhiArgument>(getBorrowedValue())) {
+    return phi->isReborrow();
+  }
+  return false;
 }
 
 namespace {
@@ -859,6 +871,10 @@ namespace {
        return true;
     }
 
+    bool visitMarkDependenceAddrInst(const MarkDependenceAddrInst *RHS) {
+       return true;
+    }
+
     bool visitOpenExistentialRefInst(const OpenExistentialRefInst *RHS) {
       return true;
     }
@@ -894,6 +910,9 @@ namespace {
       return X->getElementType() == RHS->getElementType();
     }
 
+    bool visitTypeValueInst(const TypeValueInst *RHS) {
+      return true;
+    }
   private:
     const SILInstruction *LHS;
   };
@@ -991,7 +1010,8 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     // Handle Swift builtin functions.
     const BuiltinInfo &BInfo = BI->getBuiltinInfo();
-    if (BInfo.ID == BuiltinValueKind::ZeroInitializer) {
+    if (BInfo.ID == BuiltinValueKind::ZeroInitializer ||
+        BInfo.ID == BuiltinValueKind::PrepareInitialization) {
       // The address form of `zeroInitializer` writes to its argument to
       // initialize it. The value form has no side effects.
       return BI->getArguments().size() > 0
@@ -1007,15 +1027,15 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     // Handle LLVM intrinsic functions.
     const IntrinsicInfo &IInfo = BI->getIntrinsicInfo();
     if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
-      auto IAttrs = IInfo.getOrCreateAttributes(getModule().getASTContext());
+      auto &IAttrs = IInfo.getOrCreateFnAttributes(getModule().getASTContext());
       auto MemEffects = IAttrs.getMemoryEffects();
       // Read-only.
       if (MemEffects.onlyReadsMemory() &&
-          IAttrs.hasFnAttr(llvm::Attribute::NoUnwind))
+          IAttrs.hasAttribute(llvm::Attribute::NoUnwind))
         return MemoryBehavior::MayRead;
       // Read-none?
       return MemEffects.doesNotAccessMemory() &&
-                     IAttrs.hasFnAttr(llvm::Attribute::NoUnwind)
+                     IAttrs.hasAttribute(llvm::Attribute::NoUnwind)
                  ? MemoryBehavior::None
                  : MemoryBehavior::MayHaveSideEffects;
     }
@@ -1042,10 +1062,10 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     SILModule &M = ga->getFunction()->getModule();
     auto expansion = TypeExpansionContext::maximal(M.getAssociatedContext(),
                                                    M.isWholeModule());
-    const TypeLowering &tl =
-      M.Types.getTypeLowering(ga->getType().getObjectType(), expansion);
-    return tl.isFixedABI() ? MemoryBehavior::None :
-                             MemoryBehavior::MayHaveSideEffects;
+    SILTypeProperties props =
+      M.Types.getTypeProperties(ga->getType().getObjectType(), expansion);
+    return props.isFixedABI() ? MemoryBehavior::None
+                              : MemoryBehavior::MayHaveSideEffects;
   }
 
   if (auto *li = dyn_cast<LoadInst>(this)) {
@@ -1076,6 +1096,12 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
       return MemoryBehavior::MayHaveSideEffects;
     }
     llvm_unreachable("Covered switch isn't covered?!");
+  }
+  
+  if (auto *mdi = dyn_cast<MarkDependenceInst>(this)) {
+    if (mdi->getBase()->getType().isAddress())
+      return MemoryBehavior::MayRead;
+    return MemoryBehavior::None;
   }
   
   // TODO: An UncheckedTakeEnumDataAddr instruction has no memory behavior if
@@ -1138,6 +1164,7 @@ bool SILInstruction::mayRelease() const {
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::DestroyAddrInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::StrongReleaseInst:
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   case SILInstructionKind::Name##ReleaseValueInst:
@@ -1227,7 +1254,7 @@ bool SILInstruction::mayReleaseOrReadRefCount() const {
   switch (getKind()) {
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::BeginCOWMutationInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
     return true;
   default:
     return mayRelease();
@@ -1266,15 +1293,27 @@ namespace {
 } // end anonymous namespace
 
 bool SILInstruction::isAllocatingStack() const {
-  if (isa<AllocStackInst>(this) ||
-      isa<AllocVectorInst>(this) ||
-      isa<AllocPackInst>(this) ||
-      isa<AllocPackMetadataInst>(this))
-    return true;
+  return getStackAllocation().has_value();
+}
+
+std::optional<StackAllocation>
+SILInstruction::getStackAllocation() const {
+#define SIMPLE_CASE(KIND)                                               \
+  if (auto I = dyn_cast<KIND##Inst>(this)) {                            \
+    return StackAllocation::getUnchecked(I, StackAllocationKind::KIND); \
+  }
+  SIMPLE_CASE(AllocStack)
+  SIMPLE_CASE(AllocPack)
+  SIMPLE_CASE(AllocPackMetadata)
+#undef SIMPLE_CASE
 
   if (auto *ARI = dyn_cast<AllocRefInstBase>(this)) {
     if (ARI->canAllocOnStack())
-      return true;
+      return StackAllocation::getUnchecked(ARI,
+               isa<AllocRefInst>(ARI)
+                 ? StackAllocationKind::AllocRef
+                 : StackAllocationKind::AllocRefDynamic);
+    return std::nullopt;
   }
 
   // In OSSA, PartialApply is modeled as a value which borrows its operands
@@ -1283,53 +1322,139 @@ bool SILInstruction::isAllocatingStack() const {
   // After OSSA, we make the memory allocation and dependencies explicit again,
   // with a `dealloc_stack` ending the closure's lifetime.
   if (auto *PA = dyn_cast<PartialApplyInst>(this)) {
-    return PA->isOnStack()
-      && !PA->getFunction()->hasOwnership();
+    if (PA->isOnStack() && !PA->getFunction()->hasOwnership())
+      return StackAllocation::getUnchecked(PA,
+                                           StackAllocationKind::PartialApply);
+    return std::nullopt;
   }
 
   if (auto *BAI = dyn_cast<BeginApplyInst>(this)) {
-    return BAI->isCalleeAllocated();
+    if (BAI->isCalleeAllocated())
+      return StackAllocation::getUnchecked(BAI->getCalleeAllocationResult(),
+               StackAllocationKind::CalleeAllocatedBeginApply);
+    return std::nullopt;
   }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
-    if (BI->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
-        BI->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc) {
-      return true;
+    // FIXME: BuiltinValueKind::StartAsyncLetWithLocalBuffer
+    if (auto BK = BI->getBuiltinKind()) {
+      switch (*BK) {
+#define BUILTIN_CASE(ID, KIND)                                           \
+      case BuiltinValueKind::ID:                                         \
+        return StackAllocation::getUnchecked(BI,                         \
+                                    StackAllocationKind::Builtin##KIND);
+      BUILTIN_CASE(StackAlloc, StackAlloc)
+      BUILTIN_CASE(UnprotectedStackAlloc, UnprotectedStackAlloc)
+      BUILTIN_CASE(StartAsyncLetWithLocalBuffer, StartAsyncLet)
+#undef BUILTIN_CASE
+
+      default:
+        return std::nullopt;
+      }
     }
+    return std::nullopt;
   }
 
-  return false;
+  return std::nullopt;
 }
 
-SILValue SILInstruction::getStackAllocation() const {
-  if (!isAllocatingStack()) {
-    return {};
+StackAllocationIsNested_t SILInstruction::isStackAllocationNested() const {
+  if (auto ASI = dyn_cast<AllocStackInst>(this)) {
+    return ASI->isStackAllocationNested();
+  } else if (auto PAI = dyn_cast<PartialApplyInst>(this)) {
+    return PAI->isStackAllocationNested();
+  } else {
+    // TODO: implement for all remaining allocations
+    return StackAllocationIsNested;
   }
+}
 
-  if (auto *bai = dyn_cast<BeginApplyInst>(this)) {
-    return bai->getCalleeAllocationResult();
+void SILInstruction::setStackAllocationIsNested(
+    StackAllocationIsNested_t nested) {
+  if (auto ASI = dyn_cast<AllocStackInst>(this)) {
+    ASI->setStackAllocationIsNested(nested);
+  } else if (auto PAI = dyn_cast<PartialApplyInst>(this)) {
+    PAI->setStackAllocationIsNested(nested);
+  } else if (!nested) {
+    llvm_unreachable("unimplemented");
   }
-  return cast<SingleValueInstruction>(this);
 }
 
 bool SILInstruction::isDeallocatingStack() const {
-  if (isa<DeallocStackInst>(this) ||
-      isa<DeallocStackRefInst>(this) ||
-      isa<DeallocPackInst>(this) ||
-      isa<DeallocPackMetadataInst>(this))
-    return true;
+  return getStackDeallocation().has_value();
+}
 
-  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
-    if (BI->getBuiltinKind() == BuiltinValueKind::StackDealloc) {
-      return true;
-    }
+std::optional<StackDeallocation>
+SILInstruction::getStackDeallocation() const {
+  if (auto DSI = dyn_cast<DeallocStackInst>(this)) {
+    auto alloc = StackDeallocation::getAllocationOperand(DSI);
+    if (isa<AllocStackInst>(alloc))
+      return StackDeallocation::getUnchecked(alloc, DSI,
+                                             StackAllocationKind::AllocStack);
+    if (isa<PartialApplyInst>(alloc))
+      return StackDeallocation::getUnchecked(alloc, DSI,
+                                           StackAllocationKind::PartialApply);
+    assert(isa<BeginApplyInst>(alloc->getDefiningInstruction()));
+    return StackDeallocation::getUnchecked(alloc, DSI,
+                              StackAllocationKind::CalleeAllocatedBeginApply);
   }
 
-  return false;
+  if (auto DSRI = dyn_cast<DeallocStackRefInst>(this)) {
+    auto alloc = StackDeallocation::getAllocationOperand(DSRI);
+    if (isa<AllocRefInst>(alloc))
+      return StackDeallocation::getUnchecked(alloc, DSRI,
+                                             StackAllocationKind::AllocRef);
+    assert(isa<AllocRefDynamicInst>(alloc));
+    return StackDeallocation::getUnchecked(alloc, DSRI,
+                                      StackAllocationKind::AllocRefDynamic);
+  }
+
+  if (auto DPI = dyn_cast<DeallocPackInst>(this)) {
+    auto alloc = StackDeallocation::getAllocationOperand(DPI);
+    return StackDeallocation::getUnchecked(alloc, DPI,
+                                           StackAllocationKind::AllocPack);
+  }
+
+  if (auto DPMI = dyn_cast<DeallocPackMetadataInst>(this)) {
+    auto alloc = StackDeallocation::getAllocationOperand(DPMI);
+    return StackDeallocation::getUnchecked(alloc, DPMI,
+                                      StackAllocationKind::AllocPackMetadata);
+  }
+
+  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
+    if (auto BK = BI->getBuiltinKind()) {
+      switch (*BK) {
+      case BuiltinValueKind::StackDealloc: {
+        auto alloc =
+          cast<BuiltinInst>(StackDeallocation::getAllocationOperand(BI));
+        auto allocKind = alloc->getBuiltinKind();
+        assert(allocKind);
+        assert(*allocKind == BuiltinValueKind::StackAlloc ||
+               *allocKind == BuiltinValueKind::UnprotectedStackAlloc);
+        return StackDeallocation::getUnchecked(alloc, BI,
+                 *allocKind == BuiltinValueKind::StackAlloc
+                   ? StackAllocationKind::BuiltinStackAlloc
+                   : StackAllocationKind::BuiltinUnprotectedStackAlloc);
+      }
+
+      case BuiltinValueKind::FinishAsyncLet: {
+        auto alloc = StackDeallocation::getAllocationOperand(BI);
+        return StackDeallocation::getUnchecked(alloc, BI,
+                             StackAllocationKind::BuiltinStartAsyncLet);
+      }
+
+      default:
+        return std::nullopt;
+      }
+    }
+    return std::nullopt;
+  }
+
+  return std::nullopt;
 }
 
 static bool typeOrLayoutInvolvesPack(SILType ty, SILFunction const &F) {
-  return ty.hasAnyPack() || ty.isOrContainsPack(F);
+  return ty.isOrContainsPack(F);
 }
 
 bool SILInstruction::mayRequirePackMetadata(SILFunction const &F) const {
@@ -1428,11 +1553,11 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (auto *PA = dyn_cast<PartialApplyInst>(this)) {
     return !PA->isOnStack();
   }
-  // Like partial_apply [onstack], mark_dependence [nonescaping] creates a
-  // borrow scope. We currently assume that a set of dominated scope-ending uses
-  // can be found.
+  // Like partial_apply [onstack], mark_dependence [nonescaping] on values
+  // creates a borrow scope. We currently assume that a set of dominated
+  // scope-ending uses can be found.
   if (auto *MD = dyn_cast<MarkDependenceInst>(this)) {
-    return !MD->isNonEscaping();
+    return !MD->isNonEscaping() || MD->getType().isAddress();
   }
 
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
@@ -1500,13 +1625,9 @@ bool SILInstruction::isTriviallyDuplicatable() const {
 }
 
 bool SILInstruction::mayTrap() const {
-  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
-    if (auto Kind = BI->getBuiltinKind()) {
-      if (Kind.value() == BuiltinValueKind::WillThrow) {
-        // We don't want willThrow instructions to be removed.
-        return true;
-      }
-    }
+  if (isBuiltinInst(this, BuiltinValueKind::WillThrow)) {
+    // We don't want willThrow instructions to be removed.
+    return true;
   }
   switch(getKind()) {
   case SILInstructionKind::CondFailInst:
@@ -1810,6 +1931,10 @@ MultipleValueInstruction *MultipleValueInstructionResult::getParentImpl() const 
 
 /// Returns true if evaluation of this node may cause suspension of an
 /// async task.
+///
+/// If you change this function, you probably also need to change
+/// `isSuspensionPoint` in OptimizeHopToExecutor.cpp, which intentionally
+/// excludes several of these cases.
 bool SILInstruction::maySuspend() const {
   // await_async_continuation always suspends the current task.
   if (isa<AwaitAsyncContinuationInst>(this))
@@ -1823,55 +1948,47 @@ bool SILInstruction::maySuspend() const {
   if (auto applySite = FullApplySite::isa(const_cast<SILInstruction*>(this))) {
     return applySite.getOrigCalleeType()->isAsync();
   }
+
+  if (auto bi = dyn_cast<BuiltinInst>(this)) {
+    if (auto bk = bi->getBuiltinKind()) {
+      if (*bk == BuiltinValueKind::FinishAsyncLet)
+        return true;
+    }
+  }
   
   return false;
 }
 
-static bool
-visitRecursivelyLifetimeEndingUses(
-  SILValue i, bool &noUsers,
-  llvm::function_ref<bool(Operand *)> visitScopeEnd,
-  llvm::function_ref<bool(Operand *)> visitUnknownUse) {
-
-  for (Operand *use : i->getConsumingUses()) {
-    noUsers = false;
-    if (isa<DestroyValueInst>(use->getUser())) {
-      if (!visitScopeEnd(use)) {
-        return false;
+static SILValue lookThroughOwnershipAndForwardingInsts(SILValue value) {
+  auto current = value;
+  while (true) {
+    if (auto *inst = current->getDefiningInstruction()) {
+      switch (inst->getKind()) {
+      case SILInstructionKind::MoveValueInst:
+      case SILInstructionKind::CopyValueInst:
+      case SILInstructionKind::BeginBorrowInst:
+        current = inst->getOperand(0);
+        continue;
+      default:
+        break;
       }
+      auto forward = ForwardingOperation(inst);
+      Operand *op = nullptr;
+      if (forward && (op = forward.getSingleForwardingOperand())) {
+        current = op->get();
+        continue;
+      }
+    } else if (auto *result = SILArgument::isTerminatorResult(current)) {
+      auto *op = result->forwardedTerminatorResultOperand();
+      if (!op) {
+        break;
+      }
+      current = op->get();
       continue;
     }
-    if (auto *ret = dyn_cast<ReturnInst>(use->getUser())) {
-      auto fnTy = ret->getFunction()->getLoweredFunctionType();
-      assert(!fnTy->getLifetimeDependencies().empty());
-      if (!visitScopeEnd(use)) {
-        return false;
-      }
-      continue;
-    }
-    // FIXME: Handle store to indirect result
-    
-    // There shouldn't be any dead-end consumptions of a nonescaping
-    // partial_apply that don't forward it along, aside from destroy_value.
-    //
-    // On-stack partial_apply cannot be cloned, so it should never be used by a
-    // BranchInst.
-    //
-    // This is a fatal error because it performs SIL verification that is not
-    // separately checked in the verifier. It is the only check that verifies
-    // the structural requirements of on-stack partial_apply uses.
-    auto *user = use->getUser();
-    if (user->getNumResults() == 0) {
-      return visitUnknownUse(use);
-    }
-    for (auto res : use->getUser()->getResults()) {
-      if (!visitRecursivelyLifetimeEndingUses(res, noUsers, visitScopeEnd,
-                                              visitUnknownUse)) {
-        return false;
-      }
-    }
+    break;
   }
-  return true;
+  return current;
 }
 
 bool
@@ -1882,22 +1999,133 @@ PartialApplyInst::visitOnStackLifetimeEnds(
          && "only meaningful for OSSA stack closures");
   bool noUsers = true;
 
-  auto visitUnknownUse = [](Operand *unknownUse){
-    llvm::errs() << "partial_apply [on_stack] use:\n";
-    auto *user = unknownUse->getUser();
-    user->printInContext(llvm::errs());
-    if (isa<BranchInst>(user)) {
-      llvm::report_fatal_error("partial_apply [on_stack] cannot be cloned");
+  auto *function = getFunction();
+
+  SmallVector<SILBasicBlock *, 32> discoveredBlocks;
+  SSAPrunedLiveness liveness(function, &discoveredBlocks);
+  liveness.initializeDef(this);
+
+  StackList<SILValue> values(function);
+  values.push_back(this);
+
+  while (!values.empty()) {
+    auto value = values.pop_back_val();
+    for (auto *use : value->getUses()) {
+      if (!use->isConsuming()) {
+        if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
+          values.push_back(cvi);
+        }
+        continue;
+      }
+      noUsers = false;
+      if (isa<DestroyValueInst>(use->getUser())) {
+        liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
+        continue;
+      }
+      auto forward = ForwardingOperand(use);
+      if (!forward) {
+        // There shouldn't be any non-forwarding consumptions of a nonescaping
+        // partial_apply that don't forward it along, aside from destroy_value.
+        //
+        // On-stack partial_apply cannot be cloned, so it should never be used
+        // by a BranchInst.
+        //
+        // This is a fatal error because it performs SIL verification that is
+        // not separately checked in the verifier. It is the only check that
+        // verifies the structural requirements of on-stack partial_apply uses.
+        if (lookThroughOwnershipAndForwardingInsts(use->get()) !=
+            SILValue(this)) {
+          // Consumes of values which aren't "essentially" the
+          //   partial_apply [on_stack]
+          // are okay.  For example, a not-on_stack partial_apply that captures
+          // it.
+          continue;
+        }
+        llvm::errs() << "partial_apply [on_stack] use:\n";
+        auto *user = use->getUser();
+        user->printInContext(llvm::errs());
+        if (isa<BranchInst>(user)) {
+          llvm::report_fatal_error("partial_apply [on_stack] cannot be cloned");
+        }
+        llvm::report_fatal_error("partial_apply [on_stack] must be directly "
+                                 "forwarded to a destroy_value");
+      }
+      forward.visitForwardedValues([&values](auto value) {
+        values.push_back(value);
+        return true;
+      });
     }
-    llvm::report_fatal_error("partial_apply [on_stack] must be directly "
-                             "forwarded to a destroy_value");
-    return false;
-  };
-  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func,
-                                          visitUnknownUse)) {
-    return false;
+  }
+  PrunedLivenessBoundary boundary;
+  liveness.computeBoundary(boundary);
+
+  for (auto *inst : boundary.lastUsers) {
+    // Only destroy_values were added to liveness, so only destroy_values can be
+    // the last users.
+    auto *dvi = cast<DestroyValueInst>(inst);
+    auto keepGoing = func(&dvi->getOperandRef());
+    if (!keepGoing) {
+      return false;
+    }
   }
   return !noUsers;
+}
+
+namespace swift::test {
+FunctionTest PartialApplyPrintOnStackLifetimeEnds(
+    "partial_apply_print_on_stack_lifetime_ends",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *inst = arguments.takeInstruction();
+      auto *pai = cast<PartialApplyInst>(inst);
+      function.print(llvm::outs());
+      auto result = pai->visitOnStackLifetimeEnds([](auto *operand) {
+        operand->print(llvm::outs());
+        return true;
+      });
+      const char *resultString = result ? "true" : "false";
+      llvm::outs() << "returned: " << resultString << "\n";
+    });
+} // end namespace swift::test
+
+static bool
+visitRecursivelyLifetimeEndingUses(
+  SILValue i, bool &noUsers,
+  llvm::function_ref<bool(Operand *)> visitScopeEnd,
+  llvm::function_ref<bool(Operand *)> visitUnknownUse) {
+
+  StackList<SILValue> values(i->getFunction());
+  values.push_back(i);
+
+  while (!values.empty()) {
+    auto value = values.pop_back_val();
+    for (Operand *use : value->getConsumingUses()) {
+      noUsers = false;
+      if (isa<DestroyValueInst>(use->getUser())) {
+        if (!visitScopeEnd(use)) {
+          return false;
+        }
+        continue;
+      }
+      if (auto *ret = dyn_cast<ReturnInst>(use->getUser())) {
+        auto fnTy = ret->getFunction()->getLoweredFunctionType();
+        assert(!fnTy->getLifetimeDependencies().empty());
+        if (!visitScopeEnd(use)) {
+          return false;
+        }
+        continue;
+      }
+      // FIXME: Handle store to indirect result
+
+      auto *user = use->getUser();
+      if (user->getNumResults() == 0) {
+        return visitUnknownUse(use);
+      }
+      for (auto res : use->getUser()->getResults()) {
+        values.push_back(res);
+      }
+    }
+  }
+  return true;
 }
 
 // FIXME: Rather than recursing through all results, this should only recurse
@@ -1906,9 +2134,13 @@ PartialApplyInst::visitOnStackLifetimeEnds(
 // the dependent value.
 bool MarkDependenceInst::visitNonEscapingLifetimeEnds(
   llvm::function_ref<bool (Operand *)> visitScopeEnd,
-  llvm::function_ref<bool (Operand *)> visitUnknownUse) const {
+  llvm::function_ref<bool (Operand *)> visitUnknownUse) {
   assert(getFunction()->hasOwnership() && isNonEscaping()
          && "only meaningful for nonescaping dependencies");
+  assert(getType().isObject() && "lifetime ends only exist for values");
+  assert(getOwnershipKind() == OwnershipKind::Owned
+         && getType().isEscapable(*getFunction())
+         && "only correct for owned escapable values");
   bool noUsers = true;
   if (!visitRecursivelyLifetimeEndingUses(this, noUsers, visitScopeEnd,
                                           visitUnknownUse)) {
@@ -2016,6 +2248,31 @@ SILModule &SILInstructionContext::getModule() {
   }
   return storage.get<SILFunction *>()->getModule();
 }
+
+template <class Impl, class Base>
+SILDeclRef ApplyInstBase<Impl, Base, false>::getCalleeDeclRef() const {
+  SILValue origin = getCalleeOrigin();
+  if (!origin)
+    return {};
+
+  if (auto *fri = dyn_cast<FunctionRefInst>(origin))
+    return fri->getReferencedFunction()->getDeclRef();
+
+  if (auto *m = dyn_cast<MethodInst>(origin))
+    return m->getMember();
+
+  return {};
+}
+
+template SILDeclRef
+ApplyInstBase<ApplyInst, SingleValueInstruction, false>::getCalleeDeclRef()
+    const;
+template SILDeclRef ApplyInstBase<PartialApplyInst, SingleValueInstruction,
+                                  false>::getCalleeDeclRef() const;
+template SILDeclRef ApplyInstBase<BeginApplyInst, MultipleValueInstruction,
+                                  false>::getCalleeDeclRef() const;
+template SILDeclRef
+ApplyInstBase<TryApplyInst, TryApplyInstBase, false>::getCalleeDeclRef() const;
 
 #ifndef NDEBUG
 

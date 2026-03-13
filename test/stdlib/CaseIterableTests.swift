@@ -17,7 +17,7 @@ CaseIterableTests.test("Simple Enums") {
   expectEqual(SimpleEnum.allCases, [.bar, .baz, .quux])
 }
 
-CaseIterableTests.test("MainActor Isolated Enums") {
+CaseIterableTests.test("MainActor-Isolated Enums") {
   @MainActor
   enum EnumMainActor: CaseIterable {
     case a, b

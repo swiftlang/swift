@@ -756,19 +756,19 @@ extension Unicode.Scalar.Properties {
     // more than 1 scalar.
     var specialMappingLength = 0
 
-    let specialMappingPtr = _swift_stdlib_getSpecialMapping(
+    let specialMappingPtr = unsafe _swift_stdlib_getSpecialMapping(
       _scalar.value,
       mapping.rawValue,
       &specialMappingLength
     )
 
-    if let specialMapping = specialMappingPtr, specialMappingLength != 0 {
-      let buffer = UnsafeBufferPointer<UInt8>(
+    if let specialMapping = unsafe specialMappingPtr, specialMappingLength != 0 {
+      let buffer = unsafe UnsafeBufferPointer<UInt8>(
         start: specialMapping,
         count: specialMappingLength
       )
 
-      return String._uncheckedFromUTF8(buffer, isASCII: false)
+      return unsafe String._uncheckedFromUTF8(buffer, isASCII: false)
     }
 
     // If we did not have a special mapping, check if we have a direct scalar
@@ -1203,13 +1203,12 @@ extension Unicode.Scalar.Properties {
     case (0x3400 ... 0x4DBF),
          (0x4E00 ... 0x9FFF),
          (0x20000 ... 0x2A6DF),
-         (0x2A700 ... 0x2B739),
-         (0x2B740 ... 0x2B81D),
-         (0x2B820 ... 0x2CEA1),
+         (0x2A700 ... 0x2B81D),
+         (0x2B820 ... 0x2CEAD),
          (0x2CEB0 ... 0x2EBE0),
          (0x2EBF0 ... 0x2EE5D),
          (0x30000 ... 0x3134A),
-         (0x31350 ... 0x323AF):
+         (0x31350 ... 0x33479):
       return "CJK UNIFIED IDEOGRAPH-\(scalarName)"
 
     case (0xF900 ... 0xFA6D),
@@ -1217,8 +1216,8 @@ extension Unicode.Scalar.Properties {
          (0x2F800 ... 0x2FA1D):
       return "CJK COMPATIBILITY IDEOGRAPH-\(scalarName)"
 
-    case (0x17000 ... 0x187F7),
-         (0x18D00 ... 0x18D08):
+    case (0x17000 ... 0x187FF),
+         (0x18D00 ... 0x18D1E):
       return "TANGUT IDEOGRAPH-\(scalarName)"
 
     case (0x18B00 ... 0x18CD5):
@@ -1250,10 +1249,10 @@ extension Unicode.Scalar.Properties {
     }
 
     // The longest name that Unicode defines is 88 characters long.
-    let largestCount = Int(SWIFT_STDLIB_LARGEST_NAME_COUNT)
+    let largestCount = 88
 
-    let name = String(_uninitializedCapacity: largestCount) { buffer in
-      _swift_stdlib_getScalarName(
+    let name = unsafe String(_uninitializedCapacity: largestCount) { buffer in
+      unsafe _swift_stdlib_getScalarName(
         _scalar.value,
         buffer.baseAddress,
         buffer.count
@@ -1277,11 +1276,11 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Name_Alias" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var nameAlias: String? {
-    guard let nameAliasPtr = _swift_stdlib_getNameAlias(_scalar.value) else {
+    guard let nameAliasPtr = unsafe _swift_stdlib_getNameAlias(_scalar.value) else {
       return nil
     }
 
-    return String(cString: nameAliasPtr)
+    return unsafe String(cString: nameAliasPtr)
   }
 }
 

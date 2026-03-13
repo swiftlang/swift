@@ -1,10 +1,13 @@
 
 add_swift_host_library(swiftSema STATIC
   AssociatedTypeInference.cpp
+  NonisolatedNonsendingByDefaultMigration.cpp
+  BindingProducer.cpp
   BuilderTransform.cpp
   Comment.cpp
   CSApply.cpp
   CSBindings.cpp
+  CSDisjunction.cpp
   CSSyntacticElement.cpp
   CSGen.cpp
   CSRanking.cpp
@@ -24,32 +27,38 @@ add_swift_host_library(swiftSema STATIC
   ConstraintSystem.cpp
   CompletionContextFinder.cpp
   DebuggerTestingTransform.cpp
-  DerivedConformanceActor.cpp
-  DerivedConformanceDistributedActor.cpp
-  DerivedConformanceAdditiveArithmetic.cpp
-  DerivedConformanceCaseIterable.cpp
-  DerivedConformanceCodable.cpp
-  DerivedConformanceCodingKey.cpp
-  DerivedConformanceDifferentiable.cpp
-  DerivedConformanceEquatableHashable.cpp
-  DerivedConformanceComparable.cpp
-  DerivedConformanceError.cpp
-  DerivedConformanceRawRepresentable.cpp
-  DerivedConformances.cpp
+  DerivedConformance/DerivedConformance.cpp
+  DerivedConformance/DerivedConformanceActor.cpp
+  DerivedConformance/DerivedConformanceAdditiveArithmetic.cpp
+  DerivedConformance/DerivedConformanceCaseIterable.cpp
+  DerivedConformance/DerivedConformanceCodable.cpp
+  DerivedConformance/DerivedConformanceCodingKey.cpp
+  DerivedConformance/DerivedConformanceComparable.cpp
+  DerivedConformance/DerivedConformanceDifferentiable.cpp
+  DerivedConformance/DerivedConformanceDistributedActor.cpp
+  DerivedConformance/DerivedConformanceEquatableHashable.cpp
+  DerivedConformance/DerivedConformanceError.cpp
+  DerivedConformance/DerivedConformanceRawRepresentable.cpp
   ImportResolution.cpp
   InstrumenterSupport.cpp
+  LegalLiteralExprVerifier.cpp
+  LiteralExpressionFolding.cpp
   LookupVisibleDecls.cpp
   MiscDiagnostics.cpp
   OpenedExistentials.cpp
   PCMacro.cpp
+  PerformanceHints.cpp
   PlaygroundTransform.cpp
   PreCheckTarget.cpp
   ResilienceDiagnostics.cpp
   SourceLoader.cpp
   SyntacticElementTarget.cpp
+  Subtyping.cpp
   TypeOfReference.cpp
   TypeCheckAccess.cpp
+  TypeCheckAccessNotes.cpp
   TypeCheckAttr.cpp
+  TypeCheckAttrABI.cpp
   TypeCheckAvailability.cpp
   TypeCheckBitwise.cpp
   TypeCheckCaptures.cpp
@@ -65,6 +74,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckEffects.cpp
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp
+  TypeCheckEmbedded.cpp
   TypeCheckGeneric.cpp
   TypeCheckInvertible.cpp
   TypeCheckMacros.cpp
@@ -80,6 +90,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckType.cpp
   TypeCheckUnsafe.cpp
   TypeChecker.cpp
+  TypeVariableType.cpp
   IDETypeCheckingRequests.cpp)
 if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")

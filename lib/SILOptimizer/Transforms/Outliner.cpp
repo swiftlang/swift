@@ -1435,6 +1435,9 @@ public:
 
     if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      // We know that this pass does not create infinite loops even if it
+      // deletes basic blocks.
+      Fun->setNeedBreakInfiniteLoops(false);
     }
   }
 };

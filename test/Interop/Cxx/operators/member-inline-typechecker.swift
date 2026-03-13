@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=swift-5.9
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=swift-6
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=upcoming-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=swift-5.9
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=swift-6
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=upcoming-swift
 
 import MemberInline
 
@@ -71,7 +71,7 @@ let voidReturnTypeResult: HasPreIncrementOperatorWithVoidReturnType = voidReturn
 let immortalIncrement = myCounter.successor() // expected-error {{value of type 'ImmortalCounter' has no member 'successor'}}
 
 let derivedConstIter = DerivedFromConstIteratorPrivately()
-derivedConstIter.pointee // expected-error {{value of type 'DerivedFromConstIteratorPrivately' has no member 'pointee'}}
+derivedConstIter.pointee // expected-error {{'pointee' is inaccessible due to 'private' protection level}}
 
 let derivedConstIterWithUD = DerivedFromConstIteratorPrivatelyWithUsingDecl()
 let _ = derivedConstIterWithUD.pointee
@@ -84,6 +84,13 @@ let _ = classWithSuccessorAvailable.successor();
 let classWithSuccessorUnavailable = ClassWithSuccessorUnavailable()
 let _ = classWithSuccessorUnavailable.successor(); // expected-error {{'successor()' is unavailable in Swift}}
 
+let allStar = AllStar() // expected-note {{change 'let' to 'var' to make it mutable}}
+let _ = allStar.pointee // expected-error {{cannot use mutating getter on immutable value}}
+var mutAllStar = AllStar()
+let _ = mutAllStar.pointee
+var _: AllStar  = mutAllStar * allStar
+var _: AllStar = allStar * mutAllStar
+
 var classWithOperatorStarAvailable = ClassWithOperatorStarAvailable()
 let _ = classWithOperatorStarAvailable.pointee
 let derivedClassWithOperatorStarAvailable = DerivedClassWithOperatorStarAvailable()
@@ -95,5 +102,14 @@ let _ = classWithOperatorStarUnavailable.pointee // expected-error {{'pointee' i
 // FIXME: The below test should also fail with 'pointee' is unavailable in Swift error, 
 // but currently pointee is not hidden in derived classes.
 let derivedClassWithOperatorStarUnavailable = DerivedClassWithOperatorStarUnavailable()
-let _ = derivedClassWithOperatorStarUnavailable.pointee  
+let _ = derivedClassWithOperatorStarUnavailable.pointee
 
+let classWithTemplatedOperatorStar = ClassWithTemplatedOperatorStar()
+let _ = classWithTemplatedOperatorStar.pointee // expected-error {{has no member 'pointee'}}
+
+let classWithDefaultTemplatedOperatorStar = ClassWithDefaultTemplatedOperatorStar()
+let _ = classWithDefaultTemplatedOperatorStar.pointee  // expected-error {{has no member 'pointee'}}
+// ^this could work in theory, but is niche (https://github.com/swiftlang/swift/issues/86478)
+// Same for templated operator++.
+
+let _ = HasOperatorReturningAuto().pointee // expected-error {{value of type 'HasOperatorReturningAuto' has no member 'pointee'}}

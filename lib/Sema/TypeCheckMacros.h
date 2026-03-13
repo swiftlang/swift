@@ -1,4 +1,4 @@
-//===--- TypeCheckConcurrency.h - Concurrency -------------------*- C++ -*-===//
+//===--- TypeCheckMacros.h - Macros -----------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

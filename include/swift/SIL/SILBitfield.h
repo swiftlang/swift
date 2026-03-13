@@ -109,9 +109,13 @@ public:
     }
     entity->setCustomBits((entity->getCustomBits() & ~clearMask) | (value << startBit));
   }
+
+  bool fits(unsigned value) const {
+    return value < (1u << (endBit - startBit));
+  }
 };
 
-/// A set which knowns its size.
+/// A set which knows its size.
 ///
 /// This template adds a size property to a base `Set`.
 template <class Set>

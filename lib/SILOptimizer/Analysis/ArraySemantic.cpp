@@ -14,6 +14,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -53,7 +54,6 @@ ArrayCallKind swift::getArraySemanticsKind(SILFunction *f) {
                   ArrayCallKind::kWithUnsafeMutableBufferPointer)
             .Case("array.append_contentsOf", ArrayCallKind::kAppendContentsOf)
             .Case("array.append_element", ArrayCallKind::kAppendElement)
-            .Case("array.copy_into_vector", ArrayCallKind::kCopyIntoVector)
             .Default(ArrayCallKind::kNone);
     if (Tmp != ArrayCallKind::kNone) {
       assert(Kind == ArrayCallKind::kNone && "Multiple array semantic "
@@ -298,6 +298,30 @@ static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
   if (DT->dominates(SelfBB, InsertBefore->getParent()))
     return true;
 
+  if (auto* lbi = dyn_cast<LoadBorrowInst>(SelfVal)) {
+    // Are we loading a value from an address in a struct defined at a point
+    // dominating the hoist point.
+    auto Val = lbi->getOperand();
+    bool DoesNotDominate;
+    StructElementAddrInst *SEI;
+    while ((DoesNotDominate = !DT->dominates(Val->getParentBlock(),
+                                             InsertBefore->getParent())) &&
+           (SEI = dyn_cast<StructElementAddrInst>(Val)))
+      Val = SEI->getOperand();
+    return !DoesNotDominate;
+  }
+
+  // If the self value does not dominate the new insertion point,
+  // we have to clone the self value as well.
+  // If we have a semantics call that does not consume the self value, then
+  // there will be consuming users within the loop, since we don't have support
+  // for creating the consume for the self value in the new insertion point,
+  // bailout hoisiting in this case.
+  if (SemanticsCall->getFunction()->hasOwnership() &&
+      Convention == ParameterConvention::Direct_Guaranteed) {
+    return false;
+  }
+
   if (auto *Copy = dyn_cast<CopyValueInst>(SelfVal)) {
     // look through one level
     SelfVal = Copy->getOperand();
@@ -371,6 +395,18 @@ static SILValue copySelfValue(SILValue ArrayStructValue,
            ArrayStructValue->getOwnershipKind() == OwnershipKind::Owned ||
            ArrayStructValue->getOwnershipKind() == OwnershipKind::Guaranteed);
     return ArrayStructValue;
+  }
+
+  if (auto *lbi = dyn_cast<LoadBorrowInst>(ArrayStructValue)) {
+    SILValue Val = lbi->getOperand();
+    auto *InsertPt = InsertBefore;
+    while (!DT->dominates(Val->getParentBlock(), InsertBefore->getParent())) {
+      auto *Inst = cast<StructElementAddrInst>(Val);
+      Inst->moveBefore(InsertPt);
+      Val = Inst->getOperand();
+      InsertPt = Inst;
+    }
+    return SILBuilderWithScope(InsertPt).createLoadBorrow(InsertPt->getLoc(), lbi->getOperand());
   }
 
   assert(!func->hasOwnership() ||
@@ -448,6 +484,18 @@ static SILValue hoistOrCopySelf(ApplyInst *SemanticsCall,
   return NewArrayStructValue;
 }
 
+static void createEndBorrows(SILValue array, ApplyInst *afterCall) {
+  auto *lbi = dyn_cast<LoadBorrowInst>(array);
+  if (!lbi)
+    return;
+  for (Operand *use : lbi->getUses()) {
+    if (use->isLifetimeEnding())
+      return;
+  }
+
+  SILBuilderWithScope(afterCall->getNextInstruction()).createEndBorrow(lbi->getLoc(), lbi);
+}
+
 ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
                                                   DominanceInfo *DT,
                                                   bool LeaveOriginal) {
@@ -468,6 +516,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
     auto *Call =
         hoistOrCopyCall(SemanticsCall, InsertBefore, LeaveOriginal, DT);
     Call->setSelfArgument(HoistedSelf);
+    createEndBorrows(HoistedSelf, Call);
     return Call;
   }
 
@@ -519,7 +568,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
       // Set the array.props argument.
       Call->setArgument(1, NewArrayProps);
     }
-
+    createEndBorrows(HoistedSelf, Call);
 
     return Call;
   }
@@ -722,14 +771,10 @@ SILValue swift::ArraySemanticsCall::getArrayElementStoragePointer() const {
   return getArrayUninitializedInitResult(*this, 1);
 }
 
-bool swift::ArraySemanticsCall::mapInitializationStores(
-    llvm::DenseMap<uint64_t, StoreInst *> &ElementValueMap) {
-  if (getKind() != ArrayCallKind::kArrayUninitialized &&
-      getKind() != ArrayCallKind::kArrayUninitializedIntrinsic)
-    return false;
-  SILValue ElementBuffer = getArrayElementStoragePointer();
+static SILValue getElementBaseAddress(ArraySemanticsCall initArray) {
+  SILValue ElementBuffer = initArray.getArrayElementStoragePointer();
   if (!ElementBuffer)
-    return false;
+    return SILValue();
 
   // Match initialization stores into ElementBuffer. E.g.
   // %82 = struct_extract %element_buffer : $UnsafeMutablePointer<Int>
@@ -746,9 +791,29 @@ bool swift::ArraySemanticsCall::mapInitializationStores(
   // mark_dependence can be an operand of the struct_extract or its user.
 
   SILValue UnsafeMutablePointerExtract;
-  if (getKind() == ArrayCallKind::kArrayUninitializedIntrinsic) {
+  if (initArray.getKind() == ArrayCallKind::kArrayUninitializedIntrinsic) {
     UnsafeMutablePointerExtract = dyn_cast_or_null<MarkDependenceInst>(
         getSingleNonDebugUser(ElementBuffer));
+    if (!UnsafeMutablePointerExtract) {
+      SILValue array = initArray.getArrayValue();
+      ValueWorklist worklist(array);
+      while (SILValue v = worklist.pop()) {
+        for (auto use : v->getUses()) {
+          switch (use->getUser()->getKind()) {
+            case SILInstructionKind::UncheckedRefCastInst:
+            case SILInstructionKind::StructExtractInst:
+            case SILInstructionKind::BeginBorrowInst:
+              worklist.pushIfNotVisited(cast<SingleValueInstruction>(use->getUser()));
+              break;
+            case SILInstructionKind::RefTailAddrInst:
+              return cast<RefTailAddrInst>(use->getUser());
+            default:
+              break;
+          }
+        }
+      }
+      return SILValue();
+    }
   } else {
     auto user = getSingleNonDebugUser(ElementBuffer);
     // Match mark_dependence (struct_extract or
@@ -764,21 +829,33 @@ bool swift::ArraySemanticsCall::mapInitializationStores(
     }
   }
   if (!UnsafeMutablePointerExtract)
-    return false;
+    return SILValue();
 
   auto *PointerToAddress = dyn_cast_or_null<PointerToAddressInst>(
       getSingleNonDebugUser(UnsafeMutablePointerExtract));
   if (!PointerToAddress)
+    return SILValue();
+  return PointerToAddress;
+}
+
+bool swift::ArraySemanticsCall::mapInitializationStores(
+    llvm::DenseMap<uint64_t, StoreInst *> &ElementValueMap) {
+  if (getKind() != ArrayCallKind::kArrayUninitialized &&
+      getKind() != ArrayCallKind::kArrayUninitializedIntrinsic)
+    return false;
+
+  SILValue elementAddr = getElementBaseAddress(*this);
+  if (!elementAddr)
     return false;
 
   // Match the stores. We can have either a store directly to the address or
   // to an index_addr projection.
-  for (auto *Op : PointerToAddress->getUses()) {
+  for (auto *Op : elementAddr->getUses()) {
     auto *Inst = Op->getUser();
 
     // Store to the base.
     auto *SI = dyn_cast<StoreInst>(Inst);
-    if (SI && SI->getDest() == PointerToAddress) {
+    if (SI && SI->getDest() == elementAddr) {
       // We have already seen an entry for this index bail.
       if (ElementValueMap.count(0))
         return false;

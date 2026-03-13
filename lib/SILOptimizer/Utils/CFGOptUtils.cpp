@@ -22,6 +22,7 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 using namespace swift;
@@ -519,6 +520,7 @@ bool isSafeNonExitTerminator(TermInst *ti) {
     return true;
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
   case TermKind::ThrowInst:
   case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
@@ -589,4 +591,23 @@ bool swift::findAllNonFailureExitBBs(
 
   // We understood all terminators, return true.
   return true;
+}
+
+//===----------------------------------------------------------------------===//
+//                            Swift Bridging
+//===----------------------------------------------------------------------===//
+
+static BridgedOptimizerUtilities::UpdateFunctionFn breakInfiniteLoopsFunction;
+
+void BridgedOptimizerUtilities::registerControlFlowUtils(UpdateFunctionFn breakInfiniteLoopsFn) {
+  breakInfiniteLoopsFunction = breakInfiniteLoopsFn;
+}
+
+void swift::breakInfiniteLoops(SILPassManager *pm, SILFunction *f) {
+  if (breakInfiniteLoopsFunction) {
+    breakInfiniteLoopsFunction({pm->getSwiftPassInvocation()->getCurrent()}, {f});
+  } else {
+    // If SwiftCompilerSources are not enabled or in SourceKit unit tests
+    f->setNeedBreakInfiniteLoops(false);
+  }
 }

@@ -52,7 +52,7 @@ public func main() {
   protocolBoundFunc(GenericType<Bool>(Bool()))
 }
 
-// CHECK: define {{.*}}i32 @main(i32 %0, ptr %1)
+// CHECK: define {{.*}}i32 @{{_*}}main{{.*}}(i32 %0, ptr %1)
 // CHECK: define {{.*}}void @"$e4Main4BoolVACycfC"()
 // CHECK: define {{.*}}void @"$e4Main4mainyyF"()
 // CHECK: define {{.*}}void @"$e8MyModule14nonGenericFuncyyF"()

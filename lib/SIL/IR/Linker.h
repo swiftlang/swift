@@ -81,7 +81,7 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, void> {
   llvm::DenseSet<ProtocolConformance *> VisitedConformances;
 
   /// Worklist of SILFunctions we are processing.
-  llvm::SmallVector<SILFunction *, 128> Worklist;
+  llvm::SmallVector<SILFunction *, 32> Worklist;
 
   llvm::SmallVector<SILFunction *, 32> toVerify;
 
@@ -129,6 +129,7 @@ public:
   }
   void visitInitExistentialAddrInst(InitExistentialAddrInst *IEI);
   void visitInitExistentialRefInst(InitExistentialRefInst *IERI);
+  void visitBuiltinInst(BuiltinInst *bi);
   void visitAllocRefInst(AllocRefInst *ARI);
   void visitAllocRefDynamicInst(AllocRefDynamicInst *ARI);
   void visitMetatypeInst(MetatypeInst *MI);

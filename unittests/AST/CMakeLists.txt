@@ -2,11 +2,14 @@ add_swift_unittest(SwiftASTTests
   ArithmeticEvaluator.cpp
   ASTDumperTests.cpp
   ASTWalkerTests.cpp
+  AvailabilityContextTests.cpp
   AvailabilityDomainTests.cpp
   IndexSubsetTests.cpp
   DiagnosticBehaviorTests.cpp
   DiagnosticConsumerTests.cpp
   DiagnosticGroupsTests.cpp
+  DiagnosticFormattingTests.cpp
+  DiagnosticInfoTests.cpp
   SourceLocTests.cpp
   TestContext.cpp
   TypeMatchTests.cpp
@@ -17,6 +20,8 @@ add_swift_unittest(SwiftASTTests
 target_link_libraries(SwiftASTTests
    PRIVATE
    swiftAST
+   swiftClangImporter
+   swiftSIL
    # FIXME: Circular dependencies.
    swiftParse
    swiftSema

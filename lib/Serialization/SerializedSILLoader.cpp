@@ -62,9 +62,11 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
 
 SILFunction *
 SerializedSILLoader::lookupSILFunction(StringRef Name,
-                                       std::optional<SILLinkage> Linkage) {
+                                       std::optional<SILLinkage> Linkage,
+                                       bool byAsmName) {
   for (auto &Des : LoadedSILSections) {
-    if (auto *Func = Des->lookupSILFunction(Name, /*declarationOnly*/ true)) {
+    if (auto *Func = Des->lookupSILFunction(Name, /*declarationOnly*/ true,
+                                            byAsmName)) {
       LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
                  << Des->getModuleIdentifier().str() << "\n");
       if (Linkage) {
@@ -80,6 +82,16 @@ SerializedSILLoader::lookupSILFunction(StringRef Name,
         }
       }
       return Func;
+    }
+  }
+  return nullptr;
+}
+
+SILGlobalVariable *
+SerializedSILLoader::lookupSILGlobalVariable(StringRef Name, bool byAsmName) {
+  for (auto &Des : LoadedSILSections) {
+    if (auto *G = Des->lookupSILGlobalVariable(Name, byAsmName)) {
+      return G;
     }
   }
   return nullptr;
@@ -132,6 +144,14 @@ lookupDefaultWitnessTable(SILDefaultWitnessTable *WT) {
   for (auto &Des : LoadedSILSections)
     if (auto wT = Des->lookupDefaultWitnessTable(WT))
       return wT;
+  return nullptr;
+}
+
+SILDefaultOverrideTable *
+SerializedSILLoader::lookupDefaultOverrideTable(SILDefaultOverrideTable *OT) {
+  for (auto &Des : LoadedSILSections)
+    if (auto oT = Des->lookupDefaultOverrideTable(OT))
+      return oT;
   return nullptr;
 }
 
@@ -241,6 +261,12 @@ void SerializedSILLoader::getAllWitnessTables() {
 void SerializedSILLoader::getAllDefaultWitnessTables() {
   for (auto &Des : LoadedSILSections)
     Des->getAllDefaultWitnessTables();
+}
+
+/// Deserialize all DefaultOverrideTables in all SILModules.
+void SerializedSILLoader::getAllDefaultOverrideTables() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllDefaultOverrideTables();
 }
 
 /// Deserialize all Properties in all SILModules.

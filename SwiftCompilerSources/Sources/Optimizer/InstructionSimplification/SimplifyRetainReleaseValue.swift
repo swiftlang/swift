@@ -12,7 +12,7 @@
 
 import SIL
 
-extension RetainValueInst : Simplifyable, SILCombineSimplifyable {
+extension RetainValueInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
     // Remove pairs of
@@ -59,7 +59,7 @@ extension RetainValueInst : Simplifyable, SILCombineSimplifyable {
   }
 }
 
-extension ReleaseValueInst : Simplifyable, SILCombineSimplifyable {
+extension ReleaseValueInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
     // Replace

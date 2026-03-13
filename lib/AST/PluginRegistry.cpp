@@ -172,6 +172,16 @@ PluginRegistry::loadExecutablePlugin(StringRef path, bool disableSandbox) {
   return storage.get();
 }
 
+LoadedExecutablePlugin::~LoadedExecutablePlugin() {
+  if (Process) {
+    // If the process is alive, send an empty message as the termination signal.
+    // The plugin should exit itself when receiving it.
+    if (auto error = sendMessage(""))
+      llvm::consumeError(std::move(error));
+    Process.reset();
+  }
+}
+
 llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
   if (Process) {
     // NOTE: We don't check the mtime here because 'stat(2)' call is too heavy.
@@ -213,8 +223,15 @@ LoadedExecutablePlugin::PluginProcess::~PluginProcess() {
 #else
   close(input);
   close(output);
+  kill(process.Pid, SIGTERM);
 #endif
-  llvm::sys::Wait(process, /*SecondsToWait=*/0);
+
+  // Set `SecondsToWait` non-zero so it waits for the timeout and kill it after
+  // that. Usually when the pipe is closed above, the plugin detects the EOF in
+  // the stdin and exits immediately, so this usually doesn't wait for the
+  // timeout. Note that we can't use '0' because it performs a non-blocking
+  // wait, which make the plugin a zombie if it hasn't exited.
+  llvm::sys::Wait(process, /*SecondsToWait=*/1);
 }
 
 ssize_t LoadedExecutablePlugin::PluginProcess::read(void *buf,

@@ -225,7 +225,7 @@ public:
 
       // point at the for stmt, to look nice
       SourceLoc StartLoc = FES->getStartLoc();
-      SourceLoc EndLoc = FES->getParsedSequence()->getEndLoc();
+      SourceLoc EndLoc = FES->getSequence()->getEndLoc();
       // FIXME: get the 'end' of the for stmt
       // if (FD->getResultTypeRepr()) {
       //   EndLoc = FD->getResultTypeSourceRange().End;
@@ -520,7 +520,7 @@ public:
         new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                               SourceLoc(), Context.getIdentifier(NameBuf),
                               TypeCheckDC);
-    VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
+    VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfEnvironment());
     VD->setImplicit();
 
     NamedPattern *NP = NamedPattern::createImplicit(Context, VD, VD->getTypeInContext());

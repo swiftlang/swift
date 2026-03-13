@@ -75,7 +75,7 @@ class GenericParamList;
 class TrailingWhereClause;
 class ParameterList;
 class PatternBindingEntry;
-class SpecializeAttr;
+class AbstractSpecializeAttr;
 class GenericContext;
 class DeclName;
 class StmtConditionElement;
@@ -239,6 +239,9 @@ public:
   NullablePtr<Stmt> getStmtIfAny() const;
   NullablePtr<Expr> getExprIfAny() const;
 
+  /// Whether this scope is for a decl attribute.
+  bool isDeclAttribute() const;
+
 #pragma mark - debugging and printing
 
 public:
@@ -264,7 +267,9 @@ public:
   void dumpOneScopeMapLocation(std::pair<unsigned, unsigned> lineColumn);
 
 private:
-  llvm::raw_ostream &verificationError() const;
+  [[noreturn]]
+  void abortWithVerificationError(
+      llvm::function_ref<void(llvm::raw_ostream &)> messageFn) const;
 
 #pragma mark - Scope tree creation
 public:
@@ -322,18 +327,15 @@ private:
 
 protected:
   /// Not const because may reexpand some scopes.
-  ASTScopeImpl *findInnermostEnclosingScope(ModuleDecl *,
-                                            SourceLoc,
+  ASTScopeImpl *findInnermostEnclosingScope(SourceLoc,
                                             NullablePtr<raw_ostream>);
-  ASTScopeImpl *findInnermostEnclosingScopeImpl(ModuleDecl *,
-                                                SourceLoc,
+  ASTScopeImpl *findInnermostEnclosingScopeImpl(SourceLoc,
                                                 NullablePtr<raw_ostream>,
                                                 SourceManager &,
                                                 ScopeCreator &);
 
 private:
-  NullablePtr<ASTScopeImpl> findChildContaining(ModuleDecl *,
-                                                SourceLoc loc,
+  NullablePtr<ASTScopeImpl> findChildContaining(SourceLoc loc,
                                                 SourceManager &sourceMgr) const;
 
 #pragma mark - - lookup- per scope
@@ -1236,10 +1238,10 @@ public:
 /// The \c _@specialize attribute.
 class SpecializeAttributeScope final : public ASTScopeImpl {
 public:
-  SpecializeAttr *const specializeAttr;
+  AbstractSpecializeAttr *const specializeAttr;
   AbstractFunctionDecl *const whatWasSpecialized;
 
-  SpecializeAttributeScope(SpecializeAttr *specializeAttr,
+  SpecializeAttributeScope(AbstractSpecializeAttr *specializeAttr,
                            AbstractFunctionDecl *whatWasSpecialized)
       : ASTScopeImpl(ScopeKind::SpecializeAttribute),
         specializeAttr(specializeAttr), whatWasSpecialized(whatWasSpecialized) {
@@ -1850,7 +1852,6 @@ public:
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
-  NullablePtr<AbstractClosureExpr> parentClosureIfAny() const; // public??
   BraceStmt *getStmt() const override { return stmt; }
 
 protected:
@@ -1866,15 +1867,20 @@ public:
 class TryScope final : public ASTScopeImpl {
 public:
   AnyTryExpr *const expr;
-  TryScope(AnyTryExpr *e)
-      : ASTScopeImpl(ScopeKind::Try), expr(e) {}
+
+  /// The end location of the scope. This may be past the TryExpr for
+  /// cases where the `try` is at the top-level of an unfolded SequenceExpr. In
+  /// such cases, the `try` covers all elements to the right.
+  SourceLoc endLoc;
+
+  TryScope(AnyTryExpr *e, SourceLoc endLoc)
+      : ASTScopeImpl(ScopeKind::Try), expr(e), endLoc(endLoc) {
+    ASSERT(endLoc.isValid());
+  }
   virtual ~TryScope() {}
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-
-private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
 public:
   SourceRange

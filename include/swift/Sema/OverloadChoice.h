@@ -126,19 +126,18 @@ class OverloadChoice {
   /// FIXME: This needs three bits. Can we pack them somewhere?
   FunctionRefInfo TheFunctionRefInfo = FunctionRefInfo::unappliedBaseName();
 
-public:
-  OverloadChoice() : BaseAndDeclKind(nullptr, 0), DeclOrKind() {}
-
   OverloadChoice(Type base, ValueDecl *value,
                  FunctionRefInfo functionRefInfo)
     : BaseAndDeclKind(base, 0),
       TheFunctionRefInfo(functionRefInfo) {
-    assert(!base || !base->hasTypeParameter());
     assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
            "Badly aligned decl");
     
     DeclOrKind = value;
   }
+
+public:
+  OverloadChoice() : BaseAndDeclKind(nullptr, 0), DeclOrKind() {}
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
       : BaseAndDeclKind(base, 0), DeclOrKind(uint32_t(kind)) {
@@ -160,6 +159,22 @@ public:
   bool isInvalid() const {
     return BaseAndDeclKind.getPointer().isNull() &&
            BaseAndDeclKind.getInt() == 0 && DeclOrKind.isNull();
+  }
+
+  /// Retrieve an overload choice for a declaration that was found via
+  /// unqualified lookup.
+  static OverloadChoice getDecl(ValueDecl *value,
+                                FunctionRefInfo functionRefInfo) {
+    return OverloadChoice(Type(), value, functionRefInfo);
+  }
+
+
+  /// Retrieve an overload choice for a declaration that was found via
+  /// qualified lookup.
+  static OverloadChoice getDecl(Type base, ValueDecl *value,
+                                FunctionRefInfo functionRefInfo) {
+    ASSERT(!base->hasTypeParameter());
+    return OverloadChoice(base, value, functionRefInfo);
   }
 
   /// Retrieve an overload choice for a declaration that was found via
@@ -232,8 +247,8 @@ public:
                  ? OverloadChoiceKind::KeyPathDynamicMemberLookup
                  : OverloadChoiceKind::DynamicMemberLookup;
     }
-    
-    if (DeclOrKind.is<ValueDecl*>()) {
+
+    if (isa<ValueDecl *>(DeclOrKind)) {
       switch (BaseAndDeclKind.getInt()) {
       case IsDeclViaBridge: return OverloadChoiceKind::DeclViaBridge;
       case IsDeclViaDynamic: return OverloadChoiceKind::DeclViaDynamic;
@@ -243,22 +258,35 @@ public:
       default: return OverloadChoiceKind::Decl;
       }
     }
-    uint32_t kind = DeclOrKind.get<OverloadChoiceKindWithTupleIndex>();
+    uint32_t kind = cast<OverloadChoiceKindWithTupleIndex>(DeclOrKind);
     if (kind >= (uint32_t)OverloadChoiceKind::TupleIndex)
       return OverloadChoiceKind::TupleIndex;
 
     return (OverloadChoiceKind)kind;
   }
 
-  /// Determine whether this choice is for a declaration.
-  bool isDecl() const {
-    return DeclOrKind.is<ValueDecl*>();
+  bool canBePrepared() const {
+    switch (getKind()) {
+    case OverloadChoiceKind::Decl:
+    case OverloadChoiceKind::DeclViaBridge:
+    case OverloadChoiceKind::DeclViaDynamic:
+    case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    case OverloadChoiceKind::DynamicMemberLookup:
+    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
+      return true;
+    case OverloadChoiceKind::TupleIndex:
+    case OverloadChoiceKind::MaterializePack:
+    case OverloadChoiceKind::ExtractFunctionIsolation:
+    case OverloadChoiceKind::KeyPathApplication:
+      return false;
+    }
   }
 
+  /// Determine whether this choice is for a declaration.
+  bool isDecl() const { return isa<ValueDecl *>(DeclOrKind); }
+
   /// Retrieve the declaration that corresponds to this overload choice.
-  ValueDecl *getDecl() const {
-    return DeclOrKind.get<ValueDecl*>();
-  }
+  ValueDecl *getDecl() const { return cast<ValueDecl *>(DeclOrKind); }
 
   /// Retrieves the declaration that corresponds to this overload choice, or
   /// \c nullptr if this choice is not for a declaration.
@@ -295,7 +323,7 @@ public:
   /// choice.
   unsigned getTupleIndex() const {
     assert(getKind() == OverloadChoiceKind::TupleIndex);
-    uint32_t kind = DeclOrKind.get<OverloadChoiceKindWithTupleIndex>();
+    uint32_t kind = cast<OverloadChoiceKindWithTupleIndex>(DeclOrKind);
     return kind-(uint32_t)OverloadChoiceKind::TupleIndex;
   }
 

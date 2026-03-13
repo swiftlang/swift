@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_STRUCTMETADATALAYOUT_H
 #define SWIFT_IRGEN_STRUCTMETADATALAYOUT_H
 
+#include "Field.h"
 #include "NominalMetadataVisitor.h"
 #include "swift/AST/IRGenOptions.h"
 
@@ -42,6 +43,14 @@ protected:
     : super(IGM), Target(target) {}
 
 public:
+
+  void embeddedLayout() {
+    // The embedded layout consists of:
+    // -1 : vwt
+    //  0 : metadata flags
+    super::layout();
+  }
+
   void layout() {
     static_assert(MetadataAdjustmentIndex::ValueType == 2,
                   "Adjustment index must be synchronized with this layout");
@@ -63,8 +72,10 @@ public:
 
     // Struct field offsets.
     asImpl().noteStartOfFieldOffsets();
-    for (VarDecl *prop : Target->getStoredProperties())
-      asImpl().addFieldOffset(prop);
+    for (VarDecl *prop : Target->getStoredProperties()) {
+      if (isExportableField(prop))
+        asImpl().addFieldOffset(prop);
+    }
 
     asImpl().noteEndOfFieldOffsets();
 

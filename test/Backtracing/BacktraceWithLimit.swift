@@ -1,15 +1,15 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -parse-as-library -Onone -o %t/BacktraceWithLimit
-// RUN: %target-codesign %t/BacktraceWithLimit
-// RUN: %target-run %t/BacktraceWithLimit | %FileCheck %s
+// RUN: %target-build-swift %s -parse-as-library -Xfrontend -disable-availability-checking -Onone -o %t/BacktraceWithLimit.exe
+// RUN: %target-codesign %t/BacktraceWithLimit.exe
+// RUN: %target-run %t/BacktraceWithLimit.exe | %FileCheck %s
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
-import _Backtracing
+import Runtime
 
 func doFrames(_ count: Int) {
   if count <= 0 {

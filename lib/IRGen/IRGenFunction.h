@@ -25,6 +25,7 @@
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/DenseMap.h"
@@ -45,11 +46,12 @@ namespace swift {
   class SILType;
   class SourceLoc;
   enum class MetadataState : size_t;
+  enum class CoroAllocatorKind : uint8_t;
 
-namespace Lowering {
+  namespace Lowering {
   class TypeConverter;
-}
-  
+  }
+
 namespace irgen {
   class DynamicMetadataRequest;
   class Explosion;
@@ -65,6 +67,11 @@ namespace irgen {
   class TypeInfo;
   enum class ValueWitness : unsigned;
 
+enum AllowsTaskAlloc_t : bool {
+  DoesNotAllowTaskAlloc = false,
+  AllowsTaskAlloc = true,
+};
+
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
 class IRGenFunction {
@@ -76,6 +83,9 @@ public:
   /// function attribute.
   OptimizationMode OptMode;
   bool isPerformanceConstraint;
+
+  // Destination basic blocks for condfail traps.
+  llvm::SmallVector<llvm::BasicBlock *, 8> FailBBs;
 
   llvm::Function *const CurFn;
   ModuleDecl *getSwiftModule() const;
@@ -94,7 +104,9 @@ public:
 
   friend class Scope;
 
-  Address createErrorResultSlot(SILType errorType, bool isAsync, bool setSwiftErrorFlag = true, bool isTypedError = false);
+  Address createErrorResultSlot(SILType errorType, bool isAsync,
+                                bool setSwiftErrorFlag = true,
+                                bool isTypedError = false);
 
   //--- Function prologue and epilogue
   //-------------------------------------------
@@ -102,8 +114,8 @@ public:
   Explosion collectParameters();
   void emitScalarReturn(SILType returnResultType, SILType funcResultType,
                         Explosion &scalars, bool isSwiftCCReturn,
-                        bool isOutlined, bool mayPeepholeLoad = false,
-                        SILType errorType = {});
+                        bool isOutlined, bool mayPeepholeLoad,
+                        SILType errorType);
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();
@@ -142,6 +154,8 @@ public:
   Address getCalleeTypedErrorResultSlot(SILType errorType);
   void setCalleeTypedErrorResultSlot(Address addr);
 
+  llvm::ConstantInt* getMallocTypeId();
+
   /// Are we currently emitting a coroutine?
   bool isCoroutine() {
     return CoroutineHandle != nullptr;
@@ -150,12 +164,25 @@ public:
     assert(isCoroutine());
     return CoroutineHandle;
   }
+  bool isCalleeAllocatedCoroutine() { return CoroutineAllocator != nullptr; }
+  llvm::Value *getCoroutineAllocator() {
+    assert(isCoroutine());
+    return CoroutineAllocator;
+  }
 
   void setCoroutineHandle(llvm::Value *handle) {
     assert(CoroutineHandle == nullptr && "already set handle");
     assert(handle != nullptr && "setting a null handle");
     CoroutineHandle = handle;
   }
+
+  void setCoroutineAllocator(llvm::Value *allocator) {
+    assert(CoroutineAllocator == nullptr && "already set allocator");
+    assert(allocator != nullptr && "setting a null allocator");
+    CoroutineAllocator = allocator;
+  }
+
+  std::optional<CoroAllocatorKind> getDefaultCoroutineAllocatorKind();
 
   llvm::BasicBlock *getCoroutineExitBlock() const {
     return CoroutineExitBlock;
@@ -180,13 +207,14 @@ public:
 
   llvm::Value *emitAsyncResumeProjectContext(llvm::Value *callerContextAddr);
   llvm::Function *getOrCreateResumePrjFn();
+  llvm::Value *popAsyncContext(llvm::Value *calleeContext);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Value *> args);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Type *> argTypes);
 
   void emitGetAsyncContinuation(SILType resumeTy,
-                                StackAddress optionalResultAddr,
+                                Address optionalResultAddr,
                                 Explosion &out,
                                 bool canThrow);
 
@@ -226,6 +254,7 @@ private:
   Address CallerTypedErrorResultSlot;
   Address CalleeTypedErrorResultSlot;
   llvm::Value *CoroutineHandle = nullptr;
+  llvm::Value *CoroutineAllocator = nullptr;
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
 
@@ -275,17 +304,107 @@ public:
   void setupAsync(unsigned asyncContextIndex);
   bool isAsync() const { return asyncContextLocation.isValid(); }
 
+  /// Allocate memory using whatever the current function's notion of
+  /// the stack is. This may perform either static or dynamic allocation
+  /// depending on the size. If `isNested` is true, this allocation must
+  /// use stack discipline w.r.t all other dynamic allocations.
+  ///
+  /// Always returns an address with i8 element type.
+  ///
+  /// The memory should be deallocated with emitStackDeallocation.
+  StackAddress emitStackAllocation(llvm::Value *size, Alignment align,
+                                   StackAllocationIsNested_t isNested =
+                                     StackAllocationIsNested,
+                                   const llvm::Twine &name = "");
+
+  /// Deallocate memory that was allocated with emitStackAllocation.
+  ///
+  /// Calling this is equivalent to calling whichever the appropriate
+  /// deallocation routine was for the kind of allocation that was
+  /// performed, so it should be safe to call it for any allocation.
+  void emitStackDeallocation(StackAddress address);
+
+  /// Create an alloca instruction at the static alloca insertion point
+  /// in the entry block of the function.
+  ///
+  /// You should generally prefer emitStaticAlloca and
+  /// emitDeallocateStaticAlloca instead, which also insert the
+  /// lifetime start and end intrinsics.
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name = "");
   Address createAlloca(llvm::Type *ty, llvm::Value *arraySize, Alignment align,
                        const llvm::Twine &name = "");
 
+  /// Allocate memory statically in the stack frame by creating an alloca
+  /// instruction in the entry block and calling the llvm.lifetime.start
+  /// intrinsic for it at the current IP.
+  ///
+  /// Static memory allocations in the stack frame do not need to use
+  /// stack discipline; LLVM will perform a reaching analysis for the
+  /// start/finish intrinsics when deciding whether to reuse the memory.
+  ///
+  /// Always returns an address with the given element type.
+  ///
+  /// The memory should be deallocated with emitDeallocateStaticAlloca.
+  StackAddress emitStaticAlloca(llvm::Type *ty, Size size, Alignment align,
+                                const llvm::Twine &name = "");
+  StackAddress emitStaticByteArrayAlloca(llvm::ConstantInt *size,
+                                         Alignment align,
+                                         const llvm::Twine &name = "");
+
+  /// Deallocate memory that was allocated statically in the stack frame by
+  /// calling the llvm.lifetime.end intrinsic for it at the current IP.
+  void emitDeallocateStaticAlloca(StackAddress address);
+
+  /// Like emitStackAllocation, but do not try to allocate statically.
+  ///
+  /// Always returns an address with i8 element type.
+  ///
+  /// The memory should be deallocated with emitDynamicStackDeallocation.
+  StackAddress emitDynamicStackAllocation(SILType type,
+                                          StackAllocationIsNested_t isNested,
+                                          const llvm::Twine &name = "");
+  void emitDynamicStackDeallocation(StackAddress address);
+
+  /// Allocate memory dynamically in whatever the current function's notion
+  /// of the stack is. In a synchronous, non-coroutine function, this will
+  /// use LLVM's alloca instruction together with a stacksave; other
+  /// approaches are used in other contexts.
+  ///
+  /// Always returns an address with i8 element type.
+  ///
+  /// All such allocations must use proper stack discipline, i.e. FIFO
+  /// ordering on alloc + dealloc operations.
   StackAddress emitDynamicAlloca(SILType type, const llvm::Twine &name = "");
-  StackAddress emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize,
-                                 Alignment align, bool allowTaskAlloc = true,
-                                 const llvm::Twine &name = "");
+
+  /// Allocate memory dynamically in whatever the current function's notion
+  /// of the stack is. In a synchronous, non-coroutine function, this will
+  /// use LLVM's alloca instruction together with a stacksave; other
+  /// approaches are used in other contexts.
+  ///
+  /// Always returns an address with the given element type.
+  ///
+  /// All such allocations must use proper stack discipline, i.e. FIFO
+  /// ordering on alloc + dealloc operations.
+  StackAddress
+  emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize, Alignment align,
+                    AllowsTaskAlloc_t allowTaskAlloc = AllowsTaskAlloc,
+                    llvm::Value *mallocTypeId = nullptr,
+                    const llvm::Twine &name = "");
   void emitDeallocateDynamicAlloca(StackAddress address,
-                                   bool allowTaskDealloc = true);
+                                   bool useTaskDeallocThrough = false,
+                                   bool forCalleeCoroutineFrame = false);
+
+  /// Perform a dynamic "stack" allocation that may not be properly nested.
+  /// Currently, this just calls malloc/free.
+  ///
+  /// Always returns an address with i8 element type.
+  ///
+  /// The memory should be deallocated with emitNonNestedStackDeallocation.
+  StackAddress emitNonNestedStackAllocation(llvm::Value *size,
+                                            Alignment align,
+                                            const llvm::Twine &name = "");
+  void emitNonNestedStackDeallocation(StackAddress address);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
@@ -302,7 +421,6 @@ public:
   void emitMemCpy(Address dest, Address src, llvm::Value *size);
 
   llvm::Value *emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
-                                 llvm::Type *objectType,
                                  const llvm::Twine &name = "");
   Address emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
                             const TypeInfo &type,
@@ -374,9 +492,8 @@ public:
 
   // Emit a call to the given generic type metadata access function.
   MetadataResponse emitGenericTypeMetadataAccessFunctionCall(
-                                          llvm::Function *accessFunction,
-                                          ArrayRef<llvm::Value *> args,
-                                          DynamicMetadataRequest request);
+      llvm::Function *accessFunction, ArrayRef<llvm::Value *> args,
+      DynamicMetadataRequest request, bool hasPacks = false);
 
   // Emit a reference to the canonical type metadata record for the given AST
   // type. This can be used to identify the type at runtime. For types with
@@ -437,6 +554,8 @@ public:
   void recordStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
   void eraseStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
 
+  void withLocalStackPackAllocs(llvm::function_ref<void()> fn);
+
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);
 
@@ -453,6 +572,9 @@ public:
 
   /// Emit a non-mergeable trap call, optionally followed by a terminator.
   void emitTrap(StringRef failureMessage, bool EmitUnreachable);
+
+  void emitConditionalTrap(llvm::Value *condition, StringRef failureMessage,
+                           const SILDebugScope *debugScope = nullptr);
 
   /// Given at least a src address to a list of elements, runs body over each
   /// element passing its address. An optional destination address can be
@@ -593,6 +715,9 @@ public:
   void emitNativeStrongRelease(llvm::Value *value, Atomicity atomicity);
   void emitNativeSetDeallocating(llvm::Value *value);
 
+  // Routines to deal with box (embedded) runtime calls.
+  void emitReleaseBox(llvm::Value *value);
+
   // Routines for the ObjC reference-counting style.
   void emitObjCStrongRetain(llvm::Value *value);
   llvm::Value *emitObjCRetainCall(llvm::Value *value);
@@ -629,6 +754,7 @@ public:
   Address emitTaskAlloc(llvm::Value *size,
                         Alignment alignment);
   void emitTaskDealloc(Address address);
+  void emitTaskDeallocThrough(Address address);
 
   llvm::Value *alignUpToMaximumAlignment(llvm::Type *sizeTy, llvm::Value *val);
 
@@ -735,7 +861,7 @@ public:
   void bindLocalTypeDataFromSelfWitnessTable(
                 const ProtocolConformance *conformance,
                 llvm::Value *selfTable,
-                llvm::function_ref<CanType (CanType)> mapTypeIntoContext);
+                llvm::function_ref<CanType (CanType)> mapTypeIntoEnvironment);
 
   void setDominanceResolver(DominanceResolverFunction resolver) {
     assert(DominanceResolver == nullptr);

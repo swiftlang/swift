@@ -28,7 +28,7 @@ do {
   func foo(x: String = String(ss)) {}
 }
 
-// CTP_CalleeResult
+// CTP_Initialization
 do {
   func getSubstring() -> Substring { return ss }
   let gottenString : String = String(getSubstring())

@@ -11,6 +11,12 @@
 // RUN:   -enable-library-evolution -swift-version 5 \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -verify
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault \
+// RUN:   -warnings-as-errors -Wwarning ImplementationOnlyDeprecated \
+// RUN:   -verify
+
 
 // REQUIRES: swift_feature_InternalImportsByDefault
 

@@ -157,3 +157,7 @@ module IncompleteTypes {
 module CompletionHandlerGlobals {
   header "completion_handler_globals.h"
 }
+
+module ImportedMacroError {
+  header "imported_macro_error.h"
+}

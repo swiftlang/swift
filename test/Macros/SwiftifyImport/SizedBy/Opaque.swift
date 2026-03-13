@@ -1,71 +1,107 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: swift_feature_Span
 
-// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -enable-experimental-feature Span -verify 2>&1 | %FileCheck --match-full-lines %s
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
 
+// RUN: %target-swift-frontend %t/test.swift -emit-module -plugin-path %swift-plugin-dir -strict-memory-safety -verify
+// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend %t/test.swift -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions 2> %t/expansions.out
+// RUN: %diff %t/expansions.out %t/expansions.expected
+
+//--- test.swift
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
-func nonnullUnsafeRawBufferPointer(_ ptr: OpaquePointer, _ size: CInt) {
+public func nonnullUnsafeRawBufferPointer(_ ptr: OpaquePointer, _ size: CInt) {
 }
 
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
-func nullableUnsafeRawBufferPointer(_ ptr: OpaquePointer?, _ size: CInt) {
+public func nullableUnsafeRawBufferPointer(_ ptr: OpaquePointer?, _ size: CInt) {
 }
 
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
-func impNullableUnsafeRawBufferPointer(_ ptr: OpaquePointer!, _ size: CInt) {
+public func impNullableUnsafeRawBufferPointer(_ ptr: OpaquePointer!, _ size: CInt) {
 }
 
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)))
-func nonnullSpan(_ ptr: OpaquePointer, _ size: CInt) {
-}
-
-// expected-note@+2{{in expansion of macro '_SwiftifyImport' on global function 'nullableSpan' here}}
-// Cannot refer to source location for the error: "type 'RawSpan' does not conform to protocol 'Escapable'" (which is currently necessary for Optional)
-@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)))
-func nullableSpan(_ ptr: OpaquePointer?, _ size: CInt) {
+public func nonnullSpan(_ ptr: OpaquePointer, _ size: CInt) {
 }
 
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)))
-func impNullableSpan(_ ptr: OpaquePointer!, _ size: CInt) {
+public func nullableSpan(_ ptr: OpaquePointer?, _ size: CInt) {
 }
 
-// CHECK:      @_alwaysEmitIntoClient
-// CHECK-NEXT: func nonnullUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
-// CHECK-NEXT:     return nonnullUnsafeRawBufferPointer(OpaquePointer(ptr.baseAddress!), CInt(exactly: ptr.count)!)
-// CHECK-NEXT: }
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)))
+public func impNullableSpan(_ ptr: OpaquePointer!, _ size: CInt) {
+}
 
-// CHECK:      @_alwaysEmitIntoClient
-// CHECK-NEXT: func nullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer?) {
-// CHECK-NEXT:     return nullableUnsafeRawBufferPointer(OpaquePointer(ptr?.baseAddress), CInt(exactly: ptr?.count ?? 0)!)
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient
-// CHECK-NEXT: func impNullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
-// CHECK-NEXT:     return impNullableUnsafeRawBufferPointer(OpaquePointer(ptr.baseAddress!), CInt(exactly: ptr.count)!)
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient
-// CHECK-NEXT: func nonnullSpan(_ ptr: RawSpan) {
-// CHECK-NEXT:     return ptr.withUnsafeBytes { _ptrPtr in
-// CHECK-NEXT:         return nonnullSpan(OpaquePointer(_ptrPtr.baseAddress!), CInt(exactly: ptr.byteCount)!)
-// CHECK-NEXT:     }
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient
-// CHECK-NEXT: func nullableSpan(_ ptr: RawSpan?) {
-// CHECK-NEXT:     return if ptr == nil {
-// CHECK-NEXT:         nullableSpan(nil, CInt(exactly: ptr?.byteCount ?? 0)!)
-// CHECK-NEXT:     } else {
-// CHECK-NEXT:         ptr!.withUnsafeBytes { _ptrPtr in
-// CHECK-NEXT:             return nullableSpan(OpaquePointer(_ptrPtr.baseAddress), CInt(exactly: ptr?.byteCount ?? 0)!)
-// CHECK-NEXT:         }
-// CHECK-NEXT:     }
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient
-// CHECK-NEXT: func impNullableSpan(_ ptr: RawSpan) {
-// CHECK-NEXT:     return ptr.withUnsafeBytes { _ptrPtr in
-// CHECK-NEXT:         return impNullableSpan(OpaquePointer(_ptrPtr.baseAddress!), CInt(exactly: ptr.byteCount)!)
-// CHECK-NEXT:     }
-// CHECK-NEXT: }
-
+//--- expansions.expected
+@__swiftmacro_4test29nonnullUnsafeRawBufferPointer15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func nonnullUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
+    let size = CInt(exactly: ptr.count)!
+    return unsafe nonnullUnsafeRawBufferPointer(OpaquePointer(ptr.baseAddress!), size)
+}
+------------------------------
+@__swiftmacro_4test30nullableUnsafeRawBufferPointer15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func nullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer?) {
+    let size = CInt(exactly: unsafe ptr?.count ?? 0)!
+    return unsafe nullableUnsafeRawBufferPointer(OpaquePointer(ptr?.baseAddress), size)
+}
+------------------------------
+@__swiftmacro_4test33impNullableUnsafeRawBufferPointer15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func impNullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
+    let size = CInt(exactly: ptr.count)!
+    return unsafe impNullableUnsafeRawBufferPointer(OpaquePointer(ptr.baseAddress!), size)
+}
+------------------------------
+@__swiftmacro_4test11nonnullSpan15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func nonnullSpan(_ ptr: RawSpan) {
+    let size = CInt(exactly: ptr.byteCount)!
+    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+        unsafe $0
+    }
+    defer {
+        _fixLifetime(ptr)
+    }
+    return unsafe nonnullSpan(OpaquePointer(_ptrPtr.baseAddress!), size)
+}
+------------------------------
+@__swiftmacro_4test12nullableSpan15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func nullableSpan(_ ptr: RawSpan?) {
+    let size = CInt(exactly: ptr?.byteCount ?? 0)!
+    let _ptrPtr = unsafe ptr?.withUnsafeBytes {
+        unsafe $0
+    }
+    defer {
+        _fixLifetime(ptr)
+    }
+    return unsafe nullableSpan(OpaquePointer(_ptrPtr?.baseAddress), size)
+}
+------------------------------
+@__swiftmacro_4test15impNullableSpan15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func impNullableSpan(_ ptr: RawSpan) {
+    let size = CInt(exactly: ptr.byteCount)!
+    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+        unsafe $0
+    }
+    defer {
+        _fixLifetime(ptr)
+    }
+    return unsafe impNullableSpan(OpaquePointer(_ptrPtr.baseAddress!), size)
+}
+------------------------------

@@ -25,7 +25,7 @@ CxxCopyMoveAssignTestSuite.test("NonTrivialCopyAssign") {
         expectEqual(0, instance.copyAssignCounter)
         takeValue(instance2)
     }
-    // The number of construcors and destructors called for `NonTrivialCopyAssign` must be balanced.
+    // The number of constructors and destructors called for `NonTrivialCopyAssign` must be balanced.
     expectEqual(0, InstanceBalanceCounter.getCounterValue())
 }
 
@@ -37,7 +37,7 @@ CxxCopyMoveAssignTestSuite.test("NonTrivialMoveAssign") {
         // `operator=` isn't called.
         expectEqual(0, instance.moveAssignCounter)
     }
-    // The number of construcors and destructors called for `NonTrivialCopyAssign` must be balanced.
+    // The number of constructors and destructors called for `NonTrivialCopyAssign` must be balanced.
     expectEqual(0, InstanceBalanceCounter.getCounterValue())
 }
 
@@ -51,7 +51,7 @@ CxxCopyMoveAssignTestSuite.test("NonTrivialCopyAndCopyMoveAssign") {
         expectEqual(0, instance.assignCounter)
         takeValue(instance2)
     }
-    // The number of construcors and destructors called for `NonTrivialCopyAndCopyMoveAssign` must be balanced.
+    // The number of constructors and destructors called for `NonTrivialCopyAndCopyMoveAssign` must be balanced.
     expectEqual(0, InstanceBalanceCounter.getCounterValue())
 }
 

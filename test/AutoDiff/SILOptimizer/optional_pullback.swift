@@ -13,14 +13,9 @@ import _Differentiation
 // CHECK: apply %[[ZERO1]]<τ_0_0.TangentVector>(%[[RET_TAN_BUF]], %{{.*}})
 // CHECK: %[[ADJ_IN_BB:.+]] = alloc_stack $τ_0_0.TangentVector
 //
-// CHECK: %[[TAN_VAL_COPY:.+]] = alloc_stack $Optional<τ_0_0.TangentVector>
-// CHECK: %[[TAN_BUF:.+]] = alloc_stack $Optional<τ_0_0>.TangentVector
-
-// CHECK: copy_addr %[[OPT_TAN]] to [init] %[[TAN_BUF]] : $*Optional<τ_0_0>.TangentVector
-// CHECK: %[[TAN_VAL:.+]] = struct_element_addr %[[TAN_BUF]] : $*Optional<τ_0_0>.TangentVector, #Optional.TangentVector.value
-// CHECK: copy_addr %[[TAN_VAL]] to [init] %[[TAN_VAL_COPY]] : $*Optional<τ_0_0.TangentVector>
+// CHECK: %[[TAN_VAL:.+]] = struct_element_addr %[[OPT_TAN]] : $*Optional<τ_0_0>.TangentVector, #Optional.TangentVector.value
 //
-// CHECK: %[[TAN_DATA:.+]] = unchecked_take_enum_data_addr %[[TAN_VAL_COPY]] : $*Optional<τ_0_0.TangentVector>, #Optional.some!enumelt
+// CHECK: %[[TAN_DATA:.+]] = unchecked_take_enum_data_addr %[[TAN_VAL]] : $*Optional<τ_0_0.TangentVector>, #Optional.some!enumelt
 // CHECK: %[[PLUS_EQUAL:.+]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic."+="
 // CHECK: apply %[[PLUS_EQUAL]]<τ_0_0.TangentVector>(%[[ADJ_IN_BB]], %[[TAN_DATA]], %{{.*}})
 
@@ -29,9 +24,6 @@ import _Differentiation
 // CHECK: destroy_addr %[[ADJ_IN_BB]] : $*τ_0_0.TangentVector
 
 // CHECK: copy_addr [take] %[[RET_TAN_BUF:.+]] to [init] %[[RET_TAN:.+]]
-// CHECK: destroy_addr %[[TAN_BUF]] : $*Optional<τ_0_0>.TangentVector
-// CHECK: dealloc_stack %[[TAN_BUF]] : $*Optional<τ_0_0>.TangentVector
-// CHECK: dealloc_stack %[[TAN_VAL_COPY]] : $*Optional<τ_0_0.TangentVector>
 // CHECK: dealloc_stack %[[RET_TAN_BUF]] : $*τ_0_0.TangentVector
 
 @differentiable(reverse)

@@ -82,6 +82,8 @@ METADATAKIND(ExtendedExistential, 7 | MetadataKindIsRuntimePrivate | MetadataKin
 /// A `Builtin.FixedArray`.
 METADATAKIND(FixedArray, 8 | MetadataKindIsRuntimePrivate | MetadataKindIsNonHeap)
 
+/// A `Builtin.Borrow`.
+METADATAKIND(Borrow, 9 | MetadataKindIsRuntimePrivate | MetadataKindIsNonHeap)
 
 /// A heap-allocated local variable using statically-generated metadata.
 METADATAKIND(HeapLocalVariable, 0 | MetadataKindIsNonType)

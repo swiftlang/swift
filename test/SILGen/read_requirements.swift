@@ -1,15 +1,17 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types                           \
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types   \
 // RUN:     %s                                              \
+// RUN:     -enable-callee-allocated-coro-abi               \
 // RUN:     -enable-library-evolution                       \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
-// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-NORMAL,CHECK-%target-abi-stability
+// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-%target-abi-stability
 
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types                                              \
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types                      \
 // RUN:     %s                                                                 \
+// RUN:     -enable-callee-allocated-coro-abi                                  \
 // RUN:     -enable-library-evolution                                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors                    \
 // RUN:     -enable-experimental-feature CoroutineAccessorsUnwindOnCallerError \
-// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-UNWIND,CHECK-%target-abi-stability
+// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-%target-abi-stability
 
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: swift_feature_CoroutineAccessorsUnwindOnCallerError
@@ -17,7 +19,7 @@
 // A read requirement may be satisfied by
 // - a stored property
 // - a _read accessor
-// - a read accessor
+// - a yielding borrow accessor
 // - a get accessor
 // - an unsafeAddress accessor
 
@@ -31,7 +33,7 @@ public struct U : ~Copyable {}
 public protocol P1 : ~Copyable {
   @_borrowed
   var ubgs: U { get set }
-// CHECK-LABEL sil [ossa] @$s17read_requirements2P1P4ubgsAA1UVvy : {{.*}} {
+// CHECK-LABEL: sil {{.*}} [ossa] @$s17read_requirements2P1P4ubgsAA1UVvy : {{.*}} {
 // CHECK:      bb0(
 // CHECK-SAME:     [[SELF_UNCHECKED:%[^:]+]]
 // CHECK-SAME: ):
@@ -55,7 +57,7 @@ public protocol P1 : ~Copyable {
 // CHECK:        unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements2P1P4ubgsAA1UVvy'
 
-// CHECK-LABEL: sil [ossa] @$s17read_requirements2P1P4ubgsAA1UVvx : {{.*}} {
+// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements2P1P4ubgsAA1UVvx : {{.*}} {
 // CHECK:       bb0(
 // CHECK-SAME:      [[SELF_UNCHECKED:%[^:]+]]
 // CHECK-SAME:  ):
@@ -78,7 +80,7 @@ public protocol P1 : ~Copyable {
 }
 @available(SwiftStdlib 9999, *)
 public protocol P2 : ~Copyable {
-  var urs: U { read set }
+  var urs: U { yielding borrow set }
 }
 @available(SwiftStdlib 6.0, *)
 public protocol P3 : ~Copyable {
@@ -105,7 +107,7 @@ public protocol P3 : ~Copyable {
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements2P3P2urAA1UVvy'
-  var ur: U { read }
+  var ur: U { yielding borrow }
 }
 
 @frozen
@@ -188,8 +190,7 @@ public struct ImplAStored : ~Copyable & P1 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       bb2:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -239,8 +240,7 @@ public struct ImplBStored : ~Copyable & P2 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -329,8 +329,7 @@ public struct ImplCStored : ~Copyable & P3 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -434,8 +433,7 @@ public struct ImplAUnderscoredCoroutineAccessors : ~Copyable & P1 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -521,8 +519,7 @@ public struct ImplBUnderscoredCoroutineAccessors : ~Copyable & P2 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -624,8 +621,7 @@ public struct ImplCUnderscoredCoroutineAccessors : ~Copyable & P3 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -635,10 +631,10 @@ public struct ImplCUnderscoredCoroutineAccessors : ~Copyable & P3 {
 struct ImplACoroutineAccessors : ~Copyable & P1 {
   var _i: U
   var ubgs: U {
-    read {
+    yielding borrow {
       yield _i
     }
-    modify {
+    yielding mutate {
       yield &_i
     }
   }
@@ -730,8 +726,7 @@ struct ImplACoroutineAccessors : ~Copyable & P1 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -743,10 +738,10 @@ struct ImplACoroutineAccessors : ~Copyable & P1 {
 public struct ImplBCoroutineAccessors : ~Copyable & P2 {
   var _i: U
   public var urs: U {
-    read {
+    yielding borrow {
       yield _i
     }
-    modify {
+    yielding mutate {
       yield &_i
     }
   }
@@ -787,8 +782,7 @@ public struct ImplBCoroutineAccessors : ~Copyable & P2 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -800,7 +794,7 @@ public struct ImplBCoroutineAccessors : ~Copyable & P2 {
 public struct ImplCCoroutineAccessors : ~Copyable & P3 {
   var _i: U
   public var ur: U {
-    read {
+    yielding borrow {
       yield _i
     }
   }
@@ -892,8 +886,7 @@ public struct ImplCCoroutineAccessors : ~Copyable & P3 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -992,8 +985,7 @@ public struct ImplAGetSet : P1 {
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements11ImplAGetSetVAA2P1A2aDP4ubgsAA1UVvyTW'
@@ -1056,8 +1048,7 @@ public struct ImplBGetSet : P2 {
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvyTW'
@@ -1153,8 +1144,7 @@ public struct ImplCGetSet : P3 {
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements11ImplCGetSetVAA2P3A2aDP2urAA1UVvyTW'
@@ -1262,8 +1252,7 @@ public struct ImplAUnsafeAddressors : P1 {
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements21ImplAUnsafeAddressorsVAA2P1A2aDP4ubgsAA1UVvyTW'
@@ -1332,8 +1321,7 @@ public struct ImplBUnsafeAddressors : P2 {
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvyTW'
@@ -1444,8 +1432,7 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements21ImplCUnsafeAddressorsVAA2P3A2aDP2urAA1UVvyTW'
@@ -1453,178 +1440,178 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK-LABEL: sil_witness_table{{.*}} ImplAStored: P1 module read_requirements {
 // CHECK-NEXT:    method #P1.ubgs!read
 // CHECK-SAME:      : @$s17read_requirements11ImplAStoredVAA2P1A2aDP4ubgsAA1UVvrTW
-// CHECK-NEXT:    method #P1.ubgs!read2
+// CHECK-NEXT:    method #P1.ubgs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplAStoredVAA2P1A2aDP4ubgsAA1UVvyTW
 // CHECK-NEXT:    method #P1.ubgs!setter
 // CHECK-SAME:      : @$s17read_requirements11ImplAStoredVAA2P1A2aDP4ubgsAA1UVvsTW
 // CHECK-NEXT:    method #P1.ubgs!modify
 // CHECK-SAME:      : @$s17read_requirements11ImplAStoredVAA2P1A2aDP4ubgsAA1UVvMTW
-// CHECK-NEXT:    method #P1.ubgs!modify2
+// CHECK-NEXT:    method #P1.ubgs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements11ImplAStoredVAA2P1A2aDP4ubgsAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBStored: P2 module read_requirements {
 // CHECK-unstable:    method #P2.urs!read
-// CHECK-NEXT:    method #P2.urs!read2
+// CHECK-NEXT:    method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplBStoredVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements11ImplBStoredVAA2P2A2aDP3ursAA1UVvsTW
 // CHECK-unstable:    method #P2.urs!modify
-// CHECK-NEXT:    method #P2.urs!modify2
+// CHECK-NEXT:    method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements11ImplBStoredVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplCStored: P3 module read_requirements {
 // CHECK-NEXT:    method #P3.ur!read
 // CHECK-SAME:        : @$s17read_requirements11ImplCStoredVAA2P3A2aDP2urAA1UVvrTW
-// CHECK-NEXT:    method #P3.ur!read2
+// CHECK-NEXT:    method #P3.ur!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplCStoredVAA2P3A2aDP2urAA1UVvyTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplAUnderscoredCoroutineAccessors: P1 module read_requirements {
 // CHECK-NEXT:    method #P1.ubgs!read
 // CHECK-SAME:        : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvrTW
-// CHECK-NEXT:    method #P1.ubgs!read2
+// CHECK-NEXT:    method #P1.ubgs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvyTW
 // CHECK-NEXT:    method #P1.ubgs!setter
 // CHECK-SAME:        : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvsTW
 // CHECK-NEXT:    method #P1.ubgs!modify
 // CHECK-SAME:        : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvMTW
-// CHECK-NEXT:    method #P1.ubgs!modify2
+// CHECK-NEXT:    method #P1.ubgs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBUnderscoredCoroutineAccessors: P2 module read_requirements {
 // CHECK-unstable:    method #P2.urs!read
-// CHECK-NEXT:    method #P2.urs!read2
+// CHECK-NEXT:    method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvsTW
 // CHECK-unstable:    method #P2.urs!modify
-// CHECK-NEXT:    method #P2.urs!modify2
+// CHECK-NEXT:    method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplCUnderscoredCoroutineAccessors: P3 module read_requirements {
 // CHECK-NEXT:    method #P3.ur!read
 // CHECK-SAME:        : @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsVAA2P3A2aDP2urAA1UVvrTW
-// CHECK-NEXT:    method #P3.ur!read2
+// CHECK-NEXT:    method #P3.ur!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsVAA2P3A2aDP2urAA1UVvyTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplACoroutineAccessors: P1 module read_requirements {
 // CHECK-NEXT:    method #P1.ubgs!read
 // CHECK-SAME:        : @$s17read_requirements23ImplACoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvrTW
-// CHECK-NEXT:    method #P1.ubgs!read2
+// CHECK-NEXT:    method #P1.ubgs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements23ImplACoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvyTW
 // CHECK-NEXT:    method #P1.ubgs!setter
 // CHECK-SAME:        : @$s17read_requirements23ImplACoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvsTW
 // CHECK-NEXT:    method #P1.ubgs!modify
 // CHECK-SAME:        : @$s17read_requirements23ImplACoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvMTW
-// CHECK-NEXT:    method #P1.ubgs!modify2
+// CHECK-NEXT:    method #P1.ubgs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements23ImplACoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBCoroutineAccessors: P2 module read_requirements {
 // CHECK-unstable:    method #P2.urs!read
-// CHECK-NEXT:    method #P2.urs!read2
+// CHECK-NEXT:    method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements23ImplBCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements23ImplBCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvsTW
 // CHECK-unstable:    method #P2.urs!modify
-// CHECK-NEXT:    method #P2.urs!modify2
+// CHECK-NEXT:    method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements23ImplBCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplCCoroutineAccessors: P3 module read_requirements {
 // CHECK-NEXT:    method #P3.ur!read
 // CHECK-SAME:        : @$s17read_requirements23ImplCCoroutineAccessorsVAA2P3A2aDP2urAA1UVvrTW
-// CHECK-NEXT:    method #P3.ur!read2
+// CHECK-NEXT:    method #P3.ur!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements23ImplCCoroutineAccessorsVAA2P3A2aDP2urAA1UVvyTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplAGetSet: P1 module read_requirements {
 // CHECK-NEXT:    method #P1.ubgs!read
 // CHECK-SAME:        : @$s17read_requirements11ImplAGetSetVAA2P1A2aDP4ubgsAA1UVvrTW
-// CHECK-NEXT:  method #P1.ubgs!read2
+// CHECK-NEXT:  method #P1.ubgs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplAGetSetVAA2P1A2aDP4ubgsAA1UVvyTW
 // CHECK-NEXT:    method #P1.ubgs!setter
 // CHECK-SAME:        : @$s17read_requirements11ImplAGetSetVAA2P1A2aDP4ubgsAA1UVvsTW
 // CHECK-NEXT:    method #P1.ubgs!modify
 // CHECK-SAME:        : @$s17read_requirements11ImplAGetSetVAA2P1A2aDP4ubgsAA1UVvMTW
-// CHECK-NEXT:  method #P1.ubgs!modify2
+// CHECK-NEXT:  method #P1.ubgs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements11ImplAGetSetVAA2P1A2aDP4ubgsAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBGetSet: P2 module read_requirements {
 // CHECK-unstable:    method #P2.urs!read
-// CHECK-NEXT:  method #P2.urs!read2
+// CHECK-NEXT:  method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvsTW
 // CHECK-unstable:    method #P2.urs!modify
-// CHECK-NEXT:  method #P2.urs!modify2
+// CHECK-NEXT:  method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplCGetSet: P3 module read_requirements {
 // CHECK-NEXT:    method #P3.ur!read
 // CHECK-SAME:        : @$s17read_requirements11ImplCGetSetVAA2P3A2aDP2urAA1UVvrTW
-// CHECK-NEXT:  method #P3.ur!read2
+// CHECK-NEXT:  method #P3.ur!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplCGetSetVAA2P3A2aDP2urAA1UVvyTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplAUnsafeAddressors: P1 module read_requirements {
 // CHECK-NEXT:    method #P1.ubgs!read
 // CHECK-SAME:        : @$s17read_requirements21ImplAUnsafeAddressorsVAA2P1A2aDP4ubgsAA1UVvrTW
-// CHECK-NEXT:    method #P1.ubgs!read2
+// CHECK-NEXT:    method #P1.ubgs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements21ImplAUnsafeAddressorsVAA2P1A2aDP4ubgsAA1UVvyTW
 // CHECK-NEXT:    method #P1.ubgs!setter
 // CHECK-SAME:        : @$s17read_requirements21ImplAUnsafeAddressorsVAA2P1A2aDP4ubgsAA1UVvsTW
 // CHECK-NEXT:    method #P1.ubgs!modify
 // CHECK-SAME:        : @$s17read_requirements21ImplAUnsafeAddressorsVAA2P1A2aDP4ubgsAA1UVvMTW
-// CHECK-NEXT:    method #P1.ubgs!modify2
+// CHECK-NEXT:    method #P1.ubgs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements21ImplAUnsafeAddressorsVAA2P1A2aDP4ubgsAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBUnsafeAddressors: P2 module read_requirements {
 // CHECK-unstable:    method #P2.urs!read
-// CHECK-NEXT:    method #P2.urs!read2
+// CHECK-NEXT:    method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvsTW
 // CHECK-unstable:    method #P2.urs!modify
-// CHECK-NEXT:    method #P2.urs!modify2
+// CHECK-NEXT:    method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplCUnsafeAddressors: P3 module read_requirements {
 // CHECK-NEXT:    method #P3.ur!read
 // CHECK-SAME:        : @$s17read_requirements21ImplCUnsafeAddressorsVAA2P3A2aDP2urAA1UVvrTW
-// CHECK-NEXT:    method #P3.ur!read2
+// CHECK-NEXT:    method #P3.ur!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements21ImplCUnsafeAddressorsVAA2P3A2aDP2urAA1UVvyTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_default_witness_table P1 {
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #P1.ubgs!read2
+// CHECK-NEXT:    method #P1.ubgs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements2P1P4ubgsAA1UVvy
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #P1.ubgs!modify2
+// CHECK-NEXT:    method #P1.ubgs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements2P1P4ubgsAA1UVvx
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_default_witness_table P2 {
 // CHECK-NEXT:    no_default
-// CHECK-unstable-NEXT:  method #P2.urs!read2
+// CHECK-unstable-NEXT:  method #P2.urs!yielding_borrow
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
-// CHECK-unstable-NEXT:  method #P2.urs!modify2
+// CHECK-unstable-NEXT:  method #P2.urs!yielding_mutate
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_default_witness_table P3 {
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #P3.ur!read2:
+// CHECK-NEXT:    method #P3.ur!yielding_borrow:
 // CHECK-SAME:      : @$s17read_requirements2P3P2urAA1UVvy
 // CHECK-NEXT:  }

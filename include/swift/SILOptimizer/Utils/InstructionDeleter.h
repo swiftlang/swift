@@ -119,11 +119,15 @@ class InstructionDeleter {
   /// Callbacks used when adding/deleting instructions.
   InstModCallbacks callbacks;
 
-public:
-  InstructionDeleter() : deadInstructions() {}
+  bool assumeFixedLifetimes = true;
 
-  InstructionDeleter(InstModCallbacks &&callbacks)
-    : deadInstructions(), callbacks(std::move(callbacks)) {}
+public:
+  InstructionDeleter(bool assumeFixedLifetimes = true)
+    : deadInstructions(), assumeFixedLifetimes(assumeFixedLifetimes) {}
+
+  InstructionDeleter(InstModCallbacks &&callbacks, bool assumeFixedLifetimes = true)
+    : deadInstructions(), callbacks(std::move(callbacks)),
+      assumeFixedLifetimes(assumeFixedLifetimes) {}
 
   InstModCallbacks &getCallbacks() { return callbacks; }
 

@@ -3,5 +3,6 @@
 
 // CHECK: var a_char: CChar
 // CHECK: var a_wchar: wchar_t
+// CHECK: var an_initialized_wchar: wchar_t { get }
 
 // CHECK-CXX: var small_char: UInt8

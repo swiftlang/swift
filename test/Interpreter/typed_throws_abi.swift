@@ -1,11 +1,11 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(TypedThrowsABI)) -enable-library-evolution %S/Inputs/typed_throws_abi_impl.swift -emit-module -emit-module-path %t/TypedThrowsABI.swiftmodule -module-name TypedThrowsABI
-// RUN: %target-codesign %t/%target-library-name(TypedThrowsABI)
 
 // RUN: %target-build-swift -parse-as-library -Xfrontend -disable-availability-checking %s -lTypedThrowsABI -I %t -L %t -o %t/main %target-rpath(%t)
-// RUN: %target-codesign %t/main
+// RUN: %target-codesign %t/main %t/%target-library-name(TypedThrowsABI)
 // RUN: %target-run %t/main %t/%target-library-name(TypedThrowsABI) | %FileCheck %s
 
 // REQUIRES: executable_test
+// UNSUPPORTED: back_deployment_runtime
 
 import TypedThrowsABI
 
@@ -50,6 +50,11 @@ func checkSync() async {
     await invoke { try impl.f5(true) }
     // CHECK: Error: Empty()
     await invoke { try impl.f5(false) }
+
+    // CHECK: Success: ManyBytes(x0: 0, x1: 1, x2: 2, x3: 3, x4: 4, x5: 5, x6: 6, x7: 7, x8: 8, x9: 9, x10: 10, x11: 11, x12: 12, x13: 13, x14: 14, x15: 15)
+    await invoke { try impl.fManyBytes(true) }
+    // CHECK: Error: Empty()
+    await invoke { try impl.fManyBytes(false) }
 
     // CHECK: Success: ()
     await invoke { try impl.g0(true) }
@@ -184,6 +189,11 @@ func checkAsync() async {
     // CHECK: Error: Empty()
     await invoke { try await impl.f5(false) }
 
+    // CHECK: Success: ManyBytes(x0: 0, x1: 1, x2: 2, x3: 3, x4: 4, x5: 5, x6: 6, x7: 7, x8: 8, x9: 9, x10: 10, x11: 11, x12: 12, x13: 13, x14: 14, x15: 15)
+    await invoke { try await impl.fManyBytes(true) }
+    // CHECK: Error: Empty()
+    await invoke { try await impl.fManyBytes(false) }
+
     // CHECK: Success: ()
     await invoke { try await impl.g0(true) }
     // CHECK: Error: OneWord(x: 0)
@@ -285,6 +295,40 @@ func checkAsync() async {
     await invoke { try await impl.nonMatching_f1(false) }
 }
 
+enum SmallError: Error {
+    case a(Int)
+}
+
+@inline(never)
+func smallResultLargerError() throws(SmallError) -> Int8? {
+  return 10
+}
+
+func callSmallResultLargerError() {
+  let res = try! smallResultLargerError()
+  print("Result is: \(String(describing: res))")
+}
+
+enum UInt8OptSingletonError: Error {
+  case a(Int8?)
+}
+
+@inline(never)
+func smallErrorLargerResult() throws(UInt8OptSingletonError) -> Int {
+  throw .a(10)
+}
+
+func callSmallErrorLargerResult() {
+  do {
+    _ = try smallErrorLargerResult()
+  } catch {
+    switch error {
+      case .a(let x):
+        print("Error value is: \(String(describing: x))")
+    }
+  }
+}
+
 enum MyError: Error {
     case x
     case y
@@ -315,5 +359,10 @@ public struct Main {
         await checkAsync()
         // CHECK: Arg is 10
         print(try! await callAsyncIndirectResult(p: AsyncGenProtoImpl(), x: 10))
+
+        // CHECK: Result is: Optional(10)
+        callSmallResultLargerError()
+        // CHECK: Error value is: Optional(10)
+        callSmallErrorLargerResult()
     }
 }

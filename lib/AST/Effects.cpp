@@ -86,7 +86,7 @@ bool AbstractFunctionDecl::hasEffect(EffectKind kind) const {
   case EffectKind::Async:
     return hasAsync();
   case EffectKind::Unsafe:
-    return isUnsafe();
+    return getExplicitSafety() == ExplicitSafety::Unsafe;
   }
   llvm_unreachable("Bad effect kind");
 }
@@ -136,7 +136,7 @@ void swift::simple_display(llvm::raw_ostream &out,
 
 bool ProtocolConformanceRef::hasEffect(EffectKind kind) const {
   if (!isConcrete()) { return kind != EffectKind::Unsafe; }
-  return evaluateOrDefault(getRequirement()->getASTContext().evaluator,
+  return evaluateOrDefault(getProtocol()->getASTContext().evaluator,
      ConformanceHasEffectRequest{kind, getConcrete()},
      true);
 }

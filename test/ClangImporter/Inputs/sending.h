@@ -43,4 +43,7 @@ sendUserDefinedFromGlobalFunction(NonSendableCStruct other) SWIFT_SENDING;
 void sendUserDefinedIntoGlobalFunction(
     NonSendableCStruct arg SWIFT_SENDING);
 
+void sendingWithCompletionHandler(void (^completion)(SWIFT_SENDING NonSendableCStruct arg));
+SWIFT_SENDING NonSendableCStruct sendingWithLazyReturn(SWIFT_SENDING NonSendableCStruct (^makeLazily)(void));
+
 #pragma clang assume_nonnull end

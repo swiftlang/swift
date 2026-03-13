@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend -emit-module-path %t/MyModule.swiftmodule %t/Inputs/MyModule.swift
 
-// RUN: %target-swift-frontend -typecheck -verify -I %t %t/test.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %t %t/test.swift
 
 //--- Inputs/MyModule.swift
 open class MySuperclassA {

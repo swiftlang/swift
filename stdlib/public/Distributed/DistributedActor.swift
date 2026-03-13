@@ -406,10 +406,10 @@ extension DistributedActor {
   @_implements(Actor, unownedExecutor)
   public nonisolated var __actorUnownedExecutor: UnownedSerialExecutor {
     if #available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *) {
-      return unownedExecutor
+      return unsafe unownedExecutor
     } else {
       // On older platforms, all distributed actors are default actors.
-      return UnownedSerialExecutor(Builtin.buildDefaultActorExecutorRef(self))
+      return unsafe UnownedSerialExecutor(Builtin.buildDefaultActorExecutorRef(self))
     }
   }
 

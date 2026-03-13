@@ -65,9 +65,9 @@ func makerParamAutoclosure(@Maker // expected-error {{result builder attribute '
                            fn: @autoclosure () -> ()) {}
 
 @resultBuilder
-struct GenericMaker<T> {} // expected-note {{generic type 'GenericMaker' declared here}} expected-error {{result builder must provide at least one static 'buildBlock' method}}
+struct GenericMaker<T> {} // expected-note {{generic struct 'GenericMaker' declared here}} expected-error {{result builder must provide at least one static 'buildBlock' method}}
 
-struct GenericContainer<T> {  // expected-note {{generic type 'GenericContainer' declared here}}
+struct GenericContainer<T> {  // expected-note {{generic struct 'GenericContainer' declared here}}
   @resultBuilder
   struct Maker {} // expected-error {{result builder must provide at least one static 'buildBlock' method}}
 }

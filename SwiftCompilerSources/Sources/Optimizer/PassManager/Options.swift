@@ -32,12 +32,32 @@ struct Options {
     _bridged.enableSimplificationFor(inst.bridged)
   }
 
+  func enableAddressDependencies() -> Bool {
+    _bridged.enableAddressDependencies()
+  }
+
+  var noAllocations: Bool {
+    _bridged.noAllocations()
+  }
+
   var enableEmbeddedSwift: Bool {
-    _bridged.hasFeature(.Embedded)
+    hasFeature(.Embedded)
+  }
+
+  var enableEmbeddedSwiftExistentials: Bool {
+    hasFeature(.Embedded) && hasFeature(.EmbeddedExistentials)
+  }
+
+  var enableMergeableTraps: Bool {
+    _bridged.enableMergeableTraps()
   }
 
   func hasFeature(_ feature: BridgedFeature) -> Bool {
     _bridged.hasFeature(feature)
+  }
+
+  func shouldRemoveCondFail(withMessage message: StringRef, inFunction: StringRef) -> Bool {
+    _bridged.shouldRemoveCondFail(message._bridged, inFunction._bridged)
   }
 
   // The values for the assert_configuration call are:

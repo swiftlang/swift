@@ -47,12 +47,10 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:      index_a = 2
   // CHECK-NEXT:    case .unavailableMacCatalyst:
   // CHECK-NEXT:      index_a = 3
-  // FIXME: This case should diagnose (rdar://125930716)
   // CHECK-NEXT:    case .unavailableMacOSAndiOS:
-  // CHECK-NEXT:      index_a = 4
-  // FIXME: This case should diagnose (rdar://125930716)
+  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}
   // CHECK-NEXT:    case .unavailableMacOSAndMacCatalyst:
-  // CHECK-NEXT:      index_a = 5
+  // CHECK-NEXT:      index_a = 4
   // CHECK-NEXT:    }
   // CHECK-NEXT:    var index_b: Int
   // CHECK-NEXT:    switch b {
@@ -66,12 +64,10 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:      index_b = 2
   // CHECK-NEXT:    case .unavailableMacCatalyst:
   // CHECK-NEXT:      index_b = 3
-  // FIXME: This case should diagnose (rdar://125930716)
   // CHECK-NEXT:    case .unavailableMacOSAndiOS:
-  // CHECK-NEXT:      index_b = 4
-  // FIXME: This case should diagnose (rdar://125930716)
+  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}
   // CHECK-NEXT:    case .unavailableMacOSAndMacCatalyst:
-  // CHECK-NEXT:      index_b = 5
+  // CHECK-NEXT:      index_b = 4
   // CHECK-NEXT:    }
   // CHECK-NEXT:    return index_a == index_b
   // CHECK-NEXT:  }
@@ -89,12 +85,10 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:      discriminator = 2
   // CHECK-NEXT:    case .unavailableMacCatalyst:
   // CHECK-NEXT:      discriminator = 3
-  // FIXME: This case should diagnose (rdar://125930716)
   // CHECK-NEXT:    case .unavailableMacOSAndiOS:
-  // CHECK-NEXT:      discriminator = 4
-  // FIXME: This case should diagnose (rdar://125930716)
+  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}
   // CHECK-NEXT:    case .unavailableMacOSAndMacCatalyst:
-  // CHECK-NEXT:      discriminator = 5
+  // CHECK-NEXT:      discriminator = 4
   // CHECK-NEXT:    }
   // CHECK-NEXT:    hasher.combine(discriminator)
   // CHECK-NEXT:  }

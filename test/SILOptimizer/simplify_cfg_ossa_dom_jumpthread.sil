@@ -600,6 +600,7 @@ bb4(%unusedPayload : $Int32):
 
 bb5:
   cond_fail %5 : $Builtin.Int1
+  destroy_value [dead_end] %100
   unreachable
 
 bb6:

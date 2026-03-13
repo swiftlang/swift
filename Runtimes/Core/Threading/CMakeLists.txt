@@ -6,10 +6,16 @@ add_library(swiftThreading OBJECT
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Threading/C11.cpp"
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Threading/Linux.cpp"
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Threading/Pthreads.cpp"
-  "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Threading/Win32.cpp")
+  "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Threading/WindowsThreading.cpp")
 target_link_libraries(swiftThreading PRIVATE swiftShims)
 
 # FIXME: We should split out the parts that are needed by the runtime
 #        to avoid pulling in headers from the compiler.
 target_include_directories(swiftThreading PRIVATE
   "${SwiftCore_SWIFTC_SOURCE_DIR}/include")
+
+if(NOT BUILD_SHARED_LIBS)
+  install(TARGETS swiftThreading
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime)
+endif()

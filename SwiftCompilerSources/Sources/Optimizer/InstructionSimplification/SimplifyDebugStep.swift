@@ -12,9 +12,9 @@
 
 import SIL
 
-extension DebugStepInst : Simplifyable {
+extension DebugStepInst : Simplifiable {
   func simplify(_ context: SimplifyContext) {
-    // When compiling with optimizations (note: it's not a OnoneSimplifyable transformation),
+    // When compiling with optimizations (note: it's not a OnoneSimplifiable transformation),
     // unconditionally remove debug_step instructions.
     context.erase(instruction: self)
   }

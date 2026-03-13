@@ -98,7 +98,7 @@ protected:
     bool shouldUseSupplementaryOutputFileMapInFrontendInvocation() const;
 
     /// Reify the existing behavior that SingleCompile compile actions do not
-    /// filter, but batch-mode and single-file compilations do. Some clients are
+    /// filter, single-file compilations do. Some clients are
     /// relying on this (i.e., they pass inputs that don't have ".swift" as an
     /// extension.) It would be nice to eliminate this distinction someday.
     bool shouldFilterFrontendInputsByType() const;
@@ -280,33 +280,6 @@ public:
                                     ArrayRef<const Action *> inputActions,
                                     std::unique_ptr<CommandOutput> output,
                                     const OutputInfo &OI) const;
-
-  /// Return true iff the input \c Job \p A is an acceptable candidate for
-  /// batching together into a BatchJob, via a call to \c
-  /// constructBatchJob. This is true when the \c Job is a built from a \c
-  /// CompileJobAction in a \c Compilation \p C running in \c
-  /// OutputInfo::Mode::StandardCompile output mode, with a single \c TY_Swift
-  /// \c InputAction.
-  bool jobIsBatchable(const Compilation &C, const Job *A) const;
-
-  /// Equivalence relation that holds iff the two input Jobs \p A and \p B are
-  /// acceptable candidates for combining together into a \c BatchJob, via a
-  /// call to \c constructBatchJob. This is true when each job independently
-  /// satisfies \c jobIsBatchable, and the two jobs have identical executables,
-  /// output types and environments (i.e. they are identical aside from their
-  /// inputs).
-  bool jobsAreBatchCombinable(const Compilation &C, const Job *A,
-                              const Job *B) const;
-
-  /// Construct a \c BatchJob that subsumes the work of a set of Jobs. Any pair
-  /// of elements in \p Jobs are assumed to satisfy the equivalence relation \c
-  /// jobsAreBatchCombinable, i.e. they should all be "the same" job in in all
-  /// ways other than their choices of inputs. The provided \p NextQuasiPID
-  /// should be a negative number that persists between calls; this method will
-  /// decrement it to assign quasi-PIDs to each of the \p Jobs passed.
-  std::unique_ptr<Job> constructBatchJob(ArrayRef<const Job *> Jobs,
-                                         int64_t &NextQuasiPID,
-                                         Compilation &C) const;
 
   /// Return the default language type to use for the given extension.
   /// If the extension is empty or is otherwise not recognized, return

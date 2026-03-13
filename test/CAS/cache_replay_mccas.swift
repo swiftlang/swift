@@ -37,16 +37,16 @@
 // RUN: test -f %t/Test.swiftmodule
 
 /// Expect cache miss a subset of outputs.
-// RUN %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
-// RUN  -module-name Test -o %t/test.o -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --check-prefix=CACHE-MISS %s
+// RUN: %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
+// RUN:  -module-name Test -o %t/test.o -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --check-prefix=CACHE-MISS %s
 
 /// Cache hit for retry.
-// RUN %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
-// RUN  -module-name Test -o %t/test.o -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --check-prefix=CACHE-HIT %s
+// RUN: %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
+// RUN:  -module-name Test -o %t/test.o -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --check-prefix=CACHE-HIT %s
 
 /// Skip cache
-// RUN %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job -cache-disable-replay %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
-// RUN  -module-name Test -o %t/test.o -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --allow-empty --check-prefix=SKIP-CACHE %s
+// RUN: %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job -cache-disable-replay %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
+// RUN:  -module-name Test -o %t/test.o -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --allow-empty --check-prefix=SKIP-CACHE %s
 
 // CACHE-MISS: remark: cache miss for input
 // CACHE-HIT: remark: replay output file '<cached-diagnostics>': key 'llvmcas://{{.*}}'

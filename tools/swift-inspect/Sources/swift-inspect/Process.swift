@@ -80,7 +80,7 @@ internal func getAllProcesses(options: UniversalOptions) -> [ProcessIdentifier]?
   }
   let newCount = bufferSize / kinfo_stride
   if count > newCount {
-    buffer.dropLast(count - newCount)
+    buffer.removeLast(count - newCount)
   }
   let sorted = buffer.sorted { first, second in
     first.kp_proc.p_pid > second.kp_proc.p_pid

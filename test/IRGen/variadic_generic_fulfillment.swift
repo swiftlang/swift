@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -target %target-swift-5.9-abi-triple | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=mandatory-temp-rvalue-elimination -emit-ir %s -target %target-swift-5.9-abi-triple | %FileCheck %s -DINT=i%target-ptrsize
 
 public struct G<T> {}
 

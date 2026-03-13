@@ -15,14 +15,19 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
     CxxSet.swift
     CxxRandomAccessCollection.swift
     CxxSequence.swift
+    CxxBorrowingSequence.swift
     CxxVector.swift
     CxxSpan.swift
     UnsafeCxxIterators.swift
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -cxx-interoperability-mode=default
-    -enable-experimental-feature Span
     -enable-experimental-feature BuiltinModule
+    -enable-experimental-feature AllowUnsafeAttribute
+    -enable-experimental-feature Lifetimes
+    -enable-experimental-feature SuppressedAssociatedTypesWithDefaults
+    -enable-experimental-feature BorrowingSequence
+    -strict-memory-safety
     # This module should not pull in the C++ standard library, so we disable it explicitly.
     # For functionality that depends on the C++ stdlib, use C++ stdlib overlay (`swiftstd` module).
     -Xcc -nostdinc++
@@ -37,6 +42,7 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
     DEPENDS ${SWIFT_CXX_DEPS}
     MACCATALYST_BUILD_FLAVOR zippered
     INSTALL_IN_COMPONENT compiler
+    INSTALL_BINARY_SWIFTMODULE NON_DARWIN_ONLY
     INSTALL_WITH_SHARED)
 
 add_subdirectory(libstdcxx)

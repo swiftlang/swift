@@ -1660,6 +1660,7 @@ do {
   func foo(_: (() -> Void)?) {}
   func bar() -> ((()) -> Void)? { return nil }
   foo(bar()) // expected-error {{cannot convert value of type '((()) -> Void)?' to expected argument type '(() -> Void)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('(()) -> Void' and '() -> Void') are expected to be equal}}
 }
 
 // https://github.com/apple/swift/issues/49059
@@ -1699,6 +1700,7 @@ do {
   func log<T>() -> ((T) -> Void)? { return nil }
 
   f(a: log() as ((()) -> Void)?) // expected-error {{cannot convert value of type '((()) -> Void)?' to expected argument type '(() -> Void)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('(()) -> Void' and '() -> Void') are expected to be equal}}
 
   func logNoOptional<T>() -> (T) -> Void { }
   f(a: logNoOptional() as ((()) -> Void)) // expected-error {{cannot convert value of type '(()) -> Void' to expected argument type '() -> Void'}}
@@ -1726,7 +1728,7 @@ do {
 do {
   func f(_: Int...) {}
   let _ = [(1, 2, 3)].map(f) // expected-error {{no exact matches in call to instance method 'map'}}
-  // expected-note@-1 {{found candidate with type '(((Int, Int, Int)) -> _) -> Array<_>'}}
+  // expected-note@-1 {{found candidate with type '(((Int, Int, Int)) -> T) -> [T]'}}
 }
 
 // rdar://problem/48443263 - cannot convert value of type '() -> Void' to expected argument type '(_) -> Void'

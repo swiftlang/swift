@@ -13,7 +13,7 @@ class C {
   func assign() {
     p = self
     // expected-error@-1 {{cannot assign value of type 'C' to type '(any P)?'}}
-    // expected-note@-2 {{add missing conformance to 'P' to class 'C'}} {{-4:8-8=: P}} {{-4:10-10=\n    func method() {\n        <#code#>\n    \}\n\n    var property: Int\n}}
+    // expected-note@-2 {{add missing conformance to 'P' to class 'C'}} {{-4:8-8=: P}} {{-4:10-10=\n    func method() {\n        <#code#>\n    \}\n\n    let property: Int\n}}
   }
 }
 
@@ -25,7 +25,7 @@ class C1 {
   func assign() {
     p = self
     // expected-error@-1 {{cannot assign value of type 'C1' to type '(any P)?'}}
-    // expected-note@-2 {{add missing conformance to 'P' to class 'C1'}} {{-4:9-9=: P}} {{-4:11-11=\n    var property: Int\n}}
+    // expected-note@-2 {{add missing conformance to 'P' to class 'C1'}} {{-4:9-9=: P}} {{-4:11-11=\n    let property: Int\n}}
   }
 
   func method() {}

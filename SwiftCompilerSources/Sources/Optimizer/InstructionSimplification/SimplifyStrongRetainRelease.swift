@@ -12,7 +12,7 @@
 
 import SIL
 
-extension StrongRetainInst : Simplifyable, SILCombineSimplifyable {
+extension StrongRetainInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if isNotReferenceCounted(value: instance) {
       context.erase(instruction: self)
@@ -44,7 +44,7 @@ extension StrongRetainInst : Simplifyable, SILCombineSimplifyable {
   }
 }
 
-extension StrongReleaseInst : Simplifyable, SILCombineSimplifyable {
+extension StrongReleaseInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     let op = instance
     if isNotReferenceCounted(value: op) {

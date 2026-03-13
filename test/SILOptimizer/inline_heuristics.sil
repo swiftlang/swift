@@ -30,22 +30,27 @@ enum E {
 	case B((Int32) -> Int32)
 }
 
+class C {
+  init()
+}
 
 // CHECK-LABEL: sil @testDirectClosure
 // CHECK: [[C:%[0-9]+]] = thin_to_thick_function
-// CHECK: apply [[C]](
+// CHECK: [[MD:%[0-9]+]] = mark_dependence [[C]]
+// CHECK: apply [[MD]](
 // CHECK: return
 
 // CHECK-LOG-LABEL: Inline into caller: testDirectClosure
 // CHECK-LOG-NEXT: decision {{.*}}, b=70,
 
-sil @testDirectClosure : $@convention(thin) () -> Int32 {
-bb0:
+sil @testDirectClosure : $@convention(thin) (@guaranteed C) -> Int32 {
+bb0(%c : $C):
   %0 = function_ref @takeDirectClosure : $@convention(thin) (@owned @callee_guaranteed (Int32) -> Int32) -> Int32
   %1 = function_ref @closure : $@convention(thin) (Int32) -> Int32
   %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_guaranteed (Int32) -> Int32
-  %3 = apply %0(%2) : $@convention(thin) (@owned @callee_guaranteed (Int32) -> Int32) -> Int32
-  return %3 : $Int32
+  %3 = mark_dependence %2 on %c
+  %4 = apply %0(%3) : $@convention(thin) (@owned @callee_guaranteed (Int32) -> Int32) -> Int32
+  return %4 : $Int32
 }
 
 sil @takeDirectClosure : $@convention(thin) (@owned @callee_guaranteed (Int32) -> Int32) -> Int32 {

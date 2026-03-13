@@ -12,7 +12,7 @@
 
 import SIL
 
-extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if optimizeLoadOfAddrUpcast(context) {
       return
@@ -24,6 +24,9 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
       return
     }
     if replaceLoadOfGlobalLet(context) {
+      return
+    }
+    if tryRemoveAddressCast(context) {
       return
     }
     removeIfDead(context)
@@ -75,7 +78,7 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
        index < stringLiteral.value.count {
 
       let builder = Builder(before: self, context)
-      let charLiteral = builder.createIntegerLiteral(Int(stringLiteral.value[index]), type: type)
+      let charLiteral = builder.createIntegerLiteral(stringLiteral.value[index], type: type)
       uses.replaceAll(with: charLiteral, context)
       context.erase(instruction: self)
       return true
@@ -104,15 +107,36 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
     if !globalInitVal.canBeCopied(into: parentFunction, context) {
       return false
     }
-    var cloner = StaticInitCloner(cloneBefore: self, context)
+    var cloner = Cloner(cloneBefore: self, context)
     defer { cloner.deinitialize() }
 
-    let initVal = cloner.clone(globalInitVal)
+    let initVal = cloner.cloneRecursively(globalInitValue: globalInitVal)
 
     uses.replaceAll(with: initVal, context)
     // Also erases a builtin "once" on which the global_addr depends on. This is fine
     // because we only replace the load if the global init function doesn't have any side effect.
     transitivelyErase(load: self, context)
+    return true
+  }
+
+  /// Replaces address casts of heap objects
+  /// ```
+  ///   %1 = unchecked_addr_cast %0 : $*SomeClass to $*OtherClass
+  ///   %2 = load [copy] %1
+  /// ```
+  /// with ref-casts of the loaded value
+  /// ```
+  ///   %1 = load [copy] %0
+  ///   %2 = unchecked_ref_cast %1 : $SomeClass to $OtherClass
+  /// ```
+  private func tryRemoveAddressCast(_ context: SimplifyContext) -> Bool {
+    guard let addrCast = address.isAddressCastOfHeapObjects else {
+      return false
+    }
+    let builder = Builder(before: self, context)
+    let newLoad = builder.createLoad(fromAddress: addrCast.fromAddress, ownership: loadOwnership)
+    let cast = builder.createUncheckedRefCast(from: newLoad, to: addrCast.type.objectType)
+    replace(with: cast, context)
     return true
   }
 
@@ -272,7 +296,10 @@ private func getInitializerFromInitFunction(of globalAddr: GlobalAddrInst, _ con
   }
   let initFn = initFnRef.referencedFunction
   context.notifyDependency(onBodyOf: initFn)
-  guard let (_, storeToGlobal) = getGlobalInitialization(of: initFn, forStaticInitializer: false, context) else {
+  guard let (_, storeToGlobal) = getGlobalInitialization(of: initFn, context, handleUnknownInstruction: {
+    // Accept `global_value` because the class header can be initialized at runtime by the `global_value` instruction.
+    return $0 is GlobalValueInst
+  }) else {
     return nil
   }
   return storeToGlobal.source
@@ -305,10 +332,6 @@ private func transitivelyErase(load: LoadInst, _ context: SimplifyContext) {
 
 private extension Value {
   func canBeCopied(into function: Function, _ context: SimplifyContext) -> Bool {
-    if !function.isAnySerialized {
-      return true
-    }
-
     // Can't use `ValueSet` because the this value is inside a global initializer and
     // not inside a function.
     var worklist = Stack<Value>(context)
@@ -320,8 +343,13 @@ private extension Value {
     handled.insert(ObjectIdentifier(self))
 
     while let value = worklist.pop() {
+      if value is VectorInst {
+        return false
+      }
       if let fri = value as? FunctionRefInst {
-        if !fri.referencedFunction.hasValidLinkageForFragileRef(function.serializedKind) {
+        if function.isAnySerialized,
+           !fri.referencedFunction.hasValidLinkageForFragileRef(function.serializedKind)
+        {
           return false
         }
       }
@@ -360,6 +388,18 @@ private extension Value {
   }
 }
 
+extension Value {
+  var isAddressCastOfHeapObjects: UncheckedAddrCastInst? {
+    if let addrCast = self as? UncheckedAddrCastInst,
+       addrCast.fromAddress.type.isHeapObjectReferenceType,
+       addrCast.type.isHeapObjectReferenceType
+    {
+      return addrCast
+    }
+    return nil
+  }
+}
+
 private extension Instruction {
   var isShiftRightByAtLeastOne: Bool {
     guard let bi = self as? BuiltinInst,
@@ -371,4 +411,75 @@ private extension Instruction {
     }
     return shiftValue > 0
   }
+}
+
+/// Analyses the global initializer function and returns the `alloc_global` and `store`
+/// instructions which initialize the global.
+/// Returns nil if `function` has any side-effects beside initializing the global.
+///
+/// The function's single basic block must contain following code pattern:
+/// ```
+///   alloc_global @the_global
+///   %a = global_addr @the_global
+///   %i = some_const_initializer_insts
+///   store %i to %a
+/// ```
+///
+/// For all other instructions `handleUnknownInstruction` is called and such an instruction
+/// is accepted if `handleUnknownInstruction` returns true.
+private func getGlobalInitialization(
+  of function: Function,
+  _ context: some Context,
+  handleUnknownInstruction: (Instruction) -> Bool
+) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
+  guard let block = function.blocks.singleElement else {
+    return nil
+  }
+
+  var allocInst: AllocGlobalInst? = nil
+  var globalAddr: GlobalAddrInst? = nil
+  var store: StoreInst? = nil
+
+  for inst in block.instructions {
+    switch inst {
+    case is ReturnInst,
+         is DebugValueInst,
+         is DebugStepInst,
+         is BeginAccessInst,
+         is EndAccessInst:
+      continue
+    case let agi as AllocGlobalInst:
+      if allocInst == nil {
+        allocInst = agi
+        continue
+      }
+    case let ga as GlobalAddrInst:
+      if let agi = allocInst, agi.global == ga.global {
+        globalAddr = ga
+      }
+      continue
+    case let si as StoreInst:
+      if store == nil,
+         let ga = globalAddr,
+         si.destination == ga
+      {
+        store = si
+        continue
+      }
+    // Note that the initializer must not contain a `global_value` because `global_value` needs to
+    // initialize the class metadata at runtime.
+    default:
+      if inst.isValidInStaticInitializerOfGlobal(context) {
+        continue
+      }
+    }
+    if handleUnknownInstruction(inst) {
+      continue
+    }
+    return nil
+  }
+  if let store = store {
+    return (allocInst: allocInst!, storeToGlobal: store)
+  }
+  return nil
 }

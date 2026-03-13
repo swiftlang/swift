@@ -71,15 +71,15 @@ extension _Deque._Storage {
 
 
   internal var capacity: Int {
-    _buffer.withUnsafeMutablePointerToHeader { $0.pointee.capacity }
+    unsafe _buffer.withUnsafeMutablePointerToHeader { unsafe $0.pointee.capacity }
   }
 
   internal var count: Int {
-    _buffer.withUnsafeMutablePointerToHeader { $0.pointee.count }
+    unsafe _buffer.withUnsafeMutablePointerToHeader { unsafe $0.pointee.count }
   }
 
   internal var startSlot: _DequeSlot {
-    _buffer.withUnsafeMutablePointerToHeader { $0.pointee.startSlot
+    unsafe _buffer.withUnsafeMutablePointerToHeader { unsafe $0.pointee.startSlot
     }
   }
 }
@@ -90,20 +90,20 @@ extension _Deque._Storage {
   internal typealias _UnsafeHandle = _Deque._UnsafeHandle
 
   internal func read<R>(_ body: (_UnsafeHandle) throws -> R) rethrows -> R {
-    try _buffer.withUnsafeMutablePointers { header, elements in
-      let handle = _UnsafeHandle(header: header,
+    try unsafe _buffer.withUnsafeMutablePointers { header, elements in
+      let handle = unsafe _UnsafeHandle(header: header,
                                  elements: elements,
                                  isMutable: false)
-      return try body(handle)
+      return try unsafe body(handle)
     }
   }
 
   internal func update<R>(_ body: (_UnsafeHandle) throws -> R) rethrows -> R {
-    try _buffer.withUnsafeMutablePointers { header, elements in
-      let handle = _UnsafeHandle(header: header,
+    try unsafe _buffer.withUnsafeMutablePointers { header, elements in
+      let handle = unsafe _UnsafeHandle(header: header,
                                  elements: elements,
                                  isMutable: true)
-      return try body(handle)
+      return try unsafe body(handle)
     }
   }
 }
@@ -124,7 +124,7 @@ extension _Deque._Storage {
   }
 
   internal mutating func _makeUniqueCopy() {
-    self = self.read { $0.copyElements() }
+    self = unsafe self.read { unsafe $0.copyElements() }
   }
 
   /// The growth factor to use to increase storage size to make place for an
@@ -165,16 +165,16 @@ extension _Deque._Storage {
   ) {
     if capacity >= minimumCapacity {
       assert(!self.isUnique())
-      self = self.read { $0.copyElements() }
+      self = unsafe self.read { unsafe $0.copyElements() }
     } else if isUnique() {
       let minimumCapacity = _growCapacity(to: minimumCapacity, linearly: linearGrowth)
-      self = self.update { source in
-        source.moveElements(minimumCapacity: minimumCapacity)
+      self = unsafe self.update { source in
+        unsafe source.moveElements(minimumCapacity: minimumCapacity)
       }
     } else {
       let minimumCapacity = _growCapacity(to: minimumCapacity, linearly: linearGrowth)
-      self = self.read { source in
-        source.copyElements(minimumCapacity: minimumCapacity)
+      self = unsafe self.read { source in
+        unsafe source.copyElements(minimumCapacity: minimumCapacity)
       }
     }
   }

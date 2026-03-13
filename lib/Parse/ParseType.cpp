@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/SourceFile.h" // only for isMacroSignatureFile
 #include "swift/AST/TypeRepr.h"
@@ -51,11 +52,15 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
   }
 
   if (ConstLoc.isValid()) {
-    ty = new (p.Context) CompileTimeConstTypeRepr(ty, ConstLoc);
+    ty = new (p.Context) CompileTimeLiteralTypeRepr(ty, ConstLoc);
   }
 
   if (SendingLoc.isValid()) {
     ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
+  }
+
+  if (CallerIsolatedLoc.isValid()) {
+    ty = new (p.Context) CallerIsolatedTypeRepr(ty, CallerIsolatedLoc);
   }
 
   if (lifetimeEntry) {
@@ -175,9 +180,28 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     tildeLoc = consumeToken();
   }
 
+  auto diagnoseAndRecover = [&]() -> ParserResult<TypeRepr> {
+    {
+      auto diag = diagnose(Tok, MessageID);
+      // If the next token is closing or separating, the type was likely
+      // forgotten
+      if (Tok.isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::arrow,
+                    tok::equal, tok::comma, tok::semi))
+        diag.fixItInsert(getEndOfPreviousLoc(), " <#type#>");
+    }
+    if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
+      ty = makeParserErrorResult(ErrorTypeRepr::create(Context, Tok.getLoc()));
+      consumeToken();
+      return ty;
+    }
+    checkForInputIncomplete();
+    return nullptr;
+  };
+
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::identifier:
+  case tok::colon_colon:
     // In SIL files (not just when parsing SIL types), accept the
     // Pack{} syntax for spelling variadic type packs.
     if (isInSILMode() && Tok.isContextualKeyword("Pack") &&
@@ -220,7 +244,10 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     }
     break;
   case tok::kw_Any:
-    ty = parseAnyType();
+    if (peekToken().is(tok::colon_colon))
+      ty = parseTypeIdentifier(/*base=*/nullptr);
+    else
+      ty = parseAnyType();
     break;
   case tok::l_paren:
     ty = parseTypeTupleBody();
@@ -240,29 +267,26 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     break;
   }
   case tok::kw__:
-    ty = makeParserResult(new (Context) PlaceholderTypeRepr(consumeToken()));
+    if (peekToken().is(tok::colon_colon))
+      ty = parseTypeIdentifier(/*base=*/nullptr);
+    else
+      ty = makeParserResult(new (Context) PlaceholderTypeRepr(consumeToken()));
     break;
   case tok::kw_protocol:
     if (startsWithLess(peekToken())) {
       ty = parseOldStyleProtocolComposition();
       break;
     }
-    LLVM_FALLTHROUGH;
+    return diagnoseAndRecover();
+  case tok::kw_self:
+  case tok::kw_super:
+    if (peekToken().is(tok::colon_colon)) {
+      ty = parseTypeIdentifier(/*base=*/nullptr);
+      break;
+    }
+    return diagnoseAndRecover();
   default:
-    {
-      auto diag = diagnose(Tok, MessageID);
-      // If the next token is closing or separating, the type was likely forgotten
-      if (Tok.isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::arrow,
-                    tok::equal, tok::comma, tok::semi))
-        diag.fixItInsert(getEndOfPreviousLoc(), " <#type#>");
-    }
-    if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
-      ty = makeParserErrorResult(ErrorTypeRepr::create(Context, Tok.getLoc()));
-      consumeToken();
-      return ty;
-    }
-    checkForInputIncomplete();
-    return nullptr;
+    return diagnoseAndRecover();
   }
 
   // '.X', '.Type', '.Protocol', '?', '!', '[]'.
@@ -408,6 +432,15 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   if (status.hasCodeCompletion()) {
     auto *ET = ErrorTypeRepr::create(Context, PreviousLoc);
     return makeParserCodeCompletionResult<TypeRepr>(ET);
+  }
+
+  // "nonisolated" for attribute lists.
+  if (reason == ParseTypeReason::InheritanceClause &&
+      Tok.isContextualKeyword("nonisolated")) {
+    SourceLoc nonisolatedLoc = consumeToken();
+    parsedAttributeList.Attributes.push_back(
+        TypeAttribute::createSimple(Context, TypeAttrKind::Nonisolated,
+                                    SourceLoc(), nonisolatedLoc));
   }
 
   // Parse generic parameters in SIL mode.
@@ -716,7 +749,7 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
   // variadic generic types.
   if (!startsWithGreater(Tok)) {
     while (true) {
-      // Note: This can be a value type, e.g. 'Slab<3, Int>'.
+      // Note: This can be a value type, e.g. 'InlineArray<3, Int>'.
       ParserResult<TypeRepr> Ty = parseTypeOrValue(diag::expected_type);
       if (Ty.isNull() || Ty.hasCodeCompletion()) {
         // Skip until we hit the '>'.
@@ -727,6 +760,10 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
       Args.push_back(Ty.get());
       // Parse the comma, if the list continues.
       if (!consumeIf(tok::comma))
+        break;
+      
+      // If the comma was a trailing comma, finish parsing the list of types
+      if (startsWithGreater(Tok))
         break;
     }
   }
@@ -1147,7 +1184,7 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
   SmallVector<TupleTypeReprElement, 8> ElementsR;
 
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
-                                  /*AllowSepAfterLast=*/false,
+                                  /*AllowSepAfterLast=*/true,
                                   diag::expected_rparen_tuple_type_list,
                                   [&] () -> ParserStatus {
     TupleTypeReprElement element;
@@ -1299,6 +1336,41 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
                                                 SourceRange(LPLoc, RPLoc)));
 }
 
+ParserResult<TypeRepr> Parser::parseTypeInlineArray(SourceLoc lSquare) {
+  ParserStatus status;
+
+  // 'isStartOfInlineArrayTypeBody' means we should at least have a type and
+  // 'of' to start with.
+  auto count = parseTypeOrValue();
+  if (count.isNull())
+    return makeParserError();
+
+  auto *countTy = count.get();
+  status |= count;
+
+  // 'of'
+  consumeToken(tok::identifier);
+
+  // Allow parsing a value for better recovery, Sema will diagnose any
+  // mismatch.
+  auto element = parseTypeOrValue();
+  if (element.hasCodeCompletion() || element.isNull())
+    return element;
+
+  auto *elementTy = element.get();
+  status |= element;
+
+  SourceLoc rSquare;
+  if (parseMatchingToken(tok::r_square, rSquare,
+                         diag::expected_rsquare_inline_array, lSquare)) {
+    status.setIsParseError();
+  }
+
+  SourceRange brackets(lSquare, rSquare);
+  auto *result =
+      InlineArrayTypeRepr::create(Context, countTy, elementTy, brackets);
+  return makeParserResult(status, result);
+}
 
 /// parseTypeArray - Parse the type-array production, given that we
 /// are looking at the initial l_square.  Note that this index
@@ -1351,6 +1423,10 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
   assert(Tok.is(tok::l_square));
   Parser::StructureMarkerRAII parsingCollection(*this, Tok);
   SourceLoc lsquareLoc = consumeToken();
+
+  // Check to see if we can parse as InlineArray.
+  if (isStartOfInlineArrayTypeBody())
+    return parseTypeInlineArray(lsquareLoc);
 
   // Parse the element type.
   ParserResult<TypeRepr> firstTy = parseType(diag::expected_element_type);
@@ -1465,22 +1541,64 @@ ParserResult<TypeRepr> Parser::parseTypeOrValue() {
 
 ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
                                                 ParseTypeReason reason) {
+  if (canParseGenericValueLiteral())
+    return parseGenericValueLiteral();
+
+  // Look ahead to consider if this is a generic value expression
+  // or possibly a tuple type with a postfix grammar
+  bool shouldParseValueExpr = false;
+  if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
+      Tok.is(tok::l_paren)) {
+    BacktrackingScope backtrack(*this);
+    skipSingle();
+    if (Tok.is(tok::comma) || startsWithGreater(Tok) ||
+        (Tok.isContextualKeyword("of") && !Tok.isAtStartOfLine()))
+      shouldParseValueExpr = true;
+  }
+
+  if (shouldParseValueExpr) {
+    // Ensure that constituent references get parsed as declaration references,
+    // not type references.
+    llvm::SaveAndRestore<PatternBindingState> X(
+        InBindingPattern, PatternBindingState::NotInBinding);
+    auto expr = parseExprPrimary(MessageID, false);
+    if (expr.isNull()) {
+      diagnose(Tok, MessageID);
+      return makeParserError();
+    }
+    return makeParserResult(
+        new (Context) GenericArgumentExprTypeRepr(expr.get(), &Context));
+  } else {
+    return parseType(MessageID, reason);
+  }
+}
+
+bool Parser::canParseGenericValueLiteral() {
+  return (Tok.isMinus() && peekToken().is(tok::integer_literal)) ||
+         Tok.is(tok::integer_literal);
+}
+
+ParserResult<TypeRepr> Parser::parseGenericValueLiteral() {
   // Eat any '-' preceding integer literals.
   SourceLoc minusLoc;
   if (Tok.isMinus() && peekToken().is(tok::integer_literal)) {
     minusLoc = consumeToken();
   }
 
-  // Attempt to parse values first. Right now the only value that can be parsed
+  // Attempt to parse the integer value
   // as a type are integers.
-  if (Tok.is(tok::integer_literal)) {
-    auto text = copyAndStripUnderscores(Tok.getText());
-    auto loc = consumeToken(tok::integer_literal);
-    return makeParserResult(new (Context) IntegerTypeRepr(text, loc, minusLoc));
+  if (!Tok.is(tok::integer_literal)) {
+    diagnose(Tok, diag::expected_integer_generic_value);
+    return makeParserError();
   }
 
-  // Otherwise, attempt to parse a regular type.
-  return parseType(MessageID, reason);
+  auto digitsText = copyAndStripUnderscores(Tok.getText());
+  auto loc = consumeToken(tok::integer_literal);
+  auto intLitExpr = new (Context) IntegerLiteralExpr(digitsText, loc, false);
+  if (minusLoc)
+    intLitExpr->setNegative(minusLoc);
+  return makeParserResult(
+      new (Context) GenericArgumentExprTypeRepr(intLitExpr, &Context));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1550,10 +1668,15 @@ bool Parser::canParseGenericArguments() {
   }
 
   do {
-    if (!canParseType())
+    if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
+        Tok.is(tok::l_paren))
+      skipSingle();
+    else if (!canParseType())
       return false;
+
     // Parse the comma, if the list continues.
-  } while (consumeIf(tok::comma));
+    // This could be the trailing comma.
+  } while (consumeIf(tok::comma) && !startsWithGreater(Tok));
 
   if (!startsWithGreater(Tok)) {
     return false;
@@ -1563,23 +1686,7 @@ bool Parser::canParseGenericArguments() {
   }
 }
 
-bool Parser::canParseType() {
-  // 'repeat' starts a pack expansion type.
-  consumeIf(tok::kw_repeat);
-
-  // Accept 'inout' at for better recovery.
-  consumeIf(tok::kw_inout);
-
-  if (Tok.isContextualKeyword("some")) {
-    consumeToken();
-  } else if (Tok.isContextualKeyword("any")) {
-    consumeToken();
-  } else if (Tok.isContextualKeyword("each")) {
-    consumeToken();
-  } else if (Tok.isContextualKeyword("sending")) {
-    consumeToken();
-  }
-
+bool Parser::canParseTypeSimple() {
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::kw_Any:
@@ -1607,6 +1714,8 @@ bool Parser::canParseType() {
 
       if (!Tok.is(tok::integer_literal))
         return false;
+
+      consumeToken();
     }
 
     break;
@@ -1625,14 +1734,7 @@ bool Parser::canParseType() {
     return canParseType();
   }
   case tok::l_square:
-    consumeToken();
-    if (!canParseType())
-      return false;
-    if (consumeIf(tok::colon)) {
-      if (!canParseType())
-        return false;
-    }
-    if (!consumeIf(tok::r_square))
+    if (!canParseCollectionType())
       return false;
     break;
   case tok::kw__:
@@ -1673,13 +1775,83 @@ bool Parser::canParseType() {
     }
     break;
   }
+  return true;
+}
+
+bool Parser::canParseTypeSimpleOrComposition() {
+  auto canParseElement = [&]() -> bool {
+    if (Tok.isContextualKeyword("some")) {
+      consumeToken();
+    } else if (Tok.isContextualKeyword("any")) {
+      consumeToken();
+    } else if (Tok.isContextualKeyword("each")) {
+      consumeToken();
+    }
+
+    return canParseTypeSimple();
+  };
+  if (!canParseElement())
+    return false;
 
   while (Tok.isContextualPunctuator("&")) {
     consumeToken();
-    // FIXME: Should be 'canParseTypeSimple', but we don't have one.
-    if (!canParseType())
+    // Note we include 'some', 'any', and 'each' here for better recovery.
+    if (!canParseElement())
       return false;
   }
+
+  return true;
+}
+
+bool Parser::canParseNonisolatedAsTypeModifier() {
+  assert(Tok.isContextualKeyword("nonisolated"));
+
+  BacktrackingScope scope(*this);
+
+  // Consume 'nonisolated'
+  consumeToken();
+
+  // Something like:
+  //
+  // nonisolated
+  //  (42)
+  if (Tok.isAtStartOfLine())
+    return false;
+
+  // Always requires `(nonsending)`, together
+  // we don't want eagerly interpret something
+  // like `nonisolated(0)` as a modifier.
+
+  if (!consumeIf(tok::l_paren))
+    return false;
+
+  if (!Tok.isContextualKeyword("nonsending"))
+    return false;
+
+  consumeToken();
+
+  return consumeIf(tok::r_paren);
+}
+
+bool Parser::canParseTypeScalar() {
+  // Accept 'inout' at for better recovery.
+  consumeIf(tok::kw_inout);
+
+  if (Tok.isContextualKeyword("sending"))
+    consumeToken();
+
+  if (Tok.isContextualKeyword("nonisolated")) {
+    if (!canParseNonisolatedAsTypeModifier())
+      return false;
+
+    // consume 'nonisolated'
+    consumeToken();
+    // skip '(nonsending)'
+    skipSingle();
+  }
+
+  if (!canParseTypeSimpleOrComposition())
+    return false;
 
   if (isAtFunctionTypeArrow()) {
     // Handle type-function if we have an '->' with optional
@@ -1695,23 +1867,85 @@ bool Parser::canParseType() {
 
     if (!consumeIf(tok::arrow))
       return false;
-    
-    if (!canParseType())
+
+    if (!canParseTypeScalar())
       return false;
-    
-    return true;
   }
+  return true;
+}
+
+bool Parser::canParseType() {
+  // 'repeat' starts a pack expansion type.
+  consumeIf(tok::kw_repeat);
+
+  if (!canParseTypeScalar())
+    return false;
 
   // Parse pack expansion 'T...'.
   if (Tok.isEllipsis()) {
     Tok.setKind(tok::ellipsis);
     consumeToken();
   }
-
   return true;
 }
 
+bool Parser::canParseStartOfInlineArrayType() {
+  // We must have at least '[<type> of', which cannot be any other kind of
+  // expression or type. We specifically look for any type, not just integers
+  // for better recovery in e.g cases where the user writes '[Int of 2]'. We
+  // only do type-scalar since variadics would be ambiguous e.g 'Int...of'.
+  if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
+      Tok.is(tok::l_paren))
+    skipSingle(); // Assume a parentheses-delimited value expression
+  else if (!canParseTypeScalar())
+    return false;
+
+  // For now we don't allow multi-line since that would require
+  // disambiguation.
+  if (Tok.isAtStartOfLine() || !Tok.isContextualKeyword("of"))
+    return false;
+
+  consumeToken();
+  return true;
+}
+
+bool Parser::isStartOfInlineArrayTypeBody() {
+  BacktrackingScope backtrack(*this);
+  return canParseStartOfInlineArrayType();
+}
+
+bool Parser::canParseCollectionType() {
+  if (!consumeIf(tok::l_square))
+    return false;
+
+  // Check to see if we have an InlineArray sugar type.
+  {
+    CancellableBacktrackingScope backtrack(*this);
+    if (canParseStartOfInlineArrayType()) {
+      backtrack.cancelBacktrack();
+      if (!canParseType())
+        return false;
+      if (!consumeIf(tok::r_square))
+        return false;
+      return true;
+    }
+  }
+
+  if (!canParseType())
+    return false;
+
+  if (consumeIf(tok::colon)) {
+    if (!canParseType())
+      return false;
+  }
+
+  return consumeIf(tok::r_square);
+}
+
 bool Parser::canParseTypeIdentifier() {
+  // Parse a module selector, if present.
+  parseModuleSelector();
+  
   // Parse an identifier.
   //
   // FIXME: We should expect e.g. 'X.var'. Almost any keyword is a valid member component.
@@ -1807,7 +2041,7 @@ bool Parser::canParseTypeTupleBody() {
           skipSingle();
         }
       }
-    } while (consumeIf(tok::comma));
+    } while (consumeIf(tok::comma) && Tok.isNot(tok::r_paren));
   }
   
   return consumeIf(tok::r_paren);

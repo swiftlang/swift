@@ -14,6 +14,7 @@ import WinSDK.core.synch
 
 @available(SwiftStdlib 6.0, *)
 @frozen
+@safe
 @_staticExclusiveOnly
 public struct _MutexHandle: ~Copyable {
   @usableFromInline
@@ -23,14 +24,14 @@ public struct _MutexHandle: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public init() {
-    value = _Cell(SRWLOCK())
+    unsafe value = _Cell(SRWLOCK())
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _lock() {
-    AcquireSRWLockExclusive(value._address)
+    unsafe AcquireSRWLockExclusive(value._address)
   }
 
   @available(SwiftStdlib 6.0, *)
@@ -38,13 +39,13 @@ public struct _MutexHandle: ~Copyable {
   @_transparent
   internal borrowing func _tryLock() -> Bool {
     // Windows BOOLEAN gets imported as 'UInt8'...
-    TryAcquireSRWLockExclusive(value._address) != 0
+    unsafe TryAcquireSRWLockExclusive(value._address) != 0
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _unlock() {
-    ReleaseSRWLockExclusive(value._address)
+    unsafe ReleaseSRWLockExclusive(value._address)
   }
 }

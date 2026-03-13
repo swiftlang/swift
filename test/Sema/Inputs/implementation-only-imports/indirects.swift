@@ -6,3 +6,5 @@ public typealias GenericAliasFromIndirect<T> = (StructFromIndirect, T)
 
 public func globalFunctionFromIndirect() {}
 public var globalVariableFromIndirect = 0
+
+@_spi(S) public func spiFunctionFromDirect() {}

@@ -4,3 +4,6 @@ import CxxStdlib
 import StdString
 
 let _ = HasMethodThatReturnsString().getString()
+
+let x: std.string = "Hello"
+let y: std.string = "\(x), World!" 

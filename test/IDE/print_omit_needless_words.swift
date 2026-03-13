@@ -314,7 +314,7 @@
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "veryCarefullyBurn()")
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func veryCarefullyBurnGarbage4DTypeRefMask_t()
 
-// CHECK-OMIT-NEEDLESS-WORDS-DIAGS: inconsistent Swift name for Objective-C property 'conflictingProp1' in 'OMWSub' ('waggleProp1' in 'OMWWaggle' vs. 'wiggleProp1' in 'OMWSuper')
+// CHECK-OMIT-NEEDLESS-WORDS-DIAGS: inconsistent Swift name for Objective-C property 'conflictingProp1' in 'OMWSub' ('waggleProp1' in 'OMWWaggle' vs. 'wiggleProp1' in 'OMWSuper') [#ClangDeclarationImport]
 
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws

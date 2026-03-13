@@ -1,5 +1,6 @@
 target_sources(swiftAST PRIVATE
   ASTContextBridging.cpp
+  AvailabilityBridging.cpp
   DeclAttributeBridging.cpp
   DeclBridging.cpp
   DeclContextBridging.cpp

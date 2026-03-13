@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types  %s -update-borrowed-from -let-property-lowering | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types  %s -let-property-lowering | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -205,6 +205,7 @@ bb3:
 // CHECK-NEXT:    end_init_let_ref %2
 // CHECK:       bb2:
 // CHECK-NEXT:    end_init_let_ref %2
+// CHECK-NEXT:    destroy_value [dead_end]
 // CHECK-NEXT:    unreachable
 // CHECK:       bb3:
 // CHECK:       } // end sil function 'test_multi_block2'
@@ -219,6 +220,7 @@ bb1:
   end_borrow %3 : $C
   br bb3
 bb2:
+  destroy_value [dead_end] %2
   unreachable
 bb3:
   return %2 : $C
@@ -249,6 +251,7 @@ bb2:
   destroy_addr %9 : $*Int
   end_access %9 : $*Int
   end_borrow %7 : $C
+  destroy_value [dead_end] %2
   unreachable
 bb3:
   return %2 : $C
@@ -286,6 +289,7 @@ bb2:
   destroy_addr %19 : $*Int
   end_access %19 : $*Int
   end_borrow %17 : $C
+  destroy_value [dead_end] %2
   unreachable
 }
 
@@ -297,17 +301,50 @@ bb2:
 // CHECK:       } // end sil function 'test_reborrow'
 sil [ossa] @test_reborrow : $@convention(thin) (@owned C, Int) -> @owned C {
 bb0(%0 : @owned $C, %1 : $Int):
-  %2 = mark_uninitialized [rootself] %0 : $C
-  %3 = begin_borrow %2 : $C
-  %4 = ref_element_addr %3 : $C, #C.a
-  store %1 to [trivial] %4 : $*Int
-  br bb1(%3 : $C)
-bb1(%3a : @reborrow $C):
-  end_borrow %3a : $C
-  %7 = begin_borrow %2 : $C
-  %8 = ref_element_addr %7 : $C, #C.a
-  %9 = load [trivial] %8 : $*Int
-  end_borrow %7 : $C
-  return %2 : $C
+  %2 = mark_uninitialized [rootself] %0
+  %3 = begin_borrow %2
+  %4 = ref_element_addr %3, #C.a
+  store %1 to [trivial] %4
+  br bb1(%3)
+
+bb1(%7 : @reborrow $C):
+  %8 = borrowed %7 from (%2)
+  end_borrow %8
+  %10 = begin_borrow %2
+  %11 = ref_element_addr %10, #C.a
+  %12 = load [trivial] %11
+  end_borrow %10
+  return %2
+}
+
+
+// CHECK-LABEL: sil [ossa] @test_no_phis :
+// CHECK:         %3 = end_init_let_ref %2
+// CHECK:         return %3
+// CHECK:       } // end sil function 'test_no_phis'
+sil [ossa] @test_no_phis : $@convention(thin) (Int, @owned C) -> @owned C {
+bb0(%0 : $Int, %1 : @owned $C):
+  %2 = mark_uninitialized [rootself] %1
+  %3 = begin_borrow %2
+  cond_br undef, bb1, bb2
+bb1:
+  br bb7
+bb2:
+  cond_br undef, bb3, bb8
+bb3:
+  cond_br undef, bb4, bb5
+bb4:
+  br bb7
+bb5:
+  br bb6
+bb6:
+  end_borrow %3
+  return %2
+bb7:
+  br bb6
+bb8:
+  end_borrow %3
+  destroy_value [dead_end] %2
+  unreachable
 }
 

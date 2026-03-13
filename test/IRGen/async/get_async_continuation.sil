@@ -23,8 +23,8 @@ bb0:
 //   Initialize the async continuation context:
 
 //   Initialize Parent.
-// CHECK: [[base_context:%.*]] = getelementptr inbounds %swift.continuation_context, ptr [[cont_context]], i32 0, i32 0
-// CHECK: [[context_addr:%.*]] = getelementptr inbounds %swift.context, ptr [[base_context]], i32 0, i32 0
+// CHECK: [[base_context:%.*]] = getelementptr inbounds{{.*}} %swift.continuation_context, ptr [[cont_context]], i32 0, i32 0
+// CHECK: [[context_addr:%.*]] = getelementptr inbounds{{.*}} %swift.context, ptr [[base_context]], i32 0, i32 0
 // CHECK: [[ctxt:%.*]] = load ptr, ptr [[ctxt_addr]]
 // CHECK-arm64e: [[ctxt_addr_int:%[0-9]+]] = ptrtoint ptr [[context_addr]] to i64
 // CHECK-arm64e: [[ptrauth_blend:%[0-9]+]]   = call i64 @llvm.ptrauth.blend(i64 [[ctxt_addr_int]], i64 48546)
@@ -35,12 +35,12 @@ bb0:
 // CHECK-x86_64: store ptr [[ctxt]], ptr [[context_addr]]
 
 //   Initialize NormalResult.
-// CHECK: [[result_addr:%.*]] = getelementptr inbounds %swift.continuation_context, ptr [[cont_context]], i32 0, i32 4
+// CHECK: [[result_addr:%.*]] = getelementptr inbounds{{.*}} %swift.continuation_context, ptr [[cont_context]], i32 0, i32 4
 // CHECK: store ptr [[result_storage]], ptr [[result_addr]]
 
 //   Initialize ResumeParent.
 // CHECK: [[resume_intrinsic:%.*]] = call ptr @llvm.coro.async.resume()
-// CHECK: [[continuation_fn_addr:%.*]] = getelementptr inbounds %swift.context, ptr [[base_context]], i32 0, i32 1
+// CHECK: [[continuation_fn_addr:%.*]] = getelementptr inbounds{{.*}} %swift.context, ptr [[base_context]], i32 0, i32 1
 // CHECK-arm64e: [[continuation_fn_addr_int:%[0-9]+]] = ptrtoint ptr [[continuation_fn_addr]] to i64
 // CHECK-arm64e: [[ptrauth_blend:%[0-9]+]]   = call i64 @llvm.ptrauth.blend(i64 [[continuation_fn_addr_int]], i64 55047)
 // CHECK-arm64e: [[continuation_fn_int:%[0-9]+]]      = ptrtoint ptr [[resume_intrinsic]] to i64
@@ -57,7 +57,7 @@ bb0:
 
 //   Arrive at the await_async_continuation point.
 // CHECK: [[suspend:%.*]] = call { ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0s(i32 0, ptr [[resume_intrinsic]], ptr @__swift_async_resume_project_context, ptr @__swift_continuation_await_point, ptr [[cont_context]])
-// CHECK:   [[result_addr_addr:%.*]] = getelementptr inbounds %swift.continuation_context, ptr [[cont_context]], i32 0, i32 4
+// CHECK:   [[result_addr_addr:%.*]] = getelementptr inbounds{{.*}} %swift.continuation_context, ptr [[cont_context]], i32 0, i32 4
 // CHECK:   [[result_addr:%.*]] = load ptr, ptr [[result_addr_addr]]
 // CHECK:   [[result_value:%.*]] = load i32, ptr [[result_addr]]
 // CHECK:   br label %[[result_bb:[0-9]+]]

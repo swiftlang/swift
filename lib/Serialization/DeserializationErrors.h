@@ -241,6 +241,22 @@ public:
     return DeclBaseName();
   }
 
+  std::string getFullName() const {
+    std::string buf;
+    llvm::raw_string_ostream os(buf);
+    auto filteredPath = llvm::make_filter_range(path,
+        [](const PathPiece &piece) {
+          return !piece.getAsBaseName().empty();
+        });
+    llvm::interleave(filteredPath, os,
+      [&os](PathPiece piece) {
+        DeclBaseName result = piece.getAsBaseName();
+        if (!result.empty())
+          os << result.userFacingName().str();
+      }, ".");
+    return buf;
+  }
+
   void removeLast() {
     path.pop_back();
   }
@@ -352,7 +368,6 @@ public:
   };
 
 private:
-  DeclName name;
   bool declIsType;
   Kind errorKind;
 
@@ -371,13 +386,13 @@ private:
   std::optional<std::pair<Type, Type>> mismatchingTypes;
 
 public:
-  explicit ModularizationError(DeclName name, bool declIsType, Kind errorKind,
+  explicit ModularizationError(bool declIsType, Kind errorKind,
                                const ModuleDecl *expectedModule,
                                const ModuleFile *referenceModule,
                                const ModuleDecl *foundModule,
                                XRefTracePath path,
                                std::optional<std::pair<Type, Type>> mismatchingTypes):
-    name(name), declIsType(declIsType), errorKind(errorKind),
+    declIsType(declIsType), errorKind(errorKind),
     expectedModule(expectedModule),
     referenceModule(referenceModule),
     foundModule(foundModule), path(path),
@@ -387,7 +402,7 @@ public:
                 DiagnosticBehavior limit = DiagnosticBehavior::Fatal) const;
 
   void log(raw_ostream &OS) const override {
-    OS << "modularization issue on '" << name << "', reference from '";
+    OS << "modularization issue on '" << path.getFullName() << "', reference from '";
     OS << referenceModule->getName() << "' not resolvable: ";
     switch (errorKind) {
       case Kind::DeclMoved:
@@ -670,6 +685,54 @@ public:
   void log(raw_ostream &OS) const override {
     OS << "invalid value " << enumValue << " for enumeration "
        << enumDescription;
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
+// Cross-reference to a conformance was not found where it was expected.
+class ConformanceXRefError : public llvm::ErrorInfo<ConformanceXRefError,
+                                                    DeclDeserializationError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  DeclName protoName;
+  const ModuleDecl *expectedModule;
+
+public:
+  ConformanceXRefError(Identifier name, Identifier protoName,
+                       const ModuleDecl *expectedModule):
+                     protoName(protoName), expectedModule(expectedModule) {
+    this->name = name;
+  }
+
+  void diagnose(const ModuleFile *MF,
+                DiagnosticBehavior limit = DiagnosticBehavior::Fatal) const;
+
+  void log(raw_ostream &OS) const override {
+    OS << "Conformance of '" << name << "' to '" << protoName
+       << "' not found in module '" << expectedModule->getName() << "'";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
+class InvalidAvailabilityDomainError
+    : public llvm::ErrorInfo<InvalidAvailabilityDomainError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+public:
+  InvalidAvailabilityDomainError() {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "Invalid availability domain";
   }
 
   std::error_code convertToErrorCode() const override {

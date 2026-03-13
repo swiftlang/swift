@@ -109,7 +109,9 @@
 #define SWIFT_WEAK_IMPORT
 #endif
 
-#if __has_attribute(musttail)
+// WASM says yes to __has_attribute(musttail) but doesn't support using it, so
+// exclude WASM from SWIFT_MUSTTAIL.
+#if __has_attribute(musttail) && !defined(__wasm__)
 #define SWIFT_MUSTTAIL [[clang::musttail]]
 #else
 #define SWIFT_MUSTTAIL
@@ -134,7 +136,7 @@
 // right for Windows, we have everything set up to get it right on
 // other targets as well, and doing so lets the compiler use more
 // efficient symbol access patterns.
-#if defined(__MACH__) || defined(__wasi__)
+#if defined(__MACH__) || defined(__wasm__)
 
 // On Mach-O and WebAssembly, we use non-hidden visibility.  We just use
 // default visibility on both imports and exports, both because these
@@ -289,6 +291,13 @@
 #define SWIFT_RUNTIME_STDLIB_INTERNAL extern "C" SWIFT_LIBRARY_VISIBILITY
 #else
 #define SWIFT_RUNTIME_STDLIB_INTERNAL SWIFT_LIBRARY_VISIBILITY
+#endif
+
+// Used when declaring functions in a static compatibility library
+#if defined(__cplusplus)
+#define SWIFT_RUNTIME_COMPATIBILITY extern "C" SWIFT_LIBRARY_VISIBILITY
+#else
+#define SWIFT_RUNTIME_COMPATIBILITY SWIFT_LIBRARY_VISIBILITY
 #endif
 
 #if __has_builtin(__builtin_expect)

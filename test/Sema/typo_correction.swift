@@ -10,7 +10,7 @@ import NoSuchModule
 
 // This is close enough to get typo-correction.
 func test_short_and_close() {
-  let plop = 4 // expected-note {{did you mean 'plop'?}}
+  let plop = 4 // expected-note {{'plop' declared here}}
   let bab = plob + 1
   // expected-error@-1 {{cannot find 'plob' in scope}}
 }

@@ -115,6 +115,19 @@ function(get_bootstrapping_swift_lib_dir bs_lib_dir bootstrapping)
       # FIXME: This assumes the ABI hasn't changed since the builder.
       get_filename_component(swift_bin_dir ${CMAKE_Swift_COMPILER} DIRECTORY)
       get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+
+      # Detect and handle swiftly-managed hosts.
+      if(swift_bin_dir MATCHES ".*/swiftly/bin")
+        execute_process(COMMAND swiftly use --print-location
+          OUTPUT_VARIABLE swiftly_dir
+          ERROR_VARIABLE err)
+        if(err)
+          message(SEND_ERROR "Failed to find swiftly Swift compiler")
+        endif()
+        string(STRIP "${swiftly_dir}" swiftly_dir)
+        set(swift_dir "${swiftly_dir}/usr")
+      endif()
+
       set(bs_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
     endif()
   endif()

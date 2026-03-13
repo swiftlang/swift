@@ -10,11 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/Punycode.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/Demangling/Punycode.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/CommandLine.h"
 #include <algorithm>
@@ -30,19 +32,6 @@ llvm::cl::opt<bool> PrintSwiftManglingStats(
 
 namespace {
 
-struct SizeStatEntry {
-  int sizeDiff;
-  std::string Old;
-  std::string New;
-};
-
-static std::vector<SizeStatEntry> SizeStats;
-
-static int numSmaller = 0;
-static int numEqual = 0;
-static int numLarger = 0;
-static int totalOldSize = 0;
-static int totalNewSize = 0;
 static int mergedSubsts = 0;
 static int numLargeSubsts = 0;
 
@@ -72,24 +61,6 @@ void Mangle::printManglingStats() {
   if (!PrintSwiftManglingStats)
     return;
 
-  std::sort(SizeStats.begin(), SizeStats.end(),
-    [](const SizeStatEntry &LHS, const SizeStatEntry &RHS) {
-      return LHS.sizeDiff < RHS.sizeDiff;
-    });
-
-  llvm::outs() << "Mangling size stats:\n"
-                  "  num smaller: " << numSmaller << "\n"
-                  "  num larger:  " << numLarger << "\n"
-                  "  num equal:   " << numEqual << "\n"
-                  "  total old size: " << totalOldSize << "\n"
-                  "  total new size: " << totalNewSize << "\n"
-                  "  new - old size: " << (totalNewSize - totalOldSize) << "\n"
-                  "List or larger:\n";
-  for (const SizeStatEntry &E : SizeStats) {
-    llvm::outs() << "  delta " << E.sizeDiff << ": " << E.Old << " - " << E.New
-                 << '\n';
-  }
-  
   llvm::outs() << "Mangling operator stats:\n";
 
   using MapEntry = llvm::StringMapEntry<OpStatEntry>;
@@ -200,25 +171,28 @@ void Mangler::verify(StringRef nameStr, ManglingFlavor Flavor) {
   Demangler Dem;
   NodePointer Root = Dem.demangleSymbol(nameStr);
   if (!Root || treeContains(Root, Node::Kind::Suffix)) {
-    llvm::errs() << "Can't demangle: " << nameStr << '\n';
-    abort();
+    ABORT([&](auto &out) {
+      out << "Can't demangle: " << nameStr;
+    });
   }
   auto mangling = mangleNode(Root, Flavor);
   if (!mangling.isSuccess()) {
-    llvm::errs() << "Can't remangle: " << nameStr << '\n';
-    abort();
+    ABORT([&](auto &out) {
+      out << "Can't remangle: " << nameStr;
+    });
   }
   std::string Remangled = mangling.result();
   if (Remangled == nameStr)
     return;
 
-  llvm::errs() << "Remangling failed:\n"
-                  "original     = " << nameStr << "\n"
-                  "remangled    = " << Remangled << "\n";
-  abort();
+  ABORT([&](auto &out) {
+    out << "Remangling failed:\n";
+    out << "original     = " << nameStr << "\n";
+    out << "remangled    = " << Remangled;
+  });
 }
 
-void Mangler::appendIdentifier(StringRef ident) {
+void Mangler::appendIdentifier(StringRef ident, bool allowRawIdentifiers) {
   auto Iter = StringSubstitutions.find(ident);
   if (Iter != StringSubstitutions.end())
     return mangleSubstitution(Iter->second);
@@ -226,9 +200,37 @@ void Mangler::appendIdentifier(StringRef ident) {
   size_t OldPos = Storage.size();
   addSubstitution(ident);
 
-  mangleIdentifier(*this, ident);
+  if (allowRawIdentifiers && Lexer::identifierMustAlwaysBeEscaped(ident)) {
+    llvm::SmallString<256> escaped;
+    appendRawIdentifierForRuntime(ident, escaped);
+    mangleIdentifier(*this, escaped);
+  } else {
+    mangleIdentifier(*this, ident);
+  }
 
   recordOpStat("<identifier>", OldPos);
+}
+
+void Mangler::appendRawIdentifierForRuntime(
+    StringRef ident, llvm::SmallVectorImpl<char> &buffer) {
+  // SE-0451: Raw identifiers retain their backticks as part of their
+  // mangling. Additionally, the runtime has historically used spaces
+  // (U+0020) as delimiters in some metadata (e.g., tuple element labels
+  // and protocol associated type names). If one of these names is a raw
+  // identifier, it may also contain U+0020. To address this in a
+  // backwards-compatible fashion, we replace any occurrences of U+0020 in
+  // the name with U+00A0 (UTF-8: 0xC2 0xA0), since U+00A0 is not permitted
+  // in raw identifiers.
+  buffer.push_back('`');
+  for (auto ch : ident) {
+    if (ch == ' ') {
+      buffer.push_back(0xc2);
+      buffer.push_back(0xa0);
+    } else {
+      buffer.push_back(ch);
+    }
+  }
+  buffer.push_back('`');
 }
 
 void Mangler::dump() const {

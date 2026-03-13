@@ -4,7 +4,7 @@
 // RUN: %FileCheck %S/Inputs/custom-modules/ImportAsMember.h <%t.txt
 // RUN: %FileCheck %S/Inputs/custom-modules/ImportAsMember_Private.h <%t.txt
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -F %S/Inputs/frameworks -I %S/Inputs/custom-modules -module-cache-path %t.mcp %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -F %S/Inputs/frameworks -I %S/Inputs/custom-modules -module-cache-path %t.mcp %s -verify -verify-ignore-unrelated
 
 import ImportAsMember
 import ImportAsMember_Private

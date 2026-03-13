@@ -25,7 +25,7 @@ enum Node {
 }
 
 // CHECK: define internal i32 @"$s22multi_payload_shifting4NodeOwet"(ptr noalias %value, i32 %numEmptyCases, ptr %Node)
-// CHECK:  [[ADDR:%.*]] = getelementptr inbounds { i64, i64, i64, i8 }, ptr {{.*}}, i32 0, i32 3
+// CHECK:  [[ADDR:%.*]] = getelementptr inbounds{{.*}} { i64, i64, i64, i8 }, ptr {{.*}}, i32 0, i32 3
 // CHECK:  [[BYTE:%.*]] = load i8, ptr [[ADDR]]
 // Make sure we zext before we shift.
 // CHECK:  [[ZEXT:%.*]] = zext i8 [[BYTE]] to i32

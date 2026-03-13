@@ -81,12 +81,10 @@ static void _buildNameForMetadata(const Metadata *type,
 #if SWIFT_OBJC_INTEROP
   if (type->getKind() == MetadataKind::Class) {
     auto classType = static_cast<const ClassMetadata *>(type);
-    // Look through artificial subclasses.
-    while (classType->isTypeMetadata() && classType->isArtificialSubclass())
-      classType = classType->Superclass;
-
-    // Ask the Objective-C runtime to name ObjC classes.
-    if (!classType->isTypeMetadata()) {
+    // Ask the Objective-C runtime to name ObjC classes. isTypeMetadata should
+    // always be true here (pure ObjC classes get ObjCClassWrappers), but check
+    // it just to be sure.
+    if (!classType->isTypeMetadata() || !classType->getDescription()) {
       result += class_getName(classType);
       return;
     }
@@ -529,13 +527,16 @@ static bool _unknownClassConformsToObjCProtocol(const OpaqueValue *value,
 }
 #endif
 
-bool swift::_conformsToProtocol(const OpaqueValue *value,
-                                const Metadata *type,
-                                ProtocolDescriptorRef protocol,
-                                const WitnessTable **conformance) {
+bool swift::_conformsToProtocol(
+    const OpaqueValue *value,
+    const Metadata *type,
+    ProtocolDescriptorRef protocol,
+    const WitnessTable **conformance,
+    ConformanceExecutionContext *context) {
   // Look up the witness table for protocols that need them.
   if (protocol.needsWitnessTable()) {
-    auto witness = swift_conformsToProtocolCommon(type, protocol.getSwiftProtocol());
+    auto witness = swift_conformsToProtocolWithExecutionContext(
+        type, protocol.getSwiftProtocol(), context);
     if (!witness)
       return false;
     if (conformance)
@@ -607,12 +608,36 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
   return false;
 }
 
+bool swift::_conformsToProtocolInContext(
+    const OpaqueValue *value,
+    const Metadata *type,
+    ProtocolDescriptorRef protocol,
+    const WitnessTable **conformance,
+    bool prohibitIsolatedConformances) {
+
+  ConformanceExecutionContext context;
+  if (!_conformsToProtocol(value, type, protocol, conformance, &context))
+    return false;
+
+  // If we aren't allowed to use isolated conformances and we ended up with
+  // one, fail.
+  if (prohibitIsolatedConformances &&
+      context.globalActorIsolationType)
+    return false;
+
+  if (!swift_isInConformanceExecutionContext(type, &context))
+    return false;
+
+  return true;
+}
+
 /// Check whether a type conforms to the given protocols, filling in a
 /// list of conformances.
 static bool _conformsToProtocols(const OpaqueValue *value,
                                  const Metadata *type,
                                  const ExistentialTypeMetadata *existentialType,
-                                 const WitnessTable **conformances) {
+                                 const WitnessTable **conformances,
+                                 bool prohibitIsolatedConformances) {
   if (auto *superclass = existentialType->getSuperclassConstraint()) {
     if (!swift_dynamicCastMetatype(type, superclass))
       return false;
@@ -624,7 +649,8 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   }
 
   for (auto protocol : existentialType->getProtocols()) {
-    if (!_conformsToProtocol(value, type, protocol, conformances))
+    if (!_conformsToProtocolInContext(
+            value, type, protocol, conformances, prohibitIsolatedConformances))
       return false;
     if (conformances != nullptr && protocol.needsWitnessTable()) {
       assert(*conformances != nullptr);
@@ -1030,9 +1056,10 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
 }
 
 static const Metadata *
-swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
-                                           const Metadata *targetType,
-                                           const char *file, unsigned line, unsigned column) {
+swift_dynamicCastMetatypeUnconditionalImpl(
+    const Metadata *sourceType,
+    const Metadata *targetType,
+    const char *file, unsigned line, unsigned column) {
   auto origSourceType = sourceType;
 
   // Identical types always succeed
@@ -1118,7 +1145,8 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
 
   case MetadataKind::Existential: {
     auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);
-    if (_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
+    if (_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential,
+                             nullptr, /*prohibitIsolatedConformances=*/false))
       return origSourceType;
     swift_dynamicCastFailure(sourceType, targetType);
   }
@@ -1406,10 +1434,31 @@ extern "C" const _ObjectiveCBridgeableWitnessTable BRIDGING_CONFORMANCE_SYM;
 /// Nominal type descriptor for Swift.String.
 extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SS);
 
+struct ObjCBridgeWitnessCacheEntry {
+  const Metadata *metadata;
+  const _ObjectiveCBridgeableWitnessTable *witness;
+};
+
+// String is so important that we cache it permanently, so we don't want to
+// pollute this temporary cache with the String entry
+static const _ObjectiveCBridgeableWitnessTable *
+swift_conformsToObjectiveCBridgeableNoCache(const Metadata *T) {
+  auto w = swift_conformsToProtocolCommon(
+         T, &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable));
+  return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
+}
+
 static const _ObjectiveCBridgeableWitnessTable *
 swift_conformsToObjectiveCBridgeable(const Metadata *T) {
-  return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>
-    (swift_conformsToProtocolCommon(T, &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable)));
+  static std::atomic<ObjCBridgeWitnessCacheEntry> _objcBridgeWitnessCache = {};
+  auto cached = _objcBridgeWitnessCache.load(SWIFT_MEMORY_ORDER_CONSUME);
+  if (cached.metadata == T) {
+    return cached.witness;
+  }
+  cached.witness = swift_conformsToObjectiveCBridgeableNoCache(T);
+  cached.metadata = T;
+  _objcBridgeWitnessCache.store(cached, std::memory_order_release);
+  return cached.witness;
 }
 
 static const _ObjectiveCBridgeableWitnessTable *
@@ -1421,7 +1470,7 @@ findBridgeWitness(const Metadata *T) {
   if (T->getKind() == MetadataKind::Struct) {
     auto structDescription = cast<StructMetadata>(T)->Description;
     if (structDescription == &NOMINAL_TYPE_DESCR_SYM(SS)) {
-      static auto *Swift_String_ObjectiveCBridgeable = swift_conformsToObjectiveCBridgeable(T);
+      static auto *Swift_String_ObjectiveCBridgeable = swift_conformsToObjectiveCBridgeableNoCache(T);
       return Swift_String_ObjectiveCBridgeable;
     }
   }

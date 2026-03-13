@@ -86,10 +86,6 @@ public:
   PostfixCompletionCallback(CodeCompletionExpr *CompletionExpr, DeclContext *DC)
       : CompletionExpr(CompletionExpr), DC(DC) {}
 
-  /// Typecheck the code completion expression in isolation, calling
-  /// \c sawSolution for each solution formed.
-  void fallbackTypeCheck(DeclContext *DC) override;
-
   /// Deliver code completion results that were discoverd by \c sawSolution to
   /// \p Consumer.
   /// \param DotLoc If we are completing after a dot, the location of the dot,

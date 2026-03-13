@@ -20,7 +20,7 @@
 #ifndef SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYOBJECTCHECKERUTILS_H
 #define SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYOBJECTCHECKERUTILS_H
 
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "llvm/Support/Compiler.h"
 
 #include "MoveOnlyBorrowToDestructureUtils.h"
@@ -30,7 +30,7 @@ namespace siloptimizer {
 
 class DiagnosticEmitter;
 
-/// Wrapper around CanonicalizeOSSALifetime that we use to specialize its
+/// Wrapper around OSSACanonicalizeOwned that we use to specialize its
 /// interface for our purposes.
 struct OSSACanonicalizer {
   /// A per mark must check, vector of uses that copy propagation says need a
@@ -44,7 +44,7 @@ struct OSSACanonicalizer {
   /// A list of non-consuming boundary uses.
   SmallVector<SILInstruction *, 32> nonConsumingBoundaryUsers;
 
-  CanonicalizeOSSALifetime canonicalizer;
+  OSSACanonicalizeOwned canonicalizer;
 
   OSSACanonicalizer(SILFunction *fn, DominanceInfo *domTree,
                     DeadEndBlocksAnalysis *deadEndBlocksAnalysis,
@@ -62,7 +62,7 @@ struct OSSACanonicalizer {
 
   struct LivenessState {
     OSSACanonicalizer &parent;
-    CanonicalizeOSSALifetime::LivenessState canonicalizerState;
+    OSSACanonicalizeOwned::LivenessState canonicalizerState;
 
     LivenessState(OSSACanonicalizer &parent, SILValue def)
         : parent(parent), canonicalizerState(parent.canonicalizer, def, {}) {}

@@ -19,7 +19,7 @@ protocol CP: class {}
 // CHECK-i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @bitcast_trivial(ptr %0) {{.*}} {
 // CHECK-i386:         [[BUF:%.*]] = alloca ptr, align 4
 // CHECK-i386:         store ptr %0, ptr [[BUF]]
-// CHECK-i386:         [[VALUE_BUF:%.*]] = getelementptr inbounds %TSi, ptr [[BUF]], i32 0, i32 0
+// CHECK-i386:         [[VALUE_BUF:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[BUF]], i32 0, i32 0
 // CHECK-i386:         [[VALUE:%.*]] = load i32, ptr [[VALUE_BUF]], align 4
 // CHECK-i386:         ret i32 [[VALUE]]
 // CHECK-i386:       }
@@ -27,7 +27,7 @@ protocol CP: class {}
 // CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @bitcast_trivial(ptr %0) {{.*}} {
 // CHECK-x86_64:         [[BUF:%.*]] = alloca ptr, align 8
 // CHECK-x86_64:         store ptr %0, ptr [[BUF]]
-// CHECK-x86_64:         [[VALUE_BUF:%.*]] = getelementptr inbounds %TSi, ptr [[BUF]], i32 0, i32 0
+// CHECK-x86_64:         [[VALUE_BUF:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[BUF]], i32 0, i32 0
 // CHECK-x86_64:         [[VALUE:%.*]] = load i64, ptr [[VALUE_BUF]], align 8
 // CHECK-x86_64:         ret i64 [[VALUE]]
 // CHECK-x86_64:       }
@@ -40,11 +40,9 @@ entry(%c : $C):
 
 // CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i8 } @bitcast_trivial_optional(i64 %0, i8 %1) {{.*}} {
 // CHECK-x86_64-NEXT:  entry:
-// CHECK-x86_64-NEXT:   %2 = trunc i8 %1 to i1
-// CHECK-x86_64-NEXT:   %3 = zext i1 %2 to i8
-// CHECK-x86_64-NEXT:   %4 = insertvalue { i64, i8 } undef, i64 %0, 0
-// CHECK-x86_64-NEXT:   %5 = insertvalue { i64, i8 } %4, i8 %3, 1
-// CHECK-x86_64-NEXT:   ret { i64, i8 } %5
+// CHECK-x86_64-NEXT:   %2 = insertvalue { i64, i8 } undef, i64 %0, 0
+// CHECK-x86_64-NEXT:   %3 = insertvalue { i64, i8 } %2, i8 %1, 1
+// CHECK-x86_64-NEXT:   ret { i64, i8 } %3
 
 sil @bitcast_trivial_optional: $@convention(thin) (Optional<Int>) -> Optional<Int> {
 entry(%c : $Optional<Int>):
@@ -90,7 +88,7 @@ bb0(%0 : $Optional<C>):
 //   A bunch of GEPs happen here to get from Int to int.
 // CHECK-x86_64:      store i64 %{{.*}}, ptr %bitcast.elt._value, align 8
 // CHECK-x86_64:      store i64 %{{.*}}, ptr %bitcast.elt1._value, align 8
-// CHECK-x86_64-NEXT: [[VAL:%.*]] = getelementptr inbounds %TSi, ptr %bitcast, i32 0, i32 0
+// CHECK-x86_64-NEXT: [[VAL:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr %bitcast, i32 0, i32 0
 // CHECK-x86_64-NEXT: [[RESULT:%.*]] = load i64, ptr [[VAL]], align 8
 // CHECK-x86_64:      ret i64 [[RESULT]]
 // CHECK-x86_64-NEXT: }

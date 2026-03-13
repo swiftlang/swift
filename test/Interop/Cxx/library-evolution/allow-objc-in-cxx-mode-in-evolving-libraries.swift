@@ -1,8 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend %t/test.swift -I %t/Inputs -typecheck -enable-library-evolution -enable-experimental-cxx-interop -verify
+// RUN: %target-swift-frontend %t/test.swift -I %t/Inputs -typecheck -enable-library-evolution -enable-experimental-cxx-interop -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 //--- Inputs/module.modulemap
 module ObjCxxModule {

@@ -15,12 +15,15 @@
 #include "SourceKit/Support/UIdent.h"
 
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Mutex.h"
+#include "llvm/Support/Path.h"
+
+#include <Block.h>
 #include <chrono>
 #include <xpc/xpc.h>
 #include <dispatch/dispatch.h>
-
-#include <Block.h>
+#include <dlfcn.h>
 
 using namespace SourceKit;
 using namespace sourcekitd;
@@ -285,9 +288,31 @@ static void handleInternalUIDRequest(xpc_object_t XVal,
 
 static void handleInterruptedConnection(xpc_object_t event, xpc_connection_t conn);
 
+extern "C" const char __dso_handle[];
+
 static void initializeXPCClient() {
   assert(!GlobalConn);
-  GlobalConn = xpc_connection_create(SOURCEKIT_XPCSERVICE_IDENTIFIER, nullptr);
+
+  Dl_info dlinfo;
+  dladdr(__dso_handle, &dlinfo);
+
+  // '.../usr/lib/sourcekitd.framework/sourcekitd'
+  llvm::SmallString<128> serviceNamePath(dlinfo.dli_fname);
+  if (serviceNamePath.empty()) {
+    llvm::report_fatal_error("Unable to find service name path");
+  }
+
+  llvm::sys::path::remove_filename(serviceNamePath);
+  // '.../usr/lib/sourcekitd.framework/Resources/xpc_service_name.txt'
+  llvm::sys::path::append(serviceNamePath, "Resources", "xpc_service_name.txt");
+
+  auto bufferOrErr = llvm::MemoryBuffer::getFile(serviceNamePath);
+  if (!bufferOrErr) {
+    llvm::report_fatal_error("Unable to find service name");
+  }
+
+  std::string serviceName = (*bufferOrErr)->getBuffer().trim().str();
+  GlobalConn = xpc_connection_create(serviceName.c_str(), nullptr);
 
   xpc_connection_set_event_handler(GlobalConn, ^(xpc_object_t event) {
     xpc_type_t type = xpc_get_type(event);
@@ -390,7 +415,9 @@ void sourcekitd_register_plugin_path(const char *clientPlugin,
 }
 
 static xpc_connection_t getGlobalConnection() {
-  assert(GlobalConn);
+  if (!GlobalConn) {
+    llvm::report_fatal_error("Service is invalid");
+  }
   return GlobalConn;
 }
 

@@ -257,11 +257,10 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
 
     ASSERT(rule.getLHS().back().getKind() != Symbol::Kind::Protocol);
 
-    if (constraintTerm.back().getKind() == Symbol::Kind::Shape) {
-      ASSERT(rule.getRHS().back().getKind() == Symbol::Kind::Shape);
+    if (constraintTerm.hasShape()) {
+      ASSERT(rule.getRHS().hasShape());
       // Strip off the shape symbol from the constraint term.
-      constraintTerm = MutableTerm(constraintTerm.begin(),
-                                   constraintTerm.end() - 1);
+      constraintTerm.removeShape();
     }
 
     if (constraintTerm.front().getKind() == Symbol::Kind::PackElement) {
@@ -332,10 +331,10 @@ void RequirementBuilder::processConnectedComponents() {
   for (auto &pair : Components) {
     MutableTerm subjectTerm(pair.first);
     RequirementKind kind;
-    if (subjectTerm.back().getKind() == Symbol::Kind::Shape) {
+    if (subjectTerm.hasShape()) {
       kind = RequirementKind::SameShape;
       // Strip off the shape symbol from the subject term.
-      subjectTerm = MutableTerm(subjectTerm.begin(), subjectTerm.end() - 1);
+      subjectTerm.removeShape();
     } else {
       kind = RequirementKind::SameType;
       if (subjectTerm.front().getKind() == Symbol::Kind::PackElement) {
@@ -395,6 +394,9 @@ RequirementMachine::buildRequirementsFromRules(
     bool reconstituteSugar,
     std::vector<Requirement> &reqs,
     std::vector<ProtocolTypeAlias> &aliases) const {
+  if (Failed)
+    return;
+
   RequirementBuilder builder(System, Map, genericParams, reconstituteSugar);
 
   builder.addRequirementRules(requirementRules);

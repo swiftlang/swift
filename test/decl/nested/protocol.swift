@@ -237,7 +237,7 @@ extension OuterProtocol {
 
 struct ConformsToOuterProtocol : OuterProtocol {
   typealias Hen = Int
-  func f() { let _ = InnerProtocol.self } // expected-error {{use of protocol 'InnerProtocol' as a type must be written 'any InnerProtocol'}}
+  func f() { let _ = InnerProtocol.self } // expected-warning {{use of protocol 'InnerProtocol' as a type must be written 'any InnerProtocol'}}
 }
 
 extension OuterProtocol {
@@ -257,7 +257,7 @@ extension OuterProtocol {
 // 'OtherGenericClass', so the occurrence of 'OtherGenericClass'
 // in 'InnerProtocol' is not "in context" with implicitly
 // inferred generic arguments <T, U>.
-class OtherGenericClass<T, U> { // expected-note {{generic type 'OtherGenericClass' declared here}}
+class OtherGenericClass<T, U> { // expected-note {{generic class 'OtherGenericClass' declared here}}
   protocol InnerProtocol : OtherGenericClass { }
   // expected-error@-1 {{protocol 'InnerProtocol' cannot be nested in a generic context}}
   // expected-error@-2 {{reference to generic type 'OtherGenericClass' requires arguments in <...>}}
@@ -338,7 +338,7 @@ enum SillyRawEnum : SillyProtocol.InnerClass {} // expected-error {{an enum with
 
 protocol SillyProtocol {
   class InnerClass<T> {} // expected-error {{type 'InnerClass' cannot be nested in protocol 'SillyProtocol'}}
-  // expected-note@-1 {{generic type 'InnerClass' declared here}}
+  // expected-note@-1 {{generic class 'InnerClass' declared here}}
 }
 
 protocol SelfDotTest {

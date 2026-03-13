@@ -1,7 +1,9 @@
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -verify-additional-prefix ni-
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault -verify-additional-prefix ni-ns-
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 ////////////////////////
 // MARK: Declarations //
@@ -39,9 +41,11 @@ struct CustomActor {
 @CustomActor func transferToCustomDirect(_ t: NonSendableKlass) async {}
 func useValueIndirect<T>(_ t: T) {}
 func useValueDirect(_ t: NonSendableKlass) {}
+func useValueOpaque(_ t: some OpaqueP) {}
 
 func transferValueDirect(_ x: sending NonSendableKlass) {}
 func transferValueIndirect<T>(_ x: sending T) {}
+func transferValueOpaque(_ t: sending some OpaqueP) {}
 
 func transferResult() -> sending NonSendableKlass { NonSendableKlass() }
 func transferResultWithArg(_ x: NonSendableKlass) -> sending NonSendableKlass { NonSendableKlass() }
@@ -94,6 +98,12 @@ actor MyActor {
   private var ns = NonSendableKlass()
 }
 
+protocol OpaqueP {}
+extension NonSendableKlass: OpaqueP {}
+
+func opaqueSendingResult() -> sending (some OpaqueP) { NonSendableKlass() }
+func opaqueSendingResultAsync() async -> sending (some OpaqueP) { NonSendableKlass() }
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -141,7 +151,8 @@ func transferInAndOut(_ x: sending NonSendableKlass) -> sending NonSendableKlass
 
 func transferReturnArg(_ x: NonSendableKlass) -> sending NonSendableKlass {
   return x // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{task-isolated 'x' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+  // expected-ni-note @-1 {{task-isolated 'x' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+  // expected-ni-ns-note @-2 {{task-isolated 'x' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
 }
 
 // TODO: This will be fixed once I represent @MainActor on func types.
@@ -236,9 +247,10 @@ func asyncLetReabstractionThunkTest() async {
 }
 
 func asyncLetReabstractionThunkTest2() async {
-  // We emit the error here since we are returning a main actor isolated value.
+  // We emit the error here since we are returning a MainActor-isolated value.
   async let newValue: NonSendableKlass = await getMainActorValueAsync()
-  // expected-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to nonisolated context}}
+  // expected-ni-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to nonisolated context}}
+  // expected-ni-ns-warning @-2 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to @concurrent context}}
 
   let _ = await newValue
 
@@ -259,9 +271,10 @@ func asyncLetReabstractionThunkTest2() async {
 }
 
 @MainActor func asyncLetReabstractionThunkTestGlobalActor2() async {
-  // We emit the error here since we are returning a main actor isolated value.
+  // We emit the error here since we are returning a MainActor-isolated value.
   async let newValue: NonSendableKlass = await getMainActorValueAsync()
-  // expected-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to nonisolated context}}
+  // expected-ni-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to nonisolated context}}
+  // expected-ni-ns-warning @-2 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to @concurrent context}}
 
   let _ = await newValue
 
@@ -314,4 +327,42 @@ extension MyActor {
 
     return value
   }
+}
+
+////////////////////////////////
+// MARK: Opaque Results Tests //
+////////////////////////////////
+
+func test_opaque_sending_result_basic() {
+ let x = opaqueSendingResult()
+ let y = opaqueSendingResult()
+
+ sendParameter(x)
+ sendParameter(y)
+}
+
+func test_opaque_sending_result_async() async {
+  let x = await opaqueSendingResultAsync()
+  useValueIndirect(x)
+}
+
+@MainActor
+func test_opaque_sending_result_main_actor() async {
+  let x: some OpaqueP = await opaqueSendingResultAsync()
+  sendParameter(x)
+  // expected-warning @-1 {{sending 'x' risks causing data races}}
+  // expected-note @-2 {{'x' used after being passed as a 'sending' parameter; Later uses could race}}
+  useValueOpaque(x)
+  // expected-note @-1 {{access can happen concurrently}}
+}
+
+func test_opaque_sending_result_async_race_detected() async {
+  let x = await opaqueSendingResultAsync()
+  useValueIndirect(x)
+  sendParameter(x)
+}
+
+struct TestOpaqueSendingSubscript {
+  subscript(i: Int) -> sending some OpaqueP { NonSendableKlass() }
+  subscript(send i: sending Int) -> sending some OpaqueP { NonSendableKlass() }
 }

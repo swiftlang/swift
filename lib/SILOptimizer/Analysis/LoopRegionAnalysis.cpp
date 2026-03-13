@@ -35,15 +35,13 @@ LoopRegion::~LoopRegion() {
 }
 
 LoopRegion::BlockTy *LoopRegion::getBlock() const {
-  return Ptr.get<BlockTy *>();
+  return cast<BlockTy *>(Ptr);
 }
 
-LoopRegion::LoopTy *LoopRegion::getLoop() const {
-  return Ptr.get<LoopTy *>();
-}
+LoopRegion::LoopTy *LoopRegion::getLoop() const { return cast<LoopTy *>(Ptr); }
 
 LoopRegion::FunctionTy *LoopRegion::getFunction() const {
-  return Ptr.get<FunctionTy *>();
+  return cast<FunctionTy *>(Ptr);
 }
 
 void LoopRegion::dump(bool isVerbose) const {

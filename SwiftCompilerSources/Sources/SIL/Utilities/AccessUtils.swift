@@ -55,6 +55,10 @@ public enum AccessBase : CustomStringConvertible, Hashable {
   case stack(AllocStackInst)
   
   /// The address of a global variable.
+  ///
+  /// TODO: make this payload the global address. Make AccessBase.address non-optional. Make AccessBase comparison see
+  /// though things like project_box and global_addr. Then cleanup APIs like LifetimeDependence.Scope that carry extra
+  /// address values around.
   case global(GlobalVariable)
   
   /// The address of a stored property of a class instance.
@@ -85,6 +89,8 @@ public enum AccessBase : CustomStringConvertible, Hashable {
 
   /// The access base is some SIL pattern which does not fit into any other case.
   /// This should be a very rare situation.
+  ///
+  /// TODO: unidentified should preserve its base address value, but AccessBase must be Hashable.
   case unidentified
 
   public init(baseAddress: Value) {
@@ -114,7 +120,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     }
   }
 
-  /// Return 'nil' for global varabiables and unidentified addresses.
+  /// Return 'nil' for global variables and unidentified addresses.
   public var address: Value? {
     switch self {
       case .global, .unidentified: return nil
@@ -217,6 +223,21 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     }
   }
 
+  public var storageIsLexical: Bool {
+    switch self {
+    case .argument(let arg):
+      return arg.isLexical
+    case .stack(let allocStack):
+      return allocStack.isLexical
+    case .global:
+      return true
+    case .box, .class, .tail:
+      return reference!.referenceRoot.isLexical
+    case .yield, .pointer, .index, .storeBorrow, .unidentified:
+      return false
+    }
+  }
+
   /// Returns true if it's guaranteed that this access has the same base address as the `other` access.
   ///
   /// `isEqual` abstracts away the projection instructions that are included as part of the AccessBase:
@@ -302,8 +323,19 @@ public enum AccessBase : CustomStringConvertible, Hashable {
              isDifferentAllocation(rea.instance, otherRea.instance) ||
              hasDifferentType(rea.instance, otherRea.instance)
     case (.tail(let rta), .tail(let otherRta)):
-      return isDifferentAllocation(rta.instance, otherRta.instance) ||
-             hasDifferentType(rta.instance, otherRta.instance)
+      if isDifferentAllocation(rta.instance, otherRta.instance) {
+        return true
+      }
+      if hasDifferentType(rta.instance, otherRta.instance),
+         // In contrast to `ref_element_addr`, tail addresses can also be obtained via a superclass
+         // (in case the derived class doesn't add any stored properties).
+         // Therefore if the instance types differ by sub-superclass relationship, the base is _not_ different.
+         !rta.instance.type.isExactSuperclass(of: otherRta.instance.type),
+         !otherRta.instance.type.isExactSuperclass(of: rta.instance.type)
+      {
+        return true
+      }
+      return false
     case (.argument(let arg), .argument(let otherArg)):
       return (arg.convention.isExclusiveIndirect || otherArg.convention.isExclusiveIndirect) && arg != otherArg
       
@@ -371,6 +403,11 @@ public struct AccessPath : CustomStringConvertible, Hashable {
   public func isEqualOrContains(_ other: AccessPath) -> Bool {
     return getProjection(to: other) != nil
   }
+  
+  /// Returns true if this access contains `other` access and is not equal.
+  public func contains(_ other: AccessPath) -> Bool {
+    return !(getProjection(to: other)?.isEmpty ?? true)
+  }
 
   public var materializableProjectionPath: SmallProjectionPath? {
     if projectionPath.isMaterializable {
@@ -410,7 +447,7 @@ public struct AccessPath : CustomStringConvertible, Hashable {
 
 private func canBeOperandOfIndexAddr(_ value: Value) -> Bool {
   switch value {
-  case is IndexAddrInst, is RefTailAddrInst, is PointerToAddressInst:
+  case is IndexAddrInst, is RefTailAddrInst, is PointerToAddressInst, is VectorBaseAddrInst:
     return true
   default:
     return false
@@ -424,7 +461,7 @@ private func canBeOperandOfIndexAddr(_ value: Value) -> Bool {
 /// %ptr = address_to_pointer %orig_addr
 /// %addr = pointer_to_address %ptr
 /// ```
-private extension PointerToAddressInst {
+public extension PointerToAddressInst {
   var originatingAddress: Value? {
 
     struct Walker : ValueUseDefWalker {
@@ -475,6 +512,49 @@ private extension PointerToAddressInst {
     }
     return nil
   }
+
+  // If this address is the result of a call to unsafe[Mutable]Address, return the 'self' operand of the apply. This
+  // represents the base value into which this address projects.
+  func isResultOfUnsafeAddressor() -> Operand? {
+    if isStrict,
+       let extract = pointer as? StructExtractInst,
+       extract.`struct`.type.isAnyUnsafePointer,
+       let addressorApply = extract.`struct` as? ApplyInst,
+       let addressorFunc = addressorApply.referencedFunction,
+       addressorFunc.isAddressor
+    {
+      let selfArgIdx = addressorFunc.selfArgumentIndex!
+      return addressorApply.argumentOperands[selfArgIdx]
+    }
+    return nil
+  }
+}
+
+/// TODO: migrate AccessBase to use this instead of GlobalVariable because many utilities need to get back to a
+/// representative SIL Value.
+public enum GlobalAccessBase {
+  case global(GlobalAddrInst)
+  case initializer(PointerToAddressInst)
+
+  public init?(address: Value) {
+    switch address {
+    case let ga as GlobalAddrInst:
+      self = .global(ga)
+    case let p2a as PointerToAddressInst where p2a.resultOfGlobalAddressorCall != nil:
+      self = .initializer(p2a)
+    default:
+      return nil
+    }
+  }
+
+  public var address: Value {
+    switch self {
+      case let .global(ga):
+        return ga
+      case let .initializer(p2a):
+        return p2a
+    }
+  }
 }
 
 /// The `EnclosingAccessScope` of an access is the innermost `begin_access`
@@ -501,12 +581,33 @@ public enum EnclosingAccessScope {
   case access(BeginAccessInst)
   case base(AccessBase)
   case dependence(MarkDependenceInst)
+
+  // TODO: make this non-optional after fixing AccessBase.global.
+  public var address: Value? {
+    switch self {
+    case let .access(beginAccess):
+      return beginAccess
+    case let .base(accessBase):
+      return accessBase.address
+    case let .dependence(markDep):
+      return markDep
+    }
+  }
 }
 
 // An AccessBase with the nested enclosing scopes that contain the original address in bottom-up order.
 public struct AccessBaseAndScopes {
   public let base: AccessBase
   public let scopes: SingleInlineArray<EnclosingAccessScope>
+
+  public init(base: AccessBase, scopes: SingleInlineArray<EnclosingAccessScope>) {
+    self.base = base
+    self.scopes = scopes
+  }
+
+  public var enclosingAccess: EnclosingAccessScope {
+    return scopes.first ?? .base(base)
+  }
 
   public var innermostAccess: BeginAccessInst? {
     for scope in scopes {
@@ -515,6 +616,46 @@ public struct AccessBaseAndScopes {
       }
     }
     return nil
+  }
+}
+
+extension AccessBaseAndScopes {
+  // This must return false if a mark_dependence scope is present.
+  public var isOnlyReadAccess: Bool {
+    scopes.allSatisfy(
+      {
+        if case let .access(beginAccess) = $0 {
+          return beginAccess.accessKind == .read
+        }
+        // preserve any dependence scopes.
+        return false
+      })
+  }
+}
+
+extension BeginAccessInst {
+  // Recognize an access scope for a unsafe addressor:
+  // %adr = pointer_to_address
+  // %md = mark_dependence %adr
+  // begin_access [unsafe] %md
+  public var unsafeAddressorSelf: Value? {
+    guard self.isUnsafe else {
+      return nil
+    }
+    switch self.address.enclosingAccessScope {
+    case .access, .base:
+      return nil
+    case let .dependence(markDep):
+      switch markDep.value.enclosingAccessScope {
+      case .access, .dependence:
+        return nil
+      case let .base(accessBase):
+        guard case .pointer = accessBase else {
+          return nil
+        }
+        return markDep.base
+      }
+    }
   }
 }
 
@@ -637,7 +778,7 @@ extension Value {
   // Although an AccessPathWalker is created for each call of these properties,
   // it's very unlikely that this will end up in memory allocations.
   // Only in the rare case of `pointer_to_address` -> `address_to_pointer` pairs, which
-  // go through phi-arguments, the AccessPathWalker will allocate memnory in its cache.
+  // go through phi-arguments, the AccessPathWalker will allocate memory in its cache.
 
   /// Computes the access base of this address value.
   public var accessBase: AccessBase { accessPath.base }
@@ -760,4 +901,126 @@ extension Function {
     }
     return nil
   }
+}
+
+//===--------------------------------------------------------------------===//
+//                              Tests
+//===--------------------------------------------------------------------===//
+
+let getAccessBaseTest = Test("swift_get_access_base") {
+  function, arguments, context in
+  let address = arguments.takeValue()
+  print("Address: \(address)")
+  let base = address.accessBase
+  print("Base: \(base)")
+}
+
+let accessPathTest = Test("access_path") {
+  function, arguments, context in
+  
+  // Prints access path information for memory accesses (`load` and `store`) instructions.
+  // Also verifies that `AccessPath.isDistinct(from:)` is correct.
+
+  print("Accesses for \(function.name)")
+
+  for block in function.blocks {
+    for instr in block.instructions {
+      switch instr {
+      case let st as StoreInst:
+        printAccessInfo(address: st.destination)
+      case let load as LoadInst:
+        printAccessInfo(address: load.address)
+      case let apply as ApplyInst:
+        guard let callee = apply.referencedFunction else {
+          break
+        }
+        if callee.name == "_isDistinct" {
+          checkAliasInfo(forArgumentsOf: apply, expectDistinct: true)
+        } else if callee.name == "_isNotDistinct" {
+          checkAliasInfo(forArgumentsOf: apply, expectDistinct: false)
+        }
+      default:
+        break
+      }
+    }
+  }
+
+  print("End accesses for \(function.name)")
+}
+
+private struct AccessStoragePathVisitor : ValueUseDefWalker {
+  var walkUpCache = WalkerCache<Path>()
+  mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
+    print("    Storage: \(value)")
+    print("    Path: \"\(path)\"")
+    return .continueWalk
+  }
+}
+
+private func printAccessInfo(address: Value) {
+  print("Value: \(address)")
+
+  let (ap, scope) = address.accessPathWithScope
+  if let beginAccess = scope {
+    print("  Scope: \(beginAccess)")
+  } else {
+    print("  Scope: base")
+  }
+
+  let constAp = address.constantAccessPath
+  if constAp == ap {
+    print("  Base: \(ap.base)")
+    print("  Path: \"\(ap.projectionPath)\"")
+  } else {
+    print("  nonconst-base: \(ap.base)")
+    print("  nonconst-path: \"\(ap.projectionPath)\"")
+    print("  const-base: \(constAp.base)")
+    print("  const-path: \"\(constAp.projectionPath)\"")
+  }
+
+  var arw = AccessStoragePathVisitor()
+  if !arw.visitAccessStorageRoots(of: ap) {
+    print("   no Storage paths")
+  }
+}
+
+private func checkAliasInfo(forArgumentsOf apply: ApplyInst, expectDistinct: Bool) {
+  let address1 = apply.arguments[0]
+  let address2 = apply.arguments[1]
+
+  checkIsDistinct(path1: address1.accessPath,
+                  path2: address2.accessPath,
+                  expectDistinct: expectDistinct,
+                  instruction: apply)
+
+  if !expectDistinct {
+    // Also check all combinations with the constant variant of access paths.
+    // Note: we can't do that for "isDistinct" because "isDistinct" might be more conservative in one of the variants.
+    checkIsDistinct(path1: address1.constantAccessPath,
+                    path2: address2.constantAccessPath,
+                    expectDistinct: false,
+                    instruction: apply)
+    checkIsDistinct(path1: address1.accessPath,
+                    path2: address2.constantAccessPath,
+                    expectDistinct: false,
+                    instruction: apply)
+    checkIsDistinct(path1: address1.constantAccessPath,
+                    path2: address2.accessPath,
+                    expectDistinct: false,
+                    instruction: apply)
+  }
+}
+
+private func checkIsDistinct(path1: AccessPath, path2: AccessPath, expectDistinct: Bool, instruction: Instruction) {
+  if path1.isDistinct(from: path2) != expectDistinct {
+    print("wrong isDistinct result of \(instruction)")
+  } else if path2.isDistinct(from: path1) != expectDistinct {
+    print("wrong reverse isDistinct result of \(instruction)")
+  } else {
+    return
+  }
+
+  print("in function")
+  print(instruction.parentFunction)
+  fatalError()
 }

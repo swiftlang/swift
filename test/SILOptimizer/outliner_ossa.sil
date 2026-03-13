@@ -16,6 +16,7 @@ import Foundation
 
 struct DataWrapper {
   let data: Data
+  let otherData: Data
 }
 
 sil @getData : $@convention(thin) () -> @owned Data
@@ -198,6 +199,30 @@ bb0(%0: @owned $MyObject):
   %51 = apply %50(%46, %35) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
   destroy_value %46 : $Optional<NSData>
   return %51 : $Optional<NSData>
+}
+
+// Not optimized
+// CHECK-LABEL: sil [Osize] [ossa] @test_struct_guaranteed :
+// CHECK: objc_method
+// CHECK-LABEL: } // end sil function 'test_struct_guaranteed'
+sil [Osize] [ossa] @test_struct_guaranteed : $@convention(thin) (@owned MyObject) -> @owned Optional<NSData> {
+bb0(%0 : @owned $MyObject):
+  %1 = metatype $@objc_metatype MyObject.Type
+  %2 = function_ref @getData : $@convention(thin) () -> @owned Data
+  %3 = apply %2() : $@convention(thin) () -> @owned Data
+  %4 = begin_borrow %3
+  %5 = struct $DataWrapper (%4, %4)
+  %6 = struct_extract %5, #DataWrapper.data
+  %7 = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %8 = apply %7(%6) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %9 = enum $Optional<NSData>, #Optional.some!enumelt, %8
+  end_borrow %4
+  %13 = objc_method %1, #MyObject.take!foreign : (MyObject.Type) -> (Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %14 = apply %13(%9, %1) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  destroy_value %0
+  destroy_value %3
+  destroy_value %9
+  return %14
 }
 
 sil [Osize] [ossa] @test_dont_crash : $@convention(thin) (@owned MyObject) -> () {

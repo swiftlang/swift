@@ -44,8 +44,8 @@ func testCallAsFunction(add: Adder, addTy: Adder.Type) {
 // METATYPE_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   .callAsFunction({#(self): Adder#})[#(x: Int, y: Int) -> Int#];
 // METATYPE_NO_DOT-DAG: Decl[Constructor]/CurrNominal:      .init({#base: Int#})[#Adder#];
 // METATYPE_NO_DOT-DAG: Keyword[self]/CurrNominal:          .self[#Adder.Type#];
-// METATYPE_NO_DOT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: != {#(any Any.Type)?#}[#Bool#];
-// METATYPE_NO_DOT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: == {#(any Any.Type)?#}[#Bool#];
+// METATYPE_NO_DOT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: != {#(any (~Copyable & ~Escapable).Type)?#}[#Bool#];
+// METATYPE_NO_DOT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: == {#(any (~Copyable & ~Escapable).Type)?#}[#Bool#];
 
   let _ = addTy.#^METATYPE_DOT^#;
 // METATYPE_DOT: Begin completions, 3 items

@@ -7,6 +7,7 @@ add_library(swiftStdlibStubs OBJECT
   ThreadLocalStorage.cpp
   MathStubs.cpp
   Unicode/UnicodeData.cpp
+  Unicode/UnicodeEmoji.cpp
   Unicode/UnicodeGrapheme.cpp
   Unicode/UnicodeNormalization.cpp
   Unicode/UnicodeScalarProps.cpp
@@ -57,4 +58,10 @@ if(APPLE)
   set_property(SOURCE SwiftNativeNSXXXBaseARC.m
                APPEND_STRING
                PROPERTY COMPILE_FLAGS "-fobjc-arc")
+endif()
+
+if(NOT BUILD_SHARED_LIBS)
+  install(TARGETS swiftStdlibStubs
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime)
 endif()

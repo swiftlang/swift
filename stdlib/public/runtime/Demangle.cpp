@@ -24,6 +24,12 @@
 #include <objc/runtime.h>
 #endif
 
+#ifdef _WIN32
+// We'll probably want dbghelp.h here
+#else
+#include <cxxabi.h>
+#endif
+
 using namespace swift;
 
 Demangle::NodePointer
@@ -465,6 +471,69 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   return _buildDemanglingForContext(description, demangledGenerics, Dem);
 }
 
+static Demangle::NodePointer
+_replaceGeneralizationArg(Demangle::NodePointer type,
+                          SubstGenericParametersFromMetadata substitutions,
+                          Demangle::Demangler &Dem) {
+  assert(type->getKind() == Node::Kind::Type);
+  auto genericParam = type->getChild(0);
+
+  if (genericParam->getKind() != Node::Kind::DependentGenericParamType)
+    return type;
+
+  auto depth = genericParam->getChild(0)->getIndex();
+  auto index = genericParam->getChild(1)->getIndex();
+
+  auto arg = substitutions.getMetadata(depth, index);
+  assert(arg.isMetadata());
+  return _swift_buildDemanglingForMetadata(arg.getMetadata(), Dem);
+}
+
+static Demangle::NodePointer
+_buildDemanglingForExtendedExistential(const Metadata *type,
+                                       Demangle::Demangler &Dem) {
+  auto ee = cast<ExtendedExistentialTypeMetadata>(type);
+
+  auto demangledExistential = Dem.demangleType(ee->Shape->ExistentialType.get(),
+                                               ResolveToDemanglingForContext(Dem));
+
+  if (!ee->Shape->hasGeneralizationSignature())
+    return demangledExistential;
+
+  SubstGenericParametersFromMetadata substitutions(ee->Shape,
+                                              ee->getGeneralizationArguments());
+
+  // Dig out the requirement list.
+  auto constrainedExistential = demangledExistential->getChild(0);
+  assert(constrainedExistential->getKind() == Node::Kind::ConstrainedExistential);
+  auto reqList = constrainedExistential->getChild(1);
+  assert(reqList->getKind() == Node::Kind::ConstrainedExistentialRequirementList);
+
+  auto newReqList = Dem.createNode(Node::Kind::ConstrainedExistentialRequirementList);
+
+  for (auto req : *reqList) {
+    // Currently, the only requirements that can create generalization arguments
+    // are same types.
+    if (req->getKind() != Node::Kind::DependentGenericSameTypeRequirement) {
+      newReqList->addChild(req, Dem);
+      continue;
+    }
+
+    auto lhs = _replaceGeneralizationArg(req->getChild(0), substitutions, Dem);
+    auto rhs = _replaceGeneralizationArg(req->getChild(1), substitutions, Dem);
+
+    auto newReq = Dem.createNode(Node::Kind::DependentGenericSameTypeRequirement);
+    newReq->addChild(lhs, Dem);
+    newReq->addChild(rhs, Dem);
+
+    newReqList->addChild(newReq, Dem);
+  }
+
+  constrainedExistential->replaceChild(1, newReqList);
+
+  return demangledExistential;
+}
+
 // Build a demangled type tree for a type.
 //
 // FIXME: This should use MetadataReader.h.
@@ -596,13 +665,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     return proto_list;
   }
   case MetadataKind::ExtendedExistential: {
-    // FIXME: Implement this by demangling the extended existential and
-    // substituting the generalization arguments into the demangle tree.
-    // For now, unconditional casts will report '<<< invalid type >>>' when
-    // they fail.
-    // TODO: for clients that need to guarantee round-tripping, demangle
-    // to a SymbolicExtendedExistentialType.
-    return nullptr;
+    return _buildDemanglingForExtendedExistential(type, Dem);
   }
   case MetadataKind::ExistentialMetatype: {
     auto metatype = static_cast<const ExistentialMetatypeMetadata *>(type);
@@ -758,6 +821,12 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
           Dem.createNode(Node::Kind::GlobalActorFunctionType);
       globalActorNode->addChild(globalActorTypeNode, Dem);
       funcNode->addChild(globalActorNode, Dem);
+    } else if (func->getExtendedFlags().isIsolatedAny()) {
+      funcNode->addChild(Dem.createNode(
+          Node::Kind::IsolatedAnyFunctionType), Dem);
+    } else if (func->getExtendedFlags().isNonIsolatedCaller()) {
+      funcNode->addChild(Dem.createNode(
+        Node::Kind::NonIsolatedCallerFunctionType), Dem);
     }
     switch (func->getDifferentiabilityKind().Value) {
     case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
@@ -970,3 +1039,99 @@ char *swift_demangle(const char *mangledName,
   return outputBuffer;
 #endif
 }
+
+namespace swift {
+  namespace runtime {
+
+    static bool isUTF8CodePointContinuationByte(unsigned char byte) {
+      return (byte & 0b11000000) == 0b10000000;
+    }
+
+    // Demangle entry point for backtrace and public demangle() Swift API.
+    SWIFT_RUNTIME_STDLIB_SPI size_t
+    _swift_runtime_demangle(const char *mangledName,
+                            size_t mangledNameLength,
+                            char *outputBuffer,
+                            size_t *outputBufferSize,
+                            size_t flags) {
+      assert(outputBuffer != nullptr);
+      assert(outputBufferSize != nullptr);
+
+      if (!mangledName || mangledNameLength == 0) {
+        *outputBufferSize = 0;
+        return 0;
+      }
+      if (flags > 0) {
+        *outputBufferSize = 0;
+        return 0; // ignore not supported flags
+      }
+
+      llvm::StringRef name = llvm::StringRef(mangledName, mangledNameLength);
+      if (Demangle::isSwiftSymbol(name)) {
+        // Determine demangling/formatting options:
+        auto options = DemangleOptions();
+
+        auto result = Demangle::demangleSymbolAsString(name, options);
+        size_t toCopy = std::min(*outputBufferSize, result.length());
+
+        // Are we accidentally cutting of an UTF8 codepoint in the middle?
+        // there may be up to 4 continuations of a codepoint so we need to see if we're cutting off in the middle,
+        // and if so, back out until we find the actual non-continuation byte.
+        while (toCopy > 0 &&
+               toCopy < result.length() &&
+               isUTF8CodePointContinuationByte(result.data()[toCopy])) {
+          // we're in the middle of an utf8 scalar, and would overwrite it with a null terminator resulting in a truncated UTF8-scalar.
+          // don't do that, and instead truncate further back
+          toCopy -= 1;
+        }
+
+        ::memcpy(outputBuffer, result.data(), toCopy);
+        *outputBufferSize = toCopy; // indicate how many bytes were written
+
+        // we return the total size of the result, even if we wrote less'
+        // this is how we can detect truncation
+        return result.length();
+      }
+
+      // We could attempt to demangle C++ symbols here, but we choose not to support this in Runtime.demangle(...)
+
+      *outputBufferSize = 0; // indicate we did not write to buffer
+      return 0; // we don't know how many bytes we'd need, the symbol was invalid to begin with
+    }
+
+    SWIFT_RUNTIME_STDLIB_SPI char *
+    _swift_runtime_demangle_allocate(const char *mangledName,
+                                    size_t mangledNameLength,
+                                    size_t *outputSize,
+                                    size_t flags) {
+      if (!mangledName || !outputSize)
+        return nullptr;
+      if (flags > 0)
+        return nullptr; // ignore not supported flags
+
+      llvm::StringRef name = llvm::StringRef(mangledName, mangledNameLength);
+      if (Demangle::isSwiftSymbol(name)) {
+        // Determine demangling/formatting options:
+        auto options = DemangleOptions();
+        auto result = Demangle::demangleSymbolAsString(name, options);
+
+        // we allocate the buffer for the result; truncation cannot happen in this case.
+        auto totalLength = result.length();
+        auto outputBuffer = (char *)::malloc(totalLength);
+        if (!outputBuffer) {
+          // malloc could have failed, let's handle it gracefully
+          *outputSize = 0;
+          return nullptr;
+        }
+
+        ::memcpy(outputBuffer, result.data(), totalLength);
+        *outputSize = totalLength;
+        return outputBuffer;
+      }
+
+      // We could attempt to demangle C++ symbols here, but we choose not to support this in Runtime.demangle(...)
+      return nullptr;
+    }
+
+  } // namespace runtime
+} // namespace swift

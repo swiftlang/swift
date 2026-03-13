@@ -216,7 +216,8 @@ let _ = (returnsIUO as () -> Int)() // expected-error {{cannot convert value of 
 // Make sure we only permit an IUO unwrap on the first application.
 func returnsIUOFn() -> (() -> Int?)! { nil }
 let _: (() -> Int?)? = returnsIUOFn()
-let _: (() -> Int)? = returnsIUOFn() // expected-error {{cannot convert value of type '(() -> Int?)?' to specified type '(() -> Int)?'}}
+let _: (() -> Int)? = returnsIUOFn() // expected-error {{cannot assign value of type '(() -> Int?)?' to type '(() -> Int)?'}}
+// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('() -> Int?' and '() -> Int') are expected to be equal}}
 let _: () -> Int? = returnsIUOFn()
 let _: () -> Int = returnsIUOFn() // expected-error {{cannot convert value of type '(() -> Int?)?' to specified type '() -> Int'}}
 let _: Int? = returnsIUOFn()()

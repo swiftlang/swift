@@ -26,7 +26,7 @@ static StructDecl *getFullyReferenceableStruct(SILType ktypeTy) {
 std::optional<std::pair<TypeOffsetSizePair, SILType>>
 TypeOffsetSizePair::walkOneLevelTowardsChild(
     TypeOffsetSizePair ancestorOffsetSize, SILType ancestorType,
-    SILFunction *fn) const {
+    SILType childType, SILFunction *fn) const {
   assert(ancestorOffsetSize.size >= size &&
          "Too large to be a child of ancestorType");
   assert((ancestorOffsetSize.startOffset <= startOffset &&
@@ -125,6 +125,16 @@ TypeOffsetSizePair::walkOneLevelTowardsChild(
       elementOffset += elementSize;
     }
     llvm_unreachable("Not a child of this enum?!");
+  }
+
+  if (ancestorType.isExistentialType()) {
+    assert(childType);
+    auto childArchetypeType =
+        childType.getASTType()->getAs<ExistentialArchetypeType>();
+    assert(childArchetypeType);
+    assert(childArchetypeType->getExistentialType()->getCanonicalType() ==
+           ancestorType.getASTType());
+    return {{ancestorOffsetSize, childType}};
   }
 
   llvm_unreachable("Hit a leaf type?! Should have handled it earlier");

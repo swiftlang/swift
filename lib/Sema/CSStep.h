@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_CSSTEP_H
 
 #include "swift/AST/Types.h"
+#include "swift/Sema/BindingProducer.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -39,7 +40,7 @@ class SolverStep;
 class ComponentStep;
 
 /// Represents available states which every
-/// given step could be in during it's lifetime.
+/// given step could be in during its lifetime.
 enum class StepState { Setup, Ready, Running, Suspended, Done };
 
 /// Represents result of the step execution,
@@ -407,15 +408,12 @@ private:
       auto &log = getDebugLogger();
       log << "Type variables in scope = "
           << "[";
-      auto typeVars = CS.getTypeVariables();
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
-      interleave(typeVars, [&](TypeVariableType *typeVar) {
-                   Type(typeVar).print(log, PO);
-                 },
-                 [&] {
-                   log << ", ";
-                 });
+      interleave(
+          CS.getTypeVariables(),
+          [&](TypeVariableType *typeVar) {
+            Type(typeVar).print(log, PrintOptions::forDebugging());
+          },
+          [&] { log << ", "; });
       log << "]" << '\n';
     }
 
@@ -458,11 +456,15 @@ public:
       return done(/*isSuccess=*/false);
 
     while (auto choice = Producer()) {
-      if (shouldSkip(*choice))
-        continue;
-
+      // Note: we must check if we need to stop before we check if we need to
+      // skip, because shouldStopAt() needs to consider every index. Otherwise,
+      // if the first element of a partition is skipped, we don't stop, even if
+      // we could.
       if (shouldStopAt(*choice))
         break;
+
+      if (shouldSkip(*choice))
+        continue;
 
       if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
@@ -543,19 +545,20 @@ class TypeVariableStep final : public BindingStep<TypeVarBindingProducer> {
   bool SawFirstLiteralConstraint = false;
 
 public:
-  TypeVariableStep(BindingContainer &bindings,
+  TypeVariableStep(ConstraintSystem &cs,
+                   TypeVariableType *typeVar,
+                   const BindingContainer &bindings,
                    SmallVectorImpl<Solution> &solutions)
-      : BindingStep(bindings.getConstraintSystem(), {bindings}, solutions),
-        TypeVar(bindings.getTypeVariable()) {}
+      : BindingStep(cs, {cs, typeVar, bindings}, solutions),
+        TypeVar(typeVar) {}
 
   void setup() override;
 
   StepResult resume(bool prevFailed) override;
 
   void print(llvm::raw_ostream &Out) override {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    Out << "TypeVariableStep for " << TypeVar->getString(PO) << '\n';
+    Out << "TypeVariableStep for ";
+    Out << TypeVar->getString(PrintOptions::forDebugging()) << '\n';
   }
 
 protected:
@@ -607,13 +610,15 @@ protected:
 
 class DisjunctionStep final : public BindingStep<DisjunctionChoiceProducer> {
   Constraint *Disjunction;
+  SmallVector<Constraint *, 4> DisabledChoices;
+
   std::optional<Score> BestNonGenericScore;
   std::optional<std::pair<Constraint *, Score>> LastSolvedChoice;
 
 public:
   DisjunctionStep(
       ConstraintSystem &cs,
-      std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>> &disjunction,
+      std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>> disjunction,
       SmallVectorImpl<Solution> &solutions)
       : DisjunctionStep(cs, disjunction.first, disjunction.second, solutions) {}
 
@@ -629,6 +634,9 @@ public:
   ~DisjunctionStep() override {
     // Rewind back any changes left after attempting last choice.
     ActiveChoice.reset();
+    // Re-enable previously disabled overload choices.
+    for (auto *choice : DisabledChoices)
+      choice->setEnabled();
   }
 
   StepResult resume(bool prevFailed) override;
@@ -700,6 +708,27 @@ private:
   }
 };
 
+/// Retrieves the DeclContext that a conjunction should be solved within.
+static DeclContext *getDeclContextForConjunction(ConstraintLocator *loc) {  
+  // Closures introduce a new DeclContext that needs switching into.
+  auto anchor = loc->getAnchor();
+  if (loc->directlyAt<ClosureExpr>())
+    return castToExpr<ClosureExpr>(anchor);
+
+  // SingleValueStmtExprs need to switch to their enclosing context. This
+  // is unfortunately necessary since they can be present in single-expression
+  // closures, which don't have their DeclContext established since they're
+  // solved together with the rest of the system.
+  if (loc->isForSingleValueStmtConjunction())
+    return castToExpr<SingleValueStmtExpr>(anchor)->getDeclContext();
+  
+  // Do the same for TapExprs.
+  if (loc->directlyAt<TapExpr>())
+    return castToExpr<TapExpr>(anchor)->getVar()->getDeclContext();
+
+  return nullptr;
+}
+
 class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   /// Snapshot of the constraint system before conjunction.
   class SolverSnapshot {
@@ -724,11 +753,9 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
         : CS(cs), Conjunction(conjunction),
           TypeVars(std::move(cs.TypeVariables)) {
       auto *locator = Conjunction->getLocator();
-      // If this conjunction represents a closure, we need to
-      // switch declaration context over to it.
-      if (locator->directlyAt<ClosureExpr>()) {
-        DC.emplace(CS.DC, castToExpr<ClosureExpr>(locator->getAnchor()));
-      }
+      // If we need to switch into a new DeclContext for the conjunction, do so.
+      if (auto *newDC = getDeclContextForConjunction(locator))
+        DC.emplace(CS.DC, newDC);
 
       auto &CG = CS.getConstraintGraph();
       // Remove all of the current inactive constraints.
@@ -800,8 +827,7 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
 
   /// The number of milliseconds until outer constraint system
   /// is considered "too complex" if timer is enabled.
-  std::optional<std::pair<ExpressionTimer::AnchorType, unsigned>>
-      OuterTimeRemaining = std::nullopt;
+  std::optional<unsigned> OuterTimeRemaining = std::nullopt;
 
   /// Conjunction constraint associated with this step.
   Constraint *Conjunction;
@@ -843,7 +869,7 @@ public:
 
     if (cs.Timer) {
       auto remainingTime = cs.Timer->getRemainingProcessTimeInSeconds();
-      OuterTimeRemaining.emplace(cs.Timer->getAnchor(), remainingTime);
+      OuterTimeRemaining.emplace(remainingTime);
     }
   }
 
@@ -858,11 +884,8 @@ public:
     if (HadFailure)
       restoreBestScore();
 
-    if (OuterTimeRemaining) {
-      auto anchor = OuterTimeRemaining->first;
-      auto remainingTime = OuterTimeRemaining->second;
-      CS.Timer.emplace(anchor, CS, remainingTime);
-    }
+    if (OuterTimeRemaining)
+      CS.Timer.emplace(CS, *OuterTimeRemaining);
   }
 
   StepResult resume(bool prevFailed) override;

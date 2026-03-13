@@ -26,6 +26,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
@@ -120,7 +121,7 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
   auto canType = t.getASTType();
   if (canType->hasTypeParameter()) {
     assert(GenericEnv && "Expected a GenericEnv");
-    canType = GenericEnv->mapTypeIntoContext(canType)->getCanonicalType();
+    canType = GenericEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
   }
 
   if (canType.getAnyGeneric() || t.is<BuiltinFixedArrayType>()) {
@@ -276,7 +277,10 @@ LargeSILTypeMapper::getNewResults(GenericEnvironment *GenericEnv,
     if (modNonFuncTypeResultType(GenericEnv, fnType, Mod, mustTransform)) {
       // Case (2) Above
       SILResultInfo newSILResultInfo(newSILType.getASTType(),
-                                     ResultConvention::Indirect);
+                                     result.getConvention() ==
+                                             ResultConvention::Guaranteed
+                                         ? ResultConvention::GuaranteedAddress
+                                         : ResultConvention::Indirect);
       newResults.push_back(newSILResultInfo);
     } else if (containsDifferentFunctionSignature(GenericEnv, Mod, currResultTy,
                                                   newSILType)) {
@@ -375,12 +379,14 @@ static bool modResultType(SILFunction *F, irgen::IRGenModule &Mod,
 static bool shouldTransformYields(GenericEnvironment *genEnv,
                                   CanSILFunctionType loweredTy,
                                   irgen::IRGenModule &Mod,
-                                  LargeSILTypeMapper &Mapper) {
+                                  LargeSILTypeMapper &Mapper,
+                                  TypeExpansionContext expansion) {
   if (!modifiableFunction(loweredTy)) {
     return false;
   }
   for (auto &yield : loweredTy->getYields()) {
-    auto yieldStorageType = yield.getSILStorageInterfaceType();
+    auto yieldStorageType = yield.getSILStorageType(Mod.getSILModule(),
+                                                    loweredTy, expansion);
     auto newYieldStorageType =
         Mapper.getNewSILType(genEnv, yieldStorageType, Mod);
     if (yieldStorageType != newYieldStorageType)
@@ -394,7 +400,8 @@ static bool modYieldType(SILFunction *F, irgen::IRGenModule &Mod,
   GenericEnvironment *genEnv = getSubstGenericEnvironment(F);
   auto loweredTy = F->getLoweredFunctionType();
 
-  return shouldTransformYields(genEnv, loweredTy, Mod, Mapper);
+  return shouldTransformYields(genEnv, loweredTy, Mod, Mapper,
+                               F->getTypeExpansionContext());
 }
 
 SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
@@ -1420,7 +1427,7 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
   auto canType = resultStorageType.getASTType();
   if (canType->hasTypeParameter()) {
     assert(genEnv && "Expected a GenericEnv");
-    canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
+    canType = genEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
   }
   resultStorageType = SILType::getPrimitiveObjectType(canType);
   auto newResultStorageType =
@@ -1461,7 +1468,8 @@ void LoadableStorageAllocation::convertIndirectFunctionArgs() {
   }
 
   // Convert the result type to indirect if necessary:
-  if (modNonFuncTypeResultType(pass.F, pass.Mod)) {
+  if (modNonFuncTypeResultType(pass.F, pass.Mod) &&
+      !pass.F->getConventionsInContext().hasGuaranteedResult()) {
     insertIndirectReturnArgs();
   }
 }
@@ -1751,9 +1759,8 @@ public:
 
 /// Given that we've allocated space to hold a scalar value, try to rewrite
 /// the uses of the scalar to be uses of the address.
-static void rewriteUsesOfSscalar(StructLoweringState &pass,
-                                 SILValue address, SILValue scalar,
-                                 StoreInst *storeToAddress) {
+static void rewriteUsesOfScalar(StructLoweringState &pass, SILValue address,
+                                SILValue scalar, StoreInst *storeToAddress) {
   // Copy the uses, since we're going to edit them.
   SmallVector<Operand *, 8> uses(scalar->getUses());
   for (Operand *scalarUse : uses) {
@@ -1804,7 +1811,7 @@ static void allocateAndSetForInstResult(StructLoweringState &pass,
   auto store = createStoreInit(pass, II, inst->getLoc(), instResult, alloc);
 
   // Traverse all the uses of instResult - see if we can replace
-  rewriteUsesOfSscalar(pass, alloc, instResult, store);
+  rewriteUsesOfScalar(pass, alloc, instResult, store);
 }
 
 static void allocateAndSetForArgument(StructLoweringState &pass,
@@ -1824,7 +1831,7 @@ static void allocateAndSetForArgument(StructLoweringState &pass,
   auto store = createStoreInit(pass, II, loc, value, alloc);
 
   // Traverse all the uses of value - see if we can replace
-  rewriteUsesOfSscalar(pass, alloc, value, store);
+  rewriteUsesOfScalar(pass, alloc, value, store);
 }
 
 static bool allUsesAreReplaceable(StructLoweringState &pass,
@@ -1883,7 +1890,14 @@ void LoadableStorageAllocation::replaceLoad(LoadInst *load) {
 
 static void allocateAndSet(StructLoweringState &pass,
                            LoadableStorageAllocation &allocator,
-                           SILValue operand, SILInstruction *user) {
+                           SILValue operand, SILInstruction *user,
+                           Operand &opd) {
+  if (isa<SILUndef>(operand)) {
+    auto alloc = allocate(pass, operand->getType());
+    opd.set(alloc);
+    return;
+  }
+
   auto inst = operand->getDefiningInstruction();
   if (!inst) {
     allocateAndSetForArgument(pass, cast<SILArgument>(operand), user);
@@ -1904,12 +1918,14 @@ static void allocateAndSetAll(StructLoweringState &pass,
                               LoadableStorageAllocation &allocator,
                               SILInstruction *user,
                               MutableArrayRef<Operand> operands) {
+  PrettyStackTraceSILNode backtrace("Running allocateAndSetAll on ", user);
+
   for (Operand &operand : operands) {
     SILValue value = operand.get();
     SILType silType = value->getType();
     if (pass.isLargeLoadableType(pass.F->getLoweredFunctionType(),
                                  silType)) {
-      allocateAndSet(pass, allocator, value, user);
+      allocateAndSet(pass, allocator, value, user, operand);
     }
   }
 }
@@ -2125,8 +2141,13 @@ static void rewriteFunction(StructLoweringState &pass,
     SILType currSILType = instr->getType();
     SILType newSILType = pass.getNewSILType(pass.F->getLoweredFunctionType(),
                                             currSILType);
-    auto *newInstr = allocBuilder.createAllocStack(instr->getLoc(), newSILType,
-                                                   instr->getVarInfo());
+    auto varInfo = instr->getVarInfo();
+    // Update the debug variable type to match the new SSA type so the
+    // SIL verifier does not see a mismatch between the two.
+    if (varInfo && varInfo->Type)
+      varInfo->Type = newSILType.getObjectType();
+    auto *newInstr =
+        allocBuilder.createAllocStack(instr->getLoc(), newSILType, varInfo);
     instr->replaceAllUsesWith(newInstr);
     instr->getParent()->erase(instr);
   }
@@ -2332,11 +2353,29 @@ static void rewriteFunction(StructLoweringState &pass,
     SILBuilderWithScope retBuilder(instr);
     assert(modNonFuncTypeResultType(pass.F, pass.Mod) &&
            "Expected a regular type");
+
+    auto retOp = instr->getOperand();
+
+    if (pass.F->getConventionsInContext().hasGuaranteedResult()) {
+      auto *load = dyn_cast<LoadInst>(retOp);
+      if (load) {
+        auto loadOperand = load->getOperand();
+        retBuilder.createReturn(regLoc, loadOperand);
+        instr->eraseFromParent();
+
+        // Delete the now-unused load instruction
+        if (load->use_empty()) {
+          load->eraseFromParent();
+        }
+      }
+
+      continue;
+    }
     // Before we return an empty tuple, init return arg:
+    auto storageType = retOp->getType();
     auto *entry = pass.F->getEntryBlock();
     auto *retArg = entry->getArgument(0);
-    auto retOp = instr->getOperand();
-    auto storageType = retOp->getType();
+
     if (storageType.isAddress()) {
       // There *might* be a dealloc_stack that already released this value
       // we should create the copy *before* the epilogue's deallocations
@@ -2414,6 +2453,8 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
 }
 
 void LoadableByAddress::runOnFunction(SILFunction *F) {
+  PrettyStackTraceSILFunction backtrace("Running LoadableByAddress on ", F);
+
   CanSILFunctionType funcType = F->getLoweredFunctionType();
   IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
 
@@ -2545,7 +2586,8 @@ void LoadableByAddress::recreateSingleApply(
   // and pass it as first parameter:
   if ((isa<ApplyInst>(applyInst) || isa<TryApplyInst>(applyInst)) &&
       modNonFuncTypeResultType(genEnv, origSILFunctionType, *currIRMod) &&
-      modifiableApply(applySite, *getIRGenModule())) {
+      modifiableApply(applySite, *getIRGenModule()) &&
+      !origSILFunctionType->hasGuaranteedResult(true)) {
     assert(allApplyRetToAllocMap.find(applyInst) !=
            allApplyRetToAllocMap.end());
     auto newAlloc = allApplyRetToAllocMap.find(applyInst)->second;
@@ -2569,15 +2611,35 @@ void LoadableByAddress::recreateSingleApply(
                                callArgs,
                                castedApply->getApplyOptions());
     castedApply->replaceAllUsesWith(newApply);
+
+    // For guaranteed address results, replace the pre-allocated stack slot
+    // with the returned address
+    if (modNonFuncTypeResultType(genEnv, origSILFunctionType, *currIRMod)) {
+      auto allocIt = allApplyRetToAllocMap.find(applyInst);
+      ASSERT(allocIt != allApplyRetToAllocMap.end());
+
+      if (newSILFunctionType->hasGuaranteedAddressResult()) {
+        // Delete all dealloc_stack instructions for this allocation
+        auto *stackAlloc = cast<AllocStackInst>(allocIt->second);
+        for (auto *use : stackAlloc->getUses()) {
+          if (auto *dealloc = dyn_cast<DeallocStackInst>(use->getUser())) {
+            dealloc->eraseFromParent();
+          }
+        }
+        stackAlloc->replaceAllUsesWith(newApply);
+        stackAlloc->eraseFromParent();
+      }
+    }
+
     break;
   }
   case SILInstructionKind::TryApplyInst: {
     auto *castedApply = cast<TryApplyInst>(applyInst);
     applyBuilder.createTryApply(
-        castedApply->getLoc(), callee,
-        applySite.getSubstitutionMap(), callArgs,
+        castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
         castedApply->getNormalBB(), castedApply->getErrorBB(),
         castedApply->getApplyOptions());
+
     break;
   }
   case SILInstructionKind::BeginApplyInst: {
@@ -2650,6 +2712,7 @@ void LoadableByAddress::recreateSingleApply(
     auto newApply = applyBuilder.createPartialApply(
         castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
         partialApplyConvention, resultIsolation, castedApply->isOnStack());
+    newApply->setStackAllocationIsNested(castedApply->isStackAllocationNested());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }
@@ -3093,10 +3156,15 @@ void LoadableByAddress::run() {
                 builtinInstrs.insert(instr);
                 break;
               }
+              case SILInstructionKind::BranchInst:
               case SILInstructionKind::StructInst:
               case SILInstructionKind::DebugValueInst:
                 break;
               default:
+#ifndef NDEBUG
+                currInstr->dump();
+                currInstr->getFunction()->dump();
+#endif
                 llvm_unreachable("Unhandled use of FunctionRefInst");
               }
             }
@@ -3422,8 +3490,8 @@ private:
   uint16_t numRegisters = 0;
 
 public:
-  static uint16_t MaxNumUses;
-  static uint16_t MaxNumRegisters;
+  static const uint16_t MaxNumUses = 65535;
+  static const uint16_t MaxNumRegisters = 65535;
 
   void addConstructor() {
     sawConstructor = true;
@@ -3484,26 +3552,31 @@ public:
 };
 }
 
-uint16_t Properties::MaxNumUses = 65535;
-uint16_t Properties::MaxNumRegisters = 65535;
-
 namespace {
 class LargeLoadableHeuristic {
   GenericEnvironment *genEnv;
   IRGenModule *irgenModule;
+  SILFunction &fun;
 
   llvm::DenseMap<SILType, Properties> largeTypeProperties;
 
+  /// Cutoff used to determine when to deem a type as large solely on the number
+  /// of registers.
   static const unsigned NumRegistersVeryLargeType = 16;
+  /// Cutoff when we start considering other properties to determine when we
+  /// deem a type as large.
   static const unsigned NumRegistersLargeType = 8;
-  static const unsigned numUsesThreshold = 8;
+  /// Cutoff when we start to deem a type as large based on the number of uses
+  /// (requires the number or registers to be at least 8).
+  static const unsigned NumUsesThreshold = 8;
 
   bool UseAggressiveHeuristic;
 
 public:
    LargeLoadableHeuristic(IRGenModule *irgenModule, GenericEnvironment *genEnv,
+                          SILFunction &f,
                           bool UseAggressiveHeuristic)
-      : genEnv(genEnv), irgenModule(irgenModule),
+      : genEnv(genEnv), irgenModule(irgenModule), fun(f),
       UseAggressiveHeuristic(UseAggressiveHeuristic) {}
 
    void visit(SILInstruction *i);
@@ -3525,7 +3598,7 @@ private:
     auto canType = ty.getASTType();
     if (canType->hasTypeParameter()) {
       assert(genEnv && "Expected a GenericEnv");
-      canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
+      canType = genEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
     }
 
     if (canType.getAnyGeneric() || isa<TupleType>(canType) || ty.is<BuiltinFixedArrayType>()) {
@@ -3537,6 +3610,14 @@ private:
       auto cached = entry.getNumRegisters();
       if (cached)
         return cached;
+
+      // Avoid computing an explosion schema for very large types as this can be
+      // very compile time intensive.
+      if (fun.getTypeProperties(ty).isVeryLargeType()) {
+        entry.setAsVeryLargeType();
+        largeTypeProperties[ty] = entry;
+        return entry.getNumRegisters();
+      }
 
       const TypeInfo &TI = irgenModule->getTypeInfoForLowered(canType);
       auto &nativeSchemaOrigParam = TI.nativeParameterValueSchema(*irgenModule);
@@ -3562,6 +3643,7 @@ void LargeLoadableHeuristic::propagate(PostOrderFunctionInfo &po) {
   for (auto *BB : po.getPostOrder()) {
     for (auto &I : llvm::reverse(*BB)) {
       switch (I.getKind()) {
+      case SILInstructionKind::UncheckedBitwiseCastInst:
       case SILInstructionKind::TupleExtractInst:
       case SILInstructionKind::StructExtractInst: {
         auto &proj = cast<SingleValueInstruction>(I);
@@ -3582,6 +3664,9 @@ void LargeLoadableHeuristic::propagate(PostOrderFunctionInfo &po) {
 }
 
 void LargeLoadableHeuristic::visit(SILArgument *arg) {
+  if (arg->getType().isAddress())
+    return;
+
   auto objType = arg->getType().getObjectType();
   if (numRegisters(objType) < NumRegistersLargeType)
     return;
@@ -3630,6 +3715,8 @@ void LargeLoadableHeuristic::visit(SILInstruction *i) {
   for (const auto &opd : i->getAllOperands()) {
     auto opdTy = opd.get()->getType();
     auto objType = opdTy.getObjectType();
+    bool isAddress = opdTy.isAddress();
+
     auto registerCount = numRegisters(objType);
     if (registerCount < NumRegistersLargeType)
       continue;
@@ -3678,10 +3765,12 @@ void LargeLoadableHeuristic::visit(SILInstruction *i) {
     case SILInstructionKind::PartialApplyInst:
     case SILInstructionKind::TryApplyInst:
     case SILInstructionKind::BeginApplyInst:
-      entry.addFunctionUseOrReturn();
+      if (!isAddress)
+        entry.addFunctionUseOrReturn();
       break;
     default:
-      entry.addUse();
+      if (!isAddress)
+        entry.addUse();
       break;
     }
 
@@ -3697,7 +3786,7 @@ bool LargeLoadableHeuristic::isPotentiallyCArray(SILType ty) {
   auto canType = ty.getASTType();
   if (canType->hasTypeParameter()) {
     assert(genEnv && "Expected a GenericEnv");
-    canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
+    canType = genEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
   }
 
   if (canType.getAnyGeneric() || isa<TupleType>(canType)) {
@@ -3721,7 +3810,7 @@ bool LargeLoadableHeuristic::isLargeLoadableTypeOld(SILType ty) {
   auto canType = ty.getASTType();
   if (canType->hasTypeParameter()) {
     assert(genEnv && "Expected a GenericEnv");
-    canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
+    canType = genEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
   }
 
   if (canType.getAnyGeneric() || isa<TupleType>(canType)) {
@@ -3757,7 +3846,7 @@ bool LargeLoadableHeuristic::isLargeLoadableType(SILType ty) {
   if (regs >= NumRegistersVeryLargeType)
     return true;
 
-  if (entry.numUses() > numUsesThreshold)
+  if (entry.numUses() > NumUsesThreshold)
    return true;
 
   if (entry.hasStore())
@@ -3911,6 +4000,13 @@ void AddressAssignment::finish(DominanceInfo *dominance,
   StackNesting::fixNesting(&currFn);
 }
 
+static bool isSoleUserOf(LoadInst *load, SILInstruction *next) {
+  if (!load->hasOneUse())
+    return false;
+  if(load->getSingleUse()->getUser() != next)
+    return false;
+  return true;
+}
 namespace {
 class AssignAddressToDef : SILInstructionVisitor<AssignAddressToDef> {
   friend SILVisitorBase<AssignAddressToDef>;
@@ -3968,6 +4064,14 @@ protected:
     singleValueInstructionFallback(kp);
   }
 
+  void visitEndCOWMutationInst(EndCOWMutationInst *endCOW) {
+    // This instruction is purely for semantic tracking in SIL.
+    // Simply forward the value and delete the instruction.
+    auto valAddr = assignment.getAddressForValue(endCOW->getOperand());
+    assignment.mapValueToAddress(endCOW, valAddr);
+    assignment.markForDeletion(endCOW);
+  }
+
   void visitMarkDependenceInst(MarkDependenceInst *mark) {
     // This instruction is purely for semantic tracking in SIL.
     // Simply forward the value and delete the instruction.
@@ -4012,6 +4116,14 @@ protected:
   }
 
   void visitLoadInst(LoadInst *load) {
+    // Forward the address of the load if its sole user immediately follows the
+    // load instructions.
+    if (isSoleUserOf(load, &*++load->getIterator())) {
+      assignment.markForDeletion(load);
+      assignment.mapValueToAddress(origValue, load->getOperand());
+      return;
+    }
+
     auto builder = assignment.getBuilder(load->getIterator());
     auto addr = assignment.createAllocStack(load->getType());
 
@@ -4153,9 +4265,9 @@ protected:
         BuiltinValueKind::ZeroInitializer) {
       auto build = assignment.getBuilder(++bi->getIterator());
       auto newAddr = assignment.createAllocStack(bi->getType());
+      build.createZeroInitAddr(bi->getLoc(), newAddr);
       assignment.mapValueToAddress(origValue, newAddr);
-      build.createStore(bi->getLoc(), origValue, newAddr,
-                        StoreOwnershipQualifier::Unqualified);
+      assignment.markForDeletion(bi);
     } else {
       singleValueInstructionFallback(bi);
     }
@@ -4284,6 +4396,17 @@ protected:
                                      LoadOwnershipQualifier::Unqualified);
     auto newVal = builder.createUncheckedTrivialBitCast(bc->getLoc(), loaded,
                                                         bc->getType());
+    bc->replaceAllUsesWith(newVal);
+    assignment.markForDeletion(bc);
+  }
+
+  void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *bc) {
+    auto addr = assignment.getAddressForValue(bc->getOperand());
+    auto builder = assignment.getBuilder(bc->getIterator());
+    auto loaded = builder.createLoad(bc->getLoc(), addr,
+                                     LoadOwnershipQualifier::Unqualified);
+    auto newVal = builder.createUncheckedBitwiseCast(bc->getLoc(), loaded,
+                                                     bc->getType());
     bc->replaceAllUsesWith(newVal);
     assignment.markForDeletion(bc);
   }
@@ -4440,22 +4563,35 @@ protected:
 
   void visitSwitchEnumInst(SwitchEnumInst *sw) {
     auto opdAddr = assignment.getAddressForValue(sw->getOperand());
-    {
+    // UncheckedTakeEnumDataAddr is destructive. If we have a used switch target
+    // block argument we need to provide for a destructible location for the
+    // UncheckedTakeEnumDataAddr.
+    SILValue destructibleAddress;
+    auto initDestructibleAddress = [&] () -> void{
+      if (destructibleAddress)
+        return;
       auto addr = assignment.createAllocStack(sw->getOperand()->getType());
       // UncheckedTakeEnumDataAddr is destructive.
       // So we need to copy to keep the original address location valid.
       auto builder = assignment.getBuilder(sw->getIterator());
       builder.createCopyAddr(sw->getLoc(), opdAddr, addr, IsTake,
                              IsInitialization);
-      opdAddr = addr;
-    }
+      destructibleAddress = addr;
+    };
 
     auto loc = sw->getLoc();
 
     auto rewriteCase = [&](EnumElementDecl *caseDecl, SILBasicBlock *caseBB) {
       // Nothing to do for unused case payloads.
-      if (caseBB->getArguments().size() == 0)
+      if (caseBB->getArguments().size() == 0 ||
+          caseBB->getArguments()[0]->use_empty()) {
+        if (caseBB->getArguments().size()) {
+          assignment.markBlockArgumentForDeletion(caseBB);
+        }
         return;
+      }
+
+      initDestructibleAddress();
 
       assert(caseBB->getArguments().size() == 1);
       SILArgument *caseArg = caseBB->getArgument(0);
@@ -4464,8 +4600,10 @@ protected:
 
       SILBuilder caseBuilder = assignment.getBuilder(caseBB->begin());
       auto *caseAddr =
-        caseBuilder.createUncheckedTakeEnumDataAddr(loc, opdAddr, caseDecl,
-                                                    caseArg->getType().getAddressType());
+        caseBuilder.createUncheckedTakeEnumDataAddr(loc, destructibleAddress,
+                                           caseDecl,
+                                           caseArg->getType().getAddressType());
+
       if (assignment.isLargeLoadableType(caseArg->getType())) {
         assignment.mapValueToAddress(caseArg, caseAddr);
         assignment.markBlockArgumentForDeletion(caseBB);
@@ -4676,7 +4814,7 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
     // copy_addr peepholes
     bool UseAggressiveHeuristic =
       silMod->getOptions().UseAggressiveReg2MemForCodeSize;
-    LargeLoadableHeuristic heuristic(irgenModule, genEnv,
+    LargeLoadableHeuristic heuristic(irgenModule, genEnv, currF,
                                      UseAggressiveHeuristic);
     Peepholes opts(pm, silMod, irgenModule);
     for (SILBasicBlock &BB : currF) {

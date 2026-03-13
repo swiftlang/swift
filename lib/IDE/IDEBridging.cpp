@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -25,13 +25,13 @@ ResolvedLoc::ResolvedLoc(swift::CharSourceRange range,
 
 ResolvedLoc::ResolvedLoc() {}
 
-BridgedResolvedLoc::BridgedResolvedLoc(BridgedCharSourceRange range,
+BridgedResolvedLoc::BridgedResolvedLoc(swift::CharSourceRange range,
                                        BridgedCharSourceRangeVector labelRanges,
                                        unsigned firstTrailingLabel,
                                        LabelRangeType labelType, bool isActive,
                                        ResolvedLocContext context)
     : resolvedLoc(
-          new ResolvedLoc(range.unbridged(), labelRanges.takeUnbridged(),
+          new ResolvedLoc(range, labelRanges.takeUnbridged(),
                           firstTrailingLabel == UINT_MAX
                               ? std::nullopt
                               : std::optional<unsigned>(firstTrailingLabel),

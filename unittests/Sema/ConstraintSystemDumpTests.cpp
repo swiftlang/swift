@@ -12,6 +12,7 @@
 
 #include "SemaFixture.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/TypeVariableType.h"
 
 using namespace swift;
 using namespace swift::unittest;
@@ -33,7 +34,7 @@ TEST_F(SemaTest, DumpConstraintSystemBasic) {
       TupleType::get({Type(t0), Type(t1)}, Context), emptyLoc));
 
   std::string expectedOutput =
-      R"(Score: <default 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>
+      R"(Score: <default 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>
 Type Variables:
   $T0 [can bind to: lvalue] [adjacent to: $T1, $T2] [potential bindings: <none>] @ locator@ []
   $T1 [adjacent to: $T0, $T2] [potential bindings: <none>] @ locator@ []

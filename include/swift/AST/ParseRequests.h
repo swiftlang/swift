@@ -25,6 +25,7 @@
 namespace swift {
 
 struct ASTNode;
+class AvailabilityMacroMap;
 
 /// Report that a request of the given kind is being evaluated, so it
 /// can be recorded by the stats reporter.
@@ -191,6 +192,31 @@ private:
       Evaluator &evaluator, SourceFile *SF, SourceRange conditionRange,
       bool shouldEvaluate) const;
 };
+
+/// Parse the '-define-availability' arguments.
+class AvailabilityMacroArgumentsRequest
+    : public SimpleRequest<AvailabilityMacroArgumentsRequest,
+                           const AvailabilityMacroMap *(ASTContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  const AvailabilityMacroMap *evaluate(Evaluator &evaluator,
+                                       ASTContext *ctx) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+
+  // Source location.
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+};
+
+void simple_display(llvm::raw_ostream &out, const ASTContext *state);
 
 /// The zone number for the parser.
 #define SWIFT_TYPEID_ZONE Parse

@@ -6,10 +6,10 @@
 import _Concurrency
 
 func f() async { } // expected-error{{concurrency is only available in}}
-// expected-note@-1{{add @available}}
+// expected-note@-1{{add '@available'}}
 
 actor A { }  // expected-error{{concurrency is only available in}}
-// expected-note@-1{{add @available}}
+// expected-note@-1{{add '@available'}}
 
 // Allow this without any availability for Historical Reasons.
 public func swift_deletedAsyncMethodError() async {

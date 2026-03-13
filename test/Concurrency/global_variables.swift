@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables -parse-as-library -strict-concurrency=minimal -swift-version 5 %S/Inputs/GlobalVariables.swift
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -swift-version 6 -I %t -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -swift-version 6 -I %t -emit-sil -o /dev/null -verify -verify-ignore-unrelated %s
 
 // REQUIRES: concurrency
 
@@ -8,7 +8,7 @@
 
 @globalActor
 actor TestGlobalActor {
-  static var shared = TestGlobalActor()
+  static let shared = TestGlobalActor()
 }
 
 @TestGlobalActor
@@ -72,6 +72,38 @@ struct TestStatics {
 public actor TestPublicActor {
   nonisolated(unsafe) let immutableNonisolatedUnsafeSendable = TestSendable()
   // expected-warning@-1 {{'(unsafe)' is unnecessary for a constant public actor property with 'Sendable' type 'TestSendable', consider removing it}} {{14-22=}}
+
+  // https://github.com/swiftlang/swift/issues/78435
+  static var actorStatic = 0
+  // expected-error@-1 {{static property 'actorStatic' is not concurrency-safe because it is nonisolated global shared mutable state}}
+  // expected-note@-2{{convert 'actorStatic' to a 'let' constant to make 'Sendable' shared state immutable}}{{10-13=let}}
+  // expected-note@-3{{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}{{3-3=nonisolated(unsafe) }}
+  // expected-note@-4{{add '@MainActor' to make static property 'actorStatic' part of global actor 'MainActor'}}{{3-3=@MainActor }}
+}
+
+enum EnumSpace {
+  static let enumStaticLet = TestSendable()
+
+  static var enumStatic = 0
+  // expected-error@-1 {{static property 'enumStatic' is not concurrency-safe because it is nonisolated global shared mutable state}}
+  // expected-note@-2{{convert 'enumStatic' to a 'let' constant to make 'Sendable' shared state immutable}}{{10-13=let}}
+  // expected-note@-3{{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}{{3-3=nonisolated(unsafe) }}
+  // expected-note@-4{{add '@MainActor' to make static property 'enumStatic' part of global actor 'MainActor'}}{{3-3=@MainActor }}
+}
+
+@TestGlobalActor
+enum IsolatedEnumSpace {
+  static let inferredGlobalActorStaticLet = TestSendable()
+
+  static var inferredGlobalActorStatic = 0
+}
+
+public actor GlobalActorComputed: GlobalActor {
+  static let storage = GlobalActorComputed()
+
+  public static var shared: GlobalActorComputed {
+    Self.storage
+  }
 }
 
 @TestGlobalActor

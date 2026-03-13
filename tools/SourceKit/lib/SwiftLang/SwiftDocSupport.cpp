@@ -186,10 +186,22 @@ public:
     TopEntities.push_back(std::move(Entity));
   }
 
+  bool shouldIgnoreDecl(const Decl *D) {
+    // Parameters are handled specially in addParameters().
+    if (isa<ParamDecl>(D))
+      return true;
+
+    // We only care about API for documentation purposes.
+    if (!ABIRoleInfo(D).providesAPI())
+      return true;
+
+    return false;
+  }
+
   void printDeclPre(const Decl *D,
                     std::optional<BracketOptions> Bracket) override {
-    if (isa<ParamDecl>(D))
-      return; // Parameters are handled specially in addParameters().
+    if (shouldIgnoreDecl(D))
+      return;
     if (!shouldContinuePre(D, Bracket))
       return;
     unsigned StartOffset = OS.tell();
@@ -212,17 +224,13 @@ public:
 
   void printDeclPost(const Decl *D,
                      std::optional<BracketOptions> Bracket) override {
-    if (isa<ParamDecl>(D))
-      return; // Parameters are handled specially in addParameters().
+    if (shouldIgnoreDecl(D))
+      return;
     if (!shouldContinuePost(D, Bracket))
       return;
     assert(!EntitiesStack.empty());
     TextEntity Entity = std::move(EntitiesStack.back());
     EntitiesStack.pop_back();
-
-    // We only care about API for documentation purposes.
-    if (!ABIRoleInfo(D).providesAPI())
-      return;
 
     unsigned EndOffset = OS.tell();
     Entity.Range.Length = EndOffset - Entity.Range.Offset;
@@ -265,8 +273,8 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
     return;
 
   // The declaration may not be generic itself, but instead carry additional
-  // generic requirements in a contextual where clause, so checking !isGeneric()
-  // is insufficient.
+  // generic requirements in a contextual where clause, so checking
+  // !hasGenericParamList() is insufficient.
   const auto ParentSig = GC->getParent()->getGenericSignatureOfContext();
   if (ParentSig && ParentSig->isEqual(GenericSig))
     return;
@@ -308,7 +316,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
   };
 
   // FIXME: Not right for extensions of nested generic types
-  if (GC->isGeneric()) {
+  if (GC->hasGenericParamList()) {
     for (auto *GP : GenericSig.getInnermostGenericParams()) {
       if (GP->getDecl()->isImplicit())
         continue;
@@ -431,7 +439,7 @@ static bool initDocEntityInfo(const Decl *D,
     SwiftLangSupport::printDisplayName(VD, NameOS);
     {
       llvm::raw_svector_ostream OS(Info.USR);
-      SwiftLangSupport::printUSR(VD, OS);
+      SwiftLangSupport::printUSR(VD, OS, /*distinguishSynthesizedDecls*/ true);
       if (SynthesizedTarget) {
         OS << SwiftLangSupport::SynthesizedUSRSeparator;
         SwiftLangSupport::printUSR(SynthesizedTargetNTD, OS);
@@ -451,11 +459,8 @@ static bool initDocEntityInfo(const Decl *D,
   Info.IsUnavailable = D->isUnavailable();
   Info.IsDeprecated = D->isDeprecated();
   Info.IsOptional = D->getAttrs().hasAttribute<OptionalAttr>();
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    Info.IsAsync = AFD->hasAsync();
-  } else if (auto *Storage = dyn_cast<AbstractStorageDecl>(D)) {
-    if (auto *Getter = Storage->getAccessor(AccessorKind::Get))
-      Info.IsAsync = Getter->hasAsync();
+  if (auto *valueDecl = dyn_cast<ValueDecl>(D)) {
+    Info.IsAsync = valueDecl->isAsync();
   }
 
   if (!IsRef) {
@@ -688,8 +693,13 @@ static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
   static UIdent PlatformOSXAppExt("source.availability.platform.osx_app_extension");
   static UIdent PlatformtvOSAppExt("source.availability.platform.tvos_app_extension");
   static UIdent PlatformWatchOSAppExt("source.availability.platform.watchos_app_extension");
+  static UIdent PlatformDriverKit("source.availability.platform.driverkit");
+  static UIdent PlatformSwift("source.availability.platform.swift");
+  static UIdent PlatformAnyAppleOS("source.availability.platform.any_apple_os");
+  static UIdent PlatformFreeBSD("source.availability.platform.freebsd");
   static UIdent PlatformOpenBSD("source.availability.platform.openbsd");
   static UIdent PlatformWindows("source.availability.platform.windows");
+  static UIdent PlatformAndroid("source.availability.platform.android");
   std::vector<SemanticAvailableAttr> Scratch;
 
   for (auto Attr : getAvailableAttrs(D, Scratch)) {
@@ -736,14 +746,29 @@ static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
       // FIXME: Formal platform support in SourceKit is needed.
       PlatformUID = UIdent();
       break;
+    case PlatformKind::DriverKit:
+      PlatformUID = PlatformDriverKit;
+      break;
+    case PlatformKind::Swift:
+      PlatformUID = PlatformSwift;
+      break;
+    case PlatformKind::anyAppleOS:
+      PlatformUID = PlatformAnyAppleOS;
+      break;
     case PlatformKind::OpenBSD:
       PlatformUID = PlatformOpenBSD;
+      break;
+    case PlatformKind::FreeBSD:
+      PlatformUID = PlatformFreeBSD;
       break;
     case PlatformKind::Windows:
       PlatformUID = PlatformWindows;
       break;
+    case PlatformKind::Android:
+      PlatformUID = PlatformAndroid;
+      break;
     }
-    // FIXME: [availability] Handle other availability domains?
+    // FIXME: [availability] Handle non-platform availability domains?
 
     AvailableAttrInfo Info;
     Info.AttrKind = AvailableAttrKind;
@@ -1101,7 +1126,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(OS);
 
-  printModuleInterface(M, std::nullopt, TraversalOptions, Printer, Options,
+  printModuleInterface(M, /*GroupNames*/ {}, TraversalOptions, Printer, Options,
                        true);
 
   Info.Text = std::string(OS.str());
@@ -1206,21 +1231,24 @@ public:
     return true;
   }
 
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type Ty,
                           ReferenceMetaData Data) override {
     if (Data.isImplicit || !Range.isValid())
       return true;
     // Ignore things that don't come from this buffer.
-    if (!SM.getRangeForBuffer(BufferID).contains(Range.getStart()))
+    if (!SM.getRangeForBuffer(BufferID).contains(Range.Start))
       return true;
 
-    unsigned StartOffset = getOffset(Range.getStart());
-    References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
+    CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
+        D->getASTContext().SourceMgr, Range);
+
+    unsigned StartOffset = getOffset(CharRange.getStart());
+    References.emplace_back(D, StartOffset, CharRange.getByteLength(), Ty);
     return true;
   }
 
-  bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+  bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
                                ReferenceMetaData Data,
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally
@@ -1421,7 +1449,8 @@ SwiftLangSupport::findRenameRanges(llvm::MemoryBuffer *InputBuf,
 
 void SwiftLangSupport::findLocalRenameRanges(
     StringRef Filename, unsigned Line, unsigned Column, unsigned Length,
-    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    ArrayRef<const char *> Args, bool CancelOnSubsequentRequest,
+    SourceKitCancellationToken CancellationToken,
     CategorizedRenameRangesReceiver Receiver) {
   using ResultType = CancellableResult<std::vector<CategorizedRenameRanges>>;
   std::string Error;
@@ -1468,9 +1497,9 @@ void SwiftLangSupport::findLocalRenameRanges(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken,
-                                   CancellationToken,
-                                   llvm::vfs::getRealFileSystem());
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invok, ASTConsumer, Once, CancellationToken,
+                                   llvm::vfs::createPhysicalFileSystem());
 }
 
 SourceFile *SwiftLangSupport::getSyntacticSourceFile(

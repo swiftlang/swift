@@ -16,3 +16,12 @@ struct IIOne : IOne {
 struct IIIOne : IIOne {
   int methodIII(void) const { return -111; }
 };
+
+class Base {
+public:
+  bool baseMethod() const { return true; }
+};
+
+namespace Bar {
+class Derived : public Base {};
+} // namespace Bar

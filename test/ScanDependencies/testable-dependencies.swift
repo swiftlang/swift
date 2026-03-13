@@ -50,13 +50,14 @@
 // TEST4:  "swiftPrebuiltExternal": "A"
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps4.json swiftPrebuiltExternal:A directDependencies | %FileCheck %s --check-prefix TEST4-A
 // TEST4-A:  "swift": "B"
+// WARN: warning: module file '{{.*}}{{/|\\}}A.swiftmodule' is incompatible with this Swift compiler: module built without '-enable-testing'
 
 /// Testable import non-testable build enable testing, warning about the finding then error out.
 // RUN: %target-swift-frontend -scan-dependencies -scanner-module-validation -module-load-mode prefer-interface -module-name Test %t/testable.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
-// RUN:   -o %t/deps5.json -I %t/regular -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix WARN --check-prefix ERROR
-// WARN: warning: ignore swiftmodule built without '-enable-testing'
-// ERROR: error: Unable to find module dependency: 'A'
+// RUN:   -o %t/deps5.json -I %t/regular -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix ERROR
+// ERROR: error: unable to resolve Swift module dependency to a compatible module: 'A'
+// ERROR: note: found incompatible module '{{.*}}{{/|\\}}A.swiftmodule': module built without '-enable-testing'
 
 /// Regular import a testable module with no interface, don't load optional dependencies.
 // RUN: rm %t/testable/A.swiftinterface

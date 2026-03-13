@@ -13,4 +13,6 @@
 // CHECK: TestPlugin: main
 // CHECK: TestPlugin: null.empty() -> ()
 
+// REQUIRES: executable_test
+
 func empty() {}

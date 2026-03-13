@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,6 +14,11 @@ import ASTBridging
 import BasicBridging
 import SwiftDiagnostics
 import SwiftSyntax
+
+fileprivate struct PerFrontendDiagnosticState {
+  /// The set of categories that were referenced by a diagnostic.
+  var referencedCategories: Set<DiagnosticCategory> = []
+}
 
 fileprivate func emitDiagnosticParts(
   diagnosticEngine: BridgedDiagnosticEngine,
@@ -28,15 +33,15 @@ fileprivate func emitDiagnosticParts(
   // Map severity
   let bridgedSeverity = severity.bridged
 
-  func bridgedSourceLoc(at position: AbsolutePosition) -> BridgedSourceLoc {
-    return BridgedSourceLoc(at: position.advanced(by: offset), in: sourceFileBuffer)
+  func sourceLoc(at position: AbsolutePosition) -> SourceLoc {
+    return SourceLoc(at: position.advanced(by: offset), in: sourceFileBuffer)
   }
 
   // Emit the diagnostic
   var mutableMessage = message
   let diag = mutableMessage.withBridgedString { bridgedMessage in
     BridgedDiagnostic(
-      at: bridgedSourceLoc(at: position),
+      at: sourceLoc(at: position),
       message: bridgedMessage,
       severity: bridgedSeverity,
       engine: diagnosticEngine
@@ -46,8 +51,8 @@ fileprivate func emitDiagnosticParts(
   // Emit highlights
   for highlight in highlights {
     diag.highlight(
-      start: bridgedSourceLoc(at: highlight.positionAfterSkippingLeadingTrivia),
-      end: bridgedSourceLoc(at: highlight.endPositionBeforeTrailingTrivia)
+      start: sourceLoc(at: highlight.positionAfterSkippingLeadingTrivia),
+      end: sourceLoc(at: highlight.endPositionBeforeTrailingTrivia)
     )
   }
 
@@ -56,8 +61,8 @@ fileprivate func emitDiagnosticParts(
     var newText: String = edit.replacement
     newText.withBridgedString { bridgedMessage in
       diag.fixItReplace(
-        start: bridgedSourceLoc(at: edit.range.lowerBound),
-        end: bridgedSourceLoc(at: edit.range.upperBound),
+        start: sourceLoc(at: edit.range.lowerBound),
+        end: sourceLoc(at: edit.range.upperBound),
         replacement: bridgedMessage
       )
     }
@@ -115,7 +120,7 @@ public func emitDiagnostic(
 }
 
 extension DiagnosticSeverity {
-  public var bridged: BridgedDiagnosticSeverity {
+  public var bridged: swift.DiagnosticKind {
     switch self {
     case .error: return .error
     case .note: return .note
@@ -165,15 +170,16 @@ fileprivate struct SimpleDiagnostic: DiagnosticMessage {
 
   let severity: DiagnosticSeverity
 
+  let category: DiagnosticCategory?
+
   var diagnosticID: MessageID {
     .init(domain: "SwiftCompiler", id: "SimpleDiagnostic")
   }
 }
 
-extension BridgedDiagnosticSeverity {
+extension swift.DiagnosticKind {
   var asSeverity: DiagnosticSeverity {
     switch self {
-    case .fatalError: return .error
     case .error: return .error
     case .warning: return .warning
     case .remark: return .remark
@@ -229,22 +235,37 @@ public func addQueuedSourceFile(
   queuedDiagnostics.pointee.sourceFileIDs[bufferID] = allocatedSourceFileID
 }
 
+private struct BridgedFixItMessage: FixItMessage {
+  var message: String { "" }
+
+  var fixItID: MessageID {
+    .init(domain: "SwiftCompiler", id: "BridgedFixIt")
+  }
+}
+
 /// Add a new diagnostic to the queue.
 @_cdecl("swift_ASTGen_addQueuedDiagnostic")
 public func addQueuedDiagnostic(
   queuedDiagnosticsPtr: UnsafeMutableRawPointer,
-  text: UnsafePointer<UInt8>,
-  textLength: Int,
-  severity: BridgedDiagnosticSeverity,
-  cLoc: BridgedSourceLoc,
-  highlightRangesPtr: UnsafePointer<BridgedSourceLoc>?,
-  numHighlightRanges: Int
+  perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
+  text: BridgedStringRef,
+  severity: swift.DiagnosticKind,
+  loc: SourceLoc,
+  categoryName: BridgedStringRef,
+  documentationPath: BridgedStringRef,
+  highlightRangesPtr: UnsafePointer<CharSourceRange>?,
+  numHighlightRanges: Int,
+  fixItsUntyped: BridgedArrayRef
 ) {
   let queuedDiagnostics = queuedDiagnosticsPtr.assumingMemoryBound(
     to: QueuedDiagnostics.self
   )
 
-  guard let rawPosition = cLoc.getOpaquePointerValue() else {
+  let diagnosticState = perFrontendDiagnosticStatePtr.assumingMemoryBound(
+    to: PerFrontendDiagnosticState.self
+  )
+
+  guard let rawPosition = loc.raw else {
     return
   }
 
@@ -286,15 +307,15 @@ public func addQueuedDiagnostic(
 
   // Map the highlights.
   var highlights: [Syntax] = []
-  let highlightRanges = UnsafeBufferPointer<BridgedSourceLoc>(
+  let highlightRanges = UnsafeBufferPointer<CharSourceRange>(
     start: highlightRangesPtr,
-    count: numHighlightRanges * 2
+    count: numHighlightRanges
   )
   for index in 0..<numHighlightRanges {
+    let range = highlightRanges[index]
+
     // Make sure both the start and the end land within this source file.
-    guard let start = highlightRanges[index * 2].getOpaquePointerValue(),
-      let end = highlightRanges[index * 2 + 1].getOpaquePointerValue()
-    else {
+    guard let start = range.start.raw, let end = range.end.raw else {
       continue
     }
 
@@ -333,18 +354,124 @@ public func addQueuedDiagnostic(
     }
   }
 
-  let textBuffer = UnsafeBufferPointer(start: text, count: textLength)
+  let documentationPath = String(bridged: documentationPath)
+  let documentationURL: String? = if !documentationPath.isEmpty {
+      // If this looks doesn't look like a URL, prepend file://.
+      documentationPath.looksLikeURL ? documentationPath : "file://\(documentationPath)"
+    } else {
+      nil
+    }
+
+  let categoryName = String(bridged: categoryName)
+  // If the data comes from serialized diagnostics, it's possible that
+  // the category name is empty because StringRef() is serialized into
+  // an empty string.
+  let category: DiagnosticCategory? = if !categoryName.isEmpty {
+      DiagnosticCategory(
+        name: categoryName,
+        documentationURL: documentationURL
+      )
+    } else {
+      nil
+    }
+
+  // Note that we referenced this category.
+  if let category {
+    diagnosticState.pointee.referencedCategories.insert(category)
+  }
+
+  // Map the Fix-Its
+  let fixItChanges: [FixIt.Change] = fixItsUntyped.withElements(ofType: BridgedFixIt.self) { fixIts in
+    fixIts.compactMap { fixIt in
+      guard let startPos = sourceFile.position(of: fixIt.replacementRange.start),
+            let endPos = sourceFile.position(of: fixIt.replacementRange.end) else {
+        return nil
+      }
+
+      return FixIt.Change.replaceText(
+        range: startPos..<endPos,
+        with: String(bridged: fixIt.replacementText),
+        in: sourceFile.syntax
+      )
+    }
+  }
+
+  let fixIts: [FixIt] = fixItChanges.isEmpty
+      ? []
+      : [
+          FixIt(
+            message: BridgedFixItMessage(),
+            changes: fixItChanges
+          )
+        ]
+
   let diagnostic = Diagnostic(
     node: node,
     position: position,
     message: SimpleDiagnostic(
-      message: String(decoding: textBuffer, as: UTF8.self),
-      severity: severity.asSeverity
+      message: String(bridged: text),
+      severity: severity.asSeverity,
+      category: category
     ),
-    highlights: highlights
+    highlights: highlights,
+    fixIts: fixIts
   )
 
   queuedDiagnostics.pointee.grouped.addDiagnostic(diagnostic)
+}
+
+/// Render a single diagnostic that has no source location information.
+@_cdecl("swift_ASTGen_renderSingleDiagnostic")
+public func renderSingleDiagnostic(
+  perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
+  text: BridgedStringRef,
+  severity: swift.DiagnosticKind,
+  categoryName: BridgedStringRef,
+  documentationPath: BridgedStringRef,
+  colorize: Int,
+  renderedStringOutPtr: UnsafeMutablePointer<BridgedStringRef>
+) {
+  let diagnosticState = perFrontendDiagnosticStatePtr.assumingMemoryBound(
+    to: PerFrontendDiagnosticState.self
+  )
+
+  let documentationPath = String(bridged: documentationPath)
+  let documentationURL: String? = if !documentationPath.isEmpty {
+      // If this looks doesn't look like a URL, prepend file://.
+      documentationPath.looksLikeURL ? documentationPath : "file://\(documentationPath)"
+    } else {
+      nil
+    }
+
+  let categoryName = String(bridged: categoryName)
+  // If the data comes from serialized diagnostics, it's possible that
+  // the category name is empty because StringRef() is serialized into
+  // an empty string.
+  let category: DiagnosticCategory? = if !categoryName.isEmpty {
+      DiagnosticCategory(
+        name: categoryName,
+        documentationURL: documentationURL
+      )
+    } else {
+      nil
+    }
+
+  // Note that we referenced this category.
+  if let category {
+    diagnosticState.pointee.referencedCategories.insert(category)
+  }
+
+  let formatter = DiagnosticsFormatter(colorize: colorize != 0)
+
+  let renderedStr = formatter.formattedMessage(
+    SimpleDiagnostic(
+      message: String(bridged: text),
+      severity: severity.asSeverity,
+      category: category
+    )
+  )
+
+  renderedStringOutPtr.pointee = allocateBridgedString(renderedStr)
 }
 
 /// Render the queued diagnostics into a UTF-8 string.
@@ -360,4 +487,77 @@ public func renderQueuedDiagnostics(
   let renderedStr = formatter.annotateSources(in: queuedDiagnostics.pointee.grouped)
 
   renderedStringOutPtr.pointee = allocateBridgedString(renderedStr)
+}
+
+extension String {
+  /// Simple check to determine whether the string looks like the start of a
+  /// URL.
+  fileprivate var looksLikeURL: Bool {
+    var sawColon: Bool = false
+    var forwardSlashes: Int = 0
+    for c in self {
+      if c == ":" {
+        sawColon = true
+        continue
+      }
+
+      if c == "/" && sawColon {
+        forwardSlashes += 1
+        if forwardSlashes >= 2 {
+          return true
+        }
+
+        continue
+      }
+
+      if c.isLetter || c.isNumber {
+        forwardSlashes = 0
+        sawColon = false
+        continue
+      }
+
+      return false
+    }
+
+    return false
+  }
+}
+
+@_cdecl("swift_ASTGen_createPerFrontendDiagnosticState")
+public func createPerFrontendDiagnosticState() -> UnsafeMutableRawPointer {
+  let ptr = UnsafeMutablePointer<PerFrontendDiagnosticState>.allocate(capacity: 1)
+  ptr.initialize(to: .init())
+  return UnsafeMutableRawPointer(ptr)
+}
+
+@_cdecl("swift_ASTGen_destroyPerFrontendDiagnosticState")
+public func destroyPerFrontendDiagnosticState(
+  statePtr: UnsafeMutableRawPointer
+) {
+  let state = statePtr.assumingMemoryBound(to: PerFrontendDiagnosticState.self)
+  state.deinitialize(count: 1)
+  state.deallocate()
+}
+
+@_cdecl("swift_ASTGen_renderCategoryFootnotes")
+public func renderCategoryFootnotes(
+  statePtr: UnsafeMutableRawPointer,
+  colorize: Int,
+  renderedStringOutPtr: UnsafeMutablePointer<BridgedStringRef>
+) {
+  let state = statePtr.assumingMemoryBound(to: PerFrontendDiagnosticState.self)
+  let formatter = DiagnosticsFormatter(contextSize: 0, colorize: colorize != 0)
+  var renderedStr = formatter.categoryFootnotes(
+    Array(state.pointee.referencedCategories),
+    leadingText: "\n"
+  )
+
+  if !renderedStr.isEmpty {
+    renderedStr += "\n"
+  }
+
+  renderedStringOutPtr.pointee = allocateBridgedString(renderedStr)
+
+  // Clear out categories so we start fresh.
+  state.pointee.referencedCategories = []
 }

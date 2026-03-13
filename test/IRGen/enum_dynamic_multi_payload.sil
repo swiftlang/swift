@@ -40,21 +40,21 @@ entry(%e : $Either<(), ()>):
   fix_lifetime %e : $Either<(), ()>
 
   // CHECK-NEXT: alloca
-  // CHECK-NEXT: trunc i8 {{.*}} to i1
   // CHECK-NEXT: llvm.lifetime.start
   %s = alloc_stack $Either<(), ()>
 
   %l = enum $Either<(), ()>, #Either.Left!enumelt, undef : $()
-  // CHECK-NEXT: store i1 false
+  // CHECK-NEXT: store i8 0
   store %l to %s : $*Either<(), ()>
   %r = enum $Either<(), ()>, #Either.Right!enumelt, undef : $()
-  // CHECK-NEXT: store i1 true
+  // CHECK-NEXT: store i8 1
+  // CHECK-NEXT: [[COND:%.*]] = icmp ne i8 {{%.*}}, 1
   store %r to %s : $*Either<(), ()>
 
   %a = unchecked_enum_data %l : $Either<(), ()>, #Either.Left!enumelt
   %b = unchecked_enum_data %r : $Either<(), ()>, #Either.Right!enumelt
 
-  // CHECK-NEXT: br i1 {{%.*}}, label %[[RIGHT_PRE:[0-9]+]], label %[[LEFT_PRE:[0-9]+]]
+  // CHECK-NEXT: br i1 [[COND]], label %[[LEFT_PRE:[0-9]+]], label %[[RIGHT_PRE:[0-9]+]]
   // CHECK:      [[LEFT_PRE]]:
   // CHECK:        br label [[LEFT:%[0-9]+]]
   // CHECK:      [[RIGHT_PRE]]:

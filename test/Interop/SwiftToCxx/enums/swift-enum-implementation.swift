@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Enums -clang-header-expose-decls=all-public -emit-clang-header-path %t/enums.h
+// RUN: %target-swift-frontend %s -module-name Enums -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/enums.h
 // RUN: %FileCheck %s < %t/enums.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/enums.h -Wno-unused-private-field -Wno-unused-function -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
-// RUN: %target-swift-frontend %s -typecheck -module-name Enums -enable-experimental-cxx-interop -emit-clang-header-path %t/enums-default.h
+// RUN: %target-swift-frontend %s -module-name Enums -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/enums-default.h
 // RUN: %FileCheck %s < %t/enums-default.h
 
 public enum E {

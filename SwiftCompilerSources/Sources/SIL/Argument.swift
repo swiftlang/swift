@@ -32,11 +32,23 @@ public class Argument : Value, Hashable {
 
   public var isReborrow: Bool { bridged.isReborrow() }
 
+  public func set(reborrow: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.setReborrow(reborrow)
+  }
+
   public var isLexical: Bool { false }
 
-  public var varDecl: VarDecl? { bridged.getVarDecl().getAs(VarDecl.self) }
+  public var decl: ValueDecl? { bridged.getDecl().getAs(ValueDecl.self) }
 
-  public var sourceLoc: SourceLoc? { varDecl?.nameLoc }
+  public func findVarDecl() -> VarDecl? {
+    if let varDecl = decl as? VarDecl {
+      return varDecl
+    }
+    return findVarDeclFromDebugUsers()
+  }
+
+  public var sourceLoc: SourceLoc? { findVarDecl()?.nameLoc }
 
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
@@ -54,6 +66,10 @@ final public class FunctionArgument : Argument {
 
   public override var isLexical: Bool {
     bridged.FunctionArgument_isLexical()
+  }
+
+  public var isClosureCapture: Bool {
+    bridged.FunctionArgument_isClosureCapture()
   }
 
   public var isSelf: Bool {
@@ -78,7 +94,8 @@ final public class FunctionArgument : Argument {
   /// 2. lifetimeAnnotation
   /// 3. closureCapture
   /// 4. parameterPack
-  public func copyFlags(from arg: FunctionArgument) {
+  public func copyFlags(from arg: FunctionArgument, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
     bridged.copyFlags(arg.bridged)
   }
 }
@@ -153,7 +170,7 @@ public struct Phi {
   }
 
   public var incomingValues: LazyMapSequence<LazyMapSequence<PredecessorList, Operand>, Value> {
-    incomingOperands.lazy.map { $0.value }
+    incomingOperands.values
   }
 
   public var isReborrow: Bool { value.isReborrow }
@@ -189,6 +206,22 @@ public struct Phi {
 
   public func hash(into hasher: inout Hasher) {
     value.hash(into: &hasher)
+  }
+}
+
+extension Phi {
+  /// Return true of this phi is directly returned with no side effects between the phi and the return.
+  public var isReturnValue: Bool {
+    if let singleUse = value.uses.singleUse, let ret = singleUse.instruction as? ReturnInstruction,
+       ret.parentBlock == successor {
+      for inst in successor.instructions {
+        if inst.mayHaveSideEffects {
+          return false
+        }
+      }
+      return true
+    }
+    return false
   }
 }
 
@@ -257,43 +290,42 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
   }
 
   public subscript(_ argumentIndex: Int) -> ArgumentConvention {
-    if let paramIdx = parameterIndex(for: argumentIndex) {
+    if let paramIdx = parameterIndex(ofArgumentIndex: argumentIndex) {
       return convention.parameters[paramIdx].convention
     }
-    let resultInfo = convention.indirectSILResults[argumentIndex]
+    let resultInfo = convention.indirectSILResult(at: argumentIndex)
     return ArgumentConvention(result: resultInfo.convention)
   }
 
   public subscript(result argumentIndex: Int) -> ResultInfo? {
-    if parameterIndex(for: argumentIndex) != nil {
+    if parameterIndex(ofArgumentIndex: argumentIndex) != nil {
       return nil
     }
-    return convention.indirectSILResults[argumentIndex]
+    return convention.indirectSILResult(at: argumentIndex)
   }
 
   public subscript(parameter argumentIndex: Int) -> ParameterInfo? {
-    guard let paramIdx = parameterIndex(for: argumentIndex) else {
+    guard let paramIdx = parameterIndex(ofArgumentIndex: argumentIndex) else {
       return nil
     }
     return convention.parameters[paramIdx]
   }
 
   public subscript(parameterDependencies targetArgumentIndex: Int) -> FunctionConvention.LifetimeDependencies? {
-    guard let targetParamIdx = parameterIndex(for: targetArgumentIndex) else {
+    guard let targetParamIdx = parameterIndex(ofArgumentIndex: targetArgumentIndex) else {
       return nil
     }
     return convention.parameterDependencies(for: targetParamIdx)
   }
 
+  /// Return a parameter dependence of the target argument on the source argument.
+  public func parameterDependence(targetArgumentIndex: Int, sourceArgumentIndex: Int) -> LifetimeDependenceConvention? {
+    findDependence(source: sourceArgumentIndex, in: self[parameterDependencies: targetArgumentIndex])
+  }
+
   /// Return a dependence of the function results on the indexed parameter.
   public subscript(resultDependsOn argumentIndex: Int) -> LifetimeDependenceConvention? {
     findDependence(source: argumentIndex, in: convention.resultDependencies)
-  }
-
-  /// Return a dependence of the target argument on the source argument.
-  public func getDependence(target targetArgumentIndex: Int, source sourceArgumentIndex: Int)
-    -> LifetimeDependenceConvention? {
-    findDependence(source: sourceArgumentIndex, in: self[parameterDependencies: targetArgumentIndex])
   }
 
   /// Number of SIL arguments for the function type's results
@@ -332,14 +364,14 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
 }
 
 extension ArgumentConventions {
-  private func parameterIndex(for argIdx: Int) -> Int? {
+  private func parameterIndex(ofArgumentIndex argIdx: Int) -> Int? {
     let firstParamIdx = firstParameterIndex  // bridging call
     return argIdx < firstParamIdx ? nil : argIdx - firstParamIdx
   }
 
   private func findDependence(source argumentIndex: Int, in dependencies: FunctionConvention.LifetimeDependencies?)
     -> LifetimeDependenceConvention? {
-    guard let paramIdx = parameterIndex(for: argumentIndex) else {
+    guard let paramIdx = parameterIndex(ofArgumentIndex: argumentIndex) else {
       return nil
     }
     return dependencies?[paramIdx]
@@ -455,6 +487,8 @@ public enum ArgumentConvention : CustomStringConvertible {
       self = .directUnowned
     case .pack:
       self = .packOut
+    case .guaranteed, .guaranteedAddress, .inout:
+      fatalError("Result conventions @guaranteed, @guaranteed_address and @inout are always returned directly")
     }
   }
 

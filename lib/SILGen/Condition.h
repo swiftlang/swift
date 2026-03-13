@@ -109,7 +109,7 @@ class ConditionalValue {
   std::optional<Scope> scope;
 
   /// A place to hold conditional Initializations of our result.
-  std::unique_ptr<Initialization> currentInitialization;
+  InitializationPtr currentInitialization;
   
 public:
   /// Begins a conditional computation of the type represented by the given

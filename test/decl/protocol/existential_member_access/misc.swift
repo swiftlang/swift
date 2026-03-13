@@ -50,19 +50,6 @@ func bar(a: any HasSameShape) -> (Int, String) {
   a.foo(t: 1, u: "hi")
 }
 
-// Make sure we look through a pack type when evaluating the variance of the result
-struct Variadic<each A> {}
-
-protocol VariadicResult {
-  associatedtype A
-  func foo() -> Variadic<A>
-}
-
-func variadicResult(a: any VariadicResult) {
-  a.foo()
-  // expected-error@-1 {{member 'foo' cannot be used on value of type 'any VariadicResult'; consider using a generic constraint instead}}
-}
-
 // Pack expansions are invariant
 struct Pair<X, Y> {}
 

@@ -112,7 +112,7 @@ class COWArrayOpt {
   bool HasChanged = false;
 
   // Keep track of cold blocks.
-  ColdBlockInfo ColdBlocks;
+  ColdBlockInfo *ColdBlocks;
 
   // Cache of the analysis whether a loop is safe wrt.std::make_unique hoisting by
   // looking at the operations (no uniquely identified objects).
@@ -155,11 +155,10 @@ class COWArrayOpt {
   SILValue CurrentArrayAddr;
 public:
   COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L, DominanceAnalysis *DA,
-              PostDominanceAnalysis *PDA)
+              ColdBlockAnalysis *CBA)
       : RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
         Preheader(L->getLoopPreheader()), DomTree(DA->get(Function)),
-        ColdBlocks(DA, PDA), CachedSafeLoop(false, false), ReachingBlocks(Function) {
-    ColdBlocks.analyze(Function);
+        ColdBlocks(CBA->get(Function)), CachedSafeLoop(false, false), ReachingBlocks(Function) {
   }
 
   bool run();
@@ -321,7 +320,6 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kGetElement:
   case ArrayCallKind::kGetElementAddress:
   case ArrayCallKind::kEndMutation:
-  case ArrayCallKind::kCopyIntoVector:
     return true;
   case ArrayCallKind::kMakeMutable:
   case ArrayCallKind::kMutateUnknown:
@@ -453,7 +451,7 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
         return false;
       }
 
-      SILValue InitArray = StInst->getSrc();
+      SILValue InitArray = lookThroughOwnershipInsts(StInst->getSrc());
       if (isa<SILArgument>(InitArray) || isa<ApplyInst>(InitArray))
         continue;
 
@@ -472,7 +470,7 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
       continue;
     }
 
-    if (isa<MarkDependenceInst>(UseInst)) {
+    if (MarkDependenceInstruction(UseInst)) {
       continue;
     }
 
@@ -570,8 +568,9 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
       continue;
     }
 
-    if (isa<MarkDependenceInst>(UseInst))
+    if (MarkDependenceInstruction(UseInst)) {
       continue;
+    }
 
     if (isa<EndBorrowInst>(UseInst))
       continue;
@@ -639,8 +638,9 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
   //
   // The struct_extract, unchecked_ref_cast is handled below in the
   // "Transitive SafeArrayElementUse" code.
-  if (isa<MarkDependenceInst>(UseInst))
+  if (MarkDependenceInstruction(UseInst)) {
     return true;
+  }
 
   if (isa<EndBorrowInst>(UseInst))
     return true;
@@ -1037,7 +1037,7 @@ bool COWArrayOpt::run() {
   llvm::SmallVector<ArraySemanticsCall, 8> makeMutableCalls;
   
   for (auto *BB : Loop->getBlocks()) {
-    if (ColdBlocks.isCold(BB))
+    if (ColdBlocks->isCold(BB))
       continue;
       
     // Instructions are getting moved around. To not mess with iterator
@@ -1073,7 +1073,7 @@ class COWArrayOptPass : public SILFunctionTransform {
                             << getFunction()->getName() << "\n");
 
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
-    auto *PDA = PM->getAnalysis<PostDominanceAnalysis>();
+    auto *CBA = PM->getAnalysis<ColdBlockAnalysis>();
     auto *LA = PM->getAnalysis<SILLoopAnalysis>();
     auto *RCIA =
       PM->getAnalysis<RCIdentityAnalysis>()->get(getFunction());
@@ -1095,7 +1095,7 @@ class COWArrayOptPass : public SILFunctionTransform {
 
     bool HasChanged = false;
     for (auto *L : Loops)
-      HasChanged |= COWArrayOpt(RCIA, L, DA, PDA).run();
+      HasChanged |= COWArrayOpt(RCIA, L, DA, CBA).run();
 
     if (HasChanged)
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);

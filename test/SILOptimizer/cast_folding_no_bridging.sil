@@ -64,10 +64,8 @@ bb3:
 sil @fail : $@convention(thin) () -> Never
 
 // CHECK-LABEL: sil {{.*}}@testCFToObjC
-// CHECK: bb0(
-// CHECK-NEXT: [[T0:%.*]] = load %1 : $*CFString
-// CHECK-NEXT: [[T1:%.*]] = unchecked_ref_cast [[T0]] : $CFString to $NSString
-// CHECK-NEXT: store [[T1]] to %0 : $*NSString
+// CHECK:         checked_cast_addr_br
+// CHECK:       } // end sil function 'testCFToObjC'
 sil @testCFToObjC : $@convention(thin) (@in CFString) -> @out NSString {
 bb0(%0 : $*NSString, %1 : $*CFString):
   checked_cast_addr_br take_always CFString in %1 : $*CFString to NSString in %0 : $*NSString, bb1, bb2
@@ -83,11 +81,8 @@ bb2:
 }
 
 // CHECK-LABEL: sil {{.*}}@testCFToSwift
-// CHECK: bb0(
-// CHECK-NEXT: [[T0:%.*]] = load %1 : $*CFString
-// CHECK-NEXT: [[T1:%.*]] = unchecked_ref_cast [[T0]] : $CFString to $NSString
-// CHECK:      [[FN:%.*]] = function_ref @$sSS10FoundationE34_conditionallyBridgeFromObjectiveC_6resultSbSo8NSStringC_SSSgztFZ : $@convention(method) (@guaranteed NSString, @inout Optional<String>, @thin String.Type) -> Bool
-// CHECK: apply [[FN]]([[T1]], {{.*}}, {{.*}})
+// CHECK:         checked_cast
+// CHECK:       } // end sil function 'testCFToSwift'
 sil @testCFToSwift : $@convention(thin) (@in CFString) -> @out String {
 bb0(%0 : $*String, %1 : $*CFString):
   checked_cast_addr_br take_always CFString in %1 : $*CFString to String in %0 : $*String, bb1, bb2

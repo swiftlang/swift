@@ -90,7 +90,7 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
                                      operandToStateMap),
         failureCallback(failureCallback) {}
 
-  void handleError(PartitionOpError error) {
+  void handleError(PartitionOpError &&error) {
     switch (error.getKind()) {
     case PartitionOpError::UnknownCodePattern:
     case PartitionOpError::SentNeverSendable:
@@ -98,10 +98,14 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
     case PartitionOpError::InOutSendingNotInitializedAtExit:
     case PartitionOpError::InOutSendingNotDisconnectedAtExit:
     case PartitionOpError::NonSendableIsolationCrossingResult:
+    case PartitionOpError::InOutSendingReturned:
+    case PartitionOpError::InOutSendingParametersInSameRegion:
+    case PartitionOpError::IncompatibleRegionMerge:
       llvm_unreachable("Unsupported");
     case PartitionOpError::LocalUseAfterSend: {
-      auto state = error.getLocalUseAfterSendError();
+      auto state = std::move(error).getLocalUseAfterSendError();
       failureCallback(*state.op, state.sentElement, state.sendingOp);
+      break;
     }
     }
   }
@@ -138,14 +142,17 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
 // actually dereference the instruction, so just use some invalid ptr values so
 // we can compare.
 Operand *operandSingletons[5] = {
-    (Operand *)0xDEAD0000, (Operand *)0xFEAD0000, (Operand *)0xAEDF0000,
-    (Operand *)0xFEDA0000, (Operand *)0xFBDA0000,
+    (Operand *)uintptr_t(0xDEAD0000), (Operand *)uintptr_t(0xFEAD0000),
+    (Operand *)uintptr_t(0xAEDF0000), (Operand *)uintptr_t(0xFEDA0000),
+    (Operand *)uintptr_t(0xFBDA0000),
 };
 
 SILInstruction *instSingletons[5] = {
-    (SILInstruction *)0xBEAD0000, (SILInstruction *)0xBEAD0000,
-    (SILInstruction *)0xBEDF0000, (SILInstruction *)0xBEDA0000,
-    (SILInstruction *)0xBBDA0000,
+    (SILInstruction *)uintptr_t(0xBEAD0000),
+    (SILInstruction *)uintptr_t(0xBEAD0000),
+    (SILInstruction *)uintptr_t(0xBEDF0000),
+    (SILInstruction *)uintptr_t(0xBEDA0000),
+    (SILInstruction *)uintptr_t(0xBBDA0000),
 };
 
 SILLocation fakeLoc = SILLocation::invalid();
@@ -253,22 +260,33 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
     expect_join_eq();
   };
 
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(1), Element(2)));
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(7), Element(8)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(2), Element(7)));
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(1), Element(3)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(3), Element(4)));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(1), Element(2), RegionMergeReason::Unknown));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(7), Element(8), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(2), Element(7), RegionMergeReason::Unknown));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(1), Element(3), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(3), Element(4), RegionMergeReason::Unknown));
 
   EXPECT_FALSE(Partition::equals(p1, p2));
   EXPECT_FALSE(Partition::equals(p2, p3));
   EXPECT_FALSE(Partition::equals(p1, p3));
 
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(2), Element(5)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(5), Element(6)));
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(1), Element(6)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(2), Element(6)));
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(3), Element(7)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(7), Element(8)));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(2), Element(5), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(5), Element(6), RegionMergeReason::Unknown));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(1), Element(6), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(2), Element(6), RegionMergeReason::Unknown));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(3), Element(7), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(7), Element(8), RegionMergeReason::Unknown));
 }
 
 TEST(PartitionUtilsTest, Join1) {
@@ -284,24 +302,24 @@ TEST(PartitionUtilsTest, Join1) {
 
   {
     MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
-    eval.apply({PartitionOp::Assign(Element(0), Element(0)),
-                PartitionOp::Assign(Element(1), Element(0)),
-                PartitionOp::Assign(Element(2), Element(2)),
-                PartitionOp::Assign(Element(3), Element(3)),
-                PartitionOp::Assign(Element(4), Element(3)),
-                PartitionOp::Assign(Element(5), Element(2))});
+    eval.apply({PartitionOp::AssignDirect(Element(0), Element(0)),
+                PartitionOp::AssignDirect(Element(1), Element(0)),
+                PartitionOp::AssignDirect(Element(2), Element(2)),
+                PartitionOp::AssignDirect(Element(3), Element(3)),
+                PartitionOp::AssignDirect(Element(4), Element(3)),
+                PartitionOp::AssignDirect(Element(5), Element(2))});
   }
 
   Partition p2 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data1),
                                             historyFactory.get());
   {
     MockedPartitionOpEvaluator eval(p2, factory, transferringOpToStateMap);
-    eval.apply({PartitionOp::Assign(Element(0), Element(0)),
-                PartitionOp::Assign(Element(1), Element(0)),
-                PartitionOp::Assign(Element(2), Element(2)),
-                PartitionOp::Assign(Element(3), Element(3)),
-                PartitionOp::Assign(Element(4), Element(3)),
-                PartitionOp::Assign(Element(5), Element(5))});
+    eval.apply({PartitionOp::AssignDirect(Element(0), Element(0)),
+                PartitionOp::AssignDirect(Element(1), Element(0)),
+                PartitionOp::AssignDirect(Element(2), Element(2)),
+                PartitionOp::AssignDirect(Element(3), Element(3)),
+                PartitionOp::AssignDirect(Element(4), Element(3)),
+                PartitionOp::AssignDirect(Element(5), Element(5))});
   }
 
   auto result = Partition::join(p1, p2);
@@ -327,12 +345,12 @@ TEST(PartitionUtilsTest, Join2) {
 
   {
     MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
-    eval.apply({PartitionOp::Assign(Element(0), Element(0)),
-                PartitionOp::Assign(Element(1), Element(0)),
-                PartitionOp::Assign(Element(2), Element(2)),
-                PartitionOp::Assign(Element(3), Element(3)),
-                PartitionOp::Assign(Element(4), Element(3)),
-                PartitionOp::Assign(Element(5), Element(2))});
+    eval.apply({PartitionOp::AssignDirect(Element(0), Element(0)),
+                PartitionOp::AssignDirect(Element(1), Element(0)),
+                PartitionOp::AssignDirect(Element(2), Element(2)),
+                PartitionOp::AssignDirect(Element(3), Element(3)),
+                PartitionOp::AssignDirect(Element(4), Element(3)),
+                PartitionOp::AssignDirect(Element(5), Element(2))});
   }
 
   Element data2[] = {Element(4), Element(5), Element(6),
@@ -341,12 +359,12 @@ TEST(PartitionUtilsTest, Join2) {
                                             historyFactory.get());
   {
     MockedPartitionOpEvaluator eval(p2, factory, transferringOpToStateMap);
-    eval.apply({PartitionOp::Assign(Element(4), Element(4)),
-                PartitionOp::Assign(Element(5), Element(5)),
-                PartitionOp::Assign(Element(6), Element(4)),
-                PartitionOp::Assign(Element(7), Element(7)),
-                PartitionOp::Assign(Element(8), Element(7)),
-                PartitionOp::Assign(Element(9), Element(4))});
+    eval.apply({PartitionOp::AssignDirect(Element(4), Element(4)),
+                PartitionOp::AssignDirect(Element(5), Element(5)),
+                PartitionOp::AssignDirect(Element(6), Element(4)),
+                PartitionOp::AssignDirect(Element(7), Element(7)),
+                PartitionOp::AssignDirect(Element(8), Element(7)),
+                PartitionOp::AssignDirect(Element(9), Element(4))});
   }
 
   auto result = Partition::join(p1, p2);
@@ -376,12 +394,12 @@ TEST(PartitionUtilsTest, Join2Reversed) {
 
   {
     MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
-    eval.apply({PartitionOp::Assign(Element(0), Element(0)),
-                PartitionOp::Assign(Element(1), Element(0)),
-                PartitionOp::Assign(Element(2), Element(2)),
-                PartitionOp::Assign(Element(3), Element(3)),
-                PartitionOp::Assign(Element(4), Element(3)),
-                PartitionOp::Assign(Element(5), Element(2))});
+    eval.apply({PartitionOp::AssignDirect(Element(0), Element(0)),
+                PartitionOp::AssignDirect(Element(1), Element(0)),
+                PartitionOp::AssignDirect(Element(2), Element(2)),
+                PartitionOp::AssignDirect(Element(3), Element(3)),
+                PartitionOp::AssignDirect(Element(4), Element(3)),
+                PartitionOp::AssignDirect(Element(5), Element(2))});
   }
 
   Element data2[] = {Element(4), Element(5), Element(6),
@@ -390,12 +408,12 @@ TEST(PartitionUtilsTest, Join2Reversed) {
                                             historyFactory.get());
   {
     MockedPartitionOpEvaluator eval(p2, factory, transferringOpToStateMap);
-    eval.apply({PartitionOp::Assign(Element(4), Element(4)),
-                PartitionOp::Assign(Element(5), Element(5)),
-                PartitionOp::Assign(Element(6), Element(4)),
-                PartitionOp::Assign(Element(7), Element(7)),
-                PartitionOp::Assign(Element(8), Element(7)),
-                PartitionOp::Assign(Element(9), Element(4))});
+    eval.apply({PartitionOp::AssignDirect(Element(4), Element(4)),
+                PartitionOp::AssignDirect(Element(5), Element(5)),
+                PartitionOp::AssignDirect(Element(6), Element(4)),
+                PartitionOp::AssignDirect(Element(7), Element(7)),
+                PartitionOp::AssignDirect(Element(8), Element(7)),
+                PartitionOp::AssignDirect(Element(9), Element(4))});
   }
 
   auto result = Partition::join(p2, p1);
@@ -429,36 +447,36 @@ TEST(PartitionUtilsTest, JoinLarge) {
                                             historyFactory.get());
   {
     MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
-    eval.apply({PartitionOp::Assign(Element(0), Element(29)),
-                PartitionOp::Assign(Element(1), Element(17)),
-                PartitionOp::Assign(Element(2), Element(0)),
-                PartitionOp::Assign(Element(3), Element(12)),
-                PartitionOp::Assign(Element(4), Element(13)),
-                PartitionOp::Assign(Element(5), Element(9)),
-                PartitionOp::Assign(Element(6), Element(15)),
-                PartitionOp::Assign(Element(7), Element(27)),
-                PartitionOp::Assign(Element(8), Element(3)),
-                PartitionOp::Assign(Element(9), Element(3)),
-                PartitionOp::Assign(Element(10), Element(3)),
-                PartitionOp::Assign(Element(11), Element(21)),
-                PartitionOp::Assign(Element(12), Element(14)),
-                PartitionOp::Assign(Element(13), Element(25)),
-                PartitionOp::Assign(Element(14), Element(1)),
-                PartitionOp::Assign(Element(15), Element(25)),
-                PartitionOp::Assign(Element(16), Element(12)),
-                PartitionOp::Assign(Element(17), Element(3)),
-                PartitionOp::Assign(Element(18), Element(25)),
-                PartitionOp::Assign(Element(19), Element(13)),
-                PartitionOp::Assign(Element(20), Element(19)),
-                PartitionOp::Assign(Element(21), Element(7)),
-                PartitionOp::Assign(Element(22), Element(19)),
-                PartitionOp::Assign(Element(23), Element(27)),
-                PartitionOp::Assign(Element(24), Element(1)),
-                PartitionOp::Assign(Element(25), Element(9)),
-                PartitionOp::Assign(Element(26), Element(18)),
-                PartitionOp::Assign(Element(27), Element(29)),
-                PartitionOp::Assign(Element(28), Element(28)),
-                PartitionOp::Assign(Element(29), Element(13))});
+    eval.apply({PartitionOp::AssignDirect(Element(0), Element(29)),
+                PartitionOp::AssignDirect(Element(1), Element(17)),
+                PartitionOp::AssignDirect(Element(2), Element(0)),
+                PartitionOp::AssignDirect(Element(3), Element(12)),
+                PartitionOp::AssignDirect(Element(4), Element(13)),
+                PartitionOp::AssignDirect(Element(5), Element(9)),
+                PartitionOp::AssignDirect(Element(6), Element(15)),
+                PartitionOp::AssignDirect(Element(7), Element(27)),
+                PartitionOp::AssignDirect(Element(8), Element(3)),
+                PartitionOp::AssignDirect(Element(9), Element(3)),
+                PartitionOp::AssignDirect(Element(10), Element(3)),
+                PartitionOp::AssignDirect(Element(11), Element(21)),
+                PartitionOp::AssignDirect(Element(12), Element(14)),
+                PartitionOp::AssignDirect(Element(13), Element(25)),
+                PartitionOp::AssignDirect(Element(14), Element(1)),
+                PartitionOp::AssignDirect(Element(15), Element(25)),
+                PartitionOp::AssignDirect(Element(16), Element(12)),
+                PartitionOp::AssignDirect(Element(17), Element(3)),
+                PartitionOp::AssignDirect(Element(18), Element(25)),
+                PartitionOp::AssignDirect(Element(19), Element(13)),
+                PartitionOp::AssignDirect(Element(20), Element(19)),
+                PartitionOp::AssignDirect(Element(21), Element(7)),
+                PartitionOp::AssignDirect(Element(22), Element(19)),
+                PartitionOp::AssignDirect(Element(23), Element(27)),
+                PartitionOp::AssignDirect(Element(24), Element(1)),
+                PartitionOp::AssignDirect(Element(25), Element(9)),
+                PartitionOp::AssignDirect(Element(26), Element(18)),
+                PartitionOp::AssignDirect(Element(27), Element(29)),
+                PartitionOp::AssignDirect(Element(28), Element(28)),
+                PartitionOp::AssignDirect(Element(29), Element(13))});
   }
 
   Element data2[] = {
@@ -472,35 +490,35 @@ TEST(PartitionUtilsTest, JoinLarge) {
                                             historyFactory.get());
   {
     MockedPartitionOpEvaluator eval(p2, factory, transferringOpToStateMap);
-    eval.apply({PartitionOp::Assign(Element(15), Element(31)),
-                PartitionOp::Assign(Element(16), Element(34)),
-                PartitionOp::Assign(Element(17), Element(35)),
-                PartitionOp::Assign(Element(18), Element(41)),
-                PartitionOp::Assign(Element(19), Element(15)),
-                PartitionOp::Assign(Element(20), Element(32)),
-                PartitionOp::Assign(Element(21), Element(17)),
-                PartitionOp::Assign(Element(22), Element(31)),
-                PartitionOp::Assign(Element(23), Element(21)),
-                PartitionOp::Assign(Element(24), Element(33)),
-                PartitionOp::Assign(Element(25), Element(25)),
-                PartitionOp::Assign(Element(26), Element(31)),
-                PartitionOp::Assign(Element(27), Element(16)),
-                PartitionOp::Assign(Element(28), Element(35)),
-                PartitionOp::Assign(Element(29), Element(40)),
-                PartitionOp::Assign(Element(30), Element(33)),
-                PartitionOp::Assign(Element(31), Element(34)),
-                PartitionOp::Assign(Element(32), Element(22)),
-                PartitionOp::Assign(Element(33), Element(42)),
-                PartitionOp::Assign(Element(34), Element(37)),
-                PartitionOp::Assign(Element(35), Element(34)),
-                PartitionOp::Assign(Element(36), Element(18)),
-                PartitionOp::Assign(Element(37), Element(32)),
-                PartitionOp::Assign(Element(38), Element(22)),
-                PartitionOp::Assign(Element(39), Element(44)),
-                PartitionOp::Assign(Element(40), Element(20)),
-                PartitionOp::Assign(Element(41), Element(37)),
-                PartitionOp::Assign(Element(43), Element(29)),
-                PartitionOp::Assign(Element(44), Element(25))});
+    eval.apply({PartitionOp::AssignDirect(Element(15), Element(31)),
+                PartitionOp::AssignDirect(Element(16), Element(34)),
+                PartitionOp::AssignDirect(Element(17), Element(35)),
+                PartitionOp::AssignDirect(Element(18), Element(41)),
+                PartitionOp::AssignDirect(Element(19), Element(15)),
+                PartitionOp::AssignDirect(Element(20), Element(32)),
+                PartitionOp::AssignDirect(Element(21), Element(17)),
+                PartitionOp::AssignDirect(Element(22), Element(31)),
+                PartitionOp::AssignDirect(Element(23), Element(21)),
+                PartitionOp::AssignDirect(Element(24), Element(33)),
+                PartitionOp::AssignDirect(Element(25), Element(25)),
+                PartitionOp::AssignDirect(Element(26), Element(31)),
+                PartitionOp::AssignDirect(Element(27), Element(16)),
+                PartitionOp::AssignDirect(Element(28), Element(35)),
+                PartitionOp::AssignDirect(Element(29), Element(40)),
+                PartitionOp::AssignDirect(Element(30), Element(33)),
+                PartitionOp::AssignDirect(Element(31), Element(34)),
+                PartitionOp::AssignDirect(Element(32), Element(22)),
+                PartitionOp::AssignDirect(Element(33), Element(42)),
+                PartitionOp::AssignDirect(Element(34), Element(37)),
+                PartitionOp::AssignDirect(Element(35), Element(34)),
+                PartitionOp::AssignDirect(Element(36), Element(18)),
+                PartitionOp::AssignDirect(Element(37), Element(32)),
+                PartitionOp::AssignDirect(Element(38), Element(22)),
+                PartitionOp::AssignDirect(Element(39), Element(44)),
+                PartitionOp::AssignDirect(Element(40), Element(20)),
+                PartitionOp::AssignDirect(Element(41), Element(37)),
+                PartitionOp::AssignDirect(Element(43), Element(29)),
+                PartitionOp::AssignDirect(Element(44), Element(25))});
   }
 
   auto result = Partition::join(p1, p2);
@@ -589,9 +607,9 @@ TEST(PartitionUtilsTest, TestAssign) {
   EXPECT_TRUE(Partition::equals(p2, p3));
   EXPECT_TRUE(Partition::equals(p1, p3));
 
-  evalP1.apply(PartitionOp::Assign(Element(0), Element(1)));
-  evalP2.apply(PartitionOp::Assign(Element(1), Element(0)));
-  evalP3.apply(PartitionOp::Assign(Element(2), Element(1)));
+  evalP1.apply(PartitionOp::AssignDirect(Element(0), Element(1)));
+  evalP2.apply(PartitionOp::AssignDirect(Element(1), Element(0)));
+  evalP3.apply(PartitionOp::AssignDirect(Element(2), Element(1)));
 
   // expected: p1: ((0 1) (Element(2)) (Element(3))), p2: ((0 1) (Element(2))
   // (Element(3))), p3: ((Element(0)) (1 2) (Element(3)))
@@ -600,9 +618,9 @@ TEST(PartitionUtilsTest, TestAssign) {
   EXPECT_FALSE(Partition::equals(p2, p3));
   EXPECT_FALSE(Partition::equals(p1, p3));
 
-  evalP1.apply(PartitionOp::Assign(Element(2), Element(0)));
-  evalP2.apply(PartitionOp::Assign(Element(2), Element(1)));
-  evalP3.apply(PartitionOp::Assign(Element(0), Element(2)));
+  evalP1.apply(PartitionOp::AssignDirect(Element(2), Element(0)));
+  evalP2.apply(PartitionOp::AssignDirect(Element(2), Element(1)));
+  evalP3.apply(PartitionOp::AssignDirect(Element(0), Element(2)));
 
   // expected: p1: ((0 1 2) (Element(3))), p2: ((0 1 2) (Element(3))), p3: ((0 1
   // 2) (Element(3)))
@@ -611,9 +629,9 @@ TEST(PartitionUtilsTest, TestAssign) {
   EXPECT_TRUE(Partition::equals(p2, p3));
   EXPECT_TRUE(Partition::equals(p1, p3));
 
-  evalP1.apply(PartitionOp::Assign(Element(0), Element(3)));
-  evalP2.apply(PartitionOp::Assign(Element(1), Element(3)));
-  evalP3.apply(PartitionOp::Assign(Element(2), Element(3)));
+  evalP1.apply(PartitionOp::AssignDirect(Element(0), Element(3)));
+  evalP2.apply(PartitionOp::AssignDirect(Element(1), Element(3)));
+  evalP3.apply(PartitionOp::AssignDirect(Element(2), Element(3)));
 
   // expected: p1: ((1 2) (0 3)), p2: ((0 2) (1 3)), p3: ((0 1) (2 3))
 
@@ -621,9 +639,9 @@ TEST(PartitionUtilsTest, TestAssign) {
   EXPECT_FALSE(Partition::equals(p2, p3));
   EXPECT_FALSE(Partition::equals(p1, p3));
 
-  evalP1.apply(PartitionOp::Assign(Element(1), Element(0)));
-  evalP2.apply(PartitionOp::Assign(Element(2), Element(1)));
-  evalP3.apply(PartitionOp::Assign(Element(0), Element(2)));
+  evalP1.apply(PartitionOp::AssignDirect(Element(1), Element(0)));
+  evalP2.apply(PartitionOp::AssignDirect(Element(2), Element(1)));
+  evalP3.apply(PartitionOp::AssignDirect(Element(0), Element(2)));
 
   // expected: p1: ((Element(2)) (0 1 3)), p2: ((Element(0)) (1 2 3)), p3:
   // ((Element(1)) (0 2 3))
@@ -632,9 +650,9 @@ TEST(PartitionUtilsTest, TestAssign) {
   EXPECT_FALSE(Partition::equals(p2, p3));
   EXPECT_FALSE(Partition::equals(p1, p3));
 
-  evalP1.apply(PartitionOp::Assign(Element(2), Element(3)));
-  evalP2.apply(PartitionOp::Assign(Element(0), Element(3)));
-  evalP3.apply(PartitionOp::Assign(Element(1), Element(3)));
+  evalP1.apply(PartitionOp::AssignDirect(Element(2), Element(3)));
+  evalP2.apply(PartitionOp::AssignDirect(Element(0), Element(3)));
+  evalP3.apply(PartitionOp::AssignDirect(Element(1), Element(3)));
 
   // expected: p1: ((0 1 2 3)), p2: ((0 1 2 3)), p3: ((0 1 2 3))
 
@@ -667,14 +685,14 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
                 PartitionOp::AssignFresh(Element(10)),
                 PartitionOp::AssignFresh(Element(11)),
 
-                PartitionOp::Assign(Element(1), Element(0)),
-                PartitionOp::Assign(Element(2), Element(1)),
+                PartitionOp::AssignDirect(Element(1), Element(0)),
+                PartitionOp::AssignDirect(Element(2), Element(1)),
 
-                PartitionOp::Assign(Element(4), Element(3)),
-                PartitionOp::Assign(Element(5), Element(4)),
+                PartitionOp::AssignDirect(Element(4), Element(3)),
+                PartitionOp::AssignDirect(Element(5), Element(4)),
 
-                PartitionOp::Assign(Element(7), Element(6)),
-                PartitionOp::Assign(Element(9), Element(8)),
+                PartitionOp::AssignDirect(Element(7), Element(6)),
+                PartitionOp::AssignDirect(Element(9), Element(8)),
 
                 // expected: p: ((0 1 2) (3 4 5) (6 7) (8 9) (Element(10))
                 // (Element(11)))
@@ -825,7 +843,7 @@ TEST(PartitionUtilsTest, TestLastEltInTransferredRegion) {
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
                 PartitionOp::Send(Element(0), operandSingletons[0]),
-                PartitionOp::Assign(Element(0), Element(2))});
+                PartitionOp::AssignDirect(Element(0), Element(2))});
   }
   p2.validateRegionToSendingOpMapRegions();
 }
@@ -878,13 +896,13 @@ TEST(PartitionUtilsTest, TestHistory_AssignRegion) {
 
   {
     MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
-    eval.apply({PartitionOp::Assign(Element(1), Element(2))});
+    eval.apply({PartitionOp::AssignDirect(Element(1), Element(2))});
   }
 
   Partition pSnapshot2 = p;
   {
     MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
-    eval.apply({PartitionOp::Assign(Element(0), Element(2))});
+    eval.apply({PartitionOp::AssignDirect(Element(0), Element(2))});
   }
 
   p.popHistory(joinedHistories);
@@ -912,22 +930,23 @@ TEST(PartitionUtilsTest, TestHistory_BuildNewRegionRepIsMergee) {
                 PartitionOp::AssignFresh(Element(3)),
                 PartitionOp::AssignFresh(Element(10)),
                 PartitionOp::AssignFresh(Element(0)),
-                PartitionOp::Assign(Element(3), Element(2)),
-                PartitionOp::Assign(Element(10), Element(2)),
-                PartitionOp::Merge(Element(2), Element(0))});
+                PartitionOp::AssignDirect(Element(3), Element(2)),
+                PartitionOp::AssignDirect(Element(10), Element(2)),
+                PartitionOp::Merge(Element(2), Element(0),
+                                   RegionMergeReason::Unknown)});
   }
 
   Partition pSnapshot = p;
 
   {
     MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
-    eval.apply({PartitionOp::Assign(Element(1), Element(2))});
+    eval.apply({PartitionOp::AssignDirect(Element(1), Element(2))});
   }
 
   Partition pSnapshot2 = p;
   {
     MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
-    eval.apply({PartitionOp::Assign(Element(0), Element(2))});
+    eval.apply({PartitionOp::AssignDirect(Element(0), Element(2))});
   }
 
   // Even though we pushed a new instruction, nothing changed in our region.
