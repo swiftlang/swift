@@ -479,9 +479,7 @@ func _convertConstStringToUTF8PointerArgument<
   ToPointer: _Pointer
 >(_ str: String) -> (_ConvertedObject?, ToPointer) {
   let stringObject = str._guts._object
-  if stringObject.isImmortal &&
-     stringObject.isLarge &&
-     stringObject.isFastZeroTerminated {
+  if stringObject.isLarge && stringObject.isFastZeroTerminated {
     return unsafe (
       stringObject.owner,
       ToPointer(OpaquePointer(UnsafeRawPointer(stringObject.fastUTF8.baseAddress.unsafelyUnwrapped)))
