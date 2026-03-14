@@ -55,7 +55,7 @@ func testGenericInherit() {
 }
 
 
-struct SS<T> : T { } // expected-error{{inheritance from non-protocol type 'T'}}
+struct SS<T> : T { } // expected-error{{non-protocol type 'T' cannot be used in a conformance list}}
 enum SE<T> : T { case X } // expected-error{{raw type 'T' is not expressible by a string, integer, or floating-point literal}} // expected-error {{SE<T>' declares raw type 'T', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error{{RawRepresentable conformance cannot be synthesized because raw type 'T' is not Equatable}} expected-note {{add stubs for conformance}}
 
 // Also need Equatable for init?(RawValue)

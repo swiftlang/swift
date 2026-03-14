@@ -445,9 +445,7 @@ let _: NestedBazEnumGeneric.Baz<Int>?? = .one // ok
 class C {}
 protocol P {}
 
-enum E : C & P {}
-// expected-error@-1 {{inheritance from class-constrained protocol composition type 'C & P'}}
-
+enum E : C & P {} // expected-error {{protocol conformance list cannot contain concrete type 'C'}}
 // https://github.com/apple/swift/issues/53923
 
 enum EnumWithStaticNone1 {
