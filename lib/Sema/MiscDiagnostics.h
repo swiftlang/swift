@@ -187,6 +187,9 @@ namespace swift {
                      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) {
                        return E->getType();
                      });
+
+  /// Diagnose a declaration of typed throws at the given location.
+  void diagnoseUntypedThrows(const DeclContext *dc, SourceLoc throwsLoc);
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

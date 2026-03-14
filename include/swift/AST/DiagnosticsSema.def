@@ -9157,6 +9157,12 @@ GROUPED_WARNING(perf_hint_typealias_uses_existential,ExistentialType,none,
                 "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
                 (const TypeAliasDecl *))
 
+GROUPED_WARNING(perf_hint_untyped_throws, UntypedThrows,
+                none,
+                "untyped throws performs heap allocation on each 'throw'", ())
+NOTE(perf_hint_add_thrown_error_type,none,
+     "consider adding a thrown error type with '(type)'", ())
+
 ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
       "invalid use of @_unsafeSelfDependentResult", ())
 

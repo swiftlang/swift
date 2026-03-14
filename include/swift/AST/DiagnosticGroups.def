@@ -89,10 +89,12 @@ GROUP(StringInterpolationConformance,none,"string-interpolation-conformance")
 GROUP(TemporaryPointers,none,"temporary-pointers")
 GROUP(TrailingClosureMatching,none,"trailing-closure-matching")
 GROUP(UnknownWarningGroup,none,"unknown-warning-group")
+GROUP(UntypedThrows,DefaultIgnoreWarnings,"untyped-throws")
 GROUP(WeakMutability,none,"weak-mutability")
 
 GROUP_LINK(PerformanceHints,ExistentialType)
 GROUP_LINK(PerformanceHints,ReturnTypeImplicitCopy)
+GROUP_LINK(PerformanceHints,UntypedThrows)
 
 GROUP_LINK(RegionIsolation,SendingClosureRisksDataRace)
 GROUP_LINK(RegionIsolation,SendingRisksDataRace)
