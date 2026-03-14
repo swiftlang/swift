@@ -5978,7 +5978,7 @@ if ($Android) {
 
   # Copy static dependencies
   foreach ($Build in $AndroidSDKBuilds) {
-    if (-not $Build.LinkModes.Contains("static")) { continue }
+    if (-not $Build.LinkModes.Contains("static") -or -not $AndroidSDKVersions.Contains("AndroidExperimental")) { continue }
 
     $SwiftResourceDir = "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)"
     Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\libbrotlicommon.a" -Destination "${SwiftResourceDir}\libbrotlicommon.a" | Out-Null
